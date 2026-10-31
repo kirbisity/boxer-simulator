@@ -37,6 +37,7 @@ import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, simplifyTemplate
 import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
+import { buildExoFrame } from './exoview.js';
 import { disposeObject, outlineFor, surface } from './toon.js';
 import { townSquare } from './props/town.js';
 import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
@@ -2008,6 +2009,13 @@ function detailedView(view, fighter, simple) {
   if (dress.armor?.backBox) collar.add(buildBackBox(body, garmentColors));
   if (machine) {
     for (const entry of buildRobotBody(body, dress.armor, view.steelEnv)) {
+      layers.skin.add(entry.object);
+      attachments.push(entry);
+    }
+  }
+  // A powered exoskeleton (a design's `exo`): its frame round the man, on his bones (exoview.js).
+  if (dress.look.exo) {
+    for (const entry of buildExoFrame(body, dress.look.exo, view.steelEnv)) {
       layers.skin.add(entry.object);
       attachments.push(entry);
     }

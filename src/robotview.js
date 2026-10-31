@@ -6,7 +6,10 @@
 // bends or jiggles. An outfit's `armor.robot` asks for it: `metal` (brushed
 // aluminium shells, else painted), `bulk` (plate thickness over the
 // humanoid's), `led` (the face's lights, robotHead); the shells are the armour's
-// `color`, the panels its `mail`, the accent bands its `cloth`.
+// `color`, the panels its `mail`, the accent bands its `cloth`. Two looks for
+// the mini humanoid (Unitree's G1): `bare`, the limbs' links slim and the
+// actuators standing proud of them, as the G1 ships; `plates`, bolt-on armour
+// panels over the chest, shoulders, forearms, thighs and shins (`mail`).
 
 /* global THREE */
 
@@ -30,6 +33,8 @@ export function buildRobotBody(body, armor, envMap) {
   const robot = armor.robot === true ? {} : armor.robot;
   const s = body.heightM / 1.8;
   const k = robot.bulk ?? 1;
+  // A bare frame's links are slimmer than a shelled limb (the joints keep their size).
+  const slim = robot.bare ? 0.66 : 1;
   const L = body.lengths;
   const seg = body.segments;
   const shell = robot.metal
@@ -109,7 +114,8 @@ export function buildRobotBody(body, armor, envMap) {
 
   // A limb: its shell from just past one joint to just short of the next,
   // a seam ring round it, a panel down its front where `front` says.
-  const limb = (group, radius, length, { start, end, taper, front = false, band = false }) => {
+  const limb = (group, fullRadius, length, { start, end, taper, front = false, band = false }) => {
+    const radius = fullRadius * slim;
     tube(group, shell, radius, radius * taper, start, length - end, { sides: 12 });
     ring(group, joint, radius * (1 - (1 - taper) * 0.42) + 0.002 * s, 0.004 * s, start + (length - end - start) * 0.42);
     if (front) box(group, panel, [0.01 * s, (length - end - start) * 0.5, radius * 1.1], [radius * 0.98, start + (length - end - start) * 0.45, 0]);
@@ -150,6 +156,24 @@ export function buildRobotBody(body, armor, envMap) {
     // The ankle: two slim linkages down to the foot.
     for (const offset of [-1, 1]) tube(shin, joint, 0.007 * s, 0.007 * s, L.shank - 0.11 * s, L.shank - 0.005 * s, { sides: 8 }).position.x = offset * shinR * 0.5;
     ball(shin, hardware, 0.02 * s * k, [0, L.shank - 0.005 * s, 0]);
+  }
+  // Bolt-on armour (`plates`): a panel standing off each shell, on the
+  // chest's front and flanks, over the shoulders, down the forearms' backs,
+  // the thighs' fronts and the shins.
+  if (robot.plates) {
+    const plate = surface(new THREE.Color(armor.mail ?? armor.color).getHex(), { roughness: 0.7 });
+    box(chest, plate, [0.02 * s, chestHeight * 0.55, width * 0.62], [depth / 2 + 0.014 * s, chestMid + 0.08 * chestHeight, 0]);
+    for (const side of [1, -1]) box(chest, plate, [depth * 0.7, chestHeight * 0.5, 0.016 * s], [0, chestMid, side * (width * 0.47)]);
+    for (const side of ['l', 'r']) {
+      const at = (bone) => pieces.find((entry) => entry.bone === BONE[bone]).object;
+      const armR = seg[`${side}UpperArm`].skinRadius;
+      ball(at(`${side}UpperArm`), plate, 0.075 * s, [0, 0.02 * s, 0], [1.05, 0.7, 1.15]);
+      box(at(`${side}Forearm`), plate, [0.016 * s, L.forearmToFist * 0.42, armR * 1.4], [-armR * 0.95, L.forearmToFist * 0.4, 0]);
+      const thighR = seg[`${side}Thigh`].skinRadius * slim;
+      box(at(`${side}Thigh`), plate, [0.018 * s, L.thigh * 0.5, thighR * 1.7], [thighR * 1.05, L.thigh * 0.45, 0]);
+      const shinR = seg[`${side}Shank`].skinRadius * slim;
+      box(at(`${side}Shin`), plate, [0.018 * s, L.shank * 0.55, shinR * 1.7], [shinR * 1.05, L.shank * 0.42, 0]);
+    }
   }
   // The status lights glow; everything else is inked.
   for (const { object } of pieces) inkAll(object);

@@ -694,11 +694,50 @@ export const PRESETS = {
     outfit: { kind: 'combatBot', design: 0 }, accessories: [],
     look: { skinTone: 'deep', skinColor: '#1e1f22', hairStyle: 'bald', hairColor: '#1e1f22', facialHair: 'none', eyeColor: 'brown' },
   },
+  // ---- Proofs of concept: future machines (not dealt at random: `undealt`) ----
+  // A mini humanoid after Unitree's G1: 1.32 m and 35 kg, no fat, rigid, a
+  // battery for wind, as the H-1. Its joint motors are the G1's: ~90-120 N·m
+  // at the knee against a man's ~250, on legs 0.73 of his length, so its
+  // knee pushes ~0.65 of a man's force: what a man's muscle would give at
+  // its size (`strength` 1: its leg motors weigh what its leg muscle would).
+  // Its arm motors are the small ones (~25 N·m against a man's ~70: ~0.5 of
+  // his force at its reach): ~0.7 of a man's share of motor in the arms
+  // (`muscle`), the rest in the legs and trunk. Light and short-limbed: its
+  // force per kilogram is ~1.3 times the H-1's, so it starts, turns and gets
+  // up quickly; with ~a third of a man's mass in its arm, it hits softly.
+  // Kickboxes, as Unitree's G1s did.
+  miniHumanoid: {
+    name: 'G1 "Sprite"', style: 'kickboxing', sex: 'male', heightCm: 132, frame: 'medium', age: 27, exercise: 0.6, calories: 2800, skill: 0.6, undealt: true,
+    build: { massKg: 35, bodyFat: 0, strength: 1, aerobic: 1.1, rigid: true, muscle: { upperArm: 0.7, forearm: 0.7 } },
+    outfit: { kind: 'miniHumanoid', design: 0 }, accessories: [],
+    look: { skinTone: 'deep', skinColor: '#1d1e22', hairStyle: 'bald', hairColor: '#1d1e22', facialHair: 'none', eyeColor: 'brown' },
+  },
+  // A soldier in a powered exoskeleton (after Sarcos's Guardian XO; outfits.js
+  // exoKit): a fit man of 1.80 m, ~83 kg, a regular's drill. Nothing of him is
+  // changed by the frame but what the kit says: its mass, its motors, its
+  // cover. Fights as a brawler: the frame's hands are steel, and its kicks
+  // are a walking machine's.
+  exoOpen: {
+    name: 'Pvt. Hale (XO, open)', style: 'street', sex: 'male', heightCm: 180, frame: 'medium', age: 28, exercise: 0.6, calories: 4000, undealt: true,
+    outfit: { kind: 'exoOpen', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#3a2416', facialHair: 'stubble', eyeColor: 'grey' },
+  },
   scissor: {
     name: 'Astacius', style: 'scissor', sex: 'male', heightCm: 176, frame: 'large', age: 31, exercise: 0.6, calories: 4590,
     outfit: { kind: 'scissor', design: 4 },
     look: { skinTone: 'tan', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'beard', eyeColor: 'brown' },
   },
+};
+
+// The same soldier in the armoured and the enclosed frames.
+PRESETS.exoArmoured = { ...PRESETS.exoOpen, name: 'Pvt. Hale (XO, armoured)', outfit: { kind: 'exoArmoured', design: 0 } };
+PRESETS.exoEnclosed = { ...PRESETS.exoOpen, name: 'Pvt. Hale (XO, enclosed)', outfit: { kind: 'exoEnclosed', design: 0 } };
+
+// The joints a powered frame's motors drive, by the part its `assist` names.
+const ASSISTED = {
+  arm: ['lHand', 'rHand', 'lElbow', 'rElbow'],
+  trunk: ['lShoulder', 'rShoulder', 'lHip', 'rHip', 'neck'],
+  leg: ['lKnee', 'rKnee', 'lFoot', 'rFoot', 'pelvis'],
 };
 
 const segmentKind = (key) => key.replace(/^[lr](?=[A-Z])/, '').replace(/^./, (c) => c.toLowerCase());
@@ -860,6 +899,15 @@ export function buildBody(rawInputs) {
   motorForce[P.neck] = trunkForce;
   motorForce[P.pelvis] = allometric(leg('l') + leg('r'), BODY.referenceMuscleKg.leg * 2) * force.leg * 1.5 * muscleQuality;
   motorForce[P.head] = segments.head.tissue.muscle * force.neck * (0.5 + neckIndex);
+  // A powered frame's motors (a kit's `assist`: multiples of the wearer's own force by part, outfits.js exoKit) push with his
+  // muscles: what he and the frame can move, strike and lift with, together.
+  for (const [part, joints] of Object.entries(ASSISTED)) {
+    const share = gear.assist?.[part] ?? 1;
+    for (const joint of joints) {
+      motorForce[P[joint]] *= share;
+      strikeForce[P[joint]] *= share;
+    }
+  }
   // Armour and tight tailoring keep the limbs from swinging as fast; so do stiff, worn joints.
   const jointFreedom = BODY.jointSpeedFloor + (1 - BODY.jointSpeedFloor) * aged.joints;
   for (let index = 0; index < topSpeed.length; index += 1) topSpeed[index] *= gear.swing * jointFreedom;
@@ -869,6 +917,7 @@ export function buildBody(rawInputs) {
   // A motor must at least hold its own particle up, or the fighter sags.
   for (let index = 0; index < motorForce.length; index += 1) motorForce[index] = Math.max(motorForce[index], masses[index] * 9.81 * 2.2);
 
+  const limbCarry = 1 + gear.extraMass * (gear.limbsCarry ?? 0);
   const armKg = (side) => segments[`${side}UpperArm`].mass + segments[`${side}Forearm`].mass + BODY.gloveKg;
   const technique = 0.75 + 0.25 * inputs.training;
   // A build may set its own endurance (a machine's battery): `aerobic`; so may a man of uncommon wind (`inputs.aerobic`: a boss who never tires,
@@ -880,11 +929,13 @@ export function buildBody(rawInputs) {
     // The years: shares of a young body's (aging.js); joints 1 young; stoop, the back's forward lean (rad).
     aged, joints: aged.joints, stoop: aged.stoop,
     lengths, segments, masses, motorForce, muscleForce, strikeForce, topSpeed, aerobic,
+    // A limb's mass behind a blow; with the share of the kit bolted rigidly to it (`limbsCarry`: a powered frame's steel limbs,
+    // 1; armour strapped over a limb rides loose on it, 0).
     limbKg: {
-      lArm: segments.lUpperArm.mass + segments.lForearm.mass + BODY.gloveKg,
-      rArm: segments.rUpperArm.mass + segments.rForearm.mass + BODY.gloveKg,
-      lLeg: segments.lThigh.mass + segments.lShank.mass,
-      rLeg: segments.rThigh.mass + segments.rShank.mass,
+      lArm: (segments.lUpperArm.mass + segments.lForearm.mass) * limbCarry + BODY.gloveKg,
+      rArm: (segments.rUpperArm.mass + segments.rForearm.mass) * limbCarry + BODY.gloveKg,
+      lLeg: (segments.lThigh.mass + segments.lShank.mass) * limbCarry,
+      rLeg: (segments.rThigh.mass + segments.rShank.mass) * limbCarry,
     },
     technique,
     // His own skill, as far as his kit lets him use it (a helm bolted to the breast: half; OUTFITS skillFactor).
@@ -911,7 +962,8 @@ export function buildBody(rawInputs) {
     // A build's `bones`: its bones' strength against a man's (thicker in section).
     fracture: {
       face: BODY.fractureN.face * boneDensity * BODY.toughness * (build?.bones ?? 1),
-      hand: BODY.fractureN.hand * boneDensity * (build?.bones ?? 1),
+      // A powered frame's fist takes the blow into its own strut, not his hand inside it (a kit's `fistBones`).
+      hand: BODY.fractureN.hand * boneDensity * (build?.bones ?? 1) * (gear.fistBones ?? 1),
       rib: BODY.fractureN.rib * boneDensity * BODY.toughness * (build?.bones ?? 1),
     },
   };

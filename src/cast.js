@@ -123,9 +123,9 @@ function atWeight(inputs, kg) {
   fed.calories = Math.round(caloriesForWeight(fed, kg, (FRAMES[fed.frame] ?? FRAMES.medium).lean));
   return normaliseInputs(fed);
 }
-
+// The prize fight's men: anyone unarmed, gloved, fighting mixed (not those kept for their own places: `undealt`).
 // The prize fight's men: anyone unarmed, gloved, fighting mixed.
-const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !STYLES[preset.style]?.passive && !preset.simple);
+const BOXERS = Object.values(PRESETS).filter((preset) => !STYLES[preset.style]?.weapon && !STYLES[preset.style]?.passive && !preset.simple && !preset.undealt);
 // The arena's: gladiators, knights, samurai and their kin.
 export const GLADIATORS = ['thraex', 'hoplomachus', 'murmillo', 'retiarius', 'scissor', 'secutor', 'maximus', 'commodus', 'knight', 'warhammer', 'samurai', 'naginata', 'yari'];
 
