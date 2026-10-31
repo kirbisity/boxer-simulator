@@ -10,7 +10,7 @@ import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
-import { DETAIL_ARMOUR, DETAIL_MAPS, mailUv, measureRings, plateUvAt, tileUv } from './detailmaps.js';
+import { armourTileOf, DETAIL_ARMOUR, DETAIL_MAPS, isLacedTile, mailUv, measureRings, pieceMaterial, plateUvAt, stripUv, tileUv } from './detailmaps.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
 import { ribDroop, RULES, rulesProfile, rulesShape, rulesTraits, trunkRule, trunkSilhouette } from './skinrules.js';
@@ -95,6 +95,9 @@ export const LOFT = {
   // over the next (`overlap` of a band beneath it), a dark edge line `edge`
   // of a band deep, and rivets (`rivets` round, `rivet` rad across) on each.
   lames: { lift: 0.03, tilt: 0.06, overlap: 0.25, edge: 0.14, steps: 18, rivets: 4, rivet: 0.05 },
+  // A plate harness's edges with the detail maps (harnessEdgesOn): a band `depth` (m; at most `most` of a short piece) at each
+  // end of a piece, `lift` (share of the radius) proud of it; a couter's and a poleyn's `copLames` articulating lames.
+  harnessEdge: { depth: 0.025, most: 0.3, lift: 0.012, copLames: 2 },
   // A brigandine's rivet heads: three rows to a ring, each `size` of its column
   // across (and as tall, along the piece), a hair proud of the cloth.
   studs: { rowsPerRing: 3, size: 0.3, tall: 0.07, lift: 0.012 },
@@ -166,8 +169,10 @@ const ringMeasures = new WeakMap();
 function patchUv(mesh, rings, role, index, place, angle) {
   if (!mesh.steelUv || !STEEL_ROLES.has(role)) return;
   if (!ringMeasures.has(rings)) ringMeasures.set(rings, measureRings(rings, 1));
-  mesh.uvs.set(index, plateUvAt(ringMeasures.get(rings), place, angle));
+  mesh.uvs.set(index, plateUvAt(ringMeasures.get(rings), place, angle, mesh.patchTile ?? 'plate'));
 }
+// A modern kit's moulded shell and pads (roles), which take its shell tile (`mesh.shellTile`) as steel takes its steel tile.
+const SHELL_ROLES = new Set(['armor', 'pad']);
 
 /**
  * Add one loft to the mesh arrays.
@@ -179,8 +184,14 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
   // of the angle round it (0 at the front, as the depth axis points).
   const paint = typeof color === 'function' ? color : () => color;
   // Steel with the plate's maps (`mesh.steelUv`, detailmaps.js): a loft all of steel (every point of it steel, steel2 or gilt) takes
-  // the plate tile's coordinates. (Not a loft of steel and something else: a triangle across the two would read the skin's maps.)
-  if (!uv && mesh.steelUv && !holes && rings.every((ring, index) => Array.from({ length: sides }, (_, step) => paint(ring, (step / sides) * Math.PI * 2, index, step)).every((role) => STEEL_ROLES.has(role)))) uv = tileUv(rings, inflate, 'plate');
+  // the plate tile's coordinates, or its kind's own steel tile (`mesh.steelTile`: detailmaps.js ARMOUR_TILES); a loft all of a
+  // modern kit's moulded shell, its shell tile. (Not a loft of steel and something else: a triangle across the two would read
+  // the skin's maps.)
+  if (!uv && mesh.steelUv && !holes) {
+    const roles = new Set(rings.flatMap((ring, index) => Array.from({ length: sides }, (_, step) => paint(ring, (step / sides) * Math.PI * 2, index, step))));
+    if ([...roles].every((role) => STEEL_ROLES.has(role))) uv = tileUv(rings, inflate, mesh.steelTile ?? 'plate');
+    else if (mesh.shellTile && [...roles].every((role) => SHELL_ROLES.has(role))) uv = tileUv(rings, inflate, mesh.shellTile);
+  }
   // A part with texture coordinates (`uv`: ring, share of the way round -> [u, v]) has its first column of vertices twice, so the
   // texture does not run backwards across the last quad: the pairs are welded again for relaxing and for the normals.
   const stride = uv ? sides + 1 : sides;
@@ -1190,9 +1201,10 @@ function lacedShell(mesh, rings, inflate, roleOf, bones, sides, style, holes = n
     const place = (up / rows) * last;
     shell.push({ ...ringAt(rings, measure.rising ? place : last - place), out: outward, v: up / tile.rows, role });
   };
+  // (Scales, `hangs`, the other way: each row's foot stands out over the heads of the row below.)
   for (let row = 0; row < rows; row += 1) {
-    add(row, low, roleOf(row, rows));
-    add(row + 1, high, roleOf(row, rows));
+    add(row, tile.hangs ? high : low, roleOf(row, rows));
+    add(row + 1, tile.hangs ? low : high, roleOf(row, rows));
   }
   // (In the run's own order, so the faces wind outward as the piece's own loft does.)
   if (!measure.rising) shell.reverse();
@@ -1200,6 +1212,32 @@ function lacedShell(mesh, rings, inflate, roleOf, bones, sides, style, holes = n
     color: (ring) => ring.role, inflate, shape: (ring) => ring.out / inflate, capStart: false, capEnd: false, bones,
     uv: (ring, share) => [tile.band + share * across, ring.v], holes,
   });
+}
+
+/** Where along a measured run (a fractional ring index) it has gone `distance` (m) from its first ring. */
+function placeAlong(measure, distance) {
+  const { along } = measure;
+  for (let index = 1; index < along.length; index += 1) {
+    if (along[index] >= distance) return index - 1 + (distance - along[index - 1]) / Math.max(1e-9, along[index] - along[index - 1]);
+  }
+  return along.length - 1;
+}
+
+/**
+ * A plate harness piece's two edges (detailmaps.js `harnessEdge`): at each end of the run a band LOFT.harnessEdge.depth (m) deep,
+ * a hair proud of the plate, wearing the edge strip (the turned, roped roll at the edge, a file line, the lining rivets).
+ */
+function harnessEdgesOn(mesh, rings, inflate, sides, bones = () => null) {
+  const spec = LOFT.harnessEdge;
+  const measure = measureRings(rings, inflate);
+  const depth = Math.min(spec.depth, measure.length * spec.most);
+  const last = rings.length - 1;
+  for (const [edgePlace, innerPlace] of [[0, placeAlong(measure, depth)], [last, placeAlong(measure, measure.length - depth)]]) {
+    const edge = ringAt(rings, edgePlace);
+    const inner = ringAt(rings, innerPlace);
+    // (In the run's own order, so the faces wind outward as the piece's do.)
+    loft(mesh, edgePlace === 0 ? [edge, inner] : [inner, edge], sides, { color: 'steel', inflate: inflate + spec.lift, capStart: false, capEnd: false, bones, uv: stripUv(edge, inner, inflate) });
+  }
 }
 
 /** A lamellae paint's rows (lamellaeOn's colours): the lowest `paint.edge` if given, every fourth `steel2`. */
@@ -1650,37 +1688,66 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const armor = look.armor ?? null;
   // Steel drawn with the plate's maps (detailmaps.js), not in a crowd, not leather or horn.
   mesh.steelUv = DETAIL_MAPS.on && !lowDetail && Boolean(armor) && !armor.matte;
+  // Its kind's own tiles for its steel and its moulded shell (detailmaps.js ARMOUR_TILES), where they are drawn.
+  mesh.steelTile = mesh.steelUv ? armourTileOf(armor.kind, 'steel') : null;
+  mesh.shellTile = mesh.steelUv ? armourTileOf(armor.kind, 'armor') : null;
   const plate = armor?.kind === 'plate';
   const lamellar = armor?.kind === 'lamellar';
   const hoplomachus = armor?.kind === 'hoplomachus';
   // A kind drawn from the table of pieces.
   const kit = ARMOR_KINDS[armor?.kind] ?? null;
-  const tablePiece = (rings, inflate, paint, bones, shape = null) => {
-    // Lamellae drawn as plates over a backing of their dark lacing (the robe showing in the splits), except in a crowd.
+  // A piece from the table: `slot` (trunk, skirt, upperArm...) and `material` (detailmaps.js pieceMaterial, from its paint) choose
+  // the tile it wears where the detail maps are drawn (armourTileOf).
+  const tablePiece = (rings, inflate, paint, bones, shape = null, slot = null, material = pieceMaterial(paint)) => {
+    const tile = DETAIL_MAPS.on && !lowDetail ? armourTileOf(armor?.kind, material, slot) : null;
+    const boned = bones ?? (() => null);
+    // Lamellae (and scales hung point down) drawn as plates over a backing of their dark lacing (the robe showing in the
+    // splits), except in a crowd: with the maps, one shell in rows wearing its laced tile, or a field tile over the backing
+    // (the mountain pattern); else plate by plate.
     if (paint?.lamellae && !lowDetail) {
+      const gaps = paint.gaps ? (t, angle) => inLamellaGap(paint, angle) : null;
       loft(mesh, rings, sides, { color: (ring, angle) => (inLamellaGap(paint, angle) ? 'cloth' : 'lace'), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
-      // Laced plates (not the pointed scales) as one shell with the lamellae's maps, where the detail maps are drawn.
-      if (DETAIL_MAPS.on && !paint.pointDown) lacedShell(mesh, rings, inflate, lamellaRole(paint), bones ?? (() => null), sides + 6, 'lamellae', paint.gaps ? (t, angle) => inLamellaGap(paint, angle) : null);
-      else lamellaeOn(mesh, rings, inflate, paint, bones ?? (() => null));
+      if (tile && isLacedTile(tile)) lacedShell(mesh, rings, inflate, lamellaRole(paint), boned, sides + 6, tile, gaps);
+      else if (tile) loft(mesh, rings, sides + 6, { color: (ring, angle, index) => (paint.edge && index === 0 ? paint.edge : 'steel'), inflate: inflate + LOFT.lamellae.lift, capStart: false, capEnd: false, bones: boned, holes: gaps, uv: tileUv(rings, inflate, tile) });
+      else lamellaeOn(mesh, rings, inflate, paint, boned);
       return;
     }
-    // Japanese laced rows as one shell with the kozane's maps, in the rows' base colour (not in a crowd).
-    if (paint?.kozane && DETAIL_MAPS.on && !lowDetail) {
-      lacedShell(mesh, rings, inflate, () => paint.rows[0], bones ?? (() => null), sides + 6, 'kozane');
+    // Scales painted in rows (a crowd's drawing) as a laced shell over their lacing, where the maps are drawn.
+    if (paint?.scales && tile && isLacedTile(tile)) {
+      loft(mesh, rings, sides, { color: 'lace', inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}) });
+      lacedShell(mesh, rings, inflate, () => 'steel', boned, sides + 6, tile);
+      return;
+    }
+    // Japanese laced rows as one shell with the kozane's (or sugake's) maps, in the rows' base colour (not in a crowd).
+    if (paint?.kozane && tile) {
+      lacedShell(mesh, rings, inflate, () => paint.rows[0], boned, sides + 6, tile);
       return;
     }
     // Mail with the mail's maps (detailmaps.js): one colour, the rings in the picture (not in a crowd).
-    if (paint?.mail && DETAIL_MAPS.on && !lowDetail) {
+    if (paint?.mail && tile) {
       loft(mesh, rings, sides, { color: 'mail', inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: mailUv(rings, inflate) });
+      return;
+    }
+    // A brigandine with its tile: the cloth (its binding and opening) in one loft, the rivet heads in the picture.
+    if (material === 'studded' && tile) {
+      loft(mesh, rings, sides, { color: paintFor({ ...paint, studsDrawn: true, mirror: null, rivets: null }, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile) });
+      return;
+    }
+    // A field tile of the kind's own (hoops, riveted lames, mail and plate, etching, a moulded shell): rows painted in a crowd
+    // are in the picture, so one colour (a crest painted over it is kept).
+    if (tile && tile !== 'plate' && (material === 'steel' || material === 'armor')) {
+      const colour = paint?.rows && !paint.mon ? paint.rows[0] : paintFor(paint, armor);
+      loft(mesh, rings, sides, { color: colour, inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile) });
+      if (paint?.lames) lamesOn(mesh, rings, inflate, paint, boned);
       return;
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
     loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}) });
     // Laminated plate: each lame its own band of faces (not in a crowd).
-    if (paint?.lames && !lowDetail) lamesOn(mesh, rings, inflate, paint, bones ?? (() => null));
+    if (paint?.lames && !lowDetail) lamesOn(mesh, rings, inflate, paint, boned);
     // A brigandine's rivet heads, each its own small square (not in a crowd).
-    if (paint?.studded && !lowDetail) studsOn(mesh, rings, inflate, paint, bones ?? (() => null));
+    if (paint?.studded && !lowDetail) studsOn(mesh, rings, inflate, paint, boned);
   };
   // Lamellar: rows of lacquered scales, laced between rows and down each column.
   const laced = (ring, angle, index) => (index % 3 === 2 ? 'lace' : 'steel');
@@ -1847,19 +1914,22 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const rings = trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from)))));
     // A kit's steel breastplate (rigidBreastplate) is ridged, its borders roped.
     const ridgedPiece = kit?.rigidBreastplate && paint === 'steel';
-    tablePiece(rings, inflate, ridgedPiece ? (ring, angle, index, step) => roped(ring, step) ?? 'steel' : sharpPale(paint) ? 'cloth' : paint, abdomen, ridgedPiece ? ridgedPlate : null);
+    tablePiece(rings, inflate, ridgedPiece ? (ring, angle, index, step) => roped(ring, step) ?? 'steel' : sharpPale(paint) ? 'cloth' : paint, abdomen, ridgedPiece ? ridgedPlate : null, 'trunk', pieceMaterial(paint));
+    // (Its ridged front wears the breastplate's own tile: an etched one's bands run on over it.)
+    mesh.patchTile = ridgedPiece && mesh.steelUv ? armourTileOf(armor.kind, 'steel', 'trunk') : null;
     if (ridgedPiece && !lowDetail) breastplateOn(mesh, rings, inflate, ridgedPlate, breastplate, {}, abdomen);
+    mesh.patchTile = null;
     if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', abdomen);
     if (paint?.heraldry && armor?.charge && !lowDetail) chargeOn(mesh, rings, armor.charge.kind, inflate * 1.06, 'charge', abdomen);
   }
   for (const [hem, flare, inflate, paint] of armorPieces(kit, 'skirt', 'l')) {
     const rings = skirtRings(skirtTo(hem), count(6), flare);
-    tablePiece(rings, inflate, sharpPale(paint) ? 'cloth' : paint, () => hanging3);
+    tablePiece(rings, inflate, sharpPale(paint) ? 'cloth' : paint, () => hanging3, null, 'skirt');
     if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', () => hanging3);
   }
   for (const [from, to, inflate, paint] of armorPieces(kit, 'belt', 'l')) {
     const rings = shortsRings(from, to, count(3));
-    tablePiece(rings, inflate, paint, abdomen);
+    tablePiece(rings, inflate, paint, abdomen, null, 'belt');
     if (paint?.plaques && !lowDetail) plaquesOn(mesh, rings, inflate * 1.03, paint.plaques, 'gold', abdomen);
   }
   // Straps across the trunk ([from t, from angle, to t, to angle, width rad, out, role]) and cords hanging down the skirt.
@@ -1919,6 +1989,14 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     loft(mesh, collarRings, sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false, ...mailMaps });
   }
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
+  // A plate harness's piece (with the maps): its edges turned and roped, rivets inside them (harnessEdgesOn); a couter's or a
+  // poleyn's articulating lames (`lames`) over its cop.
+  const harnessPiece = (rings, inflate, lames = 0) => {
+    armorPiece(rings, inflate);
+    if (!plate || !mesh.steelUv) return;
+    harnessEdgesOn(mesh, rings, inflate, sides);
+    if (lames) lamesOn(mesh, rings, inflate, { lames, base: 'steel' }, () => null);
+  };
 
   for (const side of ['l', 'r']) {
     yield `${side} limbs`;
@@ -1987,18 +2065,20 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
         armorPiece(forearmRings(-0.06, wrist - 0.02, count(6)), 1.32, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
       }
     } else if (kit) {
-      for (const [from, to, inflate, paint] of armorPieces(kit, 'upperArm', side)) tablePiece(upperArmRings(from, to, count(Math.max(3, Math.round(7 * (to - from))))), inflate, paint);
-      for (const [from, to, inflate, paint] of armorPieces(kit, 'forearm', side)) tablePiece(forearmRings(from, to <= 0 ? wrist + to : to, count(5)), inflate, paint);
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'upperArm', side)) tablePiece(upperArmRings(from, to, count(Math.max(3, Math.round(7 * (to - from))))), inflate, paint, null, null, 'upperArm');
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'forearm', side)) tablePiece(forearmRings(from, to <= 0 ? wrist + to : to, count(5)), inflate, paint, null, null, 'forearm');
     } else if (armor && armor.kind !== 'carrier') {
       const big = armor.joust ? LOFT.joust.pauldron : { riot: 1.6, heavyRiot: 1.85, plate: 1.65 }[armor.kind];
       // A jousting harness: mail at the armpit under the pauldron, the pauldron in lames (not in a crowd).
       if (armor.joust) loft(mesh, upperArmRings(LOFT.joust.mail[0], LOFT.joust.mail[1], count(3)), sides, { color: paintFor(MAIL, armor), inflate: LOFT.joust.mail[2], capStart: false, capEnd: false });
       const pauldron = upperArmRings(-0.2, 0.38, count(armor.joust ? 4 : 3));
-      armorPiece(pauldron, big);
+      if (plate) harnessPiece(pauldron, big);
+      else armorPiece(pauldron, big);
       if (armor.joust && !lowDetail) lamesOn(mesh, pauldron, big, { lames: LOFT.joust.pauldronLames, base: 'steel' }, () => null);
-      if (plate) armorPiece(upperArmRings(0.36, 1.0, count(4)), 1.28);
-      if (plate) armorPiece(forearmRings(-0.12, 0.12, count(2)), 1.5);
-      armorPiece(forearmRings(0.12, wrist - 0.06, count(4)), plate ? 1.32 : 1.42);
+      if (plate) harnessPiece(upperArmRings(0.36, 1.0, count(4)), 1.28);
+      if (plate) harnessPiece(forearmRings(-0.12, 0.12, count(2)), 1.5, LOFT.harnessEdge.copLames);
+      if (plate) harnessPiece(forearmRings(0.12, wrist - 0.06, count(4)), 1.32);
+      else armorPiece(forearmRings(0.12, wrist - 0.06, count(4)), 1.42);
     }
 
     yield `${side} arm`;
@@ -2040,15 +2120,16 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       // Ocreae: high greaves, up over the knee.
       armorPiece(thighRings(0.68, 1.05, count(3)), 1.34, 'steel');
     } else if (kit) {
-      for (const [from, to, inflate, paint] of armorPieces(kit, 'thigh', side)) tablePiece(thighRings(from, to, count(Math.max(2, Math.round(8 * (to - from))))), inflate, paint);
-      for (const [from, to, inflate, paint] of armorPieces(kit, 'knee', side)) tablePiece(thighRings(from, to, count(2)), inflate, paint);
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'thigh', side)) tablePiece(thighRings(from, to, count(Math.max(2, Math.round(8 * (to - from))))), inflate, paint, null, null, 'thigh');
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'knee', side)) tablePiece(thighRings(from, to, count(2)), inflate, paint, null, null, 'knee');
     } else if (armor) {
-      if (plate) armorPiece(thighRings(-0.05, 0.84, count(5)), 1.26);
+      if (plate) harnessPiece(thighRings(-0.05, 0.84, count(5)), 1.26);
       // The tasset: lames hung from the fauld over the front and outer side of the thigh, moving with it.
       // (Under a surcoat's or a huque's skirt they are not seen.)
       if (plate && !armor.over) tassetOn(mesh, thighRings(LOFT.tasset.from, armor.joust ? LOFT.joust.tassetTo : LOFT.tasset.to, count(armor.joust ? 6 : 4)), side === 'l' ? 1 : -1, armor.joust ? LOFT.joust.tassetLames : LOFT.tasset.lames);
       if (armor.kind === 'heavyRiot') armorPiece(thighRings(0.05, 0.7, count(3)), 1.35);
-      armorPiece(thighRings(0.82, 1.05, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
+      if (plate) harnessPiece(thighRings(0.82, 1.05, count(2)), 1.5, LOFT.harnessEdge.copLames);
+      else armorPiece(thighRings(0.82, 1.05, count(2)), 1.45, 'pad');
     }
     // Shin and calf: the calf sits high and behind.
     // The shin starts inside the thigh, so the knee bends without a seam.
@@ -2073,10 +2154,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     } else if (hoplomachus) {
       armorPiece(shinRings(-0.14, 0.9, count(6)), 1.32, (ring, angle, index) => (index === 0 ? 'gold' : 'steel'));
     } else if (kit) {
-      for (const [from, to, inflate, paint] of armorPieces(kit, 'shin', side)) tablePiece(shinRings(from, to, count(Math.max(2, Math.round(7 * (to - from))))), inflate, paint);
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'shin', side)) tablePiece(shinRings(from, to, count(Math.max(2, Math.round(7 * (to - from))))), inflate, paint, null, null, 'shin');
     } else if (armor) {
-      armorPiece(shinRings(-0.12, 0.12, count(2)), plate ? 1.5 : 1.45, plate ? 'steel' : 'pad');
-      if (plate || armor.kind !== 'carrier') armorPiece(shinRings(0.1, plate ? 0.95 : 0.8, count(4)), plate ? 1.32 : 1.35);
+      if (plate) harnessPiece(shinRings(-0.12, 0.12, count(2)), 1.5);
+      else armorPiece(shinRings(-0.12, 0.12, count(2)), 1.45, 'pad');
+      if (plate) harnessPiece(shinRings(0.1, 0.95, count(4)), 1.32);
+      else if (armor.kind !== 'carrier') armorPiece(shinRings(0.1, 0.8, count(4)), 1.35);
     }
     // Boot shafts up the shin; heels for a woman in business dress.
     const feet = (female && look.femaleFeet) || look.feet || {};
