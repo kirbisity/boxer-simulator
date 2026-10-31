@@ -139,4 +139,13 @@ npm run bundle       # dist/gladiator.html, one self-contained page
 
 `#faces=photo` in the URL (off by default) draws heads from regional "average face" composites instead of the drawn anime faces (`src/photoface.js`; who gets which face: `src/faceregions.js`, by kit or skin tone, or a fighter's own `faceRegion`). The atlases are built by `tools/photofaces/avg_tiles.py` and `avg_build.py` and loaded at run time from the git-ignored `faces-local/avg/`; they are not in the repository.
 
+The head itself (`src/photohead.js`) keeps the drawn head's construction and the body's morph (fat, leanness, training, age: `src/facemorph.js`), blends in a realistic shape, and raises a real face's structure in it (brow ridge, eye sockets, nose, cheekbones, lips, chin). Each region nudges that structure and the skull a little (`REGION_SHAPES` in `src/faceregions.js`): nose bridge and width, brow, cheekbones, eye sockets and lid fold, lips, jaw, chin, face length, cephalic index. These are moderate average tendencies blended with per-fighter jitter, not types. They are coarse readings of:
+
+- Farkas LG, Katic MJ, Forrest CR, et al. International anthropometric study of facial morphology in various ethnic groups/races. *J Craniofac Surg.* 2005;16(4):615–646.
+- Zhuang Z, Landsittel D, Benson S, Roberge R, Shaffer R. Facial anthropometric differences among gender, ethnicity, and age groups. *Ann Occup Hyg.* 2010;54(4):391–402.
+- Le TT, Farkas LG, Ngim RCK, Levin LS, Forrest CR. Proportionality in Asian and North American Caucasian faces using neoclassical facial canons as criteria. *Aesthetic Plast Surg.* 2002;26(1):64–69.
+- Cephalic-index surveys as summarised in Martin R, Saller K. *Lehrbuch der Anthropologie*, 3rd ed. Stuttgart: Fischer; 1957.
+
+The nose width also takes 35% from each composite's own measured nostril spacing (`tools/photofaces/avg_tiles.py`). The numbers are hand-set offsets, not measurements; refine them against the sources before relying on them.
+
 **Provenance, to verify before release.** The composites are the widely shared "average faces of the world" set (40 women's and 46 men's regional averages), found here as reposted grids, one of them marked "via 9GAG" (that strip is cropped out and never used). The set is believed to be free to use, but its original author and licence have not been confirmed; check both before shipping anything built from it.

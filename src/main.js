@@ -72,7 +72,7 @@ import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/sta
 import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
-import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces } from './photoface.js';
+import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { clearGore, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 
 const STEP = 1 / 60;
@@ -3222,6 +3222,8 @@ if (photoFacesOn()) loadPhotoFaces().then(redrawWithPhotoFaces);
 window.__photoFaces = {
   set: (on) => setPhotoFaces(on).then(() => { clearCrowdTemplates(scene); return photoFacesOn(); }),
   stats: photoFaceStats,
+  // The faces' fill on their ambient light (photoface.js PHOTO_FACES.fill): for the next heads and the ones in the scene now.
+  fill: (value) => setPhotoFill(value, scene.scene),
 };
 
 // The looks harness (looksbench.js): staged still-lifes, shots and timings, for comparing looks.

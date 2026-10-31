@@ -84,3 +84,72 @@ export function regionsFor(inputs, outfitRegion = null) {
   if (own) return Array.isArray(own) ? own : [own];
   return KIT_REGIONS[inputs.outfit?.kind] ?? TONE_REGIONS[inputs.look?.skinTone ?? 'medium'] ?? TONE_REGIONS.medium;
 }
+
+// ---- The head's shape by region ----------------------------------------------------------------------------------------
+//
+// Average tendencies of each region's face and skull, as gentle offsets (-1 .. 1, 0 the middle of all the regions) that
+// photohead.js applies over the body-driven head: a fighter gets his regions' blend, a little jitter, and the composite's own
+// measured nose width (avg_tiles.py). Moderate on purpose: tendencies, not types. Coarse readings of the anthropometric
+// literature (README, "Photo faces"): Farkas et al. 2005 (facial measurements across ethnic groups), Zhuang et al. 2010 (US
+// workers by ethnicity), Le et al. 2002 (Asian and North American Caucasian proportions), and the classic cephalic-index
+// surveys summarised in Martin & Saller.
+//   noseBridge  height of the bridge          noseWidth  width at the wings          brow   depth of the brow ridge
+//   cheekbone   prominence of the cheekbones  cheekWidth how far apart they sit      socket depth of the eye sockets
+//   lidFold     fullness of the upper lid (the epicanthic region: a flatter mid-face)   lips   fullness of the lips
+//   jaw         width of the jaw              chin       projection of the chin        faceLength  long (+) or broad (-) face
+//   cephalic    breadth of the skull for its length (+ broad, - long)
+
+const SHAPE_GROUPS = {
+  northEurope: { noseBridge: 0.6, noseWidth: -0.4, brow: 0.5, cheekbone: 0, cheekWidth: -0.2, socket: 0.4, lidFold: -0.5, lips: -0.4, jaw: 0, chin: 0.3, faceLength: 0.3, cephalic: -0.1 },
+  centralEurope: { noseBridge: 0.5, noseWidth: -0.3, brow: 0.4, cheekbone: 0.1, cheekWidth: 0, socket: 0.3, lidFold: -0.4, lips: -0.3, jaw: 0.2, chin: 0.2, faceLength: 0.1, cephalic: 0.5 },
+  mediterranean: { noseBridge: 0.7, noseWidth: -0.1, brow: 0.5, cheekbone: 0, cheekWidth: -0.1, socket: 0.4, lidFold: -0.3, lips: 0, jaw: 0, chin: 0.1, faceLength: 0.4, cephalic: -0.2 },
+  westAsia: { noseBridge: 0.8, noseWidth: 0, brow: 0.6, cheekbone: 0, cheekWidth: -0.1, socket: 0.5, lidFold: -0.3, lips: 0, jaw: 0, chin: 0, faceLength: 0.4, cephalic: 0.1 },
+  southAsia: { noseBridge: 0.3, noseWidth: 0.2, brow: 0.2, cheekbone: 0, cheekWidth: -0.2, socket: 0.3, lidFold: -0.2, lips: 0.3, jaw: -0.1, chin: 0, faceLength: 0.2, cephalic: -0.4 },
+  centralAsia: { noseBridge: 0, noseWidth: 0.1, brow: 0.1, cheekbone: 0.4, cheekWidth: 0.4, socket: 0, lidFold: 0.3, lips: 0, jaw: 0.3, chin: 0, faceLength: -0.2, cephalic: 0.6 },
+  eastAsia: { noseBridge: -0.7, noseWidth: 0.3, brow: -0.4, cheekbone: 0.6, cheekWidth: 0.6, socket: -0.6, lidFold: 0.8, lips: 0.1, jaw: 0.3, chin: -0.3, faceLength: -0.2, cephalic: 0.6 },
+  southeastAsia: { noseBridge: -0.6, noseWidth: 0.6, brow: -0.2, cheekbone: 0.3, cheekWidth: 0.3, socket: -0.4, lidFold: 0.5, lips: 0.4, jaw: 0.1, chin: -0.2, faceLength: -0.3, cephalic: 0.4 },
+  westAfrica: { noseBridge: -0.3, noseWidth: 0.9, brow: 0.2, cheekbone: 0.2, cheekWidth: 0, socket: 0, lidFold: -0.2, lips: 0.9, jaw: 0.2, chin: -0.1, faceLength: 0, cephalic: -0.6 },
+  eastAfrica: { noseBridge: 0.3, noseWidth: 0.3, brow: 0.2, cheekbone: 0.2, cheekWidth: -0.2, socket: 0.1, lidFold: -0.2, lips: 0.5, jaw: -0.2, chin: 0, faceLength: 0.5, cephalic: -0.5 },
+  andes: { noseBridge: 0.2, noseWidth: 0.3, brow: 0.1, cheekbone: 0.5, cheekWidth: 0.4, socket: 0, lidFold: 0.2, lips: 0.2, jaw: 0.3, chin: 0, faceLength: 0, cephalic: 0.4 },
+  caribbeanBrazil: { noseBridge: 0, noseWidth: 0.5, brow: 0.2, cheekbone: 0.1, cheekWidth: 0, socket: 0.1, lidFold: -0.2, lips: 0.5, jaw: 0.1, chin: 0, faceLength: 0, cephalic: -0.2 },
+  polynesia: { noseBridge: 0, noseWidth: 0.6, brow: 0.3, cheekbone: 0.3, cheekWidth: 0.3, socket: 0, lidFold: 0, lips: 0.5, jaw: 0.6, chin: 0.2, faceLength: 0.1, cephalic: 0.4 },
+};
+
+const REGION_GROUP = {
+  england: 'northEurope', ireland: 'northEurope', sweden: 'northEurope', netherlands: 'northEurope', whiteAmerican: 'northEurope', france: 'northEurope',
+  germany: 'centralEurope', austria: 'centralEurope', switzerland: 'centralEurope', czechRepublic: 'centralEurope', poland: 'centralEurope', hungary: 'centralEurope',
+  russia: 'centralEurope', ukraine: 'centralEurope', romania: 'centralEurope', serbia: 'centralEurope',
+  italy: 'mediterranean', spain: 'mediterranean', greece: 'mediterranean', argentina: 'mediterranean',
+  turkey: 'westAsia', israel: 'westAsia', lebanon: 'westAsia', iraq: 'westAsia', iran: 'westAsia', saudiArabia: 'westAsia', afghanistan: 'westAsia',
+  india: 'southAsia', southIndia: 'southAsia',
+  uzbekistan: 'centralAsia', tibet: 'centralAsia', mongolia: 'eastAsia', china: 'eastAsia', taiwan: 'eastAsia', korea: 'eastAsia', japan: 'eastAsia',
+  burma: 'southeastAsia', thailand: 'southeastAsia', cambodia: 'southeastAsia', vietnam: 'southeastAsia', philippines: 'southeastAsia',
+  westAfrica: 'westAfrica', southAfrica: 'westAfrica', chadCameroon: 'westAfrica', africanAmerican: 'westAfrica', ethiopia: 'eastAfrica',
+  mexico: 'andes', peru: 'andes', puertoRico: 'caribbeanBrazil', brazil: 'caribbeanBrazil', samoa: 'polynesia',
+};
+
+/** A few regions' own departures from their group. */
+const REGION_TWEAKS = {
+  mongolia: { faceLength: -0.4, cheekWidth: 0.8, cheekbone: 0.8 },
+  korea: { cephalic: 0.8 },
+  japan: { faceLength: 0, cephalic: 0.4 },
+  serbia: { cephalic: 0.7, faceLength: 0.4 },
+  southIndia: { noseWidth: 0.4, lips: 0.4 },
+  africanAmerican: { noseBridge: -0.1, noseWidth: 0.7, lips: 0.7 },
+  sweden: { faceLength: 0.4 },
+  ireland: { faceLength: 0.2, chin: 0.2 },
+};
+
+/** The shape offsets of a region (its group's, and its own tweaks). */
+export function regionShape(region) {
+  return { ...(SHAPE_GROUPS[REGION_GROUP[region]] ?? {}), ...(REGION_TWEAKS[region] ?? {}) };
+}
+
+/** The region's group (SHAPE_GROUPS), or null. */
+export const regionGroup = (region) => REGION_GROUP[region] ?? null;
+
+/** Detail the photo shader paints, 0..1: freckle-prone regions, and how heavy a man's beard shadow is by group. */
+export const REGION_DETAIL = {
+  freckles: { ireland: 1, england: 0.7, sweden: 0.6, netherlands: 0.5, whiteAmerican: 0.5, germany: 0.4, russia: 0.4, poland: 0.4, ukraine: 0.3, france: 0.3, czechRepublic: 0.3, austria: 0.3, switzerland: 0.3, hungary: 0.2 },
+  beard: { westAsia: 1, mediterranean: 0.85, southAsia: 0.8, centralEurope: 0.75, northEurope: 0.7, latin: 0.6, andes: 0.35, caribbeanBrazil: 0.5, westAfrica: 0.5, eastAfrica: 0.5, centralAsia: 0.45, polynesia: 0.5, eastAsia: 0.3, southeastAsia: 0.25 },
+};

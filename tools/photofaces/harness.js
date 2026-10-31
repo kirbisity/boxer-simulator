@@ -43,6 +43,21 @@
       grid: [man, woman],
     };
   });
+  // Head shape: one region at three builds and three ages (named, to be found among the views).
+  const BUILDS = [
+    ['italy', 'male', 'amateur'], ['mongolia', 'male', 'amateur'], ['westAfrica', 'male', 'amateur'], ['india', 'female', 'contender'],
+  ];
+  BUILDS.forEach(([region, sex, preset]) => {
+    const one = (name, extra) => ({ preset, name, faceRegion: region, age: 28, ...extra });
+    SCENES[`face-builds-${region}`] = {
+      about: `Head shape: ${region} ${sex}s, lean to fat and young to old.`,
+      place: 'field', seed: 31, frames: 10,
+      red: [one('lean', { calories: 2200, exercise: 0.95, frame: 'small' }), one('average', { calories: 3000, exercise: 0.4 }), one('fat', { calories: 6200, exercise: 0.03, frame: 'large' })],
+      blue: [one('age 20', { age: 20, calories: 3000, exercise: 0.4 }), one('age 45', { age: 45, calories: 3000, exercise: 0.4 }), one('age 72', { age: 72, calories: 3000, exercise: 0.4 })],
+      camera: { focus: { centre: true, height: 1.25 }, yaw: 1.25, pitch: 0.1, distance: 6, fov: 40 },
+      builds: { region, names: ['lean', 'average', 'fat', 'age 20', 'age 45', 'age 72'] },
+    };
+  });
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let bench = null;
 
@@ -115,9 +130,88 @@
           for (const [index, region] of SCENES[scene].grid.entries()) {
             aimAtHead(index, { turn: 0.15, distance: 0.75 });
             shots.push(await jpeg(`face-grid-${index ? 'f' : 'm'}-${region}`, [380, 40, 520, 600]));
+            aimAtHead(index, { turn: 1.2, distance: 0.75 });
+            shots.push(await jpeg(`face-grid-${index ? 'f' : 'm'}-${region}-profile`, [380, 40, 520, 600]));
           }
         }
         return { shots, faces: window.__photoFaces.stats() };
+      }
+      if (verb === 'builds') {
+        const shots = [];
+        for (const scene of Object.keys(SCENES).filter((id) => SCENES[id].builds)) {
+          await window.__looks.stage(scene);
+          const { region, names } = SCENES[scene].builds;
+          for (const name of names) {
+            const index = window.boxer.state.views.findIndex((view) => view.fighter.body.inputs.name === name);
+            if (index < 0 || !window.boxer.state.views[index].head) continue;
+            const slug = name.replace(' ', '');
+            aimAtHead(index, { turn: 0.12, distance: 0.75 });
+            shots.push(await jpeg(`face-build-${region}-${slug}${mode ? `-${mode}` : ""}`, [380, 40, 520, 600]));
+            aimAtHead(index, { turn: 1.2, distance: 0.75 });
+            shots.push(await jpeg(`face-build-${region}-${slug}-profile${mode ? `-${mode}` : ""}`, [380, 40, 520, 600]));
+          }
+        }
+        return { shots };
+      }
+      if (verb === 'lum') {
+        // The face's lit luminance against the chest's, both in the same frame (cheeks and forehead; the chest's front).
+        await window.__looks.stage(mode);
+        const tag = extra;
+        const scene = window.boxer.scene;
+        const out = [];
+        const shots = [];
+        for (const index of [0, 1]) {
+          const view = window.boxer.state.views[index];
+          const fighter = view.fighter;
+          const r = fighter.body.lengths.headRadius;
+          const head = view.head.group;
+          head.updateMatrixWorld(true);
+          const forward = new THREE.Vector3().setFromMatrixColumn(head.matrixWorld, 0).setY(0).normalize();
+          const at = (particle) => new THREE.Vector3(fighter.x[particle * 3], fighter.x[particle * 3 + 1], fighter.x[particle * 3 + 2]);
+          const chest = at(1).lerp(at(8), 0.3).addScaledVector(forward, 0.13);
+          const headAt = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld);
+          scene.orbit.target.copy(headAt.clone().lerp(chest, 0.5));
+          scene.orbit.yaw = Math.atan2(forward.z, forward.x) + 0.25;
+          Object.assign(scene.orbit, { pitch: 0.05, distance: 1.5 });
+          scene.camera.fov = 34;
+          scene.camera.updateProjectionMatrix();
+          window.boxer.state.paused = true;
+          window.boxer.playFrames(1);
+          await texturesIn();
+          const shot = await window.__looks.capture('lum', { save: false });
+          const image = new Image();
+          await new Promise((resolve) => { image.onload = resolve; image.src = shot.dataUrl; });
+          const canvas = Object.assign(document.createElement('canvas'), { width: image.width, height: image.height });
+          const paint = canvas.getContext('2d');
+          paint.drawImage(image, 0, 0);
+          shots.push({ name: `face-lum-${mode}-${index}-${tag}`, dataUrl: canvas.toDataURL('image/jpeg', 0.9) });
+          scene.camera.updateMatrixWorld();
+          const sample = (world) => {
+            const p = world.clone().project(scene.camera);
+            const x = Math.round(((p.x + 1) / 2) * image.width);
+            const y = Math.round(((1 - p.y) / 2) * image.height);
+            const { data } = paint.getImageData(x - 4, y - 4, 9, 9);
+            let sum = 0;
+            for (let i = 0; i < data.length; i += 4) sum += 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+            return { x, y, lum: sum / (data.length / 4) };
+          };
+          const local = (x, y, z) => new THREE.Vector3(x * r, y * r, z * r).applyMatrix4(head.matrixWorld);
+          const face = [local(0.8, -0.32, 0.3), local(0.8, -0.32, -0.3), local(0.88, 0.32, 0)].map(sample);
+          const body = sample(chest);
+          const faceLum = face.reduce((sum, point) => sum + point.lum, 0) / face.length;
+          out.push({ name: fighter.body.inputs.name, face: Math.round(faceLum), chest: Math.round(body.lum), ratio: Math.round((faceLum / body.lum) * 100) / 100, points: [...face, body] });
+        }
+        return { lum: out, shots };
+      }
+      if (verb === 'casts') {
+        await window.__looks.stage(mode);
+        return { casts: window.boxer.state.views.map((view) => { let m = null; view.head?.group.traverse((o) => { if (o.material?.userData?.photoFace) m = o.material; }); return { name: view.fighter.body.inputs.name, face: m?.userData.photoFace, colour: m?.color.getHexString(), type: m?.type, bodySkin: view.fighter.body.inputs.look?.skinTone }; }) };
+      }
+      if (verb === 'fill') {
+        // Set the photo faces' fill (ambient scale) on the heads in the scene now, and for the next ones.
+        const value = Number(mode);
+        window.__photoFaces.fill?.(value);
+        return { fill: value };
       }
       if (verb === 'shots') {
         const scene = mode;

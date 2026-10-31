@@ -20,6 +20,7 @@ import { outlineFor, STYLE, surface } from './toon.js';
 import { assignColour } from './looks/kit.js';
 import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint } from './facemorph.js';
 import { paintFromFace, PHOTO_ATLAS, photoSkinMaterial } from './photoface.js';
+import { buildPhotoHead } from './photohead.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
@@ -46,9 +47,14 @@ export const FACE_SHAPES = {
   shonen: { jawWidth: 0.8, jawAt: 0.5, chinWidth: 0.16, chinLength: 1.0, chinForward: 0.74, faceFront: 0.84, cheek: 0, crown: 1.0, eye: { width: 0.34, height: 0.25, slant: 0.14, lash: 0.055 } },
   shojo: { jawWidth: 0.9, jawAt: 0.38, chinWidth: 0.16, chinLength: 0.9, chinForward: 0.7, faceFront: 0.88, cheek: 0.07, crown: 1.06, eye: { width: 0.38, height: 0.42, slant: 0, lash: 0.07 } },
   seinen: { jawWidth: 0.88, jawAt: 0.62, chinWidth: 0.32, chinLength: 1.14, chinForward: 0.8, faceFront: 0.86, cheek: 0, crown: 0.97, eye: { width: 0.3, height: 0.19, slant: 0.06, lash: 0.04 } },
-  // For a photographed face (photoface.js): a real head's broad jaw and chin, the face only a little flattened.
+  // For a photographed face (photoface.js): a real head's broad jaw and chin, the face only a little flattened. Not a shape of
+  // its own: blended (PHOTO_SHAPE_SHARE) into the sex's drawn one, so the body's morph and the sex still shape the head.
   photo: { jawWidth: 0.92, jawAt: 0.55, chinWidth: 0.46, chinLength: 1.08, chinForward: 0.82, faceFront: 0.92, cheek: 0.03, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
 };
+// How much of FACE_SHAPES.photo a photo head takes over its drawn shape (the rest is the drawn one's).
+const PHOTO_SHAPE_SHARE = 0.6;
+const blendShapes = (a, b, share) => Object.fromEntries(Object.entries(a).map(([key, value]) => [key, typeof value === 'number' && typeof b[key] === 'number' ? value + (b[key] - value) * share : value]));
+
 // Makeup (look.makeup): `eyes` 'smoky' (a dark shadow round the eye),
 // `liner` 'winged' (a heavy upper line flicked out), `lowerLash` 'heavy',
 // `lips` a colour; and the shadow's own colour and strength.
@@ -97,6 +103,8 @@ function headDeform(position, shape) {
 
 /** One point of the unit sphere on the drawn head (and, with `shape.morph`, the face following the body: facemorph.js), unscaled by the radius. */
 function deformPoint(x, y, z, shape) {
+  // A photo head (photohead.js) has its own surface; hair and beards sit on it.
+  if (shape.photoPoint) return shape.photoPoint(x, y, z);
   let X;
   let Y;
   let Z;
@@ -159,73 +167,6 @@ function faceMap(shape) {
   FACE_MAPS.set(key, texture);
   return texture;
 }
-
-/**
- * Texture coordinates on a head for a photo face's atlas (photoface.js PHOTO_ATLAS), from each vertex's place on the drawn head:
- * u round the head from its azimuth (the face at 0.5, the back at 0 and 1, u growing to the fighter's left), v up it from its
- * height, so the atlas' eye line, lip line and chin land on the head's (the dome by its angle of elevation, so the crown is
- * not pinched). `sphereU`, the sphere's own u, keeps the seam at the back (and the poles) on the right side.
- */
-function photoUV(geometry, radius, shape, sphereU = null, jitter = null) {
-  const position = geometry.attributes.position;
-  const eye = FACE.eyeLine / SKULL[1];
-  const chin = -PHOTO_ATLAS.chinT * shape.chinLength;
-  const mouth = eye + PHOTO_ATLAS.mouthShare * (chin - eye);
-  // (The dome: the unwraps squeeze the hair over the crown into their top rows, so the atlas' upper band is spread over the top of the head and the forehead kept low.)
-  // (A fighter's own proportions, `jitter`: his eyes and mouth a little higher or lower on his head, his face a little wider.)
-  const { width = 0, eyeRow = 0, mouthRow = 0 } = jitter ?? {};
-  const knots = [[1, 1], [PHOTO_ATLAS.hairlineAt, 1 - PHOTO_ATLAS.hairlineRow], [eye, 1 - PHOTO_ATLAS.eyeRow - eyeRow], [mouth, 1 - PHOTO_ATLAS.mouthRow - mouthRow], [chin, 1 - PHOTO_ATLAS.chinRow], [-shape.chinLength, 0]];
-  const uv = new Float32Array(position.count * 2);
-  for (let index = 0; index < position.count; index += 1) {
-    const x = position.getX(index);
-    const y = position.getY(index) / (radius * SKULL[1]);
-    const z = position.getZ(index);
-    const height = y >= 0 ? Math.asin(Math.min(1, y / shape.crown)) / (Math.PI / 2) : Math.max(-shape.chinLength, y);
-    let v = 0;
-    for (let knot = 1; knot < knots.length; knot += 1) {
-      const [h0, v0] = knots[knot - 1];
-      const [h1, v1] = knots[knot];
-      if (height >= h1 || knot === knots.length - 1) {
-        v = v0 + ((v1 - v0) * (h0 - height)) / (h0 - h1);
-        break;
-      }
-    }
-    const guess = sphereU ? 1 - sphereU.getX(index) : 0.5;
-    const azimuth = Math.atan2(z, x);
-    let u = Math.hypot(x, z) < 1e-5 * radius ? guess : 0.5 + (azimuth / (Math.PI * 2)) / (1 + width * Math.exp(-((azimuth / 0.9) ** 2)));
-    while (u - guess > 0.5) u -= 1;
-    while (guess - u > 0.5) u += 1;
-    uv[index * 2] = u;
-    uv[index * 2 + 1] = Math.min(1, Math.max(0, v));
-  }
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  return geometry;
-}
-
-/**
- * A photo face's nose in the head's outline: the skull pushed out along a ridge from between the eyes to the nose's tip (where
- * the atlas has them, read from each vertex's texture coordinates), so the face has a profile. Only the nose: the rest of the
- * relief is in the normal map.
- */
-function photoNose(geometry, radius) {
-  const uv = geometry.attributes.uv;
-  const position = geometry.attributes.position;
-  const normal = geometry.attributes.normal;
-  const bridge = PHOTO_ATLAS.eyeRow - 0.01;
-  const tip = PHOTO_ATLAS.eyeRow + 0.55 * (PHOTO_ATLAS.mouthRow - PHOTO_ATLAS.eyeRow);
-  for (let index = 0; index < position.count; index += 1) {
-    const across = uv.getX(index) - 0.5;
-    const row = 1 - uv.getY(index);
-    const along = Math.min(1, Math.max(0, (row - bridge) / (tip - bridge)));
-    const below = row > tip ? Math.exp(-(((row - tip) / 0.032) ** 2)) : row < bridge ? Math.exp(-(((bridge - row) / 0.03) ** 2)) : 1;
-    const lift = PHOTO_FACE_NOSE.height * radius * (0.25 + 0.75 * along) * below * Math.exp(-((across / PHOTO_FACE_NOSE.width) ** 2));
-    if (lift < 1e-5 * radius) continue;
-    position.setXYZ(index, position.getX(index) + normal.getX(index) * lift, position.getY(index) + normal.getY(index) * lift, position.getZ(index) + normal.getZ(index) * lift);
-  }
-  geometry.computeVertexNormals();
-}
-// The nose's height (of the head's radius) at its tip, and its half-width (of the way round the head).
-const PHOTO_FACE_NOSE = { height: 0.1, width: 0.02 };
 
 function headGeometry(radius, shape, segments = 36) {
   const geometry = new THREE.SphereGeometry(1, segments, Math.round(segments * 0.75));
@@ -390,15 +331,23 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const r = body.lengths.headRadius;
   const female = body.inputs.sex === 'female';
   // A photographed face (photoface.js; `look.photoFace`, with `photoPainted` in a crowd): its eyes, brows and mouth are in its
-  // maps, so none is drawn; its head is a real one's shape. The hair is drawn, in the photo's hair colour; a drawn beard is
-  // not (over a photo it reads as a mask; the averages carry their own stubble and moustaches).
+  // maps, so none is drawn; its head is photohead.js's: the drawn head's shape and the body's morph, the region's changes, and
+  // a real face's structure. The hair and a beard are drawn, in the photo's hair colour (stubble is the photo's shader's).
   const photo = look.photoFace ?? null;
-  if (photo) Object.assign(look, { hairColor: photo.hair, facialHair: 'none', makeup: null });
-  // Chosen from the design sheet: shonen for women, seinen for men.
-  const drawn = photo ? FACE_SHAPES.photo : FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
+  if (photo) Object.assign(look, { hairColor: photo.hair, facialHair: look.facialHair === 'stubble' ? 'none' : look.facialHair, makeup: null });
+  // Chosen from the design sheet: shonen for women, seinen for men (a photo head blends a real one's over it).
+  const sexShape = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
+  const drawn = photo ? blendShapes(sexShape, FACE_SHAPES.photo, PHOTO_SHAPE_SHARE) : sexShape;
   // `faceMorph`: the face follows the body (facemorph.js): the skull, hair and beard bent alike, and a map of its shading.
   const morph = look.faceMorph ? faceMorphWeights(body) : null;
-  const shape = morph ? { ...drawn, morph } : drawn;
+  let shape = morph ? { ...drawn, morph } : drawn;
+  const unmorphed = { ...drawn, morph: null };
+  const photoHead = photo ? buildPhotoHead({
+    radius: r,
+    deform: (x, y, z) => deformPoint(x, y, z, unmorphed).map((value, axis) => value / SKULL[axis]),
+    skull: SKULL, shape, eyeLine: FACE.eyeLine, atlas: PHOTO_ATLAS, region: photo.shape, jitter: photo.jitter, coarse: Boolean(look.photoPainted),
+  }) : null;
+  if (photoHead) shape = { ...shape, photoPoint: photoHead.point };
   const group = new THREE.Group();
   const skinMaterial = photo ? photoSkinMaterial(photo, { painted: look.photoPainted }) : surface(skinHex, { steps: STYLE.faceSteps });
   if (morph && !photo) {
@@ -410,18 +359,18 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const hairMaterial = surface(look.hairColor);
   const ink = 0x24181a;
 
-  // (A photo face is finer, for its nose; in a crowd it is as coarse as any.)
-  const skullGeometry = headGeometry(r, shape, morph || (photo && !look.photoPainted) ? 48 : 36);
-  // (The photo's coordinates, and in a crowd its colours per vertex, the ears' and nose's too, read where they sit on the head.)
-  const photoParts = (geometry, sphereU = null) => {
-    if (!photo) return geometry;
-    photoUV(geometry, r, shape, sphereU, photo.jitter);
-    if (look.photoPainted) paintFromFace(geometry, photo);
-    return geometry;
-  };
-  photoParts(skullGeometry, skullGeometry.attributes.uv);
-  if (photo) photoNose(skullGeometry, r);
-  const skull = new SoftShell(skullGeometry, skinMaterial, body.segments.head.fleshFirmness);
+  let skullGeometry;
+  if (photoHead) {
+    skullGeometry = new THREE.BufferGeometry();
+    skullGeometry.setAttribute('position', new THREE.Float32BufferAttribute(photoHead.positions, 3));
+    skullGeometry.setAttribute('normal', new THREE.BufferAttribute(photoHead.normals, 3));
+    skullGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(photoHead.uvs, 2));
+    skullGeometry.setAttribute('color', new THREE.Float32BufferAttribute(photoHead.colors, 3));
+    skullGeometry.setIndex(photoHead.indices);
+    if (look.photoPainted) paintFromFace(skullGeometry, photo);
+  } else skullGeometry = headGeometry(r, shape, morph ? 48 : 36);
+  // (A photo head keeps its own normals, the face's softened: photohead.js.)
+  const skull = new SoftShell(skullGeometry, skinMaterial, body.segments.head.fleshFirmness, { recomputeNormals: !photoHead });
   group.add(skull.mesh);
   skull.mesh.add(outlineFor(skull.mesh, 0.0035));
   for (const side of [1, -1]) {
@@ -430,18 +379,24 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     ear.position.set(-0.06 * r, -0.08 * r, side * SKULL[2] * r * 0.98);
     ear.rotation.z = 0.12;
     ear.castShadow = true;
-    if (photo) {
+    if (photoHead) {
+      // On the photo head's side (a broad skull's ears further out), read from the atlas where they sit.
+      ear.position.z *= 1 + 0.05 * (photo.shape.cephalic ?? 0);
       ear.updateMatrix();
       ear.geometry.applyMatrix4(ear.matrix);
       ear.position.set(0, 0, 0);
       ear.rotation.set(0, 0, 0);
       ear.scale.set(1, 1, 1);
-      photoParts(ear.geometry);
+      const position = ear.geometry.attributes.position;
+      const uv = ear.geometry.attributes.uv;
+      for (let index = 0; index < position.count; index += 1) uv.setXY(index, ...photoHead.uvAt(position.getX(index), position.getY(index), position.getZ(index)));
+      ear.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Array(position.count * 3).fill(1), 3));
+      if (look.photoPainted) paintFromFace(ear.geometry, photo);
     }
     group.add(ear);
   }
 
-  const probe = new THREE.Mesh(headGeometry(r, shape, 28));
+  const probe = new THREE.Mesh(photoHead ? skullGeometry : headGeometry(r, shape, 28));
   probe.updateMatrixWorld();
   const raycaster = new THREE.Raycaster();
 
@@ -509,11 +464,11 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const noseAt = onSurface(new THREE.Group(), probe, raycaster, r, -0.3, 0, 0);
   noseAt.matrix.decompose(nose.position, nose.quaternion, new THREE.Vector3());
   nose.scale.set(0.05 * r, 0.06 * r, 0.07 * r);
-  // (A photo face's nose is in its skull: photoNose.)
+  // (A photo face's nose is in its skull: photohead.js.)
   if (!photo) group.add(nose);
 
   // Mouth: a drawn line that opens into a dark mouth with the guard showing.
-  // (A photo's mouth where its lips are: photoUV's lip line.)
+  // (A photo's mouth where its lips are: the atlas' lip line, photohead.js.)
   const photoMouth = (FACE.eyeLine / SKULL[1] + PHOTO_ATLAS.mouthShare * (-PHOTO_ATLAS.chinT * shape.chinLength - FACE.eyeLine / SKULL[1])) * SKULL[1];
   const mouth = onSurface(new THREE.Group(), probe, raycaster, r, photo ? photoMouth : -0.6, 0, 0.004 * r);
   const lineShape = new THREE.Shape();
@@ -555,6 +510,8 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const dangles = buildHair(group, look, r, shape, hairMaterial, female, curtains);
   // The beard in a material of its own: an open-faced helmet hides the hair, not the beard.
   const beardMaterial = hairMaterial.clone();
+  // Over a photo face a drawn beard lets a little of the face (its stubble shadow) through, so it reads as hair, not a mask.
+  if (photo) Object.assign(beardMaterial, { transparent: true, opacity: 0.8 });
   buildFacialHair(group, look, r, shape, beardMaterial, dangles);
 
   // ---- Expression -------------------------------------------------------

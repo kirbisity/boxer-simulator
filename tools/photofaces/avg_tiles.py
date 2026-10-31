@@ -91,6 +91,36 @@ def refine(meta, tiles):
             meta[k].update(landmarks(tiles[k], prior))
 
 
+def measure(tile, mark):
+    """Proportions read off the composite (of the eye spacing): face width at the cheeks, nose width (between the nostrils'
+    shadows), lip height (the rows redder than the skin)."""
+    (x1, y1), (x2, y2) = mark['eyes']
+    cx, ey, ipd = (x1 + x2) / 2, (y1 + y2) / 2, x2 - x1
+    my = mark['mouth']
+    span = my - ey
+    h, w, _ = tile.shape
+    lum = tile[..., 0] * 0.3 + tile[..., 1] * 0.59 + tile[..., 2] * 0.11
+    smooth = nd.gaussian_filter(lum, 1.0)
+    cheek_row = int(ey + 0.5 * span)
+    skin = np.median(tile[cheek_row - 2: cheek_row + 3, int(cx - 0.6 * ipd): int(cx - 0.4 * ipd)].reshape(-1, 3), axis=0)
+    distance = np.linalg.norm(nd.gaussian_filter(tile, (1.5, 1.5, 0)) - skin, axis=2)
+    def extent(row, step):
+        x = cx
+        while 0 < x + step < w - 1 and distance[row, int(x + step)] < 0.09:
+            x += step
+        return x
+    face_width = (extent(cheek_row, 1) - extent(cheek_row, -1)) / ipd
+    nostril = int(ey + 0.8 * span)
+    profile = smooth[nostril - 1: nostril + 2].mean(axis=0)
+    left = slice(int(cx - 0.45 * ipd), int(cx - 0.06 * ipd))
+    right = slice(int(cx + 0.06 * ipd), int(cx + 0.45 * ipd))
+    nose_width = ((np.argmin(profile[right]) + right.start) - (np.argmin(profile[left]) + left.start)) / ipd
+    redness = tile[..., 0] - tile[..., 1]
+    band = redness[int(my - 0.35 * span): int(my + 0.35 * span), int(cx - 0.15 * ipd): int(cx + 0.15 * ipd)].mean(axis=1)
+    lips = float((band > (skin[0] - skin[1]) + 0.04).sum()) / ipd
+    return {'faceWidth': float(face_width), 'noseWidth': float(nose_width), 'lips': lips}
+
+
 def main():
     out = sys.argv[2]
     os.makedirs(f'{out}/tiles', exist_ok=True)
@@ -111,6 +141,8 @@ def main():
             meta[key] = {'sex': sex, 'region': name, 'box': [t, l, b, r], **landmarks(tile)}
             tiles[key] = tile
     refine(meta, tiles)
+    for key in meta:
+        meta[key]['measured'] = measure(tiles[key], meta[key])
     with open(f'{out}/tiles.json', 'w') as f:
         json.dump(meta, f, indent=0, default=int)
     print(len(meta), 'tiles')
