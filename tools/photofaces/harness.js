@@ -58,6 +58,20 @@
       builds: { region, names: ['lean', 'average', 'fat', 'age 20', 'age 45', 'age 72'] },
     };
   });
+  // Hair styles: two fighters a scene, each with a style (and one old man, balding).
+  const HAIR = [['buzz', 'bun'], ['cleanShort', 'ponytail'], ['midLong', 'long'], ['topknot', 'hime'], ['bald', 'ringlets'], ['cleanShort', 'midLong']];
+  HAIR.forEach(([man, woman], index) => {
+    const old = index === 5;
+    const look = (hairStyle, female) => ({ skinTone: 'light', hairStyle, hairColor: '#3a2a1c', facialHair: !female && index === 2 ? 'beard' : 'none', eyeColor: 'brown' });
+    SCENES[`face-hair${index}`] = {
+      about: `Hair: ${man} and ${woman}.`,
+      place: 'field', seed: 40 + index, frames: 10, distance: 2.6,
+      red: [{ preset: 'amateur', name: `m-${man}${old ? '-old' : ''}`, faceRegion: index % 2 ? 'italy' : 'england', age: old ? 64 : 28, look: look(man, false) }],
+      blue: [{ preset: 'contender', name: `f-${woman}`, faceRegion: index % 2 ? 'japan' : 'sweden', age: 26, look: look(woman, true) }],
+      camera: { focus: { centre: true, height: 1.25 }, yaw: 1.25, pitch: 0.1, distance: 4.4, fov: 40 },
+      hair: true,
+    };
+  });
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let bench = null;
 
@@ -149,6 +163,23 @@
             shots.push(await jpeg(`face-build-${region}-${slug}${mode ? `-${mode}` : ""}`, [380, 40, 520, 600]));
             aimAtHead(index, { turn: 1.2, distance: 0.75 });
             shots.push(await jpeg(`face-build-${region}-${slug}-profile${mode ? `-${mode}` : ""}`, [380, 40, 520, 600]));
+            aimAtHead(index, { turn: 0.6, distance: 0.75 });
+            shots.push(await jpeg(`face-build-${region}-${slug}-34${mode ? `-${mode}` : ""}`, [380, 40, 520, 600]));
+          }
+        }
+        return { shots };
+      }
+      if (verb === 'hair') {
+        const shots = [];
+        for (const scene of Object.keys(SCENES).filter((id) => SCENES[id].hair)) {
+          await window.__looks.stage(scene);
+          for (const [index, view] of window.boxer.state.views.entries()) {
+            if (!view.head) continue;
+            const name = view.fighter.body.inputs.name;
+            aimAtHead(index, { turn: 0.45, distance: 0.85 });
+            shots.push(await jpeg(`face-hair-${name}${mode ? `-${mode}` : ''}`, [380, 40, 520, 600]));
+            aimAtHead(index, { turn: 2.3, distance: 0.95 });
+            shots.push(await jpeg(`face-hair-${name}-back${mode ? `-${mode}` : ''}`, [380, 40, 520, 600]));
           }
         }
         return { shots };
@@ -206,6 +237,20 @@
       if (verb === 'casts') {
         await window.__looks.stage(mode);
         return { casts: window.boxer.state.views.map((view) => { let m = null; view.head?.group.traverse((o) => { if (o.material?.userData?.photoFace) m = o.material; }); return { name: view.fighter.body.inputs.name, face: m?.userData.photoFace, colour: m?.color.getHexString(), type: m?.type, bodySkin: view.fighter.body.inputs.look?.skinTone }; }) };
+      }
+      if (verb === 'uni') {
+        // Zero one shader setting at a time on the first fighter's face (finding what paints what).
+        await window.__looks.stage(mode);
+        const shots = [];
+        for (const setting of ['none', ...extra.split(',')]) {
+          window.boxer.scene.scene.traverse((o) => {
+            const u = o.material?.userData?.scalp;
+            if (u && u[setting]) u[setting].value = 0;
+          });
+          aimAtHead(0);
+          shots.push(await jpeg(`uni-${setting}`, [500, 150, 300, 300]));
+        }
+        return { shots };
       }
       if (verb === 'fill') {
         // Set the photo faces' fill (ambient scale) on the heads in the scene now, and for the next ones.

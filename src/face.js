@@ -20,7 +20,8 @@ import { outlineFor, STYLE, surface } from './toon.js';
 import { assignColour } from './looks/kit.js';
 import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint } from './facemorph.js';
 import { paintFromFace, PHOTO_ATLAS, photoSkinMaterial } from './photoface.js';
-import { buildPhotoHead } from './photohead.js';
+import { buildPhotoHead, PHOTO_HEAD } from './photohead.js';
+import { buildPhotoHair, photoScalp, scalpCover } from './photohair.js';
 
 export const LOOK_OPTIONS = {
   hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
@@ -47,13 +48,26 @@ export const FACE_SHAPES = {
   shonen: { jawWidth: 0.8, jawAt: 0.5, chinWidth: 0.16, chinLength: 1.0, chinForward: 0.74, faceFront: 0.84, cheek: 0, crown: 1.0, eye: { width: 0.34, height: 0.25, slant: 0.14, lash: 0.055 } },
   shojo: { jawWidth: 0.9, jawAt: 0.38, chinWidth: 0.16, chinLength: 0.9, chinForward: 0.7, faceFront: 0.88, cheek: 0.07, crown: 1.06, eye: { width: 0.38, height: 0.42, slant: 0, lash: 0.07 } },
   seinen: { jawWidth: 0.88, jawAt: 0.62, chinWidth: 0.32, chinLength: 1.14, chinForward: 0.8, faceFront: 0.86, cheek: 0, crown: 0.97, eye: { width: 0.3, height: 0.19, slant: 0.06, lash: 0.04 } },
-  // For a photographed face (photoface.js): a real head's broad jaw and chin, the face only a little flattened. Not a shape of
-  // its own: blended (PHOTO_SHAPE_SHARE) into the sex's drawn one, so the body's morph and the sex still shape the head.
-  photo: { jawWidth: 0.92, jawAt: 0.55, chinWidth: 0.46, chinLength: 1.08, chinForward: 0.82, faceFront: 0.92, cheek: 0.03, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
+  // For a photographed face (photoface.js, photohead.js): a real head's, an inverted egg from the front: widest at the temples
+  // and cheekbones, narrowing through the cheeks to the jaw's corners and on to a defined chin, the face taller than it is wide.
+  // A woman's jaw narrower and her chin smaller. The body widens them (photoShape): fat rounds the lower face, training squares
+  // the jaw, starving hollows the cheeks.
+  photo: { jawWidth: 0.8, jawAt: 0.56, chinWidth: 0.27, chinLength: 1.12, chinForward: 0.8, faceFront: 0.88, cheek: 0, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
+  photoFemale: { jawWidth: 0.74, jawAt: 0.52, chinWidth: 0.2, chinLength: 1.06, chinForward: 0.76, faceFront: 0.88, cheek: 0.02, crown: 1.02, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
 };
-// How much of FACE_SHAPES.photo a photo head takes over its drawn shape (the rest is the drawn one's).
-const PHOTO_SHAPE_SHARE = 0.6;
-const blendShapes = (a, b, share) => Object.fromEntries(Object.entries(a).map(([key, value]) => [key, typeof value === 'number' && typeof b[key] === 'number' ? value + (b[key] - value) * share : value]));
+/** A photo head's shape: its sex's real one, widened by the body (facemorph.js weights): fat, a trained jaw, starving. */
+function photoShape(female, morph) {
+  const base = FACE_SHAPES[female ? 'photoFemale' : 'photo'];
+  if (!morph) return base;
+  const { full = 0, gaunt = 0, square = 0 } = morph;
+  return {
+    ...base,
+    jawWidth: base.jawWidth + 0.15 * full - 0.04 * gaunt + 0.06 * square,
+    chinWidth: base.chinWidth + 0.24 * full + 0.06 * square,
+    cheek: base.cheek + 0.07 * full - 0.03 * gaunt,
+    chinLength: base.chinLength - 0.03 * full,
+  };
+}
 
 // Makeup (look.makeup): `eyes` 'smoky' (a dark shadow round the eye),
 // `liner` 'winged' (a heavy upper line flicked out), `lowerLash` 'heavy',
@@ -335,17 +349,16 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   // a real face's structure. The hair and a beard are drawn, in the photo's hair colour (stubble is the photo's shader's).
   const photo = look.photoFace ?? null;
   if (photo) Object.assign(look, { hairColor: photo.hair, facialHair: look.facialHair === 'stubble' ? 'none' : look.facialHair, makeup: null });
-  // Chosen from the design sheet: shonen for women, seinen for men (a photo head blends a real one's over it).
-  const sexShape = FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
-  const drawn = photo ? blendShapes(sexShape, FACE_SHAPES.photo, PHOTO_SHAPE_SHARE) : sexShape;
   // `faceMorph`: the face follows the body (facemorph.js): the skull, hair and beard bent alike, and a map of its shading.
   const morph = look.faceMorph ? faceMorphWeights(body) : null;
+  // Chosen from the design sheet: shonen for women, seinen for men; a photo head a real one's, shaped by the body (photoShape).
+  const drawn = photo ? photoShape(female, morph) : FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
   let shape = morph ? { ...drawn, morph } : drawn;
   const unmorphed = { ...drawn, morph: null };
   const photoHead = photo ? buildPhotoHead({
     radius: r,
     deform: (x, y, z) => deformPoint(x, y, z, unmorphed).map((value, axis) => value / SKULL[axis]),
-    skull: SKULL, shape, eyeLine: FACE.eyeLine, atlas: PHOTO_ATLAS, region: photo.shape, jitter: photo.jitter, coarse: Boolean(look.photoPainted),
+    skull: SKULL, shape, eyeLine: FACE.eyeLine, atlas: PHOTO_ATLAS, region: photo.shape, jitter: photo.jitter, coarse: Boolean(look.photoPainted), female,
   }) : null;
   if (photoHead) shape = { ...shape, photoPoint: photoHead.point };
   const group = new THREE.Group();
@@ -381,7 +394,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     ear.castShadow = true;
     if (photoHead) {
       // On the photo head's side (a broad skull's ears further out), read from the atlas where they sit.
-      ear.position.z *= 1 + 0.05 * (photo.shape.cephalic ?? 0);
+      ear.position.z *= (1 + 0.05 * (photo.shape.cephalic ?? 0)) * PHOTO_HEAD.anatomy.width;
       ear.updateMatrix();
       ear.geometry.applyMatrix4(ear.matrix);
       ear.position.set(0, 0, 0);
@@ -470,7 +483,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   // Mouth: a drawn line that opens into a dark mouth with the guard showing.
   // (A photo's mouth where its lips are: the atlas' lip line, photohead.js.)
   const photoMouth = (FACE.eyeLine / SKULL[1] + PHOTO_ATLAS.mouthShare * (-PHOTO_ATLAS.chinT * shape.chinLength - FACE.eyeLine / SKULL[1])) * SKULL[1];
-  const mouth = onSurface(new THREE.Group(), probe, raycaster, r, photo ? photoMouth : -0.6, 0, 0.004 * r);
+  const mouth = onSurface(new THREE.Group(), probe, raycaster, r, photo ? photoMouth * PHOTO_HEAD.anatomy.lowerLength * (1 + 0.05 * (photo.shape.faceLength ?? 0)) : -0.6, 0, 0.004 * r);
   const lineShape = new THREE.Shape();
   lineShape.moveTo(-0.12 * r, 0.01 * r);
   lineShape.quadraticCurveTo(0, -0.012 * r, 0.12 * r, 0.01 * r);
@@ -507,12 +520,47 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
 
   // Hair down the back hangs from the upper back, not the head (render.js hangs it: hairCurtain).
   const curtains = [];
-  const dangles = buildHair(group, look, r, shape, hairMaterial, female, curtains);
+  // A photo head's hair grows out of it (photohair.js: painted scalp and cards), its beard the same; the drawn hair is for the
+  // drawn head.
+  const dangles = photo ? [] : buildHair(group, look, r, shape, hairMaterial, female, curtains);
+  if (photo) {
+    let seed = Math.floor(photo.detail.seed * 1e4) + 1;
+    const random = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    const scalp = photoScalp(look.hairStyle, female, photo.age ?? 30, random);
+    const beard = look.facialHair === 'beard' || look.facialHair === 'longBeard' ? 0.85 : 0;
+    const mustache = look.facialHair === 'mustache' || look.facialHair === 'handlebar' || beard ? 0.85 : 0;
+    const uniforms = skinMaterial.userData.scalp;
+    if (uniforms) {
+      Object.assign(uniforms.faceHairline, { value: scalp.hairline });
+      Object.assign(uniforms.faceTemple, { value: scalp.temple });
+      Object.assign(uniforms.faceSideburn, { value: scalp.sideburn });
+      Object.assign(uniforms.faceHairNape, { value: scalp.nape });
+      Object.assign(uniforms.faceHairDensity, { value: scalp.density });
+      Object.assign(uniforms.faceCrown, { value: scalp.crown });
+      Object.assign(uniforms.faceHairSeed, { value: scalp.seed });
+      Object.assign(uniforms.faceBeard, { value: beard });
+      Object.assign(uniforms.faceMustache, { value: mustache });
+    }
+    // A crowd's head: the hair painted into its vertex colours.
+    if (look.photoPainted) {
+      const uv = skullGeometry.attributes.uv;
+      const colour = skullGeometry.attributes.color;
+      const hair = new THREE.Color(photo.hair);
+      for (let index = 0; index < uv.count; index += 1) {
+        const cover = scalpCover(uv.getX(index), uv.getY(index), scalp);
+        colour.setXYZ(index, ...[hair.r, hair.g, hair.b].map((value, channel) => colour.array[index * 3 + channel] + (value - colour.array[index * 3 + channel]) * cover));
+      }
+    }
+    photo.hairTriangles = buildPhotoHair({ group, head: photoHead, r, style: look.hairStyle, facialHair: look.facialHair, colour: new THREE.Color(photo.hair), scalp, random, coarse: Boolean(look.photoPainted) });
+  }
   // The beard in a material of its own: an open-faced helmet hides the hair, not the beard.
   const beardMaterial = hairMaterial.clone();
   // Over a photo face a drawn beard lets a little of the face (its stubble shadow) through, so it reads as hair, not a mask.
   if (photo) Object.assign(beardMaterial, { transparent: true, opacity: 0.8 });
-  buildFacialHair(group, look, r, shape, beardMaterial, dangles);
+  if (!photo) buildFacialHair(group, look, r, shape, beardMaterial, dangles);
 
   // ---- Expression -------------------------------------------------------
   const face = { blinkIn: 1 + Math.random() * 3, blinking: 0, lid: 0, mouth: 0, brow: 0, flush: 0, gaze: [0, 0], gazeIn: 1 };
@@ -578,7 +626,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   // beard too, unless the helmet leaves the face open (`beard`).
   function hideHair({ beard = false } = {}) {
     group.traverse((object) => {
-      if (object.isMesh && (object.material === hairMaterial || (!beard && object.material === beardMaterial))) object.visible = false;
+      if (object.isMesh && (object.material === hairMaterial || object.userData.photoHair || (!beard && (object.material === beardMaterial || object.userData.photoBeard)))) object.visible = false;
     });
     dangles.length = 0;
   }

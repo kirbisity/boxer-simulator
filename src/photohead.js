@@ -21,11 +21,17 @@ export const PHOTO_HEAD = {
   columns: 72,
   rows: 56,
   coarse: [36, 28],
-  // How much more the body's morph shows on a photo head (bounded as the morph is, by FACE_MORPH.most).
-  morphGain: 1.35,
+  // How much the body's morph shows on a photo head (its shape already widens with fat and training: face.js photoShape).
+  morphGain: 1.0,
+  // The skull's anatomy over the drawn construction (unit space): the occiput behind, hollow temples, the cheekbones' breadth,
+  // the step under the jaw's edge.
+  // And a real head's proportions over the drawn one's: narrower (`width`: breadth about 0.8 of its length) and the face below
+  // the eyes longer (`lowerLength`), so from the front the face is taller than it is wide (hairline to chin about 1.3 times the
+  // cheekbones' width).
+  anatomy: { occiput: 0.08, temple: 0.045, zygoma: 0.03, jawEdge: 0.09, width: 0.85, lowerLength: 1.12 },
   // The face's structure, of the head's radius (unit space) and of the atlas (u round, rows down), before the region's changes.
   nose: { root: 0.05, tip: 0.2, width: 0.013, tipWidth: 0.022, tipHeight: 0.018, wing: 0.06, wingAt: 0.024 },
-  brow: { height: 0.045, width: 0.05, depth: 0.016, above: 0.05 },
+  brow: { height: 0.03, width: 0.055, depth: 0.024, above: 0.05 },
   socket: { depth: 0.05, width: 0.032, height: 0.022, eyeball: 0.025 },
   cheekbone: { height: 0.045, at: 0.115, below: 0.07, width: 0.045, depth: 0.035 },
   lips: { upper: 0.032, lower: 0.036, width: 0.034 },
@@ -62,14 +68,37 @@ function headSpaced(count, from, to, density) {
   return values;
 }
 
-/** The region's changes to the head's shape (unit space, before the morph): skull breadth, face length, jaw. */
-function applyRegionShape(point, region) {
+/** How much longer the face below the eyes is than the drawn head's: a real face's, and the region's face length. */
+const lowerScale = (region) => PHOTO_HEAD.anatomy.lowerLength * (1 + 0.05 * (region.faceLength ?? 0));
+
+/**
+ * A real skull's anatomy and the region's changes over the drawn construction (unit space, before the morph): the cranium long
+ * behind (the occiput past the neck), hollow temples, the cheekbones' breadth, the jaw's edge stepping in to the throat (less on
+ * a fat face), and the region's skull breadth, face length and jaw.
+ */
+function applyRegionShape(point, region, body = {}) {
   let [x, y, z] = point;
+  const a = PHOTO_HEAD.anatomy;
+  const full = body.full ?? 0;
+  const across = Math.abs(z);
+  const azimuth = Math.atan2(across, x);
+  // The occiput: the back of the cranium further back, most at the level of the ears and above.
+  if (x < 0) x *= 1 + a.occiput * headSmooth(-0.55, -0.1, y) * headSmooth(1.05, 0.7, y);
+  // Temples: hollow above the cheekbones, in front of the ears (fat fills them).
+  const temple = Math.exp(-(((y - 0.22) / 0.16) ** 2)) * Math.exp(-(((azimuth - 1.05) / 0.28) ** 2)) * (1 - full);
+  // Cheekbones: the face's widest, just under the eyes towards the ears.
+  const zygoma = Math.exp(-(((y + 0.12) / 0.11) ** 2)) * Math.exp(-(((azimuth - 1.3) / 0.3) ** 2)) * (1 + 0.5 * (region.cheekbone ?? 0));
+  const radial = 1 - a.temple * temple + a.zygoma * zygoma;
+  x *= radial;
+  z *= radial;
+  // The jaw's edge: under the jaw, from the chin round to its corners, the surface steps in towards the throat.
+  const under = headSmooth(-0.72, -0.98, y) * headSmooth(0.35, 0.85, azimuth) * (1 - 0.7 * full);
+  z *= 1 - a.jawEdge * under;
   const ceph = region.cephalic ?? 0;
-  z *= 1 + 0.05 * ceph;
+  z *= (1 + 0.05 * ceph) * a.width;
   x *= 1 - 0.035 * ceph;
   if (y < 0) {
-    y *= 1 + 0.05 * (region.faceLength ?? 0);
+    y *= lowerScale(region);
     z *= 1 + 0.06 * (region.jaw ?? 0) * headSmooth(-0.35, -0.85, y) - 0.03 * (region.faceLength ?? 0) * headSmooth(-0.2, -0.7, y);
   }
   return [x, y, z];
@@ -136,7 +165,7 @@ function faceStructure(du, row, marks, region) {
  * `atlas`: PHOTO_ATLAS; `region`: the fighter's shape changes; `jitter`: his proportions; `coarse`: a crowd's head.
  * `point` gives the head's surface without the face's structure (for hair and beards, which sit on it).
  */
-export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, region = {}, jitter = {}, coarse = false }) {
+export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, region = {}, jitter = {}, coarse = false, female = false }) {
   const [columns, rows] = coarse ? PHOTO_HEAD.coarse : [PHOTO_HEAD.columns, PHOTO_HEAD.rows];
   const azimuths = headSpaced(columns, -Math.PI, Math.PI, (az) => 1 + 3 * Math.exp(-((az / 0.9) ** 2)));
   const polars = headSpaced(rows, 0, Math.PI, (polar) => 1 + 2.5 * Math.exp(-(((polar - 2.0) / 0.7) ** 2)));
@@ -148,15 +177,17 @@ export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, r
   };
   // The head without its face: the drawn shape and the region's (unit space).
   const base = [];
-  for (const polar of polars) for (const az of azimuths) base.push(applyRegionShape(deform(Math.sin(polar) * Math.cos(az), Math.cos(polar), Math.sin(polar) * Math.sin(az)), region));
+  const body = { ...(morph ?? {}), female };
+  for (const polar of polars) for (const az of azimuths) base.push(applyRegionShape(deform(Math.sin(polar) * Math.cos(az), Math.cos(polar), Math.sin(polar) * Math.sin(az)), region, body));
   const stride = columns + 1;
   const widths = polars.map((_, row) => Math.max(1e-4, ...base.slice(row * stride, row * stride + stride).map((p) => Math.abs(p[2]))));
   const heights = polars.map((_, row) => base[row * stride][1]);
   const marks = photoLandmarks(atlas, jitter);
-  const eye = eyeLine / skull[1];
-  const chinAt = -atlas.chinT * shape.chinLength;
+  // (The landmarks' heights on the head as built: the face below the eyes is longer, applyRegionShape.)
+  const eye = (eyeLine / skull[1]) * lowerScale(region);
+  const chinAt = -atlas.chinT * shape.chinLength * lowerScale(region);
   const mouthAt = eye + atlas.mouthShare * (chinAt - eye);
-  const knots = [[1, 1], [atlas.hairlineAt, 1 - atlas.hairlineRow], [eye, 1 - marks.eyeRow], [mouthAt, 1 - marks.mouthRow], [chinAt, 1 - atlas.chinRow], [-shape.chinLength, 0]];
+  const knots = [[1, 1], [atlas.hairlineAt, 1 - atlas.hairlineRow], [eye, 1 - marks.eyeRow], [mouthAt, 1 - marks.mouthRow], [chinAt, 1 - atlas.chinRow], [-shape.chinLength * lowerScale(region), 0]];
   const vOf = (y) => {
     const height = y >= 0 ? Math.asin(Math.min(1, y / (shape.crown * (1 + 0.0)))) / (Math.PI / 2) : Math.max(-shape.chinLength * 1.1, y);
     for (let knot = 1; knot < knots.length; knot += 1) {
@@ -257,7 +288,7 @@ export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, r
     },
     /** The head's surface without the face (unit space, skull scale applied, no radius): for hair and beards to sit on. */
     point: (x, y, z) => {
-      const p = morphed(applyRegionShape(deform(x, y, z), region));
+      const p = morphed(applyRegionShape(deform(x, y, z), region, body));
       return [p[0] * skull[0], p[1] * skull[1], p[2] * skull[2]];
     },
     most: FACE_MORPH.most,

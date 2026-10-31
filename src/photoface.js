@@ -23,6 +23,7 @@
 
 /* global THREE */
 import { nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL } from './faceregions.js';
+import { SCALP_GLSL } from './photohair.js';
 
 /**
  * Where the landmarks sit in the atlas: u from the face's centre (eyes, ears); rows from the crown (eye line, lip line, chin, and
@@ -199,7 +200,17 @@ uniform float faceRedness;
 uniform float faceWrinkles;
 uniform float faceFill;
 uniform vec3 faceHairTint;
-float faceHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }`;
+uniform float faceHairline;
+uniform float faceTemple;
+uniform float faceSideburn;
+uniform float faceHairNape;
+uniform float faceHairDensity;
+uniform float faceCrown;
+uniform float faceHairSeed;
+uniform float faceBeard;
+uniform float faceMustache;
+float faceHash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+${SCALP_GLSL}`;
 
 /**
  * The head's material for a face: lit (standard), the two faces' albedos blended in the shader with the fighter's detail painted
@@ -236,13 +247,18 @@ export function photoSkinMaterial(cast, { painted = false } = {}) {
     faceDetail: { value: photoTexture('detail.png') }, faceWrinkleMap: { value: photoTexture('wrinkles.png') }, facePores: { value: pores },
     faceSeed: { value: d.seed }, faceStubble: { value: d.stubble }, faceFreckles: { value: d.freckles }, faceMoles: { value: d.moles },
     faceRedness: { value: d.redness }, faceWrinkles: { value: d.wrinkles }, faceFill: { value: PHOTO_FACES.fill }, faceHairTint: { value: tint },
+    // The painted scalp and beard (photohair.js photoScalp; face.js sets them once the style is known): bald until then.
+    faceHairline: { value: 0.2 }, faceTemple: { value: 0 }, faceSideburn: { value: 0.5 }, faceHairNape: { value: 0.64 }, faceHairDensity: { value: 0 },
+    faceCrown: { value: 0 }, faceHairSeed: { value: 0 }, faceBeard: { value: 0 }, faceMustache: { value: 0 },
   };
   const [eyeHalfU, eyeHalfV] = PHOTO_ATLAS.eyeHalf;
   const lidTone = (photoManifest.neutral * 0.92).toFixed(3);
   const normals = THREE.ShaderChunk.normal_fragment_maps.replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;', `vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;
 	vec4 faceMask = texture2D( faceDetail, vUv );
-	mapN.xy += ( texture2D( faceWrinkleMap, vUv ).xy * 2.0 - 1.0 ) * faceWrinkles * 0.35;
-	mapN.xy += ( texture2D( facePores, vUv * vec2( 40.0, 20.0 ) ).xy * 2.0 - 1.0 ) * 0.5 * faceMask.a;`);
+	mapN.xy += ( texture2D( faceWrinkleMap, vUv ).xy * 2.0 - 1.0 ) * faceWrinkles * 0.2;
+	mapN.xy += ( texture2D( facePores, vUv * vec2( 40.0, 20.0 ) ).xy * 2.0 - 1.0 ) * 0.5 * faceMask.a;
+	float scalpN = faceScalp( vUv );
+	mapN.x += ( faceNoise( vec2( vUv.x * 900.0, ( 1.0 - vUv.y ) * 45.0 + faceHairSeed ) ) - 0.5 ) * 1.2 * scalpN;`);
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.fragmentShader = shader.fragmentShader
@@ -262,6 +278,12 @@ vec2 moleCell = vUv * vec2(110.0, 55.0);
 float mole = step(faceHash(floor(moleCell) + faceSeed * 3.3), faceMoles) * smoothstep(0.2, 0.1, length(fract(moleCell) - 0.5));
 texelColor.rgb *= 1.0 - vec3(0.45, 0.5, 0.5) * mole * faceArea.a;
 texelColor.rgb *= 1.0 - faceArea.b * faceWrinkles * 0.1;
+// The scalp's hair, painted to an irregular hairline (photohair.js), and a beard's or moustache's density under its cards.
+float strandTone = faceNoise(vec2(vUv.x * 900.0, (1.0 - vUv.y) * 45.0 + faceHairSeed));
+vec3 hairTone = faceHairTint * ${photoManifest.neutral.toFixed(3)} * (0.65 + 0.7 * strandTone);
+texelColor.rgb = mix(texelColor.rgb, hairTone, faceScalp(vUv));
+float beardCover = faceArea.r * clamp(faceBeard + faceMustache * step(1.0 - vUv.y, ${(PHOTO_ATLAS.mouthRow - 0.006).toFixed(3)}), 0.0, 1.0);
+texelColor.rgb = mix(texelColor.rgb, hairTone, beardCover * (0.5 + 0.45 * step(0.45, faceHash(floor(vUv * vec2(1100.0, 550.0)) + faceSeed))));
 // The eyelids: down over each eye from its top, as far as faceLid, in the skin's own neutral.
 for (int side = -1; side <= 1; side += 2) {
   vec2 eye = vec2(0.5 + float(side) * ${PHOTO_ATLAS.eyeU.toFixed(4)}, ${(1 - PHOTO_ATLAS.eyeRow).toFixed(4)});
@@ -280,6 +302,7 @@ diffuseColor *= texelColor;`)
   material.userData.photoFace = cast.id;
   material.userData.lid = uniforms.faceLid;
   material.userData.fill = uniforms.faceFill;
+  material.userData.scalp = uniforms;
   material.userData.faceTextures = [uniforms.faceMap2.value, uniforms.faceDetail.value, uniforms.faceWrinkleMap.value, pores];
   return material;
 }
