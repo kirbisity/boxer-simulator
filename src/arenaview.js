@@ -56,20 +56,19 @@ function lathe(profile, material, segments = 32, start = 0, length = Math.PI * 2
  * head's radius), by `head.style`: thraex (griffin crest, feathers),
  * hoplomachus (brushed crest, feathers), murmillo (the fish's fin), secutor
  * (the smooth egg), scissor (the round smooth helmet). `bronze` is the
- * metal, `head` the design (colour, plume).
+ * metal, `head` the design (colour, plume). Returns whether it is fitted over
+ * the head (helmforms.js HELM_HEAD: the remodelled ones).
  */
 export function buildArenaHelm(group, head, r, bronze) {
   const style = head.style ?? 'hoplomachus';
   // The remodelled helmets (helmforms.js); `#helmets=now` draws them as they were, for comparison (helmstyle.js).
   if (HELM_STYLE.helmets !== 'now' && HELM_FORMS[style]) {
     formedHelm(group, head, r, bronze, style);
-    return;
+    return true;
   }
-  if (style === 'secutor' || style === 'scissor') {
-    smoothHelm(group, head, r, bronze, style === 'secutor');
-    return;
-  }
-  brimmedHelm(group, head, r, bronze, style);
+  if (style === 'secutor' || style === 'scissor') smoothHelm(group, head, r, bronze, style === 'secutor');
+  else brimmedHelm(group, head, r, bronze, style);
+  return false;
 }
 
 /** The visored helmets: bowl, a broad brim rolled at the edge, a grilled visor, and the crest of the kind. */

@@ -2,8 +2,8 @@
 // arenaview.js and unwrapped for the baked relief (tools/blender/helmforms.py reads the same surfaces through
 // tools/helmforms-dump.mjs). Plain (no Three.js).
 //
-// Head coordinates as in arenaview.js and wardrobe.js: x forward, y up, z left, in head radii (r ≈ 11.5 cm), the head's
-// centre at the origin, the chin near y = -1.45, the eyes near y = 0.15.
+// Head coordinates as in arenaview.js and wardrobe.js: x forward, y up, z left, in head radii (r ≈ 11 cm as drawn), the
+// head's centre at the origin, the chin near y = -1.33, the eyes near y = -0.07, the nose's tip at y = -0.5.
 //
 // Two kinds of surface, both symmetric about the face's middle (z = 0) and both parametrised by (u, v), u from -1 (right)
 // to 1 (left) and v from 0 to 1; their texture coordinates are (|u|, v), so a sheet holds one half at twice the detail:
@@ -11,44 +11,152 @@
 //   loft   rings round the upright axis, u the angle (u · span · π from the front), v formAlong the stations. A station's
 //          height `y` and radius `rad` are a number or K values evenly from the front (0) to the edge of the part
 //          (span · π), interpolated smoothly round it; stations are interpolated smoothly formAlong v (each span cut `sub` times).
+//          A loft with a `fit` is fitted over the head (HELM_HEAD, formFitStations): its stations are made from the head's
+//          outline, a padding gap out from it, from the given foot up to the crown.
 //   sweep  sections formAlong a spine in the middle plane, v formAlong the stations, u round the section (0 at the `top` side,
 //          ±1 at the `bottom`). A station is a pair of points `bottom`/`top` (x, y) and a half-width `w` (`wt` at the top,
 //          if it differs), or a tube's centre `at`, radius `r` and side-to-side ratio `rz`. `square` (< 1) squares the
-//          section off (a box-like crest); 1 is an ellipse.
+//          section off (a box-like crest); 1 is an ellipse. A sweep with a `seat` (the name of a fitted part) stands on that
+//          part: a station's `foot` x puts its bottom just inside the part's surface in the middle plane, and its top is the
+//          given `top` (x, y), or `rise` [dx, height] from the surface at its foot.
 //
 // Proportions from the surviving helmets (see helmmaps.js for the references): the Pompeii barracks finds in Naples (MANN
 // inv. 5672-5674 murmillo, 5649 thraex, 5642 secutor) and the British Museum's murmillo (1946,0514.1, 46 cm high, about
 // 3.5 kg); the Louvre's thraex from Pompeii (Br 1108, 38 cm). Where a helmet is 40-46 cm overall on a head of r = 11.5 cm,
-// it spans about 4 r from the visor's foot to the crest's top.
+// it spans about 4 r from the visor's foot to the crest's top. A bowl is not a ball: it follows the skull inside it, longer
+// front to back than it is broad (a skull's breadth about 0.75-0.8 of its length), its sides flatter, the brow sloping back
+// and the occiput full, a padding of 1-2 cm (the lining) between.
 
 const HELM_PI = Math.PI;
+
+// ---- The head inside -----------------------------------------------------------------------------------------------------
+
+/**
+ * The head the helmets are fitted over: the game's head (photohead.js, the default; drawn with HEAD_SCALE as the rest of the
+ * head), measured in the game over small and large, lean and fat fighters and long- and broad-headed regions (Korea, Central
+ * Asia, West Africa, a woman), the greatest of them: at each height `y` (head radii), the head's greatest distance from the
+ * upright axis at keys every sixteenth of a turn from the face (0) round to the back (π). The cranium is about 2.0 r long and
+ * 1.45-1.5 r broad (a cranial index of 0.7-0.76), its widest just above the ears, the brow sloping back from y = 0.2, the
+ * occiput fullest at the ears' height, the crown at `crown`. Below the eyes, the face: the nose's tip (y = -0.5) at the front,
+ * the cheeks (fullest on a fat face) and the jaw. The ears stand out to about 0.77 at the sides, y -0.3 to 0.14.
+ */
+export const HELM_HEAD = {
+  crown: 1.09,
+  rows: [
+    [-1.3, [0.81, 0.71, 0.63, 0.57, 0.52, 0.5, 0.46, 0.43, 0.41]],
+    [-1.2, [0.84, 0.77, 0.67, 0.63, 0.56, 0.56, 0.5, 0.45, 0.42]],
+    [-1.1, [0.84, 0.79, 0.72, 0.67, 0.64, 0.61, 0.56, 0.48, 0.46]],
+    [-1.0, [0.82, 0.79, 0.81, 0.76, 0.69, 0.69, 0.63, 0.53, 0.51]],
+    [-0.9, [0.82, 0.82, 0.86, 0.83, 0.77, 0.77, 0.7, 0.6, 0.56]],
+    [-0.8, [0.89, 0.85, 0.88, 0.86, 0.84, 0.82, 0.75, 0.64, 0.61]],
+    [-0.7, [0.9, 0.87, 0.91, 0.89, 0.87, 0.87, 0.81, 0.73, 0.67]],
+    [-0.6, [0.9, 0.9, 0.95, 0.95, 0.86, 0.87, 0.82, 0.77, 0.75]],
+    [-0.5, [1.15, 1.0, 0.98, 0.97, 0.84, 0.85, 0.84, 0.81, 0.81]],
+    [-0.4, [1.11, 0.98, 0.97, 0.95, 0.81, 0.83, 0.83, 0.88, 0.9]],
+    [-0.3, [1.05, 0.96, 0.95, 0.91, 0.8, 0.82, 0.86, 0.94, 0.96]],
+    [-0.2, [1.04, 0.96, 0.93, 0.87, 0.8, 0.83, 0.89, 0.99, 1.01]],
+    [-0.1, [1.02, 0.93, 0.88, 0.83, 0.79, 0.8, 0.89, 1.01, 1.04]],
+    [0.0, [1.02, 0.97, 0.87, 0.8, 0.76, 0.79, 0.9, 1.02, 1.04]],
+    [0.1, [1.0, 0.97, 0.87, 0.78, 0.75, 0.78, 0.89, 1.01, 1.04]],
+    [0.2, [0.98, 0.96, 0.85, 0.77, 0.74, 0.77, 0.89, 1.0, 1.03]],
+    [0.3, [0.94, 0.92, 0.83, 0.76, 0.72, 0.76, 0.87, 0.98, 1.01]],
+    [0.4, [0.89, 0.88, 0.8, 0.72, 0.69, 0.73, 0.83, 0.94, 0.96]],
+    [0.5, [0.86, 0.85, 0.77, 0.7, 0.67, 0.7, 0.8, 0.91, 0.93]],
+    [0.6, [0.81, 0.8, 0.73, 0.66, 0.63, 0.66, 0.77, 0.86, 0.88]],
+    [0.7, [0.73, 0.72, 0.65, 0.59, 0.57, 0.59, 0.68, 0.77, 0.79]],
+    [0.8, [0.67, 0.65, 0.59, 0.54, 0.52, 0.54, 0.62, 0.7, 0.72]],
+    [0.9, [0.58, 0.57, 0.52, 0.47, 0.45, 0.47, 0.54, 0.6, 0.62]],
+    [1.0, [0.42, 0.41, 0.37, 0.34, 0.32, 0.33, 0.37, 0.42, 0.43]],
+  ],
+};
+const HELM_HEAD_KEYS = HELM_HEAD.rows[0][1].length;
+/** The cranium's half-breadth over the ears' tops (y > 0.15) the helmets are fitted to: a broader head widens them (render.js). */
+export const HELM_HEAD_BREADTH = Math.max(...HELM_HEAD.rows.filter(([y]) => y > 0.15).map(([, keys]) => keys[(HELM_HEAD_KEYS - 1) / 2]));
+
+/** A keyed value (a number, or keys evenly round from the front) as `count` keys. */
+function formResample(value, count = HELM_HEAD_KEYS) {
+  return Array.from({ length: count }, (_, index) => formKeyed(value, index / (count - 1)));
+}
+
+/**
+ * The outline of a fitted surface in one half-plane (key `k` of HELM_HEAD's, from the face round to the back): the head's
+ * outline pushed out along its normal by the padding, `gap` at the sides growing to `top` over the crown, raised by `lift`
+ * at the top (a taller bowl); and never narrower below than above (it must go on over the head: below the head's widest it
+ * falls straight). Points (rad, y) from the bottom up to the top, where rad is 0.
+ */
+function formFitOutline(k, { gap, top = gap, lift = 0 }) {
+  const head = [...HELM_HEAD.rows.map(([y, rads]) => [rads[k], y]), [0, HELM_HEAD.crown]];
+  const out = head.map(([rad, y], index) => {
+    const before = head[Math.max(0, index - 1)];
+    const after = head[Math.min(head.length - 1, index + 1)];
+    const tx = after[0] - before[0];
+    const ty = after[1] - before[1];
+    const length = Math.hypot(tx, ty) || 1;
+    const normal = index === head.length - 1 ? [0, 1] : [ty / length, -tx / length];
+    const up = Math.max(0, normal[1]);
+    const pad = gap + (top - gap) * up * up;
+    return [rad + normal[0] * pad, y + normal[1] * pad + lift * up * up];
+  });
+  for (let index = out.length - 2; index >= 0; index -= 1) out[index][0] = Math.max(out[index][0], out[index + 1][0]);
+  for (let index = 1; index < out.length; index += 1) out[index][1] = Math.max(out[index][1], out[index - 1][1] + 1e-3);
+  return out;
+}
+
+/** An outline's radius at height y (straight down below its lowest point). */
+function formOutlineAt(outline, y) {
+  if (y <= outline[0][1]) return outline[0][0];
+  for (let index = 1; index < outline.length; index += 1) {
+    const [r0, y0] = outline[index - 1];
+    const [r1, y1] = outline[index];
+    if (y <= y1) return r0 + ((r1 - r0) * (y - y0)) / (y1 - y0);
+  }
+  return 0;
+}
+
+/**
+ * A fitted surface's stations: `rows` + 1 rings from its `foot` (heights, keyed round from the front) up to the top, spaced
+ * evenly along the outline at each key (formFitOutline: `gap`, `top`, `lift`). Each station's keys are HELM_HEAD's.
+ */
+export function formFitStations(fit) {
+  const foot = formResample(fit.foot);
+  const keys = foot.map((footY, k) => {
+    const outline = formFitOutline(k, fit);
+    const points = [[formOutlineAt(outline, footY), footY], ...outline.filter(([, y]) => y > footY + 1e-3)];
+    const along = [0];
+    for (let index = 1; index < points.length; index += 1) along.push(along[index - 1] + Math.hypot(points[index][0] - points[index - 1][0], points[index][1] - points[index - 1][1]));
+    const total = along.at(-1);
+    return Array.from({ length: fit.rows + 1 }, (_, row) => {
+      const at = (total * row) / fit.rows;
+      let index = 1;
+      while (index < points.length - 1 && along[index] < at) index += 1;
+      const share = (at - along[index - 1]) / Math.max(1e-9, along[index] - along[index - 1]);
+      return points[index - 1].map((value, axis) => value + (points[index][axis] - value) * share);
+    });
+  });
+  return Array.from({ length: fit.rows + 1 }, (_, row) => ({ rad: keys.map((ring) => Math.max(0, ring[row][0])), y: keys.map((ring) => ring[row][1]) }));
+}
 
 // ---- The forms ---------------------------------------------------------------------------------------------------------
 
 // Where the bowl of a brimmed helmet ends and its brim begins, keys every eighth of a turn from the front: over the brow
 // in front, falling past the ears at the sides to the nape behind (the brim is the helmet's neck guard).
-const BRIM_FOOT = { y: [0.3, 0.12, -0.26, -0.58, -0.7], rad: [1.2, 1.22, 1.25, 1.27, 1.28] };
+const BRIM_FOOT_Y = [0.3, 0.12, -0.26, -0.58, -0.7];
+// The bowl of the brimmed helmets (murmillo, thraex, hoplomachus) fitted over the head from that foot to the crown: a
+// padding of about 1.6 cm at the sides, front and back (0.15 r), a little more over the crown, where the crest's foot
+// stands. `lift`: how much higher the crown stands (the thraex's is the taller).
+const formBowlFit = (lift = 0) => ({ foot: BRIM_FOOT_Y, gap: 0.15, top: 0.2, lift, rows: 12 });
+const BRIM_FOOT = formFitStations(formBowlFit())[0];
 const formPlus = (keys, add) => keys.map((value, index) => value + (typeof add === 'number' ? add : add[index]));
 
-// The bowl of the brimmed helmets (murmillo, thraex, hoplomachus): stations from its foot to its crown. `lift`: how much
-// higher the crown stands (the thraex's is the taller).
-const formBowl = (lift = 0) => ({
-  kind: 'loft', span: 1, seg: [40, 3], region: 'bowl', look: 'metal', ink: true,
-  stations: [
-    BRIM_FOOT,
-    { y: [0.8, 0.72, 0.56, 0.4, 0.34], rad: [1.18, 1.21, 1.23, 1.25, 1.26] },
-    { y: 1.16 + lift * 0.5, rad: [0.96, 1.0, 1.02, 1.03, 1.04] },
-    { y: 1.45 + lift, rad: [0.52, 0.56, 0.58, 0.58, 0.58] },
-    { y: 1.53 + lift, rad: 0 },
-  ],
-});
+const formBowl = (lift = 0) => ({ kind: 'loft', span: 1, seg: [40, 1], region: 'bowl', look: 'metal', ink: true, fit: formBowlFit(lift) });
 
-// The brim, from the bowl's foot out to the rolled lip: turned up over the brow at the front (`peak`: how high, `front`:
-// how far out it reaches), broad and near level at the sides (`side`), widest and sloping down behind (`back`, `droop`).
+// The brim, from the bowl's foot out to the rolled lip: turned up over the brow at the front (`peak`: how high), reaching
+// out from the bowl `front` at the front, broad and near level at the sides (`side`), widest and sloping down behind
+// (`back`, `droop`).
 const formBrim = ({ peak, front, side, back, droop }) => {
-  const out = [front, (front + side) / 2 + 0.05, side, (side + back) / 2 + 0.03, back];
-  const fall = [peak, 0.04, -0.08, -droop * 0.7, -droop];
-  const at = (share) => ({ y: formPlus(BRIM_FOOT.y, fall.map((value) => value * share)), rad: BRIM_FOOT.rad.map((value, index) => value + (out[index] - value) * share) });
+  const reach = formResample([front, (front + side) / 2 + 0.05, side, (side + back) / 2 + 0.03, back]);
+  const fall = formResample([peak, 0.04, -0.08, -droop * 0.7, -droop]);
+  const at = (share) => ({ y: formPlus(BRIM_FOOT.y, fall.map((value) => value * share)), rad: formPlus(BRIM_FOOT.rad, reach.map((value) => value * share)) });
   const outer = at(1);
   return {
     kind: 'loft', span: 1, seg: [48, 2], region: 'brim', look: 'metal', ink: true, double: true, flip: true,
@@ -57,20 +165,22 @@ const formBrim = ({ peak, front, side, back, droop }) => {
 };
 
 // The visor: two halves closing over the face from under the brim to below the chin, the foot flared over the throat;
-// keys from the middle seam round to the hinges by the ears, where its top edge meets the brim's falling foot.
+// keys from the middle seam round to the hinges by the ears, where its top edge meets the brim's falling foot, just
+// outside the bowl. Its sides follow the face (the cheeks of a heavy man inside, 1.5-2 cm off), its front stands clear
+// of the nose.
 const formVisor = (top = 0.32) => ({
   kind: 'loft', span: 0.47, seg: [24, 3], region: 'visor', look: 'visor', ink: true, double: true,
   stations: [
-    { y: [-1.58, -1.52, -1.38], rad: [1.32, 1.29, 1.22] },
-    { y: [-1.3, -1.25, -1.15], rad: [1.2, 1.18, 1.14] },
-    { y: [-0.7, -0.7, -0.68], rad: [1.31, 1.27, 1.2] },
-    { y: [0.02, -0.04, -0.16], rad: [1.33, 1.3, 1.25] },
-    { y: [top, top - 0.12, -0.2], rad: [1.25, 1.25, 1.27] },
+    { y: [-1.58, -1.52, -1.38], rad: [1.3, 1.16, 1.0] },
+    { y: [-1.3, -1.25, -1.15], rad: [1.18, 1.08, 0.95] },
+    { y: [-0.7, -0.7, -0.68], rad: [1.3, 1.2, 1.03] },
+    { y: [0.02, -0.04, -0.16], rad: [1.31, 1.18, 1.0] },
+    { y: [top, top - 0.12, -0.2], rad: [1.16, 1.08, 0.95] },
   ],
 });
 
 // The side feathers in their tubes (thraex and hoplomachus): where the tube stands on the bowl, how many feathers.
-const HELM_FEATHERS = { at: [-0.05, 0.86, 1.18], tilt: 0.3 };
+const HELM_FEATHERS = { at: [-0.05, 0.8, 0.76], tilt: 0.3 };
 
 export const HELM_FORMS = {
   // Murmillo (Pompeii MANN 5672-5674, BM 1946,0514.1): a broad brim, nearly flat at the sides, turned up in a peak over
@@ -82,19 +192,19 @@ export const HELM_FORMS = {
     grille: 'panel',
     parts: {
       bowl: formBowl(0),
-      brim: formBrim({ peak: 0.32, front: 1.44, side: 1.86, back: 2.02, droop: 0.38 }),
+      brim: formBrim({ peak: 0.32, front: 0.24, side: 0.61, back: 0.74, droop: 0.38 }),
       visor: formVisor(0.34),
       crest: {
-        kind: 'sweep', seg: [12, 4], region: 'crest', look: 'metal', ink: true, square: 0.55,
+        kind: 'sweep', seg: [12, 4], region: 'crest', look: 'metal', ink: true, square: 0.55, seat: 'bowl',
         stations: [
-          { bottom: [1.02, 1.0], top: [1.08, 1.12], w: 0.05 },
-          { bottom: [0.86, 1.14], top: [1.22, 2.02], w: 0.1, wt: 0.17 },
-          { bottom: [0.38, 1.36], top: [0.72, 2.4], w: 0.1, wt: 0.19 },
-          { bottom: [-0.22, 1.42], top: [-0.02, 2.48], w: 0.1, wt: 0.19 },
-          { bottom: [-0.8, 1.2], top: [-0.78, 2.3], w: 0.1, wt: 0.17 },
-          { bottom: [-1.12, 0.78], top: [-1.32, 1.76], w: 0.09, wt: 0.14 },
-          { bottom: [-1.2, 0.42], top: [-1.46, 0.98], w: 0.06 },
-          { bottom: [-1.24, 0.34], top: [-1.32, 0.44], w: 0.03 },
+          { foot: 0.8, rise: [0.06, 0.12], w: 0.05 },
+          { foot: 0.66, top: [1.22, 2.02], w: 0.1, wt: 0.17 },
+          { foot: 0.3, top: [0.72, 2.4], w: 0.1, wt: 0.19 },
+          { foot: -0.18, top: [-0.02, 2.48], w: 0.1, wt: 0.19 },
+          { foot: -0.66, top: [-0.78, 2.3], w: 0.1, wt: 0.17 },
+          { foot: -0.98, top: [-1.32, 1.76], w: 0.09, wt: 0.14 },
+          { foot: -1.12, top: [-1.46, 0.98], w: 0.06 },
+          { foot: -1.17, rise: [-0.08, 0.1], w: 0.03 },
         ],
       },
       plume: {
@@ -120,17 +230,17 @@ export const HELM_FORMS = {
     feathers: { ...HELM_FEATHERS, perSide: 2 },
     parts: {
       bowl: formBowl(0.12),
-      brim: formBrim({ peak: 0.5, front: 1.4, side: 1.74, back: 1.98, droop: 0.42 }),
+      brim: formBrim({ peak: 0.5, front: 0.2, side: 0.49, back: 0.7, droop: 0.42 }),
       visor: formVisor(0.36),
       crest: {
-        kind: 'sweep', seg: [12, 4], region: 'crest', look: 'metal', ink: true, square: 0.7,
+        kind: 'sweep', seg: [12, 4], region: 'crest', look: 'metal', ink: true, square: 0.7, seat: 'bowl',
         stations: [
-          { bottom: [-1.18, 0.5], top: [-1.26, 0.62], w: 0.03 },
-          { bottom: [-1.04, 0.86], top: [-1.24, 1.32], w: 0.08, wt: 0.1 },
-          { bottom: [-0.5, 1.44], top: [-0.62, 2.02], w: 0.09, wt: 0.11 },
-          { bottom: [0.16, 1.62], top: [0.2, 2.2], w: 0.09, wt: 0.11 },
-          { bottom: [0.66, 1.46], top: [0.78, 2.14], w: 0.1, wt: 0.12 },
-          { bottom: [0.86, 1.3], top: [0.98, 1.98], w: 0.1, wt: 0.12 },
+          { foot: -1.14, rise: [-0.08, 0.12], w: 0.03 },
+          { foot: -1.02, top: [-1.24, 1.32], w: 0.08, wt: 0.1 },
+          { foot: -0.5, top: [-0.62, 2.02], w: 0.09, wt: 0.11 },
+          { foot: 0.12, top: [0.2, 2.2], w: 0.09, wt: 0.11 },
+          { foot: 0.56, top: [0.78, 2.14], w: 0.1, wt: 0.12 },
+          { foot: 0.7, top: [0.98, 1.98], w: 0.1, wt: 0.12 },
         ],
       },
       griffin: {
@@ -155,29 +265,29 @@ export const HELM_FORMS = {
     feathers: { ...HELM_FEATHERS, perSide: 1 },
     parts: {
       bowl: formBowl(0.08),
-      brim: formBrim({ peak: 0.42, front: 1.42, side: 1.78, back: 1.98, droop: 0.4 }),
+      brim: formBrim({ peak: 0.42, front: 0.22, side: 0.53, back: 0.7, droop: 0.4 }),
       visor: formVisor(0.35),
       crest: {
-        kind: 'sweep', seg: [8, 2], region: 'crest', look: 'metal', ink: true, square: 0.7,
+        kind: 'sweep', seg: [8, 2], region: 'crest', look: 'metal', ink: true, square: 0.7, seat: 'bowl',
         stations: [
-          { bottom: [1.1, 0.8], top: [1.16, 0.92], w: 0.04 },
-          { bottom: [0.92, 1.18], top: [1.06, 1.46], w: 0.08 },
-          { bottom: [0.2, 1.55], top: [0.24, 1.86], w: 0.09 },
-          { bottom: [-0.6, 1.4], top: [-0.68, 1.74], w: 0.09 },
-          { bottom: [-1.1, 0.86], top: [-1.26, 1.14], w: 0.07 },
-          { bottom: [-1.2, 0.5], top: [-1.3, 0.6], w: 0.03 },
+          { foot: 0.95, rise: [0.06, 0.12], w: 0.04 },
+          { foot: 0.8, rise: [0.14, 0.28], w: 0.08 },
+          { foot: 0.2, rise: [0.04, 0.31], w: 0.09 },
+          { foot: -0.55, rise: [-0.08, 0.34], w: 0.09 },
+          { foot: -1.0, rise: [-0.16, 0.28], w: 0.07 },
+          { foot: -1.13, rise: [-0.1, 0.1], w: 0.03 },
         ],
       },
       plume: {
         kind: 'sweep', seg: [8, 3], region: null, look: 'hair', ink: false, square: 0.8,
         stations: [
-          { at: [1.18, 1.5], r: 0.06, rz: 1 },
-          { at: [0.98, 1.98], r: 0.2, rz: 0.6 },
-          { at: [0.3, 2.42], r: 0.28, rz: 0.5 },
-          { at: [-0.5, 2.36], r: 0.28, rz: 0.5 },
-          { at: [-1.26, 1.72], r: 0.24, rz: 0.55 },
-          { at: [-1.72, 0.92], r: 0.12, rz: 0.7 },
-          { at: [-1.82, 0.5], r: 0.02, rz: 1 },
+          { at: [1.06, 1.3], r: 0.06, rz: 1 },
+          { at: [0.88, 1.74], r: 0.2, rz: 0.6 },
+          { at: [0.28, 2.19], r: 0.28, rz: 0.5 },
+          { at: [-0.48, 2.17], r: 0.28, rz: 0.5 },
+          { at: [-1.16, 1.58], r: 0.24, rz: 0.55 },
+          { at: [-1.6, 0.84], r: 0.12, rz: 0.7 },
+          { at: [-1.7, 0.45], r: 0.02, rz: 1 },
         ],
       },
     },
@@ -187,65 +297,154 @@ export const HELM_FORMS = {
   // nape, standing only a few centimetres; the foot flaring into a short neck guard behind and at the sides.
   secutor: {
     sheet: 'formSecutor',
-    eyes: { y: 0.18, z: 0.29, r: 0.12 },
+    eyes: { y: -0.06, z: 0.29, r: 0.12 },
     parts: {
+      // Fitted close over the whole head (1.4 cm at the sides, clear of the nose in front), drawn up over the crown into
+      // the egg's point; below, the neck guard flaring out behind and at the sides.
       shell: {
-        kind: 'loft', span: 1, seg: [48, 4], region: 'shell', look: 'metal', ink: true,
-        stations: [
-          { y: [-1.56, -1.52, -1.44, -1.5, -1.56], rad: [1.3, 1.38, 1.52, 1.72, 1.8] },
-          { y: [-1.34, -1.32, -1.26, -1.24, -1.24], rad: [1.2, 1.24, 1.3, 1.37, 1.4] },
-          { y: -0.7, rad: [1.28, 1.26, 1.2, 1.22, 1.24] },
-          { y: 0.12, rad: [1.4, 1.34, 1.21, 1.25, 1.3] },
-          { y: 0.82, rad: [1.24, 1.2, 1.1, 1.13, 1.18] },
-          { y: 1.36, rad: [0.82, 0.8, 0.74, 0.76, 0.8] },
-          { y: 1.64, rad: 0 },
+        kind: 'loft', span: 1, seg: [40, 1], region: 'shell', look: 'metal', ink: true,
+        fit: { foot: [-1.34, -1.32, -1.26, -1.24, -1.24], gap: 0.13, top: 0.3, rows: 14 },
+        flare: [
+          { dy: [-0.22, -0.2, -0.18, -0.26, -0.32], out: [0.1, 0.14, 0.22, 0.34, 0.4] },
+          { dy: [-0.1, -0.09, -0.08, -0.11, -0.13], out: [0.03, 0.04, 0.07, 0.11, 0.13] },
         ],
       },
       crest: {
-        kind: 'sweep', seg: [10, 4], region: 'crest', look: 'metal', ink: true,
+        kind: 'sweep', seg: [10, 4], region: 'crest', look: 'metal', ink: true, seat: 'shell',
         stations: [
-          { bottom: [1.2, 0.72], top: [1.28, 0.82], w: 0.03 },
-          { bottom: [1.04, 1.06], top: [1.18, 1.3], w: 0.06 },
-          { bottom: [0.5, 1.48], top: [0.56, 1.86], w: 0.07 },
-          { bottom: [-0.3, 1.54], top: [-0.32, 1.92], w: 0.07 },
-          { bottom: [-0.92, 1.22], top: [-1.04, 1.56], w: 0.06 },
-          { bottom: [-1.22, 0.6], top: [-1.38, 0.86], w: 0.05 },
-          { bottom: [-1.3, 0.1], top: [-1.4, 0.2], w: 0.03 },
+          { foot: 1.0, rise: [0.04, 0.08], w: 0.03 },
+          { foot: 0.86, rise: [0.08, 0.22], w: 0.06 },
+          { foot: 0.42, rise: [0.04, 0.34], w: 0.07 },
+          { foot: -0.26, rise: [-0.02, 0.34], w: 0.07 },
+          { foot: -0.8, rise: [-0.08, 0.3], w: 0.06 },
+          { foot: -1.08, rise: [-0.1, 0.22], w: 0.05 },
+          { foot: -1.16, rise: [-0.06, 0.08], w: 0.03 },
         ],
       },
     },
   },
-  // Scissor (arbelas; no helmet survives: reliefs show a closed helmet like the secutor's): a rounder closed bowl, a low
-  // ridge over the crown, two larger round eye openings with grilles, breathing holes below, a broad neck guard.
+  // Scissor (arbelas; no helmet survives: reliefs show a closed helmet like the secutor's): a rounder closed bowl (more
+  // room inside than the secutor's), a low ridge over the crown, two larger round eye openings with grilles, breathing
+  // holes below, a broad neck guard.
   scissor: {
     sheet: 'formScissor',
-    eyes: { y: 0.16, z: 0.4, r: 0.2 },
+    eyes: { y: -0.04, z: 0.36, r: 0.2 },
     parts: {
       shell: {
-        kind: 'loft', span: 1, seg: [36, 3], region: 'shell', look: 'metal', ink: true,
-        stations: [
-          { y: [-1.5, -1.48, -1.36, -1.28, -1.3], rad: [1.32, 1.42, 1.66, 1.92, 2.0] },
-          { y: [-1.32, -1.3, -1.18, -1.06, -1.06], rad: [1.26, 1.3, 1.36, 1.44, 1.46] },
-          { y: -0.5, rad: [1.4, 1.34, 1.28, 1.32, 1.34] },
-          { y: 0.3, rad: [1.48, 1.4, 1.3, 1.34, 1.38] },
-          { y: 1.0, rad: [1.14, 1.12, 1.08, 1.1, 1.12] },
-          { y: 1.5, rad: 0.56 },
-          { y: 1.62, rad: 0 },
+        kind: 'loft', span: 1, seg: [36, 1], region: 'shell', look: 'metal', ink: true,
+        fit: { foot: [-1.32, -1.3, -1.18, -1.06, -1.06], gap: 0.19, top: 0.26, rows: 12 },
+        flare: [
+          { dy: [-0.18, -0.18, -0.18, -0.22, -0.24], out: [0.06, 0.12, 0.3, 0.46, 0.52] },
+          { dy: [-0.08, -0.08, -0.08, -0.1, -0.11], out: [0.02, 0.04, 0.1, 0.16, 0.18] },
         ],
       },
       crest: {
-        kind: 'sweep', seg: [8, 2], region: 'crest', look: 'metal', ink: true,
+        kind: 'sweep', seg: [8, 2], region: 'crest', look: 'metal', ink: true, seat: 'shell',
         stations: [
-          { bottom: [1.3, 0.74], top: [1.36, 0.84], w: 0.03 },
-          { bottom: [0.9, 1.3], top: [0.98, 1.48], w: 0.06 },
-          { bottom: [0.0, 1.58], top: [0.0, 1.78], w: 0.06 },
-          { bottom: [-0.92, 1.28], top: [-1.02, 1.48], w: 0.06 },
-          { bottom: [-1.3, 0.5], top: [-1.4, 0.62], w: 0.03 },
+          { foot: 1.08, rise: [0.04, 0.1], w: 0.03 },
+          { foot: 0.8, rise: [0.06, 0.18], w: 0.06 },
+          { foot: 0.0, rise: [0.0, 0.2], w: 0.06 },
+          { foot: -0.84, rise: [-0.08, 0.2], w: 0.06 },
+          { foot: -1.14, rise: [-0.08, 0.1], w: 0.03 },
         ],
       },
     },
   },
 };
+
+/** A fitted part's stations (formFitStations), a closed shell's neck guard (`flare`: its rings' drop and reach) below its foot. */
+function formFitPart(part) {
+  const fitted = formFitStations(part.fit);
+  const flare = (part.flare ?? []).map(({ dy, out }) => ({ y: formPlus(fitted[0].y, formResample(dy)), rad: formPlus(fitted[0].rad, formResample(out)) }));
+  part.stations = [...flare, ...fitted];
+  return part;
+}
+
+// The fitted parts' stations, then the parts seated on them (a crest's foot on its bowl in the middle plane).
+for (const form of Object.values(HELM_FORMS)) {
+  for (const part of Object.values(form.parts)) if (part.fit) formFitPart(part);
+  for (const part of Object.values(form.parts)) {
+    if (!part.seat) continue;
+    const seat = form.parts[part.seat];
+    part.stations = part.stations.map((station) => {
+      if (station.foot === undefined) return station;
+      const { foot, rise, top, ...rest } = station;
+      const surface = formMidline(seat, foot);
+      return { ...rest, bottom: [foot, surface - 0.03], top: top ?? [foot + rise[0], surface + rise[1]] };
+    });
+  }
+}
+
+// ---- The samurai's kabuto and masks --------------------------------------------------------------------------------------
+
+/**
+ * The kabuto's bowl (hachi), an oval dome of riveted plates fitted over the head like the gladiators' bowls (wardrobe.js
+ * draws it, its ribs down the plates' joins and the tehen's ring at the top): its foot (the koshimaki) over the brow in
+ * front and round the head just above the ears and the occiput, a lining's room (about 1.6 cm) inside, a little more over
+ * the crown. The shikoro hangs from its foot, the peak (mabizashi) juts from it over the brow, the crest (maedate) stands
+ * on it at `brow` (x, y). `front`, `side`, `back`: its foot's radius at the front, the sides and the back, and `footY` the
+ * foot's height there; `top`, its crown's height.
+ */
+export const KABUTO_FORM = (() => {
+  const bowl = formFitPart({ kind: 'loft', span: 1, seg: [24, 1], fit: { foot: [0.14, 0.1, 0.05, 0.03, 0.02], gap: 0.15, top: 0.22, rows: 10 } });
+  const foot = bowl.stations[0];
+  const last = HELM_HEAD_KEYS - 1;
+  const browY = 0.32;
+  return {
+    bowl,
+    front: foot.rad[0], side: foot.rad[last / 2], back: foot.rad[last],
+    footY: { front: foot.y[0], side: foot.y[last / 2], back: foot.y[last] },
+    top: bowl.stations.at(-1).y[0],
+    brow: [formOutlineAt(formFitOutline(0, bowl.fit), browY), browY],
+  };
+})();
+
+/**
+ * How each of the samurai's masks is set on the face: drawn on a sphere (radius `R`; menpo.js, wardrobe.js), each of its
+ * points is moved to stand `gap` off the face (HELM_HEAD) in the same direction round, its height mapped by `y`: heights
+ * on the mask [as drawn, on the face] from the top down (its top edge, the eyes, the nose, the mouth, the chin's foot),
+ * straight between. The oni somen covers the whole face, its top under the kabuto's foot, its eye holes over the eyes;
+ * the half masks (menpo, ressei-men, tengu) from under the eyes, the nose over the nose, the mouth over the mouth, the chin
+ * cupped under the chin. Relief stands off the mask as drawn.
+ */
+export const MASK_FITS = {
+  oni: { R: 1.12, gap: 0.06, y: [[0.91, 0.3], [0.16, -0.07], [-0.37, -0.74], [-1.0, -1.42]] },
+  ressei: { R: 1.1, gap: 0.06, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
+  tengu: { R: 1.1, gap: 0.06, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
+  // The masks as first drawn (`#masks=now`, or without the maps): the menpo and the oni's whole face.
+  menpo: { R: 1.06, gap: 0.06, y: [[-0.067, -0.28], [-0.12, -0.45], [-0.34, -0.74], [-0.98, -1.42]] },
+  oniFace: { R: 1.08, gap: 0.06, y: [[0.83, 0.3], [0.16, -0.07], [-0.04, -0.45], [-0.36, -0.74], [-0.94, -1.42]] },
+};
+
+/** The head's (HELM_HEAD) distance from the upright axis at height y, `azimuth` (rad) round from the face. */
+export function headRadiusAt(azimuth, y) {
+  const s = Math.min(1, Math.abs(azimuth) / HELM_PI);
+  const rows = HELM_HEAD.rows;
+  if (y <= rows[0][0]) return formKeyed(rows[0][1], s);
+  for (let index = 1; index < rows.length; index += 1) {
+    const [y1, keys1] = rows[index];
+    if (y <= y1) {
+      const [y0, keys0] = rows[index - 1];
+      const a = formKeyed(keys0, s);
+      return a + ((formKeyed(keys1, s) - a) * (y - y0)) / (y1 - y0);
+    }
+  }
+  const [yTop, keysTop] = rows.at(-1);
+  const share = Math.min(1, (y - yTop) / (HELM_HEAD.crown - yTop));
+  return formKeyed(keysTop, s) * Math.sqrt(Math.max(0, 1 - share * share));
+}
+
+/** A point of a mask as drawn (head radii, on or off its sphere: MASK_FITS) set on the face. */
+export function maskOnFace(fit, [x, y, z]) {
+  let segment = 1;
+  while (segment < fit.y.length - 1 && y < fit.y[segment][0]) segment += 1;
+  const [[a0, b0], [a1, b1]] = [fit.y[segment - 1], fit.y[segment]];
+  const height = b0 + ((b1 - b0) * (y - a0)) / (a1 - a0);
+  const azimuth = Math.atan2(z, x);
+  const off = Math.hypot(x, z) - Math.sqrt(Math.max(0, fit.R * fit.R - y * y));
+  const radius = headRadiusAt(azimuth, height) + fit.gap + off;
+  return [radius * Math.cos(azimuth), height, radius * Math.sin(azimuth)];
+}
 
 /** The sheet regions (u0, v0, u1, v1; v up) the parts lay their coordinates into, by the sheet's kind. */
 export const FORM_REGIONS = {
@@ -330,6 +529,22 @@ function formSweepPoint(part, u, v) {
   return [(top[0] + bottom[0]) / 2 + half[0] * c, (top[1] + bottom[1]) / 2 + half[1] * c, width * s];
 }
 
+/** The height of a loft's surface in the middle plane at x (in front, x > 0, or behind), its topmost where it rises twice. */
+function formMidline(part, x) {
+  if (Math.abs(x) < 1e-6) return formLoftPoint(part, 0, 1)[1];
+  const u = x > 0 ? 0 : 1;
+  const steps = 400;
+  let best = -Infinity;
+  let last = formLoftPoint(part, u, 0);
+  for (let step = 1; step <= steps; step += 1) {
+    const point = formLoftPoint(part, u, step / steps);
+    const [x0, x1] = [last[0], point[0]];
+    if ((x0 - x) * (x1 - x) <= 0 && x0 !== x1) best = Math.max(best, last[1] + ((point[1] - last[1]) * (x - x0)) / (x1 - x0));
+    last = point;
+  }
+  return best;
+}
+
 /** A part's point at (u, v) in head radii. */
 export function formPoint(part, u, v) {
   return part.kind === 'loft' ? formLoftPoint(part, u, v) : formSweepPoint(part, u, v);
@@ -402,8 +617,8 @@ export function formTriangles(style) {
  * `z`, `r`: a disc standing for it where the maps are off. `pitch`, `hole`: the holes' spacing and radius.
  */
 export const FORM_GRILLES = {
-  disc: { shape: 'disc', y: 0.1, z: 0.43, r: 0.36, pitch: 0.07, hole: 0.023 },
-  panel: { shape: 'panel', y: -0.06, z: 0.5, r: 0.4, box: [0.06, -0.56, 1.02, 0.34], round: 0.2, pitch: 0.066, hole: 0.022 },
+  disc: { shape: 'disc', y: -0.02, z: 0.36, r: 0.33, pitch: 0.07, hole: 0.023 },
+  panel: { shape: 'panel', y: -0.08, z: 0.44, r: 0.38, box: [0.06, -0.56, 0.84, 0.3], round: 0.2, pitch: 0.066, hole: 0.022 },
 };
 
 /** The point of a facing surface (a visor or a shell) seen from the front at height y and across z, and its outward normal. */

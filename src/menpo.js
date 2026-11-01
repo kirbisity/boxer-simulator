@@ -7,14 +7,16 @@
 
 /* global THREE */
 import { helmMapSheet, maskMaterial } from './helmmaps.js';
+import { maskOnFace, MASK_FITS } from './helmforms.js';
 
 const MASK_SHEETS = { oni: 'maskOni', ressei: 'maskRessei', tengu: 'maskTengu' };
 
 /**
  * The mask's mesh from a sheet's grid ({ size, R, az, top, bottom, power, heights: size x size, v from the bottom, u from
- * the middle out}): 2 size - 1 columns across (the halves mirrored), size rows up; u = (angle / az) ** power.
+ * the middle out}): 2 size - 1 columns across (the halves mirrored), size rows up; u = (angle / az) ** power. With a `fit`
+ * (helmforms.js MASK_FITS), set on the face.
  */
-export function maskGeometry(grid, r) {
+export function maskGeometry(grid, r, fit = null) {
   const { size, R, az, top, bottom, power, heights } = grid;
   const columns = size * 2 - 1;
   const positions = [];
@@ -27,7 +29,8 @@ export function maskGeometry(grid, r) {
       const u = Math.abs(across) / (size - 1);
       const angle = Math.sign(across) * u ** (1 / power) * az;
       const radius = (R + heights[row * size + Math.abs(across)]) * r;
-      positions.push(radius * Math.sin(polar) * Math.cos(angle), radius * Math.cos(polar), radius * Math.sin(polar) * Math.sin(angle));
+      const point = [radius * Math.sin(polar) * Math.cos(angle), radius * Math.cos(polar), radius * Math.sin(polar) * Math.sin(angle)];
+      positions.push(...(fit ? maskOnFace(fit, point.map((value) => value / r)).map((value) => value * r) : point));
       uvs.push(u, v);
     }
   }
@@ -55,7 +58,7 @@ export function buildWarMask(group, style, r, tint, envMap) {
   const sheet = name && helmMapSheet(name);
   if (!sheet?.grid) return null;
   const material = maskMaterial(name, tint, envMap);
-  const mask = new THREE.Mesh(maskGeometry(sheet.grid, r), material);
+  const mask = new THREE.Mesh(maskGeometry(sheet.grid, r, MASK_FITS[style]), material);
   mask.userData.noOutline = true;
   mask.castShadow = true;
   group.add(mask);

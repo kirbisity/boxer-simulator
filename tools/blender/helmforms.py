@@ -114,13 +114,13 @@ def brimmed(kind, style):
     front = s['X'] > 0
     if style == 'murmillo':
         # Hercules' head over the brow, below the crest (BM 1946,0514.1; MANN 5672's herm of Hercules).
-        emboss(bowl, s['SU'], s['Y'], hercules, (-0.55, 0.32, 0.55, 1.36), 0.07, 0.012)
+        emboss(bowl, s['SU'], s['Y'], hercules, (-0.42, 0.34, 0.42, 1.12), 0.07, 0.012)
         emboss(bowl, s['SU'], s['SV'], lambda d, w, h: laurel(d, w, h, 30), (0, 0.27, end, 0.4), 0.018, 0.006, px=1400)
     elif style == 'thraex':
         # The Gorgon over the brow, a palm on each side (MANN 5649; the Gorgon helmet).
-        emboss(bowl, s['SU'], s['Y'], gorgon, (-0.55, 0.42, 0.55, 1.46), 0.07, 0.012)
-        su_side, _ = nearest(s, s["Z"] > 0, ('X', -0.35), ('Y', 0.6), ('Z', 1.2))
-        emboss(bowl, s['SU'], s['Y'], palm, (su_side - 0.25, 0.0, su_side + 0.25, 1.1), 0.035, 0.008)
+        emboss(bowl, s['SU'], s['Y'], gorgon, (-0.42, 0.36, 0.42, 1.12), 0.07, 0.012)
+        su_side, _ = nearest(s, s["Z"] > 0, ('X', -0.35), ('Y', 0.55), ('Z', 0.85))
+        emboss(bowl, s['SU'], s['Y'], palm, (su_side - 0.22, 0.02, su_side + 0.22, 1.0), 0.035, 0.008)
     # The brim: a heavy rolled lip, two raised rings, rivets along its join with the bowl.
     brim = region(atlas, kind, 'brim')
     s = brim.s
@@ -210,11 +210,12 @@ def closed(kind, style):
     X, Y, Z = s['X'], s['Y'], s['Z']
     hammered(shell, 0.003, 0.06, seed=7)
     front = smooth((X - 0.1) / 0.15)
-    # The face plate's outline seen from the front (|z|, y): over the brow, down past the ears, under the chin.
+    # The face plate's outline seen from the front (|z|, y): over the brow, down past the temples to the jaw, under the chin
+    # (inside the shell's front, which is narrower than it is long).
     if style == 'secutor':
-        outline = [(0.0, 0.78), (0.5, 0.7), (0.86, 0.42), (1.02, 0.0), (1.0, -0.6), (0.86, -1.1), (0.5, -1.38), (0.0, -1.44)]
+        outline = [(0.0, 0.7), (0.37, 0.64), (0.64, 0.38), (0.76, 0.0), (0.74, -0.6), (0.64, -1.1), (0.37, -1.38), (0.0, -1.44)]
     else:
-        outline = [(0.0, 0.72), (0.62, 0.66), (0.96, 0.4), (1.08, -0.2), (1.0, -0.9), (0.7, -1.3), (0.0, -1.4)]
+        outline = [(0.0, 0.66), (0.47, 0.6), (0.72, 0.36), (0.81, -0.2), (0.75, -0.9), (0.53, -1.3), (0.0, -1.4)]
     pts = np.asarray(outline, np.float32)
     az = np.abs(Z)
     inside_y = np.interp(Y, pts[::-1, 1], pts[::-1, 0], left=0, right=0)
@@ -244,13 +245,15 @@ def closed(kind, style):
         breath = smooth((0.03 - np.maximum(np.abs(az - 0.32) - 0.2, np.abs(Y + 0.78) - 0.2)) / 0.01) * front
         hex_holes(shell, az, Y, breath, 0.09, 0.026)
     # Hinge bosses at the temples, behind the plate's edge.
-    side = np.hypot(X - 0.25, Y - 0.05) + np.where(az > 0.8, 0, 9)
+    side = np.hypot(X - 0.25, Y - 0.05) + np.where(az > 0.7, 0, 9)
     shell.add(cap(side, 0.14) * 0.03 + bead(np.abs(side - 0.14), 0.02) * 0.012)
     # The neck guard's rolled edge, and the crest's riveted foot over the crown.
     rolled(shell, s['SV'], 0.08, 0.045)
     foot = smooth((0.13 - az) / 0.03) * smooth((Y - 1.0) / 0.12)
     shell.add(foot * 0.012)
-    add_rivets(shell, X, Y + np.where(az < 0.2, 0, 9), [(x, y) for x, y in ((0.9, 1.2), (0.0, 1.6), (-0.85, 1.25))], 0.04, 0.02)
+    # (Where the crest's foot stands: its sections' bottoms, just inside the shell.)
+    feet = [station['bottom'] for station in kind['parts']['crest']['stations']]
+    add_rivets(shell, X, Y + np.where(az < 0.2, 0, 9), [(x, y + 0.03) for x, y in (feet[1], feet[len(feet) // 2], feet[-2])], 0.04, 0.02)
     crest = region(atlas, kind, 'crest')
     s = crest.s
     hammered(crest, 0.003, 0.05, seed=8)

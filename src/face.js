@@ -651,7 +651,11 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     dangles.length = 0;
     if (hairSwing) hairSwing.enabled = false;
   }
-  return { group, shell: skull, update, dangles, hideHair, curtains, hairMaterial, get hairSwing() { return hairSwing; } };
+  // The cranium's half-breadth (head radii, over the ears' tops): a helmet fitted over a narrower head is widened to it (render.js).
+  let breadth = 0;
+  const skullPosition = skullGeometry.attributes.position;
+  for (let index = 0; index < skullPosition.count; index += 1) if (skullPosition.getY(index) > 0.15 * r) breadth = Math.max(breadth, Math.abs(skullPosition.getZ(index)) / r);
+  return { group, shell: skull, update, dangles, hideHair, curtains, hairMaterial, breadth, get hairSwing() { return hairSwing; } };
 }
 
 function hairLock(group, material, points, width, thickness, taper = 1) {
