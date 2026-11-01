@@ -139,13 +139,23 @@ test('the crests stand on their bowls; the feather holders on the bowl\'s side',
 });
 
 test('the samurai\'s masks sit on the face: off it by their gap, the chin cupped, as drawn on their sheets', () => {
+  // The oni and ressei are narrow over the eyes, broad and square at the jaw, the jaw guard standing out in front.
+  for (const name of ['oni', 'ressei']) {
+    const fit = MASK_FITS[name];
+    const at = (y) => maskOnFace(fit, [fit.R * Math.cos(1.2) * Math.sqrt(Math.max(0, 1 - (y / fit.R) ** 2)) / Math.cos(1.2) * Math.cos(1.2), y, fit.R * Math.sin(1.2) * Math.sqrt(Math.max(0, 1 - (y / fit.R) ** 2))]);
+    assert.ok(Math.abs(Math.atan2(at(0.2)[2], at(0.2)[0])) < Math.abs(Math.atan2(at(-0.9)[2], at(-0.9)[0])), `${name}: narrower above than at the jaw`);
+    const front = maskOnFace(fit, [Math.sqrt(fit.R ** 2 - 0.81), -0.9, 0]);
+    assert.ok(front[0] - headRadiusAt(0, front[1]) > fit.gap + 0.05, `${name}: the jaw guard stands out`);
+  }
   for (const [name, fit] of Object.entries(MASK_FITS)) {
     for (const polar of [0.55, 0.65, 0.75, 0.85]) {
       for (const azimuth of [0, 0.3, 0.6, 0.9]) {
         const a = polar * Math.PI;
         const point = maskOnFace(fit, [fit.R * Math.sin(a) * Math.cos(azimuth), fit.R * Math.cos(a), fit.R * Math.sin(a) * Math.sin(azimuth)]);
         const off = Math.hypot(point[0], point[2]) - headRadiusAt(Math.atan2(point[2], point[0]), point[1]);
-        assert.ok(Math.abs(off - fit.gap) < 1e-6, `${name}`);
+        // At least the gap everywhere; more only where the jaw guard stands out in front of the chin (`chin`).
+        const jutAllowed = (fit.chin ?? 0) + 1e-6;
+        assert.ok(off >= fit.gap - 1e-6 && off <= fit.gap + jutAllowed, `${name}`);
       }
     }
     const chin = maskOnFace(fit, [0, -fit.R, 0]);
