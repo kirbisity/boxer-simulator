@@ -30,7 +30,9 @@ test('the cavalry helpers make riders in the kit of their time, on the horse the
     assert.ok(canRide(inputs), `${who} can ride`);
     assert.ok(isMounted(inputs), `${who} is mounted`);
     assert.equal(inputs.outfit.kind.startsWith(kind) || inputs.outfit.kind === kind, true, `${who} wears ${kind}`);
-    assert.deepEqual(mountOf(inputs), { breed, barding }, who);
+    // (Its finish, the bard's style and colour, follows his harness: horsebard.test.js.)
+    const { breed: rode, barding: barded } = mountOf(inputs);
+    assert.deepEqual({ breed: rode, barding: barded }, { breed, barding }, who);
   }
   // A samurai's yari from the saddle; a Roman's spatha.
   assert.equal(samuraiHorseman(random, east, 'spear').style, 'yari');

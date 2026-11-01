@@ -3,7 +3,7 @@
 // people rode) and his horse is barded if it says that too (`barding`).
 // Nothing here names a character; the outfits name their horses.
 
-import { outfitOf } from './outfits.js';
+import { FACTIONS, factionOf, outfitOf } from './outfits.js';
 import { ROBOT_DOGS, ROBOT_SHELL } from './robotdogs.js';
 
 /**
@@ -43,26 +43,43 @@ export const HORSES = {
 export const HORSE_LOAD = { easy: 0.2, slows: 0.9, least: 0.6 };
 
 /**
- * Horse armour (barding), by the part of the horse it covers. Protection
- * as an outfit's (0–1 of a blow's blunt, cut and pierce harm kept out;
- * `deflects`: plate turns an edge). `mass` (kg) of the whole.
- * - plate: the chanfron (head), crinet (neck), peytral (chest), flanchards
- *   and crupper (sides and hindquarters); the legs and belly bare. 30–40 kg
- *   in surviving 15th–16th c. bards (the Wallace, the Royal Armouries).
- * - lamellar: iron lamellae laced over the head, neck, chest and body to the
- *   knees (the Jurchen 'iron pagoda' horses, the khan's guard): ~30 kg.
+ * Horse armour (barding), by the part of the horse it covers (the capsules of physics/mounted.js HORSE_SHAPE: head, neck,
+ * chest, body, legs). Protection as an outfit's (0–1 of a blow's blunt, cut and pierce harm kept out; `deflects`: plate
+ * turns an edge). `mass` (kg) of the whole. `from` (of the withers' height): a part's armour reaches down only so far, and
+ * a blow landing below it meets the bare horse (the forearms and the belly under the peytral's hem). As drawn: horsebard.js.
+ * - plate, the full bard of c. 1480–1560: the shaffron over the whole face (head); the crinet's lames over the crest and
+ *   upper sides of the neck, mail under the throat (neck: the lames turn an edge; a point finds the mail); the peytral round
+ *   the breast and the shoulders to above the forearm (chest, down to 0.6 of the withers); the flanchards under the saddle
+ *   and the crupper over the hindquarters (body); the legs and the belly bare. Surviving bards weigh 30–40 kg: the
+ *   Wallace Collection's Landshut bard (A21, c. 1480) 30.07 kg; 1–1.5 mm plate over ~3 m² of horse.
+ * - lamellar, the Song and Jin bard (Wujing Zongyao, 1044: face, neck, breast, body and rump pieces) the Jurchen 'iron
+ *   pagoda' and the khans' guards rode: the face under an iron brow plate and lamellae, the whole neck, the breast, and
+ *   a skirt down the flanks below the belly and over the rump, all small iron lamellae laced in overlapping rows
+ *   (~4.5 m², much of it doubled where the rows lap). No weights survive; at the 0.7–1 mm of the riders' own
+ *   lamellae (Met 788894), ~38 kg.
  * - bare: a saddle and tack only.
  */
 const PLATE_BARD = { blunt: 0.55, cut: 1, pierce: 0.88, deflects: true };
+// The crinet: lames over the crest and upper sides, mail under the throat (a point goes through the mail's rings; mail spreads little of a blow).
+const CRINET = { blunt: 0.42, cut: 1, pierce: 0.72, deflects: true };
 const LAMELLAR_BARD = { blunt: 0.42, cut: 0.86, pierce: 0.7 };
 const NONE = { blunt: 0, cut: 0, pierce: 0 };
 export const BARDING = {
-  plate: { label: 'Steel plate barding', mass: 34, parts: { head: PLATE_BARD, neck: PLATE_BARD, chest: PLATE_BARD, body: { ...PLATE_BARD, blunt: 0.45 }, legs: NONE } },
-  lamellar: { label: 'Steel lamellar barding', mass: 30, parts: { head: LAMELLAR_BARD, neck: LAMELLAR_BARD, chest: LAMELLAR_BARD, body: LAMELLAR_BARD, legs: NONE } },
+  plate: { label: 'Steel plate barding', mass: 36, parts: { head: PLATE_BARD, neck: CRINET, chest: { ...PLATE_BARD, from: 0.6 }, body: { ...PLATE_BARD, blunt: 0.45, from: 0.56 }, legs: NONE } },
+  lamellar: { label: 'Steel lamellar barding', mass: 38, parts: { head: LAMELLAR_BARD, neck: LAMELLAR_BARD, chest: LAMELLAR_BARD, body: LAMELLAR_BARD, legs: NONE } },
   bare: { label: 'Bare horse', mass: 0, parts: { head: NONE, neck: NONE, chest: NONE, body: NONE, legs: NONE } },
   // (a robot dog's shell, robotdogs.js.)
   robotShell: ROBOT_SHELL,
 };
+
+/**
+ * What a horse's armour keeps out at one of its parts, struck at `height` (m above the ground under it; omitted: anywhere
+ * the armour covers): the part's protection, or none below the armour's reach (`from`, of the withers' height).
+ */
+export function bardingAt(barding, part, height = Infinity, withers = 1.5) {
+  const protection = BARDING[barding]?.parts[part] ?? NONE;
+  return protection.from !== undefined && height < protection.from * withers ? NONE : protection;
+}
 
 /** A mount's breed: a horse, or a robot dog (robotdogs.js). */
 export const breedOf = (key) => HORSES[key] ?? ROBOT_DOGS[key];
@@ -72,11 +89,21 @@ export function canRide(inputs) {
   return Boolean(breedOf(outfitOf(inputs).spec.horse));
 }
 
-/** His horse and its armour (null if he does not ride): { breed, barding }. */
+/**
+ * His horse and its armour (null if he does not ride): { breed, barding, finish }. The bard is finished as his own
+ * harness is (`finish`: `style` fluted, etched or plain plate; `steel` its colour; `lace` a laced bard's lacing, as his
+ * lamellar's: his kit's cord, else his people's, else his lace).
+ */
 export function mountOf(inputs) {
-  const spec = outfitOf(inputs).spec;
+  const { spec, look } = outfitOf(inputs);
   if (!breedOf(spec.horse)) return null;
-  return { breed: spec.horse, barding: BARDING[spec.barding] ? spec.barding : 'bare' };
+  const armor = look?.armor ?? {};
+  const finish = {
+    style: armor.fluted ? 'fluted' : armor.joust ? 'etched' : 'plain',
+    steel: armor.color ?? null,
+    lace: armor.cord ?? FACTIONS[factionOf(inputs)]?.lamellarCord ?? armor.lace ?? null,
+  };
+  return { breed: spec.horse, barding: BARDING[spec.barding] ? spec.barding : 'bare', finish };
 }
 
 /** Whether his kit is bolted to its mount (a robot dog's: robotdogs.js): he is always on it, never on foot. */

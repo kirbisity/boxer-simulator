@@ -15,6 +15,8 @@
 // (where it is hung, its colour, its triangles) and run by the view.
 
 import { vec } from './pose.js';
+import { buildBard } from './horsebard.js';
+import { tileSize } from './detailmaps.js';
 
 const TAU = Math.PI * 2;
 const hmClamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -135,11 +137,13 @@ export function horseCoat(hex, seed) {
 
 /** A growing mesh: positions, colours, triangles (and normals when flat or smoothed). */
 function hmAcc() {
-  return { p: [], c: [], n: [], i: [] };
+  return { p: [], c: [], n: [], i: [], uv: [] };
 }
 
 function hmAppend(acc, prim) {
   const base = acc.p.length / 3;
+  // (Texture coordinates: only a detail-mapped piece's accumulator carries them, every primitive in it with its own.)
+  if (prim.uv) for (let k = 0; k < prim.uv.length; k += 1) acc.uv.push(prim.uv[k]);
   for (let k = 0; k < prim.p.length; k += 1) acc.p.push(prim.p[k]);
   for (let k = 0; k < prim.c.length; k += 1) acc.c.push(prim.c[k]);
   for (let k = 0; k < prim.n.length; k += 1) acc.n.push(prim.n[k]);
@@ -381,57 +385,6 @@ function hmCone(base, tip, radius, { sides = 6, color = [0.6, 0.6, 0.65] } = {})
   return hmTube([base, vec.lerp(base, tip, 0.5), tip], [radius, radius * 0.5, 0.0005], { sides, color, round: false });
 }
 
-/** A flat plate (four corners, wound as given), flat shaded. */
-function hmQuad(a, b, c, d, color) {
-  return { p: [...a, ...b, ...c, ...d], c: [...color, ...color, ...color, ...color], n: [], i: [0, 1, 2, 1, 3, 2, 0, 2, 1, 1, 2, 3] };
-}
-
-/**
- * Overlapping plates on a surface (lamellae, scales or the lames of a bard):
- * `rows` stepped from a0 to a1 (`axis: 'a'`, each row's plates across t) or
- * from t0 to t1 (`axis: 't'`, each row's plates round a), each row standing
- * `tilt` further off the surface than the row above it and reaching `over`
- * over the next; laced between with `lace`.
- */
-function hmPlates(fn, { t, a, rows, cols, axis = 'a', infl = 0.012, tilt = 0.008, over = 0.35, gap = 0.12, color, lace = [0.45, 0.1, 0.09], keep = null }) {
-  const out = { p: [], c: [], n: [], i: [] };
-  const [rowRange, colRange] = axis === 'a' ? [a, t] : [t, a];
-  const at = (row, col, thick) => (axis === 'a' ? fn(col, row, thick) : fn(row, col, thick));
-  // The lacing under the plates: a dark shell.
-  hmAppend(out, hmShell(fn, { t, a, nt: axis === 'a' ? cols : rows, na: axis === 'a' ? rows : cols, infl: infl - 0.003, color: lace, keep }));
-  for (let row = 0; row < rows; row += 1) {
-    const r0 = hmMix(rowRange[0], rowRange[1], row / rows);
-    const r1 = hmMix(rowRange[0], rowRange[1], (row + 1) / rows);
-    const r1b = r1 + (r1 - r0) * over;
-    for (let col = 0; col < cols; col += 1) {
-      const c0 = hmMix(colRange[0], colRange[1], (col + gap / 2) / cols);
-      const c1 = hmMix(colRange[0], colRange[1], (col + 1 - gap / 2) / cols);
-      const cm = (c0 + c1) / 2;
-      if (keep) {
-        const centre = axis === 'a' ? [cm, (r0 + r1) / 2] : [(r0 + r1) / 2, cm];
-        if (!keep(centre[0], centre[1])) continue;
-      }
-      const shade = 0.88 + 0.12 * (((row * 7 + col * 13) % 5) / 4);
-      const base = typeof color === 'function' ? color(row, col) : color;
-      const tone = hmScale3(base, shade);
-      const topThick = infl + tilt * (row / rows);
-      const lowThick = infl + tilt * ((row + 1) / rows) + tilt * 0.8;
-      const w = (c1 - c0) * 0.18;
-      const hex = [at(r0, c0 + w, topThick), at(r0, c1 - w, topThick), at(r1b, c1, lowThick), at(r1b, c0, lowThick), at((r0 + r1b) / 2, c0, hmMix(topThick, lowThick, 0.5)), at((r0 + r1b) / 2, c1, hmMix(topThick, lowThick, 0.5))];
-      // top edge (rounded by the narrowed corners), the sides, the foot.
-      const [tl, tr, br, bl, ml, mr] = hex;
-      const plate = { p: [...tl, ...tr, ...mr, ...br, ...bl, ...ml], c: [], n: [], i: [0, 1, 2, 0, 2, 5, 5, 2, 3, 5, 3, 4] };
-      for (let k = 0; k < 6; k += 1) plate.c.push(...tone);
-      // Wound outward whichever way the surface runs.
-      const normal = vec.cross(vec.sub(tr, tl), vec.sub(bl, tl));
-      const outward = vec.sub(hex[1], at((r0 + r1b) / 2, cm, 0));
-      if (vec.dot(normal, outward) < 0) plate.i = plate.i.map((v, k, all) => all[k - (k % 3) + (2 - (k % 3))]);
-      hmAppend(out, hmFlatten(plate));
-    }
-  }
-  return { ...out, preset: true };
-}
-
 // ---- Surfaces ---------------------------------------------------------------------
 
 /** The barrel as a table by x: [x, top, bottom, half-width], bent by the breed. */
@@ -538,14 +491,21 @@ function hmHeadFn(build, poll) {
   };
 }
 
+/** A leg's sections down each segment ([t, front, back, half-width] of the withers, before the breed's `legs`): fore or hind. */
+export const horseLegTable = (fore) => ({
+  upper: fore
+    ? [[0, 0.078, 0.078, 0.066], [0.1, 0.072, 0.078, 0.064], [0.4, 0.052, 0.062, 0.05], [0.75, 0.035, 0.04, 0.036], [0.92, 0.042, 0.036, 0.042], [1, 0.034, 0.032, 0.038]]
+    : [[0, 0.078, 0.09, 0.068], [0.15, 0.06, 0.088, 0.058], [0.45, 0.044, 0.065, 0.044], [0.8, 0.036, 0.05, 0.036], [0.93, 0.044, 0.068, 0.04], [1, 0.034, 0.045, 0.034]],
+  cannon: fore
+    ? [[0, 0.036, 0.034, 0.04], [0.12, 0.026, 0.031, 0.022], [0.78, 0.025, 0.03, 0.021], [0.95, 0.033, 0.04, 0.034], [1, 0.03, 0.036, 0.03]]
+    : [[0, 0.04, 0.042, 0.036], [0.15, 0.028, 0.034, 0.024], [0.8, 0.026, 0.03, 0.022], [0.95, 0.034, 0.04, 0.034], [1, 0.03, 0.036, 0.03]],
+  pastern: [[0, 0.036, 0.042, 0.036], [0.25, 0.029, 0.034, 0.03], [0.6, 0.026, 0.028, 0.027], [1, 0.03, 0.028, 0.032]],
+  hoof: [[0, 0.034, 0.03, 0.033], [0.15, 0.038, 0.032, 0.036], [1, 0.05, 0.038, 0.044]],
+});
+
 // ---- The model -----------------------------------------------------------------------
 
-const HM_STEEL = [0.96, 0.97, 1];
-const HM_STEEL2 = [0.72, 0.74, 0.8];
 const HM_GOLD = [0.8, 0.62, 0.22];
-const HM_EDGE = [0.38, 0.4, 0.46];
-const HM_LAMELLA = [0.5, 0.52, 0.56];
-const HM_LACE = [0.5, 0.1, 0.09];
 const HM_HORN = [0.72, 0.66, 0.58];
 
 /** A primitive with every point moved by `fn`. */
@@ -565,7 +525,8 @@ function hmFinish(acc, origin, scale) {
     positions[v * 3 + 1] = (acc.p[v * 3 + 1] - origin[1]) * scale;
     positions[v * 3 + 2] = (acc.p[v * 3 + 2] - origin[2]) * scale;
   }
-  return { positions, normals: new Float32Array(acc.n), colors: new Float32Array(acc.c), indices: count > 65000 ? new Uint32Array(acc.i) : new Uint16Array(acc.i), triangles: acc.i.length / 3 };
+  const uvs = acc.uv.length === count * 2 ? new Float32Array(acc.uv) : null;
+  return { positions, normals: new Float32Array(acc.n), colors: new Float32Array(acc.c), uvs, indices: count > 65000 ? new Uint32Array(acc.i) : new Uint16Array(acc.i), triangles: acc.i.length / 3 };
 }
 
 /**
@@ -608,8 +569,11 @@ export function buildHorseModel(spec) {
   const accs = {};
   const acc = (name, kind) => (accs[`${name}.${kind}`] ??= hmAcc());
   const add = (name, kind, prim, flat = false) => {
-    const target = acc(name, kind);
-    hmAppend(target, flat && !prim.preset ? hmFlatten(prim) : prim);
+    // A detail-mapped shell ('detail:<tile>') keeps its texture coordinates; anything else is drawn without them.
+    const mapped = kind.startsWith('detail:');
+    const target = acc(name, mapped ? `detail.${kind.slice(7)}` : kind);
+    const plain = !mapped && prim.uv ? { ...prim, uv: null } : prim;
+    hmAppend(target, flat && !plain.preset ? hmFlatten(plain) : plain);
   };
   const body = (kind, prim, flat) => add('body', kind, prim, flat);
 
@@ -633,13 +597,18 @@ export function buildHorseModel(spec) {
   }
   const muscles = low ? musclePrims.slice(0, 4) : musclePrims;
   for (const prim of muscles) body('soft', prim);
+  // What a bard is fitted over (horsebard.js): the barrel and its muscle (not the tack), the neck, the dock.
+  const snapshot = (target) => ({ p: target.p.slice(), i: target.i.slice() });
+  const colliders = { body: snapshot(acc('body', 'soft')) };
 
   // ---- The tail's dock (the hair is dynamic)
   const carriage = build.tail.carriage;
   const dockStart = bodyFn(-0.6, Math.PI / 2, -0.03);
   const dockLift = carriage[0] < 0 ? 0.075 : 0;
   const dockPath = [[dockStart[0], dockStart[1] - 0.005], [dockStart[0] - 0.04, dockStart[1] + dockLift * 0.6], [dockStart[0] - 0.075, dockStart[1] + dockLift - 0.012]];
-  body('soft', hmPathLoft(dockPath, [[0.038, 0.038, 0.034], [0.03, 0.03, 0.028], [0.026, 0.026, 0.024]], { sides: 6, round: { endLength: 0.02 }, color: coat.mane }));
+  const dock = hmPathLoft(dockPath, [[0.038, 0.038, 0.034], [0.03, 0.03, 0.028], [0.026, 0.026, 0.024]], { sides: 6, round: { endLength: 0.02 }, color: coat.mane });
+  colliders.dock = { p: dock.p.slice(), i: dock.i.slice() };
+  body('soft', dock);
   const tailRoot = [dockPath[2][0] - 0.005, dockPath[2][1], 0];
   // The hair of the tail: dynamic (the view) unless it is a crowd's horse, which has it fixed.
   const tailRest = (lift = 0) => {
@@ -685,6 +654,9 @@ export function buildHorseModel(spec) {
   };
   const addNeck = (kind, prim) => add('neck', kind, prim);
   addNeck('soft', hmLoft(hmRounded(neckStations, { startLength: 0 }), { sides: low ? 8 : 14, color: neckColor, upper: 2.5, lower: 2.1 }));
+  colliders.neck = snapshot(acc('neck', 'soft'));
+  // A barded horse's crest is under its crinet: no mane is drawn (the standing ridge or the hanging tufts).
+  const barded = spec.barding === 'plate' || spec.barding === 'lamellar';
 
   // ---- The head
   const headStations = [];
@@ -743,9 +715,9 @@ export function buildHorseModel(spec) {
       }, mouth.map(([x]) => [x, -0.1]), { width: 0.004, across: 'a', infl: 0.001, color: [0.1, 0.06, 0.06], radius: 0.05 });
       headMarks.push(strap);
     }
-    // Forelock: a tuft falling between the ears over the face.
+    // Forelock: a tuft falling between the ears over the face (under a shaffron, none).
     const lock = hmAcc();
-    for (let k = 0; k < 5; k += 1) {
+    for (let k = 0; k < (barded ? 0 : 5); k += 1) {
       const from = headFn(0.02 + k * 0.004, Math.PI / 2 + (k - 2) * 0.28, 0.003);
       const to = [from[0] + 0.02, from[1] - 0.055 - 0.01 * (k % 2), from[2] * 1.2];
       hmAppend(lock, hmFlatten({ p: [from[0], from[1], from[2] - 0.011, from[0], from[1], from[2] + 0.011, to[0], to[1], to[2]], c: [...coat.mane, ...coat.mane, ...hmScale3(coat.mane, 0.8)], n: [], i: [0, 1, 2, 0, 2, 1] }));
@@ -794,7 +766,7 @@ export function buildHorseModel(spec) {
     color: coat.mane,
   };
   // A short standing ridge down the crest (an upright, roached look) merged into the neck.
-  {
+  if (!barded) {
     const ridge = hmAcc();
     for (let k = 0; k < (low ? 8 : 20); k += 1) {
       const t = 0.04 + (0.94 * k) / ((low ? 8 : 20) - 1);
@@ -808,16 +780,6 @@ export function buildHorseModel(spec) {
 
   // ---- Legs
   const LEG = { upper: 0.33, cannon: 0.26, pastern: 0.115, hoof: 0.045 };
-  const legTable = (fore) => ({
-    upper: fore
-      ? [[0, 0.078, 0.078, 0.066], [0.1, 0.072, 0.078, 0.064], [0.4, 0.052, 0.062, 0.05], [0.75, 0.035, 0.04, 0.036], [0.92, 0.042, 0.036, 0.042], [1, 0.034, 0.032, 0.038]]
-      : [[0, 0.078, 0.09, 0.068], [0.15, 0.06, 0.088, 0.058], [0.45, 0.044, 0.065, 0.044], [0.8, 0.036, 0.05, 0.036], [0.93, 0.044, 0.068, 0.04], [1, 0.034, 0.045, 0.034]],
-    cannon: fore
-      ? [[0, 0.036, 0.034, 0.04], [0.12, 0.026, 0.031, 0.022], [0.78, 0.025, 0.03, 0.021], [0.95, 0.033, 0.04, 0.034], [1, 0.03, 0.036, 0.03]]
-      : [[0, 0.04, 0.042, 0.036], [0.15, 0.028, 0.034, 0.024], [0.8, 0.026, 0.03, 0.022], [0.95, 0.034, 0.04, 0.034], [1, 0.03, 0.036, 0.03]],
-    pastern: [[0, 0.036, 0.042, 0.036], [0.25, 0.029, 0.034, 0.03], [0.6, 0.026, 0.028, 0.027], [1, 0.03, 0.028, 0.032]],
-    hoof: [[0, 0.034, 0.03, 0.033], [0.15, 0.038, 0.032, 0.036], [1, 0.05, 0.038, 0.044]],
-  });
   const legColor = (seg, sockHeight, fore) => (t, a, p) => {
     const global = { upper: t * 0.44, cannon: 0.44 + t * 0.35, pastern: 0.79 + t * 0.15, hoof: 0.94 + t * 0.06 }[seg];
     let color = hide(p);
@@ -834,7 +796,7 @@ export function buildHorseModel(spec) {
   };
   HORSE_LEGS_KEYS.forEach((key, index) => {
     const fore = key.endsWith('Fore');
-    const table = legTable(fore);
+    const table = horseLegTable(fore);
     const scale = build.legs * (fore ? 1 : 1.04);
     const sock = coat.socks[index];
     const segments = {
@@ -966,97 +928,10 @@ export function buildHorseModel(spec) {
   }
   const bitAt = headFn(0.265, -0.05, 0.012);
 
-  // ---- Barding
-  const plate = spec.barding === 'plate';
-  const lamellar = spec.barding === 'lamellar';
-  const metal = (name, prim) => add(name, 'metal', prim);
-  if (plate || lamellar) {
-    const steelColor = (shade = 1) => (t, a, p) => hmScale3(HM_STEEL, shade * (0.94 + 0.06 * Math.sin(p[0] * 18 + p[1] * 9)));
-    const mirrored = (fn, side) => (x, a, d) => fn(x, side > 0 ? a : Math.PI - a, d);
-    const rivets = (fn, t, a, count, name, color = HM_GOLD) => {
-      for (let k = 0; k < count; k += 1) {
-        const p = fn(hmMix(t[0], t[1], (k + 0.5) / count), a, 0.012);
-        const q = fn(hmMix(t[0], t[1], (k + 0.5) / count), a, 0.017);
-        metal(name, hmCone(p, q, 0.006, { sides: 4, color }));
-      }
-    };
-    // Chanfron: a plate over the face from the poll to the nose, eye holes with a rim, a spike, ear guards.
-    const faceRange = [0.01, 0.34];
-    const eyeT = 0.115;
-    const eyeA = 0.62;
-    // Holes for the eyes (a rim is added round each).
-    const faceKeep = (x, a) => Math.min(Math.hypot((x - eyeT) / 0.042, (a - eyeA) / 0.5), Math.hypot((x - eyeT) / 0.042, (a - (Math.PI - eyeA)) / 0.5)) > 1;
-    const face = (x, a, d) => headFn(x, a, d);
-    metal('head', hmShell(face, { t: faceRange, a: [0.5, Math.PI - 0.5], nt: low ? 5 : 12, na: low ? 4 : 10, infl: 0.012, lip: 0.005, edge: HM_EDGE, color: lamellar ? HM_LAMELLA : steelColor(), keep: low ? null : faceKeep }));
-    if (!low) {
-      for (const sign of [1, -1]) {
-        const eyeP = headFn(eyeT, sign > 0 ? eyeA : Math.PI - eyeA, 0.016);
-        const toward = vec.normalize(vec.sub(eyeP, headFn(eyeT, sign > 0 ? eyeA : Math.PI - eyeA, -0.02)));
-        metal('head', hmRing(eyeP, toward, 0.03, 0.0045, { color: plate ? HM_STEEL2 : HM_GOLD }));
-      }
-      // Spike on the brow, a ridge down the nose, ear cups.
-      const brow = headFn(0.045, Math.PI / 2, 0.012);
-      const browOut = headFn(0.045, Math.PI / 2, 0.05);
-      metal('head', hmCone(brow, [browOut[0] + 0.02 + 0.03 * 0, browOut[1] + 0.07, 0], 0.014, { sides: 6, color: HM_STEEL2 }));
-      const ridge = [];
-      for (let k = 0; k <= 10; k += 1) ridge.push([0.075 + (0.255 * k) / 10, Math.PI / 2]);
-      metal('head', hmStrap(headFn, ridge, { width: 0.014, across: 'a', infl: 0.018, color: HM_STEEL2, radius: 0.05 }));
-      for (const sign of [1, -1]) {
-        const base = headFn(0.0, Math.PI / 2, 0.01);
-        metal('head', hmCone([base[0] - 0.005, base[1] + 0.02, sign * 0.036], [base[0] - 0.012, base[1] + 0.085, sign * 0.04], 0.026, { sides: 6, color: plate ? HM_STEEL2 : HM_LAMELLA }));
-      }
-    }
-    // Crinet: the neck covered in lames (plate) or laced rows (lamellar).
-    const neckSpan = [0.07, 0.97];
-    const crinetA = [0.1, Math.PI - 0.1];
-    if (plate) {
-      const lames = low ? 3 : 8;
-      for (let k = 0; k < lames; k += 1) {
-        const t0 = hmMix(neckSpan[0], neckSpan[1], k / lames);
-        const t1 = hmMix(neckSpan[0], neckSpan[1], (k + 1) / lames + 0.02);
-        metal('neck', hmShell(neckFn, { t: [t0, t1], a: [0.15, Math.PI - 0.15], nt: 2, na: low ? 4 : 8, infl: (t, a) => 0.012 + 0.008 * ((t - t0) / (t1 - t0)), lip: 0.003, edge: HM_EDGE, color: k % 2 ? steelColor(0.92) : steelColor() }));
-      }
-      if (!low) for (const sign of [1, -1]) rivets((x, a, d) => neckFn(x, sign > 0 ? a : Math.PI - a, d), neckSpan, 0.2, 'neck', 5);
-    } else {
-      metal('neck', low ? hmShell(neckFn, { t: neckSpan, a: crinetA, nt: 4, na: 6, infl: 0.012, color: HM_LAMELLA }) : hmPlates(neckFn, { t: neckSpan, a: crinetA, rows: 11, cols: 11, axis: 't', infl: 0.012, tilt: 0.008, over: 0.4, color: HM_LAMELLA }));
-    }
-    // Peytral, flanchards and crupper.
-    const chest = { t: [0.27, 0.515], a: [Math.PI - 0.5, TAU + 0.5] };
-    const rump = { t: [-0.6, -0.32], a: [-0.5, Math.PI + 0.5] };
-    if (plate) {
-      metal('body', hmShell(bodyFn, { ...chest, nt: low ? 4 : 10, na: low ? 6 : 16, infl: 0.014, lip: 0.005, edge: HM_EDGE, color: steelColor() }));
-      metal('body', hmShell(bodyFn, { ...rump, nt: low ? 4 : 10, na: low ? 6 : 16, infl: 0.014, lip: 0.005, edge: HM_EDGE, color: steelColor() }));
-      for (const sign of [1, -1]) {
-        const fn = mirrored(bodyFn, sign);
-        metal('body', hmShell(fn, { t: [-0.3, 0.02], a: [0.1, -0.85], nt: low ? 3 : 8, na: low ? 3 : 6, infl: 0.016, lip: 0.005, edge: HM_EDGE, color: steelColor(0.96) }));
-        if (!low) {
-          rivets(fn, [-0.28, 0.0], -0.05, 6, 'body');
-          rivets((x, a, d) => bodyFn(x, sign > 0 ? a : Math.PI - a, d), [0.3, 0.5], 0.4, 4, 'body');
-        }
-      }
-      if (!low) {
-        // The peytral's rolled keel down the chest and the crupper's ridge along the spine.
-        const keel = [];
-        for (let k = 0; k <= 8; k += 1) keel.push([0.3 + (0.24 * k) / 8, TAU * 0.75]);
-        metal('body', hmStrap(bodyFn, keel, { width: 0.022, across: 'a', infl: 0.024, color: HM_STEEL2, radius: 0.12 }));
-        const spine = [];
-        for (let k = 0; k <= 8; k += 1) spine.push([-0.58 + (0.24 * k) / 8, Math.PI / 2]);
-        metal('body', hmStrap(bodyFn, spine, { width: 0.022, across: 'a', infl: 0.024, color: HM_STEEL2, radius: 0.12 }));
-      }
-    } else {
-      // Lamellar over the chest, body and rump (open on the back for the saddle), skirts of laced plates to the knees.
-      const rowsA = low ? 3 : 8;
-      for (const sign of [1, -1]) {
-        const fn = mirrored(bodyFn, sign);
-        if (low) {
-          metal('body', hmShell(fn, { t: [-0.55, 0.5], a: [1.2, -0.9], nt: 8, na: 4, infl: 0.014, lip: 0.003, color: (t, a) => (Math.floor((a + 2) * 6) % 2 ? HM_LAMELLA : hmScale3(HM_LAMELLA, 0.8)) }));
-        } else {
-          metal('body', hmPlates(fn, { t: [-0.56, 0.5], a: [1.2, -0.9], rows: rowsA + 2, cols: 40, axis: 'a', infl: 0.014, tilt: 0.01, over: 0.35, color: HM_LAMELLA, keep: (x, a) => !(a > 0.55 && x > seatX - 0.2 && x < seatX + 0.2) }));
-          metal('body', hmPlates(fn, { t: [-0.56, 0.5], a: [-0.9, -1.55], rows: 4, cols: 40, axis: 'a', infl: 0.03, tilt: 0.04, over: 0.45, color: hmScale3(HM_LAMELLA, 0.92) }));
-        }
-      }
-      metal('body', hmShell(bodyFn, { t: [0.36, 0.52], a: [Math.PI - 0.6, TAU + 0.6], nt: low ? 3 : 6, na: low ? 5 : 14, infl: 0.017, lip: 0.003, color: (t, a) => (Math.floor(t * 40) % 2 ? HM_LAMELLA : hmScale3(HM_LAMELLA, 0.82)) }));
-    }
+  // ---- Barding (horsebard.js): fitted over this horse, carried by its head, neck and body.
+  let bard = null;
+  if (barded) {
+    bard = buildBard({ spec, build, low, W, bodyFn, neckFn, headFn, poll, neckPivot, tailRoot, colliders, dyed, tileSize, add, prims: { hmSmoothen, hmTube, hmRing, hmCone } }, spec.barding);
   }
 
   // ---- The trapper: a cloth skirt hung in columns from the barrel's top (the view hangs it)
@@ -1101,7 +976,12 @@ export function buildHorseModel(spec) {
   const finishPart = (name, origin, scale = W) => {
     const soft = accs[`${name}.soft`] && accs[`${name}.soft`].p.length ? hmFinish(accs[`${name}.soft`], origin, scale) : null;
     const hard = accs[`${name}.metal`] && accs[`${name}.metal`].p.length ? hmFinish(accs[`${name}.metal`], origin, scale) : null;
-    return { soft, metal: hard };
+    // The bard's detail-mapped shells, by the tile each wears.
+    const detail = {};
+    for (const [key, target] of Object.entries(accs)) {
+      if (key.startsWith(`${name}.detail.`) && target.p.length) detail[key.slice(name.length + 8)] = hmFinish(target, origin, scale);
+    }
+    return { soft, metal: hard, detail };
   };
   const earSide = [Math.sin(headAngle) * 0, 0];
   void earSide;
@@ -1123,7 +1003,7 @@ export function buildHorseModel(spec) {
     bit: hmScale3(vec.sub(bitAt, poll), W), saddle: { x: seatX * W, top: (hmBackAt(build, seatX) + 0.045) * W, bar: [(seatX + 0.02) * W, (hmBackAt(build, seatX) - 0.015) * W, 0.115 * W], pommel: [pommelX * W, (hmBackAt(build, pommelX) + 0.045 + sd.pommel) * W], cantle: [cantleX * W, (hmBackAt(build, cantleX) + 0.045 + sd.cantle) * W] },
     hind: HORSE_LEGS_KEYS.map((key) => key), lengths: { upper: LEG.upper * W, cannon: LEG.cannon * W, pastern: LEG.pastern * W, hoof: LEG.hoof * W },
     mane: { ...mane, tufts: mane.tufts.map((t) => ({ ...t, base: hmScale3(t.base, W), length: t.length * W, width: t.width * W, hw: t.hw * W, depth: t.depth * W })), count: mane.count },
-    coat, dyed, trapper, low,
+    coat, dyed, trapper, low, maneHidden: barded,
     // The bridle's reins start at the bit, the stirrup leathers at the saddle's bars.
     stirrupDrop: 0.4 * W,
   };
@@ -1141,16 +1021,18 @@ export function buildHorseModel(spec) {
   for (const key of ['body', 'neck', 'head', 'ear']) {
     countGeometry(parts[key].soft);
     countGeometry(parts[key].metal);
+    for (const geometry of Object.values(parts[key].detail)) countGeometry(geometry);
   }
   for (const key of HORSE_LEGS_KEYS) for (const segName of Object.keys(parts.legs[key])) {
     countGeometry(parts.legs[key][segName].soft);
   }
-  return { key: horseModelKey(spec), spec, build, parts, rig, triangles, pieces, low };
+  // (The bard as built, horsebard.js: its pieces' triangles and its points by part, in the horse's units.)
+  return { key: horseModelKey(spec), spec, build, parts, rig, triangles, pieces, low, bard };
 }
 
 const HORSE_LEGS_KEYS = ['lFore', 'rFore', 'lHind', 'rHind'];
 
 /** What a model depends on (cache key). */
 export function horseModelKey(spec) {
-  return [spec.breed, spec.barding, spec.coat, spec.seed, spec.caparison ? 'c' : '-', spec.detail ?? 'full', spec.corner ?? '-'].join('|');
+  return [spec.breed, spec.barding, spec.style ?? '-', spec.coat, spec.seed, spec.caparison ? 'c' : '-', spec.detail ?? 'full', spec.corner ?? '-'].join('|');
 }

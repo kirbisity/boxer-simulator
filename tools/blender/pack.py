@@ -30,7 +30,7 @@ ARMOUR = {
     **{name: {'size': 512, 'quality': 88, 'masks': masks} for name, masks in (
         ('segmentata', True), ('scale', False), ('brigandine', True), ('euroBrigandine', True), ('harnessEdge', True),
         ('krug', False), ('yokohagi', False), ('sugake', True), ('etched', False), ('polymer', False), ('panels', False),
-        ('munitionPlate', False), ('bifu', True))},
+        ('munitionPlate', False), ('bifu', True), ('fluted', False))},
 }
 # Ground tiles and the metres each covers (as baked).
 GROUND = {name: {'size': 1024, 'quality': 86, 'metres': metres} for name, metres in (
