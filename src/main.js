@@ -5,7 +5,8 @@ import { greyedHair } from './aging.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
-import { MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
+import { withTanks } from './physics/flame.js';
+import { CUSTOM_STYLE_KEYS, MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, reviveFighter, startCrawl, startJump, throwPunch, WORLD } from './physics.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
@@ -1568,6 +1569,19 @@ function askConfirm(text, yesLabel, yes) {
 // His character, built with the same form as a corner's (the fighter code's copy and load too), kept in this browser.
 let heroTurn = -0.45;
 let heroTimer = null;
+/** A custom fighter given the load his style is carried with (`packed`: physics/flame.js withTanks), or his own kit back without it. */
+function packForStyle(inputs) {
+  const packed = Boolean(STYLES[inputs.style]?.packed);
+  if (packed && !inputs.outfit?.packKg) {
+    const unpacked = { outfit: structuredClone(inputs.outfit ?? {}), sidearm: inputs.sidearm };
+    Object.assign(inputs, withTanks(inputs), { unpacked });
+  } else if (!packed && inputs.unpacked) {
+    inputs.outfit = inputs.unpacked.outfit;
+    if (inputs.unpacked.sidearm === undefined) delete inputs.sidearm;
+    else inputs.sidearm = inputs.unpacked.sidearm;
+    delete inputs.unpacked;
+  }
+}
 const builderOpen = () => !$('#hero-builder').hidden;
 function heroPreviewSoon() {
   if (!builderOpen()) return;
@@ -1960,7 +1974,7 @@ const FIELDS = [
 const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 // The compact grid: the fighting style first, then the look.
 const LOOK_FIELDS = [
-  { key: 'style', label: 'Style', options: STYLE_KEYS, names: Object.fromEntries(STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
+  { key: 'style', label: 'Style', options: CUSTOM_STYLE_KEYS, names: Object.fromEntries(CUSTOM_STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
   { key: 'skinTone', label: 'Skin', options: Object.keys(SKIN_TONES), names: { porcelain: 'porcelain', light: 'light', lightTan: 'light tan', medium: 'medium', tan: 'tan', deep: 'deep' } },
   { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long', long: 'long', ringletPigtails: 'ringlet pigtails', ringlets: 'ringlets', ringletUpdo: 'ringlet updo', hime: 'hime cut (waist length)' } },
   { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
@@ -2077,6 +2091,8 @@ function buildCornerForm(corner) {
     select.dataset.look = field.key;
     select.addEventListener('change', () => {
       if (field.onInputs) current(corner)[field.key] = select.value;
+      // A style worn on the back (`packed`: the flamethrower's tanks) puts its load on him, and takes it off when he changes style.
+      if (field.key === 'style') packForStyle(current(corner));
       else current(corner).look = { ...DEFAULT_LOOK, ...current(corner).look, [field.key]: field.toValue ? field.toValue(select.value) : select.value };
       // The colour picked is his natural colour; the hair shown is that, greyed for his age.
       if (field.key === 'hairColor') {

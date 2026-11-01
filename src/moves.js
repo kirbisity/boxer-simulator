@@ -958,7 +958,7 @@ export const STYLES = {
   // AR-15 is, the valve opened in bursts (the weapon's `automatic`) at a man within `reach` m (the M2's useful range: it carries
   // further, less surely), walked in on one further; he keeps 3 m off. A man alight past `spareAlight` is spared more fuel (ai.js).
   flamethrower: {
-    label: 'Flamethrower', hidden: true, weapon: 'flamethrower', fallback: 'mix',
+    label: 'Flamethrower', hidden: true, custom: true, packed: true, weapon: 'flamethrower', fallback: 'mix',
     // (`close` 0: fired at any range, never let fall for his hands while it has fuel: it is on its hose.)
     ranged: { flee: 3, rest: 1, runFor: 1.2, standFor: 2, close: 0, shotSeconds: 0.4, headShare: 0, between: [1.4, 1.2], move: 'fireRifle', reloadSafe: Infinity, reach: 25, spareAlight: 0.6, coverDown: true },
     cadence: { work: 1.4, move: 0.6, burst: 0.6, mobility: 0.4 },
@@ -1961,6 +1961,8 @@ STYLES.kontos = { ...STYLES.lance, label: 'Kontos', weapon: 'kontos', hidden: tr
 
 /** Styles a player can pick (a fallback such as the drawn gladius is not one). */
 export const STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidden);
+// The styles the custom builder offers: the pickers' and those kept out of them but built to order (`custom`: the flamethrower).
+export const CUSTOM_STYLE_KEYS = Object.keys(STYLES).filter((key) => !STYLES[key].hidden || STYLES[key].custom);
 
 /**
  * Game plans the AI switches between within a bout, as adjustments to its
