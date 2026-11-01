@@ -458,6 +458,27 @@ export const AI = {
   // reason to pause: no circling between flurries, no surge-and-retreat against a longer reach, one
   // attack after another as fast as its motors reset (`rest`: this share of a fresh man's pause after an attack).
   machine: { rest: 0.35 },
+  // Pressing the fight (every AI fighter, against the player or another AI, in a bout or a battle): the old pace waited
+  // ~1-3 s between blows and circled between spells, which a man at the pad (a blow tapped every few tenths of a second,
+  // walking straight in) beat by simply attacking first and more often. A man who means to win: game plans weighted by
+  // `plans`; his rest after a blow × `tempo`; spells of working × `work`, of circling × `move`; a man who walks into his
+  // range is met at once, not circled (`meet`); a blow that misses (seen a reaction's time after it turns back), or a heavy
+  // one he is committed to, is struck into within `punish` s (his cooldown cut to it); a man who gives ground is gone after at `chase` of his footwork (a surge's pace)
+  // within `chaseWithin` m of his range; a guard held up against him for `guardFor` s is pressed: `guardHeavy` more of his
+  // blows loaded (each blow on a guard costs it more breath: WORLD.guardHeld) and his rest × `guardTempo`; a lunging blow
+  // (a move's `step`) is thrown from as far as `lunge` of what its step carries him in while it comes out; and a blow is
+  // timed to where the two of them will be when it is out (`timing` of the speed they close at over its reach, when they
+  // close faster than `timedFrom` m/s: a man coming in, not the in-and-out of footwork). Behaviour only:
+  // nothing of his body, weapon or blows is changed, and every blow costs him its breath as ever. Gloves in a ring (a sport
+  // paced over its rounds: ringBout) keep the sport's own pace, spells and timing (`tempo`, `work`, `move`, `timing`). `on`
+  // false: the old AI.
+  press: {
+    on: true,
+    plans: { outboxer: 0.5, pressure: 2, counter: 0.5, brawler: 1.5 },
+    tempo: 0.75, work: 1.6, move: 0.35, meet: true, punish: 0.25, lunge: 0.8, timing: 0.6, timedFrom: 1,
+    chase: 1.5, chaseWithin: 1.2, guardFor: 0.8, guardHeavy: 0.25, guardTempo: 0.7,
+  },
+
   // A relentless man (`inputs.relentless`: a boss, Dunnottar's Noname and Lord Vaelen) knows no fear and gives no ground: he works without
   // the spells of circling, never steps back to keep his distance, retreats from no longer reach and makes no room for his own long weapon;
   // a blow at him is met with his guard, not a step back. `rest`: this share of a fresh man's pause after an attack (his wind is his body's,
@@ -503,7 +524,10 @@ function chooseStrategy(world, fighter, opponent, dt) {
   let next = null;
   if (hurt && fighter.aiStrategy !== 'outboxer' && !held) next = 'outboxer';
   else if (!hurt && finishing && !['pressure', 'brawler'].includes(fighter.aiStrategy) && !held) next = world.random() < 0.5 ? 'pressure' : 'brawler';
-  else if (!fighter.aiStrategy || fighter.aiStrategyFor <= 0) next = pick(Object.fromEntries(Object.entries(STRATEGIES).map(([key, plan]) => [key, plan.weight * (STYLES[fighter.style].plans?.[key] ?? 1)])), world.random);
+  else if (!fighter.aiStrategy || fighter.aiStrategyFor <= 0) {
+    const pressed = AI.press.on ? AI.press.plans : {};
+    next = pick(Object.fromEntries(Object.entries(STRATEGIES).map(([key, plan]) => [key, plan.weight * (STYLES[fighter.style].plans?.[key] ?? 1) * (pressed[key] ?? 1)])), world.random);
+  }
   if (next) {
     if (next !== fighter.aiStrategy) world.events.push({ time: world.time, kind: 'strategy', fighter: fighter.id, strategy: next, effects: [] });
     fighter.aiStrategy = next;
@@ -1466,7 +1490,7 @@ function phaseLength(random, mean) {
  * retreat follows. Sets the fighter's footwork; returns whether he may
  * start an attack now.
  */
-function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt }) {
+function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt, pressing = false }) {
   const random = world.random;
   const blade = AI.blade;
   const safe = reachOf(opponent) + fighter.body.lengths.headRadius + blade.margin;
@@ -1520,7 +1544,9 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
     else if (distance > hold + blade.slack) fighter.move = (wary ? 0.6 : 1) * approach;
     else fighter.move *= Math.exp(-dt * 4);
     fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 1 : -1) * cadence.mobility));
-    const opening = recovering && random() < cadence.opening * dt * 10;
+    // Pressing (AI.press): a man who walks into his range, or misses, is met at once.
+    const met = pressing && AI.press.meet && (recovering || distance <= (wary ? myRange : range) + AI.rangeSlack);
+    const opening = met || (recovering && random() < cadence.opening * dt * 10);
     if ((phase.t > phase.length || opening) && fighter.stamina > (wary ? 0.3 : 0.15)) start('work', wary ? blade.surgeSeconds : phaseLength(random, cadence.work));
     return false;
   }
@@ -1546,6 +1572,10 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   if (distance > workRange + AI.rangeSlack) fighter.move = approach * Math.min(1, AI.approachFloor + (distance - workRange) / AI.approachBrake);
   else if (distance < workRange - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = relentless(fighter) ? 0 : -0.7;
   else fighter.move *= Math.exp(-dt * 4);
+  // Pressing (AI.press): a man giving ground just beyond his range is gone after at a surge, not followed at a walk.
+  const away = [opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]];
+  const giving = ((opponent.rootVelocity?.[0] ?? 0) * away[0] + (opponent.rootVelocity?.[1] ?? 0) * away[1]) / Math.max(1e-6, distance) > 0.2;
+  if (pressing && giving && distance > workRange + AI.rangeSlack && distance < workRange + AI.press.chaseWithin) fighter.move = Math.max(fighter.move, AI.press.chase * approach);
   if (fighter.stamina < 0.25 && distance < range + 0.4 && !relentless(fighter)) fighter.move = -0.6;
   if (phase.t > phase.length && !fighter.punch && !fighter.aiCombo?.length) start('move', phaseLength(random, cadence.move));
   return true;
@@ -2799,6 +2829,17 @@ function decide(world, fighter, dt) {
     defend: basePlan.defend * Math.exp(-bold.defend * nerve) * (shaky ? 1 - AI.rout.rally.guard : 1),
     heavy: Math.max(0, basePlan.heavy + bold.heavy * nerve),
   };
+  // Pressing the fight (AI.press): a quicker pace, and a guard held up a while against him pressed.
+  const pressing = AI.press.on;
+  // (Gloves in a ring are a sport paced over its rounds: the pace and the spells are the sport's own; the rest presses as anywhere.)
+  const paced = pressing && ringBout(world, fighter, opponent);
+  if (pressing) {
+    const spec = AI.press;
+    fighter.aiGuardSeen = opponent.guardHeld ? fighter.aiGuardSeen ?? world.time : null;
+    const turtled = fighter.aiGuardSeen !== null && world.time - fighter.aiGuardSeen >= spec.guardFor;
+    plan.tempo *= (paced ? 1 : spec.tempo) * (turtled ? spec.guardTempo : 1);
+    if (turtled) plan.heavy += spec.guardHeavy;
+  }
   const distance = vec.length(vec.sub(point(opponent.x, P.pelvis), point(fighter.x, P.pelvis)));
   // A man down or getting up is not hit. The last man of his side, down,
   // is held down; anyone else is given room.
@@ -2894,6 +2935,10 @@ function decide(world, fighter, dt) {
   const fearless = (fighter.body.gear.courage >= 1 && fighter.body.gear.cutProof) || relentless(fighter);
   const wary = !waiting && !fighter.clinch && !fearless && outreached(fighter, opponent);
   const cadence = cadenceOf(world, fighter, style, plan, nerve);
+  if (pressing && !paced) {
+    cadence.work *= AI.press.work;
+    cadence.move *= AI.press.move;
+  }
   let mayAttack = true;
   if (fighter.clinch && style.clinchDrive) fighter.move = 1;
   else if (waiting || fighter.clinch) {
@@ -2901,7 +2946,7 @@ function decide(world, fighter, dt) {
     else if (distance < range - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
     else fighter.move *= Math.exp(-dt * 4);
   } else if (!fighter.defence || (fighter.defence.name !== 'stepBack' && fighter.defence.name !== 'sidestep')) {
-    mayAttack = cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt });
+    mayAttack = cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt, pressing: pressing && spacing.kickRoom });
   }
   // His man inside his long weapon's head: room first, then the point (AI.pointRoom). A relentless man makes none: he strikes from where he stands.
   const cramped = relentless(fighter) ? false : makeRoom(world, fighter, opponent);
@@ -2991,8 +3036,23 @@ function decide(world, fighter, dt) {
     return;
   }
   fighter.aiComboStep = 0;
+  // Pressing (AI.press): his man's blow missed and coming back, or a heavy one he is committed to: struck into, once for each.
+  // (Seen a reaction's time after it turns back, as any blow is seen: AI.reactionSeconds, less for the trained.)
+  const seenBack = AI.reactionSeconds - AI.reactionTrained * fighter.body.inputs.exercise;
+  const whiff = opponent.punch && !opponent.punch.landed && opponent.punch.t > opponent.punch.spec.extendUntil + seenBack ? opponent.punch : null;
+  const opened = whiff ?? (opponent.committed > 0 ? opponent.punch : null);
+  if (pressing && spacing.kickRoom && opened && fighter.aiPunished !== opened) {
+    fighter.aiPunished = opened;
+    fighter.cooldown = Math.min(fighter.cooldown, AI.press.punish);
+  }
   if (fighter.cooldown > 0) return;
   // Choose among the moves that reach from here; in the clinch, knees.
+  // (Pressing, timed to where the two of them will be when it is out: the speed they close at over its reach, AI.press timing.)
+  // (Not with a comrade at his shoulder or ahead, AI.kickClearance: in a press of men he strikes from where he stands, and
+  // jumps at no opening past them: the meeting, the chase and the punishing are for open ground too.)
+  const reachOut = pressing && spacing.kickRoom;
+  const closing = reachOut ? closingSpeed(fighter, opponent, distance) : 0;
+  const timed = closing > AI.press.timedFrom && !paced ? closing * AI.press.timing : 0;
   const choices = {};
   for (const [name, weight] of Object.entries(style.attacks)) {
     const spec = MOVES[name];
@@ -3019,7 +3079,8 @@ function decide(world, fighter, dt) {
     const held = blade?.held ? blade.spec : null;
     if (spec.reach === 'weapon' && !held) continue;
     if (cramped && strikesWithHead(name)) continue;
-    const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius;
+    // (Pressing, a lunging blow is thrown from as far as its step carries him in: AI.press lunge.)
+    const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius + (reachOut ? lungeReach(spec) + timed * spec.extendUntil : 0);
     // Close-range moves only when close; long ones only when there is room.
     if (distance <= reach && (spec.reach !== 'leg' || distance > fighter.body.reach * 0.9)) choices[name] = weight;
   }
@@ -3058,6 +3119,17 @@ function decide(world, fighter, dt) {
     fighter.cooldown = combo ? 0 : nextGap(world, fighter, style, plan, cadence);
   }
 }
+
+/** How fast (m/s) the two close on each other, hips to hips (0 when they part). */
+function closingSpeed(fighter, opponent, distance) {
+  const to = [opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]];
+  const mine = fighter.rootVelocity ?? [0, 0];
+  const his = opponent.rootVelocity ?? [0, 0];
+  return Math.max(0, ((mine[0] - his[0]) * to[0] + (mine[1] - his[1]) * to[1]) / Math.max(1e-6, distance));
+}
+
+/** How far (m) a blow's lunge carries him in while it comes out (its step's drive over its reach), the share AI.press.lunge of it. */
+const lungeReach = (spec) => (spec.step ?? 0) * Math.max(0, spec.extendUntil - spec.windup + (spec.stepLead ?? 0)) * AI.press.lunge;
 
 /**
  * His guard held (as the player's on his button: physics.js holdGuard, WORLD.guardHeld): a block he made against a blow kept up

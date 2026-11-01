@@ -165,7 +165,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // A hand grenade carried (physics/throwable.js: { kind, left }, from his kit) and the throw under way ({ kind, hand, t, mark, lit, released }).
     throwable: undefined, throwing: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
-    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null,
+    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null, aiGuardSeen: undefined, aiPunished: undefined,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
     // What he has left to shoot (physics/ranged.js ammoLeft: arrows, or bolts and charges), and since when he has held a shot his own men foul (ai.js).
     arrows: undefined, rounds: undefined, holdingShot: undefined,
