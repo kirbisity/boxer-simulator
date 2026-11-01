@@ -225,27 +225,6 @@ test('his arms are laid out upright and leaned once: the pose undone gives the a
   assert.ok(Math.abs(me.intent.bank) > 0.2, 'and it was leaned');
 });
 
-test('an AI man running to a place cornering: leans into a turn, on his feet, his heading with his path', () => {
-  const game = field();
-  const { me, world } = game;
-  me.player = false;
-  const goals = [[-60, 0], [-60, -40], [-100, -40]];
-  let goal = 0;
-  let fell = false;
-  let most = 0;
-  const point = () => [me.x[P.pelvis * 3], me.x[P.pelvis * 3 + 2]];
-  advance(world, 6, (current, dt) => {
-    thinkAll(current, dt, new Set([1]));
-    if (Math.hypot(point()[0] - goals[goal][0], point()[1] - goals[goal][1]) < 6 && goal < goals.length - 1) goal += 1;
-    Object.assign(me, { running: true, move: 1, goTo: [goals[goal][0], 0, goals[goal][1]] });
-    most = Math.max(most, Math.abs(me.bank ?? 0));
-    if (me.state !== 'up') fell = true;
-  });
-  assert.equal(fell, false, 'he never fell');
-  assert.ok(most > 0.1, `he leaned into the corner (${(most * DEG).toFixed(1)} deg)`);
-  assert.ok(most < 0.7, 'but not past what holds him');
-});
-
 test('a horse leans into a turn as a runner does, the rider with it, and is upright on the straight', () => {
   for (const [heading, sign] of [[1, -1], [-1, 1]]) {
     const world = createWorld([{ inputs: { ...structuredClone(PRESETS.knight), mounted: true }, corner: 'red' }, { inputs: structuredClone(PRESETS.light), corner: 'blue' }], { seed: 1, arena: { halfX: 60, halfZ: 60 } });

@@ -1291,6 +1291,12 @@ function teamSpacing(world, fighter, opponent, lineOfFire = AI.lineOfFire) {
     } else if (apart < AI.mateSpacing) strafe += (across >= 0 ? -1 : 1) * (1 - apart / AI.mateSpacing);
     if (apart < AI.kickClearance && along > -0.2) kickRoom = false;
   }
+  // A man not his to strike (a civilian, a prisoner: no foe of his) close by his man: no lunge, no meeting, no chase past him.
+  for (const other of world.fighters) {
+    if (other === fighter || other === opponent || other.corner === fighter.corner || other.state === 'out' || hostile(other, fighter)) continue;
+    const offset = vec.sub(point(other.x, P.pelvis), at);
+    if (Math.hypot(offset[0], offset[2]) < length + AI.kickClearance && vec.dot(offset, ahead) > -0.2) kickRoom = false;
+  }
   // Facing turns the line: the fighter's own left is the line's left.
   return { strafe: Math.max(-1, Math.min(1, strafe)), blocked, kickRoom };
 }

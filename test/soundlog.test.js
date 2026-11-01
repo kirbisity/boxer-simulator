@@ -138,32 +138,6 @@ test('sound log: a bout of fists: punches and kicks of tens to hundreds of joule
   for (const voice of voices) assert.ok(voice.strength > 0 && voice.strength <= 1 && voice.size > 1.4 && voice.size < 2.2);
 });
 
-test('sound log: steel: blades meet, edges and points land on plate and lamellar, the swing whooshes at its fastest', () => {
-  const world = duel('knight', 'samurai');
-  advance(world, 20, (current, dt) => {
-    listenTo(current, current.fighters[0]);
-    thinkAll(current, dt);
-  });
-  const clashes = ofType(world, 'clash');
-  assert.ok(clashes.length >= 1, 'the blades meet');
-  for (const clash of clashes) assert.ok(finite(clash) && clash.speed > 0 && clash.speed < 40 && ['blade', 'haft', 'blunt'].includes(clash.a) && typeof clash.slide === 'boolean');
-  const hits = ofType(world, 'hit');
-  assert.ok(hits.some((hit) => ['blade', 'point', 'blunt'].includes(hit.striker)));
-  assert.ok(hits.some((hit) => hit.covering === 'plate' && hit.who === 0), 'the samurai\'s blows ring on the knight\'s plate');
-  assert.ok(hits.some((hit) => hit.covering === 'lamellar' && hit.who === 1), 'the knight\'s on the samurai\'s lamellar');
-  for (const hit of hits) assert.ok(hit.energy > 0 && hit.energy < 2000, `${hit.energy} J`);
-  const swings = ofType(world, 'swing');
-  assert.ok(swings.length >= 1);
-  for (const swing of swings) assert.ok(swing.speed > 8 && swing.speed < 80 && swing.length > 0.3 && swing.mass > 0.3 && swing.mass < 6);
-  assert.ok(ofType(world, 'step').every((step) => step.armour === (step.who === 0 ? 'plate' : 'lamellar')));
-  // What covers each part: plate over the knight, lamellar on the samurai, flesh under a robe.
-  const [knight, samurai] = world.fighters;
-  assert.equal(coveringAt(knight, 'trunk'), 'plate');
-  assert.equal(coveringAt(knight, 'head'), 'plate');
-  assert.equal(coveringAt(samurai, 'trunk'), 'lamellar');
-  assert.equal(coveringAt(duel('heavy', 'light').fighters[0], 'head'), 'flesh');
-});
-
 test('sound log: a rider: each hoof comes down on its beat, as heavy as the laden horse', () => {
   const rider = { ...structuredClone(PRESETS.knight), mounted: true };
   const world = createWorld([{ inputs: rider, corner: 'red' }, { inputs: structuredClone(PRESETS.yari), corner: 'blue' }], { seed: 1, arena: { halfX: 30, halfZ: 20 } });

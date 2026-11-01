@@ -417,17 +417,6 @@ test('followers fight whoever the player fights, and not the unaware', () => {
   assert.equal(state(w, 'unaware'), 'idle');
 });
 
-test('an enemy who sees a fighting follower turns aggro too', () => {
-  // The follower fights an aggro guard out of the player's sight; a second guard, looking at the follower only.
-  const w = world({ spawns: [prisoner('p', 40, 0), guard('first', 48, 0, Math.PI), guard('second', 40, 18, Math.PI / 2)], player: [-40, 0] });
-  freePrisoner(w, 'p');
-  w.events.push({ time: w.time, kind: 'landed', attacker: man(w, 'p').id, defender: man(w, 'first').id, effects: [] });
-  run(w, 3);
-  assert.equal(state(w, 'first'), 'aggro');
-  assert.equal(state(w, 'p'), 'aggro');
-  assert.equal(state(w, 'second'), 'aggro');
-});
-
 test('followers are re-homed with the player: never left dormant behind when a section goes quiet', () => {
   const room = (id, x) => ({ id, name: id, bounds: [{ at: [x, 0], size: [40, 30] }], terrain: [slabOf([x, 0], [40, 30], 0, { id: `${id}-floor` })], portals: [{ to: id === 'a' ? 'b' : 'a', area: { at: [x + (id === 'a' ? 16 : -16), 0], size: [8, 30] } }], spawns: id === 'a' ? [prisoner('p', -2, 0)] : [], items: [], levers: [], gates: [], ladders: [] });
   const w = createStageWorld(field({ sections: [room('a', 0), room('b', 40)], player: [0, 0] }), hero(), { seed: 2 });

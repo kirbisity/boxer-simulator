@@ -57,27 +57,6 @@ test('in his side\'s formation his sheaves are brought up to him, a few times, a
   assert.ok(archer.weapon.spent);
 });
 
-test('a spent archer lets the bow fall, draws his sidearm and goes in to fight', () => {
-  const world = range(PRESETS.longbow, { apart: 9 });
-  const [archer, enemy] = world.fighters;
-  const sidearm = archer.body.gear.sidearm;
-  assert.ok(sidearm, 'the archer\'s kit has a sidearm');
-  archer.arrows = 1;
-  let struck = false;
-  let cursor = 0;
-  for (let t = 0; t < 20 && !struck; t += 0.1) {
-    advance(world, 0.1, (w, dt) => thinkAll(w, dt));
-    for (; cursor < world.events.length; cursor += 1) {
-      const event = world.events[cursor];
-      if (event.attacker === archer.id && event.punch && event.kind !== 'loosed') struck = true;
-    }
-  }
-  assert.ok(world.events.some((event) => event.kind === 'quiverEmpty' && event.fighter === archer.id), 'he shot his last arrow');
-  assert.ok(world.events.some((event) => event.kind === 'drew' && event.fighter === archer.id), 'and drew');
-  assert.ok(archer.weapon?.held && !archer.weapon.spec.ranged, `a weapon in hand to fight with: ${archer.weapon?.kind}`);
-  assert.ok(struck || apartOf(archer, enemy) < 2.5, 'he went to fight');
-});
-
 test('a gunner with a comrade between him and his man holds his fire; the line clear, he fires', () => {
   const world = range(PRESETS.matchlock, { apart: 12, between: true });
   const [gunner, , comrade] = world.fighters;

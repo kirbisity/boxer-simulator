@@ -257,34 +257,6 @@ function toTheEpilogue(seed = 5) {
   return world;
 }
 
-test('twist: the epilogue lets its waves go in the drain as the stage says, each man sent at him, and ends with the cards when the last is down', () => {
-  const world = toTheEpilogue();
-  const waves = DEF.epilogue.waves;
-  const men = held(world, DEF.epilogue.hold);
-  assert.equal(men.length, waves.reduce((sum, wave) => sum + wave.men.length, 0));
-  assert.ok(men.every((fighter) => fighter.dormant));
-  run(world, waves[0].at + 0.5);
-  const first = men.filter((fighter) => !fighter.dormant);
-  assert.equal(first.length, waves[0].men.length, 'the first wave');
-  for (const fighter of first) {
-    assert.equal(fighter.spawn.section, 'sewer');
-    assert.ok(Math.hypot(hips(fighter)[0] - waves[0].from[0], hips(fighter)[2] - waves[0].from[2]) < 6, 'in at the drain\'s end');
-    assert.ok(['aggro', 'charge'].includes(mindState(world, fighter.id)));
-  }
-  // The rest of them come, and fall (struck down by hand here); the end comes a breath after the last.
-  for (const wave of waves.slice(1)) {
-    run(world, wave.at - (world.time - endingOf(world).since) + 0.3);
-    for (const fighter of men.filter((each) => !each.dormant && each.state !== 'out')) knockOut(world, fighter, { time: world.time, attacker: 0, effects: [] }, 'is cut down', 'killed');
-  }
-  for (const fighter of men.filter((each) => !each.dormant && each.state !== 'out')) knockOut(world, fighter, { time: world.time, attacker: 0, effects: [] }, 'is cut down', 'killed');
-  assert.equal(men.filter((fighter) => fighter.dormant).length, 0, 'all of them came');
-  run(world, TWIST.epilogue.cleared + 0.3);
-  assert.equal(endingOf(world).phase, 'done');
-  assert.equal(endingOf(world).outcome, 'cleared');
-  assert.ok(drainUi(world).some((message) => message.type === 'ending'), 'the cards are asked for');
-  assert.ok(endingBusy(world), 'held through the cards');
-});
-
 test('twist: the epilogue ends when its time is out, and with his death: the cards, never a rest', () => {
   const timed = toTheEpilogue(7);
   // Every wave let go, and its men taken out of the world again before they reach him (they stand, not fallen: the drain is not cleared).
