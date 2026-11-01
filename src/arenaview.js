@@ -426,7 +426,7 @@ function scissorHelm(group, head, r, bronze) {
 // ---- The helmets remodelled from the surviving pieces (helmforms.js), their fine work in baked maps (helmmaps.js) ------------
 
 /** A part's mesh (helmforms.js's grid, its coordinates laid into its region of the sheet). */
-function formMesh(part, rect, material) {
+export function formMesh(part, rect, material) {
   const { positions, uvs, indices } = formGrid(part);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
