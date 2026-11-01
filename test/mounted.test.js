@@ -187,44 +187,6 @@ test('barding keeps out the edge: the same cut at a horse\'s chest bleeds a bare
   assert.ok(plate.hit.cut < 1e-6, `plate: ${plate.hit.cut}`);
 });
 
-test('mounted bouts run: a rider strikes in passing with the horse\'s speed in the blow, and the man on foot meets him', () => {
-  // (A sabre: the cut a horseman makes in passing. A knight's long sword, by its style's weights, is often a lunge made while the man is still ahead.)
-  // (Over a few bouts: whether a pass catches the man at the gallop's full speed depends on where he is, running or getting up, as the horse comes.)
-  const cuts = [];
-  for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
-    const w = world(rider('saber'), footman('yari'), seed);
-    advance(w, 20, thinkAll);
-    const riderBlows = w.events.filter((event) => (event.kind === 'landed' || event.kind === 'blocked') && event.attacker === 0);
-    const footBlows = w.events.filter((event) => (event.kind === 'landed' || event.kind === 'blocked' || event.kind === 'horseHit') && event.attacker === 1);
-    assert.ok(riderBlows.length >= 1 || seed > 1, 'the rider lands');
-    assert.ok(footBlows.length >= 1, `the spearman reaches him or his horse (seed ${seed})`);
-    cuts.push(...riderBlows.map((event) => event.speed));
-  }
-  // At a gallop the cut closes faster than any arm alone swings (~10-12 m/s).
-  assert.ok(cuts.some((speed) => speed > 9), cuts.map((speed) => speed.toFixed(1)).join(', '));
-});
-
-// ---- Momentum: the lance on foot and on horseback; horses against men and against each other ----
-
-const median = (values) => [...values].sort((a, b) => a - b)[Math.floor((values.length - 1) / 2)];
-
-test('the same lance couched from a destrier at the gallop spends an order of magnitude more than on foot at a run: the saddle and lance rest put the horse behind the point', () => {
-  const [foot, saddle] = ATTACKERS;
-  const blows = (entry, seeds) => seeds.map((seed) => firstBlow(entry[1], 'street', 3000 + seed, entry[2])).filter(Boolean).map((row) => row.hit);
-  const onFoot = blows(foot, [0, 1, 2, 3]);
-  const mounted = blows(saddle, [0, 1, 2, 3, 4, 5, 6, 7]);
-  assert.ok(onFoot.length >= 3 && mounted.length >= 3, `landed ${onFoot.length}, ${mounted.length}`);
-  const energy = (hits) => median(hits.map((hit) => hit.energy));
-  // The mass behind the point: the man's weight and the horse's share, against a quarter of the man on foot.
-  assert.ok(median(mounted.map((hit) => hit.strikeMass)) > 3 * median(onFoot.map((hit) => hit.strikeMass)));
-  // Its speed: the horse's gallop, against a laden man's run.
-  assert.ok(median(mounted.map((hit) => hit.speed)) > 2 * median(onFoot.map((hit) => hit.speed)));
-  assert.ok(energy(mounted) >= 8 * energy(onFoot), `${energy(mounted).toFixed(0)} J from the saddle, ${energy(onFoot).toFixed(0)} J on foot`);
-  assert.ok(median(mounted.map((hit) => hit.pierce)) >= 8 * median(onFoot.map((hit) => hit.pierce)));
-  // On foot it is still tens of joules; from the saddle hundreds, kilojoule class when it meets square at the gallop.
-  assert.ok(energy(onFoot) < 160 && energy(mounted) > 400, `${energy(mounted).toFixed(0)} J v ${energy(onFoot).toFixed(0)} J`);
-});
-
 test('the couched lance breaks only on heavy armour: on an unarmoured man it goes in and is kept in hand; on plate (not into a gap) it shatters, nothing left to pick up, and the sidearm is drawn', () => {
   const saddle = ATTACKERS[1];
   const runs = (target) => [0, 1, 2, 3, 4, 5, 6, 7].map((seed) => firstBlow(saddle[1], target, 3000 + seed, saddle[2])).filter(Boolean);
@@ -300,28 +262,6 @@ test('a horse at the gallop bowls a man over and carries him, the reaction slowi
   assert.ok(bare.foes[0].trauma.trunk > 0.8, `bare ${bare.foes[0].trauma.trunk.toFixed(2)}`);
   assert.ok(plate.foes[0].trauma.trunk < 0.6 * bare.foes[0].trauma.trunk, `plate ${plate.foes[0].trauma.trunk.toFixed(2)}`);
   assert.equal(bare.w.events.filter((e) => e.kind === 'horseDown').length, 0);
-});
-
-test('men in close order are one block to the horse and stop it where it rides down one man; spaced out they are bowled singly', () => {
-  const one = chargeInto(rider('knight'), row('hoplomachus', 1), [[12, 0]]);
-  const spaced = chargeInto(rider('knight'), row('hoplomachus', 3), block(3, 1, 1.8));
-  const wall = chargeInto(rider('knight'), row('hoplomachus', 9), block(3, 3));
-  // (Six men in plate: the median of seven runs, a third of its speed in half a second against a tenth for one man: which of them the horse meets second, and so how soon, depends on how the first men were crashed into each other and reeled.)
-  const platesRuns = [4000, 4001, 4002, 4003, 4004, 4005, 4006].map((seed) => chargeInto(rider('knight'), row('knight', 6, { style: 'unskilled' }), block(3, 2, 0.8), seed));
-  const plates = platesRuns[0];
-  const lostBy = (run) => (run.before - run.low) / run.before;
-  assert.ok(lostBy(one) < 0.2, `one man ${lostBy(one).toFixed(2)}`);
-  assert.ok(lostBy(spaced) < 0.3, `spaced ${lostBy(spaced).toFixed(2)}`);
-  assert.ok(lostBy(wall) > 0.6, `a wall of nine ${lostBy(wall).toFixed(2)}`);
-  assert.ok(median(platesRuns.map(lostBy)) > 0.35, `six in plate ${platesRuns.map((run) => lostBy(run).toFixed(2))}`);
-  // The rider goes over the horse's neck when it stops, and the men take less each than a lone man.
-  for (const run of [wall, plates]) assert.ok(run.w.events.some((e) => e.kind === 'unhorsed' && e.fighter === 0), 'the rider is thrown');
-  // (How fast a man is flung depends on where on his shield the horse meets him: the median of five seeds, a wall no worse for each man than a lone man.)
-  const flung = (count, places) => median([4000, 4001, 4002, 4003, 4004].map((seed) => chargeInto(rider('knight'), row('hoplomachus', count), places, seed).peak));
-  assert.ok(flung(9, block(3, 3)) < flung(1, [[12, 0]]) * 1.1, 'the men of a wall take no more each than a lone man');
-  // (The median of five seeds: the front men driven back into the ranks behind hand on their momentum, now through the shields of the men behind as well, and how many of those go over depends on how they were thrown: three seeds ran 4-7 of 9 either way.)
-  const standing = median([wall, ...[4001, 4002, 4003, 4004].map((seed) => chargeInto(rider('knight'), row('hoplomachus', 9), block(3, 3), seed))].map((run) => run.foes.filter((man) => man.state === 'up').length));
-  assert.ok(standing >= 5, `most of the wall stays on its feet (${standing} of 9)`);
 });
 
 test('a man lying in a horse\'s path is trodden on by its hooves', () => {

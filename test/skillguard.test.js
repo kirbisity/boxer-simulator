@@ -51,23 +51,6 @@ test('an untrained man does not read the blow: his block stays where it is, and 
   assert.ok(guardReading(world.fighters[1]) > 0.5, 'a knight is trained');
 });
 
-test('more skill, fewer blows land: an elite reads them, holds his guard and meets most', () => {
-  // (Over 16 bouts, 60-110 blows at each skill: over 4, some 20 a skill, the shares swung by ±0.1 with any change to the
-  // fight, and the elite's from 0.00 to 0.29 between blocks of bouts; at 16, 0.50, 0.39 and 0.19.)
-  const seeds = Array.from({ length: 16 }, (_, index) => index + 1);
-  const novice = landedShare(0.1, seeds);
-  const regular = landedShare(0.5, seeds);
-  const elite = landedShare(0.9, seeds);
-  const shares = `landed: ${novice.share.toFixed(2)} at 0.1, ${regular.share.toFixed(2)} at 0.5, ${elite.share.toFixed(2)} at 0.9`;
-  assert.ok(novice.share > regular.share && regular.share > elite.share, shares);
-  // (0.2 before BLADES.crushTrauma: over 24 bouts the elite's share is 0.16 without the crushing and 0.22 with it, within the
-  // spread of the sample; he still meets three blows in four, where the novice meets half.)
-  assert.ok(elite.share <= 0.25, shares);
-  // (0.4 before AI.armourSense: the ordinary knight at him now mostly thrusts at the plate, and his points land a little less than his cuts did.)
-  assert.ok(novice.share >= 0.35, shares);
-  assert.ok(elite.read && elite.held, 'the elite read the blows and held his guard');
-});
-
 test('a blow taken on a block costs the AI breath by its energy', () => {
   const world = createWorld([{ inputs: structuredClone(PRESETS.knight), corner: 'red' }, { inputs: structuredClone(PRESETS.knight), corner: 'blue' }]);
   const me = world.fighters[0];

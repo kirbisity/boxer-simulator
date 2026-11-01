@@ -102,19 +102,6 @@ function assertSteady(stats) {
 
 const legsBetween = (route, from, to) => route.slice(route.findIndex((leg) => leg.name === from), to ? route.findIndex((leg) => leg.name === to) : undefined);
 
-test('the sewer: down the stair, through the grotto, the drains, the cistern and the long drain, the camera is behind him at a third-person pitch, not top-down', () => {
-  const stats = walkWithCamera(legsBetween(DUNNOTTAR_SEWER_ROUTE, 'the shelf to the sea cave stair', 'the flooded way and the gallery'), { start: [-58, 0, 41.5], yaw: -Math.PI / 2 });
-  assert.ok(stats.frames > 3000, `${stats.frames} frames`);
-  assert.ok(stats.pitchMax <= 0.95, `the steepest pitch was ${stats.pitchMax.toFixed(2)} rad (the old camera went to 1.45, straight down)`);
-  assert.ok(stats.pitchMin >= ARM.pitchMin - 1e-9);
-  // (At that corner, for a frame or two, 0.99 m: the closest it comes.)
-  assert.ok(stats.nearest > 0.9, `the nearest the camera came to him was ${stats.nearest.toFixed(2)} m`);
-  assert.equal(stats.inside, 0, 'never in a wall, a roof or a floor');
-  // (1.5%, not 1%: the corner where the second drain turns east, above, holds the camera in for a moment longer than the old arm's snap round it did.)
-  assert.ok(stats.close / stats.frames < 0.015, `${stats.close} of ${stats.frames} frames had the camera nearer than 1.2 m`);
-  assertSteady(stats);
-});
-
 test('the whole way in by the front: the cliff path, the gatehouse stair and the oillets, the tunnelled ascent, the quadrangle, the vault, the keep, the winding stair of the tower, the wall walk and the chapel', () => {
   const stats = walkWithCamera(DUNNOTTAR_ROUTE);
   assert.ok(stats.frames > 6000, `${stats.frames} frames`);

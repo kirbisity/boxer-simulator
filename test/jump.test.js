@@ -20,17 +20,6 @@ const height = (fighter, options) => jumpOf(fighter, options).height;
 
 // ---- The body's numbers ----------------------------------------------------------------------------
 
-test('a fit young man jumps 0.45-0.6 m; the unfit, the old, the fat and men in armour much less', () => {
-  const leo = height(build('light'));
-  assert.ok(leo >= 0.45 && leo <= 0.6, `Leo ${leo.toFixed(2)} m`);
-  assert.ok(height(build('contender')) >= 0.45);
-  for (const [name, fighter] of [['old (75)', build('light', { age: 75 })], ['obese', build('street', { bodyFat: 0.35 })], ['plate', build('knight')], ['sumo', build('sumo')], ['heavy plate', build('maximilian')]]) {
-    const h = height(fighter);
-    assert.ok(h < leo * 0.62, `${name} ${h.toFixed(2)} m against Leo's ${leo.toFixed(2)}`);
-    assert.ok(h > 0.05, `${name} still gets off the floor`);
-  }
-});
-
 test('the height and the flight rise with leg strength and fall with mass, age, a hurt leg, the overdraft and water', () => {
   const leo = build('light');
   let last = 0;

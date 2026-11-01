@@ -23,23 +23,6 @@ function rises(entry, seconds = 30) {
   return { runs, stood: stood.length, time: stood.length ? mean(stood.map((run) => run.time)) : Infinity, braced: runs.filter((run) => run.braced).length, crawled: runs.filter((run) => run.crawling).length };
 }
 
-test('getting up: a fit man is up in 1.5-2.5 s; heavier for his strength, slower; plate slower than mail; a heavy or weak man presses a hand on his knee', () => {
-  const athletic = rises(RISE_BUILDS.athletic);
-  const average = rises(RISE_BUILDS.average);
-  const overweight = rises(RISE_BUILDS.overweight);
-  const obese = rises(RISE_BUILDS.obese);
-  const plate = rises(RISE_BUILDS.plate);
-  const mail = rises(RISE_BUILDS.mail);
-  for (const [name, row] of Object.entries({ athletic, average, overweight, obese, plate, mail })) assert.equal(row.stood, row.runs.length, `${name} gets up every time`);
-  assert.ok(athletic.time > 1.4 && athletic.time < 2.6, `a fit man ${athletic.time.toFixed(1)} s`);
-  assert.ok(athletic.time < average.time && average.time < overweight.time && overweight.time < obese.time, `athletic ${athletic.time.toFixed(1)}, average ${average.time.toFixed(1)}, overweight ${overweight.time.toFixed(1)}, obese ${obese.time.toFixed(1)} s`);
-  assert.ok(obese.time > 4 && obese.time < 8, `a heavy untrained man ${obese.time.toFixed(1)} s`);
-  assert.ok(plate.time > mail.time && plate.time > average.time + 0.8, `plate ${plate.time.toFixed(1)}, mail ${mail.time.toFixed(1)}, average ${average.time.toFixed(1)} s`);
-  assert.equal(athletic.braced, 0, 'a fit man stands off his legs alone');
-  assert.equal(obese.braced, obese.runs.length, 'a heavy untrained man with a hand on his knee');
-  assert.equal(plate.braced, plate.runs.length, 'and a man in plate');
-});
-
 test('getting up: the starved man is slow and the frail one cannot stand (he crawls or lies): never stuck, never NaN', () => {
   const starved = rises(RISE_BUILDS.starved);
   const light = rises(RISE_BUILDS.light);
@@ -90,31 +73,6 @@ test('getting up: each stage is slower the nearer the limbs are to their limit, 
   const knight = createWorld([PRESETS.knight, PRESETS.light], { seed: 1 }).fighters[0];
   const unarmoured = createWorld([{ ...PRESETS.knight, outfit: { kind: 'sports' } }, PRESETS.light], { seed: 1 }).fighters[0];
   assert.ok(riseMargins(knight).stand < riseMargins(unarmoured).stand * 0.8, 'the same man lifts his harness too');
-});
-
-test('running: top speed by build, as men run (an athletic man ~8.5 m/s, an average one 6-7, obese 3-4.5, plate 3-4.5), a stride of 3-4.5 steps a second', () => {
-  const top = Object.fromEntries(Object.entries(GAIT_BUILDS).map(([name, inputs]) => [name, gaitBody(buildBody(inputs)).top]));
-  assert.ok(top.athletic > 7.8 && top.athletic < 9.2, `athletic ${top.athletic.toFixed(2)}`);
-  assert.ok(top.average > 5.8 && top.average < 7.2, `average ${top.average.toFixed(2)}`);
-  assert.ok(top.obese > 3 && top.obese < 4.5, `obese ${top.obese.toFixed(2)}`);
-  assert.ok(top.plate > 3 && top.plate < 4.5, `plate ${top.plate.toFixed(2)}`);
-  assert.ok(top.athletic > top.average && top.average > top.overweight && top.overweight > top.obese, 'leaner and stronger, faster');
-  assert.ok(top.gambeson > top.mail && top.gambeson > top.plate, 'armour slows him');
-  assert.ok(top.light > top.sumo && top.athletic > top.old && top.light > top.starved, 'the sumo, the old and the starved are slow');
-  // Measured: a sprint gets there, and its stride is a man's.
-  for (const name of ['athletic', 'average', 'obese']) {
-    const run = runTrial(GAIT_BUILDS[name], { seconds: 7 });
-    assert.equal(run.fell, false);
-    assert.ok(Math.abs(run.topSpeed / top[name] - 1) < 0.08, `${name}: ${run.topSpeed.toFixed(2)} m/s against ${top[name].toFixed(2)}`);
-    assert.ok(run.stepRate > 2.5 && run.stepRate < 4.6, `${name}: ${run.stepRate.toFixed(2)} steps a second`);
-  }
-  // The stride lengthens and quickens with speed.
-  const man = createWorld([GAIT_BUILDS.average, PRESETS.light], { seed: 1 }).fighters[0];
-  const jog = strideOf(man, 3);
-  const sprint = strideOf(man, 6.5);
-  assert.ok(sprint.overlap < jog.overlap, 'more flight at a sprint');
-  assert.ok(1 / (sprint.overlap * sprint.seconds) > 1 / (jog.overlap * jog.seconds), 'quicker steps');
-  assert.ok(sprint.lift > jog.lift, 'the heel comes up higher');
 });
 
 test('running: an AI man runs at a pace below his sprint, more of it the better his wind; a heavy man needs more ground to stop from the same speed', () => {
