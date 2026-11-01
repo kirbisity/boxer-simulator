@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, PRESETS } from '../src/body.js';
 import { HELM_MAP_DATA } from '../src/helmmaps-data.js';
+import { MASK_SHEETS, maskPoints } from '../src/menpo.js';
+import { OUTFITS } from '../src/outfits.js';
 import { formCuts, formFacing, formGrid, formPoint, formRegions, formTriangles, HELM_FORMS, HELM_HEAD, HELM_HEAD_BREADTH, headRadiusAt, KABUTO_FORM, MASK_FITS, maskOnFace } from '../src/helmforms.js';
 
 // The head's radius (m), as the game draws it: a helmet's measures in head radii times this are centimetres on the head.
@@ -161,7 +163,45 @@ test('the samurai\'s masks sit on the face: off it by their gap, the chin cupped
     const chin = maskOnFace(fit, [0, -fit.R, 0]);
     assert.ok(chin[1] < -1.33, `${name}: the mask's foot under the chin`);
   }
-  for (const [style, sheet] of [['oni', 'maskOni'], ['ressei', 'maskRessei'], ['tengu', 'maskTengu']]) assert.equal(MASK_FITS[style].R, HELM_MAP_DATA[sheet].grid.R, style);
+  for (const [style, sheet] of Object.entries(MASK_SHEETS)) assert.equal(MASK_FITS[style].R, HELM_MAP_DATA[sheet].grid.R, style);
+});
+
+// The quick war masks of China, the steppe and the sultanates (menpo.js), and the kits that wear them.
+const WORLD_MASKS = ['tiemian', 'shoumian', 'kipchak', 'horde', 'mailVeil', 'ventail'];
+
+test('the war masks of China, the steppe and the sultanates: each worn by its kits, most designs bare-faced', () => {
+  const wearers = { mingElite: ['shoumian', 'tiemian'], kheshig: ['kipchak', 'horde'], ottomanHeavy: ['mailVeil', 'ventail'] };
+  const worn = new Set();
+  for (const [kit, masks] of Object.entries(wearers)) {
+    const designs = OUTFITS[kit].designs.filter((design) => !design.levelOnly);
+    assert.deepEqual(designs.map((design) => design.head.maskDesign).filter(Boolean), masks, kit);
+    masks.forEach((mask) => worn.add(mask));
+  }
+  assert.deepEqual([...worn].sort(), [...WORLD_MASKS].sort());
+  // Nowhere else: the other kits' faces as they were.
+  for (const [kit, outfit] of Object.entries(OUTFITS)) {
+    if (wearers[kit]) continue;
+    for (const design of outfit.designs ?? []) assert.ok(!WORLD_MASKS.includes(design.head?.maskDesign), `${kit}: ${design.label}`);
+  }
+});
+
+test('the war masks of China, the steppe and the sultanates stand off the face, never in it, the same either side', () => {
+  for (const style of WORLD_MASKS) {
+    const fit = MASK_FITS[style];
+    const { grid } = HELM_MAP_DATA[MASK_SHEETS[style]];
+    const { positions } = maskPoints(grid, 1, fit);
+    const columns = grid.size * 2 - 1;
+    let least = Infinity;
+    for (let index = 0; index < positions.length; index += 3) {
+      const [x, y, z] = positions.slice(index, index + 3);
+      least = Math.min(least, Math.hypot(x, z) - headRadiusAt(Math.atan2(z, x), y));
+      // Its mirror across the middle of the face.
+      const column = (index / 3) % columns;
+      const mirror = index + (columns - 1 - 2 * column) * 3;
+      assert.ok(Math.abs(positions[mirror] - x) < 1e-9 && Math.abs(positions[mirror + 1] - y) < 1e-9 && Math.abs(positions[mirror + 2] + z) < 1e-9, style);
+    }
+    assert.ok(least > fit.gap * 0.6, `${style}: ${least.toFixed(3)} off the face at its nearest`);
+  }
 });
 
 test('every part is symmetric about the middle of the face and lays its coordinates in a region of its sheet', () => {

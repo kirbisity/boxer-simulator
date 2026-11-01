@@ -38,6 +38,22 @@
 //     tengu https://www.metmuseum.org/art/collection/search/23997 , menpō https://www.metmuseum.org/art/collection/search/31974 ;
 //     ressei menpo (wrinkles, bared teeth, hair moustache): https://samurai-armor.com/?p=1177 ; karasu tengu menpo:
 //     https://www.christies.com.cn/lot/lot-6389201 ; Science Museum somen https://collection.sciencemuseumgroup.org.uk/objects/co155266
+//   The quick war masks of China, the steppe and the sultanates (helmsheets.py WORLD_MASKS; no Song or Jin mask survives,
+//     so the Chinese two follow the texts and pictures): the iron man's face (tiemian), Jurchen riders in full-face
+//     helmets in the Zhongxing Ruiying Tu, https://dragonsarmory.blogspot.com/2017/07/heavy-jin-dynasty-armor.html ,
+//     iron face masks since the Warring States https://en.wikipedia.org/wiki/Chinese_armour ; the bronze guardian face
+//     (shoumian), Di Qing's bronze mask (Song Shi: 臨敵被髮、帶銅面具) https://en.wikipedia.org/wiki/Di_Qing ,
+//     https://www.zdic.net/hant/銅面 , the beast face (taotie) of bronze armour fittings https://brooklynmuseum.org/objects/213207 ;
+//     the steppe man's iron face with joined brows and moustache (kipchak), the Lipovets mask (Kyiv region, 12th-13th
+//     c., now in the Hermitage) https://eng.obozrevatel.com/section-news/news-a-golden-crest-from-a-mound-and-earrings-from-olbia-five-archaeological-treasures-that-russia-stole-from-ukraine-15-02-2024.html ;
+//     the gilt half-mask with brows over almond eye cut-outs and a beak-shaped nose riveted on (horde), Cuman, 1200-1300,
+//     the type worn across the Golden Horde, National Museum of the History of Ukraine АЗС-3607
+//     https://kyiv.ua.museum-digital.org/object/12837?navlang=en ; the mail veil across the face (mailVeil), the Met's
+//     helmet with aventail 50.87 (Turkish, in the Turkman style, the mail guarding the lower face; an Ottoman arsenal
+//     mark) https://www.metmuseum.org/toah/works-of-art/50.87 and its aventails https://en.wikipedia.org/wiki/Aventail ;
+//     the ventail (mail laced across the lower face under a plate edge, the nasal over it), the Aq Qoyunlu turban helmet
+//     at the Louvre Abu Dhabi (c. 1450-1500: a detachable nasal through a mail camail guarding the neck, ears and face)
+//     https://collection.louvreabudhabi.ae/en/object/turban-helmet
 
 /* global THREE */
 import { HELM_MAP_DATA } from './helmmaps-data.js';
