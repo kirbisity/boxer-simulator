@@ -1470,7 +1470,7 @@ export function handShares(spec) {
  * free rigid body of the two, struck at that point (1/m = 1/M + d²/I).
  * Near the balance it is nearly the whole system; far out, much less.
  */
-export function effectiveMassAt(spec, armMass, distance, armLength = 0.6, along = 0) {
+export function effectiveMassAt(spec, armMass, distance, armLength = 0.6, along = 0, held = false) {
   const total = spec.mass + armMass;
   const centre = (spec.mass * spec.balance) / total;
   const reach = spec.length + spec.handle;
@@ -1482,8 +1482,17 @@ export function effectiveMassAt(spec, armMass, distance, armLength = 0.6, along 
   const pivoted = (armMass * (armLength * 0.45) ** 2 + ownInertia + spec.mass * (armLength + spec.balance) ** 2) / (armLength + Math.abs(distance)) ** 2;
   const turning = Math.max(loose, pivoted);
   // Along the blade (a thrust) the arm and weapon push as one mass; across
-  // it (a cut) they must turn. Mixed by how the contact moves.
+  // it (a cut) they must turn. Mixed by how the contact moves: a push in one
+  // line (an edge, a point sliding) meets the two in series. A point that goes
+  // in (`held`) stops in him: its motion along the shaft and across it are each
+  // stopped by their own mass (each axis takes its own ½ m v²), side by side.
+  if (held) return along * along * total + (1 - along * along) * turning;
   return 1 / ((along * along) / total + (1 - along * along) / turning);
+}
+
+/** Whether a thrust's contact is its point going in: on the point (`pointFrom`), driven near along the blade. */
+export function pointFirst(spec, along, at) {
+  return at >= (spec.pointFrom ?? BLADES.pointShare) && along > 0.5;
 }
 
 /**
@@ -1498,10 +1507,10 @@ export function harmMix(spec, mode, along, at) {
   const across = Math.sqrt(Math.max(0, 1 - along * along));
   if (mode === 'thrust') {
     // A spear's whole head is its point (a leaf of sharp iron): driven along the shaft it goes in wherever on the head it meets him.
-    const pointFirst = at >= (spec.pointFrom ?? BLADES.pointShare) && along > 0.5;
-    mix.pierce = pointFirst ? (table.pierce ?? 0) * along : 0;
+    const goesIn = pointFirst(spec, along, at);
+    mix.pierce = goesIn ? (table.pierce ?? 0) * along : 0;
     mix.cut = (table.cut ?? 0) * across ** BLADES.cutAlignmentPower;
-    if (!pointFirst) mix.blunt = Math.max(mix.blunt, 0.3);
+    if (!goesIn) mix.blunt = Math.max(mix.blunt, 0.3);
   } else {
     mix.cut = (table.cut ?? 0) * across ** BLADES.cutAlignmentPower;
     mix.pierce = 0;

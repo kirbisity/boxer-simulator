@@ -40,14 +40,14 @@ test('a graze bleeds nothing; armour that stops the edge stops the bleeding', ()
 });
 
 test('a spear thrust into the chest takes the chest\'s health, which the health bar shows; it is not a bleed', () => {
-  // A light one, at the end of his reach: a visible share, no bleeding.
+  // A light one, at the end of his reach (~25 J, the body behind the point): a visible share; what it bleeds would not put him down within 30 s.
   const light = strikeAt('spear', 'spearThrust', 'body', 2.0);
   const struck = light.world.fighters[1];
   assert.equal(light.hit.target, 'trunk');
   assert.ok(light.hit.pierce > 5);
   assert.ok(partHealth(struck, 'trunk') < 0.95, `chest ${partHealth(struck, 'trunk')}`);
   assert.ok(bodyHarm(struck) > 0.05, 'the health bar drops');
-  assert.ok(!(struck.bleed > 0));
+  assert.ok(!(struck.bleed >= bleedToLose(collapseAt(), 30)), `bleeds ${struck.bleed}`);
   // A full one, through the heart: the chest's health is gone, and he dies of it, not of the blood.
   const full = strikeAt('spear', 'spearThrust', 'body', 2.4);
   assert.ok(full.hit.pierce > 60);

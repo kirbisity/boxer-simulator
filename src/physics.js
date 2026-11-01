@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
-import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
+import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
@@ -6796,7 +6796,7 @@ function sever(world, defender, where, event, bladeVelocity) {
  * and, through the saddle, a share of the horse are behind the blow as
  * rigidly as the weapon is coupled to them (mounted.js mountedBehind).
  */
-export function bladeStrike(attacker, weapon, punch, relative, distance) {
+export function bladeStrike(attacker, weapon, punch, relative, distance, at = null) {
   const spec = punch.spec;
   const wspec = weapon.spec;
   const limbs = attacker.body.limbKg;
@@ -6804,16 +6804,34 @@ export function bladeStrike(attacker, weapon, punch, relative, distance) {
   // (A finisher's thrust is driven down with the whole weight of the kneeling man behind the dagger: finisher.js.)
   const share = attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
   const armsKg = (spec.mass.arm ?? 0) * arms * share;
-  const bodyKg = (punch.finisher?.body ?? spec.mass.body ?? 0) * attacker.body.massKg * share;
+  const bodyKg = (punch.finisher?.body ?? thrustBodyShare(attacker, weapon, spec)) * attacker.body.massKg * share;
   const speed = vec.length(relative);
   const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
   const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
   // (Whichever way the blade turns about the grip, what the weapon is coupled to goes with the point.)
   const carried = attacker.mount ? mountedBehind(attacker, spec, relative) * staggerShare(attacker, WORLD.stagger.harm) : 0;
-  const struck = effectiveMassAt(wspec, armsKg + bodyKg, distance, armLength, along);
+  // A thrust's point that goes in (`at`, how far along the blade it met him) is held there: stopped along the shaft by
+  // all that drives it, across it by the shaft turning (weapons.js effectiveMassAt `held`). (From the saddle, what is
+  // behind the point is mounted.js's.)
+  const held = spec.mode === 'thrust' && at != null && !attacker.mount && pointFirst(wspec, along, at);
+  const struck = effectiveMassAt(wspec, armsKg + bodyKg, distance, armLength, along, held);
   // (A weapon art turning the whole body through the blow, `turn`: all of it turns about the spine: physics/arts.js.)
   const turned = turnsWithBlow(spec) ? turningMass(wspec, armsKg, bodyKg, distance, armLength, attacker.body.lengths.shoulderSpan / 2, along) : 0;
   return { strikeMass: Math.max(struck, turned) + carried, along };
+}
+
+/**
+ * The share of his body's mass behind a blow along the weapon (`mass.body` of the move): for a thrust on foot,
+ * at least what his step and the grip couple to the point (WORLD.thrustBody): two hands on the shaft lock it to the
+ * trunk, one arm alone much less; a short step drives in less of it than a full lunge. From the saddle the rider's
+ * body is its own (mounted.js mountedBehind).
+ */
+function thrustBodyShare(attacker, weapon, spec) {
+  const own = spec.mass.body ?? 0;
+  if (spec.mode !== 'thrust' || attacker.mount) return own;
+  const body = WORLD.thrustBody;
+  const step = Math.min(1, (spec.step ?? 0) / body.fullStep);
+  return Math.max(own, (weapon.twoHanded ? body.twoHands : body.oneHand) * step);
 }
 
 export function strikeLiveUntil(spec) {
@@ -6860,7 +6878,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const goingIn = Math.max(closing, punch.finisher?.drive ?? 0) * glance.share;
 
   const body = defender.body;
-  const { strikeMass, along } = bladeStrike(attacker, weapon, punch, relative, distance);
+  const { strikeMass, along } = bladeStrike(attacker, weapon, punch, relative, distance, haft ? null : closest.s);
   // Met across, the weapon is stopped there, head and all, as by any blow; a haft running along its length (a thrust) slides on.
   if (!haft || along < WORLD.haft.slides) punch.landed = true;
   const struckMass = struckMassOf(defender, capsule);
@@ -7105,7 +7123,7 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
     const weapon = striker.weapon;
     const distance = strikerDistance(striker, hit.along);
     const arms = attacker.body.limbKg[`${weapon.main}Arm`] + (weapon.twoHanded ? attacker.body.limbKg[`${weapon.off}Arm`] : 0);
-    const armMass = ((spec.mass.arm ?? 0) * arms + (spec.mass.body ?? 0) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
+    const armMass = ((spec.mass.arm ?? 0) * arms + thrustBodyShare(attacker, weapon, spec) * attacker.body.massKg) * attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
     const moving = vec.sub(strikeVelocity, point(defender.v, P.lHand));
     const speed = vec.length(moving);
     const along = speed > 1e-6 ? Math.abs(vec.dot(moving, weapon.dir)) / speed : 0;

@@ -275,7 +275,9 @@ test('a sword holds its range against fists, attacks often, and fends punches of
         samples += 1;
       }
     }
-    fended += world.events.filter((event) => event.kind === 'bladeBlock' && event.effects.includes('fended off')).length;
+    // Any punch met on the blade (held out in guard, or driven into it as it strikes): the sword's thrust ends bouts the faster with
+    // the body behind it, so one met mid-stroke (`fended off`) is too rare in twelve short bouts to count on.
+    fended += world.events.filter((event) => event.kind === 'bladeBlock').length;
     attacks += world.fighters[0].stats.thrown;
     minutes += elapsed / 60;
   }

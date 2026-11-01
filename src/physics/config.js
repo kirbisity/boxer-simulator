@@ -336,6 +336,22 @@ export const WORLD = {
   // the body's weight behind the limb, at a higher stamina cost, and leaving
   // the thrower committed (unable to defend) for a moment after.
   heavy: { loadSeconds: 0.2, loadTwist: 0.6, loadDip: 0.045, massFactor: 1.4, costFactor: 2.2, committedSeconds: 0.35 },
+  // A thrust on foot is driven by the body as well as the arms: the step (the rear leg pushing off and bracing),
+  // the hips and shoulders turning in behind the shaft. Along the weapon's line that share of the body's mass
+  // pushes with the point (physics.js bladeStrike), as a move's own `mass.body` does: the larger of the two.
+  // `twoHands`: both hands spread on a shaft lock it to the trunk (the rear hand at the hip), so the trunk's drive
+  // comes through to the point; `oneHand`: one arm reaching out alone (a sword's lunge, a spear behind a shield)
+  // couples far less of it. Either is the share at a full lunge's step (`fullStep`, × footwork speed, the spear's
+  // full thrust); a shorter step puts in proportionally less. Anchored on two-handed thrusts by men trained to the
+  // bayonet (Milks, Champion, Cowper, Pope & Carr 2016, J. Archaeol. Sci. Reports 10: 191-203): 2.8-6.3 m/s at
+  // impact, mean 4.65; peak force 362-1120 N, mean 661 N; men of ~81 kg. Two-handed thrusts are estimated at
+  // ~60-120 J: at 4.65 m/s into a trunk (0.35 of a man's mass) that is a striking mass of ~7-18 kg along the
+  // shaft, the spear and both arms (~8 kg) and ~0.1-0.2 of the body. A one-handed stab is near the arm and blade
+  // alone: the UK police stab-armour levels (Horsfall et al. 1999, Forensic Sci. Int. 102: 79-89; HOSDB) are
+  // 24-43 J, "primarily the combined kinetic energy of the knife and the arm", at 5.8-12 m/s (Horsfall 1999,
+  // Chadwick et al. 1999): ~1-3 kg, so one hand couples only a few per cent of the body, at a full lunge. Mounted
+  // thrusts are their own (mounted.js mountedBehind) and take nothing from this.
+  thrustBody: { twoHands: 0.2, oneHand: 0.03, fullStep: 2.1 },
   // Damage that stays. Head damage and knockdowns weaken the chin; a blow
   // stuns for this many seconds per m/s of head speed change; after getting
   // up a fighter is hurt (muscles at `hurtStrength` rising back to full)
