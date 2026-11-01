@@ -360,7 +360,7 @@ export const HELM_FORMS = {
 };
 
 /** A fitted part's stations (formFitStations), a closed shell's neck guard (`flare`: its rings' drop and reach) below its foot. */
-function formFitPart(part) {
+export function formFitPart(part) {
   const fitted = formFitStations(part.fit);
   const flare = (part.flare ?? []).map(({ dy, out }) => ({ y: formPlus(fitted[0].y, formResample(dy)), rad: formPlus(fitted[0].rad, formResample(out)) }));
   part.stations = [...flare, ...fitted];
@@ -368,7 +368,7 @@ function formFitPart(part) {
 }
 
 /** A form's seated parts (a crest's or keel's foot on its part in the middle plane: `foot` x, `rise` or `top`). */
-function formSeat(form) {
+export function formSeat(form) {
   for (const part of Object.values(form.parts)) {
     if (!part.seat) continue;
     const seat = form.parts[part.seat];
