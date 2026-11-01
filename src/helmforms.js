@@ -386,14 +386,15 @@ for (const form of Object.values(HELM_FORMS)) {
   formSeat(form);
 }
 
-// ---- The foot soldier's helmets of the fifteenth century (designs under study) ------------------------------------------------
+// ---- The foot soldier's helmets of the fifteenth century, and the conquistador's cabasset ----------------------------------
 
 /**
  * The fifteenth century's infantry helmets as measured forms, fitted over the same head, their fine work (rivets, turned
  * edges, flutes, hammering) baked in their sheets (helmforms.py `euro`), the sights and face openings cut out of them by
- * the sheet (a cut-out in the normal map's alpha: helmmaps.js helmMaterial `cut`). A helmet kind wearing them in a design
- * (HELM_DESIGNS; helmstyle.js `#kettle=a|b|c|d`) is drawn so by any unit that wears it (wardrobe.js). The pieces (see
- * helmmaps.js for the links), in cm on a head of r ≈ 11.5 cm:
+ * the sheet (a cut-out in the normal map's alpha: helmmaps.js helmMaterial `cut`). A helmet kind is drawn in the design
+ * its wearer's kit names (outfits.js `head.design`, a key of HELM_DESIGNS[kind]; helmstyle.js `#kettle=` overrides it for
+ * comparison) by any unit that wears it (wardrobe.js). The pieces (see helmmaps.js for the links), in cm on a head of
+ * r ≈ 11.5 cm:
  *
  *   kettleRidged     the one-piece war hat (Cleveland Museum of Art 1916.1919, Italy c. 1460: 30.3 x 25.9 x 17.5 cm, a smooth
  *                    rounded crown raised to a low medial ridge, the lining's rivet holes along it, small rivets round the
@@ -406,10 +407,11 @@ for (const form of Object.values(HELM_FORMS)) {
  *                    broad, 24.8 cm high; Met 42.50.32, Caspar Rieder, c. 1480): a close skull with a low keel, drawn down
  *                    over the face to the nose with a sight across the eyes, down over the ears, and out behind in a long
  *                    tail; worn with a bevor (a scoop of plate from the chest to under the nose) strapped round the neck.
- *   barbute          the Italian barbute (Met 60.151, Jacopo da Cannobio called Bichignola, Brescia c. 1460: 28.9 cm high,
- *                    20 cm broad, 27 cm long; Met 25.188.20, c. 1465): one piece raised over the whole head to the neck, a
- *                    low ridge from brow to nape, a T opening (the eyes across, the mouth down the middle) in a turned
- *                    edge, the lining's rivets in a row round the foot.
+ *   cabassetSpanish  the conquistador's cabasset ("Spanish morion"; the pointed cabacete's descendant, Tavares, ASAC Bulletin 105,
+ *                    2012): the Met's 14.25.533 (possibly Spanish, 23.5 cm high, 24.3 broad, 32.2 long), 14.25.1851, 27.159.12
+ *                    and 14.25.532 (25.4-27.3 high, 29.2-34.3 long); the Royal Collection's RCIN 67296: a tall almond skull
+ *                    raised in one piece to a short stalk bent back, a narrow brim peaked a little fore and aft, its edge
+ *                    turned and roped, the lining's brass-capped rivets round the skull's foot, etched in bands from the point.
  */
 
 /** A fitted bowl (formFitPart) with its stations made. */
@@ -503,17 +505,22 @@ export const DESIGN_FORMS = {
       },
     };
   })(),
-  barbute: (() => {
-    const shell = formFitPart({ kind: 'loft', span: 1, seg: [28, 1], region: 'shell', look: 'metal', ink: true, fit: { foot: [-1.3, -1.28, -1.24, -1.2, -1.16], gap: 0.15, top: 0.22, lift: 0.06, rows: 12 } });
+  cabassetSpanish: (() => {
+    // Raised from the brow and nape all round, a tall almond-shaped skull drawn up to a point (`lift`), the stalk on it.
+    const bowl = formHatBowl({ foot: [0.3, 0.25, 0.16, 0.1, 0.06], gap: 0.16, top: 0.3, lift: 0.62, rows: 10 }, 24);
+    const top = formLoftPoint(bowl, 0, 1)[1];
     return {
-      sheet: 'formBarbute', build: 'barbute', period: 'Brescia, c. 1460', label: 'Italian barbute', cut: true,
-      // The T opening seen from the front (|z|, y): the eyes' bar across from `bar` (bottom, top) out to `wide`, the
-      // mouth's slot `slot` wide each side of the middle from the bar down to the foot; its corners rounded by `round`.
-      opening: { bar: [-0.22, 0.12], wide: 0.6, slot: 0.2, round: 0.06 },
-      regions: { shell: [0, 0.1, 1, 1], comb: [0, 0, 1, 0.1] },
+      sheet: 'formCabassetSpanish', build: 'cabasset', period: 'Spain or north Italy, c. 1530-60', label: 'Spanish cabasset',
+      regions: { bowl: [0, 0.42, 1, 1], brim: [0, 0.1, 1, 0.42], comb: [0, 0, 1, 0.1] },
       parts: {
-        shell,
-        comb: formKeel('shell', { front: 0.85, back: -1.0, high: 0.045 }),
+        bowl,
+        // The narrow brim, a little down at the sides and peaked up before and behind.
+        brim: formHatBrim(bowl, { reach: [0.34, 0.3, 0.26, 0.3, 0.36], fall: [0.02, -0.03, -0.07, -0.03, 0.03], bow: 0.01, lip: [0.03, 0.01], seg: 24 }),
+        // The stalk: a short stub of the skull's point, bent back.
+        comb: {
+          kind: 'sweep', seg: [6, 2], region: 'comb', look: 'metal', ink: true,
+          stations: [{ at: [0.0, top - 0.05], r: 0.07, rz: 1 }, { at: [-0.05, top + 0.05], r: 0.035, rz: 1 }, { at: [-0.13, top + 0.1], r: 0.025, rz: 1 }],
+        },
       },
     };
   })(),
@@ -522,9 +529,10 @@ export const DESIGN_FORMS = {
 // The designs' keels seated on their parts.
 for (const form of Object.values(DESIGN_FORMS)) formSeat(form);
 
-/** Which design a helmet kind is drawn in under each choice (helmstyle.js `kettle`): the forms of DESIGN_FORMS. */
+/** The designs a helmet kind is drawn in (a kit's `head.design`; helmstyle.js `kettle`), each a form of DESIGN_FORMS. */
 export const HELM_DESIGNS = {
-  kettleHat: { a: 'kettleRidged', b: 'kettleBurgundian', c: 'salletGerman', d: 'barbute' },
+  kettleHat: { a: 'kettleRidged', b: 'kettleBurgundian', c: 'salletGerman' },
+  cabasset: { spanish: 'cabassetSpanish' },
 };
 
 /** The design form a helmet kind is drawn in for a choice (null: drawn as before). */

@@ -69,6 +69,17 @@ export const DETAIL_ARMOUR = {
   // A machine's panels: seams, countersunk hex screws, vents, brushed grain (https://www.unitree.com/g1,
   // https://www.sarcos.com/products/guardian-xo/).
   panels: { band: 1500, tile: 0.16 },
+  // Munition plate (the foot soldier's spaulders, vambraces, knee cops, breast- and backplate; the Ming elite's lamed arms): raised
+  // and left from the hammer, its facets 7-16 mm across and a few tenths of a millimetre deep over a slow waviness, the polish
+  // blotchy with scale in the dents, not ground bright as a knight's harness (the Met's Italian munition breastplate 14.25.716,
+  // https://www.metmuseum.org/art/collection/search/22939; the Chalcis armour, https://en.wikipedia.org/wiki/Chalcis_armour).
+  munitionPlate: { band: 1600, tile: 0.16 },
+  // The Ming arm guard (bi fu): iron lames lapping down the forearm, riveted to a leather backing with domed copper-alloy heads
+  // (https://greatmingmilitary.blogspot.com/2016/06/bi-fu.html; the Departure Herald's segmented guards,
+  // https://greatmingmilitary.blogspot.com/2016/08/ming-qing-japanese-armour-comparison.html): 37.5 mm of each lame showing,
+  // two rivets to 80 mm round, the iron hammered and blackened. No Ming guard survives with published measures: these are the
+  // brigandine's plates' and rivets' (brigandine above).
+  bifu: { band: 1700, tile: [0.08, 0.15], masks: 'gold' },
 };
 const DETAIL_BANDS = Object.fromEntries(Object.entries(DETAIL_ARMOUR).map(([kind, spec]) => [spec.band, kind]));
 
@@ -98,8 +109,17 @@ export const ARMOUR_TILES = {
   hanLamellar: { scales: 'lamellae' },
   krug: { 'trunk.steel': 'krug' },
   conquistador: { 'trunk.steel': 'etched' },
-  // The European foot soldier's brigandine: its own plates and rivet clusters, not the Ming coat's grid of studs.
-  brigandine: { studded: 'euroBrigandine' },
+  // The European foot soldier's brigandine: its own plates and rivet clusters, not the Ming coat's grid of studs; his plate
+  // (spaulders, vambraces, knee cops, the fauld's lames) munition plate, its edges turned (ARMOUR_EDGES). His breastplate too.
+  brigandine: { studded: 'euroBrigandine', steel: 'munitionPlate' },
+  breastplate: { steel: 'munitionPlate' },
+  // The Ming coats' arm guards: the bi fu's riveted lames over a plain bracer; the elite's arms, already lamed, hammered iron.
+  mingBrigandine: { 'forearm.steel': 'bifu' },
+  mingLamellar: { 'forearm.steel': 'bifu' },
+  mingScaleCoat: { 'forearm.steel': 'bifu' },
+  mingElite: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
+  mingScale: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
+  mingEliteLamellar: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   // Tosei gusoku: the solid do of lacquered horizontal lames; its kusazuri and sleeves in sugake.
   toseiDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
   roninDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
@@ -109,18 +129,28 @@ export const ARMOUR_TILES = {
 };
 
 /**
+ * The armour kinds whose plate pieces in these slots (loftbody.js's table: upperArm, forearm, knee...) have their edges turned
+ * and their lining rivets set inside them, as a harness's are (the `harnessEdge` strip along each end: loftbody.js
+ * harnessEdgesOn). The knight's harness (`plate`) has its own.
+ */
+export const ARMOUR_EDGES = {
+  brigandine: ['upperArm', 'forearm', 'knee'],
+  breastplate: ['knee'],
+};
+
+/**
  * Every armour kind (outfits.js `armor.kind`) and the tiles its hard surfaces wear, or null for none: cloth, leather, fur,
  * feathers and quilting (the textile maps' business), the arena gladiators' kit, and a kind drawn whole elsewhere.
  */
 export const ARMOUR_COVERAGE = {
   heavyRiot: ['polymer'], riot: ['polymer'], patrolVest: null, plateCarrier: null,
-  plate: ['plate', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['euroBrigandine', 'plate'], haubergeon: ['mail'], breastplate: ['plate'],
+  plate: ['plate', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['euroBrigandine', 'munitionPlate', 'harnessEdge'], haubergeon: ['mail'], breastplate: ['munitionPlate', 'harnessEdge'],
   lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake'], roninDo: ['yokohagi', 'sugake'],
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
-  mingVest: null, mingBrigandine: ['brigandine', 'plate'], mingLamellar: ['lamellae', 'plate'], mingScaleCoat: ['scale', 'plate'],
-  mingElite: ['brigandine', 'plate'], mingScale: ['scale', 'plate'], mingEliteLamellar: ['lamellae', 'plate'],
+  mingVest: null, mingBrigandine: ['brigandine', 'bifu'], mingLamellar: ['lamellae', 'bifu'], mingScaleCoat: ['scale', 'bifu'],
+  mingElite: ['brigandine', 'plate', 'munitionPlate'], mingScale: ['scale', 'plate', 'munitionPlate'], mingEliteLamellar: ['lamellae', 'plate', 'munitionPlate'],
   ironPagoda: ['lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,
   segmentata: ['segmentata'], centurion: ['mail', 'plate'], hauberk: ['mail'], hamata: ['mail'],
   mongolDeel: null, mongolLamellar: ['lamellae'], mongolIron: ['lamellae', 'plate'], kheshig: ['scale', 'plate'], girdle: null,

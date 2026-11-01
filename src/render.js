@@ -39,7 +39,7 @@ import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
 import { buildExoFrame } from './exoview.js';
-import { disposeObject, outlineFor, surface } from './toon.js';
+import { disposeObject, doubleSided, outlineFor, surface } from './toon.js';
 import { townSquare } from './props/town.js';
 import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
 import { cajamarcaTown } from './props/cajamarca.js';
@@ -2063,6 +2063,14 @@ function detailedView(view, fighter, simple) {
   // landmarks), so the pieces are built when the bone or muscle view is first shown (ensureSkeleton): until then, empty groups.
   const skeleton = BONES.map(() => new THREE.Group());
 
+  // Every worn thing drawn from both sides (toon.js doubleSided): the helmet, its knocked-off copy, the kit on the hands, feet,
+  // chest and hips (gauntlets, sabatons, the ō-yoroi's boards, harness plates, a machine's shells and an exoskeleton's frame).
+  doubleSided(headgear?.group);
+  for (const prop of headProps) {
+    doubleSided(prop.worn);
+    doubleSided(prop.loose);
+  }
+  for (const { object } of attachments) doubleSided(object);
   const physicsLayer = buildPhysicsLayer(fighter, layers);
   if (simple) thinOut(layers.skin, skinMesh);
   view.scene.add(group);
@@ -2097,7 +2105,9 @@ const skinQuality = { tier: 'high' };
 export function setSkinQuality(fighterViews, tier) {
   if (skinQuality.tier === tier) return;
   skinQuality.tier = tier;
-  for (const fighterView of fighterViews) if (fighterView.skinMesh) skinForTier(fighterView.skinMesh.material);
+  for (const fighterView of fighterViews) {
+    for (const mesh of [fighterView.skinMesh, ...(fighterView.detailMeshes ?? [])]) if (mesh) skinForTier(mesh.material);
+  }
 }
 function skinForTier(material) {
   const full = material.userData.fullMaps;
@@ -2149,15 +2159,19 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   const detailIndices = DETAIL_MAPS.on && built.uvs ? {} : null;
   // Cloth drawn with the cloth atlas (its coordinates in a family's cell, detailmaps.js clothUvAt): all of it in one material.
   const clothIndices = [];
+  // What is worn over the skin and drawn in the skin's material (leather, lacquered shells, lacing, bindings: a triangle none of
+  // whose corners is skin), apart from the skin, where the armour is drawn apart (the detail maps): double-sided, as all armour is.
+  const wornIndices = [];
+  const wornTriangle = (triangle) => built.skinMask && [0, 1, 2].every((corner) => !built.skinMask[built.indices[triangle * 3 + corner]]);
   for (let triangle = 0; triangle < triangles; triangle += 1) {
     const first = built.indices[triangle * 3];
     const kind = detailIndices ? detailKindOf(built.uvs[first * 2]) : null;
     const cloth = detailIndices && !kind && clothCellOf(built.uvs[first * 2], built.uvs[first * 2 + 1]) !== null;
-    const target = kind ? (detailIndices[kind] ??= []) : steelTriangle(triangle) ? steelIndices : cloth ? clothIndices : bodyIndices;
+    const target = kind ? (detailIndices[kind] ??= []) : steelTriangle(triangle) ? steelIndices : cloth ? clothIndices : detailIndices && wornTriangle(triangle) ? wornIndices : bodyIndices;
     target.push(first, built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
   }
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
-  const steel = steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
+  const steel = doubleSided(steelMaterial(view.steelEnv, { skinning: true, ...lacquer }));
   let steelMesh = null;
   let steelOutline = null;
   if (steelIndices.length) {
@@ -2181,15 +2195,23 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
     for (const [kind, indices] of Object.entries(detailIndices)) {
       const base = matte ? new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 1, metalness: 0 }) : steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
       const metalness = lacquer.metalness ?? (kind === 'kozane' ? 0.5 : 1);
-      const material = armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness });
+      const material = doubleSided(armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness }));
       const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(indices), material, share: skinMesh.geometry });
       mesh.userData.detailMaps = kind;
       detailMeshes.push(mesh);
       detailOutlines.push(outlineFor(mesh));
     }
     if (clothIndices.length) {
-      const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(clothIndices), material: clothMaterial(), share: skinMesh.geometry });
+      const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(clothIndices), material: doubleSided(clothMaterial()), share: skinMesh.geometry });
       mesh.userData.detailMaps = 'cloth';
+      detailMeshes.push(mesh);
+      detailOutlines.push(outlineFor(mesh));
+    }
+    if (wornIndices.length) {
+      // (The skin's own material made again, its maps and all, for these faces: the quality tier switches it with the skin's.)
+      const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(wornIndices), share: skinMesh.geometry });
+      doubleSided(mesh.material);
+      mesh.userData.detailMaps = 'worn';
       detailMeshes.push(mesh);
       detailOutlines.push(outlineFor(mesh));
     }
@@ -2565,7 +2587,8 @@ function crowdView(view, fighter, template) {
   const skeleton = new THREE.Skeleton(bones, stretchedInverses(template.frames, frames, body.lengths.headRadius / template.headRadius));
   // His own colours (bruises) and index (a part cut off); the rest is shared.
   const skinMaterial = surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.55 });
-  const steelPaint = steelMaterial(view.steelEnv, { skinning: true, ...template.lacquer });
+  // (A crowd's steel, its helmets baked in, double-sided as all armour is: toon.js doubleSided.)
+  const steelPaint = doubleSided(steelMaterial(view.steelEnv, { skinning: true, ...template.lacquer }));
   // A body of `source` (the template, or its far body) on his skeleton: the skin and the steel, each with its ink.
   const bodyOf = (source) => {
     const geometry = new THREE.BufferGeometry();
@@ -2618,7 +2641,7 @@ function crowdView(view, fighter, template) {
   const plainSteel = steelMaterial(view.steelEnv, { vertexColors: false, color: garmentColors.steel, ...template.lacquer });
   const allowed = headgearOptions(dress.kind);
   const headProps = (body.inputs.accessories ?? []).filter((kind) => allowed.includes(kind)).map((kind) => {
-    const make = () => (kind === 'headset' ? headsetMesh(body) : buildHeadProp(kind, body, dress, garmentColors, plainSteel, corner));
+    const make = () => doubleSided(kind === 'headset' ? headsetMesh(body) : buildHeadProp(kind, body, dress, garmentColors, plainSteel, corner));
     const worn = make();
     if (!worn) return null;
     headGroup.add(worn);

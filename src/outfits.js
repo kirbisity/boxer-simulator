@@ -94,7 +94,11 @@ function tournamentDesign(label, { steel, under, leather, colour, colour2, plume
   };
 }
 
-/** A foot soldier's body armour (brigandine, mail shirt or breastplate) in its cloth, over a quilted coat, and a kettle hat. */
+/**
+ * A foot soldier's body armour (brigandine, mail shirt or breastplate) in its cloth, over a quilted coat, and his helmet: a kettle
+ * hat in one of its designs (`hat.design`, helmforms.js HELM_DESIGNS.kettleHat: a the ridged kettle hat, b the Burgundian war
+ * hat, c the German sallet and bevor).
+ */
 function footmanDesign(label, kind, cloth, quilt, hat) {
   return { label, top: { kind: 'longsleeve', color: quilt }, bottom: { kind: 'tights', color: '#3a3326' }, armor: { kind, color: '#9aa0a8', cloth, gold: '#c9a85a', mail: '#8d9097' }, head: { kind: 'kettleHat', color: '#9aa0a8', ...hat }, feet: { kind: 'compactBoot', color: '#3a2a1c' } };
 }
@@ -219,11 +223,13 @@ function shade(hex, share) {
 }
 
 // Conquistadors: the doublet, the breeches, the helmet (morion, cabasset, pot helmet).
+// The conquistadors' cabasset is drawn in its measured design (helmforms.js DESIGN_FORMS.cabassetSpanish); the morion as before.
+const helmDesign = (helmet) => (helmet === 'cabasset' ? { design: 'spanish' } : {});
 function conquistadorDesign(label, doublet, breeches, helmet, sash = null) {
-  return { label, top: { kind: 'longsleeve', color: doublet }, bottom: { kind: 'pants', color: breeches }, armor: { kind: 'conquistador', color: '#a7adb6', mail: '#8d9097', cloth: doublet, cloth2: sash ?? doublet }, head: { kind: helmet, color: '#a7adb6' }, feet: { kind: 'compactBoot', color: '#2a1d14' } };
+  return { label, top: { kind: 'longsleeve', color: doublet }, bottom: { kind: 'pants', color: breeches }, armor: { kind: 'conquistador', color: '#a7adb6', mail: '#8d9097', cloth: doublet, cloth2: sash ?? doublet }, head: { kind: helmet, color: '#a7adb6', ...helmDesign(helmet) }, feet: { kind: 'compactBoot', color: '#2a1d14' } };
 }
 function escaupilDesign(label, quilt, sleeves, helmet) {
-  return { label, top: { kind: 'longsleeve', color: sleeves }, bottom: { kind: 'pants', color: '#3a2a22' }, armor: { kind: 'escaupil', color: quilt, cloth: quilt, cloth2: shade(quilt, 0.82) }, head: { kind: helmet, color: '#9aa0a8' }, feet: { kind: 'compactBoot', color: '#2a1d14' } };
+  return { label, top: { kind: 'longsleeve', color: sleeves }, bottom: { kind: 'pants', color: '#3a2a22' }, armor: { kind: 'escaupil', color: quilt, cloth: quilt, cloth2: shade(quilt, 0.82) }, head: { kind: helmet, color: '#9aa0a8', ...helmDesign(helmet) }, feet: { kind: 'compactBoot', color: '#2a1d14' } };
 }
 // The Mexica warrior: the cotton armour, the loincloth, a feathered band (none if `band` is null).
 function mexicaDesign(label, cotton, band) {
@@ -708,11 +714,11 @@ export const OUTFITS = {
     protection: { blunt: 0.4, cut: 0.75, pierce: 0.6, bullet: { head: 0.35, torso: 0.35, limb: 0 } },
     courage: 0.25,
     designs: [
-      footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { brim: 1.9 }),
-      footmanDesign('Brigandine, blue', 'brigandine', '#1f2f5a', '#b8a888', { brim: 1.75, tall: true }),
-      footmanDesign('Mail shirt', 'haubergeon', '#5a4a30', '#b8a888', { brim: 2.0, coif: true }),
-      footmanDesign('Breastplate', 'breastplate', '#6a1e22', '#a89070', { brim: 1.8, tall: true }),
-      footmanDesign('Brigandine, black', 'brigandine', '#1c1c20', '#8a7a60', { brim: 1.85, tall: true, coif: true }),
+      footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { design: 'a', brim: 1.9 }),
+      footmanDesign('Brigandine, blue', 'brigandine', '#1f2f5a', '#b8a888', { design: 'c', brim: 1.75, tall: true }),
+      footmanDesign('Mail shirt', 'haubergeon', '#5a4a30', '#b8a888', { design: 'a', brim: 2.0, coif: true }),
+      footmanDesign('Breastplate', 'breastplate', '#6a1e22', '#a89070', { design: 'c', brim: 1.8, tall: true }),
+      footmanDesign('Brigandine, black', 'brigandine', '#1c1c20', '#8a7a60', { design: 'b', brim: 1.85, tall: true, coif: true }),
     ],
   },
   // Lamellar: small lacquered steel scales laced in rows, in red. Proof
@@ -1663,10 +1669,10 @@ export const OUTFITS = {
     protection: { blunt: 0.2, cut: 0.45, pierce: 0.3, bullet: { head: 0.1, torso: 0.08, limb: 0 } },
     courage: 0.3,
     designs: [
-      { label: 'White jack, kettle hat', top: { kind: 'longsleeve', color: '#d8d0bc' }, bottom: { kind: 'tights', color: '#5a2a22' }, armor: { kind: 'escaupil', color: '#d2c8b0', cloth: '#d2c8b0', cloth2: '#b8ad94' }, head: { kind: 'kettleHat', color: '#8a8e95', brim: 1.7 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'White jack, kettle hat', top: { kind: 'longsleeve', color: '#d8d0bc' }, bottom: { kind: 'tights', color: '#5a2a22' }, armor: { kind: 'escaupil', color: '#d2c8b0', cloth: '#d2c8b0', cloth2: '#b8ad94' }, head: { kind: 'kettleHat', design: 'a', color: '#8a8e95', brim: 1.7 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
       { label: 'Russet jack, bare head', top: { kind: 'longsleeve', color: '#7a4a2a' }, bottom: { kind: 'tights', color: '#3a3326' }, armor: { kind: 'escaupil', color: '#8a5a36', cloth: '#8a5a36', cloth2: '#6e4628' }, head: null, feet: { kind: 'compactBoot', color: '#2a1d14' } },
-      { label: 'Green-and-white livery', top: { kind: 'longsleeve', color: '#2f5a32' }, bottom: { kind: 'tights', color: '#d8d0bc' }, armor: { kind: 'escaupil', color: '#d2c8b0', cloth: '#d2c8b0', cloth2: '#2f5a32' }, head: { kind: 'kettleHat', color: '#7d8087', brim: 1.85 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
-      { label: 'Red jack, sallet', top: { kind: 'longsleeve', color: '#8a2a22' }, bottom: { kind: 'tights', color: '#2a2622' }, armor: { kind: 'escaupil', color: '#9a3a2c', cloth: '#9a3a2c', cloth2: '#7a2a20' }, head: { kind: 'kettleHat', color: '#9aa0a8', brim: 1.55, tall: true }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Green-and-white livery', top: { kind: 'longsleeve', color: '#2f5a32' }, bottom: { kind: 'tights', color: '#d8d0bc' }, armor: { kind: 'escaupil', color: '#d2c8b0', cloth: '#d2c8b0', cloth2: '#2f5a32' }, head: { kind: 'kettleHat', design: 'a', color: '#7d8087', brim: 1.85 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Red jack, sallet', top: { kind: 'longsleeve', color: '#8a2a22' }, bottom: { kind: 'tights', color: '#2a2622' }, armor: { kind: 'escaupil', color: '#9a3a2c', cloth: '#9a3a2c', cloth2: '#7a2a20' }, head: { kind: 'kettleHat', design: 'c', bevor: false, color: '#9aa0a8', brim: 1.55, tall: true }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
     ],
   },
   // ---- Level Mode (Dunnottar): kits no random deal and no picker offers (`levelOnly`) ----
@@ -1696,8 +1702,8 @@ export const OUTFITS = {
     protection: { blunt: 0.12, cut: 0.25, pierce: 0.12, bullet: { head: 0.1, torso: 0.05, limb: 0 } },
     courage: 0.05,
     designs: [
-      { label: 'Faded jack', top: { kind: 'longsleeve', color: '#6a5a46' }, bottom: { kind: 'pants', color: '#3a3326' }, armor: { kind: 'escaupil', color: '#8a7b62', cloth: '#8a7b62', cloth2: '#6b5e49' }, head: { kind: 'kettleHat', color: '#7d8087', brim: 1.7 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
-      { label: 'Wool-stained jack', top: { kind: 'longsleeve', color: '#4a4a52' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'escaupil', color: '#6e6a5a', cloth: '#6e6a5a', cloth2: '#524f43' }, head: { kind: 'kettleHat', color: '#6a6d74', brim: 1.8 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Faded jack', top: { kind: 'longsleeve', color: '#6a5a46' }, bottom: { kind: 'pants', color: '#3a3326' }, armor: { kind: 'escaupil', color: '#8a7b62', cloth: '#8a7b62', cloth2: '#6b5e49' }, head: { kind: 'kettleHat', design: 'a', color: '#7d8087', brim: 1.7 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
+      { label: 'Wool-stained jack', top: { kind: 'longsleeve', color: '#4a4a52' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'escaupil', color: '#6e6a5a', cloth: '#6e6a5a', cloth2: '#524f43' }, head: { kind: 'kettleHat', design: 'b', color: '#6a6d74', brim: 1.8 }, feet: { kind: 'compactBoot', color: '#2a1d14' } },
     ],
   },
   // A Mexica warrior: the ichcahuipilli (quilted cotton armour, soaked in

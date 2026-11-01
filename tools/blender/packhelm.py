@@ -23,7 +23,7 @@ SHEETS = {
     'formMurmillo': {'size': 512}, 'formThraex': {'size': 512}, 'formHoplomachus': {'size': 512},
     'formSecutor': {'size': 512}, 'formScissor': {'size': 512},
     'formKettleRidged': {'size': 512}, 'formKettleBurgundian': {'size': 512, 'cut': True},
-    'formSalletGerman': {'size': 512, 'cut': True}, 'formBarbute': {'size': 512, 'cut': True},
+    'formSalletGerman': {'size': 512, 'cut': True}, 'formCabassetSpanish': {'size': 512},
     'maskOni': {'size': 512, 'alpha': True}, 'maskRessei': {'size': 512, 'alpha': True}, 'maskTengu': {'size': 512, 'alpha': True},
 }
 QUALITY = {'albedo': 84, 'normal': 86, 'orm': 78}

@@ -4,7 +4,7 @@
 
 import { Dangle } from './dangle.js';
 import { FACTIONS, factionOf, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
-import { outlineFor, surface } from './toon.js';
+import { doubleSided, outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
 import { buildArenaHelm, buildGalea, buildLionHead, formMesh } from './arenaview.js';
@@ -635,12 +635,13 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       hidesHair = false;
       break;
     case 'kettleHat': {
-      // A design under study (helmstyle.js `kettle`; helmforms.js HELM_DESIGNS), fitted over the head, with its baked maps.
-      const design = HELM_STYLE.kettle !== 'now' && !lowDetail ? designFormOf(head.kind, HELM_STYLE.kettle) : null;
-      if (design && buildDesignHelm(group, design, r, metal(steel, color))) {
+      // In its design (helmforms.js HELM_DESIGNS: `head.design`, or the one helmstyle.js `kettle` asks for), fitted over the
+      // head, with its baked maps.
+      const design = helmDesignOf(head, lowDetail);
+      if (design && buildDesignHelm(group, design, r, metal(steel, color), { bevor: head.bevor !== false })) {
         fitted = true;
-        // A mail coif under any but the barbute, which closes to the neck itself.
-        if (head.coif && design.build !== 'barbute') {
+        // A mail coif under it.
+        if (head.coif) {
           const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.36 * r, 1.0 * r, 18, 1, true), metal(steel, 0x7d8087));
           coif.position.y = -0.95 * r;
           group.add(coif);
@@ -707,6 +708,12 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'cabasset': {
+      // In its design (the Spanish cabasset, helmforms.js HELM_DESIGNS), fitted over the head, its etching and rivets baked.
+      const design = helmDesignOf(head, lowDetail);
+      if (design && buildDesignHelm(group, design, r, metal(steel, color))) {
+        fitted = true;
+        break;
+      }
       // The cabasset: a tall pear-shaped crown with a little stalk, a narrow flat brim.
       const iron = metal(steel, color);
       const crown = new THREE.Mesh(new THREE.SphereGeometry(1.15 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), iron);
@@ -1657,6 +1664,8 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     });
   }
   inkAll(group);
+  // A helmet is a thin shell: drawn from both sides (toon.js doubleSided), so from under its brim or inside it is never a hole.
+  doubleSided(group);
   // An open-faced helmet (`openFace`) leaves the beard to be seen.
   return { group, hidesHair, showsBeard: Boolean(head.openFace), fitted };
 }
@@ -1953,16 +1962,27 @@ function hongying(r, { top, length, spread, colour = HONGYING.colour }) {
   return tassel;
 }
 
-/** Steel of another colour, polished like the rest. */
 /**
- * A helmet in a design under study (helmforms.js DESIGN_FORMS): each part a measured surface in head radii scaled to `r`,
+ * The design a helmet is drawn in (helmforms.js DESIGN_FORMS), or null (drawn as before): none in a crowd or under
+ * `#kettle=now`; a kettle hat in the one `#kettle=a|b|c` asks for; otherwise the wearer's own (`head.design`).
+ */
+function helmDesignOf(head, lowDetail) {
+  if (lowDetail || HELM_STYLE.kettle === 'now') return null;
+  const choice = head.kind === 'kettleHat' && HELM_STYLE.kettle !== 'own' ? HELM_STYLE.kettle : head.design;
+  return choice ? designFormOf(head.kind, choice) : null;
+}
+
+/**
+ * A helmet in a design (helmforms.js DESIGN_FORMS): each part a measured surface in head radii scaled to `r`,
  * wearing its sheet (rivets, turned edges, flutes, the sights and openings cut out). False where the maps are not there
  * (the helmet is drawn as before).
  */
-function buildDesignHelm(group, form, r, iron) {
+function buildDesignHelm(group, form, r, iron, { bevor = true } = {}) {
   if (!helmMapsReady() || !helmMapSheet(form.sheet)) return false;
   const regions = form.regions;
   for (const [name, part] of Object.entries(form.parts)) {
+    // (A sallet may be worn without its bevor: an archer's.)
+    if (name === 'bevor' && !bevor) continue;
     const material = helmMaterial(iron, form.sheet, { side: part.double ? THREE.DoubleSide : THREE.FrontSide, cut: !!form.cut });
     const mesh = formMesh(part, regions[part.region], material);
     mesh.name = `helm-${name}`;
@@ -1972,6 +1992,7 @@ function buildDesignHelm(group, form, r, iron) {
   return true;
 }
 
+/** Steel of another colour, polished like the rest. */
 function metal(steel, hex) {
   const material = steel.clone();
   material.color = new THREE.Color(hex);

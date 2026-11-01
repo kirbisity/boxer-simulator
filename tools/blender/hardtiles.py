@@ -240,6 +240,75 @@ def harness_edge(n):
     return t
 
 
+def hammer_blows(t, count, r_lo, r_hi, d_lo, d_hi):
+    """Hammer blows on the torus: `count` shallow spherical dents, radius r_lo..r_hi, depth d_lo..d_hi (m); the deepest wins.
+    Returns the dent field (<= 0) and how far into a dent each point is (0..1)."""
+    dent = np.zeros_like(t.z)
+    for _ in range(count):
+        cx, cy = t.rng.uniform(0, t.W), t.rng.uniform(0, t.H)
+        r, d = t.rng.uniform(r_lo, r_hi), t.rng.uniform(d_lo, d_hi)
+        dx = wrap(t.X - cx, t.W)
+        dy = wrap(t.Y - cy, t.H)
+        q = (dx * dx + dy * dy) / (r * r)
+        np.minimum(dent, np.where(q < 1, -d * (1 - q), 0.0), out=dent)
+    return dent, np.clip(-dent / d_hi, 0, 1)
+
+
+def munition_plate(n):
+    # Munition-grade plate of the 15th century's foot soldiers (their spaulders, vambraces, knee cops, breast- and backplates):
+    # raised over the stake and left from the hammer, not ground and polished as a knight's harness was, so its face shows
+    # the hammer's facets (7-16 mm across, a tenth to a third of a millimetre deep) over a slow waviness, the planishing only
+    # half taking them out, the polish blotchy with the scale left in the dents (the Met's munition pieces, e.g. the
+    # Italian breastplate 14.25.716, https://www.metmuseum.org/art/collection/search/22939; the Churburg and Chalcis
+    # munition armour, https://en.wikipedia.org/wiki/Chalcis_armour; Royal Armouries III.1664's plates). The edges (turned,
+    # rivets every 50 mm) are the harness's edge strip (harness_edge). A field 160 mm square.
+    W = H = 0.16
+    t = Tile(W, H, n, 71)
+    dent, depth = hammer_blows(t, 520, 0.0035, 0.008, 0.00012, 0.0003)
+    wave = t.noise(12, 1, 3, 0.00022)
+    planish = t.noise(40, 18, 60, 0.000012)
+    t.z = wave + dent + planish
+    blotch = t.noise(14, 1, 5, 0.06)
+    t.grey(0.86 + blotch - 0.08 * depth ** 1.5)
+    t.rough = 0.3 + 0.16 * depth + t.noise(10, 1, 4, 0.04)
+    t.metal = 1.0 - 0.15 * depth
+    return t
+
+
+def bifu(n):
+    # The Ming arm guard (bi fu, 臂縛): overlapping iron lames riveted to a leather backing round the forearm, each lame's foot
+    # over the head of the one below, the rivet heads of copper or brass (Great Ming Military, "Bi Fu",
+    # https://greatmingmilitary.blogspot.com/2016/06/bi-fu.html; the Departure Herald's segmented guards,
+    # https://greatmingmilitary.blogspot.com/2016/08/ming-qing-japanese-armour-comparison.html; copper rivets on cold-forged
+    # plates, https://greatmingmilitary.blogspot.com/2024/09/brigandine-armours-of-ming-dynasty.html). No surviving Ming guard has
+    # published measures: lames ~45 mm deep lapping ~8 mm (37.5 mm showing), domed rivets ~6 mm across ~40 mm apart, the iron
+    # hammered and blackened. u round the arm (two rivets, 80 mm), v up it (four lames, 150 mm).
+    W, H = 0.08, 0.15
+    ph = H / 4
+    t = Tile(W, H, n, 73)
+    yl = t.Y % ph
+    # Each lame rising from its head (tucked under the lame above) to its foot, which stands over the next lame's head; the
+    # foot's edge rolled a little; a shadowed seam where it laps.
+    lame = 0.002 * (1 - yl / ph) + 0.0005 * np.exp(-(yl / 0.0018) ** 2)
+    seam = smooth(0.0, 0.0012, yl)
+    dent, depth = hammer_blows(t, 200, 0.003, 0.007, 0.0001, 0.00025)
+    t.z = lame * seam + dent + t.noise(16, 1, 6, 0.00008)
+    heads = np.zeros_like(t.z)
+    for row in range(4):
+        for col in range(2):
+            cx = col * W / 2 + W / 4
+            cy = row * ph + ph * 0.64
+            head, mask = dome(t.X, t.Y, W, H, cx, cy, 0.003, 0.0016)
+            heads = np.maximum(heads, head)
+            t.mask1 = np.maximum(t.mask1, mask)
+    t.z = np.maximum(t.z, heads + 0.0008 * (t.mask1 > 0.5))
+    iron = 0.5 + t.noise(12, 1, 5, 0.05) - 0.12 * depth - 0.3 * (1 - seam)
+    t.grey(np.where(t.mask1 > 0.5, 0.92, iron))
+    t.rough = np.where(t.mask1 > 0.5, 0.32, 0.5 + 0.12 * depth)
+    t.metal = np.where(t.mask1 > 0.5, 1.0, 0.85)
+    return t
+
+
 def krug(n):
     # Ottoman mail and plate (the Met's Shirt of Mail and Plate, Turkish, late 15th-16th c., 04.3.456,
     # https://www.metmuseum.org/art/collection/search/24193): rows of small rectangular steel plates, slightly domed, set in
@@ -424,7 +493,7 @@ def panels(n):
 FAMILIES = {
     'segmentata': segmentata, 'scale': scale, 'brigandine': brigandine, 'euroBrigandine': euro_brigandine,
     'harnessEdge': harness_edge, 'krug': krug, 'yokohagi': yokohagi, 'sugake': sugake, 'etched': etched, 'polymer': polymer,
-    'panels': panels,
+    'panels': panels, 'munitionPlate': munition_plate, 'bifu': bifu,
 }
 
 
