@@ -16,7 +16,7 @@ import { twoBoneIK, vec } from './pose.js';
 import { buildHorseModel, horseModelKey } from './horsemesh.js';
 import { hairChain, stepHair } from './horsehair.js';
 import { steelMaterial } from './wardrobe.js';
-import { disposeObject, outlineFor, surface } from './toon.js';
+import { disposeObject, doubleSided, outlineFor, surface } from './toon.js';
 import { buildRobotDogView, disposeRobotDogView, updateRobotDogView } from './robotdogview.js';
 
 const HORSE_LOOK = {
@@ -83,9 +83,10 @@ function horseMaterials(view) {
     const hair = surface(0xffffff, { vertexColors: true });
     hair.side = THREE.DoubleSide;
     view.horseMaterials = {
-      soft: surface(0xffffff, { vertexColors: true }),
+      // (Barding and trappers are open shells: drawn from both sides, as all armour is: toon.js doubleSided.)
+      soft: doubleSided(surface(0xffffff, { vertexColors: true })),
       hair,
-      metal: steelMaterial(view.steelEnv, { vertexColors: true }),
+      metal: doubleSided(steelMaterial(view.steelEnv, { vertexColors: true })),
       rein: new THREE.LineBasicMaterial({ color: HORSE_LOOK.rein }),
     };
   }

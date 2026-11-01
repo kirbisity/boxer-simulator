@@ -1,10 +1,11 @@
 // The remodelled helmets' surfaces (src/helmforms.js) sampled for tools/blender/helmforms.py, which authors their relief:
 // for each kind, its sheet, regions, grille and eyes, and for each mapped part a grid over (|u|, v) of its points (head
 // radii) and the distances along the surface from the face's middle (su, along u) and from the part's start (sv, along v).
+// The foot soldiers' designs (DESIGN_FORMS) too, with their `build` (which of helmforms.py's builders), sights and openings.
 //
 //   node tools/helmforms-dump.mjs > forms.json
 
-import { FORM_GRILLES, formPoint, formRegions, HELM_FORMS } from '../src/helmforms.js';
+import { DESIGN_FORMS, FORM_GRILLES, formPoint, formRegions, HELM_FORMS } from '../src/helmforms.js';
 
 const N = 128;
 
@@ -41,5 +42,10 @@ for (const [style, form] of Object.entries(HELM_FORMS)) {
     if (part.region) parts[name] = { region: part.region, grid: sample(part), stations: part.stations };
   }
   out[style] = { sheet: form.sheet, regions: formRegions(style), grille: form.grille ? FORM_GRILLES[form.grille] : null, eyes: form.eyes ?? null, feathers: form.feathers ?? null, parts };
+}
+for (const [style, form] of Object.entries(DESIGN_FORMS)) {
+  const parts = {};
+  for (const [name, part] of Object.entries(form.parts)) if (part.region) parts[name] = { region: part.region, grid: sample(part), stations: part.stations };
+  out[style] = { sheet: form.sheet, regions: form.regions, build: form.build, sight: form.sight ?? null, opening: form.opening ?? null, grille: null, eyes: null, feathers: null, parts };
 }
 process.stdout.write(JSON.stringify(out));

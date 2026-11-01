@@ -209,3 +209,19 @@ test('each armoured outfit\'s body wears the tiles its kind is said to (and no o
     }
   }
 });
+
+test('the foot soldier\'s plate is munition plate with turned edges; the Ming coats\' arm guards wear the bi fu\'s riveted lames', () => {
+  for (const design of [0, 1, 3, 4]) {
+    const on = built({ ...structuredClone(PRESETS.knight), outfit: { kind: 'footman', design } }, true);
+    assert.ok(on.kinds.munitionPlate > 0 && on.kinds.harnessEdge > 0, `footman ${design}: ${JSON.stringify(on.kinds)}`);
+    assert.equal(on.kinds.plate, undefined, `footman ${design}: no plain plate left`);
+  }
+  // The Ming coats: the brigandine (designs 0-2), its lamellar (3, 4) and scale (5) variants.
+  for (const design of [0, 3, 5]) {
+    const on = built({ ...structuredClone(PRESETS.knight), outfit: { kind: 'mingBrigandine', design } }, true);
+    assert.ok(on.kinds.bifu > 0, `mingBrigandine ${design}: ${JSON.stringify(on.kinds)}`);
+  }
+  const { tile } = DETAIL_ARMOUR.munitionPlate;
+  assert.ok(tile > 0.1 && tile < 0.25, 'a field a hand and a half across');
+  assert.deepEqual(DETAIL_ARMOUR.bifu.tile, [0.08, 0.15], 'two rivets 40 mm apart round, four 37.5 mm lames up');
+});

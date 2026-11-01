@@ -366,9 +366,8 @@ function formFitPart(part) {
   return part;
 }
 
-// The fitted parts' stations, then the parts seated on them (a crest's foot on its bowl in the middle plane).
-for (const form of Object.values(HELM_FORMS)) {
-  for (const part of Object.values(form.parts)) if (part.fit) formFitPart(part);
+/** A form's seated parts (a crest's or keel's foot on its part in the middle plane: `foot` x, `rise` or `top`). */
+function formSeat(form) {
   for (const part of Object.values(form.parts)) {
     if (!part.seat) continue;
     const seat = form.parts[part.seat];
@@ -379,6 +378,175 @@ for (const form of Object.values(HELM_FORMS)) {
       return { ...rest, bottom: [foot, surface - 0.03], top: top ?? [foot + rise[0], surface + rise[1]] };
     });
   }
+}
+
+// The fitted parts' stations, then the parts seated on them (a crest's foot on its bowl in the middle plane).
+for (const form of Object.values(HELM_FORMS)) {
+  for (const part of Object.values(form.parts)) if (part.fit) formFitPart(part);
+  formSeat(form);
+}
+
+// ---- The foot soldier's helmets of the fifteenth century, and the conquistador's cabasset ----------------------------------
+
+/**
+ * The fifteenth century's infantry helmets as measured forms, fitted over the same head, their fine work (rivets, turned
+ * edges, flutes, hammering) baked in their sheets (helmforms.py `euro`), the sights and face openings cut out of them by
+ * the sheet (a cut-out in the normal map's alpha: helmmaps.js helmMaterial `cut`). A helmet kind is drawn in the design
+ * its wearer's kit names (outfits.js `head.design`, a key of HELM_DESIGNS[kind]; helmstyle.js `#kettle=` overrides it for
+ * comparison) by any unit that wears it (wardrobe.js). The pieces (see helmmaps.js for the links), in cm on a head of
+ * r ≈ 11.5 cm:
+ *
+ *   kettleRidged     the one-piece war hat (Cleveland Museum of Art 1916.1919, Italy c. 1460: 30.3 x 25.9 x 17.5 cm, a smooth
+ *                    rounded crown raised to a low medial ridge, the lining's rivet holes along it, small rivets round the
+ *                    dome's foot and the brim's outer edge, the brim wide and sloping down; Met 04.3.234, said to be from
+ *                    Lake Morat: 33.7 x 33 x 23.3 cm). Its bowl a lining's room off the head, the brim 4-5 cm all round.
+ *   kettleBurgundian the Burgundian war hat (Met 04.3.228, Burgundy or Flanders c. 1475: 37.1 cm long, 24.8 cm broad,
+ *                    25.9 cm high): a tall skull fluted in a spiral up to a point, the brim long before and behind and
+ *                    narrow at the sides, pulled down steeply over the face, a sight cut across it at the eyes.
+ *   salletGerman     the German sallet (Met 29.158.11, Hans Blarer the Younger, Basel c. 1470-80: 37.4 cm long, 20.2 cm
+ *                    broad, 24.8 cm high; Met 42.50.32, Caspar Rieder, c. 1480): a close skull with a low keel, drawn down
+ *                    over the face to the nose with a sight across the eyes, down over the ears, and out behind in a long
+ *                    tail; worn with a bevor (a scoop of plate from the chest to under the nose) strapped round the neck.
+ *   cabassetSpanish  the conquistador's cabasset ("Spanish morion"; the pointed cabacete's descendant, Tavares, ASAC Bulletin 105,
+ *                    2012): the Met's 14.25.533 (possibly Spanish, 23.5 cm high, 24.3 broad, 32.2 long), 14.25.1851, 27.159.12
+ *                    and 14.25.532 (25.4-27.3 high, 29.2-34.3 long); the Royal Collection's RCIN 67296: a tall almond skull
+ *                    raised in one piece to a short stalk bent back, a narrow brim peaked a little fore and aft, its edge
+ *                    turned and roped, the lining's brass-capped rivets round the skull's foot, etched in bands from the point.
+ */
+
+/** A fitted bowl (formFitPart) with its stations made. */
+const formHatBowl = (fit, seg = 28) => formFitPart({ kind: 'loft', span: 1, seg: [seg, 1], region: 'bowl', look: 'metal', ink: true, fit });
+
+/**
+ * A hat's brim from its bowl's foot out and down to its edge, the edge turned down (`lip`: the turn's drop and how far it
+ * comes in): `reach` how far out and `fall` how far down at the edge, keys every eighth of a turn from the front; `bow`, how
+ * much the middle stands above the straight line out (a brim a little arched); `seg` cuts round.
+ */
+function formHatBrim(bowl, { reach, fall, bow = 0.02, lip = [0.06, 0.012], seg = 28 }) {
+  const foot = bowl.stations[0];
+  const out = formResample(reach);
+  const down = formResample(fall);
+  const at = (share, rise = 0) => ({ y: formPlus(foot.y, down.map((value) => value * share + rise)), rad: formPlus(foot.rad, out.map((value) => value * share)) });
+  const edge = at(1);
+  return {
+    kind: 'loft', span: 1, seg: [seg, 1], region: 'brim', look: 'metal', ink: true, double: true, flip: true,
+    stations: [{ y: foot.y, rad: formPlus(foot.rad, -0.03) }, at(0.5, bow), edge, { y: formPlus(edge.y, -lip[0]), rad: formPlus(edge.rad, -lip[1]) }],
+  };
+}
+
+/** A low ridge (a keel) standing on a fitted part in the middle plane, from `front` to `back` (x), at most `high` tall. */
+function formKeel(seat, { front, back, high, w = 0.03, seg = [6, 1] }) {
+  const feet = Array.from({ length: 7 }, (_, index) => front + ((back - front) * index) / 6);
+  const rise = [0.25, 0.75, 1, 1, 1, 0.75, 0.25];
+  return { kind: 'sweep', seg, region: 'comb', look: 'metal', ink: true, square: 0.6, seat, stations: feet.map((foot, index) => ({ foot, rise: [0, high * rise[index]], w })) };
+}
+
+export const DESIGN_FORMS = {
+  kettleRidged: (() => {
+    const bowl = formHatBowl({ foot: [0.24, 0.2, 0.12, 0.08, 0.05], gap: 0.17, top: 0.24, lift: 0.12, rows: 8 });
+    return {
+      sheet: 'formKettleRidged', build: 'kettle', period: 'Italy, c. 1460', label: 'Ridged kettle hat',
+      regions: { bowl: [0, 0.42, 1, 1], brim: [0, 0.1, 1, 0.42], comb: [0, 0, 1, 0.1] },
+      parts: {
+        bowl,
+        brim: formHatBrim(bowl, { reach: [0.3, 0.36, 0.4, 0.36, 0.32], fall: [-0.2, -0.21, -0.24, -0.23, -0.22] }),
+        comb: formKeel('bowl', { front: 0.96, back: -1.02, high: 0.07 }),
+      },
+    };
+  })(),
+  kettleBurgundian: (() => {
+    const bowl = formHatBowl({ foot: [0.32, 0.27, 0.19, 0.15, 0.12], gap: 0.16, top: 0.3, lift: 0.42, rows: 9 });
+    const top = formLoftPoint(bowl, 0, 1)[1];
+    return {
+      sheet: 'formKettleBurgundian', build: 'kettle', period: 'Burgundy or Flanders, c. 1475', label: 'Burgundian war hat', cut: true,
+      // The sight across the brim's front at the eyes (y), as far round as `z` each side, `h` high.
+      sight: { y: -0.05, z: 0.56, h: 0.08 },
+      regions: { bowl: [0, 0.42, 1, 1], brim: [0, 0.1, 1, 0.42], comb: [0, 0, 1, 0.1] },
+      parts: {
+        bowl,
+        brim: formHatBrim(bowl, { reach: [0.34, 0.27, 0.2, 0.36, 0.5], fall: [-0.62, -0.5, -0.3, -0.36, -0.42], bow: 0.03, lip: [0.05, 0.012] }),
+        // The point the flutes run up to.
+        comb: {
+          kind: 'sweep', seg: [6, 2], region: 'comb', look: 'metal', ink: true,
+          stations: [{ at: [0, top - 0.06], r: 0.1, rz: 1 }, { at: [0, top + 0.04], r: 0.05, rz: 1 }, { at: [0, top + 0.13], r: 0.006, rz: 1 }],
+        },
+      },
+    };
+  })(),
+  salletGerman: (() => {
+    const shell = formFitPart({
+      kind: 'loft', span: 1, seg: [24, 1], region: 'shell', look: 'metal', ink: true,
+      fit: { foot: [-0.42, -0.5, -0.64, -0.72, -0.74], gap: 0.15, top: 0.24, lift: 0.1, rows: 9 },
+      // The tail: out behind, a little at the sides, none before the face.
+      flare: [
+        { dy: [-0.01, -0.03, -0.07, -0.24, -0.34], out: [0.01, 0.03, 0.07, 0.42, 0.74] },
+        { dy: [-0.005, -0.015, -0.035, -0.11, -0.15], out: [0.005, 0.012, 0.03, 0.18, 0.3] },
+      ],
+    });
+    return {
+      sheet: 'formSalletGerman', build: 'sallet', period: 'Basel, c. 1470-80', label: 'German sallet and bevor', cut: true,
+      sight: { y: 0.0, z: 0.56, h: 0.085 },
+      regions: { shell: [0, 0.38, 1, 1], bevor: [0, 0.08, 1, 0.38], comb: [0, 0, 1, 0.08] },
+      parts: {
+        shell,
+        comb: formKeel('shell', { front: 0.9, back: -1.05, high: 0.05 }),
+        // The bevor: from the upper chest up over the chin to under the nose, its top inside the sallet's foot; keys from
+        // the middle round to its edges below the ears.
+        bevor: {
+          kind: 'loft', span: 0.4, seg: [14, 1], region: 'bevor', look: 'metal', ink: true, double: true,
+          stations: [
+            { y: [-1.66, -1.6, -1.46], rad: [1.24, 1.12, 0.94] },
+            { y: [-1.36, -1.32, -1.22], rad: [1.1, 1.02, 0.9] },
+            { y: [-0.96, -0.94, -0.9], rad: [1.18, 1.1, 0.96] },
+            { y: [-0.56, -0.58, -0.62], rad: [1.24, 1.14, 0.98] },
+            { y: [-0.34, -0.38, -0.5], rad: [1.18, 1.1, 0.96] },
+          ],
+        },
+      },
+    };
+  })(),
+  cabassetSpanish: (() => {
+    // Raised from the brow and nape all round, a tall almond-shaped skull drawn up to a point (`lift`), the stalk on it.
+    const bowl = formHatBowl({ foot: [0.3, 0.25, 0.16, 0.1, 0.06], gap: 0.16, top: 0.3, lift: 0.62, rows: 10 }, 24);
+    const top = formLoftPoint(bowl, 0, 1)[1];
+    return {
+      sheet: 'formCabassetSpanish', build: 'cabasset', period: 'Spain or north Italy, c. 1530-60', label: 'Spanish cabasset',
+      regions: { bowl: [0, 0.42, 1, 1], brim: [0, 0.1, 1, 0.42], comb: [0, 0, 1, 0.1] },
+      parts: {
+        bowl,
+        // The narrow brim, a little down at the sides and peaked up before and behind.
+        brim: formHatBrim(bowl, { reach: [0.34, 0.3, 0.26, 0.3, 0.36], fall: [0.02, -0.03, -0.07, -0.03, 0.03], bow: 0.01, lip: [0.03, 0.01], seg: 24 }),
+        // The stalk: a short stub of the skull's point, bent back.
+        comb: {
+          kind: 'sweep', seg: [6, 2], region: 'comb', look: 'metal', ink: true,
+          stations: [{ at: [0.0, top - 0.05], r: 0.07, rz: 1 }, { at: [-0.05, top + 0.05], r: 0.035, rz: 1 }, { at: [-0.13, top + 0.1], r: 0.025, rz: 1 }],
+        },
+      },
+    };
+  })(),
+};
+
+// The designs' keels seated on their parts.
+for (const form of Object.values(DESIGN_FORMS)) formSeat(form);
+
+/** The designs a helmet kind is drawn in (a kit's `head.design`; helmstyle.js `kettle`), each a form of DESIGN_FORMS. */
+export const HELM_DESIGNS = {
+  kettleHat: { a: 'kettleRidged', b: 'kettleBurgundian', c: 'salletGerman' },
+  cabasset: { spanish: 'cabassetSpanish' },
+};
+
+/** The design form a helmet kind is drawn in for a choice (null: drawn as before). */
+export function designFormOf(kind, choice) {
+  const name = HELM_DESIGNS[kind]?.[choice];
+  return name ? DESIGN_FORMS[name] : null;
+}
+
+/** Triangles a design is drawn with (before outlines). */
+export function designTriangles(name) {
+  return Object.values(DESIGN_FORMS[name].parts).reduce((sum, part) => {
+    const [nu, nv] = formCuts(part);
+    return sum + nu * nv * 2;
+  }, 0);
 }
 
 // ---- The samurai's kabuto and masks --------------------------------------------------------------------------------------
@@ -459,7 +627,7 @@ export const FORM_REGIONS = {
 };
 
 /** A helmet's regions (its sheet's layout). */
-export const formRegions = (style) => (HELM_FORMS[style].parts.shell ? FORM_REGIONS.closed : FORM_REGIONS.brimmed);
+export const formRegions = (style) => DESIGN_FORMS[style]?.regions ?? (HELM_FORMS[style].parts.shell ? FORM_REGIONS.closed : FORM_REGIONS.brimmed);
 
 // ---- The surfaces ------------------------------------------------------------------------------------------------------
 
