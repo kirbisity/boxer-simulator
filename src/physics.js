@@ -12,6 +12,7 @@ import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf }
 import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
+import { gapChance, gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, loadStop, LONG_GUN, MAGAZINE_CHANGE, raisedAim, reload, reloadKind, sightsOn, SUPPORT_GRIP, TUBE_LOAD } from './physics/ranged.js';
 import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
@@ -6907,19 +6908,20 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     mix.blunt += lost * WORLD.skill.flatBlunt;
   }
   const covered = protectionAt(body.gear, capsule.key);
-  // Into a gap in rigid armour (BLADES.gaps): only what is under it, and no glance.
-  const gaps = body.gear.gaps ? { ...BLADES.gaps, ...body.gear.gaps } : BLADES.gaps;
-  // (A full plate harness has no gap for an edge: `cutProof`.)
+  const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
+  // Into a gap in rigid armour (BLADES.gaps): only where there is one (physics/gaps.js gapZoneAt: the armpit, the groin, the
+  // throat, the sights, the bend of a joint; never the middle of the breast, the back or the crown), then only what is under it, and no glance.
+  const rigid = (covered.cut ?? 0) >= gapsOf(body.gear).rigidFrom && mix.cut + mix.pierce > 0.2;
+  const gapZone = rigid ? gapZoneAt(defender, capsule.key, contactPoint, normal) : null;
   // A heavy point that wanders (punch.wander, m) is put into a gap the less often: a gap is a hand's breadth (`size`).
   const placed = BLADES.gaps.size / (BLADES.gaps.size + (punch.wander ?? 0));
   // (A finisher's point is placed, not thrown in a fight: put where the plates part, the visor, the armpit, the throat, it finds
   // the gap `finisher.gap` of the time; put to the middle of the breast, where plate is plate, never.)
-  const gapChance = (punch.finisher ? punch.finisher.gap : spec.mode === 'thrust' ? gaps.thrust : body.gear.cutProof ? 0 : gaps.swing) * placed;
-  const intoGap = (covered.cut ?? 0) >= gaps.rigidFrom && mix.cut + mix.pierce > 0.2 && world.random() < gapChance * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
-  const protection = intoGap ? { ...gaps.under, deflects: false } : covered;
+  const gapFound = gapZone ? (punch.finisher ? punch.finisher.gap : gapChance(body.gear, gapZone, spec.mode)) * placed : 0;
+  const intoGap = gapFound > 0 && world.random() < gapFound * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
+  const protection = intoGap ? { ...gapUnder(body.gear, gapZone, covered), deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
-  const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const blocked = BLOCKING.has(capsule.key);
   // A heavy hard head drives part of its blow through armour (`crush`).
   const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : wspec.crush ?? 0)));
@@ -6948,6 +6950,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
     point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt,
     edgeShare: (mix.cut + mix.pierce) / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce), haft: haft || undefined,
+    gapZone: gapZone ?? undefined,
   };
   // A cut on the helmet takes what is fixed on it (a crest) away, whatever the helmet turns.
   if (capsule.key === 'head') cutOffHeadgear(world, defender, event, energy * mix.cut, contactPoint);

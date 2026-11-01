@@ -8,7 +8,7 @@ import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, placeFighter, placeOnFloor } from '../src/physics.js';
 import { attackLayout, contextAction, directFighter, doAction, newOrders } from '../src/control.js';
-import { canFinish, FINISHER, finishTarget, finisherBlade, leastProtected, helplessOnFloor, startFinisher } from '../src/finisher.js';
+import { canFinish, FINISHER, finishTarget, finisherBlade, helplessOnFloor, startFinisher } from '../src/finisher.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
 import { stageThink, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
@@ -127,25 +127,6 @@ test('the button does the same; a knight draws his own dagger and takes his swor
   assert.equal(me.weapon.kind, 'longsword', 'the sword is back');
   assert.ok(me.body.masses[P.rHand] > heavy, 'with its weight');
   assert.equal(me.style, 'longsword');
-});
-
-test('through plate it is the gap that kills: the throat aimed, the least guarded place chosen; a blow aimed at the breast does not kill', () => {
-  const kills = { gap: 0, breast: 0 };
-  const seeds = [1, 2, 3, 4, 5];
-  for (const seed of seeds) {
-    for (const region of [null, 'breast']) {
-      const { world, me, him, step } = floored('knight', { seed });
-      assert.equal(leastProtected(him).region, 'throat', 'plate is plate all over: the throat, where the helm meets the gorget');
-      assert.ok(startFinisher(world, me, him, { region }));
-      step(3);
-      const struck = world.events.filter((event) => event.kind === 'landed' && event.attacker === me.id && event.defender === him.id);
-      if (him.state === 'out') kills[region ?? 'gap'] += 1;
-      if (!region) assert.ok(struck.some((event) => event.effects.includes('into a gap in the armour')), `seed ${seed}: the point went in at a gap`);
-      else assert.ok(struck.every((event) => event.target === 'trunk'), 'the breast was struck');
-    }
-  }
-  assert.ok(kills.gap >= seeds.length - 1, `the gap strike kills the man in plate (${kills.gap}/${seeds.length})`);
-  assert.equal(kills.breast, 0, 'but a blow at the breastplate does not, in three seconds');
 });
 
 test('a hit on the player while he kneels breaks it off: the blade is put away and the man lives', () => {

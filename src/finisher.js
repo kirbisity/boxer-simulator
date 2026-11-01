@@ -10,7 +10,8 @@
 
 import { P } from './body.js';
 import { vec, yawRotate } from './pose.js';
-import { BLADES, WEAPONS } from './weapons.js';
+import { WEAPONS } from './weapons.js';
+import { gapsOf, gapUnder } from './physics/gaps.js';
 import { drawForFinisher, hostile, plantFeet, point, protectionAt, restoreAfterFinisher, throwPunch, WORLD } from './physics.js';
 
 export const FINISHER = {
@@ -54,9 +55,9 @@ export const FINISHER = {
 // The places on a man that a point is put to, in order of preference when they are alike. `key` is the part of him struck first,
 // `move` the stab that goes there.
 const REGIONS = [
-  { region: 'throat', key: 'head', move: 'execute' },
-  { region: 'armpit', key: 'trunk', move: 'execute' },
-  { region: 'groin', key: 'trunk', move: 'execute' },
+  { region: 'throat', key: 'head', move: 'execute', zone: 'neck' },
+  { region: 'armpit', key: 'trunk', move: 'execute', zone: 'armpit' },
+  { region: 'groin', key: 'trunk', move: 'execute', zone: 'groin' },
   // Never chosen (the others are as lightly guarded or more): the blow put to the middle of the breast, where plate is plate, and
   // no gap is sought (a finisher aimed elsewhere than the gap).
   { region: 'breast', key: 'trunk', move: 'execute', gap: false },
@@ -78,13 +79,17 @@ export function regionPoint(target, region, from) {
   return vec.lerp(vec.lerp(pelvis, neck, 0.72), near, 0.2);
 }
 
-/** What the kit says of a part a point goes to: the share of a thrust it stops, allowing for a gap in rigid armour found `gap` of the time. */
-function stops(target, key) {
-  const covered = protectionAt(target.body.gear, key);
-  const gaps = target.body.gear.gaps ? { ...BLADES.gaps, ...target.body.gear.gaps } : BLADES.gaps;
+/**
+ * What the kit says of a place a point goes to: the share of a thrust it stops, allowing for the gap in rigid armour there
+ * (physics/gaps.js: its `zone`, if the kit has it) found `gap` of the time, and what is under it (a mail voider, the doublet).
+ */
+function stops(target, entry) {
+  const gear = target.body.gear;
+  const covered = protectionAt(gear, entry.key);
+  const gaps = gapsOf(gear);
   const pierce = covered.pierce ?? 0;
-  if ((covered.cut ?? 0) < gaps.rigidFrom) return pierce;
-  return pierce * (1 - FINISHER.profile.gap) + (gaps.under.pierce ?? 0) * FINISHER.profile.gap;
+  if ((covered.cut ?? 0) < gaps.rigidFrom || !entry.zone || gaps.closed?.includes(entry.zone)) return pierce;
+  return pierce * (1 - FINISHER.profile.gap) + (gapUnder(gear, entry.zone, covered).pierce ?? 0) * FINISHER.profile.gap;
 }
 
 /** The least protected place on him to put a point: { region, key, move }. Alike, the throat first. */
@@ -92,7 +97,7 @@ export function leastProtected(target) {
   let best = null;
   let bestStops = Infinity;
   for (const entry of REGIONS) {
-    const score = stops(target, entry.key);
+    const score = stops(target, entry);
     if (score < bestStops - 0.05) {
       best = entry;
       bestStops = score;

@@ -633,6 +633,11 @@ export const OUTFITS = {
     protection: { blunt: 0.6, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } },
     // A full harness leaves no gap an edge can find (its gaps are for a point: BLADES.gaps).
     cutProof: true,
+    // Under the gaps of a full harness (BLADES.gaps.zones), mail: the arming doublet's gussets of mail under the arms and at
+    // the bend of the arms, the mail skirt (or breeches) at the groin, the standard of mail at the throat under the bevor
+    // ("How a Man Shall Be Armed", Hastings MS, c. 1450; the voiders and standards worn with the Milanese and German
+    // harnesses). The back of the knee has the arming hose alone.
+    gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'] },
     courage: 0.4,
     deflects: true,
     family: 'knight',
@@ -667,6 +672,8 @@ export const OUTFITS = {
     extraMass: 0.25,
     // pierce 0.95 (was 0.9): as a knight's harness.
     protection: { blunt: 0.6, cut: 1, pierce: 0.95, bullet: { head: 0, torso: 0.7, limb: 0.3 }, regions: { head: ARENA.bare } },
+    // A knight's harness and its arming doublet: mail at the armpits, the elbows, the groin and the throat (as `knight`).
+    gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'] },
     courage: 0.6,
     deflects: true,
     designs: [
@@ -713,9 +720,10 @@ export const OUTFITS = {
     skillFactor: 0.75,
     // The frog-mouth helm: another man's head stays well outside it in a clinch.
     headBulk: 1.5,
-    // Overlapping plates bolted together: half the gaps a point finds in field plate; and under them
-    // the thick quilted jousting doublet and mail (BLADES.gaps `under`: field plate's arming coat 0.25/0.3/0.2).
-    gaps: { thrust: 0.12, under: { blunt: 0.35, cut: 0.5, pierce: 0.4 } },
+    // Overlapping plates bolted together: half the chance a point finds a gap that field plate gives (BLADES.gaps `thrust`);
+    // under them the thick quilted jousting doublet (field plate's arming coat 0.25/0.3/0.2), and mail at the armpits (under
+    // the laminated pauldrons) and the groin; the helm bolted to the breast leaves no throat between them (`closed`).
+    gaps: { thrust: 0.2, under: { blunt: 0.35, cut: 0.5, pierce: 0.4 }, mail: ['armpit', 'groin'], closed: ['neck'] },
     // Blunt 0.75 (was 0.65): the thick reinforced breast over the quilted doublet spreads a blow; pierce 0.97 (was 0.95)
     // against a point; the helm by the same ratios (blunt 0.7 → 0.81, pierce 0.95 → 0.97).
     protection: {
@@ -765,6 +773,8 @@ export const OUTFITS = {
         Shank: { blunt: 0.45, cut: 0.95, pierce: 0.7 },
       },
     },
+    // Mail everywhere the great helm and the greaves leave: the hauberk, its coif and the chausses (a gap meets mail).
+    gaps: { mail: 'all' },
     courage: 0.55,
     designs: [
       templarDesign('Knight brother (white)', '#ece8dc', '#a2201e', null),
@@ -796,6 +806,8 @@ export const OUTFITS = {
         Shank: { blunt: 0.15, cut: 0.35, pierce: 0.2 },
       },
     },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between a brigandine's plates a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.25,
     designs: [
       footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { design: 'a', brim: 1.9 }),
@@ -825,6 +837,8 @@ export const OUTFITS = {
     extraMass: 0.22,
     // Blunt 0.65 (was 0.7): laced lamellae give with a blow more than a solid shell.
     protection: { blunt: 0.65, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [
       { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743', panel: true, leather: '#5a3a22', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
@@ -873,7 +887,9 @@ export const OUTFITS = {
         Shank: { blunt: 0.37, cut: 0.75, pierce: 0.4 },
       },
     },
-    gaps: { thrust: 0.35, swing: 0.12 },
+    // More openings than later armour: a quarter more chance in a gap (BLADES.gaps), and the laced box parts at its lacing
+    // and the waidate's seam more than most laced armour (`lacing`).
+    gaps: { thrust: 0.5, swing: 0.15, lacing: 0.15 },
     courage: 0.45,
     designs: [
       oyoroiDesign('Scarlet laced (aka-ito)', { lacquer: '#16141a', lace: '#c0281e', gold: '#d6a743', leather: '#5a4430', stencil: '#d8c08a', robe: '#b83a1c', hakama: '#8e2a16', crest: 'kuwagataTall' }),
@@ -901,6 +917,10 @@ export const OUTFITS = {
     extraMass: 0.25,
     // Blunt 0.7 (was 0.75): Japanese armour, lacquered lames and laced sleeves, takes a blow a little less than a European shell.
     protection: { blunt: 0.7, cut: 0.95, pierce: 0.7, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
+    // Under its gaps, kusari (mail) where the later armour has it: the wakibiki under the arms, the kote's mail sleeves at
+    // the bend of the elbow, the haidate's mail over the groin and thighs, the yodarekake and nodowa at the throat
+    // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). The cuirass is solid lames.
+    gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'] },
     courage: 0.4,
     designs: [
       toseiDesign('Iron', '#3b3e44', '#1d2a4f', 'crescent', 'black', '#1c1d26'),
@@ -1116,6 +1136,8 @@ export const OUTFITS = {
     // Cut 0.8 and blunt 0.63 (were 0.7 and 0.6; under the elite's 0.65): plates riveted inside a padded coat turn an edge and spread a blow; pierce
     // 0.47 (was 0.5): a point finds the rivet lines. The same over the head and the bracered limbs (uniform).
     protection: { blunt: 0.63, cut: 0.8, pierce: 0.47, bullet: { head: 0.3, torso: 0.5, limb: 0 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.2,
     designs: [
       mingBrigandineDesign('Red', '#9a1f1a', '#8f949b', {}, { design: 'yongBell', finish: 'red' }),
@@ -1145,6 +1167,9 @@ export const OUTFITS = {
     extraMass: 0.25,
     // Pierce 0.75 (was 0.8): a point finds the plates' seams in the coat more than in a solid shell.
     protection: { blunt: 0.65, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the brigandine coat's plates a little anywhere but the solid plates.
+    // (No mail under its gaps: a Ming elite's voiders are not documented as the European ones are; the coat's padding.)
+    gaps: { lacing: 0.1 },
     courage: 0.35,
     designs: [
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
@@ -1177,6 +1202,8 @@ export const OUTFITS = {
     extraMass: 0.33,
     // Pierce 0.75 (was 0.8): a point finds the lacing between the lamellae.
     protection: { blunt: 0.66, cut: 0.95, pierce: 0.85, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [
       // Lamellar of dotted iron plates over a red robe, brown riding boots; the helmet a tall bowl with a plume or a horsehair tassel.
@@ -1229,6 +1256,8 @@ export const OUTFITS = {
     // plates more than through a one-piece bowl. The face is open.
     // Pierce 0.58 (was 0.62): a point finds the lacing; the helmet by the same ratio (0.5 → 0.47).
     protection: { blunt: 0.4, cut: 0.82, pierce: 0.58, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.47 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.3,
     designs: [
       { label: 'Red robe, iron lamellar', top: { kind: 'longsleeve', color: '#8a2a20' }, bottom: { kind: 'pants', color: '#2a2420' }, armor: { kind: 'hanLamellar', color: '#5d6066', cloth: '#8a2a20', cloth2: '#5a1a14', lace: '#3a2a20' }, head: { kind: 'hanHelm', color: '#5d6066', lace: '#3a2a20' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
@@ -1249,6 +1278,8 @@ export const OUTFITS = {
     extraMass: 0.1,
     // Pierce 0.58 (was 0.62): a point finds the lacing; the helmet by the same ratio (0.5 → 0.47).
     protection: { blunt: 0.4, cut: 0.82, pierce: 0.58, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.47 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.3,
     designs: [
       { label: 'Red robe, iron lamellar', top: { kind: 'longsleeve', color: '#8a2a20' }, bottom: { kind: 'pants', color: '#2a2420' }, armor: { kind: 'hanLamellar', color: '#5d6066', cloth: '#8a2a20', cloth2: '#5a1a14', lace: '#3a2a20' }, head: { kind: 'hanHelm', color: '#5d6066', lace: '#3a2a20' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
@@ -1383,6 +1414,8 @@ export const OUTFITS = {
     extraMass: 0.176,
     // Pierce 0.7 (was 0.72): a point finds the lacing between the lamellae; still heavy enough that a lance breaks on it (weapons.js `shatters`).
     protection: { blunt: 0.5, cut: 0.88, pierce: 0.7, bullet: { head: 0.3, torso: 0.35, limb: 0.15 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.3,
     designs: [
       steppeDesign('Iron, maroon deel', { kind: 'mongolIron', color: '#7d8088', lace: '#2a1a12', fur: '#7a5634' }, '#6a1f2a', '#c41e22', { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', tassel: '#b3161b' }),
@@ -1406,6 +1439,8 @@ export const OUTFITS = {
     extraMass: 0.21,
     // Blunt 0.65 (was 0.55): iron scale on a padded coat over the thick deel spreads a blow.
     protection: { blunt: 0.65, cut: 0.92, pierce: 0.8, bullet: { head: 0.4, torso: 0.4, limb: 0.2 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the scales a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [
       steppeDesign('Gilt scale, black deel', { kind: 'kheshig', color: '#8f949b', lace: '#1c1a18' }, '#1c1a18', '#d6a743', { kind: 'steppeHelm', color: '#8f949b', coif: '#6a6d73', plume: '#1c1a18', mask: true, maskDesign: 'kipchak', gold: '#d6a743' }),
@@ -1584,6 +1619,9 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.4): iron scale and laminated limbs: ~18 kg on an 80 kg man (real ~20–30 kg).
     extraMass: 0.22,
     protection: { blunt: 0.55, cut: 0.94, pierce: 0.82, bullet: { head: 0.4, torso: 0.4, limb: 0.3 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the scales a little anywhere but the solid plates.
+    // The mail hood over the face and neck: behind the helmet's sights and at the throat, mail.
+    gaps: { lacing: 0.1, mail: ['visor', 'neck'] },
     courage: 0.55,
     designs: [
       { label: 'Iron scale, red tunic', top: { kind: 'longsleeve', color: '#7a1e1e' }, bottom: { kind: 'pants', color: '#4a2a22' }, armor: { kind: 'cataphract', color: '#7d8088', lace: '#2a1a12', cloth: '#7a1e1e' }, head: { kind: 'steppeHelm', color: '#7d8088', coif: '#5a5d63', mask: true, plume: '#b3161b' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
@@ -1655,6 +1693,8 @@ export const OUTFITS = {
     // Mail-and-plate: cut 0.95 (was 0.92), the rings and plates proof against most edges; pierce 0.5 (was 0.75), a point
     // parts the rings between the plates; blunt 0.42 (was 0.5), the mail moves with a blow. The chichak (uniform) the same.
     protection: { blunt: 0.42, cut: 0.98, pierce: 0.5, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
+    // Mail-and-plate (krug): between the plates and wherever they part, the mail they are set in.
+    gaps: { mail: 'all' },
     courage: 0.3,
     designs: [
       { label: 'Steel, red kaftan', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#3a1012' }, armor: { kind: 'krug', color: '#a7adb6' }, head: { kind: 'chichak', design: 'turban', color: '#a7adb6', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
@@ -1678,6 +1718,8 @@ export const OUTFITS = {
     // A mail hauberk: cut 0.9 (was 0.85), pierce 0.45 (was 0.5), blunt 0.38 (was 0.45): mail turns an edge, parts to a point,
     // moves with a blow. The helmet (uniform) the same.
     protection: { blunt: 0.38, cut: 0.9, pierce: 0.45, bullet: { head: 0.3, torso: 0.25, limb: 0.2 } },
+    // A mail hauberk and aventail: a gap meets mail.
+    gaps: { mail: 'all' },
     courage: 0.35,
     designs: [
       { label: 'Mail, green coat', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#3a2a22' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#ece4d0' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
@@ -1722,6 +1764,8 @@ export const OUTFITS = {
         Shank: { blunt: 0.09, cut: 0.37, pierce: 0.15 },
       },
     },
+    // Two layers of mail and the aventail: a gap meets mail (the face is open).
+    gaps: { mail: 'all' },
     courage: 0.4,
     designs: [
       // Saladin's own colour: the yellow of the Ayyubid banners.
@@ -1786,6 +1830,9 @@ export const OUTFITS = {
         Shank: { blunt: 0.1, cut: 0.25, pierce: 0.1 },
       },
     },
+    // Mail under the breastplate's gaps where the kit has it: the mail sleeves at the armpits and the elbows, the mail collar
+    // at the throat (as its description: the breeches at the groin are cloth).
+    gaps: { mail: ['armpit', 'elbow', 'neck'] },
     courage: 0.35,
     designs: [
       conquistadorDesign('Black doublet', '#1c1c20', '#3a2a22', 'morion'),
@@ -2200,7 +2247,7 @@ export const OUTFITS = {
     faction: 'machines', bulletRating: 500, machine: true,
     label: 'Humanoid robot', movement: 'good', fists: 'gloved-tactical', courage: 1,
     breastplate: 0.6,
-    helmet: { mass: 0.8, padding: 0.25, curve: 0.8 },
+    helmet: { mass: 0.8, padding: 0.25, curve: 0.8, face: 'sealed' },
     deflects: true,
     // Robots: very nearly proof against a point (a thrust skids off or stops in the shell, no flesh behind it), good
     // against an edge: the trunk cut 0.8 and pierce 0.85 (were 0.7 and 0.5); head and limbs by the same ratios.
@@ -2234,7 +2281,7 @@ export const OUTFITS = {
     extraMass: 37 / 115, carriedShare: 15 / 115, balance: 1.5,
     mounted: { r: 'armRifle', l: 'armShotgun' },
     breastplate: 0.8,
-    helmet: { mass: 2.5, padding: 0.55, curve: 0.85 },
+    helmet: { mass: 2.5, padding: 0.55, curve: 0.85, face: 'sealed' },
     cutProof: true,
     protection: {
       // Pierce 0.97 (was 0.9), robots very nearly proof against a point; the limbs by the same ratio (0.85 → 0.92).
@@ -2257,7 +2304,7 @@ export const OUTFITS = {
     faction: 'machines', bulletRating: 300, machine: true,
     label: 'Mini humanoid robot', movement: 'excellent', fists: 'gloved-tactical', courage: 1,
     breastplate: 0.5,
-    helmet: { mass: 0.5, padding: 0.2, curve: 0.85 },
+    helmet: { mass: 0.5, padding: 0.2, curve: 0.85, face: 'sealed' },
     deflects: true,
     // Robots: very nearly proof against a point, good against an edge: the trunk cut 0.7 and pierce 0.8 (were 0.6 and
     // 0.4; thinner shells than the H-1's); head and limbs by the same ratios.
@@ -2442,23 +2489,27 @@ function wornHelm(inputs) {
  */
 export const HELMETS = {
   // Boxing headgear: foam, light, thick.
+  // `face`: how the face is kept (physics/gaps.js, BLADES.gaps.zones): 'closed' behind a visor, a grille or a mask, a point
+  // finding only the sights; 'sealed' behind a whole clear visor; else open (the face itself a gap in the helmet). A mask
+  // worn with an open helmet (`mask` on its look: a menpo, a Ming or a Kipchak face) closes it.
   headguard: { mass: 0.45, padding: 0.9, curve: 0.3 },
   // Modern: a riot helmet (thick liner, smooth shell); a combat helmet (pads, rounded aramid shell).
-  riotHelmet: { mass: 1.5, padding: 0.85, curve: 0.75 },
+  riotHelmet: { mass: 1.5, padding: 0.85, curve: 0.75, face: 'sealed' },
   // A firefighter's helmet (~1.4 kg, its suspension and liner) under the aluminized hood.
-  proximityHood: { mass: 1.9, padding: 0.8, curve: 0.6 },
+  proximityHood: { mass: 1.9, padding: 0.8, curve: 0.6, face: 'sealed' },
   opsHelmet: { mass: 1.4, padding: 0.85, curve: 0.85 },
   // The great helm (2–3 kg) over a mail coif and a padded arming cap: the best padded of all; flat sides, a low crown.
-  greatHelm: { mass: 2.6, padding: 0.85, curve: 0.35 },
-  // The bascinet: a pointed globular bowl on a padded lining and a mail aventail.
-  bascinet: { mass: 2.3, padding: 0.65, curve: 0.85 },
+  greatHelm: { mass: 2.6, padding: 0.85, curve: 0.35, face: 'closed' },
+  // The bascinet: a pointed globular bowl on a padded lining and a mail aventail (in play visored: the hounskull, the sallet
+  // and its bevor, the close helmet: all closed but for the sights).
+  bascinet: { mass: 2.3, padding: 0.65, curve: 0.85, face: 'closed' },
   // A kabuto: a riveted bowl (2.5–3 kg with its neck guard) on a cloth lining and a hachimaki.
   kabuto: { mass: 2.8, padding: 0.55, curve: 0.7 },
   jingasa: { mass: 1.0, padding: 0.3, curve: 0.85 },
   // Gladiators' helmets were heavy (3–4 kg, Pompeii finds), brimmed and grilled; the secutor's smooth egg made to turn the trident.
-  arenaHelm: { mass: 3.0, padding: 0.5, curve: 0.55 },
-  gladiatorHelm: { mass: 3.0, padding: 0.5, curve: 0.55 },
-  secutorHelm: { mass: 3.2, padding: 0.5, curve: 0.95 },
+  arenaHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed' },
+  gladiatorHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed' },
+  secutorHelm: { mass: 3.2, padding: 0.5, curve: 0.95, face: 'closed' },
   galea: { mass: 1.6, padding: 0.4, curve: 0.7 },
   // Sixteenth-century infantry: the combed morion, the almond cabasset, the pot helmet, the kettle hat.
   morion: { mass: 2.0, padding: 0.4, curve: 0.75 },
@@ -2469,9 +2520,10 @@ export const HELMETS = {
   // Vienna and Nuremberg examples run 8–10 kg) standing well off the head on
   // a thick padded cap laced into it; its smooth, sweeping planes turn a
   // point aside.
-  stechhelm: { mass: 9, padding: 0.95, curve: 0.8 },
+  stechhelm: { mass: 9, padding: 0.95, curve: 0.8, face: 'closed' },
   // The Iron Pagoda: a tall bowl and its rolled lamellar aventail (~4 kg together) over a padded cap.
-  pagodaHelm: { mass: 4.0, padding: 0.6, curve: 0.8 },
+  // (Its aventail rolled up round the face, only the eyes showing: closed.)
+  pagodaHelm: { mass: 4.0, padding: 0.6, curve: 0.8, face: 'closed' },
   // Steppe and Ottoman pointed bowls (the chichak with its brim and nasal).
   steppeHelm: { mass: 1.8, padding: 0.45, curve: 0.85 },
   chichak: { mass: 2.0, padding: 0.45, curve: 0.85 },
@@ -2507,6 +2559,15 @@ export const HELMETS = {
   feltHat: { mass: 0.15, padding: 0.1, curve: 0 },
 };
 const NO_HELMET = { mass: 0, padding: 0, curve: 0 };
+
+/** How his helmet keeps his face (HELMETS `face`): 'closed', 'sealed' or 'open'; 'bare' with nothing on his head. A mask closes an open helmet. */
+function helmFaceOf(inputs, spec, look) {
+  if (inputs.outfit?.bareHead) return 'bare';
+  const helm = (wornHelm(inputs) ? null : spec.helmet) ?? HELMETS[look.head?.kind];
+  if (!helm) return 'bare';
+  if (helm.face) return helm.face;
+  return look.head?.mask ? 'closed' : 'open';
+}
 
 /** A kit's protection with nothing over the head (its helm off): a bare head takes a blow, a cut and a ball as skin does. */
 function bareHeaded(protection) {
@@ -2557,7 +2618,8 @@ export function gearTraits(inputs) {
     fireproof: spec.fireproof ?? null,
     // How far off his facing he sees (rad), where the kit narrows it (a hood's visor), unless his head is locked (headLocked's slit).
     sight: inputs.outfit?.bareHead ? null : spec.sight ?? null,
-    // How often a blade finds a gap in the rigid armour (BLADES.gaps), when the kit has more (or fewer) than most.
+    // The kit's own say of the gaps in its rigid armour (BLADES.gaps): their chances, what is under them (`under`, `mail`), its
+    // `lacing`, the zones it has none of (`closed`).
     gaps: spec.gaps ?? null,
     // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
     headBulk: spec.headBulk ?? 1,
@@ -2565,6 +2627,8 @@ export function gearTraits(inputs) {
     helmet: inputs.outfit?.bareHead ? NO_HELMET : (wornHelm(inputs) ? null : spec.helmet) ?? HELMETS[look.head?.kind] ?? NO_HELMET,
     // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
     breastplate: spec.breastplate ?? 0,
+    // How the helmet keeps the face (HELMETS `face`; a mask closes an open one): 'closed', 'sealed', 'open'; 'bare' with none.
+    helmFace: helmFaceOf(inputs, spec, look),
     // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.
     sidearm: inputs.sidearm ?? spec.sidearm ?? null,
     // A hand grenade carried with this kit (weapons.js THROWABLES: 'frag', 'flashbang'), thrown once (physics/throwable.js); a man's own (`inputs.throwable`, null for none) before the kit's.

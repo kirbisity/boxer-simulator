@@ -1191,15 +1191,58 @@ export function shieldContact(a, b, shield, radius) {
 export const BLADES = {
   // Armour this proof against cuts chips a brittle (obsidian) edge.
   chipsOn: 0.6,
-  // Rigid armour (proof against cuts from `rigidFrom`) has gaps: the
-  // armpits, the inside of the elbow, the groin, the visor's slit, the
-  // lacing between lamellae. A blow finds one this often (a point far more
-  // than an edge; × the striker's technique), and meets there only what is
-  // under it (`under`: the arming doublet, a mail voider), and does not
-  // glance. Fighting in armour was largely the art of finding them.
-  // A gap is about a hand's breadth (`size`, m): a heavy point that wanders
-  // (a lance carried at a run) is put into one the less, by size / (size + its wander).
-  gaps: { rigidFrom: 0.75, thrust: 0.25, swing: 0.06, size: 0.05, under: { blunt: 0.25, cut: 0.3, pierce: 0.2 } },
+  // Rigid armour (proof against cuts from `rigidFrom`) has gaps, and only
+  // where they really are (`zones`, physics/gaps.js gapZoneAt): the armpits,
+  // the groin under the fauld, the inside of the elbow, the back of the knee,
+  // the throat between helmet and gorget, the sights of a closed helmet (or
+  // the face of an open one). The middle of the breastplate, the back plate
+  // and the crown of the helmet never have one. A blow that lands in a zone
+  // finds the opening this often (`thrust`, `swing`: a point far more than
+  // an edge; × the striker's technique and (0.5 + skill)), and meets there
+  // only what is under it (`under`: the arming doublet; `mail` where the kit
+  // has voiders, a standard or a mail skirt there; the bare face behind the
+  // sights), and does not glance. Fighting in armour was largely the art of
+  // finding them. Laced armour (lamellar, scale, brigandine) also parts at
+  // its lacing a little anywhere but the solid plates: a kit's `lacing`, a
+  // share of `thrust`. A gap is about a hand's breadth (`size`, m): a heavy
+  // point that wanders (a lance carried at a run) is put into one the less,
+  // by size / (size + its wander).
+  gaps: {
+    rigidFrom: 0.75, thrust: 0.4, swing: 0.1, size: 0.05, lacing: 0,
+    under: { blunt: 0.25, cut: 0.3, pierce: 0.2 },
+    // What else may be under a gap (a kit's `mail`: the zones, or 'all', where it has mail under them; a zone's `under`):
+    // riveted mail over the arming doublet (voiders, gussets, a standard, a mail skirt), which turns an edge and a point
+    // less (as the kits' own mail: Templar 0.88/0.5, gazi hauberk 0.9/0.45); bare skin.
+    layers: { mail: { blunt: 0.3, cut: 0.85, pierce: 0.55 }, bare: { blunt: 0, cut: 0, pierce: 0 } },
+    // A zone counts as one when the normal of the struck surface faces this far (cosine) towards where it opens (`faces`).
+    facing: 0.3,
+    // Each zone on the parts it lies on, measured on the man's own body: on the trunk, `height` the share of the way from
+    // his hips to his neck and `round` the degrees round from the front of his chest (to either side; 180 his back), `cap`
+    // how far up its top end the surface faces (the collar); on the head, `rise` how far up the face of the helmet faces
+    // (the sine: -1 under the chin, 1 the crown) and `round` as the trunk's; on a limb, `along` the share of the way out
+    // from the root joint, and `faces` the side: the trunk's (the inside of the arm), the other leg's (the inside of the
+    // thigh), or the inside of the joint's bend (`crease`: the elbow's front, the knee's back). `edge`: an edge can find it
+    // too (not the sights, a slit a point is put into); `helm`: only behind a helmet of that face (outfits.js HELMETS
+    // `face`: a closed helm's sights, an open helmet's face); `under`: what is behind it whatever the kit. A part may have
+    // more than one shape of a zone (a list).
+    zones: {
+      // (Behind the arm too, high, where the pauldron and the back plate part.)
+      armpit: { trunk: [{ height: [0.6, 0.92], round: [50, 125] }, { height: [0.7, 0.92], round: [125, 140] }], UpperArm: { along: [0, 0.3], faces: 'trunk' }, edge: true },
+      groin: { trunk: { height: [-1, 0.08], round: [0, 75] }, Thigh: { along: [0, 0.25], faces: 'inside' }, edge: true },
+      // (Under the chin, and behind, the nape under the helmet's tail, where the aventail or the standard is.)
+      neck: { trunk: { cap: 0.6 }, head: [{ rise: [-1, -0.5], round: [0, 180] }, { rise: [-1, -0.3], round: [120, 180] }], edge: true },
+      elbow: { UpperArm: { along: [0.8, 1], faces: 'crease' }, Forearm: { along: [0, 0.2], faces: 'crease' }, edge: true },
+      knee: { Thigh: { along: [0.8, 1], faces: 'crease' }, Shank: { along: [0, 0.2], faces: 'crease' }, edge: true },
+      visor: { head: { rise: [-0.05, 0.4], round: [0, 35] }, helm: 'closed', under: 'bare' },
+      face: { head: { rise: [-0.5, 0.35], round: [0, 55] }, helm: 'open', under: 'bare', edge: true },
+    },
+    // For a man weighing his blows (ai.js harmThrough): the share of the points that land on a part aimed at that falls in
+    // one of its zones (measured, tools/gaps.js: on the trunk 12%, the head 33% behind a closed helm (the throat, the
+    // sights), 55% behind an open one (its face, the throat); a limb's joints a guess).
+    aimed: { trunk: 0.12, limb: 0.1, head: { closed: 0.33, open: 0.55, sealed: 0.2, bare: 0 } },
+    // Never a gap, not even at the lacing: the middle of the breast, the back, the crown.
+    solid: { trunk: [{ height: [0.08, 1.1], round: [0, 50] }, { height: [-1, 1.1], round: [125, 180] }], head: [{ rise: [0.4, 1], round: [0, 180] }] },
+  },
   // A point meets plate square enough to bite only within ~35 degrees of
   // square (the cosine, 0.82); further round the curve of a breastplate or
   // helm it skids off and goes in nowhere, as arrows and spear points were

@@ -8,11 +8,12 @@ import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
-import { BLADES, WEAPONS } from './weapons.js';
+import { WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { startThrow, throwChoice } from './physics/throwable.js';
 import { heldOffAt } from './physics/brush.js';
+import { expectedGap, gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
@@ -73,10 +74,11 @@ export const AI = {
   // it at) is weighted by the share of its harm that gets through that man's kit there (harmThrough: its cut/pierce/blunt
   // against the protection, a point's chance of a gap in rigid armour) raised to `power` × his sense: none below `from`
   // (WORLD.guardRead's untrained: he swings as drilled), all of it from `full` (an elite: OUTFITS' tiers). On a knight a
-  // longsword's cut lets ~0.13 of itself through (the edge glances, the blow is spread), its thrust ~0.3 (the gaps: the
-  // armpit, the visor), so to an elite each cut weighs ~1/12 of what his style gives it and ~0.83 of his choices are the
-  // thrust, as the Fechtbücher taught in harness; on an unarmoured man every move gets through alike and he fights as his
-  // style says. A combination is tried as often as its moves are worth it (the mean of their weights against the best).
+  // longsword's cut lets ~0.13 of itself through (the edge glances, the blow is spread), its thrust at the body ~0.10 and at
+  // the head ~0.13 (the gaps only where they are: a point aimed at the breast meets the breastplate, one at the head
+  // sometimes the sights or the throat; physics/gaps.js), so against plate he no longer weights the thrust over the cut;
+  // on an unarmoured man every move gets through alike and he fights as his style says. A combination is tried as often
+  // as its moves are worth it (the mean of their weights against the best).
   armourSense: { from: 0.3, full: 0.7, power: 3 },
   // Seconds between attacks; pros throw ~40–60 strikes a round, in bursts.
   restMin: 0.9,
@@ -3199,7 +3201,8 @@ export function armourSense(fighter) {
  * the move's mode (a blow with no weapon: all blunt) against the protection
  * there, the blunt of a heavy head driven through (`crush`), and an edge or
  * point put into a gap in rigid armour as often as this man finds one
- * (BLADES.gaps × his technique and skill), meeting only what is under it.
+ * (physics/gaps.js expectedGap: as often as such blows land where there is
+ * one, × his technique and skill), meeting only what is under it.
  */
 export function harmThrough(attacker, defender, spec, zone = 'body') {
   const gear = defender.body?.gear;
@@ -3211,13 +3214,14 @@ export function harmThrough(attacker, defender, spec, zone = 'body') {
   const [blunt, cut, pierce] = [table.blunt ?? 0, table.cut ?? 0, table.pierce ?? 0];
   const total = blunt + cut + pierce;
   if (total <= 0) return 1;
-  const covered = protectionAt(gear, ZONE_PART[zone] ?? 'trunk');
-  const gaps = gear.gaps ? { ...BLADES.gaps, ...gear.gaps } : BLADES.gaps;
-  const rigid = (covered.cut ?? 0) >= gaps.rigidFrom && cut + pierce > 0.2;
-  const found = rigid ? Math.min(1, (spec.mode === 'thrust' ? gaps.thrust : gear.cutProof ? 0 : gaps.swing) * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5))) : 0;
+  const part = ZONE_PART[zone] ?? 'trunk';
+  const covered = protectionAt(gear, part);
+  const rigid = (covered.cut ?? 0) >= gapsOf(gear).rigidFrom && cut + pierce > 0.2;
+  const gap = rigid ? expectedGap(gear, part, spec.mode, covered) : { found: 0, under: covered };
+  const found = Math.min(1, gap.found * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5)));
   const edge = (on) => cut * (1 - (on.cut ?? 0)) + pierce * (1 - (on.pierce ?? 0));
   const felt = blunt * (1 - (covered.blunt ?? 0) * (1 - (wspec?.crush ?? 0)));
-  return (felt + (1 - found) * edge(covered) + found * edge(gaps.under)) / total;
+  return (felt + (1 - found) * edge(covered) + found * edge(gap.under)) / total;
 }
 
 /**
