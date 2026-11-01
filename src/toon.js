@@ -73,6 +73,33 @@ export function outlineFor(mesh, width = STYLE.outlineWidth) {
   return outline;
 }
 
+/**
+ * Worn things drawn from both sides: armour, helmets, shields and barding are thin open shells (a pauldron's loft, a helmet's
+ * bowl, a brim), and a camera inside or behind one would otherwise see straight through it. Every mesh under `root` (or the one
+ * material given) drawn front-side only is made double-sided; its shadow keeps being drawn from its back faces (`shadowSide`
+ * BackSide, as a front-side material's is), so the shadows and their acne are as they were. The inside faces are lit with
+ * their normals flipped (three's faceDirection), so they read darker. Outlines (inverted hulls, back faces only) and anything
+ * already double- or back-sided are left as they are. Returns `root`.
+ */
+export function doubleSided(root) {
+  if (!root) return root;
+  const fix = (material) => {
+    if (!material || material.side !== THREE.FrontSide) return;
+    material.side = THREE.DoubleSide;
+    material.shadowSide = THREE.BackSide;
+    material.needsUpdate = true;
+  };
+  if (root.isMaterial) {
+    fix(root);
+    return root;
+  }
+  root.traverse((object) => {
+    if (!object.isMesh || object.userData.outline) return;
+    for (const material of [].concat(object.material ?? [])) fix(material);
+  });
+  return root;
+}
+
 let hiddenOutlineMaterial = null;
 function hiddenOutline(mesh) {
   hiddenOutlineMaterial ??= new THREE.MeshBasicMaterial({ visible: false });

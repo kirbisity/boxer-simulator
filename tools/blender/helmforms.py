@@ -30,7 +30,7 @@ from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from helmsheets import (  # noqa: E402
-    HOLE, Atlas, add_rivets, bead, cap, dolphin, draw_mask, emboss, gorgon, hammered, hercules, laurel, palm, smooth,
+    GILT, HOLE, Atlas, add_rivets, bead, cap, dolphin, draw_mask, emboss, gorgon, hammered, hercules, laurel, palm, smooth,
     stamp, trophy, victory,
 )
 
@@ -273,7 +273,10 @@ def closed(kind, style):
 #                    lining's rivets round the skull, the keel, the tail's edge turned; the bevor's edges turned, a ridge
 #                    down its middle, its strap's rivets at the sides.
 #   barbute          (Met 60.151, 25.188.20) the T opening in a turned edge, the lining's rivets round the foot and round the
-#                    opening, the ridge's line from brow to nape, the foot's edge turned.
+#                    opening, the ridge's line from brow to nape, the foot's edge turned. (Studied, not drawn by the game.)
+#   cabassetSpanish  (Royal Collection RCIN 67296; Met 14.25.533, 14.25.1851, 27.159.12, 14.25.532; Cleveland 2012.39) the
+#                    conquistador's: etched bands of foliage on a blackened ground up the skull, a band round its foot with
+#                    the lining's brass-capped rivets, the brim's edge turned and roped.
 
 IRON = np.array([0.9, 0.9, 0.92])
 
@@ -409,7 +412,73 @@ def euro_barbute(kind, style):
     return atlas
 
 
-EURO = {'kettle': euro_kettle, 'sallet': euro_sallet, 'barbute': euro_barbute}
+def etched_band(reg, s, centre, half, seed):
+    """An etched band down the skull at `centre` (a share of the way round, 0 the face, 1 the back): scrolling foliage left
+    bright on a sunk, stippled, blackened ground between two border lines (the Royal Collection's Spanish morions, RCIN 67296
+    and 67373; the Met's 14.25.629). `half`: its half-width (r) at the foot; it narrows towards the point as the bands do."""
+    end = np.maximum(s['SU_END'], 1e-3)
+    width = half * np.clip(end / float(end.max()), 0.35, 1.0)
+    dx = (s['SU'] / end - centre) * end
+    band = np.abs(dx) < width
+    phase = s['SV'] / 0.32
+    vine_x = width * 0.45 * np.sin(2 * np.pi * phase)
+    vine = np.abs(dx - vine_x) < 0.016
+    leaves = np.zeros(dx.shape, bool)
+    for k in range(-2, 12):
+        ly = (k + 0.25) * 0.16
+        side = 1 if k % 2 else -1
+        lx = width * 0.45 * np.sin(2 * np.pi * ly / 0.32) + side * width * 0.42
+        ang = side * 0.6
+        du, dv = dx - lx, s['SV'] - ly
+        u = du * np.cos(ang) + dv * np.sin(ang)
+        v = -du * np.sin(ang) + dv * np.cos(ang)
+        leaves |= (u / (width * 0.42)) ** 2 + (v / 0.03) ** 2 < 1
+        leaves |= np.hypot(du + side * width * 0.3, dv - 0.05) < 0.016
+    borders = np.abs(np.abs(dx) - width * 0.9) < 0.008
+    bright = vine | leaves | borders
+    ground = (band & ~bright).astype(np.float32)
+    rng = np.random.default_rng(seed)
+    stipple = reg.blur(rng.standard_normal(dx.shape).astype(np.float32), 0.004)
+    ground_soft = reg.blur(ground, 0.003)
+    reg.add(-ground_soft * 0.006 + stipple * ground_soft * 0.0015)
+    reg.paint(ground_soft, rgb=(0.16, 0.15, 0.14), rough=0.62, metal=0.55)
+
+
+def euro_cabasset(kind, style):
+    """The Spanish cabasset (src/helmforms.js DESIGN_FORMS.cabassetSpanish): raised in one piece and polished, four etched bands
+    from the foot to the stalk (front, sides and back), a band etched round the skull's foot, the lining's brass-capped
+    rosette rivets round it (sixteen to eighteen on the Royal Collection's RCIN 67296), the brim's edge turned and roped."""
+    atlas = Atlas(kind['sheet'], base=IRON, rough=0.3, n=N)
+    bowl = region(atlas, kind, 'bowl')
+    s = bowl.s
+    iron(bowl, 41)
+    end = float(s['SU_END'].max())
+    for k, centre in enumerate((0.0, 0.5, 1.0)):
+        etched_band(bowl, s, centre, 0.13, 41 + k)
+    # The band round the foot of the skull, and the lining's rivets standing in it, brass-capped (17 round: 8.5 a side).
+    foot = (np.abs(s['SV'] - 0.12) < 0.07).astype(np.float32)
+    bowl.paint(bowl.blur(foot, 0.004) * 0.85, rgb=(0.14, 0.13, 0.12), rough=0.6, metal=0.55)
+    for y in (0.045, 0.195):
+        bowl.add(bead(np.abs(s['SV'] - y), 0.012) * 0.006)
+        bowl.paint(smooth(1 - np.abs(s['SV'] - y) / 0.01), rgb=IRON, rough=0.25, metal=1.0)
+    rivets = add_rivets(bowl, s['SU'], s['SV'], [(su, 0.12) for su in along(end, end / 8.5)], 0.04, 0.026)
+    bowl.paint(smooth(rivets / 0.004), rgb=GILT, rough=0.3, metal=1.0)
+    # The brim: its edge turned under and roped (a twist every 25 mm), a file line inside it.
+    brim = region(atlas, kind, 'brim')
+    s = brim.s
+    iron(brim, 42)
+    edge = s['SV_END'] - s['SV']
+    rolled(brim, edge, 0.05, 0.03)
+    rope = 0.5 + 0.5 * np.sin(2 * np.pi * (s['SU'] / 0.22 + edge / 0.05))
+    brim.add(cap(edge, 0.05) * rope * 0.008)
+    brim.add(-bead(np.abs(edge - 0.08), 0.006) * 0.004)
+    brim.add(bead(np.abs(s['SV'] - 0.015), 0.02) * 0.008)
+    comb = region(atlas, kind, 'comb')
+    iron(comb, 43)
+    return atlas
+
+
+EURO = {'kettle': euro_kettle, 'sallet': euro_sallet, 'barbute': euro_barbute, 'cabasset': euro_cabasset}
 
 
 def main():

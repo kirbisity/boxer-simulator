@@ -42,7 +42,7 @@ import { updateNets } from './arenaview.js';
 import { blastEvent, createBlastScreen, fragmentEvent, updateThrown } from './blastview.js';
 import { DETAIL_MAPS } from './detailmaps.js';
 import { setHelmStyle } from './helmstyle.js';
-import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, SKIN_TONES, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { placeMounted } from './physics/mounted.js';
 import { boltedOn, breedOf, canRide, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
@@ -76,7 +76,9 @@ import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/sta
 import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
-import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
+import { loadPhotoFaces, photoFaceRegions, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
+import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
+import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
 
@@ -1976,7 +1978,6 @@ const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a
 // The compact grid: the fighting style first, then the look.
 const LOOK_FIELDS = [
   { key: 'style', label: 'Style', options: CUSTOM_STYLE_KEYS, names: Object.fromEntries(CUSTOM_STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
-  { key: 'skinTone', label: 'Skin', options: Object.keys(SKIN_TONES), names: { porcelain: 'porcelain', light: 'light', lightTan: 'light tan', medium: 'medium', tan: 'tan', deep: 'deep' } },
   { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long', long: 'long', ringletPigtails: 'ringlet pigtails', ringlets: 'ringlets', ringletUpdo: 'ringlet updo', hime: 'hime cut (waist length)' } },
   { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
   { key: 'facialHair', label: 'Face', options: LOOK_OPTIONS.facialHair },
@@ -2104,6 +2105,8 @@ function buildCornerForm(corner) {
     row.append(select);
     return row;
   }));
+  // Where he is from and his skin, after his style: the character creator's choices (menu.js), in the grid's own rows.
+  looks.children[0].after(originRow(corner), skinRow(corner));
   // Gear: only shown for a fighter in street clothes.
   const outfit = document.createElement('div');
   outfit.className = 'looks outfit';
@@ -2163,6 +2166,76 @@ function buildCornerForm(corner) {
   fillCornerForm(corner);
 }
 
+// ---- Origin and skin in the builder form (faceregions.js) ----------------------------------------------------
+// As in the character creator: the photo faces of his sex by continent, or "from the kit" (no `look.faceRegion`: cast as his kit's
+// men are); choosing one resets his skin to its tone. The Skin slider moves his shade (skintones.js) within his origin's range
+// (toneSpan), settling the origin shown if it was the kit's. With drawn faces (#faces=off) there is no origin: the whole ladder.
+const lookOfCorner = (corner) => (current(corner).look = { ...DEFAULT_LOOK, ...current(corner).look });
+/** The origin his kit gives him (shown as "from the kit"), among the faces of his sex. */
+const kitOrigin = (inputs, regions) => originOf({ ...inputs, faceRegion: undefined, look: { ...inputs.look, faceRegion: undefined } }, regions, outfitOf(inputs).faceRegion);
+function originRow(corner) {
+  const row = document.createElement('label');
+  row.className = 'look-field';
+  row.innerHTML = '<span>Origin</span>';
+  const select = document.createElement('select');
+  select.dataset.look = 'faceRegion';
+  select.addEventListener('change', () => {
+    const look = lookOfCorner(corner);
+    if (select.value) {
+      look.faceRegion = select.value;
+      setShade(look, toneShade(regionTone(select.value)));
+    } else {
+      delete look.faceRegion;
+      delete look.skinShade;
+    }
+    fillCornerForm(corner);
+  });
+  row.append(select);
+  return row;
+}
+function skinRow(corner) {
+  const row = document.createElement('label');
+  row.className = 'look-field';
+  row.innerHTML = '<span>Skin</span>';
+  const input = Object.assign(document.createElement('input'), { type: 'range', step: 0.05, className: 'tone' });
+  input.dataset.look = 'skinShade';
+  input.setAttribute('aria-label', 'Skin');
+  input.addEventListener('input', () => {
+    const inputs = current(corner);
+    const look = lookOfCorner(corner);
+    const regions = photoFaceRegions(inputs.sex);
+    if (regions && !look.faceRegion) look.faceRegion = kitOrigin(inputs, regions);
+    setShade(look, Number(input.value));
+    fillCornerForm(corner);
+  });
+  row.append(input);
+  return row;
+}
+function fillOriginRows(form, inputs) {
+  const regions = photoFaceRegions(inputs.sex);
+  inputs.look = settleOrigin({ ...DEFAULT_LOOK, ...inputs.look }, regions);
+  const select = form.querySelector('[data-look="faceRegion"]');
+  select.closest('label').hidden = !regions;
+  const own = [inputs.look.faceRegion ?? []].flat()[0] ?? null;
+  const kit = regions ? kitOrigin(inputs, regions) : null;
+  if (regions) {
+    select.replaceChildren(new Option(`From the kit: ${regionName(kit)}`, ''), ...REGION_ORIGINS.map((group) => {
+      const optgroup = Object.assign(document.createElement('optgroup'), { label: group.label });
+      optgroup.append(...Object.keys(group.regions).filter((region) => regions.includes(region)).map((region) => new Option(group.regions[region], region)));
+      return optgroup;
+    }).filter((optgroup) => optgroup.children.length));
+    select.value = own ?? '';
+  }
+  const origin = regions ? own ?? kit : null;
+  const [low, high] = toneSpan(origin);
+  const skin = form.querySelector('[data-look="skinShade"]');
+  Object.assign(skin, { min: low, max: high });
+  // His own shade once the origin is his, else (cast from his kit) the composite's, which is the origin's tone.
+  skin.value = !origin || own ? skinShadeOf(origin, inputs.look) : toneShade(regionTone(origin));
+  skin.style.setProperty('--tone-track', shadeGradient(low, high));
+  skin.title = shadeTone(Number(skin.value)).replace(/([A-Z])/g, ' $1').toLowerCase();
+}
+
 /** A select showing a value; one the list does not offer (the Forger's own style and kit) is added to it. */
 function showValue(select, value, names) {
   if (![...select.options].some((option) => option.value === value)) select.append(new Option(`${names?.[value] ?? OUTFITS[value]?.label ?? STYLES[value]?.label ?? value}`, value));
@@ -2211,6 +2284,7 @@ function fillCornerForm(corner) {
     input.value = inputs[field.key];
     input.nextElementSibling.textContent = field.format ? field.format(inputs[field.key]) : field.unit ? `${inputs[field.key]} ${field.unit}` : '';
   }
+  fillOriginRows(form, inputs);
   const look = { ...DEFAULT_LOOK, ...inputs.look };
   for (const field of LOOK_FIELDS) {
     const value = field.onInputs ? inputs[field.key] ?? 'boxing' : field.key === 'hairColor' ? look.hairNatural ?? look.hairColor : look[field.key];
@@ -3259,6 +3333,8 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
 
 // Photo faces (photoface.js; #faces=off for the drawn ones): the fighters are drawn again once the faces' manifest is in. The harness turns them on and off.
 const redrawWithPhotoFaces = (count) => {
+  // The builder forms offer the origins of the faces there are (fillOriginRows): filled before the manifest was in, again now.
+  if (count) for (const corner of ['red', 'blue', 'hero']) fillCornerForm(corner);
   if (!count || !state.world) return count;
   clearCrowdTemplates(scene);
   rebuildViews();
@@ -3266,7 +3342,7 @@ const redrawWithPhotoFaces = (count) => {
 };
 if (photoFacesOn()) loadPhotoFaces().then(redrawWithPhotoFaces);
 window.__photoFaces = {
-  set: (on) => setPhotoFaces(on).then(() => { clearCrowdTemplates(scene); return photoFacesOn(); }),
+  set: (on) => setPhotoFaces(on).then(() => { clearCrowdTemplates(scene); for (const corner of ['red', 'blue', 'hero']) fillCornerForm(corner); return photoFacesOn(); }),
   stats: photoFaceStats,
   // The faces' fill on their ambient light (photoface.js PHOTO_FACES.fill): for the next heads and the ones in the scene now.
   fill: (value) => setPhotoFill(value, scene.scene),

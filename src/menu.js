@@ -9,14 +9,14 @@ import { normaliseInputs, PRESETS } from './body.js';
 import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
 import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, outfitOf, PICKABLE_OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
-import { clampTone, nearestRegion, originOf, REGION_ORIGINS, regionName, regionTone, toneRange } from './faceregions.js';
+import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { photoFaceRegions } from './photoface.js';
 import { battleOf, SCENARIOS } from './scenarios.js';
 import { musterScreen } from './musterview.js';
 import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
 import { boltedOn, breedOf, canRide, mountOf } from './horses.js';
-import { SKIN_TONES } from './render.js';
+import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { fightUiHomeSwitch } from './fightui/toggle.js';
 import { STAGE_LIST } from './levelmode/story.js';
 import { audioMixer } from './audio/controls.js';
@@ -59,7 +59,6 @@ const STYLE_NOTES = {
   langyaShield: 'A wolf-tooth mace and an iron parry buckler: crushes armour.', maceShield: 'A flanged mace and kalkan: the answer to armour.', champi: 'The Inca star mace: a bronze star on a wooden haft, swung overhead and from the side.', steppeBow: 'A composite bow: a faster, harder arrow; the sabre up close.', kheshigBow: 'Up to five quick arrows, then straight in with the flanged mace.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
 const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', infantry: '🪖', knight: '🏰', tournament: '🏇', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', archer: '🏹', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', sohei: '📿', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', mingIronLamellar: '🏮', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙', saladin: '🌙', joan: '⚜️', guanYu: '🐉', commodus: '🦁', lorarius: '🪢', hanSoldier: '🏮', wuxia: '🗡️', riot: '🛡️', thug: '🧢', legionary: '🦅', centurion: '🦅', silverback: '🦍', monkeyFur: '🐒', go2Dog: '🐕', spotDog: '🐕', vision60Dog: '🐕', humanoid: '🤖', miniHumanoid: '🤖', combatBot: '🤖', exoArmoured: '🦾' };
-const SKIN = Object.fromEntries(Object.entries(SKIN_TONES).map(([key, hex]) => [key, `#${hex.toString(16).padStart(6, '0')}`]));
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
 /** A style's name, and its weapon when the name does not already say it. */
@@ -433,16 +432,18 @@ export function installMenus(game) {
       button.onclick = () => { onPick(option); draw(); };
       return button;
     }));
-    const slider = ({ label, min, max, step, get, set, show: shown }) => {
+    // (`track`: a CSS background for the slider's track, the Skin's shades.)
+    const slider = ({ label, min, max, step, get, set, show: shown, track = null }) => {
       const value = el('output', { textContent: shown(get()) });
       const input = el('input', { type: 'range', min, max, step, value: get(), ariaLabel: label });
+      if (track) input.style.setProperty('--tone-track', track);
       input.oninput = () => {
         set(Number(input.value));
         value.textContent = shown(get());
         refreshStats();
         preview();
       };
-      return el('label', { className: 'slider' }, el('span', { className: 'slider-head' }, el('b', { textContent: label }), value), input);
+      return el('label', { className: track ? 'slider tone' : 'slider' }, el('span', { className: 'slider-head' }, el('b', { textContent: label }), value), input);
     };
     let statsBox = null;
     const refreshStats = () => {
@@ -475,11 +476,7 @@ export function installMenus(game) {
           if (!HAIR_STYLES[sex].includes(inputs.look.hairStyle)) inputs.look.hairStyle = HAIR_STYLES[sex][0];
           if (sex === 'female') inputs.look.facialHair = 'none';
           // An origin chosen with no composite of this sex: the nearest that has one, the skin kept within its range.
-          const regions = photoFaceRegions(sex);
-          if (regions && inputs.look.faceRegion) {
-            inputs.look.faceRegion = nearestRegion(inputs.look.faceRegion, regions);
-            inputs.look.skinTone = clampTone(inputs.look.faceRegion, inputs.look.skinTone);
-          }
+          settleOrigin(inputs.look, photoFaceRegions(sex));
         }, (sex) => (sex === 'male' ? 'Man' : 'Woman'))),
         slider({ label: 'Age', min: 18, max: 100, step: 1, get: () => inputs.age, set: (value) => { inputs.age = value; }, show: (value) => `${value} years` }),
       );
@@ -541,9 +538,9 @@ export function installMenus(game) {
     }
     // Where they are from (faceregions.js REGION_ORIGINS): the photo faces of their sex, by continent, whatever they wear or
     // fight with. Untouched it shows their kit's own (originOf) and writes nothing, so they are cast as that kit's men are;
-    // chosen, it is `look.faceRegion`, and the skin goes back to the origin's own tone. The skin is then picked from the
-    // origin's range only (toneRange); picking it settles the origin shown, since the tone is reckoned from it.
-    // (Drawn faces, #faces=off, have no origin: every tone is offered, as before.)
+    // chosen, it is `look.faceRegion`, and the skin goes back to the origin's own tone. The Skin slider then moves the shade
+    // smoothly within the origin's range only (toneSpan); moving it settles the origin shown, since the shade is reckoned from it.
+    // (Drawn faces, #faces=off, have no origin: the slider runs the whole ladder, as the swatches did.)
     const originNow = () => {
       const regions = photoFaceRegions(inputs.sex);
       return regions ? originOf(inputs, regions, outfitOf(inputs).faceRegion) : null;
@@ -557,28 +554,32 @@ export function installMenus(game) {
       select.value = origin;
       select.onchange = () => {
         inputs.look.faceRegion = select.value;
-        inputs.look.skinTone = regionTone(select.value);
+        setShade(inputs.look, toneShade(regionTone(select.value)));
         draw();
       };
       return select;
     }
+    function skinSlider(origin) {
+      const look = inputs.look;
+      const [low, high] = toneSpan(origin);
+      // The shade seen: his own once the origin is his, else (cast from his kit) the composite's, which is the origin's tone.
+      const shade = () => (!origin || look.faceRegion ? skinShadeOf(origin, look) : toneShade(regionTone(origin)));
+      return slider({ label: 'Skin', min: low, max: high, step: 0.05, get: shade, track: shadeGradient(low, high), show: (value) => words(shadeTone(value)), set: (value) => {
+        setShade(look, value);
+        if (origin) look.faceRegion ??= origin;
+      } });
+    }
     function stepLook(content) {
       const look = inputs.look;
       const origin = originNow();
-      const tones = origin ? Object.fromEntries(toneRange(origin).map((tone) => [tone, SKIN[tone]])) : SKIN;
-      // The tone seen: his own once the origin is his, else (cast from his kit) the composite's, which is the origin's tone.
-      const tone = !origin ? look.skinTone : look.faceRegion ? clampTone(origin, look.skinTone) : regionTone(origin);
-      content.append(
+      content.append(...[
         origin ? el('div', { className: 'field' }, el('b', { textContent: 'Origin' }), originPicker(origin)) : null,
-        el('div', { className: 'field' }, el('b', { textContent: 'Skin' }), swatches(tones, () => SKIN[tone], (hex) => {
-          look.skinTone = Object.keys(tones).find((key) => tones[key] === hex);
-          if (origin) look.faceRegion ??= origin;
-        })),
+        skinSlider(origin),
         el('div', { className: 'field' }, el('b', { textContent: 'Hair' }), buttons(HAIR_STYLES[inputs.sex] ?? HAIR_STYLES.male, () => look.hairStyle, (style) => { look.hairStyle = style; })),
         el('div', { className: 'field' }, el('b', { textContent: 'Hair colour' }), swatches(HAIR, () => look.hairColor, (hex) => { look.hairColor = hex; })),
         inputs.sex === 'male' ? el('div', { className: 'field' }, el('b', { textContent: 'Facial hair' }), buttons(['none', 'stubble', 'mustache', 'beard'], () => look.facialHair, (hair) => { look.facialHair = hair; })) : null,
         el('div', { className: 'field' }, el('b', { textContent: 'Eyes' }), buttons(['brown', 'hazel', 'blue', 'green', 'grey', 'amber'], () => look.eyeColor, (eye) => { look.eyeColor = eye; })),
-      );
+      ].filter(Boolean));
     }
     function stepReady(content) {
       const style = STYLES[inputs.style];

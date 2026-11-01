@@ -4,7 +4,7 @@
 
 import { Dangle } from './dangle.js';
 import { FACTIONS, factionOf, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
-import { outlineFor, surface } from './toon.js';
+import { doubleSided, outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
 import { buildArenaHelm, buildGalea, buildLionHead, formMesh } from './arenaview.js';
@@ -14,6 +14,8 @@ import { clothPropMaterial, wearTile } from './detailtex.js';
 import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
+import { buildHanHood, buildMingDesignHelm, buildTassel } from './chinahelmview.js';
+import { HONGYING_MOUNTS, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf } from './knighthelms.js';
 
@@ -645,12 +647,13 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       hidesHair = false;
       break;
     case 'kettleHat': {
-      // A design under study (helmstyle.js `kettle`; helmforms.js HELM_DESIGNS), fitted over the head, with its baked maps.
-      const design = HELM_STYLE.kettle !== 'now' && !lowDetail ? designFormOf(head.kind, HELM_STYLE.kettle) : null;
-      if (design && buildDesignHelm(group, design, r, metal(steel, color))) {
+      // In its design (helmforms.js HELM_DESIGNS: `head.design`, or the one helmstyle.js `kettle` asks for), fitted over the
+      // head, with its baked maps.
+      const design = helmDesignOf(head, lowDetail);
+      if (design && buildDesignHelm(group, design, r, metal(steel, color), { bevor: head.bevor !== false })) {
         fitted = true;
-        // A mail coif under any but the barbute, which closes to the neck itself.
-        if (head.coif && design.build !== 'barbute') {
+        // A mail coif under it.
+        if (head.coif) {
           const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.36 * r, 1.0 * r, 18, 1, true), metal(steel, 0x7d8087));
           coif.position.y = -0.95 * r;
           group.add(coif);
@@ -717,6 +720,12 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'cabasset': {
+      // In its design (the Spanish cabasset, helmforms.js HELM_DESIGNS), fitted over the head, its etching and rivets baked.
+      const design = helmDesignOf(head, lowDetail);
+      if (design && buildDesignHelm(group, design, r, metal(steel, color))) {
+        fitted = true;
+        break;
+      }
       // The cabasset: a tall pear-shaped crown with a little stalk, a narrow flat brim.
       const iron = metal(steel, color);
       const crown = new THREE.Mesh(new THREE.SphereGeometry(1.15 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), iron);
@@ -1066,7 +1075,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       if (head.tassel) {
         spike.scale.y = 1.4;
         spike.position.y = 2.78 * r;
-        group.add(hongying(r, { top: 3.0, length: 0.75, spread: 0.62, colour: head.tassel }));
+        group.add(hongying(r, HONGYING_MOUNTS.steppeHelm, head.tassel, lowDetail));
       } else if (head.plume) {
         const plume = new THREE.Mesh(new THREE.ConeGeometry(0.09 * r, 0.9 * r, 6), surface(head.plume, { roughness: 0.9 }));
         plume.position.y = 3.2 * r;
@@ -1356,6 +1365,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'mingHat': {
+      // In one of the rank and file's four designs (chinahelms.js MING_HELMS: `design`, `finish`), fitted over the head.
+      if (head.design && buildMingDesignHelm(group, head, r, steel, { lowDetail })) {
+        fitted = true;
+        break;
+      }
       // The Ming soldier's iron helmet: a round crown, a wide brim almost
       // flat, a spike on top and the red horsehair tassel (hongying) bound
       // to it, falling round it over the crown.
@@ -1368,7 +1382,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       brim.position.y = 0.06 * r;
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.07 * r, 1.0 * r, 8), iron);
       spike.position.y = 1.85 * r;
-      group.add(crown, brim, spike, hongying(r, { top: 1.95, length: 0.85, spread: 0.85, colour: head.tassel }));
+      group.add(crown, brim, spike, hongying(r, HONGYING_MOUNTS.mingHat, head.tassel, lowDetail));
       break;
     }
     case 'montefortino': {
@@ -1514,6 +1528,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'hanHelm': {
+      // The Western Han lamellar hood (chinahelms.js HAN_HOOD), fitted over the head, its lamellae and lacing in its maps.
+      if (!head.old && buildHanHood(group, head, r, steel, { lowDetail })) {
+        fitted = true;
+        break;
+      }
       // A Western Han iron helmet (doumou), as the one from the King of Qi's
       // tomb at Linzi (2nd c. BC): a rounded cap of small iron lamellae laced
       // in overlapping rows to an iron crown boss, and a lamellar curtain over
@@ -1574,7 +1593,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       finial.position.y = 2.32 * r;
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05 * r, 0.7 * r, 8), bowlSteel);
       spike.position.y = 2.95 * r;
-      group.add(bowl, band, finial, spike, hongying(r, { top: 2.75, length: 1.05, spread: 0.72, colour: head.tassel }));
+      group.add(bowl, band, finial, spike, hongying(r, HONGYING_MOUNTS.mingHelm, head.tassel, lowDetail));
       if (head.neck === 'steel') {
         // A steel neck guard: three lames stepping out from the rim to the
         // shoulders, open over the face (+x).
@@ -1667,8 +1686,13 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     });
   }
   inkAll(group);
+  // A helmet is a thin shell: drawn from both sides (toon.js doubleSided), so from under its brim or inside it is never a hole.
+  doubleSided(group);
+  // What swings (a tassel, a plume, feathers: chinahelmview.js), moved each frame by render.js.
+  const swings = [];
+  group.traverse((object) => object.userData.swing && swings.push(object.userData.swing));
   // An open-faced helmet (`openFace`) leaves the beard to be seen.
-  return { group, hidesHair, showsBeard: Boolean(head.openFace), fitted };
+  return { group, hidesHair, showsBeard: Boolean(head.openFace), fitted, swings };
 }
 
 // Saladin's helmet, in head radii: the bowl's lathe profile from its rim up
@@ -1933,34 +1957,17 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
   group.add(plates, dots);
 }
 
-// The Ming helmet's red tassel (hongying): a hank of horsehair dyed red,
-// bound round the finial's spike and falling all round it like a mop over
-// the top of the bowl; every Ming helmet bore one, the soldier's iron hat and
-// the officer's tall bowl alike. Its colour; and its make, in head radii.
-const HONGYING = { colour: 0xb3161b, strands: 26, hem: [1, 0.5, 0.82, 0.62, 0.92, 0.55] };
+// The Ming helmet's red tassel (hongying): a hank of horsehair dyed red, bound round the finial's spike and falling all
+// round it over the top of the bowl; every Ming helmet bore one, the soldier's iron hat and the officer's tall bowl alike.
+// Drawn as strands of hair (chinahelmview.js buildTassel, chinahelms.js TASSELS.hongying) that swing as the head moves.
 
 /**
- * A red horsehair tassel hung from a helmet's finial: `top` (head radii up)
- * where it is bound to the spike, `length` how far it falls, `spread` how
- * wide its hem stands out. One mesh: an open cone, its hem cut into locks
- * of uneven length that flick out a little.
+ * A red horsehair tassel bound to a helmet's spike where its mount says (chinahelms.js HONGYING_MOUNTS: `top`, `length`,
+ * the `hull` it is kept out of as it swings); still in a crowd (`lowDetail`).
  */
-function hongying(r, { top, length, spread, colour = HONGYING.colour }) {
-  const geometry = new THREE.ConeGeometry(spread * r, length * r, HONGYING.strands, 3, true);
-  const position = geometry.attributes.position;
-  for (let index = 0; index < position.count; index += 1) {
-    if (position.getY(index) > -length * r * 0.49) continue;
-    const lock = HONGYING.hem[index % HONGYING.hem.length];
-    position.setY(index, position.getY(index) - (lock - 0.7) * length * r * 0.7);
-    position.setX(index, position.getX(index) * (0.85 + 0.25 * lock));
-    position.setZ(index, position.getZ(index) * (0.85 + 0.25 * lock));
-  }
-  geometry.computeVertexNormals();
-  const hair = surface(colour, { roughness: 1 });
-  hair.side = THREE.DoubleSide;
-  const tassel = new THREE.Mesh(geometry, hair);
-  tassel.position.y = (top - length / 2) * r;
-  return tassel;
+function hongying(r, { top, length, hull }, colour = TASSELS.hongying.colour, lowDetail = false) {
+  const spec = lowDetail ? { ...TASSELS.hongying, length, count: 16 } : { ...TASSELS.hongying, length };
+  return buildTassel(spec, r, { at: [0, top, 0], hull, still: lowDetail, colour });
 }
 
 /**
@@ -1990,16 +1997,27 @@ function buildKnightHelm(group, head, r, iron, lowDetail) {
   return true;
 }
 
-/** Steel of another colour, polished like the rest. */
 /**
- * A helmet in a design under study (helmforms.js DESIGN_FORMS): each part a measured surface in head radii scaled to `r`,
+ * The design a helmet is drawn in (helmforms.js DESIGN_FORMS), or null (drawn as before): none in a crowd or under
+ * `#kettle=now`; a kettle hat in the one `#kettle=a|b|c` asks for; otherwise the wearer's own (`head.design`).
+ */
+function helmDesignOf(head, lowDetail) {
+  if (lowDetail || HELM_STYLE.kettle === 'now') return null;
+  const choice = head.kind === 'kettleHat' && HELM_STYLE.kettle !== 'own' ? HELM_STYLE.kettle : head.design;
+  return choice ? designFormOf(head.kind, choice) : null;
+}
+
+/**
+ * A helmet in a design (helmforms.js DESIGN_FORMS): each part a measured surface in head radii scaled to `r`,
  * wearing its sheet (rivets, turned edges, flutes, the sights and openings cut out). False where the maps are not there
  * (the helmet is drawn as before).
  */
-function buildDesignHelm(group, form, r, iron) {
+function buildDesignHelm(group, form, r, iron, { bevor = true } = {}) {
   if (!helmMapsReady() || !helmMapSheet(form.sheet)) return false;
   const regions = form.regions;
   for (const [name, part] of Object.entries(form.parts)) {
+    // (A sallet may be worn without its bevor: an archer's.)
+    if (name === 'bevor' && !bevor) continue;
     const material = helmMaterial(iron, form.sheet, { side: part.double ? THREE.DoubleSide : THREE.FrontSide, cut: !!form.cut });
     const mesh = formMesh(part, regions[part.region], material);
     mesh.name = `helm-${name}`;
@@ -2009,10 +2027,74 @@ function buildDesignHelm(group, form, r, iron) {
   return true;
 }
 
+/** Steel of another colour, polished like the rest. */
 function metal(steel, hex) {
   const material = steel.clone();
   material.color = new THREE.Color(hex);
   return material;
+}
+
+// Shaguma's hair (an oni's mane: dyed yak or bear hair set into the kabuto, as on Uesugi and Ii retainers' helmets): the
+// steel bowl left showing and the hair growing out of it, from the crown down the sides and back, standing out from
+// the bowl and falling over the neck guard to the shoulders, wild and uneven; never across the face.
+const SHAGUMA = { locks: 220, width: 0.13, length: [1.8, 3.7], lift: 0.25, droop: 4.2, segments: 7 };
+
+/** The hair growing out of the kabuto's bowl (KABUTO_FORM): one mesh of tapering strands, greys varied lock by lock. */
+function shagumaHair(form, r, colour) {
+  const base = new THREE.Color(colour);
+  const positions = [];
+  const colours = [];
+  const indices = [];
+  // A fixed sequence, so every fighter's mane is the same hair.
+  let seed = 7;
+  const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  for (let lock = 0; lock < SHAGUMA.locks; lock += 1) {
+    const side = lock % 2 ? 1 : -1;
+    // Round from over the brow's corner (u 0.14: the face kept clear) to the nape (u 1), up from near the foot to the crown.
+    const u = 0.14 + 0.86 * random();
+    const v = 0.3 + 0.62 * Math.sqrt(random());
+    const root = formPoint(form.bowl, u, v).map((value) => value * r);
+    root[2] *= side;
+    const outward = new THREE.Vector3(root[0], root[1] - 0.2 * r, root[2]).normalize();
+    // Longer behind than at the temples; the crown's locks stand up before they fall.
+    const length = (SHAGUMA.length[0] + (SHAGUMA.length[1] - SHAGUMA.length[0]) * (0.35 + 0.65 * u) * (0.6 + 0.4 * random())) * r;
+    const lift = SHAGUMA.lift * (random() - 0.35);
+    const grey = base.clone().offsetHSL(0, 0, (random() - 0.5) * 0.22);
+    const first = positions.length / 3;
+    let at = new THREE.Vector3(...root);
+    // Out from the bowl at first, a crown lock a little up or down, then falling.
+    let heading = new THREE.Vector3(outward.x, outward.y * 0.45 + lift, outward.z).normalize();
+    for (let step = 0; step <= SHAGUMA.segments; step += 1) {
+      const t = step / SHAGUMA.segments;
+      // The strand's breadth across it, flat to the bowl: tangent to the outward direction and the heading.
+      const across = new THREE.Vector3().crossVectors(heading, outward).normalize();
+      if (across.lengthSq() < 1e-6) across.set(0, 0, 1);
+      const half = SHAGUMA.width * r * (1 - 0.85 * t) * (0.7 + 0.6 * random());
+      positions.push(at.x - across.x * half, at.y - across.y * half, at.z - across.z * half, at.x + across.x * half, at.y + across.y * half, at.z + across.z * half);
+      const shade = grey.clone().multiplyScalar(0.45 + 0.3 * t);
+      colours.push(shade.r, shade.g, shade.b, shade.r, shade.g, shade.b);
+      if (step < SHAGUMA.segments) {
+        const a = first + step * 2;
+        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+      // Each segment bends the strand down under its weight and a little outward, with a kink of its own.
+      at = at.clone().addScaledVector(heading, length / SHAGUMA.segments);
+      heading = heading.clone()
+        .addScaledVector(new THREE.Vector3(0, -1, 0), SHAGUMA.droop / SHAGUMA.segments)
+        .addScaledVector(new THREE.Vector3(outward.x, 0, outward.z), 0.5 / SHAGUMA.segments)
+        .add(new THREE.Vector3((random() - 0.5) * 0.3, 0, (random() - 0.5) * 0.3))
+        .normalize();
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
+  const mane = new THREE.Mesh(geometry, material);
+  mane.userData.noOutline = true;
+  return mane;
 }
 
 /**
@@ -2160,30 +2242,7 @@ function buildKabuto(group, head, r, steel, color) {
   // The crest (maedate) is headgear of its own (kabutoCrest): it can be knocked off.
   // Shaguma: the whole helmet dressed in long yak hair, a shaggy cap over the
   // bowl and a mane over the neck guard to the shoulders, open at the face.
-  if (head.hair) {
-    const hair = surface(head.hair, { roughness: 1, flatShading: true });
-    const narrow = (form.side + 0.3) / (form.back + 0.3);
-    const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(1.38 * r, 1), hair);
-    cap.scale.set(1, 0.72, narrow);
-    cap.position.y = 0.32 * r;
-    // Over the shikoro: a skirt flaring to the shoulders, open at the face (cylinder angles start at +z).
-    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(1.42 * r, 2.15 * r, 1.45 * r, 14, 1, true, Math.PI * 0.78, Math.PI * 1.44), hair);
-    skirt.material = hair.clone();
-    skirt.material.side = THREE.DoubleSide;
-    skirt.position.y = -0.55 * r;
-    skirt.scale.z = narrow;
-    group.add(cap, skirt);
-    // Locks hanging past the skirt's edge, uneven.
-    for (let lock = 0; lock < 22; lock += 1) {
-      const around = Math.PI * 0.78 + ((lock + 0.5) / 22) * Math.PI * 1.44;
-      const length = (0.7 + 0.35 * ((lock * 7) % 5) / 4) * r;
-      const strand = new THREE.Mesh(new THREE.ConeGeometry(0.22 * r, length, 4), hair);
-      strand.rotation.x = Math.PI;
-      // Cylinder angle θ: x = sin θ, z = cos θ.
-      strand.position.set(Math.sin(around) * 2.05 * r, -1.25 * r - length / 2, Math.cos(around) * 2.05 * r * narrow);
-      group.add(strand);
-    }
-  }
+  if (head.hair) group.add(shagumaHair(form, r, head.hair));
   // A mask in a design under study (helmstyle.js `masks`), drawn with baked maps (menpo.js), set on the face (helmforms.js
   // MASK_FITS); the gorget under it, hanging from under the chin.
   if (head.mask && HELM_STYLE.masks !== 'now' && helmMapsReady() && buildWarMask(group, HELM_STYLE.masks, r, head.mask === 'red' ? color : 0x141416, steel.envMap)) {

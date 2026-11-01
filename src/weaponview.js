@@ -8,7 +8,7 @@ import { P } from './body.js';
 import { floorUnder, SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { reloadProps } from './physics/ranged.js';
 import { BONE } from './rig.js';
-import { disposeObject, outlineFor, surface } from './toon.js';
+import { disposeObject, doubleSided, outlineFor, surface } from './toon.js';
 import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
 import { arrowSightScale } from './arrowsight.js';
 import { outfitOf } from './outfits.js';
@@ -1455,6 +1455,11 @@ function germanicShield(spec, envMap, paint) {
  * for a shield painted in his unit's (the late Roman oval, the Germanic round).
  */
 export function buildShieldMesh(spec, envMap, paint = null) {
+  // A shield is a board or a thin shell: drawn from both sides (toon.js doubleSided), as all armour is.
+  return doubleSided(shieldMesh(spec, envMap, paint));
+}
+
+function shieldMesh(spec, envMap, paint) {
   if (spec.look === 'oval') return ovalShield(spec, envMap, paint);
   if (spec.look === 'germanic') return germanicShield(spec, envMap, paint);
   // The arena's shaped shields and the scissor's crescent, in detail.

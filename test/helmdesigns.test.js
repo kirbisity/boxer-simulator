@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, PRESETS } from '../src/body.js';
 import { HELM_MAP_DATA } from '../src/helmmaps-data.js';
-import { HELM_STYLE, helmStyleFrom } from '../src/helmstyle.js';
+import { HELM_STYLE, helmStyleFrom, KETTLE_STYLES } from '../src/helmstyle.js';
+import { OUTFITS } from '../src/outfits.js';
 import { DESIGN_FORMS, designFormOf, designTriangles, formCuts, formGrid, formPoint, HELM_DESIGNS, HELM_HEAD, headRadiusAt } from '../src/helmforms.js';
 
 // The head's radius (cm) as the game draws it, and the drawn head's scale over the body's head radius (render.js).
@@ -15,7 +16,8 @@ const MUSEUM = {
   kettleRidged: [[30.3, 25.9, 17.5], [33.7, 33, 23.3]],
   kettleBurgundian: [[37.1, 24.8, 25.9]],
   salletGerman: [[37.4, 20.2, 24.8], [37.8, 22.9, 24.1]],
-  barbute: [[27, 20, 28.9], [24.9, 19.7, 26.3]],
+  // Met 14.25.533, 14.25.1851, 27.159.12, 14.25.532 (front to back with the brim).
+  cabassetSpanish: [[32.2, 24.3, 23.5], [29.2, 23.1, 25.4], [33.7, 24.4, 27.3], [34.3, 23.8, 27.0]],
 };
 
 /** A loft's distance from the upright axis at `azimuth` (rad from the face) and height y, or null where it does not reach. */
@@ -54,15 +56,43 @@ function extent(form) {
   return [0, 2, 1].map((axis) => (high[axis] - low[axis]) * R_CM);
 }
 
-test('the kettle hat is drawn as it was unless a design is asked for; any unit wearing one is drawn in it', () => {
-  assert.equal(helmStyleFrom('').kettle, 'now');
-  assert.equal(HELM_STYLE.kettle, 'now');
+/** Every design of every outfit, with its unit's key. */
+const allDesigns = () => Object.entries(OUTFITS).flatMap(([kind, outfit]) => outfit.designs.map((design) => ({ kind, design })));
+
+test('each wearer draws his own design unless the address asks for one; #kettle=now draws them as before; no barbute', () => {
+  assert.equal(helmStyleFrom('').kettle, 'own');
+  assert.equal(HELM_STYLE.kettle, 'own');
   assert.equal(helmStyleFrom('#kettle=c').kettle, 'c');
-  assert.equal(helmStyleFrom('#kettle=z').kettle, 'now');
+  assert.equal(helmStyleFrom('#kettle=now').kettle, 'now');
+  assert.deepEqual(KETTLE_STYLES, ['own', 'now', 'a', 'b', 'c']);
+  assert.deepEqual(Object.keys(HELM_DESIGNS.kettleHat), ['a', 'b', 'c']);
+  assert.deepEqual(HELM_DESIGNS.cabasset, { spanish: 'cabassetSpanish' });
+  assert.equal(DESIGN_FORMS.barbute, undefined);
+  assert.equal(HELM_MAP_DATA.formBarbute, undefined);
   assert.equal(designFormOf('kettleHat', 'now'), null);
+  assert.equal(designFormOf('kettleHat', 'd'), null);
   assert.equal(designFormOf('bascinet', 'a'), null);
-  for (const [choice, name] of Object.entries(HELM_DESIGNS.kettleHat)) assert.equal(designFormOf('kettleHat', choice), DESIGN_FORMS[name], choice);
-  assert.equal(new Set(Object.values(DESIGN_FORMS).map((form) => form.build)).size, 3, 'kettle hats, a sallet, a barbute: different kinds');
+  for (const [kind, designs] of Object.entries(HELM_DESIGNS)) {
+    for (const [choice, name] of Object.entries(designs)) assert.equal(designFormOf(kind, choice), DESIGN_FORMS[name], `${kind} ${choice}`);
+  }
+  assert.equal(new Set(Object.values(DESIGN_FORMS).map((form) => form.build)).size, 3, 'kettle hats, a sallet, a cabasset: different kinds');
+});
+
+test('the foot soldier\'s five designs wear the kettle hats a, b and c; every kettle hat and cabasset worn names its design', () => {
+  const footman = OUTFITS.footman.designs.map((design) => design.head.design);
+  assert.deepEqual(footman, ['a', 'c', 'a', 'c', 'b']);
+  for (const { kind, design } of allDesigns()) {
+    const head = design.head;
+    if (!head || !HELM_DESIGNS[head.kind]) continue;
+    assert.ok(designFormOf(head.kind, head.design), `${kind} '${design.label}': ${head.kind} in design ${head.design}`);
+  }
+  // The Spanish cabasset only on the conquistadors, and on both kinds of them.
+  const cabassets = allDesigns().filter(({ design }) => design.head?.kind === 'cabasset');
+  assert.deepEqual([...new Set(cabassets.map(({ kind }) => kind))].sort(), ['conquistadorPlate', 'conquistadorQuilted']);
+  for (const kind of ['conquistadorPlate', 'conquistadorQuilted']) {
+    const heads = OUTFITS[kind].designs.map((design) => design.head.kind);
+    assert.ok(heads.includes('morion') && heads.includes('cabasset'), `${kind}: the morion and the Spanish cabasset both`);
+  }
 });
 
 test('each design is drawn with no more triangles than the old kettle hat (752) and has its sheet baked', () => {
@@ -130,7 +160,7 @@ test('each design stands within the measures of the pieces it is drawn from (the
   }
 });
 
-test('the brims slope down; the Burgundian hat\'s and the sallet\'s sights are at the eyes, the barbute open at the face', () => {
+test('the brims slope down; the Burgundian hat\'s and the sallet\'s sights are at the eyes; the cabasset\'s brim narrow, its stalk bent back', () => {
   for (const name of ['kettleRidged', 'kettleBurgundian']) {
     const brim = DESIGN_FORMS[name].parts.brim;
     for (const u of [0, 0.5, 1]) assert.ok(formPoint(brim, u, 1)[1] < formPoint(brim, u, 0)[1] - 0.15, `${name}: the brim falls`);
@@ -139,8 +169,14 @@ test('the brims slope down; the Burgundian hat\'s and the sallet\'s sights are a
   const brimFront = burgundian.parts.brim;
   assert.ok(formPoint(brimFront, 0, 1)[1] < burgundian.sight.y - burgundian.sight.h, 'the brim comes down past the eyes, the sight in it');
   for (const name of ['kettleBurgundian', 'salletGerman']) assert.ok(Math.abs(DESIGN_FORMS[name].sight.y - -0.05) < 0.08 && DESIGN_FORMS[name].sight.z > 0.4, `${name}: the sight across both eyes`);
-  const { bar, slot, wide } = DESIGN_FORMS.barbute.opening;
-  assert.ok(bar[0] < -0.07 && bar[1] > -0.07 && wide > 0.4 && slot > 0.1, 'the T: the eyes across, the mouth down');
+  const { bowl, brim, comb } = DESIGN_FORMS.cabassetSpanish.parts;
+  for (const u of [0, 0.5, 1]) {
+    const reach = Math.hypot(formPoint(brim, u, 1)[0], formPoint(brim, u, 1)[2]) - Math.hypot(formPoint(brim, u, 0)[0], formPoint(brim, u, 0)[2]);
+    assert.ok(reach * R_CM > 2.5 && reach * R_CM < 4.5, `the cabasset's brim 3-4 cm (${(reach * R_CM).toFixed(1)} at ${u})`);
+  }
+  const crown = formPoint(bowl, 0, 1);
+  const tip = formPoint(comb, 0.5, 1);
+  assert.ok(tip[1] > crown[1] && tip[0] < crown[0] - 0.05, 'the stalk stands above the point, bent back');
 });
 
 test('the sallet has its tail behind and its bevor clear of the face, tucked under the sallet\'s front', () => {

@@ -27,9 +27,12 @@
 //     German sallet, Hans Blarer the Younger, Basel c. 1470-80, Met 29.158.11 (37.4 x 20.2 x 24.8 cm):
 //     https://www.metmuseum.org/art/collection/search/26445 ; Caspar Rieder's, Mühlau c. 1480, Met 42.50.32:
 //     https://www.metmuseum.org/art/collection/search/24701 ; the sallet and bevor: https://en.wikipedia.org/wiki/Sallet
-//     barbute, Jacopo da Cannobio (Bichignola), Brescia c. 1460, Met 60.151 (28.9 x 20 x 27 cm):
-//     https://www.metmuseum.org/art/collection/search/24849 ; Met 25.188.20, c. 1465:
-//     https://www.metmuseum.org/art/collection/search/32788
+//     the Spanish cabasset: Royal Collection RCIN 67296 (etched bands, roped brim, rosette rivets):
+//     https://col.rct.uk/collection/67296/spanish-morion ; Met 14.25.533 https://www.metmuseum.org/art/collection/search/27105 ,
+//     14.25.1851 https://www.metmuseum.org/art/collection/search/33561 , 27.159.12
+//     https://www.metmuseum.org/art/collection/search/22982 , 14.25.532 https://www.metmuseum.org/art/collection/search/26512 ;
+//     the Spanish cabacete, Cleveland 2012.39: https://www.clevelandart.org/art/2012.39 ; the morion's development (Tavares,
+//     ASAC Bulletin 105, 2012): https://americansocietyofarmscollectors.org/wp-content/uploads/2022/04/2012-B105-The-Morion-An-Introduction-to-its-Develo.pdf
 //   Samurai masks, the Met: somen https://www.metmuseum.org/art/collection/search/24176 , grimacing man (Myōchin
 //     Munesuke) https://www.metmuseum.org/art/collection/search/22080 , mountain demon https://www.metmuseum.org/art/collection/search/24145 ,
 //     tengu https://www.metmuseum.org/art/collection/search/23997 , menpō https://www.metmuseum.org/art/collection/search/31974 ;
@@ -95,7 +98,7 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
     vertexColors: false, map: sheet.map, normalMap: sheet.normalMap, roughnessMap: sheet.ormMap, metalnessMap: sheet.ormMap,
     roughness: duller ? 1.25 : 1, metalness: Math.min(base.metalness ?? 1, duller ? 0.5 : 1), side,
   });
-  // A sheet with openings (a sight, a barbute's T): the normal map's alpha cuts them out.
+  // A sheet with openings (a sight): the normal map's alpha cuts them out.
   if (cut) {
     material.onBeforeCompile = (shader) => {
       shader.fragmentShader = shader.fragmentShader.replace(
