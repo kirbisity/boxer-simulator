@@ -14,6 +14,8 @@ import { clothPropMaterial, wearTile } from './detailtex.js';
 import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
+import { buildHanHood, buildMingDesignHelm, buildTassel } from './chinahelmview.js';
+import { HONGYING_MOUNTS, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 
 export const WARDROBE = {
@@ -1063,7 +1065,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       if (head.tassel) {
         spike.scale.y = 1.4;
         spike.position.y = 2.78 * r;
-        group.add(hongying(r, { top: 3.0, length: 0.75, spread: 0.62, colour: head.tassel }));
+        group.add(hongying(r, HONGYING_MOUNTS.steppeHelm, head.tassel, lowDetail));
       } else if (head.plume) {
         const plume = new THREE.Mesh(new THREE.ConeGeometry(0.09 * r, 0.9 * r, 6), surface(head.plume, { roughness: 0.9 }));
         plume.position.y = 3.2 * r;
@@ -1353,6 +1355,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'mingHat': {
+      // In one of the rank and file's four designs (chinahelms.js MING_HELMS: `design`, `finish`), fitted over the head.
+      if (head.design && buildMingDesignHelm(group, head, r, steel, { lowDetail })) {
+        fitted = true;
+        break;
+      }
       // The Ming soldier's iron helmet: a round crown, a wide brim almost
       // flat, a spike on top and the red horsehair tassel (hongying) bound
       // to it, falling round it over the crown.
@@ -1365,7 +1372,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       brim.position.y = 0.06 * r;
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.07 * r, 1.0 * r, 8), iron);
       spike.position.y = 1.85 * r;
-      group.add(crown, brim, spike, hongying(r, { top: 1.95, length: 0.85, spread: 0.85, colour: head.tassel }));
+      group.add(crown, brim, spike, hongying(r, HONGYING_MOUNTS.mingHat, head.tassel, lowDetail));
       break;
     }
     case 'montefortino': {
@@ -1511,6 +1518,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'hanHelm': {
+      // The Western Han lamellar hood (chinahelms.js HAN_HOOD), fitted over the head, its lamellae and lacing in its maps.
+      if (!head.old && buildHanHood(group, head, r, steel, { lowDetail })) {
+        fitted = true;
+        break;
+      }
       // A Western Han iron helmet (doumou), as the one from the King of Qi's
       // tomb at Linzi (2nd c. BC): a rounded cap of small iron lamellae laced
       // in overlapping rows to an iron crown boss, and a lamellar curtain over
@@ -1571,7 +1583,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       finial.position.y = 2.32 * r;
       const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05 * r, 0.7 * r, 8), bowlSteel);
       spike.position.y = 2.95 * r;
-      group.add(bowl, band, finial, spike, hongying(r, { top: 2.75, length: 1.05, spread: 0.72, colour: head.tassel }));
+      group.add(bowl, band, finial, spike, hongying(r, HONGYING_MOUNTS.mingHelm, head.tassel, lowDetail));
       if (head.neck === 'steel') {
         // A steel neck guard: three lames stepping out from the rim to the
         // shoulders, open over the face (+x).
@@ -1666,8 +1678,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
   inkAll(group);
   // A helmet is a thin shell: drawn from both sides (toon.js doubleSided), so from under its brim or inside it is never a hole.
   doubleSided(group);
+  // What swings (a tassel, a plume, feathers: chinahelmview.js), moved each frame by render.js.
+  const swings = [];
+  group.traverse((object) => object.userData.swing && swings.push(object.userData.swing));
   // An open-faced helmet (`openFace`) leaves the beard to be seen.
-  return { group, hidesHair, showsBeard: Boolean(head.openFace), fitted };
+  return { group, hidesHair, showsBeard: Boolean(head.openFace), fitted, swings };
 }
 
 // Saladin's helmet, in head radii: the bowl's lathe profile from its rim up
@@ -1932,34 +1947,17 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
   group.add(plates, dots);
 }
 
-// The Ming helmet's red tassel (hongying): a hank of horsehair dyed red,
-// bound round the finial's spike and falling all round it like a mop over
-// the top of the bowl; every Ming helmet bore one, the soldier's iron hat and
-// the officer's tall bowl alike. Its colour; and its make, in head radii.
-const HONGYING = { colour: 0xb3161b, strands: 26, hem: [1, 0.5, 0.82, 0.62, 0.92, 0.55] };
+// The Ming helmet's red tassel (hongying): a hank of horsehair dyed red, bound round the finial's spike and falling all
+// round it over the top of the bowl; every Ming helmet bore one, the soldier's iron hat and the officer's tall bowl alike.
+// Drawn as strands of hair (chinahelmview.js buildTassel, chinahelms.js TASSELS.hongying) that swing as the head moves.
 
 /**
- * A red horsehair tassel hung from a helmet's finial: `top` (head radii up)
- * where it is bound to the spike, `length` how far it falls, `spread` how
- * wide its hem stands out. One mesh: an open cone, its hem cut into locks
- * of uneven length that flick out a little.
+ * A red horsehair tassel bound to a helmet's spike where its mount says (chinahelms.js HONGYING_MOUNTS: `top`, `length`,
+ * the `hull` it is kept out of as it swings); still in a crowd (`lowDetail`).
  */
-function hongying(r, { top, length, spread, colour = HONGYING.colour }) {
-  const geometry = new THREE.ConeGeometry(spread * r, length * r, HONGYING.strands, 3, true);
-  const position = geometry.attributes.position;
-  for (let index = 0; index < position.count; index += 1) {
-    if (position.getY(index) > -length * r * 0.49) continue;
-    const lock = HONGYING.hem[index % HONGYING.hem.length];
-    position.setY(index, position.getY(index) - (lock - 0.7) * length * r * 0.7);
-    position.setX(index, position.getX(index) * (0.85 + 0.25 * lock));
-    position.setZ(index, position.getZ(index) * (0.85 + 0.25 * lock));
-  }
-  geometry.computeVertexNormals();
-  const hair = surface(colour, { roughness: 1 });
-  hair.side = THREE.DoubleSide;
-  const tassel = new THREE.Mesh(geometry, hair);
-  tassel.position.y = (top - length / 2) * r;
-  return tassel;
+function hongying(r, { top, length, hull }, colour = TASSELS.hongying.colour, lowDetail = false) {
+  const spec = lowDetail ? { ...TASSELS.hongying, length, count: 16 } : { ...TASSELS.hongying, length };
+  return buildTassel(spec, r, { at: [0, top, 0], hull, still: lowDetail, colour });
 }
 
 /**

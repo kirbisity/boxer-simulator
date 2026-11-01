@@ -2076,7 +2076,7 @@ function detailedView(view, fighter, simple) {
   view.scene.add(group);
   const fighterView = {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells,
-    baseColors, vertexSegment, damageVersion: -1, headProps, dangles, steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
+    baseColors, vertexSegment, damageVersion: -1, headProps, dangles, swings: headgear?.swings ?? [], steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
   };
   if (later) queueSkin(fighterView, wanted);
@@ -2984,6 +2984,8 @@ export function updateFighterView(fighterView, dt, time) {
   const colliders = dangleColliders(fighterView, points);
   if (!fighterView.headDetached) fighterView.head.update(step, fighter, time, colliders);
   for (const dangle of fighterView.dangles) dangle.update(step, colliders.slice(1));
+  // A helmet's tassel, plume or feathers swing after the head (chinahelmview.js); still while paused (dt 0).
+  if (!fighterView.headDetached) for (const swing of fighterView.swings ?? []) swing.update(step, fighter.hitAt?.[P.head] ?? null, time);
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
 }
 
