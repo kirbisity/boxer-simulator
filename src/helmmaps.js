@@ -18,6 +18,18 @@
 //     https://penelope.uchicago.edu/encyclopaedia_romana/gladiators/secutorhelmet.html
 //   The scissor's closed helmet, like the secutor's or the hoplomachus's: https://en.wikipedia.org/wiki/Scissor_(gladiator)
 //   The 2025 Leeds loan of three Pompeii helmets: https://www.theartnewspaper.com/2025/06/23/are-you-not-entertained-three-ancient-helmets-headline-uk-exhibition-exploring-gladiators
+//   The fifteenth-century foot soldiers' helmets (helmforms.js DESIGN_FORMS; measures from the museums' records):
+//     ridged kettle hat, Italy c. 1460, Cleveland Museum of Art 1916.1919 (30.3 x 25.9 x 17.5 cm, 5.66 kg; rivets for the
+//     lining along the ridge, round the dome's foot and the brim's edge): https://www.clevelandart.org/art/1916.1919 ; war
+//     hat said to be from Lake Morat, Met 04.3.234 (tinned): https://www.metmuseum.org/art/collection/search/25097
+//     Burgundian war hat, c. 1475, Met 04.3.228 (spirally fluted, 37.1 x 24.8 x 25.9 cm):
+//     https://www.metmuseum.org/art/collection/search/21983
+//     German sallet, Hans Blarer the Younger, Basel c. 1470-80, Met 29.158.11 (37.4 x 20.2 x 24.8 cm):
+//     https://www.metmuseum.org/art/collection/search/26445 ; Caspar Rieder's, Mühlau c. 1480, Met 42.50.32:
+//     https://www.metmuseum.org/art/collection/search/24701 ; the sallet and bevor: https://en.wikipedia.org/wiki/Sallet
+//     barbute, Jacopo da Cannobio (Bichignola), Brescia c. 1460, Met 60.151 (28.9 x 20 x 27 cm):
+//     https://www.metmuseum.org/art/collection/search/24849 ; Met 25.188.20, c. 1465:
+//     https://www.metmuseum.org/art/collection/search/32788
 //   Samurai masks, the Met: somen https://www.metmuseum.org/art/collection/search/24176 , grimacing man (Myōchin
 //     Munesuke) https://www.metmuseum.org/art/collection/search/22080 , mountain demon https://www.metmuseum.org/art/collection/search/24145 ,
 //     tengu https://www.metmuseum.org/art/collection/search/23997 , menpō https://www.metmuseum.org/art/collection/search/31974 ;
@@ -75,7 +87,7 @@ export function helmSheetBytes() {
  * roughness and metalness from the ORM map (roughness as baked, metalness times the bronze's). `duller`: the visor's
  * rougher polish (arenaview.js). Null when the sheet is not there.
  */
-export function helmMaterial(base, name, { side = THREE.FrontSide, duller = false } = {}) {
+export function helmMaterial(base, name, { side = THREE.FrontSide, duller = false, cut = false } = {}) {
   const sheet = helmMapSheet(name);
   if (!sheet) return null;
   const material = base.clone();
@@ -83,6 +95,19 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
     vertexColors: false, map: sheet.map, normalMap: sheet.normalMap, roughnessMap: sheet.ormMap, metalnessMap: sheet.ormMap,
     roughness: duller ? 1.25 : 1, metalness: Math.min(base.metalness ?? 1, duller ? 0.5 : 1), side,
   });
+  // A sheet with openings (a sight, a barbute's T): the normal map's alpha cuts them out.
+  if (cut) {
+    material.onBeforeCompile = (shader) => {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>
+#if defined( USE_MAP ) && defined( USE_NORMALMAP )
+  if ( texture2D( normalMap, vUv ).a < 0.5 ) discard;
+#endif`,
+      );
+    };
+    material.customProgramCacheKey = () => 'helm-cut';
+  }
   return material;
 }
 

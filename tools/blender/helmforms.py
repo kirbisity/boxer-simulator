@@ -261,6 +261,157 @@ def closed(kind, style):
     return atlas
 
 
+# ---- The foot soldiers' helmets of the fifteenth century (src/helmforms.js DESIGN_FORMS) ---------------------------------
+#
+#   kettleRidged     (Cleveland 1916.1919; Met 04.3.234) raised in one piece: the medial ridge's line and the lining's rivets
+#                    along it, a row of small rivets round the dome's foot (the lining band) and round the brim's outer edge,
+#                    the brim's edge turned down, hammer marks and the planishing over them, the polish a little blotched.
+#   kettleBurgundian (Met 04.3.228) the skull fluted to its point (the Met's flutes run in a spiral; a mirrored sheet draws
+#                    them straight, as on other fluted war hats), a plain band at the foot with its rivets, the brim's sight
+#                    across the eyes (two slits, a bar between, their lips raised), the edge turned.
+#   salletGerman     (Met 29.158.11, 42.50.32) the sight across the eyes with the brow's stop-rib raised over it, the
+#                    lining's rivets round the skull, the keel, the tail's edge turned; the bevor's edges turned, a ridge
+#                    down its middle, its strap's rivets at the sides.
+#   barbute          (Met 60.151, 25.188.20) the T opening in a turned edge, the lining's rivets round the foot and round the
+#                    opening, the ridge's line from brow to nape, the foot's edge turned.
+
+IRON = np.array([0.9, 0.9, 0.92])
+
+
+def iron(reg, seed):
+    """Raised and planished iron: broad hammer blows, finer planishing over them, a little blotching of the polish."""
+    hammered(reg, 0.003, 0.07, seed=seed)
+    hammered(reg, 0.0012, 0.022, seed=seed + 50)
+    rng = np.random.default_rng(seed + 100)
+    blotch = reg.blur(rng.standard_normal(reg.x.shape).astype(np.float32), 0.12)
+    blotch = smooth(blotch / (blotch.std() + 1e-9) * 0.5 + 0.5)
+    reg.paint(blotch * 0.35, mul=(0.86, 0.85, 0.84), rough=0.5)
+
+
+def along(end, step, start=0.0):
+    """Evenly spaced positions from `start` to `end`, about `step` apart (so a row of rivets meets itself at the back)."""
+    count = max(1, int(round((end - start) / step)))
+    return [start + (end - start) * (k + 0.5) / count for k in range(count)]
+
+
+def sight(reg, s, spec, bar=0.035):
+    """A sight cut across the front at the eyes: two slits (a bar between at the middle), the lips raised round them."""
+    y, z, h = spec['y'], spec['z'], spec['h']
+    az = np.abs(s['Z'])
+    front = s['X'] > 0.2
+    # Distance outside the slit (negative inside), in (|z|, y).
+    dz = np.maximum(bar - az, az - z)
+    dy = np.abs(s['Y'] - y) - h / 2
+    out = np.where(front, np.maximum(dz, dy), 9)
+    hole = smooth(-out / 0.006)
+    reg.add(bead(np.abs(out - 0.025), 0.022) * 0.022 * front - hole * 0.01)
+    reg.paint(hole, rgb=HOLE, rough=1.0, metal=0.0, cut=0.0)
+
+
+def euro_kettle(kind, style):
+    atlas = Atlas(kind['sheet'], base=IRON, rough=0.36, n=N)
+    bowl = region(atlas, kind, 'bowl')
+    s = bowl.s
+    iron(bowl, 11)
+    end = float(s['SU_END'].max())
+    if style == 'kettleBurgundian':
+        # Flutes from the band up to the point, eight a side, a ridge at the front and back middles.
+        theta = np.arctan2(np.abs(s['Z']), s['X'])
+        rise = smooth((s['SV'] - 0.16) / 0.12) * smooth((float(s['SV_END'].max()) - 0.05 - s['SV']) / 0.25)
+        bowl.add(np.cos(theta * 16) * 0.016 * rise)
+        # The plain band at the foot, a bead above it, its rivets.
+        bowl.add(bead(np.abs(s['SV'] - 0.14), 0.02) * 0.015)
+        add_rivets(bowl, s['SU'], s['SV'], [(su, 0.07) for su in along(end, 0.3)], 0.03, 0.02)
+    else:
+        # The lining's rivets beside the ridge (before and behind), the lining band's rivets round the foot.
+        tall = float(s['SV_END'].max())
+        add_rivets(bowl, s['SU'], s['SV'], [(su, tall * share) for su in (0.09, end - 0.09) for share in (0.45, 0.7)], 0.026, 0.016)
+        add_rivets(bowl, s['SU'], s['SV'], [(su, 0.09) for su in along(end, 0.26)], 0.028, 0.018)
+    # The brim: its edge turned down (a rolled bead), the rivets round its outer edge (the Cleveland hat's), its sight.
+    brim = region(atlas, kind, 'brim')
+    s = brim.s
+    iron(brim, 12)
+    edge = s['SV_END'] - s['SV']
+    rolled(brim, edge, 0.06, 0.035)
+    brim.add(bead(np.abs(s['SV'] - 0.02), 0.03) * 0.012)
+    add_rivets(brim, s['SU'], edge, [(su, 0.14) for su in along(float(s['SU_END'].max()), 0.3)], 0.024, 0.016)
+    if kind.get('sight'):
+        sight(brim, s, kind['sight'])
+    comb = region(atlas, kind, 'comb')
+    iron(comb, 13)
+    return atlas
+
+
+def euro_sallet(kind, style):
+    atlas = Atlas(kind['sheet'], base=IRON, rough=0.34, n=N)
+    shell = region(atlas, kind, 'shell')
+    s = shell.s
+    iron(shell, 21)
+    # The tail's (and the whole foot's) edge turned out; the lining's rivets round the skull above the ears.
+    rolled(shell, s['SV'], 0.06, 0.035)
+    end = float(s['SU_END'].max())
+    add_rivets(shell, s['SU'], s['Y'], [(su, 0.32) for su in along(end, 0.3)], 0.028, 0.018)
+    # The keel's line over the skull.
+    shell.add(bead(np.abs(s['Z']), 0.05) * 0.01 * smooth((s['Y'] - 0.4) / 0.2))
+    # The sight, the brow's stop-rib raised over it.
+    spec = kind['sight']
+    sight(shell, s, spec)
+    front = smooth((s['X'] - 0.4) / 0.1) * smooth((spec['z'] + 0.12 - np.abs(s['Z'])) / 0.05)
+    shell.add(bead(np.abs(s['Y'] - (spec['y'] + spec['h'] / 2 + 0.06)), 0.035) * 0.02 * front)
+    # The bevor: edges turned, a ridge down the middle, the strap's rivets at its sides.
+    bevor = region(atlas, kind, 'bevor')
+    s = bevor.s
+    iron(bevor, 22)
+    edge = np.minimum(np.minimum(s['SV'], s['SV_END'] - s['SV']), s['SU_END'] - s['SU'])
+    rolled(bevor, edge, 0.05, 0.03)
+    bevor.add(bead(s['SU'], 0.06) * 0.018 * smooth((s['SV'] - 0.1) / 0.1))
+    side = s['SU_END'] - s['SU']
+    add_rivets(bevor, side, s['Y'], [(0.12, -0.75), (0.12, -1.05)], 0.032, 0.022)
+    comb = region(atlas, kind, 'comb')
+    iron(comb, 23)
+    return atlas
+
+
+def euro_barbute(kind, style):
+    atlas = Atlas(kind['sheet'], base=IRON, rough=0.34, n=N)
+    shell = region(atlas, kind, 'shell')
+    s = shell.s
+    iron(shell, 31)
+    end = float(s['SU_END'].max())
+    # The foot's edge turned, the lining band's rivets in a row above it; the ridge's line over the skull.
+    rolled(shell, s['SV'], 0.06, 0.035)
+    add_rivets(shell, s['SU'], s['SV'], [(su, 0.16) for su in along(end, 0.26)], 0.028, 0.018)
+    shell.add(bead(np.abs(s['Z']), 0.05) * 0.01 * smooth((s['Y'] - 0.4) / 0.2))
+    # The T opening: the eyes' bar and the mouth's slot, corners rounded, in a turned edge with the lining's rivets round it.
+    o = kind['opening']
+    az = np.abs(s['Z'])
+    b0, b1 = o['bar']
+    rd = o['round']
+
+    def box(z1, y0, y1):
+        """Signed distance (|z|, y) to a box from the middle out to z1, y0 to y1, its corners rounded by rd."""
+        qz = az - (z1 - rd)
+        qy = np.maximum(y0 + rd - s['Y'], s['Y'] - (y1 - rd))
+        return np.hypot(np.maximum(qz, 0), np.maximum(qy, 0)) + np.minimum(np.maximum(qz, qy), 0) - rd
+
+    out = np.minimum(box(o['wide'], b0, b1), box(o['slot'], -3.0, b1))
+    out = np.where(s['X'] > 0, out, 9)
+    hole = smooth(-out / 0.006)
+    shell.add(bead(np.abs(out - 0.03), 0.03) * 0.03 - hole * 0.01)
+    shell.paint(hole, rgb=HOLE, rough=1.0, metal=0.0, cut=0.0)
+    # Rivets round the opening, a little outside its turned edge.
+    ring = [(z, b1 + 0.11) for z in np.linspace(0.0, o['wide'] - 0.05, 4)]
+    ring += [(o['wide'] + 0.1, y) for y in np.linspace(b0, b1, 2)]
+    ring += [(o['slot'] + 0.11, y) for y in np.linspace(b0 - 0.2, -1.05, 4)]
+    add_rivets(shell, az + np.where(s['X'] > 0, 0, 9), s['Y'], [(float(z), float(y)) for z, y in ring], 0.026, 0.018)
+    comb = region(atlas, kind, 'comb')
+    iron(comb, 33)
+    return atlas
+
+
+EURO = {'kettle': euro_kettle, 'sallet': euro_sallet, 'barbute': euro_barbute}
+
+
 def main():
     folder = sys.argv[1]
     with open(os.path.join(folder, 'forms.json')) as file:
@@ -268,7 +419,10 @@ def main():
     kinds = sys.argv[2:] or list(forms)
     for style in kinds:
         kind = forms[style]
-        atlas = closed(kind, style) if 'shell' in kind['parts'] else brimmed(kind, style)
+        if kind.get('build'):
+            atlas = EURO[kind['build']](kind, style)
+        else:
+            atlas = closed(kind, style) if 'shell' in kind['parts'] else brimmed(kind, style)
         atlas.save(folder)
         # A quick look: the colour lit from the left by the height's slope.
         shade = np.clip(0.75 + np.gradient(atlas.h, axis=1) * 3000, 0, 1.5)
