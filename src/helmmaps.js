@@ -48,12 +48,15 @@
 //     c., now in the Hermitage) https://eng.obozrevatel.com/section-news/news-a-golden-crest-from-a-mound-and-earrings-from-olbia-five-archaeological-treasures-that-russia-stole-from-ukraine-15-02-2024.html ;
 //     the gilt half-mask with brows over almond eye cut-outs and a beak-shaped nose riveted on (horde), Cuman, 1200-1300,
 //     the type worn across the Golden Horde, National Museum of the History of Ukraine АЗС-3607
-//     https://kyiv.ua.museum-digital.org/object/12837?navlang=en ; the mail veil across the face (mailVeil), the Met's
-//     helmet with aventail 50.87 (Turkish, in the Turkman style, the mail guarding the lower face; an Ottoman arsenal
-//     mark) https://www.metmuseum.org/toah/works-of-art/50.87 and its aventails https://en.wikipedia.org/wiki/Aventail ;
+//     https://kyiv.ua.museum-digital.org/object/12837?navlang=en ;
 //     the ventail (mail laced across the lower face under a plate edge, the nasal over it), the Aq Qoyunlu turban helmet
 //     at the Louvre Abu Dhabi (c. 1450-1500: a detachable nasal through a mail camail guarding the neck, ears and face)
 //     https://collection.louvreabudhabi.ae/en/object/turban-helmet
+//   The Turkman turban helmet with its aventail, the mail closing across the face below the eye arches (helmforms.js
+//     DESIGN_FORMS.turbanTurkman): the Met's 50.87, Helmet with Aventail (Turkish, in the Turkman style, late 15th-16th c.;
+//     34.6 cm high without the mail, 55.9 cm with it, 25.4 cm across, 3.35 kg with the mail; an Ottoman arsenal mark)
+//     https://www.metmuseum.org/art/collection/search/24813 ; the Met's turban helmets 04.3.211 (Aq Qoyunlu, Sultan Ya'qub,
+//     1478-c. 1490) https://www.metmuseum.org/art/collection/search/22013 ; aventails https://en.wikipedia.org/wiki/Aventail
 
 /* global THREE */
 import { HELM_MAP_DATA } from './helmmaps-data.js';

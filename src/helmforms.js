@@ -527,6 +527,63 @@ export const DESIGN_FORMS = {
   })(),
 };
 
+// The Turkman "turban helmet" with its mail (the Met's 50.87, Helmet with Aventail, Turkish in the Turkman style, late
+// 15th-16th c.: 34.6 cm high without the mail, 55.9 cm with it, 25.4 cm across; https://www.metmuseum.org/art/collection/search/24813
+// ; the Aq Qoyunlu turban helmet at the Louvre Abu Dhabi, c. 1450-1500, its nasal passing through the mail
+// https://collection.louvreabudhabi.ae/en/object/turban-helmet ; the Met's turban helmets 04.3.211, 04.3.215): raised in one
+// piece, its lower sides an upright cylinder round the head (a lining's room off it, so longer than broad) from the rim to
+// above the brow, then swelling a little and drawn up in an ogee to a tall narrow point with a small finial; two arches cut
+// out of the rim over the eyes, a sliding nasal between them with a round finial; the mail aventail riveted to the rim all
+// round and hanging to the shoulders, closing across the face below the eye arches (the veil). Its silver-inlaid inscription
+// band, arabesque roundels, the rim's band and rivets and the mail's links are in its sheet (helmforms.py `turban`).
+const TURBAN_KEYS = 5;
+// The head's widest at each key above the nose (from the face round to the back) and the lining's room: the cylinder's radius.
+const TURBAN_WIDE = Array.from({ length: TURBAN_KEYS }, (_, k) => Math.max(...[-0.3, -0.2, 0, 0.2, 0.4, 0.6].map((y) => headRadiusAt((k / (TURBAN_KEYS - 1)) * HELM_PI, y))) + 0.15);
+// The rim: down to the nose's root in front (the eye arches cut up from it), over the ears' tops at the sides.
+const TURBAN_RIM = [-0.42, -0.4, -0.32, -0.36, -0.4];
+DESIGN_FORMS.turbanTurkman = (() => {
+  const ring = (y, scale, add = 0) => ({ y, rad: TURBAN_WIDE.map((wide) => wide * scale + add) });
+  const front = TURBAN_WIDE[0];
+  // The nasal's stations from its finial down to its tip: height, half-width.
+  const nasal = [[1.2, 0.02], [1.15, 0.11], [1.02, 0.14], [0.89, 0.11], [0.84, 0.04], [0.5, 0.04], [0.0, 0.045], [-0.5, 0.05], [-0.7, 0.07], [-0.8, 0.02]];
+  return {
+    sheet: 'formTurbanTurkman', build: 'turban', period: 'Turkman or Ottoman, late 15th-16th c.', label: 'Turban helmet with aventail', cut: true,
+    // The arches over the eyes cut up from the rim: their middles `z` off the face's middle, `w` half as wide, up to `top`.
+    arches: { z: 0.33, w: 0.2, top: 0.1 },
+    regions: { bowl: [0, 0.5, 1, 1], mail: [0, 0.08, 1, 0.5], comb: [0, 0, 0.3, 0.08], nasal: [0.3, 0, 1, 0.08] },
+    parts: {
+      bowl: {
+        kind: 'loft', span: 1, seg: [24, 1], region: 'bowl', look: 'metal', ink: true, double: true,
+        stations: [
+          // (Stations close on the cylinder and the swell, where its inlay is, fewer up the point: the sheet's rows.)
+          { y: TURBAN_RIM, rad: TURBAN_WIDE }, ring(-0.15, 1), ring(0.1, 1), ring(0.35, 1), ring(0.6, 1), ring(0.82, 1.005),
+          ring(1.09, 0.985), ring(1.36, 0.89), ring(1.66, 0.68), ring(1.95, 0.44), ring(2.22, 0.2), ring(2.41, 0.06), ring(2.5, 0),
+        ],
+      },
+      // The mail: from just inside the rim, hanging in front of the face and chin and out over the shoulders.
+      mail: {
+        kind: 'loft', span: 1, seg: [16, 1], region: 'mail', look: 'metal', double: true,
+        stations: [
+          { y: TURBAN_RIM.map((y) => y + 0.05), rad: TURBAN_WIDE.map((wide) => wide - 0.015) },
+          { y: TURBAN_RIM.map((y) => y - 0.5), rad: TURBAN_WIDE.map((wide, k) => wide + [0.02, 0.04, 0.08, 0.08, 0.05][k]) },
+          { y: -1.6, rad: [1.24, 1.26, 1.36, 1.36, 1.3] },
+          { y: -2.15, rad: [1.34, 1.44, 1.66, 1.56, 1.44] },
+        ],
+      },
+      // The finial on the point: a small knob and a short spike.
+      finial: {
+        kind: 'sweep', seg: [6, 1], region: 'comb', look: 'metal', ink: true,
+        stations: [{ at: [0, 2.47], r: 0.035, rz: 1 }, { at: [0, 2.56], r: 0.07, rz: 1 }, { at: [0, 2.64], r: 0.028, rz: 1 }, { at: [0, 2.78], r: 0.008, rz: 1 }],
+      },
+      // The sliding nasal before the face, its round finial on the bowl above the brow.
+      nasal: {
+        kind: 'sweep', seg: [6, 1], region: 'nasal', look: 'metal', ink: true, square: 0.4,
+        stations: nasal.map(([y, w]) => ({ bottom: [front + 0.01, y], top: [front + 0.05, y], w })),
+      },
+    },
+  };
+})();
+
 // The designs' keels seated on their parts.
 for (const form of Object.values(DESIGN_FORMS)) formSeat(form);
 
@@ -534,6 +591,7 @@ for (const form of Object.values(DESIGN_FORMS)) formSeat(form);
 export const HELM_DESIGNS = {
   kettleHat: { a: 'kettleRidged', b: 'kettleBurgundian', c: 'salletGerman' },
   cabasset: { spanish: 'cabassetSpanish' },
+  chichak: { turban: 'turbanTurkman' },
 };
 
 /** The design form a helmet kind is drawn in for a choice (null: drawn as before). */
@@ -592,9 +650,11 @@ export const MASK_FITS = {
   oniFace: { R: 1.08, gap: 0.06, y: [[0.83, 0.3], [0.16, -0.07], [-0.04, -0.45], [-0.36, -0.74], [-0.94, -1.42]] },
   // The quick variants of China, the steppe and the sultanates (menpo.js): the whole-face ones on the oni somen's patch,
   // but their eyes cut through, so drawn (0.12 r low, as the oni's) with the eye holes over the eyes, the mouth over the
-  // mouth; the ventail as the half masks; the mail veil a little further off the face (it hangs over the nose and chin).
-  ...Object.fromEntries(['tiemian', 'shoumian', 'kipchak', 'horde'].map((name) => [name, { R: 1.12, gap: 0.06, span: 0.84, y: WORLD_FACE_Y }])),
-  mailVeil: { R: 1.12, gap: 0.08, span: 0.84, y: WORLD_FACE_Y },
+  // mouth; the ventail as the half masks. (The mail veil is the Turkman turban helmet's own aventail: DESIGN_FORMS.)
+  // The guardian face pinched in through the middle (broad at the brow and jaw); the steppe face narrower, squared.
+  ...Object.fromEntries(['tiemian', 'horde'].map((name) => [name, { R: 1.12, gap: 0.06, span: 0.84, y: WORLD_FACE_Y }])),
+  shoumian: { R: 1.12, gap: 0.06, span: [0.95, 0.5, 0.92], y: WORLD_FACE_Y },
+  kipchak: { R: 1.12, gap: 0.06, span: [0.66, 0.62, 0.8], square: 0.15, y: WORLD_FACE_Y },
   ventail: { R: 1.1, gap: 0.07, span: 0.84, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
 };
 
@@ -616,6 +676,19 @@ export function headRadiusAt(azimuth, y) {
   return formKeyed(keysTop, s) * Math.sqrt(Math.max(0, 1 - share * share));
 }
 
+/**
+ * A mask's span at a height on the face: one figure; [over the eyes, at the chin], straight between from y -0.3 to -1.2;
+ * or [at the brow, at the cheeks and nose, at the jaw], straight between from the brow (y 0.3) to the cheeks (-0.45) and
+ * on to the jaw (-1.2): a mask pinched in through the middle, or squared off below.
+ */
+export function maskSpanAt(span = 1, height) {
+  if (!Array.isArray(span)) return span;
+  const share = (from, to) => Math.min(1, Math.max(0, (from - height) / (from - to)));
+  if (span.length === 2) return span[0] + (span[1] - span[0]) * share(-0.3, -1.2);
+  const [brow, middle, jaw] = span;
+  return height > -0.45 ? brow + (middle - brow) * share(0.3, -0.45) : middle + (jaw - middle) * share(-0.45, -1.2);
+}
+
 /** A point of a mask as drawn (head radii, on or off its sphere: MASK_FITS) set on the face. */
 export function maskOnFace(fit, [x, y, z]) {
   let segment = 1;
@@ -623,12 +696,13 @@ export function maskOnFace(fit, [x, y, z]) {
   const [[a0, b0], [a1, b1]] = [fit.y[segment - 1], fit.y[segment]];
   const height = b0 + ((b1 - b0) * (y - a0)) / (a1 - a0);
   // `span` (< 1) draws the mask in round the face, less far back over the cheeks: one figure, or [over the eyes, at the
-  // chin], narrow above and broad and square below; `chin` (head radii) stands the jaw guard out in front of the chin.
+  // chin], narrow above and broad and square below, or [at the brow, at the cheeks and nose, at the jaw] (maskSpanAt);
+  // `chin` (head radii) stands the jaw guard out in front of the chin.
   const below = Math.min(1, Math.max(0, (-0.3 - height) / 0.9));
-  const [spanTop, spanLow] = Array.isArray(fit.span) ? fit.span : [fit.span ?? 1, fit.span ?? 1];
-  const azimuth = Math.atan2(z, x) * (spanTop + (spanLow - spanTop) * below);
+  const azimuth = Math.atan2(z, x) * maskSpanAt(fit.span, height);
   const off = Math.hypot(x, z) - Math.sqrt(Math.max(0, fit.R * fit.R - y * y));
-  const jut = (fit.chin ?? 0) * below * below * Math.max(0, Math.cos(azimuth));
+  // `square` (head radii) stands the whole lower mask off the jaw, so its sides fall straighter to a squarer jaw line.
+  const jut = ((fit.chin ?? 0) * Math.max(0, Math.cos(azimuth)) + (fit.square ?? 0)) * below * below;
   const radius = headRadiusAt(azimuth, height) + fit.gap + off + jut;
   return [radius * Math.cos(azimuth), height, radius * Math.sin(azimuth)];
 }

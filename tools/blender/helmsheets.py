@@ -543,7 +543,7 @@ FULL = {'R': 1.12, 'az': 0.42 * PI, 'top': 0.2 * PI, 'bottom': 0.86 * PI}
 HALF = {'R': 1.1, 'az': 0.44 * PI, 'top': 0.42 * PI, 'bottom': 0.88 * PI}
 WORLD_MASKS = {
     'maskTiemian': FULL, 'maskShoumian': FULL, 'maskKipchak': FULL, 'maskHorde': FULL,
-    'maskMailVeil': FULL, 'maskVentail': HALF,
+    'maskVentail': HALF,
 }
 WORLD_N = 512
 METAL = np.array([0.8, 0.8, 0.8])
@@ -583,6 +583,13 @@ def world_mask_atlas(name):
     if spec is FULL:
         Y = Y + 0.12
         outline = smooth((0.9 * width - X - np.clip(-0.45 - Y, 0, None) * 0.9) / 0.04)
+        if name == 'maskKipchak':
+            # Squarer: straight sides down to a straight jaw line, the corners only a little rounded.
+            corner = 0.14
+            qx = X - (0.86 * width - corner)
+            qy = -0.8 - Y + corner
+            d = np.hypot(np.maximum(qx, 0), np.maximum(qy, 0)) + np.minimum(np.maximum(qx, qy), 0) - corner
+            outline = smooth(-d / 0.04)
     else:
         outline = smooth((0.97 * width - X - np.clip(Y - 0.0, 0, None) * 0.8 - np.clip(-0.72 - Y, 0, None) * 1.2) / 0.04)
     after = []
@@ -652,16 +659,6 @@ def world_mask_atlas(name):
         after.append(lambda: eye_hole(region, X, Y, 0.24, 0.17, 0.12, 0.05, -0.15, 0.015))
         after.append(lambda: add_rivets(region, X, Y, [(0.0, 0.3), (0.0, 0.1), (0.0, -0.08), (0.42, 0.62), (0.15, 0.78)], 0.026, 0.02))
         after.append(lambda: region.add(-bead(np.abs(X - 0.1), 0.006) * smooth((0.28 - np.abs(Y - 0.02)) / 0.02) * 0.008))
-    elif name == 'maskMailVeil':
-        # A veil of riveted mail hung from the helmet's rim across the face, only the eyes left open, falling loose to
-        # the throat: it stands off the chin and hangs away below it.
-        relief += dome(ellipse(X, Y, 0.0, 0.05, 1.0, 0.9), 1.0) * 0.03 + dome(ellipse(X, Y, 0.0, -0.12, 0.14, 0.2), 1.0) * 0.05
-        relief += smooth((-0.45 - Y) / 0.45) * 0.12
-        after.append(lambda: mail(region, X, Y))
-        slot = np.maximum(np.abs(Y - 0.15) / 0.06, np.abs(X - 0.22) / 0.17)
-        after.append(lambda slot=slot: region.paint(smooth((1.0 - slot) / 0.15), cut=0.0))
-        band = smooth((0.06 - np.abs(Y - 0.85)) / 0.01)
-        after.append(lambda band=band: (region.add(band * 0.015), region.paint(band, rgb=GILT * 0.8, rough=0.35, metal=1.0, mask=0.0)))
     else:
         # The ventail: mail laced across the lower face from cheek to cheek, from under the eyes to under the chin, its
         # top edge a riveted iron plate over the nose and cheekbones, a riveted strip down the middle where it fastens.
@@ -677,7 +674,7 @@ def world_mask_atlas(name):
     region.add(relief - mask_grid(atlas, region, relief, spec))
     for step in after:
         step()
-    if name not in ('maskMailVeil', 'maskVentail'):
+    if name != 'maskVentail':
         hammered(region, 0.003, 0.05, seed=len(name))
     region.add(bead(np.abs(outline - 0.5) * 0.08, 0.03) * 0.02)
     region.paint(1 - outline, cut=0.0)

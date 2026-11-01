@@ -1607,7 +1607,7 @@ export const OUTFITS = {
     protection: { blunt: 0.42, cut: 0.95, pierce: 0.5, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
     courage: 0.3,
     designs: [
-      { label: 'Steel, red kaftan', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#3a1012' }, armor: { kind: 'krug', color: '#a7adb6' }, head: { kind: 'chichak', color: '#a7adb6', gold: '#d6a743', maskDesign: 'mailVeil' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
+      { label: 'Steel, red kaftan', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#3a1012' }, armor: { kind: 'krug', color: '#a7adb6' }, head: { kind: 'chichak', design: 'turban', color: '#a7adb6', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
       { label: 'Gilt, blue kaftan', top: { kind: 'longsleeve', color: '#2a3a6a' }, bottom: { kind: 'pants', color: '#1c2238' }, armor: { kind: 'krug', color: '#b8a066' }, head: { kind: 'chichak', color: '#b8a066', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
       { label: 'Dark steel, green kaftan', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#1c2a20' }, armor: { kind: 'krug', color: '#6a6d73' }, head: { kind: 'chichak', color: '#6a6d73', gold: '#b8a066', maskDesign: 'ventail' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
     ],

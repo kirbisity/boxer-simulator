@@ -30,7 +30,7 @@ from scipy import ndimage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from helmsheets import (  # noqa: E402
-    GILT, HOLE, Atlas, add_rivets, bead, cap, dolphin, draw_mask, emboss, gorgon, hammered, hercules, laurel, palm, smooth,
+    GILT, HOLE, Atlas, add_rivets, bead, cap, dolphin, draw_mask, emboss, gorgon, hammered, hercules, laurel, mail, palm, smooth,
     stamp, trophy, victory,
 )
 
@@ -478,7 +478,103 @@ def euro_cabasset(kind, style):
     return atlas
 
 
-EURO = {'kettle': euro_kettle, 'sallet': euro_sallet, 'barbute': euro_barbute, 'cabasset': euro_cabasset}
+SILVER = np.array([0.97, 0.97, 0.98])
+BLUED = np.array([0.46, 0.46, 0.48])
+
+
+def inlay(reg, field, raise_=0.0025):
+    """Silver hammered into the iron along `field` (0..1): bright, smooth, a hair proud."""
+    reg.add(field * raise_)
+    reg.paint(field, rgb=SILVER, rough=0.22, metal=1.0)
+
+
+def calligraphy(su, sv, base, height, seed):
+    """Pseudo-thuluth in silver along a band (su along it, sv up from its foot at `base`): tall upright strokes (the alifs
+    and lams) rising from a running baseline, low bowls and swashes between, letter groups in a row."""
+    rng = np.random.default_rng(seed)
+    strokes = np.zeros(su.shape, np.float32)
+    x = 0.04
+    end = float(su.max())
+    while x < end:
+        kind = rng.random()
+        if kind < 0.45:
+            top = base + height * rng.uniform(0.55, 1.0)
+            d = np.hypot(np.maximum(np.abs(su - x) - 0.004, 0), np.maximum(np.maximum(sv - top, base - sv), 0))
+            strokes = np.maximum(strokes, smooth((0.012 - d) / 0.004))
+            x += rng.uniform(0.04, 0.07)
+        else:
+            w = rng.uniform(0.05, 0.1)
+            cy = base + height * 0.12
+            bowl = np.hypot((su - x - w / 2) / (w / 2), (sv - cy) / (height * 0.18))
+            arc = (sv < cy + height * 0.05) & (np.abs(bowl - 1) < 0.22)
+            strokes = np.maximum(strokes, arc.astype(np.float32))
+            x += w + rng.uniform(0.01, 0.03)
+    return strokes
+
+
+def euro_turban(kind, style):
+    """The Turkman turban helmet with its aventail (src/helmforms.js DESIGN_FORMS.turbanTurkman; the Met's 50.87): the iron
+    darkened and inlaid in silver, a band of inscription in cartouches round the cylinder between roundels, a scalloped
+    arcade and arabesque roundels on the swell, flutes up the point; the rim's narrow band and the mail's rivets; the arches
+    over the eyes cut out in a turned edge; the mail riveted, its last rows of brass rings; the nasal's finial a roundel."""
+    atlas = Atlas(kind['sheet'], base=BLUED, rough=0.36, n=N)
+    bowl = region(atlas, kind, 'bowl')
+    s = bowl.s
+    iron(bowl, 61)
+    su, sv, end = s['SU'], s['SV'], s['SU_END']
+    # The arches over the eyes, cut up from the rim.
+    arch = kind['arches']
+    e = np.hypot((np.abs(s['Z']) - arch['z']) / arch['w'], (s['Y'] + 0.45) / (arch['top'] + 0.45))
+    e = np.where(s['X'] > 0.3, e, 9)
+    hole = smooth((1 - e) / 0.04)
+    bowl.add(bead(np.abs(e - 1.08), 0.09) * 0.02)
+    bowl.paint(hole, rgb=HOLE, rough=1.0, metal=0.0, cut=0.0)
+    # The rim's band and the mail's rivets in it.
+    band = smooth((0.1 - sv) / 0.008)
+    bowl.add(band * 0.008 + bead(np.abs(sv - 0.1), 0.01) * 0.004)
+    rivets = add_rivets(bowl, su, sv, [(x, 0.05) for x in along(float(end.max()), 0.11)], 0.022, 0.016)
+    bowl.paint(smooth(rivets / 0.004), rgb=SILVER * 0.9, rough=0.3, metal=1.0)
+    # The inscription band round the cylinder: cartouches between roundels, bordered above and below.
+    lo, hi = 0.3, 0.92
+    clear = 1 - smooth((1.25 - e) / 0.1)
+    borders = (bead(np.abs(sv - lo), 0.008) + bead(np.abs(sv - hi), 0.008)) * clear
+    pitch = 1.3
+    cell = np.mod(su + pitch / 2, pitch) - pitch / 2
+    roundel = np.hypot(cell, sv - (lo + hi) / 2)
+    ring = bead(np.abs(roundel - 0.25), 0.01) + bead(np.abs(roundel - 0.2), 0.006)
+    in_roundel = roundel < 0.25
+    script = calligraphy(su, sv, lo + 0.05, hi - lo - 0.1, 61) * (~in_roundel) * (sv > lo) * (sv < hi)
+    rosette = (np.abs(np.sin(np.arctan2(sv - (lo + hi) / 2, cell) * 4)) * 0.15 > roundel) * in_roundel
+    inlay(bowl, np.clip(borders + ring + script + rosette * 0.9, 0, 1) * clear)
+    # The swell: a scalloped arcade over the band, a roundel of scrolls under each arch.
+    arcade_y = hi + 0.14 + 0.16 * np.abs(np.cos(np.pi * su / 0.6))
+    inlay(bowl, bead(np.abs(sv - arcade_y), 0.008))
+    cell2 = np.mod(su, 0.6) - 0.3
+    knot = np.hypot(cell2, sv - (hi + 0.62))
+    scroll = bead(np.abs(knot - 0.13 - 0.03 * np.sin(np.arctan2(sv - hi - 0.62, cell2) * 3)), 0.008) * (knot < 0.2)
+    inlay(bowl, scroll * (end > 0.9))
+    # Rings of silver round the point.
+    top = float(sv.max())
+    inlay(bowl, sum(bead(np.abs(sv - (top - d)), 0.01) for d in (0.35, 0.75, 1.15)))
+    # The mail: riveted rings, the last rows of brass.
+    mail_reg = region(atlas, kind, 'mail')
+    m = mail_reg.s
+    mail_reg.paint(np.ones(m['SU'].shape), rgb=np.array([0.62, 0.62, 0.64]), rough=0.5, metal=1.0)
+    mail(mail_reg, m['SU'], m['SV'], pitch=0.09, height=0.014)
+    hem = smooth((0.16 - (m['SV_END'] - m['SV'])) / 0.02)
+    mail_reg.paint(hem * 0.8, mul=(1.25, 0.95, 0.55))
+    comb = region(atlas, kind, 'finial')
+    iron(comb, 62)
+    nasal = region(atlas, kind, 'nasal')
+    n = nasal.s
+    iron(nasal, 63)
+    edge = np.minimum(n['SU'], n['SU_END'] - n['SU'])
+    rolled(nasal, edge, 0.02, 0.012)
+    inlay(nasal, bead(np.abs(n['SU'] - n['SU_END'] / 2), 0.008) * smooth((n['SV'] - 0.45) / 0.02))
+    return atlas
+
+
+EURO = {'kettle': euro_kettle, 'sallet': euro_sallet, 'barbute': euro_barbute, 'cabasset': euro_cabasset, 'turban': euro_turban}
 
 
 def main():

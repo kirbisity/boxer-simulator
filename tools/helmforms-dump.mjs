@@ -46,6 +46,6 @@ for (const [style, form] of Object.entries(HELM_FORMS)) {
 for (const [style, form] of Object.entries(DESIGN_FORMS)) {
   const parts = {};
   for (const [name, part] of Object.entries(form.parts)) if (part.region) parts[name] = { region: part.region, grid: sample(part), stations: part.stations };
-  out[style] = { sheet: form.sheet, regions: form.regions, build: form.build, sight: form.sight ?? null, opening: form.opening ?? null, grille: null, eyes: null, feathers: null, parts };
+  out[style] = { sheet: form.sheet, regions: form.regions, build: form.build, sight: form.sight ?? null, opening: form.opening ?? null, arches: form.arches ?? null, grille: null, eyes: null, feathers: null, parts };
 }
 process.stdout.write(JSON.stringify(out));

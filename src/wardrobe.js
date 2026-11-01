@@ -1167,6 +1167,13 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'chichak': {
+      // In its design (helmforms.js HELM_DESIGNS: `head.design`, the Turkman turban helmet), fitted over the head, its
+      // inlay, rivets and mail baked; the mail closing across the face below the eye arches.
+      const design = helmDesignOf(head, lowDetail);
+      if (design && buildDesignHelm(group, design, r, metal(steel, color))) {
+        fitted = true;
+        break;
+      }
       // The Ottoman chichak: a pointed bowl with a gilt band and finial, a
       // sliding nasal bar, cheek plates and a mail aventail round the neck;
       // (`turban`) a turban wound round it, as an alp wore it.
@@ -2337,26 +2344,24 @@ const MASK_THROAT_Y = -1.5;
 // The metal each of the other war masks is drawn in (menpo.js): of the helmet's steel, bronze, its gilt, or its mail.
 const WORLD_MASK_METAL = {
   tiemian: (head, color) => color, kipchak: (head, color) => color, shoumian: () => 0x9a7a4a,
-  horde: (head) => head.gold ?? 0xc9a23a, mailVeil: (head, color) => head.mail ?? head.coif ?? color, ventail: (head, color) => head.mail ?? head.coif ?? color,
+  horde: (head) => head.gold ?? 0xc9a23a, ventail: (head, color) => head.mail ?? head.coif ?? color,
 };
 
 /**
  * A helmet's war mask of China, the steppe or the sultanates (`head.maskDesign`: menpo.js MASK_SHEETS), set on the face
  * as the samurai's are and kept fitted through the helmet's span (helmforms.js HELM_SPAN); under a plate mask, mail at
- * the throat hanging from its foot (the veil falls to the throat itself). Whether it was drawn (else the helmet's own).
+ * the throat hanging from its foot. Whether it was drawn (else the helmet's own).
  */
 function worldMask(group, head, r, steel, color) {
   const tintOf = WORLD_MASK_METAL[head.maskDesign];
   if (!tintOf || HELM_STYLE.masks === 'now' || !helmMapsReady()) return false;
   const span = HELM_SPAN[head.kind] ?? null;
   if (!buildWarMask(group, head.maskDesign, r, tintOf(head, color), steel.envMap, span)) return false;
-  if (head.maskDesign !== 'mailVeil') {
-    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), metal(steel, WORLD_MASK_METAL.mailVeil(head, color)).clone());
-    throat.material.side = THREE.DoubleSide;
-    throat.position.y = MASK_THROAT_Y * r;
-    if (span) throat.scale.set(1 / span[0], 1 / span[1], 1 / span[2]);
-    group.add(throat);
-  }
+  const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), metal(steel, head.mail ?? head.coif ?? color).clone());
+  throat.material.side = THREE.DoubleSide;
+  throat.position.y = MASK_THROAT_Y * r;
+  if (span) throat.scale.set(1 / span[0], 1 / span[1], 1 / span[2]);
+  group.add(throat);
   return true;
 }
 

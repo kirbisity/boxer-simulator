@@ -13,7 +13,7 @@ import { maskOnFace, MASK_FITS } from './helmforms.js';
 
 export const MASK_SHEETS = {
   oni: 'maskOni', ressei: 'maskRessei', tengu: 'maskTengu',
-  tiemian: 'maskTiemian', shoumian: 'maskShoumian', kipchak: 'maskKipchak', horde: 'maskHorde', mailVeil: 'maskMailVeil', ventail: 'maskVentail',
+  tiemian: 'maskTiemian', shoumian: 'maskShoumian', kipchak: 'maskKipchak', horde: 'maskHorde', ventail: 'maskVentail',
 };
 
 /** The mask's vertices (flat [x, y, z, ...], head coordinates times `r`) and texture coordinates from a sheet's grid. */

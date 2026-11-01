@@ -155,8 +155,9 @@ test('the samurai\'s masks sit on the face: off it by their gap, the chin cupped
         const a = polar * Math.PI;
         const point = maskOnFace(fit, [fit.R * Math.sin(a) * Math.cos(azimuth), fit.R * Math.cos(a), fit.R * Math.sin(a) * Math.sin(azimuth)]);
         const off = Math.hypot(point[0], point[2]) - headRadiusAt(Math.atan2(point[2], point[0]), point[1]);
-        // At least the gap everywhere; more only where the jaw guard stands out in front of the chin (`chin`).
-        const jutAllowed = (fit.chin ?? 0) + 1e-6;
+        // At least the gap everywhere; more only where the jaw guard stands out in front of the chin (`chin`), or the lower
+        // mask off the jaw all round (`square`).
+        const jutAllowed = (fit.chin ?? 0) + (fit.square ?? 0) + 1e-6;
         assert.ok(off >= fit.gap - 1e-6 && off <= fit.gap + jutAllowed, `${name}`);
       }
     }
@@ -166,11 +167,26 @@ test('the samurai\'s masks sit on the face: off it by their gap, the chin cupped
   for (const [style, sheet] of Object.entries(MASK_SHEETS)) assert.equal(MASK_FITS[style].R, HELM_MAP_DATA[sheet].grid.R, style);
 });
 
+test('the guardian face is pinched in through the middle; the steppe face narrower than the rest, its sides straight', () => {
+  // The edge of a whole-face mask (drawn at 0.86 of its reach round) set on the face: its breadth (z) at a drawn height.
+  const edge = (fit, y) => {
+    const polar = Math.acos(y / fit.R);
+    const azimuth = 0.42 * Math.PI * 0.86;
+    return maskOnFace(fit, [fit.R * Math.sin(polar) * Math.cos(azimuth), y, fit.R * Math.sin(polar) * Math.sin(azimuth)])[2];
+  };
+  const guardian = MASK_FITS.shoumian;
+  assert.ok(edge(guardian, -0.3) < edge(guardian, 0.6) - 0.05 && edge(guardian, -0.3) < edge(guardian, -0.8), 'pinched at the cheeks');
+  const steppe = MASK_FITS.kipchak;
+  const breadths = [0.6, 0.3, 0, -0.3, -0.6, -0.8, -0.9].map((y) => edge(steppe, y));
+  assert.ok(Math.max(...breadths) - Math.min(...breadths) < 0.12, `straight-sided: ${breadths.map((b) => b.toFixed(2))}`);
+  assert.ok(Math.max(...breadths) < Math.max(...[0.6, 0.3, 0, -0.3, -0.6].map((y) => edge(MASK_FITS.tiemian, y))), 'narrower than the iron man\'s face');
+});
+
 // The quick war masks of China, the steppe and the sultanates (menpo.js), and the kits that wear them.
-const WORLD_MASKS = ['tiemian', 'shoumian', 'kipchak', 'horde', 'mailVeil', 'ventail'];
+const WORLD_MASKS = ['tiemian', 'shoumian', 'kipchak', 'horde', 'ventail'];
 
 test('the war masks of China, the steppe and the sultanates: each worn by its kits, most designs bare-faced', () => {
-  const wearers = { mingElite: ['shoumian', 'tiemian'], kheshig: ['kipchak', 'horde'], ottomanHeavy: ['mailVeil', 'ventail'] };
+  const wearers = { mingElite: ['shoumian', 'tiemian'], kheshig: ['kipchak', 'horde'], ottomanHeavy: ['ventail'] };
   const worn = new Set();
   for (const [kit, masks] of Object.entries(wearers)) {
     const designs = OUTFITS[kit].designs.filter((design) => !design.levelOnly);
@@ -178,6 +194,8 @@ test('the war masks of China, the steppe and the sultanates: each worn by its ki
     masks.forEach((mask) => worn.add(mask));
   }
   assert.deepEqual([...worn].sort(), [...WORLD_MASKS].sort());
+  // The mail veil is the Turkman turban helmet's own aventail (DESIGN_FORMS.turbanTurkman), on the Ottoman heavy's steel kit.
+  assert.deepEqual(OUTFITS.ottomanHeavy.designs.map((design) => design.head.design ?? null), ['turban', null, null]);
   // Nowhere else: the other kits' faces as they were.
   for (const [kit, outfit] of Object.entries(OUTFITS)) {
     if (wearers[kit]) continue;

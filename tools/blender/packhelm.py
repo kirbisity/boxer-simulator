@@ -24,9 +24,10 @@ SHEETS = {
     'formSecutor': {'size': 512}, 'formScissor': {'size': 512},
     'formKettleRidged': {'size': 512}, 'formKettleBurgundian': {'size': 512, 'cut': True},
     'formSalletGerman': {'size': 512, 'cut': True}, 'formCabassetSpanish': {'size': 512},
+    'formTurbanTurkman': {'size': 512, 'cut': True},
     'maskOni': {'size': 512, 'alpha': True}, 'maskRessei': {'size': 512, 'alpha': True}, 'maskTengu': {'size': 512, 'alpha': True},
     # The war masks of China, the steppe and the sultanates (helmsheets.py WORLD_MASKS): quick, small sheets.
-    **{name: {'size': 256, 'alpha': True} for name in ('maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskMailVeil', 'maskVentail')},
+    **{name: {'size': 256, 'alpha': True} for name in ('maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskVentail')},
 }
 QUALITY = {'albedo': 84, 'normal': 86, 'orm': 78}
 AO_IN_ALBEDO = 0.7
