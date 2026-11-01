@@ -1948,6 +1948,69 @@ function metal(steel, hex) {
   return material;
 }
 
+// Shaguma's hair (an oni's mane: dyed yak or bear hair set into the kabuto, as on Uesugi and Ii retainers' helmets): the
+// steel bowl left showing and the hair growing out of it, from the crown down the sides and back, standing out from
+// the bowl and falling over the neck guard to the shoulders, wild and uneven; never across the face.
+const SHAGUMA = { locks: 220, width: 0.13, length: [1.8, 3.7], lift: 0.25, droop: 4.2, segments: 7 };
+
+/** The hair growing out of the kabuto's bowl (KABUTO_FORM): one mesh of tapering strands, greys varied lock by lock. */
+function shagumaHair(form, r, colour) {
+  const base = new THREE.Color(colour);
+  const positions = [];
+  const colours = [];
+  const indices = [];
+  // A fixed sequence, so every fighter's mane is the same hair.
+  let seed = 7;
+  const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  for (let lock = 0; lock < SHAGUMA.locks; lock += 1) {
+    const side = lock % 2 ? 1 : -1;
+    // Round from over the brow's corner (u 0.14: the face kept clear) to the nape (u 1), up from near the foot to the crown.
+    const u = 0.14 + 0.86 * random();
+    const v = 0.3 + 0.62 * Math.sqrt(random());
+    const root = formPoint(form.bowl, u, v).map((value) => value * r);
+    root[2] *= side;
+    const outward = new THREE.Vector3(root[0], root[1] - 0.2 * r, root[2]).normalize();
+    // Longer behind than at the temples; the crown's locks stand up before they fall.
+    const length = (SHAGUMA.length[0] + (SHAGUMA.length[1] - SHAGUMA.length[0]) * (0.35 + 0.65 * u) * (0.6 + 0.4 * random())) * r;
+    const lift = SHAGUMA.lift * (random() - 0.35);
+    const grey = base.clone().offsetHSL(0, 0, (random() - 0.5) * 0.22);
+    const first = positions.length / 3;
+    let at = new THREE.Vector3(...root);
+    // Out from the bowl at first, a crown lock a little up or down, then falling.
+    let heading = new THREE.Vector3(outward.x, outward.y * 0.45 + lift, outward.z).normalize();
+    for (let step = 0; step <= SHAGUMA.segments; step += 1) {
+      const t = step / SHAGUMA.segments;
+      // The strand's breadth across it, flat to the bowl: tangent to the outward direction and the heading.
+      const across = new THREE.Vector3().crossVectors(heading, outward).normalize();
+      if (across.lengthSq() < 1e-6) across.set(0, 0, 1);
+      const half = SHAGUMA.width * r * (1 - 0.85 * t) * (0.7 + 0.6 * random());
+      positions.push(at.x - across.x * half, at.y - across.y * half, at.z - across.z * half, at.x + across.x * half, at.y + across.y * half, at.z + across.z * half);
+      const shade = grey.clone().multiplyScalar(0.45 + 0.3 * t);
+      colours.push(shade.r, shade.g, shade.b, shade.r, shade.g, shade.b);
+      if (step < SHAGUMA.segments) {
+        const a = first + step * 2;
+        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+      // Each segment bends the strand down under its weight and a little outward, with a kink of its own.
+      at = at.clone().addScaledVector(heading, length / SHAGUMA.segments);
+      heading = heading.clone()
+        .addScaledVector(new THREE.Vector3(0, -1, 0), SHAGUMA.droop / SHAGUMA.segments)
+        .addScaledVector(new THREE.Vector3(outward.x, 0, outward.z), 0.5 / SHAGUMA.segments)
+        .add(new THREE.Vector3((random() - 0.5) * 0.3, 0, (random() - 0.5) * 0.3))
+        .normalize();
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
+  const mane = new THREE.Mesh(geometry, material);
+  mane.userData.noOutline = true;
+  return mane;
+}
+
 /**
  * A samurai's kabuto, head coordinates (x forward, y up, z left; r the head
  * radius): a ribbed bowl, the shikoro (tiers of laced lames flaring down
@@ -2093,30 +2156,7 @@ function buildKabuto(group, head, r, steel, color) {
   // The crest (maedate) is headgear of its own (kabutoCrest): it can be knocked off.
   // Shaguma: the whole helmet dressed in long yak hair, a shaggy cap over the
   // bowl and a mane over the neck guard to the shoulders, open at the face.
-  if (head.hair) {
-    const hair = surface(head.hair, { roughness: 1, flatShading: true });
-    const narrow = (form.side + 0.3) / (form.back + 0.3);
-    const cap = new THREE.Mesh(new THREE.IcosahedronGeometry(1.38 * r, 1), hair);
-    cap.scale.set(1, 0.72, narrow);
-    cap.position.y = 0.32 * r;
-    // Over the shikoro: a skirt flaring to the shoulders, open at the face (cylinder angles start at +z).
-    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(1.42 * r, 2.15 * r, 1.45 * r, 14, 1, true, Math.PI * 0.78, Math.PI * 1.44), hair);
-    skirt.material = hair.clone();
-    skirt.material.side = THREE.DoubleSide;
-    skirt.position.y = -0.55 * r;
-    skirt.scale.z = narrow;
-    group.add(cap, skirt);
-    // Locks hanging past the skirt's edge, uneven.
-    for (let lock = 0; lock < 22; lock += 1) {
-      const around = Math.PI * 0.78 + ((lock + 0.5) / 22) * Math.PI * 1.44;
-      const length = (0.7 + 0.35 * ((lock * 7) % 5) / 4) * r;
-      const strand = new THREE.Mesh(new THREE.ConeGeometry(0.22 * r, length, 4), hair);
-      strand.rotation.x = Math.PI;
-      // Cylinder angle θ: x = sin θ, z = cos θ.
-      strand.position.set(Math.sin(around) * 2.05 * r, -1.25 * r - length / 2, Math.cos(around) * 2.05 * r * narrow);
-      group.add(strand);
-    }
-  }
+  if (head.hair) group.add(shagumaHair(form, r, head.hair));
   // A mask in a design under study (helmstyle.js `masks`), drawn with baked maps (menpo.js), set on the face (helmforms.js
   // MASK_FITS); the gorget under it, hanging from under the chin.
   if (head.mask && HELM_STYLE.masks !== 'now' && helmMapsReady() && buildWarMask(group, HELM_STYLE.masks, r, head.mask === 'red' ? color : 0x141416, steel.envMap)) {
