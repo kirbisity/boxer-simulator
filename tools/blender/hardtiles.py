@@ -435,6 +435,26 @@ def etched(n):
     return t
 
 
+def fluted(n):
+    # 'Maximilian' fluting (German, c. 1510-1535): the plate raised in parallel flutes, round ridges between hollow channels
+    # some 10-14 mm apart, hammered up from behind and ground bright, as on the fluted bards of the KHM Vienna's
+    # Hofjagd- und Rüstkammer and the Met's fluted shaffron (https://www.metmuseum.org/art/collection/search/27175). A
+    # field 60 mm square: five flutes across (u), running up (v), each ridge
+    # a little irregular from the hammer; the channels a shade darker and less polished (the grinding wheel reached
+    # the ridges best).
+    W = H = 0.06
+    t = Tile(W, H, n, 83)
+    pitch = W / 5
+    wobble = t.noise(10, 1, 3, 0.0004)
+    phase = TAU * (t.X + wobble) / pitch
+    ridge = 0.5 + 0.5 * np.cos(phase)
+    t.z = 0.0011 * ridge ** 0.7 + t.noise(30, 2, 12, 0.00003)
+    channel = 1 - ridge
+    t.grey(0.9 - 0.12 * channel ** 2 + t.noise(14, 1, 5, 0.025))
+    t.rough = 0.2 + 0.1 * channel ** 2
+    return t
+
+
 def polymer(n):
     # Moulded and coated shells: riot armour's polycarbonate and ABS plates, a ballistic helmet's painted aramid/UHMWPE shell
     # (the coated matte finish of an ACH/ECH or FAST-type shell, and riot suit hard parts as e.g. NIJ 0115/HOSDB-rated kits are
@@ -493,7 +513,7 @@ def panels(n):
 FAMILIES = {
     'segmentata': segmentata, 'scale': scale, 'brigandine': brigandine, 'euroBrigandine': euro_brigandine,
     'harnessEdge': harness_edge, 'krug': krug, 'yokohagi': yokohagi, 'sugake': sugake, 'etched': etched, 'polymer': polymer,
-    'panels': panels, 'munitionPlate': munition_plate, 'bifu': bifu,
+    'panels': panels, 'munitionPlate': munition_plate, 'bifu': bifu, 'fluted': fluted,
 }
 
 

@@ -14,7 +14,7 @@
 import { shieldCovering, soundEvent, soundHit } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
-import { BARDING, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
+import { BARDING, bardingAt, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact } from '../weapons.js';
 import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
@@ -85,7 +85,7 @@ export function createHorse(fighter, id, random) {
   const over = Math.max(0, load / breed.mass - HORSE_LOAD.easy);
   const pace = Math.max(HORSE_LOAD.least, 1 - HORSE_LOAD.slows * over);
   const horse = {
-    id, corner: fighter.corner, rider: fighter.id, breed: kit.breed, barding: kit.barding, coat,
+    id, corner: fighter.corner, rider: fighter.id, breed: kit.breed, barding: kit.barding, finish: kit.finish, coat,
     spec: breed, withers: breed.withers, mass: breed.mass + barding.mass, load,
     // Its paces laden, and how hard it gets away (its own weight to its weight laden).
     paces: { gallop: breed.gallop * pace, canter: breed.canter * pace, trot: breed.trot, walk: breed.walk },
@@ -834,13 +834,15 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const drawn = 1 + WORLD.skill.draw * 2 * ((attacker.body.skill ?? 0.5) - 0.5);
   mix.cut *= drawn;
   mix.pierce *= drawn;
-  const protection = BARDING[horse.barding].parts[capsule.part];
+  // (Where the blow lands: below a part's armour, the bare horse: horses.js bardingAt.)
+  const landsAt = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
+  const protection = bardingAt(horse.barding, capsule.part, landsAt[1] + (horse.sunk ?? 0), horse.withers);
   const sharp = weapon.edge ?? 1;
   const blunt = energy * mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
   const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp;
   const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0)) * sharp;
   const glanced = Boolean(protection.deflects) && mix.cut + mix.pierce > 0.2;
-  const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
+  const contactPoint = landsAt;
   const event = {
     time: world.time, kind: 'horseHit', attacker: attacker.id, horse: horse.id, rider: horse.rider ?? undefined, weapon: weapon.kind, punch: punch.type, target: capsule.key,
     speed: closing, impulse, energy, strikeMass, harm: blunt, cut, pierce, point: contactPoint, normal, effects: [],

@@ -7,7 +7,7 @@ import { hairChain, stepHair } from '../src/horsehair.js';
 const spec = (breed, barding, detail = 'full', extra = {}) => ({ breed, barding, coat: HORSES[breed].coats[0], seed: 3, detail, withers: HORSES[breed].withers, corner: 'red', ...extra });
 const geometries = (model) => {
   const out = [];
-  for (const key of ['body', 'neck', 'head', 'ear']) out.push(model.parts[key].soft, model.parts[key].metal);
+  for (const key of ['body', 'neck', 'head', 'ear']) out.push(model.parts[key].soft, model.parts[key].metal, ...Object.values(model.parts[key].detail));
   for (const leg of Object.values(model.parts.legs)) for (const segment of Object.values(leg)) out.push(segment.soft, segment.metal);
   return out.filter(Boolean);
 };
@@ -105,15 +105,16 @@ test('barding is drawn: plate and lamellar add steel to the head, neck and body;
   const bare = buildHorseModel(spec('destrier', 'bare'));
   const plate = buildHorseModel(spec('destrier', 'plate'));
   const lamellar = buildHorseModel(spec('steppe', 'lamellar'));
+  // The bard's steel: its plain pieces and its shells wearing the detail maps (horsebard.js).
+  const steel = (model, part) => (model.parts[part].metal?.triangles ?? 0) + Object.values(model.parts[part].detail).reduce((sum, g) => sum + g.triangles, 0);
   for (const part of ['head', 'neck', 'body']) {
     // (A bare horse's only steel is its bit's rings.)
-    assert.ok((bare.parts[part].metal?.triangles ?? 0) < 300, `${part} bare`);
-    assert.ok(plate.parts[part].metal.triangles > (bare.parts[part].metal?.triangles ?? 0) * 2, `${part} plate`);
-    assert.ok(plate.parts[part].metal, `${part} in plate`);
-    assert.ok(lamellar.parts[part].metal, `${part} in lamellar`);
+    assert.ok(steel(bare, part) < 300, `${part} bare`);
+    assert.ok(steel(plate, part) > steel(bare, part) * 2 + 100, `${part} plate`);
+    assert.ok(steel(lamellar, part) > steel(bare, part) * 2 + 100, `${part} lamellar`);
   }
-  // Lamellae are many small plates: far more triangles than the plate bard's few large ones.
-  assert.ok(lamellar.parts.body.metal.triangles > plate.parts.body.metal.triangles * 2);
+  // Laced lamellae are one mapped shell (the tile draws the plates), not a mesh of little plates.
+  assert.ok(lamellar.parts.body.detail.lamellae.triangles < 3000);
 });
 
 test('a hair chain follows its pin, keeps its links, and settles hanging', () => {

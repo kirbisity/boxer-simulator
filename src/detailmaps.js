@@ -80,6 +80,10 @@ export const DETAIL_ARMOUR = {
   // two rivets to 80 mm round, the iron hammered and blackened. No Ming guard survives with published measures: these are the
   // brigandine's plates' and rivets' (brigandine above).
   bifu: { band: 1700, tile: [0.08, 0.15], masks: 'gold' },
+  // 'Maximilian' fluting (German, c. 1510-1535): parallel flutes 12 mm apart raised in the plate and ground bright (the Met's
+  // fluted shaffron, https://www.metmuseum.org/art/collection/search/27175; the KHM Vienna's fluted bards). The fluted bard's
+  // field (horsebard.js); the flutes run up the tile.
+  fluted: { band: 1800, tile: 0.06 },
 };
 const DETAIL_BANDS = Object.fromEntries(Object.entries(DETAIL_ARMOUR).map(([kind, spec]) => [spec.band, kind]));
 

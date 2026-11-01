@@ -17,6 +17,8 @@ import { buildHorseModel, horseModelKey } from './horsemesh.js';
 import { hairChain, stepHair } from './horsehair.js';
 import { steelMaterial } from './wardrobe.js';
 import { disposeObject, doubleSided, outlineFor, surface } from './toon.js';
+import { armourDetailMaterial } from './detailtex.js';
+import { DETAIL_ARMOUR } from './detailmaps.js';
 import { buildRobotDogView, disposeRobotDogView, updateRobotDogView } from './robotdogview.js';
 
 const HORSE_LOOK = {
@@ -50,16 +52,18 @@ function horseSeed(horse) {
   return 1 + (hash % HORSE_LOOK.variety);
 }
 
-/** Whether a horse wears a cloth trapper: its own say, else a heavy horse now and then (never a lamellar one). */
+/** Whether a horse wears a cloth trapper: its own say, else an unarmoured heavy horse now and then (a bard is worn bare). */
 function horseCaparison(horse, seed) {
   if (horse.caparison !== undefined) return Boolean(horse.caparison);
-  return (horse.breed === 'destrier' || horse.breed === 'warhorse') && horse.barding !== 'lamellar' && seed % 2 === 0;
+  return (horse.breed === 'destrier' || horse.breed === 'warhorse') && (horse.barding ?? 'bare') === 'bare' && seed % 2 === 0;
 }
 
 /** The model for a horse (built the first time that look is wanted). */
 export function horseModelFor(horse, detail = 'full') {
   const seed = horseSeed(horse);
-  const spec = { breed: horse.breed, barding: horse.barding, coat: horse.coat, seed, caparison: horseCaparison(horse, seed), detail, withers: horse.withers, corner: horse.corner };
+  // (The bard's finish: fluted, etched or plain plate, as the rider's harness is: horses.js mountOf.)
+  const style = horse.barding === 'plate' ? horse.finish?.style ?? 'plain' : null;
+  const spec = { breed: horse.breed, barding: horse.barding, style, coat: horse.coat, seed, caparison: horseCaparison(horse, seed), detail, withers: horse.withers, corner: horse.corner };
   const key = horseModelKey(spec);
   if (!horseModels.has(key)) horseModels.set(key, buildHorseModel(spec));
   return horseModels.get(key);
@@ -71,6 +75,7 @@ function horseGeometry(part) {
     geometry.setAttribute('position', new THREE.BufferAttribute(part.positions, 3));
     geometry.setAttribute('normal', new THREE.BufferAttribute(part.normals, 3));
     geometry.setAttribute('color', new THREE.BufferAttribute(part.colors, 3));
+    if (part.uvs) geometry.setAttribute('uv', new THREE.BufferAttribute(part.uvs, 2));
     geometry.setIndex(new THREE.BufferAttribute(part.indices, 1));
     geometry.computeBoundingSphere();
     horseGeometries.set(part, geometry);
@@ -93,6 +98,27 @@ function horseMaterials(view) {
   return view.horseMaterials;
 }
 
+/**
+ * The bard's steel wearing a tile's maps (detailmaps.js), its colour the rider's harness's (`finish.steel`) and a laced tile's
+ * cords the rider's lacing (`finish.lace`); the rivet heads of a turned edge in the steel. Made once per view and look.
+ */
+function bardMaterial(view, tile, finish) {
+  view.bardMaterials ??= new Map();
+  const key = `${tile}|${finish?.steel ?? '-'}|${finish?.lace ?? '-'}`;
+  if (!view.bardMaterials.has(key)) {
+    const base = steelMaterial(view.steelEnv, { vertexColors: true });
+    if (finish?.steel) base.color = new THREE.Color(finish.steel).lerp(new THREE.Color(0xffffff), 0.35);
+    const masks = DETAIL_ARMOUR[tile]?.masks;
+    const lace = finish?.lace ? new THREE.Color(finish.lace) : new THREE.Color(0x6a1a14);
+    const cords = masks === 'lace' ? [lace, lace] : masks === 'gold' ? [new THREE.Color(0xffffff), new THREE.Color(0xffffff)] : null;
+    // (A bard's broad plates would mirror only the ground under them: a little less of a mirror than the rider's harness, which
+    // turns every way; mail and lamellae less bright again.)
+    const metalness = tile === 'lamellae' || tile === 'mail' ? 0.75 : 0.85;
+    view.bardMaterials.set(key, doubleSided(armourDetailMaterial(base, tile, { cords, metalness })));
+  }
+  return view.bardMaterials.get(key);
+}
+
 /** A mesh of a shared geometry (not freed with the horse), inked if asked. */
 function horseMesh(parent, geometry, material, { ink = 0 } = {}) {
   const mesh = new THREE.Mesh(geometry, material);
@@ -107,11 +133,16 @@ function horseMesh(parent, geometry, material, { ink = 0 } = {}) {
   return mesh;
 }
 
-/** A part's soft and metal geometries as meshes under `parent`; returns them. */
-function horsePart(parent, part, materials, { ink = 0 } = {}) {
+/** A part's soft and metal geometries (and its bard's detail-mapped shells) as meshes under `parent`; returns them. */
+function horsePart(parent, part, materials, { ink = 0, bard = null } = {}) {
   const meshes = [];
   if (part?.soft) meshes.push(horseMesh(parent, horseGeometry(part.soft), materials.soft, { ink }));
   if (part?.metal) meshes.push(horseMesh(parent, horseGeometry(part.metal), materials.metal));
+  for (const [tile, geometry] of Object.entries(part?.detail ?? {})) {
+    const mesh = horseMesh(parent, horseGeometry(geometry), bard ? bard(tile) : materials.metal);
+    mesh.userData.detailMaps = tile;
+    meshes.push(mesh);
+  }
   return meshes;
 }
 
@@ -168,16 +199,17 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
   frame.position.y = -pivot;
   body.add(frame);
   const owned = [];
-  horsePart(frame, parts.body, materials, { ink });
+  const bard = (tile) => bardMaterial(view, tile, horse.finish);
+  horsePart(frame, parts.body, materials, { ink, bard });
   // Neck, head, ears: the neck pivots at the withers, the head at the poll, the ears at their bases.
   const neck = new THREE.Group();
   neck.position.set(...rig.neckPivot);
   frame.add(neck);
-  horsePart(neck, parts.neck, materials, { ink });
+  horsePart(neck, parts.neck, materials, { ink, bard });
   const head = new THREE.Group();
   head.position.set(...rig.poll);
   neck.add(head);
-  horsePart(head, parts.head, materials, { ink });
+  horsePart(head, parts.head, materials, { ink, bard });
   const ears = [];
   if (!low) {
     for (const side of [1, -1]) {
@@ -204,7 +236,7 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
   // Hair and cloth that move: made per horse.
   const hang = {};
   if (!low) {
-    hang.mane = horseMane(neck, rig, materials, owned);
+    if (!rig.maneHidden) hang.mane = horseMane(neck, rig, materials, owned);
     hang.tail = horseTail(frame, rig, materials, owned);
     if (rig.trapper) hang.trapper = horseTrapper(frame, rig, materials, owned);
     hang.stirrups = horseStirrups(frame, rig, materials, owned);
@@ -682,10 +714,10 @@ export function updateHorseView(view, world = null) {
     }
   }
   // Hair and cloth hang from where everything now is.
-  if (view.hang.mane) {
+  if (view.hang.tail) {
     view.group.updateMatrixWorld(true);
     const motion = { cycle, time, sway: 0.09 * moving + 0.03, stream: 0.5 * pace + 0.05 * (1 - moving), pace };
-    updateMane(view.hang.mane, rig, motion);
+    if (view.hang.mane) updateMane(view.hang.mane, rig, motion);
     updateTail(view.hang.tail, rig, view.frame, motion, dt);
     const rider = world?.fighters.find((fighter) => fighter.id === horse.rider && fighter.mount === horse) ?? null;
     if (view.hang.trapper) updateTrapper(view.hang.trapper, rig, view.frame, drawn, dt);
