@@ -6634,7 +6634,9 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
 export function poiseOf(fighter) {
   const body = fighter.body;
   const share = body.bodyMassKg > 0 ? (body.gearKg ?? 0) / body.bodyMassKg : 0;
-  return 1 + WORLD.poise.mass * share + WORLD.poise.shell * (protectionAt(body.gear, 'trunk').blunt ?? 0) + (body.gear.poise ?? 0);
+  // A load (tanks, a frame, a battery) is not armour: its weight counts at the plain rate.
+  const carried = Math.min(share, (body.gear.carriedShare ?? 0) + (body.bodyMassKg > 0 ? (body.inputs?.outfit?.packKg ?? 0) / body.bodyMassKg : 0));
+  return 1 + WORLD.poise.mass * (share - carried) + WORLD.poise.carried * carried + WORLD.poise.shell * (protectionAt(body.gear, 'trunk').blunt ?? 0) + (body.gear.poise ?? 0);
 }
 
 /**

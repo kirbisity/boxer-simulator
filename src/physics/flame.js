@@ -62,7 +62,8 @@ export const FLAME = {
   fright: { self: 1, nearby: 0.4, near: 8, passing: 0.5, stream: 2, halfLife: 3 },
   // The full tanks on his back (kg: the M2-2's ~32 kg less its wand); `keptKg` of his own kit kept on under them (helmet, plate
   // carrier and plates; a rifleman's magazines and the rest of his fighting load left behind). His sidearm (a style): a pistol.
-  tanksKg: 30, keptKg: 12, sidearm: 'handgun',
+  // `keptKg` 6.6 (was 12): the armour cut with all armour to 0.55 of its weight.
+  tanksKg: 30, keptKg: 6.6, sidearm: 'handgun',
 };
 
 const BURNED_LIMBS = ['lUpperArm', 'rUpperArm', 'lThigh', 'rThigh', 'lShank', 'rShank'];
@@ -80,7 +81,7 @@ export function withTanks(inputs) {
   const own = buildBody({ ...inputs, outfit: { ...inputs.outfit, extraMass: 0 } }).bodyMassKg;
   const base = inputs.outfit?.extraMass ?? OUTFITS[inputs.outfit?.kind]?.extraMass ?? 0;
   const kept = Math.min(base, FLAME.keptKg / own);
-  return { ...inputs, sidearm: inputs.sidearm ?? FLAME.sidearm, outfit: { ...inputs.outfit, extraMass: kept + FLAME.tanksKg / own, packKg: FLAME.tanksKg } };
+  return { ...inputs, sidearm: inputs.sidearm ?? FLAME.sidearm, outfit: { ...inputs.outfit, extraMass: kept + FLAME.tanksKg / own, packKg: FLAME.tanksKg, carriedShare: 0 } };
 }
 
 /**

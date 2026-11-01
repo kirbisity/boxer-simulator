@@ -9,7 +9,7 @@ import { bulletProof, RIFLE } from '../src/weapons.js';
 
 test('a fixed build is its given mass, fed or not: the robots and the gorilla', () => {
   assert.equal(Math.round(buildBody(PRESETS.humanoid).massKg), 70);
-  assert.equal(Math.round(buildBody(PRESETS.combatBot).massKg), 170);
+  assert.equal(Math.round(buildBody(PRESETS.combatBot).massKg), 152);
   assert.equal(Math.round(buildBody({ ...PRESETS.humanoid, calories: 1200 }).massKg), 70, 'no diet moves it');
   const gorilla = buildBody(PRESETS.gorilla);
   assert.equal(Math.round(gorilla.massKg), 230);

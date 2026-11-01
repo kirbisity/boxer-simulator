@@ -44,7 +44,7 @@ function headBlow(kind, attacker, move, seed, gap) {
   return world.events.find((event) => event.kind === 'landed' && event.target === 'head' && event.attacker === 0)?.harmDeltaV ?? null;
 }
 
-test('the Stechzeug\'s helm: a blow to the head does about half what it does to a knight in his bascinet', () => {
+test('the Stechzeug\'s helm: a blow to the head does about a third of what it does to a knight in his bascinet', () => {
   const blows = [
     ['a cross', { ...PRESETS.heavy, style: 'boxing', outfit: { kind: 'casual', design: 0 } }, 'cross', -0.25],
     ['a war hammer', PRESETS.warhammer, 'hammerOverhead', 0.5],
@@ -61,11 +61,12 @@ test('the Stechzeug\'s helm: a blow to the head does about half what it does to 
     }
     assert.ok(knight > 0, `${label} landed`);
     const ratio = tournament / knight;
-    assert.ok(ratio > 0.38 && ratio < 0.62, `${label}: ${ratio.toFixed(2)} of the knight's head harm`);
+    // (About half before the armour balance raised the helm's blunt from 0.7 to 0.81 and doubled armour's poise: 0.48-0.58; now 0.30-0.41.)
+    assert.ok(ratio > 0.22 && ratio < 0.5, `${label}: ${ratio.toFixed(2)} of the knight's head harm`);
   }
-  // A point: half of what gets through (5% against 10%).
+  // A point: 0.6 of what gets through (3% against 5%).
   const [plate, joust] = [OUTFITS.knight.protection, OUTFITS.tournament.protection];
-  assert.ok(Math.abs((1 - joust.regions.head.pierce) / (1 - plate.pierce) - 0.5) < 1e-9);
+  assert.ok(Math.abs((1 - joust.regions.head.pierce) / (1 - plate.pierce) - 0.6) < 1e-9);
 });
 
 test('the Stechzeug: cut-proof, better against a point than plate, proofed, slow, heavy, all poise', () => {

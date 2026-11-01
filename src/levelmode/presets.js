@@ -187,15 +187,15 @@ export const LEVEL_PRESETS = {
   // ---- The boss -------------------------------------------------------------------------------
   // Lord Vaelen, the Queen's chief jailer: 210 cm, a body of 150 kg (a big man gone soft in the Queen's service:
   // little drilled, `exercise` 0.2, so his strength is a giant's, not a strongman's) in a jousting harness (the
-  // Stechzeug and its helm) that weighs what one weighs, ~45 kg (`outfit.extraMass` 0.3 of his body, where the
-  // kit's own 0.8 would make it 120 kg), 195 kg in all, with the poleaxe in both hands. Slow in the harness, hard
+  // Stechzeug and its helm), ~25 kg since all armour was cut to 0.55 of its weight (`outfit.extraMass` 0.165 of his
+  // body, was 0.3: ~45 kg; the kit's own 0.44 would make it 66 kg), ~175 kg in all, with the poleaxe in both hands. Slow in the harness, hard
   // to knock down (`poise`); skill 0.8 of which the helm leaves him three quarters (skillFactor).
   // Tuned (tools/dunnottar.js): a rested operative with the sword and buckler beats him about one time in four.
   // Relentless as Noname is (ai.js AI.relentless: no backing off, no room made for the poleaxe, out of a corner along the wall), with a big man's
   // deep wind (`aerobic` 1.8) and his weight set low behind the harness (`outfit.poise` 0.5).
   vaelen: {
     name: 'Lord Vaelen', style: 'warhammer', sex: 'male', heightCm: 210, frame: 'large', age: 38, exercise: 0.35, calories: 5515, skill: 0.9,
-    outfit: { kind: 'tournament', design: 1, extraMass: 0.3, balance: 1.5, poise: 0.5 }, accessories: [], relentless: true, aerobic: 1.8,
+    outfit: { kind: 'tournament', design: 1, extraMass: 0.165, balance: 1.5, poise: 0.5 }, accessories: [], relentless: true, aerobic: 1.8,
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#1c1c20', facialHair: 'beard', eyeColor: 'grey' },
   },
 };
