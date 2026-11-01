@@ -698,11 +698,61 @@ def tapestry():
     return {'height': h, 'shade': np.clip(shade, 0, 1), 'rough': np.full((N, N), 0.88), 'metres': metres}
 
 
+def crinkles(n, seed, cells=10, octaves=3):
+    """A foil film's crinkle: creases where a thin laminate was folded and smoothed out again, ridged noise (0..1, 1 a crease)."""
+    a = np.abs(periodic_noise(n, cells, seed, octaves))
+    b = np.abs(periodic_noise(n, cells * 2, seed + 1, 2))
+    return np.clip(1 - a * 6, 0, 1) ** 2 * 0.7 + np.clip(1 - b * 7, 0, 1) ** 2 * 0.3
+
+
+def aluminized():
+    """
+    Aluminized cloth: a film of vacuum-deposited aluminium (on polyester) laminated over a para-aramid or PBI twill, the shell
+    of a proximity suit (https://www.gentexcorp.com/wp-content/uploads/2023/04/Dual-Mirror-Aluminized-Fabric-Catalog.pdf;
+    the film thin and prone to crease and delaminate: US 4942083). The twill's ribs show faintly through the film, c. 20
+    threads/cm (120 to the 60 mm tile), and the film's crinkles where it has been folded, 10-30 mm apart; mirror-smooth
+    between, a little duller in the creases where the coating is crazed. Drawn as metal (detailmaps.js CLOTH_FAMILIES `metal`).
+    """
+    metres = 0.06
+    count = 120
+    pitch = metres / count
+    over = np.array([[((a - b) % 4) < 2 for b in range(4)] for a in range(4)], bool)
+    h, _ = weave(over, count, count, width=0.95, lift=0.2, seed=201)
+    crease = blur(crinkles(N, 202, cells=4), 2)
+    h = h * pitch * 0.1 - 0.00012 * crease + 0.0002 * periodic_noise(N, 3, 203, 2)
+    shade = 0.93 - 0.12 * crease + 0.02 * periodic_noise(N, 8, 204)
+    rough = 0.2 + 0.25 * crease
+    return {'height': h, 'shade': shade, 'rough': rough, 'metres': metres}
+
+
+def aluminized_quilt():
+    """
+    A fire-entry suit's face: the same aluminized film over a multi-layer shell quilted to its insulation (batts of glass or
+    aramid felt between: Newtex X60, https://newtex.com/assets/pdf/safety/x60_advanced_fire_entry_suit.pdf), stitched in
+    50 mm boxes (two to the 100 mm tile), the film puffed between the stitch lines and crinkled more where the quilting
+    draws it in.
+    """
+    metres = 0.1
+    x, y = grid()
+    u = (x * 2) % 1
+    v = (y * 2) % 1
+    puff = (np.sin(np.pi * u) * np.sin(np.pi * v)) ** 0.5
+    crease = crinkles(N, 211, cells=8)
+    crease = blur(crease, 2)
+    h = 0.003 * puff * (1 + 0.1 * periodic_noise(N, 10, 212, 2)) - 0.00025 * crease * (1.5 - puff)
+    line = np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v))
+    along = np.where(np.minimum(u, 1 - u) < np.minimum(v, 1 - v), y, x) * 40
+    h += np.where((line < 0.008) & ((along % 1) < 0.65), 0.0002, 0.0)
+    shade = 0.84 + 0.08 * puff ** 0.5 - 0.1 * crease
+    rough = 0.22 + 0.25 * crease + 0.1 * (1 - puff)
+    return {'height': h, 'shade': np.clip(shade, 0, 1), 'rough': rough, 'metres': metres}
+
+
 FAMILIES = {
     'plain': plain, 'twill': twill, 'denim': denim, 'quilt': quilt, 'diamondQuilt': diamond_quilt, 'felt': felt,
     'damask': damask, 'leather': leather, 'fur': fur, 'feathers': feathers, 'straw': straw, 'cordura': cordura,
     'ripstop': ripstop, 'knit': knit, 'jack': jack, 'camo': camo, 'kikko': kikko,
-    'cloudDamask': cloud_damask, 'tapestry': tapestry,
+    'cloudDamask': cloud_damask, 'tapestry': tapestry, 'aluminized': aluminized, 'aluminizedQuilt': aluminized_quilt,
 }
 
 

@@ -479,6 +479,13 @@ export const PRESETS = {
     outfit: { kind: 'thug', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
+  // A firefighter of an airport crash crew in his aluminized proximity suit and breathing set, his pike pole (the ceiling hook
+  // on its 1.8 m pole, fought as a staff) in his hands.
+  firefighter: {
+    name: 'Lt. Joe Brennan', style: 'staff', sex: 'male', heightCm: 180, frame: 'large', age: 36, exercise: 0.6, calories: 3600,
+    outfit: { kind: 'proximity', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2a1c', facialHair: 'mustache', eyeColor: 'blue' },
+  },
   riot: {
     name: 'Officer Dale Burke', style: 'riot', sex: 'male', heightCm: 183, frame: 'medium', age: 32, exercise: 0.6, calories: 4300,
     outfit: { kind: 'riot', design: 0 }, accessories: [],

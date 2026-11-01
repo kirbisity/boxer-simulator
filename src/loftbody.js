@@ -46,6 +46,9 @@ export const TOPS = {
   // to below its lowest jag and down the arm past the longest sleeve, then cut. Coarse on purpose (`torn`: `rings` and `sides` for
   // the trunk, `sleeveRings` and `sleeveSides` for a sleeve): whole quads go, so the opening is a few big notches and the hem
   // jags by the ring spacing; a few hundred triangles in all.
+  // A firefighter's turnout coat (a proximity or fire-entry suit's): loose, long-sleeved to the glove, its skirt to mid-thigh
+  // over the trousers, not belted (`unbelted`), its storm flap down the front.
+  turnout: { hem: -0.1, neck: 1.0, loose: 1.2, sleeve: 1.9, sleeveLoose: 1.36, skirt: 0.5, unbelted: true },
   rags: { hem: 0.03, neck: 0.96, loose: 1.1, sleeve: 0.9, sleeveLoose: 1.3, torn: { rings: 12, sides: 14, sleeveRings: 4, sleeveSides: 8 } },
 };
 
@@ -1812,6 +1815,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
         return (index * 3 + step * 5) % 7 === 0 ? 'pattern' : 'top';
       case 'puffer':
         return index % 2 ? 'trim' : 'top';
+      case 'turnout':
+        return ahead > 0 && side < 0.08 ? 'trim' : 'top';
       default:
         return 'top';
     }
@@ -1906,7 +1911,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   if (topShape?.inner) loft(mesh, trunkRings(-0.02, 0.99, count(12)), trunkSides, { color: 'shirt', inflate: TOPS[topShape.inner].loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
   if (topShape?.skirt) {
     loft(mesh, skirtRings(skirtTo(topShape.skirt), count(5), 0.45), sides, { color: 'top', inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
-    loft(mesh, shortsRings(0.1, 0.16, 1), sides, { color: 'belt', inflate: 1.16, capStart: false, capEnd: false, bones: abdomen });
+    if (!topShape.unbelted) loft(mesh, shortsRings(0.1, 0.16, 1), sides, { color: 'belt', inflate: 1.16, capStart: false, capEnd: false, bones: abdomen });
   }
   // Rags: this man's tear (outfits.js RAGS), cut from a coarse wrap (TOPS.rags.torn).
   const tear = topShape?.torn ? ragTear(body.inputs.outfit) : null;
@@ -2124,11 +2129,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       sculptProfile([[-0.14, thighR * 1.0], [0.1, thighR * 1.1], [0.5, thighR * 0.95], [1, shankR * 0.9]]),
       sculptProfile([[0, 0], [0.5, thighR * 0.08], [1, 0]])));
     // The legs of the bottom: how far down the thigh, then the shin, it runs.
-    const legReach = { hakama: [1.04, 0.3], bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9], ragTrousers: [1.04, RAGS.trousers.hem + RAGS.trousers.jag * 1.7] }[bottom?.kind] ?? [0, 0];
+    const legReach = { hakama: [1.04, 0.3], bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9], bunker: [1.04, 0.93], ragTrousers: [1.04, RAGS.trousers.hem + RAGS.trousers.jag * 1.7] }[bottom?.kind] ?? [0, 0];
     const legs = sculpted ? { thigh: limbShapes(traits, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : [], armoured), shank: limbShapes(traits, 'shank', side, legReach[1] > 0 ? [[-0.3, legReach[1]]] : [], armoured) } : null;
     loft(mesh, thighRings(-0.14, 1.0, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.thigh, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : []) } : {}), ...skinUv(`${side}Thigh`), part: `${side}Thigh` });
     mesh.covers[`${side}Thigh`] = legReach[0] > 0 ? [[-0.3, legReach[0]]] : [];
-    const legLoose = { hakama: 1.3, bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1, ragTrousers: 1.24 }[bottom?.kind] ?? 1.12;
+    const legLoose = { hakama: 1.3, bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1, ragTrousers: 1.24, bunker: 1.3 }[bottom?.kind] ?? 1.12;
     const outer = side === 'l' ? 1 : -1;
     const legPattern = (ring, angle) => {
       if (bottom?.stripe && Math.abs(Math.sin(angle)) > 0.9) return 'trim2';
@@ -2176,7 +2181,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       const gathered = bottom.kind === 'joggers' || bottom.kind === 'trackPants';
       // Breeches cut off ragged below the knee (outfits.js RAGS): a coarse tube, whole quads gone at the hem.
       const ragged = ragLeg ? { holes: (t, angle) => ragHemTorn(ragTear(body.inputs.outfit), side, t, angle) } : {};
-      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, ragLeg ? ragLeg.shin : count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), ragLeg ? ragLeg.sides : sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : ragLeg ? ragLeg.shinLoose : 1.22, capStart: false, capEnd: false, ...ragged });
+      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, ragLeg ? ragLeg.shin : count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), ragLeg ? ragLeg.sides : sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : ragLeg ? ragLeg.shinLoose : bottom.kind === 'bunker' ? 1.32 : 1.22, capStart: false, capEnd: false, ...ragged });
       if (gathered) loft(mesh, shinRings(legReach[1] - 0.08, legReach[1], 1), sides, { color: 'trim2', inflate: 1.15, capStart: false, capEnd: false });
     }
     if (lamellar) {

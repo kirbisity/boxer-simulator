@@ -32,6 +32,17 @@ export const WARDROBE = {
 
 const darker = (hex, share = 0.72) => new THREE.Color(hex).multiplyScalar(share);
 
+// Aluminized cloth on the pieces off the body (a proximity suit's gloves, boots and hood): the film's sheen as metal, lit by
+// the steel's reflections, the cloth atlas's crinkled tile on it (render.js FOIL is the body's). The hood's visor: gold
+// film on polycarbonate (a gold-coated visor reflects the radiant heat and dims the glare), `visor` its finish.
+export const FOIL_PIECE = { metalness: 0.85, roughness: 0.3, envMapIntensity: 1.2, visor: { color: 0xd8a640, metalness: 1, roughness: 0.08 } };
+
+/** Aluminized cloth (`stuff`: a CLOTH_MATERIALS key, aluminized or its quilted kind) in `color`, lit by `envMap`. */
+export function foilMaterial(envMap, color, stuff = 'aluminized') {
+  const material = new THREE.MeshStandardMaterial({ color, metalness: FOIL_PIECE.metalness, roughness: FOIL_PIECE.roughness, envMap, envMapIntensity: FOIL_PIECE.envMapIntensity });
+  return DETAIL_MAPS.on ? clothPropMaterial(material, stuff) : material;
+}
+
 /** What a worn piece of a slot (`feet`, the shoe of this kind) is made of for this man (detailmaps.js clothMaterialOf). */
 function wornMaterial(body, slot, kind) {
   const inputs = body.inputs ?? {};
@@ -191,7 +202,8 @@ const finish = (group) => {
  */
 export function buildHand(body, side, kind, skinColor, steel) {
   const scale = body.heightM / 1.8;
-  const material = kind === 'gauntlet' ? steel : surface(kind === 'tactical' ? 0x18191d : skinColor);
+  // (A proximity suit's aluminized gloves: their gauntlet cuff over the sleeve.)
+  const material = kind === 'gauntlet' ? steel : kind === 'proximity' ? foilMaterial(steel?.envMap ?? null, 0xc9ccd1) : surface(kind === 'tactical' ? 0x18191d : skinColor);
   const hand = new THREE.Group();
   const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), material);
   palm.scale.set(0.034 * scale * (kind === 'bare' ? 1 : 1.1), 0.045 * scale, 0.042 * scale * (kind === 'bare' ? 1 : 1.08));
@@ -208,7 +220,7 @@ export function buildHand(body, side, kind, skinColor, steel) {
   hand.add(thumb);
   if (kind !== 'bare') {
     // The cuff of the glove or the gauntlet's flared wrist.
-    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * scale, kind === 'gauntlet' ? 0.055 * scale : 0.042 * scale, 0.06 * scale, 14), material);
+    const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * scale, kind === 'gauntlet' || kind === 'proximity' ? 0.055 * scale : 0.042 * scale, 0.06 * scale, 14), material);
     cuff.position.y = -0.04 * scale;
     hand.add(cuff);
   }
@@ -229,6 +241,8 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     trainer: { width: 0.054, height: 0.05, sole: 0xf4f4f6 },
     hikingBoot: { width: 0.06, height: 0.058, sole: 0x2a2420 },
     tacticalBoot: { width: 0.06, height: 0.056, sole: 0x111111 },
+    // A proximity suit's boot: rubber, under an aluminized cover (`foil`).
+    proximityBoot: { width: 0.064, height: 0.06, sole: 0x111111, foil: true },
     compactBoot: { width: 0.054, height: 0.05, sole: 0x111111 },
     heelAnkleBoot: { width: 0.05, height: 0.042, sole: 0x0b0b0d },
     // A patent platform shoe: a round toe, straps over the instep and ankle.
@@ -246,10 +260,10 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     sabaton: { width: 0.058, height: 0.05 },
     bare: { width: 0.042, height: 0.032 },
   }[kind] ?? { width: 0.05, height: 0.045, sole: 0x17171c };
-  const upperMaterial = kind === 'sabaton' ? steel : kind === 'bare' || spec.skin ? surface(skinColor) : surface(upperColor, { roughness: spec.patent ? 0.12 : 0.5 });
   // The cloth atlas's tile on the upper (detailtex.js clothPropMaterial: leather, a trainer's knit, a tabi's cotton).
   const stuff = wornMaterial(body, 'feet', kind);
-  if (kind !== 'sabaton' && kind !== 'bare' && !spec.skin) clothPropMaterial(upperMaterial, stuff);
+  const upperMaterial = kind === 'sabaton' ? steel : spec.foil ? foilMaterial(steel?.envMap ?? null, upperColor, stuff) : kind === 'bare' || spec.skin ? surface(skinColor) : surface(upperColor, { roughness: spec.patent ? 0.12 : 0.5 });
+  if (kind !== 'sabaton' && kind !== 'bare' && !spec.skin && !spec.foil) clothPropMaterial(upperMaterial, stuff);
   const upper = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), upperMaterial);
   upper.scale.set(spec.width, length / 2, spec.height);
   upper.position.set(-0.012, length * 0.28, 0);
@@ -1648,6 +1662,28 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         slit.position.set(1.08 * r, 0.12 * r, 0);
         group.add(mask, slit);
       }
+      break;
+    }
+    case 'proximityHood': {
+      // A proximity (or fire-entry) hood over a firefighter's helmet and his breathing mask: a crown of aluminized cloth
+      // standing off the head on the helmet, its bib falling over the shoulders under the coat's collar, and a broad
+      // gold-coated visor in a dark rubber gasket across the face (it narrows his sight: outfits.js `sight`).
+      const foil = foilMaterial(steel?.envMap ?? null, new THREE.Color(color).getHex(), head.quilted ? 'aluminizedQuilt' : 'aluminized');
+      // One lathe from the bib's hem up (head radii: [radius, height]): the bib over the shoulders, the straight sides down
+      // past the chin, the crown rounded over the helmet.
+      const profile = [[2.25, -2.15], [2.05, -1.95], [1.7, -1.55], [1.52, -1.1], [1.5, -0.4], [1.5, 0.35], [1.44, 0.8], [1.25, 1.2], [0.9, 1.48], [0.45, 1.62], [0, 1.66]];
+      const hood = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x * r, y * r)), 28), foil);
+      hood.scale.set(1.06, 1, 1);
+      // The window across the face (a cylinder's angle 0 is +z, the front +x at π/2), in its gasket.
+      const across = 1.95;
+      const gasket = new THREE.Mesh(new THREE.CylinderGeometry(1.535 * r, 1.535 * r, 1.22 * r, 24, 1, true, Math.PI / 2 - (across + 0.14) / 2, across + 0.14), surface(0x16171a, { roughness: 0.6 }));
+      gasket.scale.set(1.06, 1, 1);
+      gasket.position.y = -0.12 * r;
+      const visor = new THREE.Mesh(new THREE.CylinderGeometry(1.56 * r, 1.56 * r, 1.04 * r, 24, 1, true, Math.PI / 2 - across / 2, across), new THREE.MeshStandardMaterial({ ...FOIL_PIECE.visor, envMap: steel?.envMap ?? null, envMapIntensity: 1.3 }));
+      visor.scale.set(1.06, 1, 1);
+      visor.position.y = -0.12 * r;
+      visor.userData.noOutline = true;
+      group.add(hood, gasket, visor);
       break;
     }
     case 'secutorHelm': {
@@ -3186,12 +3222,53 @@ export function buildBackBox(body, colors) {
   return group;
 }
 
+/**
+ * A breathing set on the back (a design's `airPack`), on the collar's frame (x forward, y up the spine, z to the left): a
+ * carbon-wrapped cylinder (6.8 L, ~160 mm across and ~520 mm long, its valve and regulator at the bottom) on a backplate, with
+ * its harness's shoulder straps; `covered` (a fire-entry suit, worn over the set) the same shape as a hump in the suit's cloth.
+ */
+export function buildAirPack(body, pack, colors, envMap) {
+  const scale = body.heightM / 1.8;
+  const back = body.segments.trunk.skinRadius * 0.62 * 1.32;
+  const group = new THREE.Group();
+  const cylinder = pack.covered ? foilMaterial(envMap, colors.top.getHex(), 'aluminizedQuilt') : surface(pack.color ?? 0x2a2c30, { roughness: 0.45 });
+  const frame = pack.covered ? cylinder : surface(0x141416, { roughness: 0.7 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 0.9, roughness: 0.3, envMap });
+  const add = (mesh, at) => {
+    mesh.position.set(...at.map((value) => value * scale));
+    group.add(mesh);
+    return mesh;
+  };
+  const radius = (pack.covered ? 0.1 : 0.08) * scale;
+  add(new THREE.Mesh(new THREE.BoxGeometry(0.02 * scale, 0.5 * scale, 0.24 * scale), frame), [-back / scale - 0.012, -0.24, 0]);
+  // The cylinder: a tube with domed ends.
+  const behind = -back / scale - 0.02 - radius / scale;
+  add(new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, 0.4 * scale, 16), cylinder), [behind, -0.26, 0]);
+  for (const end of [-0.06, -0.46]) add(new THREE.Mesh(new THREE.SphereGeometry(radius, 16, 8), cylinder), [behind, end, 0]);
+  if (!pack.covered) {
+    add(new THREE.Mesh(new THREE.CylinderGeometry(0.025 * scale, 0.025 * scale, 0.06 * scale, 10), brass), [-back / scale - 0.1, -0.54, 0]);
+    // A band of the cylinder's label, and the shoulder straps over the coat.
+    add(new THREE.Mesh(new THREE.CylinderGeometry(radius * 1.02, radius * 1.02, 0.08 * scale, 16), surface(pack.band ?? 0xd8b030, { roughness: 0.5 })), [-back / scale - 0.02 - radius / scale, -0.16, 0]);
+    // The harness: a strap from the backplate over each shoulder and down the chest.
+    for (const side of [1, -1]) {
+      add(new THREE.Mesh(new THREE.BoxGeometry(2.1 * back, 0.014 * scale, 0.05 * scale), frame), [0, -0.005, side * 0.1]);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.014 * scale, 0.3 * scale, 0.05 * scale), frame), [back / scale * 1.02, -0.16, side * 0.1]);
+    }
+  }
+  for (const mesh of group.children) {
+    mesh.castShadow = true;
+    mesh.add(outlineFor(mesh, 0.003));
+  }
+  return group;
+}
+
 /** Which kind of hand an outfit gives. */
 export function handKind(inputs, gloved) {
   if (gloved) return 'gloved';
   const fists = outfitOf(inputs).spec.fists;
   if (fists === 'gloved-tactical') return 'tactical';
   if (fists === 'gauntlet') return 'gauntlet';
+  if (fists === 'gloved-proximity') return 'proximity';
   return 'bare';
 }
 

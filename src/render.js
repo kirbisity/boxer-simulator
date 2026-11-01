@@ -14,7 +14,7 @@ import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps,
 import { bodyCheck } from './skinworker.js';
 import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
-import { DETAIL_ARMOUR, DETAIL_MAPS, clothCellOf, detailKindOf } from './detailmaps.js';
+import { DETAIL_ARMOUR, DETAIL_MAPS, clothCellOf, detailKindOf, metalClothCell } from './detailmaps.js';
 import { armourDetailMaterial, clothAtlasTexture, clothDetailMaterial, preloadDetailMaps } from './detailtex.js';
 import { lookSkinHex } from './skintones.js';
 import { buildSkeleton } from './bones.js';
@@ -28,7 +28,7 @@ import { harbourPort } from './props/harbour.js';
 import { SUBWAY_ARENA, subwayPuddleFilm, subwayStation } from './props/subway.js';
 import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks, coastPalms, coastPier, coastSampans, coastShip, coastShipMaterials } from './props/coast.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
-import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
+import { buildAirPack, buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
 import { HELM_HEAD_BREADTH, HELM_SPAN } from './helmforms.js';
 import { photoFaceFor } from './photoface.js';
@@ -2016,6 +2016,8 @@ function detailedView(view, fighter, simple) {
   if (!headgear?.hidesHair) for (const curtain of headView.curtains ?? []) dangles.push(...(simple ? [hairCurtain(collar, headView.hairMaterial, body.lengths.headRadius, curtain)] : hairCurtainSoft(collar, headView.hairMaterial, body.lengths.headRadius, curtain)));
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   if (dress.armor?.backBox) collar.add(buildBackBox(body, garmentColors));
+  // A breathing set on the back (a design's `airPack`: wardrobe.js buildAirPack), under a fire-entry suit its hump.
+  if (dress.look.airPack) collar.add(buildAirPack(body, dress.look.airPack, garmentColors, view.steelEnv));
   if (machine) {
     for (const entry of buildRobotBody(body, dress.armor, view.steelEnv)) {
       layers.skin.add(entry.object);
@@ -2120,7 +2122,9 @@ function skinForTier(material) {
 }
 const SKIN_LOW_ROUGHNESS = 0.62;
 // The helmets that close over the whole face (wardrobe.js): the head under them is not drawn.
-const CLOSED_HELMS = ['greatHelm', 'stechhelm', 'bascinet'];
+const CLOSED_HELMS = ['greatHelm', 'stechhelm', 'bascinet', 'proximityHood'];
+// Aluminized cloth: an aluminium film (~90% reflective) over fabric; a little less a mirror than polished steel.
+const FOIL = { metalness: 0.85, envMapIntensity: 1.2 };
 
 /** A body's skin in a style if it is built and its maps are made: a fighter's own copy (his dents move its points), else null. */
 function readySkin(body, style) {
@@ -2159,6 +2163,8 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   const detailIndices = DETAIL_MAPS.on && built.uvs ? {} : null;
   // Cloth drawn with the cloth atlas (its coordinates in a family's cell, detailmaps.js clothUvAt): all of it in one material.
   const clothIndices = [];
+  // Cloth of a metal family (aluminized: detailmaps.js CLOTH_FAMILIES `metal`) in a metallic material of its own.
+  const foilIndices = [];
   // What is worn over the skin and drawn in the skin's material (leather, lacquered shells, lacing, bindings: a triangle none of
   // whose corners is skin), apart from the skin, where the armour is drawn apart (the detail maps): double-sided, as all armour is.
   const wornIndices = [];
@@ -2166,8 +2172,9 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   for (let triangle = 0; triangle < triangles; triangle += 1) {
     const first = built.indices[triangle * 3];
     const kind = detailIndices ? detailKindOf(built.uvs[first * 2]) : null;
-    const cloth = detailIndices && !kind && clothCellOf(built.uvs[first * 2], built.uvs[first * 2 + 1]) !== null;
-    const target = kind ? (detailIndices[kind] ??= []) : steelTriangle(triangle) ? steelIndices : cloth ? clothIndices : detailIndices && wornTriangle(triangle) ? wornIndices : bodyIndices;
+    const cell = detailIndices && !kind ? clothCellOf(built.uvs[first * 2], built.uvs[first * 2 + 1]) : null;
+    const cloth = cell !== null;
+    const target = kind ? (detailIndices[kind] ??= []) : steelTriangle(triangle) ? steelIndices : cloth ? (metalClothCell(cell) ? foilIndices : clothIndices) : detailIndices && wornTriangle(triangle) ? wornIndices : bodyIndices;
     target.push(first, built.indices[triangle * 3 + 1], built.indices[triangle * 3 + 2]);
   }
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
@@ -2207,6 +2214,12 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
       detailMeshes.push(mesh);
       detailOutlines.push(outlineFor(mesh));
     }
+    if (foilIndices.length) {
+      const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(foilIndices), material: doubleSided(clothMaterial(view.steelEnv)), share: skinMesh.geometry });
+      mesh.userData.detailMaps = 'cloth';
+      detailMeshes.push(mesh);
+      detailOutlines.push(outlineFor(mesh));
+    }
     if (wornIndices.length) {
       // (The skin's own material made again, its maps and all, for these faces: the quality tier switches it with the skin's.)
       const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(wornIndices), share: skinMesh.geometry });
@@ -2226,8 +2239,10 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
 /**
  * A fighter's cloth: the look's own skin material (a Lambert one made standard, so the relief shows), wearing the cloth atlas
  * (detailtex.js clothDetailMaterial). One per fighter, as his skin's is (a ghosted man's goes see-through on its own).
+ * `metalEnv`: aluminized cloth, drawn as metal (its colour the film's sheen, its roughness the atlas's) lit by that reflection map.
  */
-function clothMaterial() {
+function clothMaterial(metalEnv = null) {
+  if (metalEnv) return clothDetailMaterial(steelMaterial(metalEnv, { skinning: true, metalness: FOIL.metalness, envMapIntensity: FOIL.envMapIntensity }));
   const base = surface(0xffffff, { skinning: true, vertexColors: true, roughness: 0.85 });
   const standard = base.isMeshLambertMaterial ? new THREE.MeshStandardMaterial({ color: base.color, vertexColors: true, skinning: true, roughness: 0.85, metalness: 0 }) : base;
   return clothDetailMaterial(standard);

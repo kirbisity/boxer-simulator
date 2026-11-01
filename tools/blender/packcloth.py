@@ -3,6 +3,9 @@
 #
 #   python3 tools/blender/packcloth.py <bake dir> [--preview]
 #
+# A family not baked in <bake dir> keeps its cell (and its means) from the atlas already in src/clothmaps-data.js, so a new
+# family can be baked alone and added (its cells re-encoded once more).
+#
 # The atlas is 8 x 8 cells of CELL pixels (2048² in all: the GPU budget, and a power of two so every mipmap level halves
 # every cell exactly), each family's tile filtered down to CELL - 2 PAD and wrapped PAD pixels round on
 # every side (so the coarser mipmaps of a cell blend only its own tile, never its neighbour's); cell k at column k % 8 and
@@ -26,7 +29,7 @@ from pack import normals, resample, to8  # noqa: E402
 
 # In the order of src/detailmaps.js CLOTH_FAMILIES (each one's cell is its index); the tile's side in metres as baked.
 FAMILIES = ['plain', 'twill', 'denim', 'quilt', 'diamondQuilt', 'felt', 'damask', 'leather', 'fur', 'feathers', 'straw', 'cordura', 'ripstop', 'knit',
-            'jack', 'camo', 'kikko', 'cloudDamask', 'tapestry']
+            'jack', 'camo', 'kikko', 'cloudDamask', 'tapestry', 'aluminized', 'aluminizedQuilt']
 # 256 px a cell (224 of tile): finer than a garment is ever seen (a 13 mm weave tile at 60 µm a pixel, its threads 9 px).
 CELL = 256
 PAD = 16
@@ -52,14 +55,39 @@ def cell_of(folder, family):
     return tile[np.ix_(index, index)], [round(float(shade.mean()), 4), round(float(rough.mean()), 4)]
 
 
+def current_atlas():
+    """The atlas in src/clothmaps-data.js (RGBA 0..1, as the picture is laid out) and its families' means, or (None, {})."""
+    path = os.path.join(ROOT, 'src', 'clothmaps-data.js')
+    if not os.path.exists(path):
+        return None, {}
+    text = open(path).read()
+    data = text.split("atlas: '", 1)[1].split("'", 1)[0]
+    families = json.loads(text.split('families: ', 1)[1].split(',\n', 1)[0])
+    means = json.loads(text.split('means: ', 1)[1].split(',\n', 1)[0])
+    image = Image.open(io.BytesIO(base64.b64decode(data))).convert('RGBA')
+    return np.asarray(image).astype(np.float64) / 255, {family: means[k] for k, family in enumerate(families)}
+
+
+def old_cell(atlas, k):
+    """Cell k of an atlas laid out as this one is."""
+    col, row = k % GRID, k // GRID
+    top = (GRID - 1 - row) * CELL
+    return atlas[top:top + CELL, col * CELL:(col + 1) * CELL]
+
+
 def main():
     folder = sys.argv[1]
     preview = '--preview' in sys.argv
     atlas = np.zeros((CELL * GRID, CELL * GRID, 4))
     atlas[:, :] = (0.5, 0.5, 0.9, 0.85)
     means = []
+    old, old_means = current_atlas()
+    old_families = list(old_means)
     for k, family in enumerate(FAMILIES):
-        cell, mean = cell_of(folder, family)
+        if os.path.exists(os.path.join(folder, f'{family}_normal.npy')):
+            cell, mean = cell_of(folder, family)
+        else:
+            cell, mean = old_cell(old, old_families.index(family)), old_means[family]
         col, row = k % GRID, k // GRID
         top = (GRID - 1 - row) * CELL
         atlas[top:top + CELL, col * CELL:(col + 1) * CELL] = cell

@@ -57,7 +57,24 @@ export const FLAME = {
     catchFrom: 0.25, rollShare: [0.2, 0.75], rollSeconds: 3, rollEvery: 0.45, rollPush: 9, roll: 3, wet: 4, fuelRoll: 1, fuelWet: 1,
     // A cry every `cryEvery` s while he burns.
     cryEvery: 1.6,
+    // The heat flux of the fire on him at full heat (kW/m²): a man wrapped in burning hydrocarbon (~800-1200 °C) takes
+    // ~50-150 kW/m² as a pool fire's engulfed object does (https://iomosaic.com/resources/publications/presentation-detail/docs/default-source/papers/consistency-and-limitations-of-api521-equation-a1-for-pool-fires);
+    // `radiant` of it as radiation, the rest by the hot gases' touch (convection), as the flash-fire and TPP tests mix it (50/50 at
+    // 84 kW/m²). Read by a fireproof suit (fireproofThrough), not by the burns: they are the heat's share as before.
+    flux: 120, radiant: 0.5,
   },
+  // A fireproof suit (an outfit's `fireproof`: { tpp, reflect, leak, breach }): rated by its thermal protective performance `tpp`
+  // (cal/cm²: the incident energy, at 84 kW/m² half radiant and half convective, its layers let through before the skin under it
+  // takes a second-degree burn: TPP = 2 x seconds at 2 cal/cm²/s; ASTM D4108 / ISO 17492, NFPA 1971 >= 35 for a proximity
+  // ensemble: https://www.ppe101.com/wp-content/uploads/2020/03/TPP-explanation.doc.pdf). Its aluminized face reflects `reflect` of
+  // the radiant heat (>90%: https://www.firerescue1.com/fire-products/personal-protective-equipment-ppe/articles/what-you-need-to-know-about-proximity-suits-8hocPfz9S5NdMdGS),
+  // none of the convective. What it does not reflect its layers soak up: they hold `tpp` of the test's absorbed energy
+  // (`tppRadiant` of it radiant) before the skin burns; till then only `leak` of the heat reaches him. Spent, its layers
+  // char and the foil delaminates (aramid breaks down ~425-550 °C), and the heat comes through at a share rising to all of it
+  // over another `breach` of that budget. The foil does not let the gel soak in: on the intact face it burns off as an open
+  // film does (FLAME.machine.burn); charred, it soaks into the cloth as into any clothes. Nor does the shell catch from a
+  // burning patch: the flames lick it only while he stands in them. The budget is never given back (the char, the stored heat).
+  suit: { tppRadiant: 0.5, calPerCm2: 41.84 },
   // A machine: of the fire's heat (`fuelHeat` J a kg of fuel burned), `absorbed` goes into it (the rest goes up with the flame); its
   // body holds `specificHeat` J/kg·K (aluminium, steel, plastic) and sheds `cooling` W/K to the air. Past `limit` K over the air its
   // motors' and battery's thermal cut-outs stop it. Standing in a burning patch heats it at `patch` of full.
@@ -312,10 +329,11 @@ function burnFirePatches(world, flame, dt) {
  */
 function igniteMan(world, fighter, fuel, part, by) {
   const machine = Boolean(fighter.body.gear.machine);
-  const burning = (fighter.burning ??= { fuel: 0, clothes: 0, heat: 0, part, reacted: false, rolling: false, running: false, rollClock: 0, cryClock: 0, side: 1, since: world.time, machine });
+  const burning = (fighter.burning ??= { fuel: 0, clothes: 0, heat: 0, through: 1, part, reacted: false, rolling: false, running: false, rollClock: 0, cryClock: 0, side: 1, since: world.time, machine });
   burning.fuel += fuel;
-  // (A machine in a burning patch: its legs in the flames this moment, `clothes` its time left there.)
-  burning.clothes = machine ? 0.1 : FLAME.man.clothes;
+  // (A machine in a burning patch, or a man in an unburnt fireproof suit: the flames on him this moment, `clothes` his time
+  // left in them; nothing of his catches.)
+  burning.clothes = machine || suitIntact(fighter) ? 0.1 : FLAME.man.clothes;
   if (by !== undefined) burning.by = by;
   if (part === 'trunk' || part === 'head') burning.part = part;
 }
@@ -330,6 +348,27 @@ function igniteHorse(world, horse, fuel, by) {
 /** The share of the heat that reaches him: plate over most of him keeps much of it off. */
 const fireExposure = (fighter) => 1 - (fighter.body.gear.cutProof ? FLAME.man.plate : 0);
 
+/** A fireproof suit's budget (kJ/m² its layers soak up before the skin under them burns), from its rating (FLAME.suit). */
+export const suitBudget = (suit) => suit.tpp * FLAME.suit.calPerCm2 * (1 - suit.reflect * FLAME.suit.tppRadiant);
+
+/** The share of the fire's heat a fireproof suit lets through, its budget `spent` (a share of it): `leak`, then rising to all. */
+export const suitThrough = (suit, spent) => suit.leak + (1 - suit.leak) * Math.min(1, Math.max(0, (spent - 1) / suit.breach));
+
+/** Whether he wears a fireproof suit not yet burnt through (FLAME.suit). */
+const suitIntact = (fighter) => Boolean(fighter.body.gear.fireproof) && (fighter.suitSpent ?? 0) < 1;
+
+/**
+ * The share of the fire's heat (`heat`, 0..1 of FLAME.man.flux) that reaches his skin this moment: all of it unsuited; through a
+ * fireproof suit, what its spent budget lets through, the suit taking what it does not reflect into its budget for `dt` s.
+ */
+function fireproofThrough(fighter, heat, dt) {
+  const suit = fighter.body.gear.fireproof;
+  if (!suit) return 1;
+  const absorbed = heat * FLAME.man.flux * (1 - suit.reflect * FLAME.man.radiant) * dt;
+  fighter.suitSpent = (fighter.suitSpent ?? 0) + absorbed / suitBudget(suit);
+  return suitThrough(suit, fighter.suitSpent);
+}
+
 /** Whether he stands or lies in water. */
 function inWaterNow(world, fighter) {
   if (fighter.wading) return true;
@@ -343,25 +382,30 @@ function burnOnMan(world, fighter, dt) {
   const down = fighter.state === 'down' || fighter.state === 'out';
   const wet = inWaterNow(world, fighter);
   const smother = (down ? spec.roll : 1) * (wet ? spec.wet : 1);
-  burning.fuel = Math.max(0, burning.fuel - spec.burn * (down ? spec.fuelRoll : 1) * (wet ? spec.fuelWet : 1) * dt);
+  // (On a fireproof suit's unburnt foil the gel cannot soak in: it burns off as an open film.)
+  const burnOff = suitIntact(fighter) ? FLAME.machine.burn : spec.burn;
+  burning.fuel = Math.max(0, burning.fuel - burnOff * (down ? spec.fuelRoll : 1) * (wet ? spec.fuelWet : 1) * dt);
   burning.clothes = Math.max(0, burning.clothes - smother * dt);
   burning.heat = Math.min(1, Math.max(burning.fuel / spec.cover, burning.fuel >= spec.stuckFrom ? spec.stuckHeat : 0, burning.clothes > 0 ? spec.clothesHeat : 0)) * fireExposure(fighter);
   if (burning.heat <= 0.01) {
     fighter.burning = undefined;
     return;
   }
+  // `heat`: the fire on him (as it is seen and heard); `through`, its share that reaches his skin (a fireproof suit's); `felt`, that.
+  burning.through = fireproofThrough(fighter, burning.heat, dt);
+  const felt = burning.heat * burning.through;
   if (fighter.state === 'out') return;
   // The burns: the trunk, the limbs, the head, as much as the heat.
   for (const [key, rate] of [['trunk', spec.trunk], ['head', spec.head], ...BURNED_LIMBS.map((limb) => [limb, spec.limbs])]) {
     const capacity = (WORLD.damageCapacity[key.replace(/^[lr](?=[A-Z])/, '')] ?? 20) * BODY.toughness;
-    addDamage(fighter, key, burning.heat * rate * dt * capacity, false);
+    addDamage(fighter, key, felt * rate * dt * capacity, false);
   }
   burning.cryClock -= dt;
-  if (burning.cryClock <= 0) {
+  if (burning.cryClock <= 0 && felt > 0.05) {
     burning.cryClock = spec.cryEvery;
-    soundVoice(world, fighter, 'struck', burning.heat, { striker: 'burn' });
+    soundVoice(world, fighter, 'struck', felt, { striker: 'burn' });
   }
-  if (!burning.reacted && burning.heat >= spec.catchFrom && fighter.state === 'up' && !fighter.player) catchAlight(world, fighter, burning);
+  if (!burning.reacted && felt >= spec.catchFrom && fighter.state === 'up' && !fighter.player) catchAlight(world, fighter, burning);
   if (burning.rolling && fighter.state === 'down') rollOver(world, fighter, burning, dt);
 }
 
