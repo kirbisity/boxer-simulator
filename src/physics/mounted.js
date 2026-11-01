@@ -15,6 +15,7 @@ import { shieldCovering, soundEvent, soundHit } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
 import { BARDING, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
+import { DOG_JUMP } from '../robotdogs.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact } from '../weapons.js';
 import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
@@ -64,13 +65,17 @@ export function gaitAt(speed) {
   return GAITS.find((gait) => pace <= gait.upTo);
 }
 
-/** A mount's own gait at its speed (a robot dog's are its own: robotdogs.js), and its strides a second: past its longest stride a robot steps faster. */
+/**
+ * A mount's own gait at its speed (a robot dog's are its own: robotdogs.js), and its strides a second. A robot's foot sweeps
+ * back under it at the ground's speed while it is down (`duty` of a stride): past its longest sweep (`strideMost`) its legs
+ * step faster, not further.
+ */
 function mountGait(horse) {
   const pace = Math.abs(horse.speed);
   return (horse.gaits ?? GAITS).find((gait) => pace <= gait.upTo);
 }
 function mountStrideRate(horse, gait) {
-  return horse.spec?.robot && gait.hz > 0 ? Math.max(gait.hz, Math.abs(horse.speed) / (horse.shape.strideMost * horse.withers)) : gait.hz;
+  return horse.spec?.robot && gait.hz > 0 ? Math.max(gait.hz, (Math.abs(horse.speed) * gait.duty) / (horse.shape.strideMost * horse.withers)) : gait.hz;
 }
 
 /** A rider's horse, for createWorld: under him, facing his way. */
@@ -164,7 +169,8 @@ export function horsePoint(horse, local) {
   const f = forwardOf(horse.yaw);
   const l = leftOf(horse.yaw);
   // (Sunk into soft ground, fieldworks.js horseMire: its hooves on the firm layer under the mud.)
-  return [horse.at[0] + f[0] * x + l[0] * z, y + (horse.bob ?? 0) - (horse.sunk ?? 0), horse.at[1] + f[2] * x + l[2] * z];
+  // (In a jump, `lift`: the body over where it stands, below it in the crouch: physics/mounted.js mountJump.)
+  return [horse.at[0] + f[0] * x + l[0] * z, y + (horse.bob ?? 0) + (horse.lift ?? 0) - (horse.sunk ?? 0), horse.at[1] + f[2] * x + l[2] * z];
 }
 
 /** How much of each gait a speed is in (they blend over `motion.blend` m/s at the changes: the motion has no jump). */
@@ -226,19 +232,31 @@ export function poseHorse(horse) {
   const shape = horse.shape ?? HORSE_SHAPE;
   const gait = mountGait(horse);
   const rate = mountStrideRate(horse, gait);
-  const stride = rate > 0 ? Math.min((shape.strideMost ?? 0.7) * W, Math.abs(horse.speed) / rate) : 0;
-  // The body rises and falls, pitches and rocks with the stride.
+  // (A robot's foot is down `duty` of the stride, sweeping back at the ground's speed: robotdogs.js.)
+  const sweep = horse.spec?.robot ? Math.abs(horse.speed) * gait.duty : Math.abs(horse.speed);
+  const stride = rate > 0 ? Math.min((shape.strideMost ?? 0.7) * W, sweep / rate) : 0;
+  // The body rises and falls, pitches and rocks with the stride; and rocks on its legs from a push (a robot's recoil: `kick`).
   const motion = horseMotion(horse);
   horse.bob = motion.bob;
-  horse.pitch = motion.pitch;
-  horse.rock = motion.rock;
+  horse.pitch = motion.pitch + (horse.kick?.pitch ?? 0);
+  horse.rock = motion.rock + (horse.kick?.roll ?? 0);
   const capsules = horse.capsules;
   capsules.length = 0;
   for (const part of shape.parts) capsules.push({ key: part.key, part: part.part, a: horsePoint(horse, scale(part.a)), b: horsePoint(horse, scale(part.b)), radius: part.radius * W, mass: part.mass });
+  const flying = horse.air?.phase === 'flight';
   for (const leg of shape.legs) {
     const root = scale(leg.root);
     let hoof;
-    if (horse.state !== 'up') {
+    if (horse.severed?.has(leg.key)) {
+      // Cut off at the hip: nothing below it (the piece lies where it fell: its debris).
+      const at = horsePoint(horse, root);
+      horse.legs[leg.key] = { root: at, knee: at, hoof: at, severed: true };
+      continue;
+    }
+    if (flying) {
+      // In the air: the feet tucked up under it.
+      hoof = [root[0] + (leg.fore ? 0.04 : -0.04) * W, 0.03 * W + DOG_JUMP.tuck * (shape.upperLeg + shape.lowerLeg) * W, root[2]];
+    } else if (horse.state !== 'up') {
       // Down: the legs stiff, out from the body.
       hoof = [root[0] + (leg.fore ? 0.15 : -0.15) * W, 0.05 * W, root[2]];
     } else {
@@ -254,8 +272,8 @@ export function poseHorse(horse) {
       }
       hoof = [root[0] + along, 0.03 * W + lift, root[2]];
     }
-    // (A hoof on the ground stays there as the body rises over it and pitches: the leg is longer or shorter.)
-    if (horse.state === 'up') hoof[1] -= horse.bob + horse.pitch * hoof[0];
+    // (A hoof on the ground stays there as the body rises over it, pitches, and crouches or lands from a jump: the leg is longer or shorter.)
+    if (horse.state === 'up' && !flying) hoof[1] -= horse.bob + horse.pitch * hoof[0] + (horse.lift ?? 0);
     // The knee bends forward on a foreleg, the hock back on a hind leg.
     const knee = twoBoneIK(root, hoof, shape.upperLeg * W, shape.lowerLeg * W, [leg.bend ?? (leg.fore ? 1 : -1), 0, 0]);
     const world = { root: horsePoint(horse, root), knee: horsePoint(horse, knee), hoof: horsePoint(horse, hoof) };
@@ -272,6 +290,8 @@ export function poseHorse(horse) {
  */
 export function stepHorse(world, horse, h) {
   if (horse.state === 'falling' || horse.state === 'down') {
+    // (Brought down in the air: it falls the rest of the way.)
+    if (horse.air) stepMountJump(world, horse, h);
     horse.speed *= Math.exp(-h * 2.5);
     horse.yawRate = 0;
     horse.bank = 0;
@@ -280,13 +300,19 @@ export function stepHorse(world, horse, h) {
       horse.roll = horse.side * (Math.PI / 2) * horse.fall * horse.fall;
       if (horse.fall >= 1) horse.state = 'down';
     }
+  } else if (horse.air && horse.air.phase !== 'land') {
+    // Gathering for a jump, pushing off, or in the air: no steering (mountJump).
+    stepMountJump(world, horse, h);
   } else {
+    if (horse.air) stepMountJump(world, horse, h);
     const goal = horse.goal;
     // In soft ground it sinks by its weight on its hooves, and its legs are held there (fieldworks.js horseMire).
     const mire = world.arena.works ? horseMire(world, horse) : null;
     horse.sunk = mire?.sunk ?? 0;
     const top = (mire?.pace ?? 1) * horse.paces.gallop * (horse.lame ? 0.3 : 1) * (1 - 0.5 * Math.min(1, horse.bloodLost / collapseShare())) * (1 - WORLD.mount.stamina.slows * (horse.tire ?? 0));
     // It will not run onto stakes, a fence or a ditch before it (fieldworks.js horseBalks): it pulls up as hard as it can; too close to stop, it runs into them slower.
+    // (What a robot could jump, short of its jump's height, it does not pull up for: it jumps it: riding.js robotJumps.)
+    if (mire && horse.spec?.legs) horse.clearance = 0.85 * (mountJumpOf(world, horse)?.height ?? 0);
     const balk = mire ? horseBalks(world, horse) : Infinity;
     const wanted = Math.max(-1, Math.min(top, balk, goal.speed));
     const change = wanted - horse.speed;
@@ -304,7 +330,13 @@ export function stepHorse(world, horse, h) {
     let turn = goal.heading - horse.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     const rate = turnRateAt(horse, horse.speed);
-    horse.yawRate = Math.max(-rate, Math.min(rate, turn * 4));
+    const twist = horse.spec?.yawAccel;
+    if (twist) {
+      // A robot (robotdogs.js `yawAccel`): its yaw rate changes only as fast as its feet can twist its body round, and it
+      // brakes the turn in time to stop on its heading (the fastest turn its feet allow); near it, it eases on.
+      const want = Math.sign(turn) * Math.min(rate, Math.sqrt(2 * twist * Math.abs(turn)), 2 * Math.sqrt(twist) * Math.abs(turn));
+      horse.yawRate += Math.max(-twist * h, Math.min(twist * h, want - horse.yawRate));
+    } else horse.yawRate = Math.max(-rate, Math.min(rate, turn * 4));
     horse.yaw += horse.yawRate * h;
     // It leans into the turn, as a runner does (gait.js bankOf): the push through its legs is v × yaw rate, positive to the right.
     const leanWanted = -Math.sign(horse.yawRate) * Math.atan(Math.abs(horse.speed * horse.yawRate) / WORLD.gravity);
@@ -319,10 +351,20 @@ export function stepHorse(world, horse, h) {
   horse.at[1] += (f[2] * horse.speed + horse.shove[1]) * h;
   // Fieldworks: a wall or a ditch's lip stops it, a stake's point goes into it (fieldworks.js).
   if (world.arena.works) horseOnWorks(world, horse, before, HORSE_HURT);
-  // What a crash shoved it sideways by dies away as its legs find the ground.
-  const settle = Math.exp(-h * WORLD.mount.crash.shoveDecay);
+  // What a crash shoved it sideways by dies away as its legs find the ground (in the air, it keeps it).
+  const settle = horse.air && horse.air.phase !== 'land' ? 1 : Math.exp(-h * WORLD.mount.crash.shoveDecay);
   horse.shove[0] *= settle;
   horse.shove[1] *= settle;
+  // A robot rocked on its legs (a recoil's `kick`): its controller springs it back level (robotdogs.js `stance`).
+  if (horse.kick) {
+    const stance = horse.spec.stance ?? { hz: 3, zeta: 0.6 };
+    const omega = Math.PI * 2 * stance.hz;
+    const kick = horse.kick;
+    kick.pitchV += (-omega * omega * kick.pitch - 2 * stance.zeta * omega * kick.pitchV) * h;
+    kick.pitch += kick.pitchV * h;
+    kick.rollV += (-omega * omega * kick.roll - 2 * stance.zeta * omega * kick.rollV) * h;
+    kick.roll += kick.rollV * h;
+  }
   horse.shock *= Math.exp(-h / WORLD.mount.crash.shockSeconds);
   const arena = world.arena;
   const margin = 0.9 * horse.withers;
@@ -340,6 +382,286 @@ export function stepHorse(world, horse, h) {
   if (world.ear && horse.state === 'up' && gait.hz > 0 && !horse.spec?.robot) hoofBeats(world, horse, gait, stride);
   const rider = horse.rider === null ? null : world.fighters[horse.rider];
   if (rider?.mount === horse) absorbMotion(rider, horse, h);
+}
+
+// ---- A robot's jump --------------------------------------------------------
+//
+// A robot dog jumps as a body does (physics/jump.js, a man's): all four legs push it off through their stroke
+// (robotdogs.js DOG_JUMP `stroke` of their length), with a force its knee motors give (`legs.knee` N·m through the thigh,
+// at the middle of the stroke the knee's lever sin 45° of it) over all it weighs laden, no faster than its knees straighten
+// (`legs.speed` rad/s through the same lever); the takeoff is the slower of the two, blended (1/v² = 1/vF² + 1/vS²). It
+// crouches, pushes off along the way it means (up, a leap, aside), flies as anything thrown does (no steering in the air),
+// and lands on its legs over the same stroke, the harder the faster it comes down.
+
+/** What a robot's legs give a jump now (null: it has no legs for one): the takeoff speed (m/s), the stroke (m), the push (body weights), its height and reach (m). */
+export function mountJumpOf(world, horse) {
+  const legs = horse.spec?.legs;
+  if (!legs) return null;
+  const W = horse.withers;
+  const thigh = horse.shape.upperLeg * W;
+  const stroke = DOG_JUMP.stroke * (horse.shape.upperLeg + horse.shape.lowerLeg) * W;
+  const mass = ladenMass(world, horse);
+  const lever = thigh * Math.SQRT1_2;
+  const sound = horse.shape.legs.filter((leg) => !horse.severed?.has(leg.key)).length;
+  const push = (sound * legs.knee) / lever / (mass * WORLD.gravity);
+  const forceSpeed = Math.sqrt(Math.max(0, 2 * (push - 1) * WORLD.gravity * stroke));
+  const legSpeed = legs.speed * lever;
+  const v = forceSpeed > 0 ? (forceSpeed * legSpeed) / Math.hypot(forceSpeed, legSpeed) : 0;
+  return { v, stroke, push, height: stroke / 2 + (v * v) / (2 * WORLD.gravity), reach: stroke + (v * v) / WORLD.gravity };
+}
+
+/**
+ * How far ahead (m) a robot running at its pace must start a jump to be off the ground and rising over something there:
+ * the ground it covers crouching and pushing off, and a little more to be up.
+ */
+export function mountJumpLead(world, horse) {
+  const model = mountJumpOf(world, horse);
+  if (!model || model.v <= 0) return 0;
+  return Math.abs(horse.speed) * (DOG_JUMP.crouch + (2 * model.stroke) / model.v + 0.06) + 0.1;
+}
+
+/** Why a robot cannot jump now (a word), or null. */
+export function mountJumpBlocked(world, horse) {
+  if (!horse?.spec?.legs) return 'no legs for it';
+  if (horse.state !== 'up') return 'down';
+  if (horse.air) return 'air';
+  if (world.time < (horse.jumpReadyAt ?? -Infinity)) return 'recovering';
+  if (horse.lame) return 'hurt';
+  return null;
+}
+
+/**
+ * A robot dog jumps (its rider, or the man playing it, asks): `kind` 'up', 'leap' or 'aside' (DOG_JUMP.angle: how steeply
+ * it pushes off), along `heading` (rad, the world's; its own way if left out), on top of how it is going. False if it cannot.
+ */
+export function mountJump(world, horse, { kind = 'up', heading = horse.yaw } = {}) {
+  if (mountJumpBlocked(world, horse)) return false;
+  const model = mountJumpOf(world, horse);
+  if (!model || model.v <= 0) return false;
+  const angle = DOG_JUMP.angle[kind] ?? DOG_JUMP.angle.up;
+  horse.air = { phase: 'crouch', t: 0, kind, heading, model, vy: model.v * Math.sin(angle), along: model.v * Math.cos(angle), from: [...horse.at], top: 0 };
+  return true;
+}
+
+/** Each substep of a jump: the crouch, the push off (the body rising through the stroke), the flight, the landing. */
+function stepMountJump(world, horse, h) {
+  const jump = horse.air;
+  const half = jump.model.stroke / 2;
+  jump.t += h;
+  // (Brought down before it was off: it was never off.)
+  if (horse.state !== 'up' && (jump.phase === 'crouch' || jump.phase === 'push')) {
+    jump.phase = 'flight';
+    jump.vy = 0;
+  }
+  if (jump.phase === 'crouch') {
+    const share = Math.min(1, jump.t / DOG_JUMP.crouch);
+    horse.lift = -half * share * share * (3 - 2 * share);
+    if (jump.t >= DOG_JUMP.crouch) Object.assign(jump, { phase: 'push', t: 0 });
+    return;
+  }
+  if (jump.phase === 'push') {
+    // Through the stroke at an even push, from the crouch to the legs straight: off at the takeoff speed.
+    const pushSeconds = (2 * jump.model.stroke) / jump.model.v;
+    const share = Math.min(1, jump.t / pushSeconds);
+    horse.lift = -half + jump.model.stroke * share * share;
+    if (share >= 1) {
+      // Off: up, and along the way it meant at the push's speed that way, or its run's if that is faster (its feet on the
+      // ground, its legs cannot push it on faster than they straighten: a running jump keeps its run, and rises).
+      const forward = forwardOf(horse.yaw);
+      const velocity = [forward[0] * horse.speed + horse.shove[0], forward[2] * horse.speed + horse.shove[1]];
+      const way = [Math.cos(jump.heading), -Math.sin(jump.heading)];
+      const already = velocity[0] * way[0] + velocity[1] * way[1];
+      const added = Math.max(0, jump.along - already);
+      velocity[0] += way[0] * added;
+      velocity[1] += way[1] * added;
+      horse.speed = velocity[0] * forward[0] + velocity[1] * forward[2];
+      horse.shove = [velocity[0] - forward[0] * horse.speed, velocity[1] - forward[2] * horse.speed];
+      Object.assign(jump, { phase: 'flight', t: 0, from: [...horse.at] });
+      world.events.push({ time: world.time, kind: 'jump', horse: horse.id, rider: horse.rider ?? undefined, jumpKind: jump.kind, height: jump.model.height, effects: [`jumps (${jump.kind})`] });
+    }
+    return;
+  }
+  if (jump.phase === 'flight') {
+    jump.vy -= WORLD.gravity * h;
+    horse.lift += jump.vy * h;
+    jump.top = Math.max(jump.top, horse.lift);
+    // Its feet (the legs straight under it) meet the ground.
+    if (horse.lift <= half && jump.vy < 0) {
+      const impact = -jump.vy;
+      // Its legs stop it over their stroke: the force that takes, in body weights, against what they push with.
+      const asked = (impact * impact) / (2 * WORLD.gravity * jump.model.stroke) + 1;
+      const ratio = asked / Math.max(1, jump.model.push);
+      Object.assign(jump, { phase: 'land', t: 0, impact, ratio, dip: half * Math.min(1.6, 0.3 + ratio), start: horse.lift });
+      world.events.push({ time: world.time, kind: 'touchdown', horse: horse.id, rider: horse.rider ?? undefined, speed: impact, ratio, distance: Math.hypot(horse.at[0] - jump.from[0], horse.at[1] - jump.from[1]), height: jump.top, effects: [ratio > 1 ? 'lands hard' : 'lands'] });
+      if (horse.state !== 'up') {
+        horse.lift = 0;
+        horse.air = null;
+      }
+    }
+    return;
+  }
+  // Landed: down through the dip as its legs take it, and up again to stand (`land` s).
+  const share = Math.min(1, jump.t / DOG_JUMP.land);
+  const down = Math.min(1, share * 3);
+  const up = Math.max(0, (share - 1 / 3) * 1.5);
+  horse.lift = share < 1 / 3 ? jump.start + (-jump.dip - jump.start) * down * (2 - down) : -jump.dip * (1 - up * up * (3 - 2 * up));
+  if (share >= 1) {
+    horse.lift = 0;
+    horse.air = null;
+    horse.jumpReadyAt = world.time + DOG_JUMP.recover;
+  }
+}
+
+// ---- A turret on a robot's back ---------------------------------------------
+//
+// What a robot carries mounted (a weapon's `turret`: the Vision 60's SPUR) is laid by its pan and tilt motors, not swung by a
+// wrist: each a servo that drives its axis toward the line to the mark at a rate proportional to how far off it is
+// (`servo` /s), no faster than its motors slew (`slew` rad/s) and changing rate no faster than they accelerate it (`accel`
+// rad/s²), between its stops (`pan` either way of the robot's line, `tilt` [down, up]). Its angles are its own, measured on
+// the robot's back, so they never wrap: the line to the mark is turned into them each substep, the robot's turning and its
+// rocking taken out. The gun rides on its cradle with a little give (`mount`: Hz, damping), where the recoil throws it (the
+// muzzle climbs: the bore is `bore` m above the trunnion, the gun and cradle `inertia` kg·m² about it) and it rings down;
+// the same kick goes on through the mount into the robot (turretRecoil). The rider's gun hand (the receiver) is held where
+// the gun is: its arm is not what aims it.
+
+/** The turret's trunnion (world), over the robot's seat. */
+function turretPivot(fighter, weapon) {
+  const horse = fighter.mount;
+  const seat = (horse.shape ?? HORSE_SHAPE).seat;
+  return horsePoint(horse, [seat[0] * horse.withers, seat[1] * horse.withers + weapon.spec.turret.height, 0]);
+}
+
+/** A direction in the robot's frame (x ahead, y up, z its left), in the world: turned, pitched and rocked with it. */
+function robotDirection(horse, local) {
+  const origin = horsePoint(horse, [0, 0.76 * horse.withers, 0]);
+  return vec.sub(horsePoint(horse, [local[0], 0.76 * horse.withers + local[1], local[2]]), origin);
+}
+
+/** The barrel's line at a pan and tilt (rad, the robot's frame) in the world. */
+export function turretLine(horse, pan, tilt) {
+  return vec.normalize(robotDirection(horse, [Math.cos(tilt) * Math.cos(pan), Math.sin(tilt), -Math.cos(tilt) * Math.sin(pan)]));
+}
+
+/**
+ * Each substep: lay the turret toward `mark` (a world point; null: level, ahead), its gun on its cradle, and hold the
+ * rider's gun hand to the receiver. Sets the weapon's line (`dir`), its turning (`spin`), its tip and the tip's speed.
+ */
+export function stepTurret(fighter, weapon, mark, h) {
+  const horse = fighter.mount;
+  const spec = weapon.spec.turret;
+  const turret = (weapon.turret ??= { pan: 0, tilt: spec.rest, panV: 0, tiltV: 0, climb: 0, climbV: 0, swing: 0, swingV: 0, rate: 0, panWanted: 0, tiltWanted: spec.rest, panLead: 0, tiltLead: 0, seen: false });
+  const pivot = turretPivot(fighter, weapon);
+  // (Down, its motors are dead: it stays as it was.)
+  const live = fighter.state === 'up' && horse.state === 'up';
+  // The line to the mark, in the robot's frame (none: level, ahead).
+  let panWanted = 0;
+  let tiltWanted = spec.rest;
+  if (mark && live) {
+    const want = vec.normalize(vec.sub(mark, pivot));
+    const ahead = vec.normalize(robotDirection(horse, [1, 0, 0]));
+    const up = vec.normalize(robotDirection(horse, [0, 1, 0]));
+    const left = vec.normalize(robotDirection(horse, [0, 0, 1]));
+    const local = [vec.dot(want, ahead), vec.dot(want, up), vec.dot(want, left)];
+    panWanted = Math.atan2(-local[2], local[0]);
+    tiltWanted = Math.asin(Math.max(-1, Math.min(1, local[1])));
+  }
+  // How fast that line is moving across the robot (its own turning and rocking, the mark's going): the servo leads by it
+  // (a stabilised mount's rate loop), so it holds a moving line without lagging behind it; smoothed over `lead` s, and
+  // nothing when the mark is new, or behind a stop.
+  const leadShare = Math.min(1, h / spec.lead);
+  const seen = mark && live && turret.seen;
+  const panMoving = seen ? Math.atan2(Math.sin(panWanted - turret.panWanted), Math.cos(panWanted - turret.panWanted)) / h : 0;
+  const tiltMoving = seen ? (tiltWanted - turret.tiltWanted) / h : 0;
+  turret.panLead = seen ? turret.panLead + (panMoving - turret.panLead) * leadShare : 0;
+  turret.tiltLead = seen ? turret.tiltLead + (tiltMoving - turret.tiltLead) * leadShare : 0;
+  turret.panWanted = panWanted;
+  turret.tiltWanted = tiltWanted;
+  turret.seen = Boolean(mark && live);
+  const lay = (angle, rate, target, lead, low, high) => {
+    const goal = Math.max(low, Math.min(high, target));
+    const leading = goal === target ? lead : 0;
+    const wanted = live ? Math.max(-spec.slew, Math.min(spec.slew, leading + (goal - angle) * spec.servo)) : 0;
+    let next = rate + Math.max(-spec.accel * h, Math.min(spec.accel * h, wanted - rate));
+    let at = angle + next * h;
+    if (at < low || at > high) {
+      at = Math.max(low, Math.min(high, at));
+      next = 0;
+    }
+    return [at, next];
+  };
+  [turret.pan, turret.panV] = lay(turret.pan, turret.panV, panWanted, turret.panLead, -spec.pan, spec.pan);
+  [turret.tilt, turret.tiltV] = lay(turret.tilt, turret.tiltV, tiltWanted, turret.tiltLead, spec.tilt[0], spec.tilt[1]);
+  // The gun's give on its cradle, ringing down.
+  const omega = Math.PI * 2 * spec.mount.hz;
+  const damping = 2 * spec.mount.zeta * omega;
+  turret.climbV += (-omega * omega * turret.climb - damping * turret.climbV) * h;
+  turret.climb += turret.climbV * h;
+  turret.swingV += (-omega * omega * turret.swing - damping * turret.swingV) * h;
+  turret.swing += turret.swingV * h;
+  const dir = turretLine(horse, turret.pan + turret.swing, turret.tilt + turret.climb);
+  const up = vec.normalize(robotDirection(horse, [0, 1, 0]));
+  const across = vec.cross(dir, up);
+  const acrossUnit = vec.length(across) > 1e-6 ? vec.normalize(across) : [0, 0, 1];
+  // Its turning: the robot's own about the vertical, the pan's about the robot's up, the tilt's across the barrel.
+  weapon.spin = vec.add(vec.scale([0, 1, 0], horse.yawRate ?? 0), vec.add(vec.scale(up, turret.panV + turret.swingV), vec.scale(acrossUnit, turret.tiltV + turret.climbV)));
+  turret.rate = Math.hypot(turret.panV + turret.swingV, turret.tiltV + turret.climbV);
+  turret.pivot = pivot;
+  weapon.dir = dir;
+  // The receiver over the trunnion: the rider's gun hand held to it, carried at the robot's speed there.
+  const main = P[`${weapon.main}Hand`];
+  const receiver = vec.add(pivot, vec.scale(dir, spec.grip));
+  turret.receiver = receiver;
+  const velocity = horseVelocityAt(horse, receiver);
+  for (let axis = 0; axis < 3; axis += 1) {
+    fighter.x[main * 3 + axis] = receiver[axis];
+    fighter.v[main * 3 + axis] = velocity[axis];
+    fighter.prev[main * 3 + axis] = receiver[axis] - velocity[axis] * h;
+  }
+  weapon.tip = vec.add(receiver, vec.scale(dir, weapon.spec.length));
+  weapon.tipVelocity = vec.add(velocity, vec.cross(weapon.spin, vec.scale(dir, weapon.spec.length)));
+}
+
+/**
+ * Whether the turret lies on `mark` (a world point) as its sight sees it (on the receiver), within `within` rad (its
+ * `lay`): its fire control looses then, and not before (not while the last kick still rings in it).
+ */
+export function turretLaid(weapon, mark, within = weapon.spec.turret.lay) {
+  const turret = weapon.turret;
+  if (!turret?.receiver || !mark) return true;
+  const toMark = vec.normalize(vec.sub(mark, turret.receiver));
+  return vec.dot(toMark, weapon.dir) >= Math.cos(within);
+}
+
+/**
+ * A round fired from the turret: its recoil (N·s: the bullet's momentum and its powder gas's, the shot's `recoil`) back
+ * along the barrel. On the cradle it climbs the muzzle (the bore above the trunnion: an angular impulse of recoil × bore on
+ * the gun's inertia); through the mount it pushes the robot back (on its laden mass) and tips it on its legs (the bore that
+ * high over its feet), forward and back or side to side as the gun points; its legs spring it back level (stepHorse).
+ */
+export function turretRecoil(world, fighter, weapon, impulse) {
+  const horse = fighter.mount;
+  const spec = weapon.spec.turret;
+  const turret = weapon.turret;
+  if (!horse || !turret) return;
+  turret.climbV += (impulse * spec.bore) / spec.inertia;
+  const mass = ladenMass(world, horse);
+  const barrel = weapon.dir;
+  const flat = Math.hypot(barrel[0], barrel[2]) || 1;
+  horse.shove[0] -= (barrel[0] / flat) * ((impulse * flat) / mass);
+  horse.shove[1] -= (barrel[2] / flat) * ((impulse * flat) / mass);
+  // Rocked on its legs: standing, it tips about its feet (on the ground: the bore's height above them the lever), its body
+  // a box of its length, breadth and depth carried at its hips' height (the parallel axes: its own inertia, and its mass
+  // that high).
+  const W = horse.withers;
+  const shape = horse.shape ?? HORSE_SHAPE;
+  const length = 2 * shape.parts[0].b[0] * W;
+  const breadth = 2 * Math.abs(shape.legs[0].root[2]) * W;
+  const depth = 2 * shape.parts[0].radius * W;
+  const middle = shape.parts[0].a[1] * W;
+  const lever = Math.max(0, (turret.pivot?.[1] ?? middle) + spec.bore - (horse.lift ?? 0));
+  const kick = (horse.kick ??= { pitch: 0, pitchV: 0, roll: 0, rollV: 0 });
+  kick.pitchV += (lever * impulse * flat * Math.cos(turret.pan)) / (mass * ((length * length + depth * depth) / 12 + middle * middle));
+  kick.rollV += (lever * impulse * flat * Math.sin(turret.pan)) / (mass * ((breadth * breadth + depth * depth) / 12 + middle * middle));
 }
 
 /**
@@ -384,7 +706,8 @@ function seatPoints(fighter, horse) {
   const l = leftOf(horse.yaw);
   const points = {};
   // His hips and thighs are at the saddle; his pelvis is carried at the height his lower back lets it (absorbMotion).
-  points[P.pelvis] = fighter.seated ? [seat[0], fighter.seated.y, seat[2]] : seat;
+  // (Bolted on, a robot's load is carried exactly with its back, through a jump too.)
+  points[P.pelvis] = fighter.seated && !fighter.body.gear.bolted ? [seat[0], fighter.seated.y, seat[2]] : seat;
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     const hip = vec.add(seat, vec.scale(l, sign * L.hipSpan / 2));
     const out = 0.62 * Math.min(1.2, W / 1.5);
@@ -891,6 +1214,11 @@ export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, 
     horse.bleed += bleedToLose(collapseShare() - horse.bloodLost, spec.heartSeconds);
     event.effects.push('through the heart');
   }
+  // A robot's leg link cut right through (robotdogs.js `legSever`): off at the hip; it shorts out, and down it goes.
+  if (capsule.part === 'legs' && spec.legSever && cut > spec.legSever && !horse.severed?.has(capsule.key)) {
+    severMountLeg(world, horse, capsule.key, event, attacker);
+    return;
+  }
   if (capsule.part === 'legs' && blunt + cut > spec.legBreak) {
     horse.lame = true;
     event.effects.push('its leg broken');
@@ -902,6 +1230,35 @@ export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, 
   }
   horse.trauma += blunt;
   if (horse.trauma > spec.trunkFatal * BODY.toughness) bringDown(world, horse, 'killed by the blows');
+}
+
+/**
+ * A robot's leg cut off at the hip by `event`'s blow: no capsule there now, the piece (its two links) thrown off as debris
+ * (`dogLeg`), a 'legSevered' event (at the hip: where its stump shorts out, machinefx.js); on three legs it goes down.
+ */
+function severMountLeg(world, horse, key, event, attacker) {
+  const leg = horse.legs[key];
+  horse.severed ??= new Set();
+  horse.severed.add(key);
+  horse.lame = true;
+  const W = horse.withers;
+  const shape = horse.shape ?? HORSE_SHAPE;
+  const length = (shape.upperLeg + shape.lowerLeg) * W * 0.9;
+  const axis = vec.length(vec.sub(leg.hoof, leg.root)) > 1e-4 ? vec.normalize(vec.sub(leg.hoof, leg.root)) : [0, -1, 0];
+  const centre = vec.add(leg.root, vec.scale(axis, length / 2));
+  const carried = horseVelocityAt(horse, centre);
+  const random = world.random;
+  const away = event?.normal ? vec.scale(event.normal, -1.2) : [0, 0, 0];
+  const debris = {
+    id: world.debris.length, kind: 'dogLeg', horse: horse.id, breed: horse.breed, leg: key, owner: horse.rider ?? -1, x: centre, v: vec.add(vec.add(carried, away), [0, 1.2, 0]),
+    q: [0, 0, 0, 1], spin: [random() * 6 - 3, random() * 4 - 2, random() * 6 - 3], radius: shape.legRadius * W * 1.2, axis, half: length / 2, resting: false,
+  };
+  world.debris.push(debris);
+  (horse.severedDebris ??= {})[key] = debris.id;
+  event?.effects?.push('its leg cut off');
+  world.events.push({ time: world.time, kind: 'legSevered', horse: horse.id, rider: horse.rider ?? undefined, fighter: horse.rider ?? undefined, attacker: attacker?.id, leg: key, point: [...leg.root], debris: debris.id, effects: ['a leg cut off'] });
+  poseHorse(horse);
+  bringDown(world, horse, 'goes down on three legs');
 }
 
 /** The horse's timers each step: it bleeds, and down it goes past what it can lose. */

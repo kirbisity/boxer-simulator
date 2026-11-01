@@ -224,8 +224,22 @@ export const FLAMER = {
 // buckshot, fed from the body (`rounds` without end: never reloaded).
 export const ARM_RIFLE = { ...RIFLE, rounds: Infinity, ammo: Infinity };
 export const ARM_SHOTGUN = { ...SHOTGUN, rounds: Infinity, ammo: Infinity };
-// (the SPUR turret's 6.5 Creedmoor, semi-automatic: ~3.0 kJ at the muzzle against the AR-15's 1.75.)
-export const TURRET_RIFLE = { ...RIFLE, energy: 3000, automatic: undefined, rounds: Infinity, ammo: Infinity };
+/**
+ * A cartridge's recoil (N·s): the bullet's momentum and its powder gas's (the gas leaves at ~1.7 times the bullet's speed,
+ * a rifle's rule of thumb), less what a suppressor catches of the gas (`gasShare`: what gets out through it).
+ */
+export function cartridgeRecoil({ bulletKg, muzzle, chargeKg, gasSpeed = 1.7, gasShare = 1 }) {
+  return bulletKg * muzzle + chargeKg * muzzle * gasSpeed * gasShare;
+}
+// The SPUR turret's 6.5 Creedmoor, semi-automatic: a 140 gr (9.07 g) bullet at ~813 m/s (3.0 kJ at the muzzle, against the
+// AR-15's 1.75) on ~41 gr (2.66 g) of powder, through its suppressor (~3/4 of the gas's push gets out): ~10 N·s of recoil
+// (the AR-15's 5.56 ~5). Fired from a rigid, motor-laid mount with a magnified optic, it is more precise than a carbine
+// from the shoulder: its round goes ~25% tighter.
+export const TURRET_RIFLE = {
+  ...RIFLE, energy: 3000, automatic: undefined, rounds: Infinity, ammo: Infinity,
+  recoil: cartridgeRecoil({ bulletKg: 0.00907, muzzle: 813, chargeKg: 0.00266, gasShare: 0.75 }),
+  spread: 0.0037, movingSpread: 0.015,
+};
 
 // `art`: the weapon art (moves.js, weaponarts.js) its family is made for, the move the player can make with it once his
 // blood is up: the katana's and ōdachi's draw-cut (iai), the long sword's pommel strike, the jian's and dao's drawing cut,
@@ -466,11 +480,20 @@ export const WEAPONS = {
   // SWORD Defense's SPUR, the rifle turret shown on Ghost Robotics' Vision 60: a 6.5 Creedmoor
   // (~9 g at ~820 m/s, ~3.0 kJ: TURRET_RIFLE) on a pan-and-tilt mount on the robot's back, fired one round at a time.
   // Drawn and aimed as the combat bot's forearm rifle (`mounted`); never dropped; its ten-round box not counted (fudged).
+  // Laid by its pan-and-tilt motors (`turret`: physics/mounted.js stepTurret), not a wrist: the trunnion `height` m over the
+  // robot's back, the receiver `grip` m ahead of it; at rest level (`rest` rad); its stops `pan` rad either way and `tilt`
+  // [down, up]; its motors slew it at most `slew` rad/s (~100°/s, as a light remote weapon station's), accelerating it
+  // `accel` rad/s², laying it at `servo` /s of its error and leading by how fast the line to the mark moves (smoothed over
+  // `lead` s: a stabilised mount); the gun gives on its cradle (`mount`: Hz, damping), the bore `bore` m above the trunnion,
+  // the gun and cradle `inertia` kg·m² about it (4 kg over ~0.9 m, and the cradle); its fire control looses only once the
+  // barrel lies within `lay` rad of the mark (~1 cm a metre), and its gunner (ai.js gunfight) asks for a shot only once it
+  // is within `ready` rad.
   turretRifle: {
     label: 'SPUR rifle turret', hands: 'one', hand: 'r', mounted: true, length: 0.7, strikeFrom: 0.18, handle: 0.02, mass: 4, balance: 0.3, radius: 0.03,
     harm: { swing: { blunt: 0.5 }, thrust: { blunt: 0.3 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 14, zeta: 0.85 }, threat: 7, ranged: true,
     muzzle: [0.6, 0.03],
+    turret: { height: 0.12, grip: 0.05, rest: -0.05, pan: 2.6, tilt: [-0.35, 1.05], slew: 1.75, accel: 20, servo: 10, lead: 0.05, mount: { hz: 9, zeta: 0.35 }, bore: 0.04, inertia: 0.3, lay: 0.01, ready: 0.15 },
     shot: TURRET_RIFLE,
   },
   armShotgun: {

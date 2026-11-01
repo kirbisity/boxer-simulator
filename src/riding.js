@@ -7,8 +7,9 @@
 import { P } from './body.js';
 import { MOVES, STYLES, moveRange } from './moves.js';
 import { aimPoint, bladeFor, dropWeapon, point, throwPunch, toLocal, WORLD } from './physics.js';
-import { leanedShoulder, steerInside, turnRadius } from './physics/mounted.js';
+import { leanedShoulder, mountJump, mountJumpBlocked, mountJumpLead, mountJumpOf, steerInside, turnRadius } from './physics/mounted.js';
 import { ammoCarried } from './physics/ranged.js';
+import { DOG_JUMP } from './robotdogs.js';
 import { vec, yawRotate } from './pose.js';
 
 /**
@@ -84,6 +85,12 @@ import { vec, yawRotate } from './pose.js';
  *   from (`push` of the turn), and one ahead in his lane is not ridden up
  *   to (he eases to its pace); so are men of his own side on foot, standing
  *   within `footGap` m of his line ahead.
+ * - robot: a robot dog (robotdogs.js) fights from its own legs. With a turret on its back, its man within `turretStand` m
+ *   (too near to ride round), it stands and turns to face him, its gun laid over its head. It jumps (physics/mounted.js
+ *   mountJump): over what is in its way that it can clear (`hurdle`, fieldworks.js horseBalks); aside and away from a blow
+ *   (not a shot) wound up at it by a man within his weapon's reach and `dodgeReach` m more, if it can be off the ground
+ *   before the blow comes (a chance of `dodge` for each blow it sees coming); and with nothing to fight with but its body,
+ *   at its man in its charge, from `leap` of its leap's reach off him.
  */
 export const RIDING = {
   lookAhead: 1.6,
@@ -112,6 +119,7 @@ export const RIDING = {
   patience: { passes: 3, seconds: 25 },
   lane: { gap: 2.6, look: 1.6, push: 1.8, footGap: 1.6 },
   assist: { through: 8, face: 0.45, halted: 0.5, ready: 4 },
+  robot: { turretStand: 3, dodge: 0.35, dodgeReach: 0.6, leap: [0.9, 1.4] },
 };
 
 const aheadOf = (yaw) => yawRotate([1, 0, 0], yaw);
@@ -409,6 +417,8 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     setGoal(headingOf(-along[2], along[0]) , horse.paces.walk);
     return true;
   }
+  // A robot dog's jumps (RIDING.robot).
+  if (horse.spec?.legs) robotJumps(world, fighter, opponent, distance, along, style);
   // A bow (a gun) from the saddle: the horse archer's way of fighting (skirmish).
   const gun = style.ranged && fighter.weapon?.held && !fighter.weapon.spent ? style.ranged : null;
   if (gun && fighter.weapon.spec.bow) {
@@ -418,6 +428,11 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   if (gun) {
     // A gun (the three-eyed gun): round him at a canter, his man on the bow side, shooting as on foot.
     gunfight(world, fighter, opponent, distance, gun, dt);
+    // (A turret on a robot's back, its man too near to ride round: it stands and turns to face him.)
+    if (fighter.weapon.spec.turret && distance < RIDING.robot.turretStand) {
+      setGoal(headingOf(along[0], along[2]), 0);
+      return true;
+    }
     const spec = RIDING.archer;
     fighter.ride ??= { phase: 'charge' };
     if (!fighter.ride.plan) drawPass(world, fighter.ride, world.time);
@@ -506,6 +521,46 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   const zone = markZone(opponent, fighter);
   strikeInPassing(world, fighter, opponent, style.attacks, (who) => aimPoint(who, zone), (spec) => (spec.zones.includes(zone) ? zone : spec.zones[0]), forward);
   return true;
+}
+
+/**
+ * A robot dog's jumps, each as RIDING.robot says: over a hurdle in its way, aside from a blow wound up at it, at its man in
+ * a charge with nothing but its body to fight with.
+ */
+function robotJumps(world, fighter, opponent, distance, along, style) {
+  const horse = fighter.mount;
+  if (mountJumpBlocked(world, horse)) return;
+  const spec = RIDING.robot;
+  const model = mountJumpOf(world, horse);
+  // Over what is in its way: from where it is off and rising by the time it gets there (at a run, it keeps its run and
+  // pushes up; slower, it leaps).
+  const hurdle = horse.hurdle;
+  if (hurdle && hurdle.distance <= mountJumpLead(world, horse)) {
+    mountJump(world, horse, { kind: Math.abs(horse.speed) > model.v * Math.cos(DOG_JUMP.angle.leap) ? 'up' : 'leap', heading: horse.yaw });
+    return;
+  }
+  // A blow wound up at it, by a man near enough to land it: aside and away (once a blow, by a chance).
+  const blow = opponent.punch;
+  // (Only if it can be off the ground before the blow comes: its crouch and push take a moment, standing there.)
+  const offIn = DOG_JUMP.crouch + (2 * model.stroke) / Math.max(0.1, model.v);
+  if (blow && blow.spec.path !== 'aim' && blow.target === fighter.id && (blow.spec.windup ?? 0) - blow.t > offIn && blow.dodgeSeen !== fighter.id) {
+    blow.dodgeSeen = fighter.id;
+    const weapon = opponent.weapon?.held ? opponent.weapon.spec : null;
+    const reach = (weapon && !weapon.ranged ? weapon.length : 0) + opponent.body.lengths.upperArm + opponent.body.lengths.forearmToFist + spec.dodgeReach;
+    if (distance < reach && world.random() < spec.dodge) {
+      // Off his line: away from him and to one side (the side it is already turned to), at the dodge's angle.
+      const away = headingOf(-along[0], -along[2]);
+      const side = Math.sign(Math.sin(horse.yaw - away)) || 1;
+      mountJump(world, horse, { kind: 'aside', heading: away + side * (Math.PI / 3) });
+      return;
+    }
+  }
+  // Its body its only weapon (no blow in its style): in its charge, at him from a leap's reach off.
+  const unarmed = !Object.keys(style.attacks ?? {}).length && !style.ranged;
+  const ahead = vec.dot(along, aheadOf(horse.yaw));
+  if (unarmed && fighter.ride?.phase === 'charge' && ahead > 0.9 && distance >= spec.leap[0] * model.reach && distance <= spec.leap[1] * model.reach) {
+    mountJump(world, horse, { kind: 'leap', heading: headingOf(along[0], along[2]) });
+  }
 }
 
 /** The way from one floor point to another as a heading, and how far. */

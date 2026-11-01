@@ -1369,6 +1369,8 @@ function logEvent(event) {
   else if (event.kind === 'pain') text = `😣 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'unhorsed') text = `🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'horseDown') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} goes down · <em>${event.effects.join(', ')}</em>`;
+  // A robot dog's leg cut off (physics/mounted.js severMountLeg): its stump shorts out.
+  else if (event.kind === 'legSevered') text = `⚡ ${steed(event).replace(/^a /, 'A ')} · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'horseHit') text = `${event.attacker < 0 ? `A ${event.weapon}` : `<b>${name(event.attacker)}</b>`} ${event.punch ?? (event.weapon === 'stake' ? 'meets' : 'hits')} → ${steed(event)} (${event.target}) · ${event.speed === undefined ? '' : `${event.speed.toFixed(1)} m/s · `}${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
   else if (event.kind === 'horseCrash') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} · ${event.speed.toFixed(1)} m/s · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'trampled') text =`🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
@@ -1384,7 +1386,7 @@ function logEvent(event) {
   }
   const row = document.createElement('li');
   row.innerHTML = text;
-  if (['knockout', 'broken', 'severed', 'killed', 'bledOut', 'drowned', 'pinned'].includes(event.kind) || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
+  if (['knockout', 'broken', 'severed', 'legSevered', 'killed', 'bledOut', 'drowned', 'pinned'].includes(event.kind) || event.effects?.some((effect) => effect.startsWith('knockdown'))) row.className = 'big';
   const log = $('#log');
   log.prepend(row);
   while (log.children.length > 5) log.lastChild.remove();

@@ -18,6 +18,7 @@ import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
 import { ammoLeft, emptied } from './physics/ranged.js';
 import { rayBlocked } from './physics/terrain.js';
+import { turretLaid } from './physics/mounted.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -2570,6 +2571,8 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   if (other) fighter.focus = other.id;
   if (fouled === 'line') fighter.strafe = teamSpacing(world, fighter, opponent).strafe || fighter.strafe;
   if (fouled) return;
+  // A turret (physics/mounted.js) is still being laid onto him, well off its line: not yet (its fire control holds a shot it is not laid for).
+  if (weapon.spec.turret && !turretLaid(weapon, weapon.turretMark, weapon.spec.turret.ready)) return;
   const zone = world.random() < gun.headShare ? 'head' : 'body';
   if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
     // From the stance the gun is already up: the shot goes as soon as the sights settle.

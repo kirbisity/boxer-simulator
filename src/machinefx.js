@@ -14,6 +14,9 @@
 //     arcs jumping at its joints, one after another, flickering, dying away.
 //   'stump': a limb cut off: the stump sputters, sparks in bursts from the
 //     cut cables with an arc now and then, weaker as the capacitors drain.
+// A robot dog (robotdogs.js) is its chassis: its leg cut off at the hip
+// ('legSevered', physics/mounted.js) shorts out there, and it down (the
+// 'disabled' of what it carries) shorts out through its own body and legs.
 // What they do is asked of the view through `emit` (weaponview.js): sparks
 // (from a point along a direction), an arc (a jagged short line between two
 // points) and a flash (a point of light), so this file holds only numbers.
@@ -49,7 +52,7 @@ export const MACHINE_FX = {
 /** A store of emitters for one view: a fixed pool, and the machines already shorted out (once each). */
 export function machineFxCreate(spec = MACHINE_FX) {
   const pool = [];
-  for (let slot = 0; slot < spec.maxEmitters; slot += 1) pool.push({ live: false, kind: null, fighter: -1, joint: null, side: null, start: 0, next: 0, seed: 0, first: false });
+  for (let slot = 0; slot < spec.maxEmitters; slot += 1) pool.push({ live: false, kind: null, fighter: -1, joint: null, side: null, leg: null, start: 0, next: 0, seed: 0, first: false });
   return { pool, downed: new Set() };
 }
 
@@ -68,6 +71,8 @@ export function machineFxFor(event, fighter, spec = MACHINE_FX) {
   // A man in a powered frame (a kit's `assist`: the exoskeleton) is no machine, but a limb cut off takes the frame's cables
   // with it: that stump shorts out too (he bleeds as well; he does not short out when he falls).
   if (event.kind === 'severed' && fighter?.body?.gear?.assist) return 'stump';
+  // A robot dog's leg cut off at the hip (its `fighter`: what rides it).
+  if (event.kind === 'legSevered') return fighter?.mount?.spec?.machine ? 'stump' : null;
   if (!fighter?.body?.gear?.machine) return null;
   if (event.kind === 'severed') return 'stump';
   if (spec.downKinds.has(event.kind)) return 'death';
@@ -97,12 +102,15 @@ export function machineFxHear(store, event, world, now, spec = MACHINE_FX) {
   slot.fighter = fighter.id;
   slot.joint = event.joint ?? null;
   slot.side = event.side ?? null;
+  slot.leg = event.kind === 'legSevered' ? event.leg : null;
   slot.start = now;
   slot.next = now;
   slot.seed = (fighter.id * 7919 + Math.round(now * 1000)) % 65536;
   slot.first = true;
   if (world.ear) {
-    const at = kind === 'stump' && event.point ? event.point : point(fighter.x, P.pelvis);
+    // (A robot dog's death: in its own body, under what it carries.)
+    const chest = fighter.mount?.spec?.robot ? fighter.mount.capsules.find((capsule) => capsule.key === 'chest') : null;
+    const at = kind === 'stump' && event.point ? event.point : chest ? chest.b.map((value, axis) => (value + chest.a[axis]) / 2) : point(fighter.x, P.pelvis);
     soundEvent(world, spec.sound, { at, kind, fighter: fighter.id, intensity: spec.intensity[kind] });
   }
   return slot;

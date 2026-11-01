@@ -30,7 +30,7 @@ import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
 import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
-import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, seatMass, seatRider, stepHorse, strikeHorses } from './physics/mounted.js';
+import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, stepHorse, stepTurret, strikeHorses } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
@@ -1009,6 +1009,16 @@ function weaponIntent(world, fighter, intent) {
   if (weapon.spec.leadAhead) target = { ...target, hand: vec.sub(target.hand, vec.scale(target.dir, weapon.spec.spacing * LEAD_GRIP.rearShare)) };
   intent[`${main}Hand`] = target.hand;
   intent.bladeDir = target.dir;
+  // A turret on a robot's back (a weapon's `turret`) is laid on the mark itself, by its motors (physics/mounted.js
+  // stepTurret): the man it shoots at where he is now (its sight tracks him, as the robot under it moves and turns), kept
+  // for each substep; the rider's gun hand is where its receiver is.
+  if (weapon.spec.turret) {
+    const aiming = weapon.spec.ranged && (punch?.spec.path === 'aim' || fighter.aimAt !== undefined);
+    const shotAt = punch?.spec.path === 'aim' ? world.fighters[punch.target] : null;
+    const aimedAt = shotAt ? aimPoint(shotAt, punch.zone) : punch?.spec.path === 'aim' && punch.aim ? toWorld(fighter, punch.aim) : world.fighters[fighter.aimAt] ? aimPoint(world.fighters[fighter.aimAt], 'body') : null;
+    weapon.turretMark = aiming ? aimedAt : null;
+    if (weapon.turret?.receiver) intent[`${main}Hand`] = toLocal(fighter, weapon.turret.receiver);
+  }
   // (Carried at his waist in a run, a short two-hander is in the one hand: the other runs free.)
   const atWaist = fighter.runPose > 0.5 && !punch && !blocking && carryKind(weapon.spec) === 'waist';
   const oneHanded = atWaist || weapon.spec.hands === 'one' || (weapon.spec.hands === 'hybrid' && (fighter.net?.held || (punch?.spec.path === 'blade' && punch.spec.grip === 'one' && punch.t <= punch.spec.extendUntil)));
@@ -1230,6 +1240,10 @@ function pairedGun(world, fighter, intent, dt) {
  */
 function updateWeapon(fighter, h, weapon = fighter.weapon) {
   const spec = weapon.spec;
+  if (spec.turret && fighter.mount) {
+    stepTurret(fighter, weapon, weapon.turretMark ?? null, h);
+    return;
+  }
   const main = P[`${weapon.main}Hand`];
   const off = P[`${weapon.off}Hand`];
   const previous = weapon.dir;
@@ -2241,7 +2255,8 @@ function updateIntent(world, fighter, dt) {
       punch.with.age = punch.age;
       if (punch.with.at) punch.with.aim = toLocal(fighter, punch.with.at);
     }
-    if (punch.spec.path === 'aim' && !punch.fired && punch.t >= (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) && (sightsOn(fighter) || punch.t >= punch.spec.extendUntil)) fire(world, fighter);
+    // (A turret's fire control never looses unlaid: physics/mounted.js turretLaid.)
+    if (punch.spec.path === 'aim' && !punch.fired && punch.t >= (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt) && (sightsOn(fighter) || (punch.t >= punch.spec.extendUntil && !held?.spec.turret))) fire(world, fighter);
     // Automatic fire: the trigger held, a round at the gun's cyclic rate until the burst is spent (or the gun).
     const automatic = punch.spec.path === 'aim' && fighter.weapon?.held ? fighter.weapon.spec.shot?.automatic : null;
     if (automatic && punch.fired) {
@@ -3109,6 +3124,8 @@ function trackAir(fighter, time) {
 
 /** The jump he could make now: jump.js's takeoff with his legs as sound and fresh as they are, and why he cannot (null if he can). */
 export function jumpNow(world, fighter) {
+  // (On a robot dog's back: the robot's jump, physics/mounted.js.)
+  if (fighter?.mount?.spec?.legs) return { ...mountJumpOf(world, fighter.mount), blocked: fighter.state !== 'up' ? 'down' : mountJumpBlocked(world, fighter.mount) };
   const model = jumpOf(fighter, { legs: limbShares(fighter).leg, strength: fighter.motorScale ?? 1 });
   let blocked = jumpBlocked(fighter, world.time);
   if (!blocked && legBroken(fighter)) blocked = 'hurt';
@@ -3124,6 +3141,14 @@ export function jumpNow(world, fighter) {
  * costs stamina by the work. False if he cannot jump now.
  */
 export function startJump(world, fighter) {
+  // On a robot dog's back (robotdogs.js `legs`), the robot jumps (physics/mounted.js mountJump): on the move, a leap the way it
+  // is going; standing, straight up.
+  const robot = fighter?.mount?.spec?.legs ? fighter.mount : null;
+  if (robot) {
+    if (fighter.state !== 'up') return false;
+    const moving = Math.abs(robot.speed) > 0.3 || robot.goal.speed > 0.3;
+    return mountJump(world, robot, { kind: moving ? 'leap' : 'up', heading: moving ? robot.goal.heading : robot.yaw });
+  }
   const model = jumpNow(world, fighter);
   if (model.blocked) return false;
   const running = Math.max(WORLD.jump.crouch.running, 1 - Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) / WORLD.jump.crouch.fast);

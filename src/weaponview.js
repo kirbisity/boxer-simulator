@@ -2384,9 +2384,47 @@ export function machineEvent(view, event, world) {
   return machineFxHear(view.machineFx, event, world, view.clock ?? 0);
 }
 
+/**
+ * Where an emitter is on a robot dog (what `fighter` rides): a cut leg's stump at its hip, sparking out and down; its
+ * death's first flash in its chest, then arcs at its legs' joints (hip to knee, knee to foot) one after another.
+ */
+function robotDogPlace(emitter, horse) {
+  const { from, to, along } = machineScratch;
+  const chest = horse.capsules.find((capsule) => capsule.key === 'chest');
+  const middle = chest ? [0, 1, 2].map((axis) => (chest.a[axis] + chest.b[axis]) / 2) : [horse.at[0], horse.withers * 0.8, horse.at[1]];
+  if (emitter.kind === 'stump') {
+    const root = horse.legs[emitter.leg]?.root ?? middle;
+    for (let axis = 0; axis < 3; axis += 1) {
+      from[axis] = root[axis];
+      along[axis] = root[axis] - middle[axis] - (axis === 1 ? horse.withers : 0);
+    }
+    const length = Math.hypot(along[0], along[1], along[2]) || 1;
+    for (let axis = 0; axis < 3; axis += 1) to[axis] = root[axis] + (along[axis] / length) * MACHINE_ARCS.stumpOut + (Math.random() - 0.5) * 2 * MACHINE_ARCS.stumpJump;
+    return;
+  }
+  const legs = Object.values(horse.legs).filter((leg) => !leg.severed);
+  if (emitter.first || !legs.length) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      from[axis] = middle[axis];
+      to[axis] = middle[axis];
+      along[axis] = axis === 1 ? 1 : 0;
+    }
+    return;
+  }
+  const leg = legs[Math.floor(Math.random() * legs.length)];
+  const [joint, beyond] = Math.random() < 0.5 ? [leg.root, leg.knee] : [leg.knee, leg.hoof];
+  for (let axis = 0; axis < 3; axis += 1) {
+    from[axis] = joint[axis];
+    to[axis] = joint[axis] + (beyond[axis] - joint[axis]) * MACHINE_ARCS.out + (Math.random() - 0.5) * 2 * MACHINE_ARCS.jump;
+    along[axis] = beyond[axis] - joint[axis];
+  }
+}
+
 /** Where an emitter is on its machine now: `from` (the root), `to` (where an arc reaches), `along` (the way sparks go). */
 function machinePlace(emitter, fighter) {
   const { from, to, along } = machineScratch;
+  // (A robot dog: on its own body, a cut leg's stump or its death; what it carries is not drawn as a man.)
+  if (fighter.mount?.spec?.robot && (emitter.leg || emitter.kind === 'death')) return robotDogPlace(emitter, fighter.mount);
   if (emitter.kind === 'stump') {
     const ends = stumpEnds(emitter);
     const at = stumpPoint(fighter, ends);
