@@ -1176,7 +1176,7 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.6): iron lamellar to below the knee: ~33 kg on a 100 kg man (real heavy lamellar ~25–30 kg).
     extraMass: 0.33,
     // Pierce 0.75 (was 0.8): a point finds the lacing between the lamellae.
-    protection: { blunt: 0.66, cut: 0.95, pierce: 0.75, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
+    protection: { blunt: 0.66, cut: 0.95, pierce: 0.85, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
     courage: 0.4,
     designs: [
       // Lamellar of dotted iron plates over a red robe, brown riding boots; the helmet a tall bowl with a plume or a horsehair tassel.
@@ -1654,7 +1654,7 @@ export const OUTFITS = {
     extraMass: 0.165,
     // Mail-and-plate: cut 0.95 (was 0.92), the rings and plates proof against most edges; pierce 0.5 (was 0.75), a point
     // parts the rings between the plates; blunt 0.42 (was 0.5), the mail moves with a blow. The chichak (uniform) the same.
-    protection: { blunt: 0.42, cut: 0.95, pierce: 0.5, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
+    protection: { blunt: 0.42, cut: 0.98, pierce: 0.5, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
     courage: 0.3,
     designs: [
       { label: 'Steel, red kaftan', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#3a1012' }, armor: { kind: 'krug', color: '#a7adb6' }, head: { kind: 'chichak', design: 'turban', color: '#a7adb6', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
