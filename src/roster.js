@@ -114,6 +114,8 @@ export const WARRIORS = [
   warrior('infantry', 'Spc. Luis Herrera', PRESETS.infantry),
   // An M2-2 flamethrower operator: SSgt. Brooks's build and training, a plate carrier and helmet under the tanks, a pistol at his belt.
   warrior('flamer', 'Sgt. Cal Rourke', withTanks({ ...structuredClone(PRESETS.rifle), name: 'Sgt. Cal Rourke', style: 'flamethrower', look: { ...PRESETS.rifle.look, facialHair: 'stubble', hairColor: '#2a1c12' } })),
+  // A firefighter in a proximity suit, his pike pole fought as a staff.
+  warrior('firefighter', 'Lt. Joe Brennan', PRESETS.firefighter),
   warrior('knife', 'Ryo Kanda', PRESETS.knife),
   // Apes and monkeys. The faction opens on the silverback (`flagship`).
   { ...warrior('gorilla', 'Silverback', PRESETS.gorilla), flagship: true },

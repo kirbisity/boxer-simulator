@@ -316,6 +316,11 @@ export function plateUvAt(measure, place, angle, kind = 'plate') {
  *   kikko        kikkō-hanabishi silk brocade, hexagons with a flower in each (https://www.metmuseum.org/art/collection/search/44883)
  *   cloudDamask  Chinese satin damask of ruyi-headed auspicious clouds (https://collections.mfa.org/objects/9588)
  *   tapestry     Andean weft-faced interlocked tapestry, ribs round the body (https://collections.peabody.harvard.edu/objects/details/90334)
+ *   aluminized   aluminium film laminated over aramid twill, crinkled: a proximity suit's shell
+ *                (https://www.gentexcorp.com/wp-content/uploads/2023/04/Dual-Mirror-Aluminized-Fabric-Catalog.pdf)
+ *   aluminizedQuilt  the same over a fire-entry suit's quilted insulation, in 50 mm boxes
+ *                (https://newtex.com/assets/pdf/safety/x60_advanced_fire_entry_suit.pdf)
+ * `metal`: the family is drawn as metal (render.js: its cloth in a metallic material of its own, lit by the steel's reflections).
  */
 export const CLOTH_FAMILIES = {
   plain: { cell: 0, metres: 0.0133 },
@@ -337,6 +342,8 @@ export const CLOTH_FAMILIES = {
   kikko: { cell: 16, metres: 0.1 },
   cloudDamask: { cell: 17, metres: 0.1 },
   tapestry: { cell: 18, metres: 0.003636 },
+  aluminized: { cell: 19, metres: 0.06, metal: true },
+  aluminizedQuilt: { cell: 20, metres: 0.1, metal: true },
 };
 /** The atlas's flat cell: the faces of a cloth loft whose own material has no tile (skin through lace, satin). */
 export const CLOTH_FLAT_CELL = 63;
@@ -390,6 +397,9 @@ export const CLOTH_MATERIALS = {
   feathers: { family: 'feathers', scale: 1 },
   straw: { family: 'straw', scale: 1 },
   cordura: { family: 'cordura', scale: 1 },
+  // A proximity suit's aluminized shell; a fire-entry suit's, quilted.
+  aluminized: { family: 'aluminized', scale: 1 },
+  aluminizedQuilt: { family: 'aluminizedQuilt', scale: 1 },
   ripstop: { family: 'ripstop', scale: 1 },
   jersey: { family: 'knit', scale: 1 },
   // Brushed fleece (a hoodie, joggers) and rib (cuffs, socks, a waistband).
@@ -409,17 +419,17 @@ export const CLOTH_GARMENTS = {
   top: {
     sportsBra: 'jersey', tank: 'jersey', tee: 'jersey', longsleeve: 'linen', compression: 'jersey', jacket: 'ripstop', hoodie: 'fleece',
     puffer: 'ripstop', flannel: 'flannel', suit: 'worsted', waistcoat: 'worsted', aloha: 'cotton', haramaki: 'rib', bodice: 'silk',
-    kosode: 'cotton', tunic: 'woolTabby', rags: 'hemp',
+    kosode: 'cotton', tunic: 'woolTabby', rags: 'hemp', turnout: 'aluminized',
   },
   bottom: {
     bloomers: 'cotton', cargo: 'ripstop', gown: 'silk', hakama: 'hemp', jeans: 'denim', joggers: 'fleece', loincloth: 'linen',
     longShorts: 'none', mawashi: 'canvas', pants: 'cotton', ragTrousers: 'hemp', slacks: 'worsted', splitShorts: 'none', tights: 'wool',
-    trunks: 'none',
+    trunks: 'none', bunker: 'aluminized',
   },
   feet: {
     bare: 'none', boxingBoot: 'leather', compactBoot: 'leather', dressShoe: 'leather', footRags: 'hemp', heelAnkleBoot: 'leather',
     hikingBoot: 'leather', jinBoot: 'leather', platformShoe: 'leather', ridingBoot: 'leather', sabaton: 'none', sandal: 'leather',
-    tabi: 'cotton', tacticalBoot: 'cordura', trainer: 'jersey',
+    tabi: 'cotton', tacticalBoot: 'cordura', trainer: 'jersey', proximityBoot: 'aluminized',
   },
   armor: {
     // Japan: lacquered iron and kozane are metal (the armour tiles), laced in silk braid; the ō-yoroi's brocade sleeve.
@@ -510,7 +520,7 @@ export const CLOTH_GARMENTS = {
     kabuto: 'none', katozukin: 'cotton', kettleHat: 'none', lionHead: 'fur', llautu: 'camelid', loovuuz: 'fur', mingHat: 'none',
     mingHelm: 'none', montefortino: 'none', morion: 'none', opsHelmet: 'cordura', pagodaHelm: 'none', policeCap: 'worsted', potHelmet: 'none',
     ridgeHelm: 'none', riotHelmet: 'none', robotHead: 'none', spangenhelm: 'none', stechhelm: 'none', steppeHelm: 'none', tiltHat: 'felt',
-    topHat: 'felt', turban: 'cotton', widowCap: 'cotton',
+    topHat: 'felt', turban: 'cotton', widowCap: 'cotton', proximityHood: 'aluminized',
     // The primates' heads are their coats.
     macaqueHead: 'fur', baboonHead: 'fur', chimpHead: 'fur',
   },
@@ -555,6 +565,8 @@ export const CLOTH_BY_OUTFIT = {
   dobok: { 'top.jacket': 'cotton' },
   thug: { 'top.jacket': 'jersey' },
   sohei: { 'top.kosode': 'hemp' },
+  // A fire-entry suit: the aluminized film over its quilted insulation.
+  fireEntry: { 'top.turnout': 'aluminizedQuilt', 'bottom.bunker': 'aluminizedQuilt', 'feet.proximityBoot': 'aluminizedQuilt' },
 };
 
 /**
@@ -598,6 +610,9 @@ export function clothFamilyOf(material) {
   if (!spec) return null;
   return { ...CLOTH_FAMILIES[spec.family], family: spec.family, scale: spec.scale };
 }
+
+/** Whether the atlas cell (clothCellOf) is a metal family's (CLOTH_FAMILIES `metal`: aluminized cloth). */
+export const metalClothCell = (cell) => Object.values(CLOTH_FAMILIES).some((family) => family.metal && family.cell === cell);
 
 /** The atlas cell (0..63) a vertex's texture coordinates put it in, or null where they are not cloth's. */
 export function clothCellOf(u, v) {

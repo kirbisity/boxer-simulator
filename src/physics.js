@@ -5285,9 +5285,9 @@ function blindside(defender, attacker) {
   return (facing[0] * from[0] + facing[2] * from[2]) / length < Math.cos(sightAngle(defender));
 }
 
-/** How far off his facing a man sees (rad): a head locked in a jousting helm sees only out of its slit. */
+/** How far off his facing a man sees (rad): a head locked in a jousting helm sees only out of its slit; a hood's visor narrows it. */
 export function sightAngle(fighter) {
-  return fighter.body.gear.headLocked ? WORLD.headLock.sight : WORLD.blindsideAngle;
+  return fighter.body.gear.headLocked ? WORLD.headLock.sight : fighter.body.gear.sight ?? WORLD.blindsideAngle;
 }
 
 // ---- Props -------------------------------------------------------------------

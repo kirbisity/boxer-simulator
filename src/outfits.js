@@ -560,6 +560,56 @@ export const OUTFITS = {
       { label: 'Woodland, green carrier', top: { kind: 'longsleeve', color: '#4f5640' }, bottom: { kind: 'cargo', color: '#474d3a' }, armor: { kind: 'plateCarrier', color: '#4a5038', cloth: '#4a5038', cloth2: '#3a3f2c' }, head: { kind: 'opsHelmet', color: '#4a5038' }, feet: { kind: 'tacticalBoot', color: '#3a3226' } },
     ],
   },
+  // A firefighter in an aluminized proximity suit (NFPA 1971's proximity ensemble, an airport crash crew's): coat and trousers
+  // of aramid under an aluminium film that turns >90% of a fire's radiant heat, a hood with a gold-coated visor over his helmet
+  // and mask, aluminized gloves and boots, a breathing set on his back. It is for working near a fire, not in it: rated
+  // TPP >= 35 cal/cm² (17.5 s to a second-degree burn at 84 kW/m²), ~40 for a good one (`fireproof`, physics/flame.js FLAME.suit).
+  // Against a blade it is cloth: a few layers of aramid turn a little of a slash; his helmet under the hood takes a blow.
+  proximity: {
+    // Trained: fit and drilled to his trade, never to fight (`skill`: OUTFITS' tiers).
+    skill: 0.2,
+    faction: 'law',
+    label: 'Firefighter — proximity suit', movement: 'limited', fists: 'gloved-proximity',
+    // Coat, trousers, hood, gloves and boots ~8-11 kg (Newtex X30/X40: 7.8-11.3 kg, https://www.newtex.com/nxp/proximity-suits/x30-attack-fire-fighting)
+    // and a helmet ~1.5 kg: ~11 kg, at 0.55 of its weight as all armour is (~6 kg); the breathing set (~11 kg: a 6.8 L carbon
+    // cylinder, its backplate and regulator) a load kept whole (`carriedShare`): ~17 kg on an ~85 kg man.
+    extraMass: 0.2, carriedShare: 0.13,
+    // TPP 40 cal/cm², the film's radiant reflectance 0.9 (FLAME.suit).
+    fireproof: { tpp: 40, reflect: 0.9, leak: 0.02, breach: 0.5 },
+    // The visor is a window in the hood: he sees ~45° either side of ahead, not the ~60° of a bare head (physics.js sightAngle).
+    sight: Math.PI / 4,
+    protection: {
+      blunt: 0.15, cut: 0.3, pierce: 0.15,
+      regions: { head: { blunt: 0.55, cut: 0.6, pierce: 0.4 }, limb: { blunt: 0.12, cut: 0.25, pierce: 0.12 } },
+    },
+    designs: [
+      { label: 'Aluminized, gold visor', top: { kind: 'turnout', color: '#c9ccd1', trim: '#9da1a8' }, bottom: { kind: 'bunker', color: '#c4c7cc' }, head: { kind: 'proximityHood', color: '#c9ccd1' }, feet: { kind: 'proximityBoot', color: '#bfc2c7' }, airPack: { color: '#2a2c30', band: '#d8b030' } },
+    ],
+  },
+  // A fire-entry suit: the aluminized film over a shell of glass cloth and two quilted batts of insulation, worn over the
+  // breathing set (the hump on his back), for walking into the flames themselves: makers rate them for brief total flame
+  // to ~1100 °C (2000 °F) and long radiant to ~815 °C, no time given (FireRescue1; Lakeland 700 series), a NASA note ~20 s at
+  // 2000 °F before the suit is destroyed. Its budget (`fireproof`) set for ~30-40 s in the flamethrower's fire. Stiff and heavy:
+  // he walks in it, he does not skip (`slow`).
+  fireEntry: {
+    skill: 0.2,
+    faction: 'law',
+    label: 'Firefighter — fire-entry suit', movement: 'slow', fists: 'gloved-proximity',
+    // The suit ~17 kg (jacket and trousers) to ~25 kg (the whole ensemble: Newtex X60,
+    // https://newtex.com/assets/pdf/safety/x60_advanced_fire_entry_suit.pdf) at 0.55 (~14 kg) and the breathing set kept whole
+    // (~11 kg): ~25 kg on an ~85 kg man.
+    extraMass: 0.29, carriedShare: 0.13,
+    // TPP-equivalent 90 cal/cm² (the standard reports anything past 60 as ">60"), reflectance 0.95 (Newtex: 95%).
+    fireproof: { tpp: 90, reflect: 0.95, leak: 0.02, breach: 0.5 },
+    sight: Math.PI / 4,
+    protection: {
+      blunt: 0.25, cut: 0.4, pierce: 0.2,
+      regions: { head: { blunt: 0.55, cut: 0.6, pierce: 0.4 }, limb: { blunt: 0.2, cut: 0.35, pierce: 0.18 } },
+    },
+    designs: [
+      { label: 'Quilted aluminized, gold visor', top: { kind: 'turnout', color: '#c6c9ce', trim: '#9da1a8' }, bottom: { kind: 'bunker', color: '#c2c5ca' }, head: { kind: 'proximityHood', color: '#c6c9ce', quilted: true }, feet: { kind: 'proximityBoot', color: '#bfc2c7' }, airPack: { covered: true } },
+    ],
+  },
   knight: {
     // Trained: a knight: trained in arms from a page (`skill`: OUTFITS' tiers).
     skill: 0.75,
@@ -2338,7 +2388,7 @@ export const FACTIONS = {
   // Parthia (Surena's army at Carrhae, 53 BC): Iranian horsemen.
   parthians: { label: 'Parthia', glyph: '🏹', standard: { weapon: 'tug' }, blurb: 'The Parthian horse of Carrhae: cataphracts, man and horse in iron scale, with the kontos; horse archers in tunic and felt cap with the composite bow.' },
   romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.' },
-  law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT, special forces and the infantry: the baton, the service pistol, the shotgun, the AR-15 and the grenade.' },
+  law: { label: 'Law', glyph: '🚓', blurb: 'Police, SWAT, special forces and the infantry: the baton, the service pistol, the shotgun, the AR-15 and the grenade; firefighters in aluminized proximity and fire-entry suits.' },
   primates: { label: 'Apes & Monkeys', glyph: '🐒', blurb: 'Not men: a silverback gorilla, a chimpanzee, a chacma baboon and a rhesus macaque, fighting as their kinds fight: the charge, the grab, the clubbing arm and the bite.' },
   machines: { label: 'Machines', glyph: '🤖', blurb: 'Machines, and a man in one: a full-size and a mini humanoid robot, a combat bot whose forearms are an AR-15 and a shotgun, three robot dogs (a Go2, Spot with its arm, a Vision 60 with a rifle turret), and a soldier in a powered exoskeleton.' },
 };
@@ -2395,6 +2445,8 @@ export const HELMETS = {
   headguard: { mass: 0.45, padding: 0.9, curve: 0.3 },
   // Modern: a riot helmet (thick liner, smooth shell); a combat helmet (pads, rounded aramid shell).
   riotHelmet: { mass: 1.5, padding: 0.85, curve: 0.75 },
+  // A firefighter's helmet (~1.4 kg, its suspension and liner) under the aluminized hood.
+  proximityHood: { mass: 1.9, padding: 0.8, curve: 0.6 },
   opsHelmet: { mass: 1.4, padding: 0.85, curve: 0.85 },
   // The great helm (2–3 kg) over a mail coif and a padded arming cap: the best padded of all; flat sides, a low crown.
   greatHelm: { mass: 2.6, padding: 0.85, curve: 0.35 },
@@ -2501,6 +2553,10 @@ export function gearTraits(inputs) {
     drill: spec.drill ?? null,
     // A full plate harness: no gap for an edge (a point may still find one).
     cutProof: Boolean(spec.cutProof),
+    // A fireproof suit (physics/flame.js FLAME.suit): { tpp, reflect, leak, breach }, or null.
+    fireproof: spec.fireproof ?? null,
+    // How far off his facing he sees (rad), where the kit narrows it (a hood's visor), unless his head is locked (headLocked's slit).
+    sight: inputs.outfit?.bareHead ? null : spec.sight ?? null,
     // How often a blade finds a gap in the rigid armour (BLADES.gaps), when the kit has more (or fewer) than most.
     gaps: spec.gaps ?? null,
     // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
