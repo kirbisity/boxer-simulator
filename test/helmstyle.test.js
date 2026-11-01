@@ -5,13 +5,13 @@ import { HELM_MAP_DATA } from '../src/helmmaps-data.js';
 import { HELM_FORMS } from '../src/helmforms.js';
 
 test('the helmets are the remodelled ones unless the address asks for the old; the masks as they were unless asked', () => {
-  assert.deepEqual(helmStyleFrom(''), { helmets: 'new', masks: 'now' });
-  assert.deepEqual(helmStyleFrom('#helmets=now&masks=ressei'), { helmets: 'now', masks: 'ressei' });
-  assert.deepEqual(helmStyleFrom('#maps=off&helmets=now'), { helmets: 'now', masks: 'now' });
-  assert.deepEqual(helmStyleFrom('#helmets=b&masks=kabuki'), { helmets: 'new', masks: 'now' });
-  assert.deepEqual(HELM_STYLE, { helmets: 'new', masks: 'now' });
-  assert.deepEqual(setHelmStyle({ helmets: 'now', masks: 'nope' }), { helmets: 'now', masks: 'now' });
-  setHelmStyle({ helmets: 'new' });
+  assert.deepEqual(helmStyleFrom(''), { helmets: 'new', masks: 'now', kettle: 'now' });
+  assert.deepEqual(helmStyleFrom('#helmets=now&masks=ressei&kettle=b'), { helmets: 'now', masks: 'ressei', kettle: 'b' });
+  assert.deepEqual(helmStyleFrom('#maps=off&helmets=now'), { helmets: 'now', masks: 'now', kettle: 'now' });
+  assert.deepEqual(helmStyleFrom('#helmets=b&masks=kabuki&kettle=x'), { helmets: 'new', masks: 'now', kettle: 'now' });
+  assert.deepEqual(HELM_STYLE, { helmets: 'new', masks: 'now', kettle: 'now' });
+  assert.deepEqual(setHelmStyle({ helmets: 'now', masks: 'nope', kettle: 'd' }), { helmets: 'now', masks: 'now', kettle: 'd' });
+  setHelmStyle({ helmets: 'new', kettle: 'now' });
 });
 
 test('every helmet kind and mask has its sheet baked; a mask carries its mesh relief', () => {
