@@ -8,7 +8,7 @@
 // both: a region missing for a sex falls back to the nearest one that has it
 // (by the map, REGION_PLACES).
 
-import { SKIN_TONES } from './skintones.js';
+import { SKIN_LADDER, shadeTone, toneShade } from './skintones.js';
 
 /** Each source region's place (latitude, longitude, degrees), for the nearest-region fallback. */
 export const REGION_PLACES = {
@@ -92,15 +92,16 @@ const kitRegions = (inputs) => KIT_REGIONS[inputs.outfit?.kind] ?? TONE_REGIONS[
 
 // ---- Choosing an origin: the character creator -------------------------------------------------------------------------
 //
-// In the character creator (menu.js) the player may say where a fighter is from: one of the composites' regions, for his sex,
+// In the character creators (menu.js's wizard; main.js's builder form, the sandbox's corners and the level's character) the player may say where a fighter is from: one of the composites' regions, for his sex,
 // whatever he wears and whatever he fights with (a Korean in a knight's harness, an Englishman in a samurai's). It is kept as
 // `look.faceRegion`, which wins over his kit's (regionsFor). Left alone, he is cast as before, from his kit: the creator shows
 // that kit's commonest region (originOf) as the one chosen, and writes nothing until the player changes it.
 //
 // The skin is the origin's, within reason. Each region has a tone of the game's ladder (SKIN_TONES, lightest to deepest) that
-// its composite stands for, and the player may move it a step or so either way (TONE_REACH): lighter or darker men of the same
-// people, not a different people (that is what the origin is for). The photo face's own skin (the composite's, photoface.js) is
-// shifted by the ratio of the chosen tone to the region's, so the region's own tone leaves the composite's skin exactly as it
+// its composite stands for, and the player may slide it, smoothly, up to a step or so either way (TONE_REACH; the shade,
+// `look.skinShade`, skintones.js): lighter or darker men of the same people, not a different people (that is what the origin
+// is for). The photo face's own skin (the composite's, photoface.js) is made lighter or darker by the ratio of the chosen
+// shade's brightness to the region's tone's, its hue kept, so the region's own tone leaves the composite's skin exactly as it
 // was. Only a fighter with an origin of his own is shifted: everyone else's `skinTone` (the presets', the dealt men's) never
 // touched the photo skin, and still does not.
 
@@ -150,7 +151,7 @@ export const REGION_TONES = {
  */
 export const TONE_REACH = { steps: 1, wide: { brazil: 2, puertoRico: 2, africanAmerican: 2, southAfrica: 2, india: 2 } };
 
-const TONE_LADDER = Object.keys(SKIN_TONES);
+const TONE_LADDER = SKIN_LADDER;
 
 /** The tone a region's composite stands for (REGION_TONES), medium for one not listed. */
 export const regionTone = (region) => REGION_TONES[region] ?? 'medium';
@@ -182,16 +183,57 @@ export function originOf(inputs, available, outfitRegion = null) {
 }
 
 /**
- * The tone a photo face's skin is shifted from and to, or null to leave it as the composite's: only a fighter with an origin of
- * his own (`look.faceRegion`), whose tone (clamped to the origin's range) is not the origin's.
+ * The shades (skintones.js: places on the ladder, fractional between two tones) a fighter of `region` may have, [lightest,
+ * deepest]: the ends of his toneRange. With no region (drawn faces), the whole ladder.
+ */
+export function toneSpan(region) {
+  if (!region) return [0, TONE_LADDER.length - 1];
+  const range = toneRange(region);
+  return [TONE_LADDER.indexOf(range[0]), TONE_LADDER.indexOf(range[range.length - 1])];
+}
+
+/**
+ * A look's shade, kept within `region`'s span: its own `skinShade` if it has one, else its named tone's (clampTone), so a
+ * fighter made before the slider (or given only a tone) keeps the shade he had.
+ */
+export function skinShadeOf(region, look) {
+  const [low, high] = toneSpan(region);
+  if (Number.isFinite(look?.skinShade)) return Math.min(high, Math.max(low, look.skinShade));
+  return region ? TONE_LADDER.indexOf(clampTone(region, look?.skinTone)) : toneShade(look?.skinTone);
+}
+
+/** Set a look's shade (rounded to a hundredth of a step) and, with it, the nearest named tone, for whatever reads the name. */
+export function setShade(look, shade) {
+  look.skinShade = Math.round(shade * 100) / 100;
+  look.skinTone = shadeTone(look.skinShade);
+  return look;
+}
+
+/**
+ * A look's origin and shade after his sex is changed (the composites of a sex are not all the same peoples): an origin with no
+ * composite among `available` becomes the nearest that has one, and the shade is kept within its span. Nothing for a look with
+ * no origin of its own.
+ */
+export function settleOrigin(look, available) {
+  if (!look?.faceRegion || !available?.length) return look;
+  const own = Array.isArray(look.faceRegion) ? look.faceRegion[0] : look.faceRegion;
+  const origin = nearestRegion(own, available);
+  if (origin === own && !Array.isArray(look.faceRegion) && (!Number.isFinite(look.skinShade) || look.skinShade === skinShadeOf(origin, look))) return look;
+  look.faceRegion = origin;
+  return setShade(look, skinShadeOf(origin, look));
+}
+
+/**
+ * The shades a photo face's skin is moved from and to, or null to leave it as the composite's: only a fighter with an origin of
+ * his own (`look.faceRegion`), whose shade (kept within the origin's span) is not the origin's own tone.
  */
 export function toneShift(inputs) {
   const own = inputs.look?.faceRegion;
   const origin = Array.isArray(own) ? own[0] : own;
-  if (!origin || !inputs.look?.skinTone) return null;
-  const from = regionTone(origin);
-  const to = clampTone(origin, inputs.look.skinTone);
-  return to === from ? null : { from, to };
+  if (!origin || (!inputs.look?.skinTone && !Number.isFinite(inputs.look?.skinShade))) return null;
+  const from = TONE_LADDER.indexOf(regionTone(origin));
+  const to = skinShadeOf(origin, inputs.look);
+  return Math.abs(to - from) < 0.005 ? null : { from, to };
 }
 
 // ---- The head's shape by region ----------------------------------------------------------------------------------------

@@ -21,7 +21,7 @@
 
 /* global THREE */
 import { nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL, toneShift } from './faceregions.js';
-import { SKIN_TONES } from './skintones.js';
+import { luminance, shadeColor } from './skintones.js';
 import { SCALP_GLSL } from './photohair.js';
 
 /**
@@ -164,14 +164,15 @@ export function photoFaceFor(inputs, outfitRegion = null) {
   const skin = new THREE.Color(primary.skin).lerp(new THREE.Color(secondary.skin), blend);
   const hsl = skin.getHSL({});
   skin.setHSL(hsl.h + (random() - 0.5) * 2 * vary.warm * 0.1, hsl.s * (1 + (random() - 0.5) * 2 * vary.warm), hsl.l * (1 + (random() - 0.5) * 2 * vary.bright));
-  // An origin chosen with a lighter or darker skin than its own (faceregions.js toneShift): the composite's skin moved by the
-  // ratio of the two tones, channel by channel, so it stays this face's skin, a shade off. (No draw from `random`: the rest of
-  // his casting is the same whatever his tone.)
+  // An origin chosen with a lighter or darker skin than its own (faceregions.js toneShift): the composite's skin made lighter or
+  // darker by the ratio of the two shades' brightness, its hue kept, so it stays this face's skin, a shade off. (Not the ratio
+  // channel by channel: the ladder's tones differ in hue too, and a yellow tone over a pink one turned a light Korean pink.)
+  // (No draw from `random`: the rest of his casting is the same whatever his tone.)
   const shift = toneShift(inputs);
   if (shift) {
-    const from = new THREE.Color(SKIN_TONES[shift.from]);
-    const to = new THREE.Color(SKIN_TONES[shift.to]);
-    skin.setRGB(Math.min(1, (skin.r * to.r) / from.r), Math.min(1, (skin.g * to.g) / from.g), Math.min(1, (skin.b * to.b) / from.b));
+    const ratio = luminance(shadeColor(shift.to)) / luminance(shadeColor(shift.from));
+    const scale = Math.min(ratio, 1 / Math.max(skin.r, skin.g, skin.b, 1e-6));
+    skin.setRGB(skin.r * scale, skin.g * scale, skin.b * scale);
   }
   const age = inputs.age ?? 30;
   const grey = Math.min(1, Math.max(0, (age - 42) / 30)) * 0.75;

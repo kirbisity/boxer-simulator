@@ -100,6 +100,7 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .look-field { display: grid; grid-template-columns: 44px 1fr; gap: 6px; align-items: center; font-size: 12px; }
 .look-field span { color: var(--muted); }
 .look-field select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; min-width: 0; font-size: 12px; }
+.look-field input[type=range] { width: 100%; min-width: 0; margin: 0; height: 26px; }
 .derived { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 12px; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .derived div { display: flex; justify-content: space-between; font-size: 12px; }
 .derived span { color: var(--muted); }
@@ -267,6 +268,12 @@ button.big { padding: 12px 34px; font-size: 18px; }
 .slider-head { display: flex; justify-content: space-between; align-items: baseline; }
 .slider output { font: 500 14px var(--mono); color: var(--gold); font-variant-numeric: tabular-nums; }
 .slider input[type=range] { width: 100%; accent-color: var(--gold); height: 28px; }
+/* The Skin slider (and the builder's): its track is the origin's shades, lightest to deepest (--tone-track), the thumb a ring. */
+input[type=range].tone, .slider.tone input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; }
+input[type=range].tone::-webkit-slider-runnable-track, .slider.tone input[type=range]::-webkit-slider-runnable-track { height: 12px; border-radius: 6px; background: var(--tone-track); border: 1px solid rgba(255, 255, 255, 0.25); }
+input[type=range].tone::-moz-range-track, .slider.tone input[type=range]::-moz-range-track { height: 12px; border-radius: 6px; background: var(--tone-track); border: 1px solid rgba(255, 255, 255, 0.25); }
+input[type=range].tone::-webkit-slider-thumb, .slider.tone input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 24px; height: 24px; margin-top: -7px; border-radius: 50%; background: transparent; border: 3px solid var(--gold); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55); }
+input[type=range].tone::-moz-range-thumb, .slider.tone input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: transparent; border: 3px solid var(--gold); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55); }
 .hint { margin: 0; color: var(--muted); font-size: 13px; }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
 .stat { display: grid; gap: 2px; }
