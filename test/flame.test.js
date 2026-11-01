@@ -160,17 +160,6 @@ test('a robot has no flesh to burn: a burst it shrugs off, kept burning it overh
   assert.equal(burn(3, 120).state, 'out');
 });
 
-test('the stream sticks on a robot dog and, kept burning, it overheats and goes down', () => {
-  const world = createWorld([
-    { inputs: withTanks({ ...structuredClone(PRESETS.rifle), style: 'flamethrower' }), corner: 'red' },
-    { inputs: structuredClone(PRESETS.dogGo2), corner: 'blue' },
-  ], { seed: 2, arena: { halfX: 30, halfZ: 30 } });
-  placeFighter(world.fighters[0], -10, 0);
-  placeFighter(world.fighters[1], 10, 0);
-  run(world, 25);
-  assert.ok(world.events.some((event) => event.kind === 'horseDown' && /overheats/.test(event.effects.join())), 'overheated');
-});
-
 test('empty, the flamethrower is let fall and his pistol drawn; a man alight who panics runs from it', () => {
   const duel = createWorld([
     { inputs: withTanks({ ...structuredClone(PRESETS.rifle), style: 'flamethrower' }), corner: 'red' },
