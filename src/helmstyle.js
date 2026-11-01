@@ -12,16 +12,18 @@
 //                        every kettle hat in that one (a, the ridged kettle hat, Cleveland 1916.1919; b, the Burgundian war
 //                        hat with its sight, Met 04.3.228; c, the German sallet and bevor, Met 29.158.11). A design needs
 //                        the detail maps (`#maps=off`, or a crowd's low detail, draws them as before).
-//   #knighthelm=now|1..6 the knights' helmets (knighthelms.js), on every unit wearing a knight's bascinet or great helm:
-//                        now, as they were; 1 the great helm, 2 the hounskull bascinet, 3 the great bascinet, 4 the armet,
-//                        5 the sallet with visor and bevor, 6 the close helmet. Needs the detail maps too.
+//   #knighthelm=own|now|2|5|6  the knights' helmets (knighthelms.js): own (the default), each knight's own (outfits.js
+//                        `head.design`: the hounskull bascinet, the sallet and bevor and the close helmet across the knight's
+//                        harnesses); now, every one as drawn before, for comparison; 2, 5 or 6, every knight's bascinet and
+//                        great helm in that one (2 the hounskull bascinet, 5 the sallet and bevor, 6 the close helmet). A
+//                        design needs the detail maps (`#maps=off`, or a crowd, draws them as before).
 //
 // `boxer.helmStyle({ helmets, masks, kettle, knight })` switches them in a running page and draws the fighters again.
 
 export const HELMET_STYLES = ['new', 'now'];
 export const MASK_STYLES = ['now', 'oni', 'ressei', 'tengu'];
 export const KETTLE_STYLES = ['own', 'now', 'a', 'b', 'c'];
-export const KNIGHT_STYLES = ['now', '1', '2', '3', '4', '5', '6'];
+export const KNIGHT_STYLES = ['own', 'now', '2', '5', '6'];
 
 /** The styles an address's hash asks for (the first of each list for anything missing or unknown). */
 export function helmStyleFrom(hash = '') {

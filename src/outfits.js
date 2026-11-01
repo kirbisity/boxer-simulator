@@ -72,9 +72,12 @@ function exoKit(label, frameKg, kit) {
   };
 }
 
-/** Knight plate in another finish. */
-function plateDesign(label, steel, fluted, pointed, under) {
-  return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'tights', color: under }, armor: { kind: 'plate', color: steel, fluted }, head: { kind: 'bascinet', color: steel, pointed }, feet: { kind: 'sabaton', color: steel } };
+/**
+ * Knight plate in another finish, and its helmet (`helm`, knighthelms.js: the hounskull bascinet of the early harness, the
+ * German sallet and bevor of the Gothic, the close helmet of the fluted Maximilian harness).
+ */
+function plateDesign(label, steel, fluted, pointed, under, helm) {
+  return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'tights', color: under }, armor: { kind: 'plate', color: steel, fluted }, head: { kind: 'bascinet', color: steel, pointed, design: helm }, feet: { kind: 'sabaton', color: steel } };
 }
 
 /**
@@ -576,14 +579,16 @@ export const OUTFITS = {
     deflects: true,
     family: 'knight',
     // The designs in play (picked from the five); the game shuffles among them.
-    picked: [0, 1, 2],
+    picked: [0, 1, 2, 3],
     designs: [
-      // The gothic shape — fluted plate, pointed bascinet — in bright polished steel.
-      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true }, feet: { kind: 'sabaton', color: '#b7bcc4' } },
-      plateDesign('Milanese', '#a7adb6', false, false, '#3a2a22'),
-      plateDesign('Blackened', '#3a3d42', true, true, '#1c1a18'),
-      plateDesign('Bright, wine arming coat', '#c4c9d0', true, false, '#5a1a22'),
-      plateDesign('Russeted', '#7a5a42', false, true, '#2a2622'),
+      // The gothic shape — fluted plate, the German sallet and bevor — in bright polished steel.
+      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet' }, feet: { kind: 'sabaton', color: '#b7bcc4' } },
+      // Italian plate of about 1400 under the visored (hounskull) bascinet and its mail.
+      plateDesign('Milanese', '#a7adb6', false, false, '#3a2a22', 'hounskull'),
+      plateDesign('Blackened', '#3a3d42', true, true, '#1c1a18', 'sallet'),
+      // The fluted harness of the 1510s-20s and its close helmet.
+      plateDesign('Bright, wine arming coat', '#c4c9d0', true, false, '#5a1a22', 'closeHelmet'),
+      plateDesign('Russeted', '#7a5a42', false, true, '#2a2622', 'hounskull'),
     ],
   },
   // Joan of Arc: a full white harness (polished, unpainted plate: "armure

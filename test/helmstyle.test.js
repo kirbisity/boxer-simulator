@@ -5,15 +5,15 @@ import { HELM_MAP_DATA } from '../src/helmmaps-data.js';
 import { HELM_FORMS } from '../src/helmforms.js';
 
 test('the helmets are the remodelled ones unless the address asks for the old; the masks as they were unless asked', () => {
-  assert.deepEqual(helmStyleFrom(''), { helmets: 'new', masks: 'now', kettle: 'own', knight: 'now' });
-  assert.deepEqual(helmStyleFrom('#helmets=now&masks=ressei&kettle=b'), { helmets: 'now', masks: 'ressei', kettle: 'b', knight: 'now' });
-  assert.deepEqual(helmStyleFrom('#maps=off&helmets=now&kettle=now'), { helmets: 'now', masks: 'now', kettle: 'now', knight: 'now' });
-  assert.deepEqual(helmStyleFrom('#helmets=b&masks=kabuki&kettle=x'), { helmets: 'new', masks: 'now', kettle: 'own', knight: 'now' });
-  assert.deepEqual(helmStyleFrom('#kettle=d'), { helmets: 'new', masks: 'now', kettle: 'own', knight: 'now' }, 'the barbute is not offered');
-  assert.deepEqual(HELM_STYLE, { helmets: 'new', masks: 'now', kettle: 'own', knight: 'now' });
-  assert.deepEqual(setHelmStyle({ helmets: 'now', masks: 'nope', kettle: 'c', knight: 'now' }), { helmets: 'now', masks: 'now', kettle: 'c', knight: 'now' });
-  assert.deepEqual(setHelmStyle({ kettle: 'd', knight: 'now' }).kettle, 'c');
-  setHelmStyle({ helmets: 'new', kettle: 'own', knight: 'now' });
+  assert.deepEqual(helmStyleFrom(''), { helmets: 'new', masks: 'now', kettle: 'own', knight: 'own' });
+  assert.deepEqual(helmStyleFrom('#helmets=now&masks=ressei&kettle=b'), { helmets: 'now', masks: 'ressei', kettle: 'b', knight: 'own' });
+  assert.deepEqual(helmStyleFrom('#maps=off&helmets=now&kettle=now'), { helmets: 'now', masks: 'now', kettle: 'now', knight: 'own' });
+  assert.deepEqual(helmStyleFrom('#helmets=b&masks=kabuki&kettle=x'), { helmets: 'new', masks: 'now', kettle: 'own', knight: 'own' });
+  assert.deepEqual(helmStyleFrom('#kettle=d'), { helmets: 'new', masks: 'now', kettle: 'own', knight: 'own' }, 'the barbute is not offered');
+  assert.deepEqual(HELM_STYLE, { helmets: 'new', masks: 'now', kettle: 'own', knight: 'own' });
+  assert.deepEqual(setHelmStyle({ helmets: 'now', masks: 'nope', kettle: 'c', knight: 'own' }), { helmets: 'now', masks: 'now', kettle: 'c', knight: 'own' });
+  assert.deepEqual(setHelmStyle({ kettle: 'd', knight: 'own' }).kettle, 'c');
+  setHelmStyle({ helmets: 'new', kettle: 'own', knight: 'own' });
 });
 
 test('every helmet kind and mask has its sheet baked; a mask carries its mesh relief', () => {
