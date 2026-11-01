@@ -954,13 +954,14 @@ export const STYLES = {
     tempo: 1,
     ...STAND_OFF,
   },
-  // The flamethrower (hidden from the pickers: a test unit, roster.js TEST_WARRIORS; physics/flame.js): the wand shouldered as the
+  // The flamethrower (kept out of the style pickers: a kit as well as a style, his tanks on his back; carried by the roster's Sgt.
+  // Rourke and built to order in custom mode; physics/flame.js): the wand shouldered as the
   // AR-15 is, the valve opened in bursts (the weapon's `automatic`) at a man within `reach` m (the M2's useful range: it carries
   // further, less surely), walked in on one further; he keeps 3 m off. A man alight past `spareAlight` is spared more fuel (ai.js).
   flamethrower: {
     label: 'Flamethrower', hidden: true, custom: true, packed: true, weapon: 'flamethrower', fallback: 'mix',
     // (`close` 0: fired at any range, never let fall for his hands while it has fuel: it is on its hose.)
-    ranged: { flee: 3, rest: 1, runFor: 1.2, standFor: 2, close: 0, shotSeconds: 0.4, headShare: 0, between: [1.4, 1.2], move: 'fireRifle', reloadSafe: Infinity, reach: 25, spareAlight: 0.6, coverDown: true },
+    ranged: { flee: 3, rest: 1, runFor: 1.2, standFor: 2, close: 0, shotSeconds: 0.4, headShare: 0, between: [1.4, 1.2], move: 'fireRifle', reloadSafe: Infinity, reach: 19, spareAlight: 0.6, coverDown: true },
     cadence: { work: 1.4, move: 0.6, burst: 0.6, mobility: 0.4 },
     stance: { blade: 0.45, crouch: 0.1, width: 1.2, lean: 0.12, guardHeight: -0.02 },
     weaponGuard: { hand: [0.16, 0.66, -0.12], dir: [0.9, -0.35, 0.05] },

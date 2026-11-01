@@ -31,9 +31,9 @@ import { floorAt } from './terrain.js';
 export const FLAME = {
   // The jet (the M2-2): thickened fuel leaves the nozzle at `speed` m/s, `flow` kg/s (its two tanks' ~18 L, ~14.4 kg of thickened
   // petrol at ~0.8 kg/L, in ~8 s: weapons.js FLAMER), drawn as `blobs` lumps a second, slowed by the air (`drag`, 1/s: the rope of
-  // fuel breaking up as it goes): ~38 m at its best angle (`bestAngle` rad), ~21 m aimed nearly flat; `jitter` rad of wander; a lump
-  // burns out in the air after `life` s (longer than the longest arc's flight). At most `maxBlobs` in flight.
-  speed: 26, flow: 1.8, blobs: 50, drag: 0.35, bestAngle: 0.62, jitter: 0.025, life: 3.5, maxBlobs: 260,
+  // fuel breaking up as it goes): ~29 m at its best angle (`bestAngle` rad) from the shoulder, ~13 m aimed flat; `jitter` rad of
+  // wander; a lump burns out in the air after `life` s (longer than the longest arc's flight). At most `maxBlobs` in flight.
+  speed: 23, flow: 1.8, blobs: 50, drag: 0.42, bestAngle: 0.62, jitter: 0.025, life: 3.5, maxBlobs: 260,
   // A man is struck within `radius` m of the line from his feet to his head (ahead of a shooter's own nozzle after `clear` s of flight);
   // `stick` of the lump stays on him (thickened fuel clings), the rest falls at his feet.
   radius: 0.26, clear: 0.2, stick: 0.5,

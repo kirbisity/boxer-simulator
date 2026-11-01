@@ -12,7 +12,7 @@ import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
-import { ratingOf, TEST_WARRIORS } from './roster.js';
+import { ratingOf, WARRIORS } from './roster.js';
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
@@ -78,7 +78,7 @@ import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGate
 import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
-import { updateFlames } from './flameview.js';
+import { placeFlameTanks, updateFlames } from './flameview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -1220,7 +1220,7 @@ function drawWorld(dt, drawIt = true) {
   blastScreen.update(state.paused ? 0 : dt);
   updateWhips(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
-  updateFlames(scene, world);
+  updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
@@ -2816,6 +2816,8 @@ function drawPortrait(inputs, yaw = -0.45) {
   updateFighterView(view, 0, world.time);
   updateArms(portraitView, view, world.time);
   updateProps(portraitView, [view], world);
+  // The flamethrower's tanks on his back (taken off again by the next portrait's world).
+  placeFlameTanks(portraitView, world);
   const horse = fighter.mount ? buildHorseView(portraitView, fighter.mount) : null;
   if (horse) updateHorseView(horse, world);
   // A rider framed with his horse (PORTRAIT_RIDER): further off, higher, from his horse's quarter. A robot dog (PORTRAIT_ROBOT_DOG)
@@ -3560,12 +3562,12 @@ const boxer = window.boxer = {
     },
     clouds: () => scene.blood?.dye.clouds ?? [],
   },
-  // The flamethrower (physics/flame.js, flameview.js; the roster's test unit, Sgt. Rourke) against four swords (or `foes`, presets), watched.
+  // The flamethrower (physics/flame.js, flameview.js; the roster's Sgt. Rourke) against four swords (or `foes`, presets), watched.
   // `#flame` in the address opens it.
   flameDemo: (place = 'field', seed = 1, foes = ['knight', 'samurai', 'swordShield', 'gaziAlp']) => {
     skipIntro();
     menus.close();
-    fight([structuredClone(TEST_WARRIORS.find((warrior) => warrior.key === 'flamer').inputs)], foes.map((preset) => ({ preset })), { place, seed });
+    fight([structuredClone(WARRIORS.find((warrior) => warrior.key === 'flamer').inputs)], foes.map((preset) => ({ preset })), { place, seed });
     $('#modes button[data-value="watch"]')?.click();
     return state.world.fighters.map((fighter) => fighter.style);
   },

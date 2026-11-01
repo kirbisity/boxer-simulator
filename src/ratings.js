@@ -4,7 +4,7 @@
 // The infantryman (Spc. Luis Herrera) rated afterwards against Maximus, SSgt. Brooks and Cpl. Hale, their scores held (22 bouts).
 // The mini humanoid (G1) and the exoskeleton soldier (Pvt. Owen Kade) rated afterwards, each against Maximus and the two nearest by that seed, their scores held (76 bouts).
 // The apes and monkeys (chimpanzee, chacma baboon, rhesus macaque) and the robot dogs (Go2, Spot, Vision 60) rated afterwards, each against Maximus and the two nearest by that seed (the Vision 60, unbeaten, also against the two top-rated), their scores held (182 bouts).
-// The flamethrower (Sgt. Cal Rourke, a test unit: roster.js TEST_WARRIORS) rated provisionally by hand from 18 bouts (3 from each corner against Maximus, SSgt. Brooks and Sir Edric), their scores held: not in the pickers, nor in the tool's run.
+// The flamethrower (Sgt. Cal Rourke) rated afterwards, provisionally by hand from 18 bouts (3 from each corner against Maximus, SSgt. Brooks and Sir Edric), their scores held.
 export const RATINGS = {
  "references": [
   "maximus",

@@ -356,7 +356,7 @@ function battleFxPuffTexture() {
   return texture;
 }
 
-function battleFxInstanced(geometry, material, count, attributes) {
+export function battleFxInstanced(geometry, material, count, attributes) {
   for (const [name, width] of attributes) {
     const attribute = new THREE.InstancedBufferAttribute(new Float32Array(count * width), width);
     attribute.setUsage(THREE.DynamicDrawUsage);
@@ -571,9 +571,14 @@ export function battleFxAddPuff(view, puff) {
   fx.puffs.push(puff);
 }
 
-/** The flash's light lent to a fire this frame (at a point, as bright), where the fire outshines the last shot's flash. */
-export function battleFxFireLight(view, at, intensity) {
-  battleFxOf(view).fireLight = { at, intensity };
+/** The flash's light lent to a fire this frame (at a point, as bright, out to `range` m, its colour), where the fire outshines the last shot's flash. */
+export function battleFxFireLight(view, at, intensity, range = BATTLE_FX.lightRange, colour = BATTLE_FX.flashColour) {
+  battleFxOf(view).fireLight = { at, intensity, range, colour };
+}
+
+/** How light the place is (luminance of its sky's light and half its sun's), as last measured; null before the first frame. */
+export function battleFxSceneLight(view) {
+  return view.battleFx?.sceneLight ?? null;
 }
 
 /** The scene's brightest light, for glints: { light, lamp } or null. */
@@ -664,6 +669,9 @@ function battleFxLighting(view, fx) {
   uniforms.uAmbient.value.fromArray(ambient);
   battleFxNearestLamp(view, fx, uniforms);
   fx.primary = primary;
+  // How light the place is (the sky's light and half the sun's, as luminance): a fire's light reads less by day (flameview.js).
+  const luminance = (colour) => 0.2126 * colour[0] + 0.7152 * colour[1] + 0.0722 * colour[2];
+  fx.sceneLight = luminance(ambient) + (primary ? 0.5 * luminance(primary.color.toArray()) * primary.intensity : 0);
   if (primary) {
     const direction = battleFxScratch.direction.copy(primary.position).sub(primary.target.position).normalize();
     uniforms.uSunColour.value.copy(primary.color).multiplyScalar(primary.intensity * (primary.isSpotLight ? 0.6 : 1));
@@ -686,10 +694,14 @@ export function battleFxUpdate(view, dt, sparks = []) {
   fx.lightAge += dt;
   const flicker = fx.lightAge < 0.2 ? Math.exp(-fx.lightAge / BATTLE_FX.lightSeconds) : 0;
   fx.light.intensity = (fx.lightPeak ?? BATTLE_FX.lightPeak) * flicker;
+  fx.light.distance = BATTLE_FX.lightRange;
   const fire = fx.fireLight;
   if (fire && fire.intensity > fx.light.intensity) {
     fx.light.position.set(fire.at[0], fire.at[1], fire.at[2]);
     fx.light.intensity = fire.intensity;
+    fx.light.distance = fire.range;
+    fx.light.color.fromArray(fire.colour);
+    // (Lent: the next shot sets its own colour again.)
   }
   fx.fireLight = null;
   const uniforms = fx.smoke.material.uniforms;

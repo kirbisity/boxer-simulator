@@ -54,13 +54,13 @@ function douse(preset, seconds = 0.6, setup = () => {}) {
   return { world, man };
 }
 
-test('the jet is aimed up for the range and carries 20-40 m at most, as the M2 did', () => {
-  for (const distance of [3, 8, 15, 22]) assert.ok(Math.abs(landing(aimJet(distance, 0)) - distance) < 0.3, `${distance} m`);
+test('the jet is aimed up for the range and carries 25-32 m at most, as the M2 did with thickened fuel', () => {
+  for (const distance of [3, 8, 15, 20]) assert.ok(Math.abs(landing(aimJet(distance, 0)) - distance) < 0.3, `${distance} m`);
   const most = landing(aimJet(200, 0));
-  assert.ok(most > 20 && most < 40, `${most.toFixed(1)} m at most`);
+  assert.ok(most > 25 && most < 32, `${most.toFixed(1)} m at most`);
 });
 
-test('the flamethrower is the M2-2: 7-9 s of fire from ~18 L in bursts of 1-3 s, hidden from the pickers, used at 3-25 m', () => {
+test('the flamethrower is the M2-2: 7-9 s of fire from ~18 L in bursts of 1-3 s, kept out of the style pickers, used at 3-19 m', () => {
   const spec = WEAPONS.flamethrower;
   const seconds = spec.shot.rounds / spec.shot.automatic.rate;
   assert.equal(spec.shot.flame, true);
@@ -69,7 +69,7 @@ test('the flamethrower is the M2-2: 7-9 s of fire from ~18 L in bursts of 1-3 s,
   assert.ok(litres > 16 && litres < 20, `${litres.toFixed(1)} L`);
   for (const rounds of spec.shot.automatic.burst) assert.ok(rounds / spec.shot.automatic.rate >= 1 && rounds / spec.shot.automatic.rate <= 3);
   assert.equal(STYLES.flamethrower.hidden, true);
-  assert.equal(STYLES.flamethrower.ranged.reach, 25);
+  assert.equal(STYLES.flamethrower.ranged.reach, 19);
   assert.equal(STYLES.flamethrower.ranged.flee, 3);
   // The tanks on his back (~30 kg) over what he keeps of his kit; his wind spent carrying them; a pistol for when they are empty.
   const plain = createWorld([{ inputs: structuredClone(PRESETS.rifle) }]).fighters[0];
@@ -164,7 +164,7 @@ test('the stream sticks on a robot dog and, kept burning, it overheats and goes 
   const world = createWorld([
     { inputs: withTanks({ ...structuredClone(PRESETS.rifle), style: 'flamethrower' }), corner: 'red' },
     { inputs: structuredClone(PRESETS.dogGo2), corner: 'blue' },
-  ], { seed: 1, arena: { halfX: 30, halfZ: 30 } });
+  ], { seed: 2, arena: { halfX: 30, halfZ: 30 } });
   placeFighter(world.fighters[0], -10, 0);
   placeFighter(world.fighters[1], 10, 0);
   run(world, 25);
@@ -189,10 +189,11 @@ test('empty, the flamethrower is let fall and his pistol drawn; a man alight who
   assert.ok(ran, 'ran');
 });
 
-test('the flamethrower soldier is a test unit: rated, out of the pickers unless the address says #flamer', async () => {
-  const { TEST_WARRIORS, testUnitsOn, ratingOf, WARRIORS } = await import('../src/roster.js');
-  const flamer = TEST_WARRIORS.find((warrior) => warrior.key === 'flamer');
-  assert.ok(flamer && !WARRIORS.includes(flamer));
+test('the flamethrower soldier is in the game: in the Deadliest Warrior picker without a flag, rated; #flamer harmless', async () => {
+  const { testUnitsOn, ratingOf, WARRIORS } = await import('../src/roster.js');
+  const flamer = WARRIORS.find((warrior) => warrior.key === 'flamer');
+  assert.ok(flamer, 'in WARRIORS');
+  assert.equal(WARRIORS.filter((warrior) => warrior.key === 'flamer').length, 1);
   assert.ok(ratingOf(flamer.inputs) > 0);
   assert.equal(flamer.inputs.style, 'flamethrower');
   assert.ok(testUnitsOn('#flamer') && testUnitsOn('#maps=off&flamer') && !testUnitsOn('#flame') && !testUnitsOn(''));
