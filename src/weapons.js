@@ -201,20 +201,21 @@ export const SHOTGUN = {
 };
 
 /**
- * The M2 flamethrower (1943-): two ~9 L tanks of thickened fuel and a small
- * one of nitrogen on the back (~30 kg full), a hose to the wand. The trigger
+ * The M2-2 flamethrower (1943-): two ~9 L tanks of thickened fuel and a small
+ * one of nitrogen on the back (~32 kg full), a hose to the wand. The trigger
  * opens the valve: a jet of burning fuel, thickened so that it carries as a
  * rope and arcs under gravity to 20-40 m, sticks where it lands and burns on
- * there. About 7 s of fire in all, in bursts of a second or so. Fired as an
+ * there. About 8 s of fire in all (7-9 s), in bursts of 1-2.5 s. Fired as an
  * automatic gun is (`automatic`): each "round" is a tenth of a second of the
  * valve open (physics/flame.js FLAME: the stream, what it does to a man).
+ * Empty, it is let fall and his sidearm drawn (no refilling it in a fight).
  */
 export const FLAMER = {
   flame: true,
-  rounds: 70,
-  ammo: 70,
+  rounds: 80,
+  ammo: 80,
   reloadSeconds: Infinity,
-  automatic: { rate: 10, burst: [6, 11] },
+  automatic: { rate: 10, burst: [10, 25] },
   misfire: 0,
   spread: 0.02,
 };
@@ -438,9 +439,10 @@ export const WEAPONS = {
     muzzle: [0.72, 0.03],
     shot: SHOTGUN,
   },
-  // The flamethrower's wand (the tanks on his back are his kit's weight: physics/flame.js withTanks); swung, a steel tube.
+  // The flamethrower's wand (the tanks on his back are his kit's weight: physics/flame.js withTanks); swung, a steel tube. On its
+  // hose to the tanks (`tethered`): never knocked away or shaken loose, let go only when he means to.
   flamethrower: {
-    label: 'Flamethrower', hands: 'two', length: 0.8, strikeFrom: 0.3, handle: 0.2, spacing: 0.42, supportAhead: true, longGun: true,
+    label: 'Flamethrower', hands: 'two', length: 0.8, strikeFrom: 0.3, handle: 0.2, spacing: 0.42, supportAhead: true, longGun: true, tethered: true,
     mass: 4.5, balance: 0.35, radius: 0.028,
     harm: { swing: { blunt: 0.8 }, thrust: { blunt: 0.6 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 10, zeta: 0.9 }, threat: 8, grip: 0.7, ranged: true, edgeUp: true,

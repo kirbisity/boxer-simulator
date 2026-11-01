@@ -11,7 +11,7 @@ import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
-import { ratingOf } from './roster.js';
+import { ratingOf, TEST_WARRIORS } from './roster.js';
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
@@ -78,7 +78,6 @@ import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { updateFlames } from './flameview.js';
-import { withTanks } from './physics/flame.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -3545,12 +3544,12 @@ const boxer = window.boxer = {
     },
     clouds: () => scene.blood?.dye.clouds ?? [],
   },
-  // The flamethrower's proof of concept (physics/flame.js, flameview.js): the flamethrower and his tanks against four swords, watched.
+  // The flamethrower (physics/flame.js, flameview.js; the roster's test unit, Sgt. Rourke) against four swords (or `foes`, presets), watched.
   // `#flame` in the address opens it.
-  flameDemo: (place = 'field', seed = 1) => {
+  flameDemo: (place = 'field', seed = 1, foes = ['knight', 'samurai', 'swordShield', 'gaziAlp']) => {
     skipIntro();
     menus.close();
-    fight([withTanks({ ...PRESETS.rifle, style: 'flamethrower' })], ['knight', 'samurai', 'swordShield', 'gaziAlp'].map((preset) => ({ preset })), { place, seed });
+    fight([structuredClone(TEST_WARRIORS.find((warrior) => warrior.key === 'flamer').inputs)], foes.map((preset) => ({ preset })), { place, seed });
     $('#modes button[data-value="watch"]')?.click();
     return state.world.fighters.map((fighter) => fighter.style);
   },

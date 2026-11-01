@@ -267,7 +267,8 @@ export function stormSkyImage(id, onReady) {
   if (!entry) {
     entry = { image: null, ready: false };
     skyPhotos.set(id, entry);
-    if (typeof Image !== 'undefined' && STORM_SKY_DATA[id]) {
+    // (A lite bundle, tools/bundle.js --lite, carries no photographs: the painted sky stays.)
+    if (typeof Image !== 'undefined' && STORM_SKY_DATA[id]?.jpeg) {
       const image = new Image();
       image.onload = () => {
         entry.image = image;

@@ -4,6 +4,7 @@
 // The infantryman (Spc. Luis Herrera) rated afterwards against Maximus, SSgt. Brooks and Cpl. Hale, their scores held (22 bouts).
 // The mini humanoid (G1) and the exoskeleton soldier (Pvt. Owen Kade) rated afterwards, each against Maximus and the two nearest by that seed, their scores held (76 bouts).
 // The apes and monkeys (chimpanzee, chacma baboon, rhesus macaque) and the robot dogs (Go2, Spot, Vision 60) rated afterwards, each against Maximus and the two nearest by that seed (the Vision 60, unbeaten, also against the two top-rated), their scores held (182 bouts).
+// The flamethrower (Sgt. Cal Rourke, a test unit: roster.js TEST_WARRIORS) rated provisionally by hand from 18 bouts (3 from each corner against Maximus, SSgt. Brooks and Sir Edric), their scores held: not in the pickers, nor in the tool's run.
 export const RATINGS = {
  "references": [
   "maximus",
@@ -2027,9 +2028,39 @@ export const RATINGS = {
     "specialForces": 13,
     "infantry": 13
    }
+  },
+  "flamer": {
+   "title": "Sgt. Cal Rourke",
+   "faction": "law",
+   "type": "flamethrower|specialForces",
+   "records": {
+    "maximus": {
+     "wins": 5,
+     "losses": 1,
+     "draws": 0
+    },
+    "specialForces": {
+     "wins": 3,
+     "losses": 3,
+     "draws": 0
+    },
+    "plate": {
+     "wins": 1,
+     "losses": 5,
+     "draws": 0
+    }
+   },
+   "score": 796,
+   "provisional": 796,
+   "kd": {
+    "maximus": 3.67,
+    "specialForces": 1,
+    "plate": 0.27
+   }
   }
  },
  "types": {
+  "flamethrower|specialForces": 796,
   "dogTurret|vision60Dog": 43389,
   "dogGrip|spotDog": 16,
   "dogRam|go2Dog": 41,

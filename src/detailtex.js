@@ -205,7 +205,8 @@ let clothAtlas = null;
  * texture for every fighter: a stand-in of flat cloth until it is decoded. Null when the maps are off (or no browser).
  */
 export function clothAtlasTexture() {
-  if (!DETAIL_MAPS.on || typeof THREE === 'undefined' || typeof Image === 'undefined' || typeof document === 'undefined') return null;
+  // (No atlas in this build, `CLOTH_MAP_DATA` empty: a lite bundle, tools/bundle.js --lite. The cloth is drawn as with the maps off.)
+  if (!DETAIL_MAPS.on || !CLOTH_MAP_DATA.atlas || typeof THREE === 'undefined' || typeof Image === 'undefined' || typeof document === 'undefined') return null;
   if (clothAtlas) return clothAtlas;
   const [width, height] = CLOTH_MAP_DATA.size;
   clothAtlas = new THREE.Texture(standIn([128, 128, 224, 217]));
@@ -227,7 +228,7 @@ export function clothAtlasTexture() {
 // How far the detail is drawn: past this mipmap level of a cell (its tile then a few dozen pixels across the screen) the relief
 // fades to the cell's mean, so the coarse levels, where the cells' paddings run out, are never read for relief.
 // (From the level at which a cell's padding is one pixel: log2 of the padding.)
-const CLOTH_FADE = [Math.log2(CLOTH_MAP_DATA.pad), Math.log2(CLOTH_MAP_DATA.pad) + 1.5];
+const CLOTH_FADE = [Math.log2(CLOTH_MAP_DATA.pad ?? 1), Math.log2(CLOTH_MAP_DATA.pad ?? 1) + 1.5];
 
 /**
  * A fighter's cloth wearing the atlas: `material` (the look's own skin material, MeshStandard, Toon or Phong, vertex-coloured)

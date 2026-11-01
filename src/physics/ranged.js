@@ -441,7 +441,7 @@ function spendMissile(world, fighter, weapon) {
   else fighter.rounds = left;
   if (left > 0 || resupplyInLine(world, fighter, weapon, carried)) return;
   weapon.spent = true;
-  const what = weapon.spec.bow ? 'his quiver is empty' : weapon.spec.shot.bolt ? 'his bolts are spent' : 'his powder and shot are spent';
+  const what = weapon.spec.bow ? 'his quiver is empty' : weapon.spec.shot.bolt ? 'his bolts are spent' : weapon.spec.shot.flame ? 'his tanks are empty' : 'his powder and shot are spent';
   world.events.push({ time: world.time, kind: weapon.spec.bow ? 'quiverEmpty' : 'ammoEmpty', fighter: fighter.id, weapon: weapon.kind, effects: [what] });
 }
 

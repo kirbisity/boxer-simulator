@@ -89,6 +89,21 @@ export function updateFlames(view, world) {
     smokeOff(view, neck, smoke.man * heat, dt);
     lend(neck, FLAME_VIEW.light.man * heat);
   }
+  // A horse or a robot dog alight: tongues along its body's capsules (its legs too), as hot as it burns.
+  for (const horse of world.horses ?? []) {
+    const heat = horse.burning?.heat ?? 0;
+    if (heat <= 0.01) continue;
+    for (let spot = 0; spot < horse.capsules.length; spot += 1) {
+      const capsule = horse.capsules[spot];
+      const lick = fireFlicker(horse.id * 11 + spot, time);
+      if (lick > 0.35 + 0.65 * heat) continue;
+      const where = [(capsule.a[0] + capsule.b[0]) / 2, (capsule.a[1] + capsule.b[1]) / 2 + capsule.radius, (capsule.a[2] + capsule.b[2]) / 2];
+      add(where, FLAME_VIEW.manFlame * (0.45 + 0.55 * heat) * (0.7 + 0.5 * lick), flameColour(0.4 + 0.4 * lick, 0.5), [0, (0.25 + 0.45 * lick) * (0.5 + heat), 0]);
+    }
+    const back = [horse.at[0], horse.withers, horse.at[1]];
+    smokeOff(view, back, smoke.man * heat, dt);
+    lend(back, FLAME_VIEW.light.man * heat);
+  }
   if (flame) {
     let streamAt = null;
     for (const blob of flame.blobs) {

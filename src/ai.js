@@ -1700,6 +1700,10 @@ function holdDown(world, fighter, opponent) {
     return true;
   }
   if (world.rules?.noPins) return false;
+  // Nobody takes hold of a man on fire; a style that covers a man down from where it stands (`ranged.coverDown`: the flamethrower,
+  // his wand on him) does not go in to hold him while it has something to shoot.
+  if (opponent.burning?.heat > 0.05) return false;
+  if (STYLES[fighter.style]?.ranged?.coverDown && fighter.weapon?.held && !fighter.weapon.spent) return false;
   const lastOfSide = world.fighters.filter((other) => other.corner === opponent.corner && inFight(other)).length === 1;
   if (!lastOfSide || (opponent.state !== 'down' && opponent.state !== 'rising')) return false;
   const holding = world.fighters.filter((other) => other.pin?.target === opponent.id).length;
@@ -2362,6 +2366,20 @@ function keepAway(world, fighter, opponent, dt) {
   if (!fighter.defence && enemies.some((enemy) => enemy.punch?.target === fighter.id)) perform(world, fighter, 'guard');
 }
 
+/** A man on fire runs: for the open ground away from his man (escapePoint), flat out while his wind lasts, at a jog after. */
+function runFromFire(world, fighter, opponent, dt) {
+  fighter.punch = null;
+  fighter.aiEscapeAge = (fighter.aiEscapeAge ?? Infinity) + dt;
+  if (!fighter.aiEscape || fighter.aiEscapeAge > AI.gunKite.rethink) {
+    fighter.aiEscape = escapePoint(world, fighter, opponent);
+    fighter.aiEscapeAge = 0;
+  }
+  fighter.goTo = fighter.aiEscape;
+  fighter.move = 1;
+  fighter.strafe = 0;
+  fighter.running = fighter.stamina > AI.passive.runWhile;
+}
+
 /**
  * A gun keeps away. Closer than `flee` (m), he turns and runs for the most
  * open ground, round him and never into a corner, until he has `flee` plus
@@ -2537,6 +2555,12 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
   // A style that walks on as it shoots (`ranged.advance`, of a full step) closes the range instead.
   fighter.move = gun.advance ?? (!gun.holdGround && roomBehind > AI.gunKite.wallMargin ? -0.6 : 0);
   fighter.strafe = Math.sin(world.time * 0.8 + fighter.id * 1.7) * 0.4;
+  // A weapon that sets men alight (`ranged.spareAlight`, heat 0..1): his man burning that hot, more fuel on him is fuel wasted. The
+  // trigger let go and held (another of them in reach and not alight taken instead), unless his man is near and still coming on.
+  if (gun.spareAlight !== undefined && spareTheBurning(world, fighter, opponent, distance, gun)) {
+    if (fighter.punch?.burst) fighter.punch.burst.left = 0;
+    return;
+  }
   if (fighter.punch || fighter.cooldown > 0) return;
   // His own men in the way: no shot (shotFouled). One on the line, he steps off it for a clear one; his man at grips
   // with ours, he looks for another, and in the end puts the weapon by and goes to them (heldTooLong).
@@ -2552,6 +2576,17 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
     fighter.punch.quick = true;
     fighter.cooldown = gun.between[0] + world.random() * gun.between[1];
   }
+}
+
+/** Whether he holds his fire on a man already alight (gunfight `spareAlight`); another of them to burn put in his sights if there is one. */
+function spareTheBurning(world, fighter, opponent, distance, gun) {
+  const alight = (man) => (man.burning?.heat ?? 0) >= gun.spareAlight;
+  if (!alight(opponent)) return false;
+  if (distance < gun.flee + gun.rest + 1 && opponent.state === 'up' && !opponent.panicked) return false;
+  const at = point(fighter.x, P.pelvis);
+  const other = world.fighters.find((man) => foeOf(fighter, man) && man.state === 'up' && !man.fled && !man.hidden && !alight(man) && Math.hypot(man.x[P.pelvis * 3] - at[0], man.x[P.pelvis * 3 + 2] - at[2]) < (gun.reach ?? Infinity));
+  if (other) fighter.focus = other.id;
+  return true;
 }
 
 /** How far a floor point is from the nearest edge of the arena (m). */
@@ -2726,6 +2761,11 @@ function decide(world, fighter, dt) {
   fighter.aiConfidence = nerve;
   // Fear builds and may break him; broken, or passive by choice, he only covers up and gets away.
   feelFear(world, fighter, nerve, dt, opponent);
+  // On fire and running (physics/flame.js catchAlight): away from them while it burns, wherever the open ground is.
+  if (fighter.burning?.running && fighter.state === 'up') {
+    runFromFire(world, fighter, opponent, dt);
+    return;
+  }
   if (fighter.panicked && rout(world, fighter, opponent)) return;
   if (style.passive || fighter.panicked) {
     keepAway(world, fighter, opponent, dt);

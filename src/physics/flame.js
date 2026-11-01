@@ -1,42 +1,50 @@
-// The flamethrower's fire (a proof of concept: weapons.js FLAMER, moves.js STYLES.flamethrower; drawn by flameview.js, heard by
-// audio/engine.js `flames`). Removing it is this file, those three entries and the hooks that name `flame`.
+// The flamethrower's fire (weapons.js FLAMER, moves.js STYLES.flamethrower; drawn by flameview.js, heard by audio/flamesound.js).
+// Removing it is this file, those three entries and the hooks that name `flame`.
 //
 // The trigger held (the automatic fire of physics.js), each "round" opens the valve a tenth of a second longer (`flamePulse`). While it is
 // open, lumps of thickened fuel leave the nozzle (`FLAME.blobs` a second, pooled, capped) aimed up for the range (`aimJet`: gravity and
 // the air's drag solved for the mark), and fly under gravity. A lump that meets a man (the line from his feet to his head, `radius`)
-// leaves part of its fuel on him, the rest at his feet; one that meets the floor leaves a burning patch there (merged with one near).
+// leaves part of its fuel on him, the rest at his feet; one that meets a horse or a robot dog (its capsules), the same on it; one that
+// meets the floor leaves a burning patch there (merged with one near).
 //
 // A man with fuel on him, or whose clothes caught from a patch underfoot, burns (`fighter.burning`): heat 0..1 by the fuel on him
 // (plate over most of him keeps most of it off), harm a share of each part's injury capacity a second through physics.js addDamage (the
 // trunk's mark kills, as any injury does), a cry every second or so. Caught well alight, a man drops and rolls (the drilled more often:
-// rolling smothers it `roll` times as fast, rolled by pushes side to side) or panics and runs, letting go of his weapon. Water under him
-// puts it out faster. A man on fire, a man burning near him, or the stream going past frightens him (`flameFright`, read by ai.js
-// shockFear: fear as any other, so men break and run from it).
+// rolling smothers it `roll` times as fast, rolled by pushes side to side) or panics and runs (`burning.running`: ai.js runs him from
+// it), letting go of his weapon. Water under him puts it out faster. A man on fire, a man burning near him, or the stream going past
+// frightens him (`flameFright`, read by ai.js shockFear: fear as any other, so men break and run from it).
+//
+// A machine (a robot, a robot dog) has no flesh to burn and nothing to fear: the fuel on it burns off all the same, and what of the
+// fire's heat goes into it warms it (`heatC`, K over the air, by its mass's heat capacity). A burst it shrugs off; kept burning, it
+// overheats past its cut-outs' limit and stops (FLAME.machine). A horse burns as a man's trunk does, against its own limit.
 
 import { soundVoice } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
-import { BODY, P } from '../body.js';
+import { BODY, buildBody, P } from '../body.js';
 import { OUTFITS } from '../outfits.js';
-import { addDamage, dropWeapon, fall, point, toWorld } from '../physics.js';
+import { addDamage, dropWeapon, fall, knockOut, point, toWorld } from '../physics.js';
 import { vec } from '../pose.js';
 import { WORLD } from './config.js';
+import { bringDown } from './mounted.js';
 import { floorAt } from './terrain.js';
 
 export const FLAME = {
-  // The jet: fuel leaves the nozzle at `speed` m/s, `flow` kg/s (the M2: ~18 L in ~7 s), drawn as `blobs` lumps a second, slowed by the
-  // air (`drag`, 1/s: the rope of fuel breaking up as it goes), ~30 m at its best angle; `jitter` rad of wander; a lump burns out in
-  // the air after `life` s. At most `maxBlobs` in flight.
-  speed: 21, flow: 2.6, blobs: 50, drag: 0.35, jitter: 0.025, life: 3, maxBlobs: 240,
+  // The jet (the M2-2): thickened fuel leaves the nozzle at `speed` m/s, `flow` kg/s (its two tanks' ~18 L, ~14.4 kg of thickened
+  // petrol at ~0.8 kg/L, in ~8 s: weapons.js FLAMER), drawn as `blobs` lumps a second, slowed by the air (`drag`, 1/s: the rope of
+  // fuel breaking up as it goes): ~38 m at its best angle (`bestAngle` rad), ~21 m aimed nearly flat; `jitter` rad of wander; a lump
+  // burns out in the air after `life` s (longer than the longest arc's flight). At most `maxBlobs` in flight.
+  speed: 26, flow: 1.8, blobs: 50, drag: 0.35, bestAngle: 0.62, jitter: 0.025, life: 3.5, maxBlobs: 260,
   // A man is struck within `radius` m of the line from his feet to his head (ahead of a shooter's own nozzle after `clear` s of flight);
-  // `stick` of the lump stays on him, the rest falls at his feet.
-  radius: 0.26, clear: 0.2, stick: 0.4,
+  // `stick` of the lump stays on him (thickened fuel clings), the rest falls at his feet.
+  radius: 0.26, clear: 0.2, stick: 0.5,
   // A patch on the floor: burns its fuel at `burn` kg/s (`wet` times faster spread thin on water or mud), lumps within `merge` m join it,
   // its flames reach `reach` m round it (and more as it holds more fuel, to `reachMost`). At most `most`, the oldest put out first.
   patch: { burn: 0.035, wet: 1.6, merge: 0.6, reach: 0.35, reachMost: 0.8, most: 80 },
   man: {
-    // The fuel on him burns off at `burn` kg/s; `cover` kg of it wraps him (full heat). His clothes, once caught, burn `clothes` s at
-    // `clothesHeat`. Plate over most of him (a cutProof kit) keeps `plate` of the heat off.
-    burn: 0.12, cover: 0.3, clothes: 4, clothesHeat: 0.5, plate: 0.6,
+    // The fuel on him burns off at `burn` kg/s (a pool fire's ~0.05 kg/m²·s over the ~0.5 m² of him alight); `cover` kg of it wraps
+    // him (full heat). His clothes, once caught, burn `clothes` s at `clothesHeat`. Plate over most of him (a cutProof kit) keeps
+    // `plate` of the heat off.
+    burn: 0.025, cover: 0.3, clothes: 4, clothesHeat: 0.5, plate: 0.6,
     // The harm at full heat: a share of the part's injury capacity a second (physics.js addDamage; 2.5 of the trunk's kills).
     trunk: 0.14, limbs: 0.08, head: 0.06,
     // Alight past `catchFrom` (heat), he reacts once: drops and rolls (`rollShare` from the least skilled to the best), down `rollSeconds`
@@ -45,11 +53,16 @@ export const FLAME = {
     // A cry every `cryEvery` s while he burns.
     cryEvery: 1.6,
   },
+  // A machine: of the fire's heat (`fuelHeat` J a kg of fuel burned), `absorbed` goes into it (the rest goes up with the flame); its
+  // body holds `specificHeat` J/kg·K (aluminium, steel, plastic) and sheds `cooling` W/K to the air. Past `limit` K over the air its
+  // motors' and battery's thermal cut-outs stop it. Standing in a burning patch heats it at `patch` of full.
+  machine: { fuelHeat: 43e6, absorbed: 0.05, specificHeat: 900, cooling: 15, limit: 60, patch: 0.3 },
   // Fear: himself on fire, `self`; a man burning within `near` m, up to `nearby`; the stream (another side's) within `stream` m,
   // `passing`. It fades with a half-life of `halfLife` s.
   fright: { self: 1, nearby: 0.4, near: 8, passing: 0.5, stream: 2, halfLife: 3 },
-  // The full tanks on his back (kg).
-  tanksKg: 30,
+  // The full tanks on his back (kg: the M2-2's ~32 kg less its wand); `keptKg` of his own kit kept on under them (helmet, plate
+  // carrier and plates; a rifleman's magazines and the rest of his fighting load left behind). His sidearm (a style): a pistol.
+  tanksKg: 30, keptKg: 12, sidearm: 'handgun',
 };
 
 const BURNED_LIMBS = ['lUpperArm', 'rUpperArm', 'lThigh', 'rThigh', 'lShank', 'rShank'];
@@ -59,15 +72,20 @@ function flameStateOf(world) {
   return (world.flame ??= { blobs: [], free: [], patches: [], valves: new Map() });
 }
 
-/** A man to carry the flamethrower: his kit made heavier by the full tanks (kit weight is a share of his own, `weightKg` taken as his). */
-export function withTanks(inputs, weightKg = 85) {
+/**
+ * A man to carry the flamethrower: his kit's weight cut to what he keeps on under the tanks (FLAME.keptKg) and the full tanks
+ * added, carried on his back (`packKg`: body.js, a load that costs him wind), a pistol for his sidearm.
+ */
+export function withTanks(inputs) {
+  const own = buildBody({ ...inputs, outfit: { ...inputs.outfit, extraMass: 0 } }).bodyMassKg;
   const base = inputs.outfit?.extraMass ?? OUTFITS[inputs.outfit?.kind]?.extraMass ?? 0;
-  return { ...inputs, outfit: { ...inputs.outfit, extraMass: base + FLAME.tanksKg / weightKg } };
+  const kept = Math.min(base, FLAME.keptKg / own);
+  return { ...inputs, sidearm: inputs.sidearm ?? FLAME.sidearm, outfit: { ...inputs.outfit, extraMass: kept + FLAME.tanksKg / own, packKg: FLAME.tanksKg } };
 }
 
 /**
  * The elevation (rad) to put a jet leaving at `speed` with linear `drag` onto a mark `distance` m off and `rise` m above: the lower of the
- * two arcs, by bisection on the closed-form flight; the best angle (`most`) when it is out of reach.
+ * two arcs, by bisection on the closed-form flight; the best angle when it is out of reach.
  */
 export function aimJet(distance, rise, speed = FLAME.speed, drag = FLAME.drag, gravity = WORLD.gravity) {
   const heightAt = (angle) => {
@@ -77,7 +95,7 @@ export function aimJet(distance, rise, speed = FLAME.speed, drag = FLAME.drag, g
     const t = -Math.log(1 - share) / drag;
     return ((speed * Math.sin(angle) + gravity / drag) * distance) / across - (gravity * t) / drag;
   };
-  const most = 0.7;
+  const most = FLAME.bestAngle;
   if (heightAt(most) < rise) return most;
   let low = -0.6;
   let high = most;
@@ -101,7 +119,7 @@ export function flamePulse(world, fighter, weapon) {
   world.pendingImpulses.push({ fighter, shares: [[hand, 1], [P[`${weapon.main}Elbow`], 0.5], [P[`${weapon.main}Shoulder`], 0.9]], direction: vec.scale(weapon.dir, -1), impulse: (FLAME.flow * FLAME.speed) / rate });
 }
 
-/** The fire, each step: the jets, the lumps in flight, the patches, the men burning, and the fear of it. */
+/** The fire, each step: the jets, the lumps in flight, the patches, what burns (men, machines, horses), and the fear of it. */
 export function stepFlame(world, dt) {
   const flame = world.flame;
   for (const [id, valve] of flame.valves) {
@@ -111,7 +129,11 @@ export function stepFlame(world, dt) {
   }
   if (flame.blobs.length) flyFuel(world, flame, dt);
   if (flame.patches.length) burnFirePatches(world, flame, dt);
-  for (const fighter of world.fighters) if (fighter.burning) burnOnMan(world, fighter, dt);
+  for (const fighter of world.fighters) {
+    if (fighter.burning?.machine || fighter.heatC > 0) burnOnMachine(world, fighter, dt);
+    else if (fighter.burning) burnOnMan(world, fighter, dt);
+  }
+  for (const horse of world.horses ?? []) if (horse.burning || horse.heatC > 0) burnOnHorse(world, horse, dt);
   frightenOfFire(world, flame, dt);
 }
 
@@ -172,6 +194,23 @@ export function struckPart(fighter, at) {
   return left ? 'lThigh' : 'rThigh';
 }
 
+/** The horse (or robot dog) standing that a point is in (within one of its capsules), or null. */
+export function struckHorse(world, at) {
+  for (const horse of world.horses ?? []) {
+    if (horse.state === 'down') continue;
+    const dx = at[0] - horse.at[0];
+    const dz = at[2] - horse.at[1];
+    if (dx * dx + dz * dz > 9 * horse.withers * horse.withers) continue;
+    for (const capsule of horse.capsules) {
+      const along = vec.sub(capsule.b, capsule.a);
+      const share = Math.max(0, Math.min(1, vec.dot(vec.sub(at, capsule.a), along) / Math.max(1e-9, vec.dot(along, along))));
+      const off = vec.sub(at, vec.add(capsule.a, vec.scale(along, share)));
+      if (vec.dot(off, off) < capsule.radius * capsule.radius) return horse;
+    }
+  }
+  return null;
+}
+
 function flyFuel(world, flame, dt) {
   const blobs = flame.blobs;
   const slow = Math.exp(-FLAME.drag * dt);
@@ -189,10 +228,20 @@ function flyFuel(world, flame, dt) {
         if (fighter.dormant || fighter.hidden || (fighter.id === blob.owner && blob.age < FLAME.clear)) continue;
         const part = struckPart(fighter, blob.x);
         if (!part) continue;
-        igniteMan(world, fighter, blob.fuel * FLAME.stick, part);
+        // A robot dog's load (its sensor head, its turret) is the robot's own: the fuel on it is on the dog.
+        if (fighter.mount?.spec?.machine && fighter.mount.state !== 'down') igniteHorse(world, fighter.mount, blob.fuel * FLAME.stick, blob.owner);
+        else igniteMan(world, fighter, blob.fuel * FLAME.stick, part, blob.owner);
         addFirePatch(world, flame, [blob.x[0], floorUnderFlame(world, blob.x[0], fighter.x[P.pelvis * 3 + 1], blob.x[2]), blob.x[2]], blob.fuel * (1 - FLAME.stick));
         done = true;
         break;
+      }
+    }
+    if (!done && world.horses?.length) {
+      const horse = struckHorse(world, blob.x);
+      if (horse && !(horse.rider === blob.owner && blob.age < FLAME.clear)) {
+        igniteHorse(world, horse, blob.fuel * FLAME.stick, blob.owner);
+        addFirePatch(world, flame, [blob.x[0], floorUnderFlame(world, blob.x[0], blob.x[1], blob.x[2]), blob.x[2]], blob.fuel * (1 - FLAME.stick));
+        done = true;
       }
     }
     if (!done) {
@@ -236,7 +285,7 @@ function burnFirePatches(world, flame, dt) {
     patch.age += dt;
     const reach = patchReach(patch);
     for (const fighter of world.fighters) {
-      if (fighter.dormant || fighter.burning?.clothes > 0) continue;
+      if (fighter.dormant || fighter.mount || fighter.burning?.clothes > 0) continue;
       for (const foot of [P.lFoot, P.rFoot]) {
         const dx = fighter.x[foot * 3] - patch.x[0];
         const dz = fighter.x[foot * 3 + 2] - patch.x[2];
@@ -250,13 +299,25 @@ function burnFirePatches(world, flame, dt) {
   flame.patches = flame.patches.filter((patch) => patch.fuel > 0);
 }
 
-/** Fuel on a man (kg; 0: only his clothes caught), on a part of him. A machine has nothing to catch. */
-function igniteMan(world, fighter, fuel, part) {
-  if (fighter.body.gear.machine) return;
-  const burning = (fighter.burning ??= { fuel: 0, clothes: 0, heat: 0, part, reacted: false, rolling: false, rollClock: 0, cryClock: 0, side: 1, since: world.time });
+/**
+ * Fuel on a man (kg; 0: only his clothes caught, or a machine stood in the fire), on a part of him, by `by` (who threw it). A
+ * machine has no clothes to catch: the fuel burns on its shell (burnOnMachine).
+ */
+function igniteMan(world, fighter, fuel, part, by) {
+  const machine = Boolean(fighter.body.gear.machine);
+  const burning = (fighter.burning ??= { fuel: 0, clothes: 0, heat: 0, part, reacted: false, rolling: false, running: false, rollClock: 0, cryClock: 0, side: 1, since: world.time, machine });
   burning.fuel += fuel;
-  burning.clothes = FLAME.man.clothes;
+  // (A machine in a burning patch: its legs in the flames this moment, `clothes` its time left there.)
+  burning.clothes = machine ? 0.1 : FLAME.man.clothes;
+  if (by !== undefined) burning.by = by;
   if (part === 'trunk' || part === 'head') burning.part = part;
+}
+
+/** Fuel on a horse or a robot dog (kg). */
+function igniteHorse(world, horse, fuel, by) {
+  const burning = (horse.burning ??= { fuel: 0, heat: 0, since: world.time });
+  burning.fuel += fuel;
+  if (by !== undefined) horse.lastHitBy = by;
 }
 
 /** The share of the heat that reaches him: plate over most of him keeps much of it off. */
@@ -296,6 +357,56 @@ function burnOnMan(world, fighter, dt) {
   if (burning.rolling && fighter.state === 'down') rollOver(world, fighter, burning, dt);
 }
 
+/** The heat a fire puts into a machine this moment (W): its share of the fire's, as much as it burns (`heat` 0..1). */
+const machineHeating = (heat) => heat * FLAME.man.burn * FLAME.machine.fuelHeat * FLAME.machine.absorbed;
+
+/** A machine's heat (K over the air) after `dt` s taking `watts` in, its heat capacity `capacity` J/K, cooling as it does. */
+function warmed(heatC, watts, capacity, dt) {
+  return Math.max(0, (heatC ?? 0) + ((watts - FLAME.machine.cooling * (heatC ?? 0)) * dt) / capacity);
+}
+
+/** Fuel burning on a robot (or one stood in the fire): it burns off; the robot warms; past its limit, it cuts out. */
+function burnOnMachine(world, fighter, dt) {
+  const spec = FLAME.machine;
+  const burning = fighter.burning;
+  let heat = 0;
+  if (burning) {
+    burning.fuel = Math.max(0, burning.fuel - FLAME.man.burn * (inWaterNow(world, fighter) ? FLAME.man.wet : 1) * dt);
+    burning.clothes = Math.max(0, burning.clothes - dt);
+    heat = Math.min(1, Math.max(burning.fuel / FLAME.man.cover, burning.clothes > 0 ? spec.patch : 0));
+    burning.heat = heat;
+    if (heat <= 0.01) fighter.burning = undefined;
+  }
+  fighter.heatC = warmed(fighter.heatC, machineHeating(heat), fighter.body.massKg * spec.specificHeat, dt);
+  if (fighter.heatC < 0.05 && !fighter.burning) fighter.heatC = 0;
+  if (fighter.heatC > spec.limit && (fighter.state === 'up' || fighter.state === 'rising' || fighter.state === 'down')) {
+    knockOut(world, fighter, { attacker: burning?.by ?? -1, effects: [] }, 'overheats: its cut-outs stop it');
+  }
+}
+
+/** Fuel burning on a horse (as a man's trunk, against its own limit) or a robot dog (it warms, and past its limit goes down). */
+function burnOnHorse(world, horse, dt) {
+  const burning = horse.burning;
+  let heat = 0;
+  if (burning) {
+    burning.fuel = Math.max(0, burning.fuel - FLAME.man.burn * dt);
+    heat = Math.min(1, burning.fuel / FLAME.man.cover);
+    burning.heat = heat;
+    if (heat <= 0.01) horse.burning = undefined;
+  }
+  if (horse.state !== 'up') return;
+  if (horse.spec?.machine) {
+    const riderKg = world.fighters[horse.rider]?.body.massKg ?? 0;
+    horse.heatC = warmed(horse.heatC, machineHeating(heat), (horse.mass + riderKg) * FLAME.machine.specificHeat, dt);
+    if (horse.heatC < 0.05 && !horse.burning) horse.heatC = 0;
+    if (horse.heatC > FLAME.machine.limit) bringDown(world, horse, 'overheats: its cut-outs stop it');
+    return;
+  }
+  const limit = { ...WORLD.mount.horse, ...horse.spec?.harm }.trunkFatal * BODY.toughness;
+  horse.trauma += heat * FLAME.man.trunk * limit * dt;
+  if (horse.trauma > limit) bringDown(world, horse, 'burned');
+}
+
 /** Alight: he drops and rolls (the drilled, the skilled the more often), or panics and runs, letting his weapon go. */
 function catchAlight(world, fighter, burning) {
   const [least, most] = FLAME.man.rollShare;
@@ -311,6 +422,7 @@ function catchAlight(world, fighter, burning) {
   fighter.calmFor = 0;
   fighter.punch = null;
   fighter.clinch = null;
+  burning.running = true;
   if (fighter.weapon?.held) dropWeapon(world, fighter, 'dropped');
   world.events.push({ time: world.time, kind: 'panic', fighter: fighter.id, effects: ['on fire: runs'] });
 }

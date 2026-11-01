@@ -60,18 +60,24 @@ test('the jet is aimed up for the range and carries 20-40 m at most, as the M2 d
   assert.ok(most > 20 && most < 40, `${most.toFixed(1)} m at most`);
 });
 
-test('the flamethrower is a heavy automatic weapon with about 7 s of fire, hidden from the pickers, used at 3-20 m', () => {
+test('the flamethrower is the M2-2: 7-9 s of fire from ~18 L in bursts of 1-3 s, hidden from the pickers, used at 3-25 m', () => {
   const spec = WEAPONS.flamethrower;
+  const seconds = spec.shot.rounds / spec.shot.automatic.rate;
   assert.equal(spec.shot.flame, true);
-  assert.ok(Math.abs(spec.shot.rounds / spec.shot.automatic.rate - 7) < 0.5);
+  assert.ok(seconds >= 7 && seconds <= 9, `${seconds} s`);
+  const litres = (FLAME.flow * seconds) / 0.8;
+  assert.ok(litres > 16 && litres < 20, `${litres.toFixed(1)} L`);
+  for (const rounds of spec.shot.automatic.burst) assert.ok(rounds / spec.shot.automatic.rate >= 1 && rounds / spec.shot.automatic.rate <= 3);
   assert.equal(STYLES.flamethrower.hidden, true);
-  assert.equal(STYLES.flamethrower.ranged.reach, 20);
+  assert.equal(STYLES.flamethrower.ranged.reach, 25);
   assert.equal(STYLES.flamethrower.ranged.flee, 3);
-  // The tanks are his kit's weight: ~30 kg more of him to move.
+  // The tanks on his back (~30 kg) over what he keeps of his kit; his wind spent carrying them; a pistol for when they are empty.
   const plain = createWorld([{ inputs: structuredClone(PRESETS.rifle) }]).fighters[0];
   const laden = createWorld([{ inputs: withTanks(structuredClone(PRESETS.rifle)) }]).fighters[0];
-  const mass = (fighter) => fighter.body.masses.reduce((sum, value) => sum + value, 0);
-  assert.ok(Math.abs(mass(laden) - mass(plain) - FLAME.tanksKg) < 5, `${(mass(laden) - mass(plain)).toFixed(1)} kg`);
+  assert.ok(Math.abs(laden.body.gearKg - FLAME.tanksKg - FLAME.keptKg) < 1, `${laden.body.gearKg.toFixed(1)} kg carried`);
+  assert.ok(laden.body.massKg > plain.body.massKg + 10);
+  assert.ok(Math.abs(laden.body.aerobic / plain.body.aerobic - laden.body.bodyMassKg / (laden.body.bodyMassKg + FLAME.tanksKg)) < 0.01);
+  assert.equal(laden.body.gear.sidearm, 'handgun');
 });
 
 test('the stream sets a man alight: burns to his trunk, fear, and he drops and rolls or runs', () => {
@@ -135,4 +141,59 @@ test('out of the jet\'s reach he walks in and does not fire', () => {
   run(world, 2);
   assert.ok(!world.flame, 'no fire at 28 m');
   assert.ok(shooter.x[P.pelvis * 3] > startedAt + 1, 'walked in');
+});
+
+test('a robot has no flesh to burn: a burst it shrugs off, kept burning it overheats and stops', () => {
+  const burn = (fuel, seconds) => {
+    const world = createWorld([{ inputs: structuredClone(PRESETS.humanoid) }], { seed: 1, arena: { halfX: 20, halfZ: 20 } });
+    const [robot] = world.fighters;
+    world.flame = { blobs: [], free: [], patches: [], valves: new Map() };
+    robot.burning = { fuel, clothes: 0, heat: 0, part: 'trunk', machine: true, since: 0 };
+    for (let t = 0; t < seconds; t += 1 / 60) stepFlame(world, 1 / 60);
+    return robot;
+  };
+  const burst = burn(0.2, 10);
+  assert.equal(burst.state, 'up');
+  assert.ok(burst.heatC > 1 && burst.heatC < FLAME.machine.limit, `${burst.heatC.toFixed(1)} K`);
+  assert.ok(!burst.trauma?.trunk, 'no burns');
+  assert.ok(!burst.flameFright, 'no fear');
+  assert.equal(burn(3, 120).state, 'out');
+});
+
+test('the stream sticks on a robot dog and, kept burning, it overheats and goes down', () => {
+  const world = createWorld([
+    { inputs: withTanks({ ...structuredClone(PRESETS.rifle), style: 'flamethrower' }), corner: 'red' },
+    { inputs: structuredClone(PRESETS.dogGo2), corner: 'blue' },
+  ], { seed: 1, arena: { halfX: 30, halfZ: 30 } });
+  placeFighter(world.fighters[0], -10, 0);
+  placeFighter(world.fighters[1], 10, 0);
+  run(world, 25);
+  assert.ok(world.events.some((event) => event.kind === 'horseDown' && /overheats/.test(event.effects.join())), 'overheated');
+});
+
+test('empty, the flamethrower is let fall and his pistol drawn; a man alight who panics runs from it', () => {
+  const duel = createWorld([
+    { inputs: withTanks({ ...structuredClone(PRESETS.rifle), style: 'flamethrower' }), corner: 'red' },
+    { inputs: { ...structuredClone(PRESETS.knight), style: 'passive' }, corner: 'blue' },
+  ], { seed: 2, arena: { halfX: 30, halfZ: 20 } });
+  const [shooter, man] = duel.fighters;
+  shooter.rounds = 12;
+  placeFighter(shooter, -6, 0);
+  placeFighter(man, 6, 0);
+  run(duel, 8);
+  assert.ok(duel.events.some((event) => event.kind === 'ammoEmpty' && /tanks are empty/.test(event.effects.join())), 'emptied');
+  assert.equal(shooter.weapon?.kind, 'pistol');
+  // Alight and not one to drop and roll (`rollShare`'s least), he runs: away from the fire, flat out.
+  const { world, man: doused } = douse('infantry', 0.6, (_, target) => { target.body.skill = -10; });
+  const ran = world.events.some((event) => event.fighter === doused.id && /on fire: runs/.test(event.effects?.join() ?? ''));
+  assert.ok(ran, 'ran');
+});
+
+test('the flamethrower soldier is a test unit: rated, out of the pickers unless the address says #flamer', async () => {
+  const { TEST_WARRIORS, testUnitsOn, ratingOf, WARRIORS } = await import('../src/roster.js');
+  const flamer = TEST_WARRIORS.find((warrior) => warrior.key === 'flamer');
+  assert.ok(flamer && !WARRIORS.includes(flamer));
+  assert.ok(ratingOf(flamer.inputs) > 0);
+  assert.equal(flamer.inputs.style, 'flamethrower');
+  assert.ok(testUnitsOn('#flamer') && testUnitsOn('#maps=off&flamer') && !testUnitsOn('#flame') && !testUnitsOn(''));
 });

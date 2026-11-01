@@ -461,7 +461,8 @@ function rearm(world, fighter, weapon) {
 
 /** Going down shakes the grip: sometimes the weapon goes with the fall. */
 export function shakenLoose(world, fighter) {
-  if (fighter.weapon?.held && world.random() < WORLD.weapons.dropOnFall) dropWeapon(world, fighter, 'dropped');
+  // (A weapon on a hose to his back, `tethered`: a flamethrower's wand, hanging there, taken up again as he rises.)
+  if (fighter.weapon?.held && !fighter.weapon.spec.tethered && world.random() < WORLD.weapons.dropOnFall) dropWeapon(world, fighter, 'dropped');
   if (fighter.offWeapon?.held && world.random() < WORLD.weapons.dropOnFall) dropOffWeapon(world, fighter, 'dropped');
   if (fighter.shield && world.random() < WORLD.shield.dropOnFall) dropShield(world, fighter, 'dropped');
 }
@@ -691,6 +692,11 @@ export function strainGrip(world, fighter, impulse, push = [0, 0, 0], weapon = f
   // A long lever off the hands is easier to tear away (`grip` < 1).
   weapon.strain += impulse / (BLADES.gripImpulsePerNewton * (weapon.spec.grip ?? 1) * fighter.body.strikeForce[P[`${weapon.main}Hand`]]);
   if (weapon.strain < 1) return;
+  // Torn from his hands, a weapon on a hose to his back (`tethered`) is not knocked away: it swings on the hose and he has it again.
+  if (weapon.spec.tethered) {
+    weapon.strain = 0;
+    return;
+  }
   if (weapon === fighter.offWeapon) dropOffWeapon(world, fighter, 'disarmed', push);
   else dropWeapon(world, fighter, 'disarmed', push);
 }

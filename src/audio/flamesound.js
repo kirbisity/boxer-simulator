@@ -17,6 +17,8 @@ export const FLAME_SOUND = {
   burnings: 3, patchFuel: 0.15,
   // How quickly a loop comes up to its level, and fades when it stops (s).
   ease: 0.05, fade: 0.35,
+  // The fight's time standing still this long (s): paused, the loops fall silent.
+  stillFor: 0.3,
 };
 
 /** What of the fire is heard now: [{ key, kind ('roar' | 'burn'), at, level (dB SPL at 1 m) }]: every open jet, the loudest burnings. */
@@ -30,6 +32,10 @@ export function flameSources(world, listener) {
     if (!fighter.burning || fighter.dormant) continue;
     const at = [fighter.x[3], fighter.x[4], fighter.x[5]];
     burnings.push({ key: `man:${fighter.id}`, kind: 'burn', at, level: FLAME_SOUND.burn.level + 20 * Math.log10(Math.max(0.05, fighter.burning.heat)) });
+  }
+  for (const horse of world.horses ?? []) {
+    if (!horse.burning) continue;
+    burnings.push({ key: `horse:${horse.id}`, kind: 'burn', at: [horse.at[0], horse.withers, horse.at[1]], level: FLAME_SOUND.burn.level + 20 * Math.log10(Math.max(0.05, horse.burning.heat)) });
   }
   for (const patch of flame?.patches ?? []) burnings.push({ key: `patch:${patch.seed}`, kind: 'burn', at: patch.x, level: FLAME_SOUND.burn.level + 10 * Math.log10(Math.max(0.01, patch.fuel / FLAME_SOUND.patchFuel)) });
   burnings.sort((a, b) => heard(b) - heard(a));
@@ -72,10 +78,16 @@ export function createFlameSound() {
     source.start(at, spec.lead + Math.random() * spec.seconds);
     return { source, gain, pan };
   }
+  // The fight paused (its time still for `stillFor` s of the ear's): every loop let fall silent, not left roaring.
+  let lastTime = null;
+  let stillSince = 0;
   return {
     update(world, now, { ctx, samples, out, listener }) {
       const live = new Set();
-      for (const source of flameSources(world, listener)) {
+      if (world.time !== lastTime) stillSince = now;
+      lastTime = world.time;
+      const paused = now - stillSince > FLAME_SOUND.stillFor;
+      for (const source of paused ? [] : flameSources(world, listener)) {
         live.add(source.key);
         let bed = beds.get(source.key);
         if (!bed) {

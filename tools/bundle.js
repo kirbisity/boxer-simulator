@@ -12,7 +12,30 @@ import { transformSync } from 'esbuild';
 const MODULES = ['aging', 'outfits', 'robotdogs', 'horses', 'physiology', 'body', 'physics/config', 'physics/overdraft', 'physics/terrain', 'physics/jump', 'joints', 'pose', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics/fieldworks', 'audio/surface', 'audio/log', 'physics/arts', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'physics/throwable', 'physics/brush', 'physics/whip', 'physics/flame', 'physics/rising', 'physics/gait', 'physics/mounted', 'cast', 'riding', 'command', 'ai', 'battletally', 'battleend', 'lastgate', 'gesture', 'finisher', 'lowstrike', 'runsteer', 'weaponarts', 'control', 'followcam', 'watchcam', 'cameraarm', 'occluders', 'camerarig', 'scenerylod', 'levelmode/quality', 'adaptres', 'rig', 'bodymesh', 'skintones', 'sculpt', 'skinrules', 'skindetail', 'skintex', 'detailmaps', 'loftbody', 'fleshbody', 'bodystyles', 'skinworker', 'looks/kit', 'looks/toon', 'looks/probe-lite', 'looks', 'blooddye', 'detailmaps-data', 'clothmaps-data', 'detailtex', 'helmstyle', 'helmforms', 'helmmaps-data', 'helmmaps', 'menpo', 'ground/painted', 'ground/living', 'scenery/skyball-photo-data', 'scenery/skyball', 'scenery/generated', 'scenery/trees', 'scenery', 'toon', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'faceregions', 'photohair', 'hairswing', 'hairmass', 'photoface', 'photohead', 'facemorph', 'face', 'wardrobe', 'robotview', 'exoview', 'oyoroi', 'crowdview', 'crowdlod', 'props/town', 'props/rural', 'props/arena', 'props/harbour', 'props/coast', 'props/subway', 'props/jiangnan', 'props/cajamarca', 'props/plains', 'fightui/logic', 'fightui/icons', 'fightui/kit', 'fightui/command', 'fightui/buttons', 'fightui/target', 'fightui/index', 'fightui/toggle', 'fightui/marker', 'generalmark', 'depthrange', 'levelmode/kitpaint', 'levelmode/kitshadow', 'levelmode/kitwear', 'levelmode/kittex', 'levelmode/kitgeo', 'levelmode/kitchapel', 'levelmode/kitfilth', 'levelmode/kitprops', 'levelmode/stagelooks', 'levelmode/stormsky-data', 'levelmode/stagesky', 'levelmode/storm', 'levelmode/water', 'levelmode/kitwater', 'worksview', 'render', 'battlefx', 'machinefx', 'arrowsight', 'weaponview', 'flameview', 'blastview', 'horsemesh', 'horsehair', 'robotdogview', 'horseview', 'drama', 'hitfeel', 'hitfeelview', 'artdrama', 'artdramaview', 'scenarios', 'muster', 'musterview', 'ratings', 'roster', 'overdraftview', 'touch', 'tutorial', 'intro', 'levelmode/presets', 'levelmode/story', 'audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/spark', 'audio/sfx/ui', 'audio/sfx/thump', 'audio/sfx/art', 'audio/sfx/sampled', 'audio/samples', 'audio/families', 'audio/cries', 'audio/acoustics', 'audio/farfield', 'audio/charge', 'audio/flamesound', 'audio/ambience', 'audio/music/data/menu', 'audio/music/data/roman', 'audio/music/data/medieval', 'audio/music/data/japan', 'audio/music/data/china', 'audio/music/data/korea', 'audio/music/data/aztec', 'audio/music/data/ottoman', 'audio/music/data/modern', 'audio/music/data/scottish', 'audio/music/data/boss', 'audio/music/data/bosschoir', 'audio/music/data/victory', 'audio/music/data/defeat', 'audio/music/manifest', 'audio/music', 'audio/engine', 'audio/controls', 'audio/bench', 'lastgateview', 'menu', 'uicheck', 'looksbench', 'levelmode/stages/testyard-vault', 'levelmode/stages/testyard', 'levelmode/landform', 'levelmode/stages/dnbuild', 'levelmode/stages/dunnottar-sewer', 'levelmode/stages/dunnottar-vault', 'levelmode/stages/dunnottar-chapel', 'levelmode/stages/dunnottar-light', 'levelmode/stages/dunnottar', 'levelmode/stages', 'levelmode/awareness', 'levelmode/stage', 'levelmode/travel', 'levelmode/config', 'levelmode/adapter', 'levelmode/items', 'levelmode/loot', 'levelmode/attempts', 'levelmode/checkpoints', 'levelmode/interact', 'levelmode/cutscene', 'levelmode/ending', 'levelmode/level', 'levelmode/team', 'levelmode/sandbox', 'levelmode/teamview', 'levelmode/hud', 'levelmode/markers', 'levelmode/endingview', 'levelmode/cutsceneview', 'levelmode/torchpool', 'levelmode/visibility', 'levelmode/kit', 'levelmode/terrainview', 'levelmode/awarenessview', 'main'];
 const args = process.argv.slice(2);
 const minify = !args.includes('--no-minify');
-const out = args.find((arg) => !arg.startsWith('--')) ?? 'dist/gladiator.html';
+// `--lite`: a smaller page (a test build, under 15 MB with nothing beside it): the heaviest baked pictures left out, each where the
+// game already draws without them (the `#maps=off` look), least seen first; the sounds, music and photo faces kept. No source map.
+const lite = args.includes('--lite');
+const out = args.find((arg) => !arg.startsWith('--')) ?? (lite ? 'dist/gladiator-lite.html' : 'dist/gladiator.html');
+// What a lite page leaves out, by module: its data (the module's one exported const) cut down to what is kept.
+const LITE = {
+  // The grounds' tiles (13 MB of the 15): the places' painted ground is drawn under them anyway. Of the armour's, the samurai's
+  // lacing (kozane, 0.7 MB) too; the rest kept (plate, mail and the others on most armoured men: 1.6 MB).
+  'detailmaps-data': (data) => Object.fromEntries(Object.entries(data).filter(([name, tile]) => tile.kind !== 'ground' && !LITE_DROPPED_TILES.includes(name))),
+  // The cloth atlas and the helmets' sheets: cloth and helmets drawn as with the maps off (detailtex.js, helmmaps.js).
+  'clothmaps-data': () => ({}),
+  'helmmaps-data': () => ({}),
+  // Level mode's storm-sky photographs (its painted storm sky kept: levelmode/stagesky.js), their sizes and colours kept.
+  'levelmode/stormsky-data': (data) => Object.fromEntries(Object.entries(data).map(([name, photo]) => [name, { ...photo, jpeg: null }])),
+};
+const LITE_DROPPED_TILES = ['kozane'];
+/** A lite page's stand-in for a data module: its exported const, cut down (LITE). */
+async function liteSource(name) {
+  const module = await import(new URL(`../src/${name}.js`, import.meta.url));
+  const [[constName, data]] = Object.entries(module);
+  return `// (Lite build: ${name}.js cut down by tools/bundle.js --lite.)\nexport const ${constName} = ${JSON.stringify(LITE[name](data))};\n`;
+}
+const liteSources = new Map();
+if (lite) for (const name of Object.keys(LITE)) liteSources.set(name, await liteSource(name));
 
 const html = readFileSync('index.html', 'utf8');
 const css = readFileSync('boxer.css', 'utf8') + readFileSync('fightui.css', 'utf8');
@@ -31,7 +54,7 @@ function faceEmbed() {
 }
 /** A module's code with its imports and exports taken out (the bundle is one scope). */
 function strip(name) {
-  let source = readFileSync(`src/${name}.js`, 'utf8');
+  let source = liteSources.get(name) ?? readFileSync(`src/${name}.js`, 'utf8');
   if (name === 'photoface') {
     if (!source.includes(FACE_EMBED_LINE)) throw new Error(`src/photoface.js: no '${FACE_EMBED_LINE}' to fill`);
     source = source.replace(FACE_EMBED_LINE, faceEmbed());
@@ -125,8 +148,10 @@ if (minify) {
   pageCode = main.code;
   pageWorker = minified(workerCode, 'skin-worker-src.js').code;
   new vm.Script(pageCode);
-  pageCode += `\n//# sourceMappingURL=${mapName}\n`;
-  writeFileSync(`${out}.map`, main.map);
+  if (!lite) {
+    pageCode += `\n//# sourceMappingURL=${mapName}\n`;
+    writeFileSync(`${out}.map`, main.map);
+  }
 }
 if (/<\/script/i.test(pageCode + pageWorker)) throw new Error('a closing script tag inside the code would end the page\'s script early');
 const page = `${title}\n${fonts}\n<style>\n${css}</style>\n${markup}\n${three}\n<script type="text/plain" id="skin-worker-source">\n${pageWorker}</script>\n<script type="module">\n${pageCode}</script>\n`;
