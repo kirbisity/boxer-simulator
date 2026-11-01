@@ -340,8 +340,9 @@ test('a fighter who loses his weapon fights mixed, and anyone can pick a loose w
 test('weapon holders keep their arms forward: elbows seldom fall behind the shoulder', async () => {
   const { armFolding } = await import('../tools/arms.js');
   for (const style of ['longsword', 'warhammer', 'naginata', 'spear']) {
-    // (The spear over four bouts: in one, its share swings with how that bout goes, 25–34%.)
-    const row = armFolding(style, style === 'spear' ? 4 : 1, 25);
+    // (The spear and the naginata over four bouts: in one, the share swings with how that bout goes, 25–34% for the spear;
+    // the naginata's thrust, drawn back to the hip as the spear's, 15-32% in one bout since the AI presses (ai.js AI.press).)
+    const row = armFolding(style, style === 'spear' || style === 'naginata' ? 4 : 1, 25);
     // Before the arms were held forward: 24–65% (the spear worst).
     // (The spear's thrust draws the shaft right back to the hip before it drives: its elbow goes behind on purpose for that moment.)
     const most = style === 'spear' ? 0.3 : 0.25;
