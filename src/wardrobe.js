@@ -16,7 +16,7 @@ import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildTassel } from './chinahelmview.js';
 import { HONGYING_MOUNTS, TASSELS } from './chinahelms.js';
-import { designFormOf, formGrid, formPoint, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
+import { designFormOf, formGrid, formPoint, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf, knightGrid } from './knighthelms.js';
 
 export const WARDROBE = {
@@ -1050,9 +1050,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     }
     case 'pagodaHelm':
       buildPagodaHelm(group, head, r, steel, color, { laced: Boolean(partTiles.aventail) });
+      worldMask(group, head, r, steel, color);
       break;
     case 'ayyubidHelm':
       buildAyyubidHelm(group, head, r, steel, color);
+      worldMask(group, head, r, steel, color);
       break;
     case 'steppeHelm': {
       // A steppe helmet: a tall pointed iron bowl, a brow band, a spike with
@@ -1085,7 +1087,8 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       aventail.material.side = THREE.DoubleSide;
       aventail.position.y = -0.52 * r;
       group.add(aventail);
-      if (head.mask) {
+      // The kit's own war mask (`maskDesign`: worldMask), else the plain one.
+      if (head.mask && !worldMask(group, head, r, steel, color)) {
         const mask = new THREE.Mesh(new THREE.SphereGeometry(1.12 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.42, Math.PI * 0.44), iron.clone());
         mask.material.side = THREE.DoubleSide;
         const slit = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.12 * r, 1.0 * r), surface(0x0b0b0d));
@@ -1190,6 +1193,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.15 * r, 1.6 * r, 1.1 * r, 22, 2, true, Math.PI * 0.75, Math.PI * 1.5), mailCloth);
       aventail.position.y = -0.45 * r;
       group.add(aventail);
+      worldMask(group, head, r, steel, color);
       if (head.turban) {
         const wrap = new THREE.Mesh(new THREE.TorusGeometry(1.24 * r, 0.2 * r, 8, 22), surface(head.turban, { roughness: 0.9 }));
         wrap.rotation.x = Math.PI / 2;
@@ -1629,7 +1633,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         studs.userData.noOutline = true;
         group.add(coif, studs);
       }
-      if (head.mask) {
+      if (head.mask && !worldMask(group, head, r, steel, color)) {
         // A steel face mask from the brow to the chin, an eye slit across it.
         const mask = new THREE.Mesh(new THREE.SphereGeometry(1.12 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.44, Math.PI * 0.42), bowlSteel.clone());
         mask.material.side = THREE.DoubleSide;
@@ -1692,7 +1696,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
   const swings = [];
   group.traverse((object) => object.userData.swing && swings.push(object.userData.swing));
   // An open-faced helmet (`openFace`) leaves the beard to be seen.
-  return { group, hidesHair, showsBeard: Boolean(head.openFace), fitted, swings };
+  return { group, hidesHair, showsBeard: Boolean(head.openFace && !head.maskDesign), fitted, swings };
 }
 
 // Saladin's helmet, in head radii: the bowl's lathe profile from its rim up
@@ -2329,6 +2333,32 @@ function buildKabuto(group, head, r, steel, color) {
 
 // The gorget's (nodowa's) middle under a samurai's mask, head radii: hanging from the mask's foot under the chin.
 const MASK_THROAT_Y = -1.5;
+
+// The metal each of the other war masks is drawn in (menpo.js): of the helmet's steel, bronze, its gilt, or its mail.
+const WORLD_MASK_METAL = {
+  tiemian: (head, color) => color, kipchak: (head, color) => color, shoumian: () => 0x9a7a4a,
+  horde: (head) => head.gold ?? 0xc9a23a, mailVeil: (head, color) => head.mail ?? head.coif ?? color, ventail: (head, color) => head.mail ?? head.coif ?? color,
+};
+
+/**
+ * A helmet's war mask of China, the steppe or the sultanates (`head.maskDesign`: menpo.js MASK_SHEETS), set on the face
+ * as the samurai's are and kept fitted through the helmet's span (helmforms.js HELM_SPAN); under a plate mask, mail at
+ * the throat hanging from its foot (the veil falls to the throat itself). Whether it was drawn (else the helmet's own).
+ */
+function worldMask(group, head, r, steel, color) {
+  const tintOf = WORLD_MASK_METAL[head.maskDesign];
+  if (!tintOf || HELM_STYLE.masks === 'now' || !helmMapsReady()) return false;
+  const span = HELM_SPAN[head.kind] ?? null;
+  if (!buildWarMask(group, head.maskDesign, r, tintOf(head, color), steel.envMap, span)) return false;
+  if (head.maskDesign !== 'mailVeil') {
+    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), metal(steel, WORLD_MASK_METAL.mailVeil(head, color)).clone());
+    throat.material.side = THREE.DoubleSide;
+    throat.position.y = MASK_THROAT_Y * r;
+    if (span) throat.scale.set(1 / span[0], 1 / span[1], 1 / span[2]);
+    group.add(throat);
+  }
+  return true;
+}
 
 /**
  * The pieces of a mask drawn on its sphere set on the face (helmforms.js maskOnFace with `fit`): a patch of the sphere

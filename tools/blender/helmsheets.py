@@ -535,10 +535,164 @@ def mask_grid(atlas, region, relief, spec):
     return smoothed
 
 
+# ---- The war masks of China, the steppe and the sultanates ------------------------------------------------------------
+
+# Quick variants on the samurai masks' two patches: a whole face (the oni somen's sphere, its features drawn 0.12 r low the
+# same way) or a lower face (the menpo's). Smaller sheets (WORLD_N, packed at 256). References: src/menpo.js.
+FULL = {'R': 1.12, 'az': 0.42 * PI, 'top': 0.2 * PI, 'bottom': 0.86 * PI}
+HALF = {'R': 1.1, 'az': 0.44 * PI, 'top': 0.42 * PI, 'bottom': 0.88 * PI}
+WORLD_MASKS = {
+    'maskTiemian': FULL, 'maskShoumian': FULL, 'maskKipchak': FULL, 'maskHorde': FULL,
+    'maskMailVeil': FULL, 'maskVentail': HALF,
+}
+WORLD_N = 512
+METAL = np.array([0.8, 0.8, 0.8])
+
+
+def mail(region, X, Y, pitch=0.075, height=0.012):
+    """Riveted mail: rows of rings, each row offset half a ring, the dark between them. Returns the rings' weight."""
+    field = np.zeros(X.shape, np.float32)
+    for shift in (0.0, 0.5):
+        row = np.floor(Y / pitch - shift)
+        cy = (row + 0.5 + shift) * pitch
+        offset = (row % 2) * 0.5 * pitch
+        cx = np.round((X - offset) / pitch) * pitch + offset
+        d = np.hypot(X - cx, (Y - cy) * 1.15)
+        np.maximum(field, bead(np.abs(d - 0.36 * pitch), 0.14 * pitch), out=field)
+    region.add(field * height)
+    region.paint(smooth((0.25 - field) * 6) * 0.85, rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+    return field
+
+
+def eye_hole(region, X, Y, cx, cy, rx, ry, angle=0.0, rim=0.012):
+    """An eye opening, a raised lip round it: dark, as the oni somen's (cut through, the face behind it reads as a glow)."""
+    eye = ellipse(X, Y, cx, cy, rx, ry, angle)
+    region.add(bead(np.abs(eye - 1.08), 0.2) * rim)
+    region.paint(smooth((1.0 - eye) / 0.05), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+    return eye
+
+
+def world_mask_atlas(name):
+    spec = WORLD_MASKS[name]
+    atlas = Atlas(name, base=METAL, rough=0.42, metal=1.0, n=WORLD_N)
+    region = atlas.region((0, 0, 1, 1), mask_surface(spec), spec['az'] * spec['R'])
+    X, Y = region.s['X'], region.s['Y']
+    region.paint(np.ones(X.shape), mask=1.0)
+    width = spec['az'] * spec['R']
+    relief = np.zeros(X.shape, np.float32)
+    if spec is FULL:
+        Y = Y + 0.12
+        outline = smooth((0.9 * width - X - np.clip(-0.45 - Y, 0, None) * 0.9) / 0.04)
+    else:
+        outline = smooth((0.97 * width - X - np.clip(Y - 0.0, 0, None) * 0.8 - np.clip(-0.72 - Y, 0, None) * 1.2) / 0.04)
+    after = []
+    if name in ('maskTiemian', 'maskKipchak'):
+        # A stern man's face hammered in iron: brows (joined over the nose on the steppe mask), almond eyes cut through, a
+        # long straight nose, the cheekbones, a closed mouth, the moustache raised in relief (incised hairs), a small beard.
+        relief += dome(ellipse(X, Y, 0.0, 0.05, 1.0, 0.9), 1.0) * 0.07
+        relief += dome(ellipse(X, Y, 0.36, -0.08, 0.2, 0.16), 1.0) * 0.05
+        nose = dome(seg_dist(X, Y, [(0, 0.3), (0, -0.12)]), 0.1) * 0.12 + dome(ellipse(X, Y, 0.0, -0.13, 0.1, 0.07), 1.0) * 0.06
+        relief += nose
+        relief += dome(ellipse(X, Y, 0.0, -0.66, 0.2, 0.16), 1.0) * 0.05
+        joined = name == 'maskKipchak'
+        brow_pts = [(0.0, 0.3), (0.14, 0.31), (0.3, 0.3), (0.44, 0.24)] if joined else [(0.07, 0.29), (0.2, 0.32), (0.36, 0.3), (0.46, 0.24)]
+        brow = seg_dist(X, Y, curve(brow_pts, 24))
+        relief += bead(brow, 0.045) * 0.035
+        moustache = curve([(0.0, -0.3), (0.1, -0.31), (0.2, -0.36), (0.27, -0.46) if joined else (0.26, -0.42)], 24)
+        m = bead(seg_dist(X, Y, moustache), 0.04) * smooth((0.3 - X) / 0.05)
+        relief += m * 0.03
+        after.append(lambda m=m: region.add(-np.abs(np.sin((X * 0.8 + Y) * 180)) * m * 0.004))
+        mouth = np.abs(Y + 0.39 + 0.03 * (X / 0.15) ** 2)
+        after.append(lambda mouth=mouth: (region.add(-bead(mouth, 0.012) * smooth((0.16 - X) / 0.03) * 0.02), region.paint(bead(mouth, 0.008) * smooth((0.15 - X) / 0.03), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)))
+        if name == 'maskTiemian':
+            beard = dome(ellipse(X, Y, 0.0, -0.6, 0.06 + 0.04 * smooth((Y + 0.66) / 0.14), 0.1), 1.0)
+            relief += beard * 0.025
+            after.append(lambda beard=beard: region.add(-np.abs(np.sin(X * 220)) * beard * 0.004))
+        nostril = ellipse(X, Y, 0.05, -0.16, 0.03, 0.018)
+        after.append(lambda nostril=nostril: (region.add(-smooth((1 - nostril) / 0.3) * 0.02), region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)))
+        after.append(lambda: eye_hole(region, X, Y, 0.24, 0.16, 0.11, 0.045, -0.12))
+        # The holes for the laces that hang it from the helmet, round its edge.
+        after.append(lambda: [region.paint(smooth((0.016 - np.hypot(X - x, Y - y)) / 0.006), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0) for x, y in ((0.9 * width - 0.07, 0.5), (0.9 * width - 0.07, 0.0), (0.9 * width - 0.08, -0.4), (0.0, 0.92))])
+    elif name == 'maskShoumian':
+        # A guardian beast's face in bronze (the shoumian): bulging eyes under curled brows, a broad snout, the mouth
+        # open on fangs, cloud scrolls on the brow and cheeks.
+        relief += dome(ellipse(X, Y, 0.0, 0.05, 1.0, 0.9), 1.0) * 0.08
+        eye = ellipse(X, Y, 0.26, 0.15, 0.12, 0.09)
+        relief += dome(eye, 1.25) * 0.06
+        relief += dome(ellipse(X, Y, 0.0, -0.08, 0.2, 0.15), 1.0) * 0.14
+        relief += dome(ellipse(X, Y, 0.4, -0.15, 0.2, 0.18), 1.0) * 0.06
+        mouth = ellipse(X, Y, 0.0, -0.4 - 0.04 * (X / 0.3) ** 2, 0.3, 0.1)
+        relief += bead(np.abs(mouth - 1.0), 0.3) * 0.035
+        brow = curve([(0.06, 0.27), (0.2, 0.33), (0.38, 0.32), (0.44, 0.26), (0.4, 0.22)], 30)
+        relief += bead(seg_dist(X, Y, brow), 0.05) * 0.04
+        after.append(lambda: region.paint(smooth((0.98 - mouth) / 0.06), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0))
+        after.append(lambda: teeth(region, X, Y, -0.33, -0.39, 0.22, 4, METAL, 1.0, 0.35, 0.025))
+        for x0, y0, y1 in ((0.2, -0.32, -0.5), (0.14, -0.5, -0.33)):
+            fang = bead(seg_dist(X, Y, [(x0, y0), (x0 + 0.01, y1)]), 0.028) * smooth(1 - np.abs(Y - (y0 + y1) / 2) / abs(y1 - y0) * 1.6)
+            after.append(lambda fang=fang: (region.add(fang * 0.04), region.paint(smooth(fang * 4), rgb=METAL, mask=1.0, metal=1.0, rough=0.3)))
+        # The pupils, dark.
+        after.append(lambda: region.paint(smooth((0.035 - np.hypot(X - 0.26, Y - 0.15)) / 0.01), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0))
+        after.append(lambda: region.add(-bead(np.abs(np.hypot(X - 0.26, Y - 0.15) - 0.06), 0.01) * 0.008))
+        nostril = ellipse(X, Y, 0.09, -0.12, 0.05, 0.03, 0.4)
+        after.append(lambda nostril=nostril: (region.add(-smooth((1 - nostril) / 0.3) * 0.03), region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)))
+        # Cloud scrolls: incised spirals on the brow and cheeks.
+        for cx, cy, s in ((0.12, 0.62, 0.09), (0.36, 0.55, 0.08), (0.5, -0.32, 0.08), (0.62, 0.15, 0.07)):
+            spiral = [(cx + s * t / 6 * math.cos(t), cy + s * t / 6 * math.sin(t)) for t in np.linspace(0, 6, 30)]
+            after.append(lambda spiral=spiral: region.add(wrinkle(X, Y, spiral, 0.01, 0.012)))
+    elif name == 'maskHorde':
+        # A half-mask of gilt iron over the upper face (the Cuman and Golden Horde type): the brows raised, drawn down into
+        # the almond cut-outs of the eyes, a beak-shaped nose riveted on; it stops over the upper lip.
+        outline *= smooth((Y + 0.27 - 0.1 * (X / 0.5) ** 2) / 0.03)
+        outline *= smooth((0.62 * width - X) / 0.04)
+        relief += dome(ellipse(X, Y, 0.0, 0.2, 0.9, 0.7), 1.0) * 0.06
+        nose = np.clip(1 - np.hypot(X / 0.1, (Y + 0.02) / 0.26), 0, None) ** 1.2 * (0.1 + 0.08 * smooth((0.1 - Y) / 0.3))
+        relief += nose
+        brow = curve([(0.04, 0.27), (0.18, 0.32), (0.34, 0.29), (0.44, 0.2)], 24)
+        relief += bead(seg_dist(X, Y, brow), 0.05) * 0.04
+        after.append(lambda: eye_hole(region, X, Y, 0.24, 0.17, 0.12, 0.05, -0.15, 0.015))
+        after.append(lambda: add_rivets(region, X, Y, [(0.0, 0.3), (0.0, 0.1), (0.0, -0.08), (0.42, 0.62), (0.15, 0.78)], 0.026, 0.02))
+        after.append(lambda: region.add(-bead(np.abs(X - 0.1), 0.006) * smooth((0.28 - np.abs(Y - 0.02)) / 0.02) * 0.008))
+    elif name == 'maskMailVeil':
+        # A veil of riveted mail hung from the helmet's rim across the face, only the eyes left open, falling loose to
+        # the throat: it stands off the chin and hangs away below it.
+        relief += dome(ellipse(X, Y, 0.0, 0.05, 1.0, 0.9), 1.0) * 0.03 + dome(ellipse(X, Y, 0.0, -0.12, 0.14, 0.2), 1.0) * 0.05
+        relief += smooth((-0.45 - Y) / 0.45) * 0.12
+        after.append(lambda: mail(region, X, Y))
+        slot = np.maximum(np.abs(Y - 0.15) / 0.06, np.abs(X - 0.22) / 0.17)
+        after.append(lambda slot=slot: region.paint(smooth((1.0 - slot) / 0.15), cut=0.0))
+        band = smooth((0.06 - np.abs(Y - 0.85)) / 0.01)
+        after.append(lambda band=band: (region.add(band * 0.015), region.paint(band, rgb=GILT * 0.8, rough=0.35, metal=1.0, mask=0.0)))
+    else:
+        # The ventail: mail laced across the lower face from cheek to cheek, from under the eyes to under the chin, its
+        # top edge a riveted iron plate over the nose and cheekbones, a riveted strip down the middle where it fastens.
+        outline *= smooth((0.12 - 0.12 * np.exp(-((X - 0.28) / 0.18) ** 2) - Y) / 0.03)
+        relief += dome(ellipse(X, Y, 0.0, -0.4, 1.0, 0.8), 1.0) * 0.04 + dome(ellipse(X, Y, 0.0, -0.06, 0.13, 0.2), 1.0) * 0.08
+        relief += smooth((-0.6 - Y) / 0.4) * 0.06
+        top = 0.12 - 0.12 * np.exp(-((X - 0.28) / 0.18) ** 2)
+        plate = smooth((Y - (top - 0.12)) / 0.01)
+        strip = smooth((0.05 - X) / 0.01) * smooth((top - 0.1 - Y) * 50) * smooth((Y + 0.86) / 0.02)
+        after.append(lambda: mail(region, X, Y))
+        after.append(lambda plate=plate, strip=strip: (region.add(np.maximum(plate, strip) * 0.018), region.paint(np.maximum(plate, strip), rgb=METAL, rough=0.4, metal=1.0, mask=1.0)))
+        after.append(lambda: add_rivets(region, X, Y, [(x, 0.12 - 0.12 * math.exp(-((x - 0.28) / 0.18) ** 2) - 0.06) for x in (0.08, 0.22, 0.36, 0.52, 0.68, 0.86, 1.04, 1.22)] + [(0.0, y) for y in (-0.2, -0.38, -0.56, -0.74)], 0.022, 0.016))
+    region.add(relief - mask_grid(atlas, region, relief, spec))
+    for step in after:
+        step()
+    if name not in ('maskMailVeil', 'maskVentail'):
+        hammered(region, 0.003, 0.05, seed=len(name))
+    region.add(bead(np.abs(outline - 0.5) * 0.08, 0.03) * 0.02)
+    region.paint(1 - outline, cut=0.0)
+    # Wear: the raised edges rubbed bright (under the lacquer's undercoat threshold, src/helmmaps.js: no red).
+    h = region.view('h') / region.k
+    wear = smooth((h - region.blur(h, 0.035)) * 160) * region.view('mask')
+    region.paint(wear * 0.6, rgb=METAL + 0.05)
+    return atlas
+
+
 BUILDERS = {
     'maskOni': lambda: mask_atlas('maskOni'),
     'maskRessei': lambda: mask_atlas('maskRessei'),
     'maskTengu': lambda: mask_atlas('maskTengu'),
+    **{name: (lambda name=name: world_mask_atlas(name)) for name in WORLD_MASKS},
 }
 
 

@@ -17,7 +17,7 @@ test('the helmets are the remodelled ones unless the address asks for the old; e
 });
 
 test('every helmet kind and mask has its sheet baked; a mask carries its mesh relief', () => {
-  const sheets = [...Object.values(HELM_FORMS).map((form) => form.sheet), 'maskOni', 'maskRessei', 'maskTengu'];
+  const sheets = [...Object.values(HELM_FORMS).map((form) => form.sheet), 'maskOni', 'maskRessei', 'maskTengu', 'maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskMailVeil', 'maskVentail'];
   for (const name of sheets) {
     const sheet = HELM_MAP_DATA[name];
     assert.ok(sheet && sheet.albedo && sheet.normal && sheet.orm, name);

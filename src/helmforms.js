@@ -582,6 +582,7 @@ export const KABUTO_FORM = (() => {
  * the half masks (menpo, ressei-men, tengu) from under the eyes, the nose over the nose, the mouth over the mouth, the chin
  * cupped under the chin. Relief stands off the mask as drawn.
  */
+const WORLD_FACE_Y = [[0.91, 0.3], [0.04, -0.07], [-0.49, -0.74], [-1.0, -1.42]];
 export const MASK_FITS = {
   oni: { R: 1.12, gap: 0.06, span: 0.84, y: [[0.91, 0.3], [0.16, -0.07], [-0.37, -0.74], [-1.0, -1.42]] },
   ressei: { R: 1.1, gap: 0.06, span: 0.84, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
@@ -589,6 +590,12 @@ export const MASK_FITS = {
   // The masks as first drawn (`#masks=now`, or without the maps): the menpo and the oni's whole face.
   menpo: { R: 1.06, gap: 0.06, y: [[-0.067, -0.28], [-0.12, -0.45], [-0.34, -0.74], [-0.98, -1.42]] },
   oniFace: { R: 1.08, gap: 0.06, y: [[0.83, 0.3], [0.16, -0.07], [-0.04, -0.45], [-0.36, -0.74], [-0.94, -1.42]] },
+  // The quick variants of China, the steppe and the sultanates (menpo.js): the whole-face ones on the oni somen's patch,
+  // but their eyes cut through, so drawn (0.12 r low, as the oni's) with the eye holes over the eyes, the mouth over the
+  // mouth; the ventail as the half masks; the mail veil a little further off the face (it hangs over the nose and chin).
+  ...Object.fromEntries(['tiemian', 'shoumian', 'kipchak', 'horde'].map((name) => [name, { R: 1.12, gap: 0.06, span: 0.84, y: WORLD_FACE_Y }])),
+  mailVeil: { R: 1.12, gap: 0.08, span: 0.84, y: WORLD_FACE_Y },
+  ventail: { R: 1.1, gap: 0.07, span: 0.84, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
 };
 
 /** The head's (HELM_HEAD) distance from the upright axis at height y, `azimuth` (rad) round from the face. */
