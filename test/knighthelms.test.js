@@ -15,8 +15,8 @@ const HEAD_SCALE = 1.12;
 // 36 breaths and the cross cut (boxes), its coif (20).
 const OLD_BASCINET = 20 * 13 * 2 + 14 * 3 + 12 + 18 * 2;
 const OLD_GREAT_HELM = 6 * 28 * 2 + 5 * 28 * 2 + 24 * 5 * 2 + 16 * 2 + 36 * 12 + 2 * 12 + 20 * 2;
-// Each design's budget: no more than its first drawing (commit 802be01), and none over the Templar's great helm today.
-const BUDGET = { greatHelm: 544, hounskull: 1160, greatBascinet: 1024, armet: 1236, sallet: 1248, closeHelmet: 1384 };
+// Each design's budget: no more than its drawing before (main 665fa12), and none over the Templar's great helm today.
+const BUDGET = { hounskull: 1160, sallet: 1176, closeHelmet: 1236 };
 // The eyes (HELM_HEAD: y about -0.07, either side of the middle at |z| about 0.3).
 const EYES = { y: -0.07, z: 0.3 };
 
@@ -68,29 +68,35 @@ function extent(form, leave = ['aventail', 'bevor', 'rondel', 'liner', 'comb']) 
   return { length: (high[0] - low[0]) * R_CM, breadth: (high[2] - low[2]) * R_CM, height: (high[1] - low[1]) * R_CM, low, high };
 }
 
-test('the knights\' helmets are drawn as they were unless a design is asked for; any knightly unit can wear one', () => {
-  assert.equal(helmStyleFrom('').knight, 'now');
-  assert.equal(HELM_STYLE.knight, 'now');
-  assert.equal(helmStyleFrom('#knighthelm=4').knight, '4');
-  assert.equal(helmStyleFrom('#kettle=b&knighthelm=9').knight, 'now');
-  for (const kind of KNIGHT_HELM_KINDS) assert.equal(knightFormOf(kind, 'now'), null, kind);
-  assert.equal(knightFormOf('kettleHat', '3'), null);
-  assert.equal(Object.keys(KNIGHT_HELM_CHOICES).length, 6);
-  for (const [choice, name] of Object.entries(KNIGHT_HELM_CHOICES)) {
-    for (const kind of KNIGHT_HELM_KINDS) assert.equal(knightFormOf(kind, choice), KNIGHT_FORMS[name], `${kind} ${choice}`);
-  }
-  // A unit naming its design wears it whatever is asked; none does today.
-  assert.equal(knightFormOf('bascinet', 'now', 'armet'), KNIGHT_FORMS.armet);
-  const heads = ['knight', 'templar'].flatMap((unit) => OUTFITS[unit].designs.map((design) => design.head));
-  assert.ok(heads.every((head) => KNIGHT_HELM_KINDS.includes(head.kind) && head.design === undefined));
-  assert.deepEqual(setHelmStyle({ knight: 3 }).knight, '3');
-  setHelmStyle({ knight: 'now' });
-  assert.equal(HELM_STYLE.knight, 'now');
+
+test('every knight wears his harness\'s helmet: the hounskull, the sallet and bevor or the close helmet; #knighthelm compares them', () => {
+  assert.equal(helmStyleFrom('').knight, 'own');
+  assert.equal(HELM_STYLE.knight, 'own');
+  assert.equal(helmStyleFrom('#knighthelm=5').knight, '5');
+  for (const dropped of ['1', '3', '4', '9']) assert.equal(helmStyleFrom(`#knighthelm=${dropped}`).knight, 'own', dropped);
+  assert.deepEqual(KNIGHT_HELM_CHOICES, { 2: 'hounskull', 5: 'sallet', 6: 'closeHelmet' });
+  // The knight's harnesses each name one; the three spread across the designs in play.
+  const knight = OUTFITS.knight;
+  const worn = Object.fromEntries(knight.designs.map((design) => [design.label, design.head.design]));
+  assert.deepEqual(worn, { 'Gothic plate': 'sallet', Milanese: 'hounskull', Blackened: 'sallet', 'Bright, wine arming coat': 'closeHelmet', Russeted: 'hounskull' });
+  assert.deepEqual(new Set(knight.picked.map((index) => knight.designs[index].head.design)), new Set(['sallet', 'hounskull', 'closeHelmet']));
+  for (const design of knight.designs) assert.equal(knightFormOf(design.head.kind, 'own', design.head.design), KNIGHT_FORMS[design.head.design], design.label);
+  // The Templars (c. 1180-1300) keep their great helm; Joan of Arc goes bareheaded; the jousters keep the Stechhelm.
+  for (const design of OUTFITS.templar.designs) assert.equal(knightFormOf(design.head.kind, 'own', design.head.design), null);
+  assert.ok(OUTFITS.joan.designs.every((design) => !design.head));
+  assert.ok(OUTFITS.tournament.designs.every((design) => design.head.kind === 'stechhelm'));
+  // Comparison: every knight in one, or all as before.
+  assert.equal(knightFormOf('bascinet', '6', 'sallet'), KNIGHT_FORMS.closeHelmet);
+  assert.equal(knightFormOf('greatHelm', '2'), KNIGHT_FORMS.hounskull);
+  assert.equal(knightFormOf('bascinet', 'now', 'sallet'), null);
+  assert.equal(knightFormOf('kettleHat', '5', 'sallet'), null);
+  assert.deepEqual(setHelmStyle({ knight: 5 }).knight, '5');
+  setHelmStyle({ knight: 'own' });
+  assert.equal(HELM_STYLE.knight, 'own');
 });
 
-test('six designs of different kinds, each with its period, its museum piece and its sheet baked with cut-outs', () => {
-  assert.equal(Object.keys(KNIGHT_FORMS).length, 6);
-  assert.deepEqual(Object.values(KNIGHT_FORMS).map((form) => form.number).sort(), [1, 2, 3, 4, 5, 6]);
+test('three designs, each with its period, its museum piece and its sheet baked with cut-outs', () => {
+  assert.deepEqual(Object.keys(KNIGHT_FORMS), ['hounskull', 'sallet', 'closeHelmet']);
   for (const [name, form] of Object.entries(KNIGHT_FORMS)) {
     assert.ok(form.label && form.period && form.museum && /^https:\/\//.test(form.link) && form.line, name);
     const sheet = HELM_MAP_DATA[form.sheet];
@@ -100,7 +106,7 @@ test('six designs of different kinds, each with its period, its museum piece and
   }
 });
 
-test(`each design is drawn with no more triangles than its first drawing, none over the Templar's great helm today (${OLD_GREAT_HELM}; the bascinet ${OLD_BASCINET})`, () => {
+test(`each design is drawn with no more triangles than before, none over the Templar's great helm today (${OLD_GREAT_HELM}; the bascinet ${OLD_BASCINET})`, () => {
   for (const name of Object.keys(KNIGHT_FORMS)) {
     assert.ok(knightTriangles(name) <= BUDGET[name] && knightTriangles(name) <= OLD_GREAT_HELM, `${name}: ${knightTriangles(name)}`);
   }
@@ -145,27 +151,75 @@ test('every design is fitted over the head on a small and a large man: a lining\
   }
 });
 
-test('the sights are at the eyes, across both of them, cut through the face the eyes look out of', () => {
-  for (const [name, form] of Object.entries(KNIGHT_FORMS)) {
-    const [y0, y1] = form.sight.y;
-    const [z0, z1] = form.sight.z;
-    assert.ok(y0 < EYES.y && y1 > EYES.y - 0.06 && Math.abs((y0 + y1) / 2 - EYES.y) < 0.06, `${name}: at eye height`);
-    assert.ok(y1 - y0 >= 0.08 && y1 - y0 <= 0.16, `${name}: a slit 1-2 cm high`);
-    assert.ok(z0 < EYES.z - 0.1 && z1 > EYES.z + 0.15, `${name}: across the eye`);
-    // The sight is a cut-out of the part the face looks out of (the foremost at eye height).
-    const facing = metalLofts(form).map(([, part]) => part).filter((part) => frontAt(form, part, EYES.y) !== null);
-    const front = facing.reduce((a, b) => (frontAt(form, b, EYES.y) > frontAt(form, a, EYES.y) ? b : a));
-    const slot = front.bake.find((feature) => feature.kind === 'slot' && feature.cut);
-    assert.ok(slot && slot.y[0] === y0 && slot.y[1] === y1 && slot.z[0] === z0 && slot.z[1] === z1, `${name}: cut in the foremost plate`);
+
+/** The part the face looks out of at eye height (the foremost there). */
+function facing(form) {
+  const parts = metalLofts(form).map(([, part]) => part).filter((part) => frontAt(form, part, EYES.y) !== null);
+  return parts.reduce((a, b) => (frontAt(form, b, EYES.y) > frontAt(form, a, EYES.y) ? b : a));
+}
+
+test('the hounskull\'s sights are at the eyes, cut through the visor', () => {
+  const form = KNIGHT_FORMS.hounskull;
+  const [y0, y1] = form.sight.y;
+  assert.ok(y0 < EYES.y && y1 > EYES.y - 0.06 && Math.abs((y0 + y1) / 2 - EYES.y) < 0.06);
+  const front = facing(form);
+  assert.equal(front, form.parts.visor);
+  assert.ok(front.bake.some((feature) => feature.kind === 'slot' && feature.cut && feature.y[0] === y0));
+});
+
+test('the sallet\'s and the close helmet\'s sight is one long narrow slit at the eyes, nearly ear to ear, in the plate before them', () => {
+  for (const name of ['sallet', 'closeHelmet']) {
+    const form = KNIGHT_FORMS[name];
+    const front = facing(form);
+    const cuts = front.bake.filter((feature) => feature.cut || feature.kind === 'vue');
+    // One opening at eye height: the vue, continuous across the middle of the face (no bar, no pair of holes).
+    const atEyes = cuts.filter((feature) => feature.y && feature.y[0] < EYES.y + 0.1 && feature.y[1] > EYES.y - 0.1);
+    assert.equal(atEyes.length, 1, `${name}: one opening at the eyes`);
+    const [vue] = atEyes;
+    assert.equal(vue.kind, 'vue', `${name}: a slit across the middle`);
+    assert.deepEqual(vue.y, form.sight.y);
+    assert.equal(vue.to, form.sight.to);
+    const [y0, y1] = vue.y;
+    const high = (y1 - y0) * R_CM;
+    assert.ok(high >= 0.9 && high <= 1.6, `${name}: ${high.toFixed(2)} cm high`);
+    assert.ok(Math.abs((y0 + y1) / 2 - EYES.y) < 0.06, `${name}: at eye height`);
+    // Its ends far round the face: well past the eyes, towards the ears.
+    let end = null;
+    for (let step = 0; step <= 400; step += 1) {
+      const point = knightPoint(form, front, vue.to, step / 400);
+      if (!end || Math.abs(point[1] - EYES.y) < Math.abs(end[1] - EYES.y)) end = point;
+    }
+    assert.ok(Math.abs(end[2]) > 0.75, `${name}: the slit reaches round to |z| ${Math.abs(end[2]).toFixed(2)}`);
     assert.ok(frontAt(form, front, EYES.y) > headRadiusAt(0, EYES.y) + 0.1, `${name}: in front of the eyes`);
   }
 });
 
+test('the sallet and the close helmet are two pieces: the upper laps over the lower in a step, each with its own edges and pivot or strap', () => {
+  for (const [name, upperName, lowerName] of [['sallet', 'shell', 'bevor'], ['closeHelmet', 'visor', 'bevor']]) {
+    const form = KNIGHT_FORMS[name];
+    assert.equal(form.pieces.length, 2, name);
+    assert.ok(form.pieces[0].includes(upperName) && form.pieces[1].includes(lowerName), name);
+    const upper = form.parts[upperName];
+    const lower = form.parts[lowerName];
+    // The lower piece is a surface of its own with its own turned edges, its shadow under the upper's edge, and its
+    // strap or pivot.
+    const edges = lower.bake.filter((feature) => feature.kind === 'edge').map((feature) => feature.at);
+    assert.ok(['start', 'end', 'side'].every((at) => edges.includes(at)), `${name}: the lower piece's edges turned`);
+    assert.ok(lower.bake.some((feature) => feature.kind === 'shade'), `${name}: in shadow under the upper's edge`);
+    assert.ok(lower.bake.some((feature) => feature.kind === 'rivets' || feature.kind === 'boss'), `${name}: strapped or pivoted`);
+    // They overlap in height down the middle of the face, and there the upper stands out over the lower (the step).
+    const upperLow = Math.min(...points(form, upper).filter((p) => Math.abs(p[2]) < 0.05 && p[0] > 0).map((p) => p[1]));
+    const lowerHigh = Math.max(...points(form, lower).filter((p) => Math.abs(p[2]) < 0.05 && p[0] > 0).map((p) => p[1]));
+    assert.ok(lowerHigh > upperLow + 0.05, `${name}: the lower piece's top runs up under the upper's edge`);
+    const y = upperLow + 0.03;
+    assert.ok(frontAt(form, upper, y) - frontAt(form, lower, y) > 0.05, `${name}: the upper's edge stands over the lower in a step`);
+  }
+});
+
 test('each design stands within the measures of the piece it is drawn from (the game\'s broad head allowed for)', () => {
-  // Front to back and high (cm), from the museums' records: Prankh helm (31 deep), Musée de l'Armée H 21 (29 high), British
-  // Museum OA.2190 (26 deep, 44 high), Met 29.158.22 (28.6 deep, 29.2 high), Met 04.3.229 (37.1 deep, 24.8 high), Met
-  // 42.50.47 (33.7 deep, 29.8 high). The broad game head (about 21-24 cm across inside) makes each a little bigger.
-  const MUSEUM = { greatHelm: [31, 34], hounskull: [36, 31], greatBascinet: [34, 44], armet: [28.6, 31], sallet: [37.1, 26], closeHelmet: [33.7, 31] };
+  // Front to back and high (cm), from the museums' records: Musée de l'Armée H 21 (29 high), Met 04.3.229 (37.1 deep, 24.8
+  // high), Met 42.50.47 (33.7 deep, 29.8 high). The broad game head (about 21-24 cm across inside) makes each a little bigger.
+  const MUSEUM = { hounskull: [36, 31], sallet: [37.1, 26], closeHelmet: [33.7, 31] };
   for (const [name, form] of Object.entries(KNIGHT_FORMS)) {
     // (The sallet's bevor a piece of its own, strapped on.)
     const { length, height } = extent(form, ['aventail', 'rondel', 'liner', 'comb', ...(name === 'sallet' ? ['bevor'] : [])]);
@@ -174,31 +228,18 @@ test('each design stands within the measures of the piece it is drawn from (the 
   }
 });
 
-test('each kind\'s silhouette: the great helm\'s flat top and prow, the bascinets\' apex over the back, the snout, the armet\'s chin and rondel, the sallet\'s tail, the close helmet\'s comb and beak', () => {
-  const { greatHelm, hounskull, greatBascinet, armet, sallet, closeHelmet } = KNIGHT_FORMS;
-  // The great helm: a flat top plate (its crown within 0.6 cm of level across most of it), flat sides, a prow down the face.
-  const top = points(greatHelm, greatHelm.parts.shell).filter(([x, y, z]) => y > 1.19 && Math.hypot(x, z) < 0.7);
-  assert.ok(top.length && Math.max(...top.map((p) => p[1])) - Math.min(...top.map((p) => p[1])) < 0.06, 'a flat top');
-  assert.ok(frontAt(greatHelm, greatHelm.parts.shell, -0.6) - knightPoint(greatHelm, greatHelm.parts.shell, 0.1, 0.25)[0] > 0.05, 'the face plates meet in a ridge');
-  // The bascinets: the apex well behind the middle of the head, the hounskull's snout 0.7 r or more before the face.
+test('each kind\'s silhouette: the hounskull\'s apex over the back and its snout, the sallet\'s tail, the close helmet\'s comb and beak', () => {
+  const { hounskull, sallet, closeHelmet } = KNIGHT_FORMS;
   const apex = (form) => knightPoint(form, mainOf(form), 0, 1);
-  assert.ok(apex(hounskull)[0] < -0.6 && apex(hounskull)[1] > 1.6, `the hounskull's apex over the back (${apex(hounskull)[0].toFixed(2)})`);
-  assert.ok(apex(greatBascinet)[0] < -0.2, 'the great bascinet\'s apex leans back');
+  assert.ok(apex(hounskull)[0] < -0.6 && apex(hounskull)[1] > 1.55, `the hounskull's apex over the back (${apex(hounskull)[0].toFixed(2)})`);
   const snout = Math.max(...points(hounskull, hounskull.parts.visor).map((p) => p[0]));
   assert.ok(snout - 1.15 > 0.75, `the snout stands ${(snout - 1.15).toFixed(2)} r before the nose`);
   const tip = points(hounskull, hounskull.parts.visor).reduce((a, b) => (b[0] > a[0] ? b : a));
   assert.ok(tip[1] < -0.4 && tip[1] > -0.8, 'pointed at the mouth');
-  // The great bascinet: down over the neck, flaring out behind at the foot.
-  const gb = greatBascinet.parts.shell;
-  assert.ok(Math.min(...gb.stations[0].y) < -2.0 && -knightPoint(greatBascinet, gb, 1, 0)[0] > -knightPoint(greatBascinet, gb, 1, 0.12)[0] + 0.2, 'the flare behind');
-  // The armet: its chin standing before the neck, the neck drawn in behind, the rondel behind the nape.
-  const chin = frontAt(armet, armet.parts.shell, -1.34);
-  assert.ok(chin > 1.0 && -knightPoint(armet, armet.parts.shell, 1, 0.1)[0] < 0.8, 'the chin full, the neck drawn in');
-  assert.ok(formPoint(armet.parts.rondel, 0, 0.7)[0] < -0.9, 'the rondel behind the nape');
-  // The sallet: its tail reaching well behind the head and down below the ears.
+  // The sallet: its face down past the nose and clear of it, its tail reaching well behind the head and below the ears.
+  assert.ok(frontAt(sallet, sallet.parts.shell, -0.5) > 1.15 + 0.1, 'the sallet\'s face clear of the nose');
   const tail = knightPoint(sallet, sallet.parts.shell, 1, 0);
   assert.ok(tail[0] < -1.8 && tail[1] < -0.9, 'the long tail');
-  // The close helmet: the comb standing a third of a head radius or more above the skull; the visor's beak before the face.
   const comb = Math.max(...points(closeHelmet, closeHelmet.parts.comb, 24).map((p) => p[1]));
   assert.ok(comb - apex(closeHelmet)[1] > 0.3, 'a tall comb');
   assert.ok(Math.max(...points(closeHelmet, closeHelmet.parts.visor).map((p) => p[0])) > 1.6, 'the beak');

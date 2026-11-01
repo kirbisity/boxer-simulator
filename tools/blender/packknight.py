@@ -14,7 +14,7 @@ from packhelm import pack  # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 OUT = os.path.join(ROOT, 'src', 'knighthelms-data.js')
 SHEETS = {name: {'size': 512, 'cut': True} for name in (
-    'knightGreatHelm', 'knightHounskull', 'knightGreatBascinet', 'knightArmet', 'knightSallet', 'knightCloseHelmet')}
+    'knightHounskull', 'knightSallet', 'knightCloseHelmet')}
 
 
 def kept(name):

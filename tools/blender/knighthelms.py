@@ -127,6 +127,19 @@ def feature(reg, s, f):
         # Where one plate laps over the next: a step down below the line, the lapping edge turned.
         reg.add(smooth((s['Y'] - f['y']) / f['w']) * f['h'] + bead(np.abs(s['Y'] - f['y'] - f['w'] * 0.6), f['w']) * f['h'] * 0.6)
         return
+    if kind == 'vue':
+        # A sight slit across the middle of the face, `to` the share of the way round each side, `y` (bottom, top) high.
+        end = np.maximum(s['SU_END'], 1e-3)
+        d = np.maximum(s['SU'] - f['to'] * end, np.maximum(f['y'][0] - s['Y'], s['Y'] - f['y'][1]))
+        opening(reg, d, s['X'] > -0.2, f.get('lip', 0.0), True)
+        return
+    if kind == 'shade':
+        # The shadow where another piece laps over this one: darker and rougher above the line (|z|, y), fading below it.
+        line = np.asarray(f['line'], np.float32)
+        edge = np.interp(np.abs(s['Z']), line[:, 0], line[:, 1])
+        weight = smooth((s['Y'] - edge + f['w']) / f['w'])
+        reg.paint(weight * 0.75, mul=(0.35, 0.34, 0.33), rough=0.7)
+        return
     A, B, mask, at = view(s, f['view'])
     if kind == 'slot':
         z0, z1 = f['z']
