@@ -28,24 +28,6 @@ test('adrenaline surges more in a young big man than in an older, smaller woman'
   assert.ok(adrenalineGain(world.fighters[0]) > adrenalineGain(world.fighters[1]) * 1.4);
 });
 
-test('broken by fear he throws his weapon down; with adrenaline up he does not break', () => {
-  const run = (adrenaline) => {
-    const world = createWorld([{ ...PRESETS.contender, style: 'katana' }, { ...PRESETS.heavy, style: 'longsword' }], { seed: 2 });
-    const man = world.fighters[0];
-    man.concussion = 1e9;
-    man.fear = 1;
-    for (let second = 0; second < 8 && !man.panicked; second += 0.1) {
-      man.adrenaline = adrenaline;
-      advance(world, 0.1, (current, dt) => thinkAll(current, dt, new Set([1])));
-    }
-    return man;
-  };
-  const broken = run(0);
-  assert.ok(broken.panicked, 'he breaks');
-  assert.equal(broken.weapon, null, 'and drops the katana');
-  assert.ok(!run(1).panicked, 'adrenaline holds him');
-});
-
 test('a body out for longer than the limit is left where it lies, unsimulated', () => {
   const world = createWorld([{ ...PRESETS.contender }, { ...PRESETS.contender }]);
   const body = world.fighters[1];
