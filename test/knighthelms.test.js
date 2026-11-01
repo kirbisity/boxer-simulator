@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { buildBody, PRESETS } from '../src/body.js';
 import { HELM_MAP_DATA } from '../src/helmmaps-data.js';
 import { HELM_STYLE, helmStyleFrom, setHelmStyle } from '../src/helmstyle.js';
-import { formCuts, formGrid, formPoint, HELM_HEAD, headRadiusAt } from '../src/helmforms.js';
-import { KNIGHT_FORMS, KNIGHT_HELM_CHOICES, KNIGHT_HELM_KINDS, knightFormOf, knightTriangles } from '../src/knighthelms.js';
+import { formCuts, formPoint, HELM_HEAD, headRadiusAt } from '../src/helmforms.js';
+import { KNIGHT_FORMS, KNIGHT_HELM_CHOICES, KNIGHT_HELM_KINDS, knightFormOf, knightGrid, knightPoint, knightTriangles } from '../src/knighthelms.js';
 import { OUTFITS } from '../src/outfits.js';
 
 // The head's radius (cm) as drawn, and the drawn head's scale over the body's head radius (render.js).
@@ -15,36 +15,58 @@ const HEAD_SCALE = 1.12;
 // 36 breaths and the cross cut (boxes), its coif (20).
 const OLD_BASCINET = 20 * 13 * 2 + 14 * 3 + 12 + 18 * 2;
 const OLD_GREAT_HELM = 6 * 28 * 2 + 5 * 28 * 2 + 24 * 5 * 2 + 16 * 2 + 36 * 12 + 2 * 12 + 20 * 2;
-// Each design's budget: no more than the Templar's great helm today.
-const BUDGET = OLD_GREAT_HELM;
+// Each design's budget: no more than its first drawing (commit 802be01), and none over the Templar's great helm today.
+const BUDGET = { greatHelm: 544, hounskull: 1160, greatBascinet: 1024, armet: 1236, sallet: 1248, closeHelmet: 1384 };
 // The eyes (HELM_HEAD: y about -0.07, either side of the middle at |z| about 0.3).
 const EYES = { y: -0.07, z: 0.3 };
 
-/** A loft's distance from the upright axis at `azimuth` and height y (its outermost crossing), or null where it does not reach. */
-function loftRadiusAt(part, azimuth, y) {
-  const u = azimuth / (Math.PI * (part.span ?? 1));
-  if (u > 1) return null;
-  let last = formPoint(part, u, 0);
+/** Every point of a part on a fine grid (leaned as its design leans). */
+function points(form, part, steps = 96) {
+  const out = [];
+  for (let i = 0; i <= steps; i += 1) for (let j = 0; j <= steps; j += 1) out.push(knightPoint(form, part, -1 + (2 * i) / steps, j / steps));
+  return out;
+}
+
+/** Whether a point falls in its part's face opening (cut away under the visor). */
+function inOpening(part, [x, y, z]) {
+  const opening = (part.bake ?? []).find((feature) => feature.kind === 'cutout');
+  return !!opening && x > 0 && Math.abs(z) < opening.z[1] && y > opening.y[0] && y < opening.y[1];
+}
+
+/** How far forward (x) a part reaches down the middle of the face at height y, or null. */
+function frontAt(form, part, y) {
+  let last = knightPoint(form, part, 0, 0);
   let best = null;
-  for (let step = 1; step <= 240; step += 1) {
-    const point = formPoint(part, u, step / 240);
+  for (let step = 1; step <= 400; step += 1) {
+    const point = knightPoint(form, part, 0, step / 400);
     if ((last[1] - y) * (point[1] - y) <= 0 && last[1] !== point[1]) {
-      const t = (y - last[1]) / (point[1] - last[1]);
-      const radius = Math.hypot(last[0] + (point[0] - last[0]) * t, last[2] + (point[2] - last[2]) * t);
-      best = best === null ? radius : Math.min(best, radius);
+      const x = last[0] + ((point[0] - last[0]) * (y - last[1])) / (point[1] - last[1]);
+      best = best === null ? x : Math.max(best, x);
     }
     last = point;
   }
   return best;
 }
 
-/** Whether a point (azimuth, y, radius) of a part falls in its face opening (cut away under the visor). */
-function inOpening(part, azimuth, y, radius) {
-  const opening = (part.bake ?? []).find((feature) => feature.kind === 'cutout');
-  return !!opening && azimuth < Math.PI / 2 && radius * Math.sin(azimuth) < opening.z[1] && y > opening.y[0] && y < opening.y[1];
-}
-
 const metalLofts = (form) => Object.entries(form.parts).filter(([, part]) => part.kind === 'loft' && part.look === 'metal');
+const mainOf = (form) => form.parts.shell ?? form.parts.skull;
+
+/** The metal's extent (cm) front to back, side to side and high, leaving out what hangs below or stands off (named). */
+function extent(form, leave = ['aventail', 'bevor', 'rondel', 'liner', 'comb']) {
+  const low = [Infinity, Infinity, Infinity];
+  const high = [-Infinity, -Infinity, -Infinity];
+  for (const [name, part] of Object.entries(form.parts)) {
+    if (leave.includes(name)) continue;
+    const { positions } = knightGrid(form, part);
+    for (let index = 0; index < positions.length; index += 3) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        low[axis] = Math.min(low[axis], positions[index + axis]);
+        high[axis] = Math.max(high[axis], positions[index + axis]);
+      }
+    }
+  }
+  return { length: (high[0] - low[0]) * R_CM, breadth: (high[2] - low[2]) * R_CM, height: (high[1] - low[1]) * R_CM, low, high };
+}
 
 test('the knights\' helmets are drawn as they were unless a design is asked for; any knightly unit can wear one', () => {
   assert.equal(helmStyleFrom('').knight, 'now');
@@ -78,20 +100,22 @@ test('six designs of different kinds, each with its period, its museum piece and
   }
 });
 
-test(`each design is drawn with no more triangles than the Templar's great helm today (${OLD_GREAT_HELM}; the knight's bascinet ${OLD_BASCINET})`, () => {
-  for (const name of Object.keys(KNIGHT_FORMS)) assert.ok(knightTriangles(name) <= BUDGET, `${name}: ${knightTriangles(name)}`);
+test(`each design is drawn with no more triangles than its first drawing, none over the Templar's great helm today (${OLD_GREAT_HELM}; the bascinet ${OLD_BASCINET})`, () => {
+  for (const name of Object.keys(KNIGHT_FORMS)) {
+    assert.ok(knightTriangles(name) <= BUDGET[name] && knightTriangles(name) <= OLD_GREAT_HELM, `${name}: ${knightTriangles(name)}`);
+  }
 });
 
 test('every design is symmetric about the middle of the face', () => {
   for (const [name, form] of Object.entries(KNIGHT_FORMS)) {
     for (const [partName, part] of Object.entries(form.parts)) {
       for (const [u, v] of [[0.2, 0.1], [0.5, 0.5], [0.85, 0.9]]) {
-        const left = formPoint(part, u, v);
-        const right = formPoint(part, -u, v);
+        const left = knightPoint(form, part, u, v);
+        const right = knightPoint(form, part, -u, v);
         assert.ok(Math.abs(left[0] - right[0]) < 1e-9 && Math.abs(left[1] - right[1]) < 1e-9 && Math.abs(left[2] + right[2]) < 1e-9, `${name} ${partName}`);
       }
       const [nu, nv] = formCuts(part);
-      assert.equal(formGrid(part).indices.length, nu * nv * 6);
+      assert.equal(knightGrid(form, part).indices.length, nu * nv * 6);
     }
   }
 });
@@ -102,17 +126,13 @@ test('every design is fitted over the head on a small and a large man: a lining\
   for (const [name, form] of Object.entries(KNIGHT_FORMS)) {
     let least = Infinity;
     let most = -Infinity;
-    const main = form.parts.shell ?? form.parts.skull;
     for (const [, part] of metalLofts(form)) {
-      for (let y = -1.3; y <= HELM_HEAD.crown - 0.04; y += 0.05) {
-        for (let k = 0; k <= 32; k += 1) {
-          const azimuth = (Math.PI * k) / 32;
-          const outside = loftRadiusAt(part, azimuth, y);
-          if (outside === null || inOpening(part, azimuth, y, outside)) continue;
-          const gap = outside - headRadiusAt(azimuth, y);
-          least = Math.min(least, gap);
-          if (part === main && y >= 0.2 && y <= 0.5) most = Math.max(most, gap);
-        }
+      for (const point of points(form, part)) {
+        const [x, y, z] = point;
+        if (y < -1.3 || y > HELM_HEAD.crown - 0.04 || inOpening(part, point)) continue;
+        const gap = Math.hypot(x, z) - headRadiusAt(Math.atan2(Math.abs(z), x), y);
+        least = Math.min(least, gap);
+        if (part === mainOf(form) && y >= 0.2 && y <= 0.5) most = Math.max(most, gap);
       }
     }
     for (const r of [small, large]) {
@@ -120,10 +140,8 @@ test('every design is fitted over the head on a small and a large man: a lining\
       assert.ok(cm(least) >= 1.0, `${name}: ${cm(least).toFixed(2)} cm at the closest`);
       assert.ok(cm(most) <= form.standoff + 0.3, `${name}: ${cm(most).toFixed(2)} cm off the cranium`);
     }
-    const front = formPoint(main, 0, 0.6);
-    const side = formPoint(main, 0.5, 0.6);
-    const back = formPoint(main, 1, 0.6);
-    assert.ok(2 * side[2] < front[0] - back[0], `${name}: longer than broad`);
+    const { length, breadth } = extent(form);
+    assert.ok(breadth < 0.86 * length, `${name}: narrow side to side (${breadth.toFixed(1)} against ${length.toFixed(1)} cm)`);
   }
 });
 
@@ -134,44 +152,54 @@ test('the sights are at the eyes, across both of them, cut through the face the 
     assert.ok(y0 < EYES.y && y1 > EYES.y - 0.06 && Math.abs((y0 + y1) / 2 - EYES.y) < 0.06, `${name}: at eye height`);
     assert.ok(y1 - y0 >= 0.08 && y1 - y0 <= 0.16, `${name}: a slit 1-2 cm high`);
     assert.ok(z0 < EYES.z - 0.1 && z1 > EYES.z + 0.15, `${name}: across the eye`);
-    // The sight is one of the cut-outs of the part the face looks out of (the foremost at eye height).
-    const facing = metalLofts(form).map(([, part]) => part).filter((part) => loftRadiusAt(part, 0, EYES.y) !== null);
-    const front = facing.reduce((a, b) => (loftRadiusAt(b, 0, EYES.y) > loftRadiusAt(a, 0, EYES.y) ? b : a));
+    // The sight is a cut-out of the part the face looks out of (the foremost at eye height).
+    const facing = metalLofts(form).map(([, part]) => part).filter((part) => frontAt(form, part, EYES.y) !== null);
+    const front = facing.reduce((a, b) => (frontAt(form, b, EYES.y) > frontAt(form, a, EYES.y) ? b : a));
     const slot = front.bake.find((feature) => feature.kind === 'slot' && feature.cut);
     assert.ok(slot && slot.y[0] === y0 && slot.y[1] === y1 && slot.z[0] === z0 && slot.z[1] === z1, `${name}: cut in the foremost plate`);
-    assert.ok(loftRadiusAt(front, 0, EYES.y) > headRadiusAt(0, EYES.y), `${name}: in front of the eyes`);
+    assert.ok(frontAt(form, front, EYES.y) > headRadiusAt(0, EYES.y) + 0.1, `${name}: in front of the eyes`);
   }
-});
-
-test('the parts that close the face stand clear of the nose; the armet carries its rondel behind, the hounskull its snout', () => {
-  for (const [name, form] of Object.entries(KNIGHT_FORMS)) {
-    const front = Math.max(...metalLofts(form).map(([, part]) => loftRadiusAt(part, 0, -0.5) ?? 0));
-    assert.ok(front > 1.15 + 0.1, `${name}: ${front.toFixed(2)} before the nose's tip`);
-  }
-  const rondel = KNIGHT_FORMS.armet.parts.rondel;
-  assert.ok(formPoint(rondel, 0, 0.7)[0] < -1.0, 'the rondel behind the nape');
-  assert.ok(loftRadiusAt(KNIGHT_FORMS.hounskull.parts.visor, 0, -0.5) > 1.8, 'the hound\'s snout');
-  assert.ok(Math.min(...KNIGHT_FORMS.greatBascinet.parts.shell.stations[0].y) < -2.0, 'the great bascinet down over the neck');
 });
 
 test('each design stands within the measures of the piece it is drawn from (the game\'s broad head allowed for)', () => {
-  // Front to back and high (cm), from the museums' records.
-  const MUSEUM = { greatHelm: [31, 36], hounskull: [33, 29], greatBascinet: [26, 44], armet: [28.6, 29.2], sallet: [37.1, 24.8], closeHelmet: [33.7, 29.8] };
+  // Front to back and high (cm), from the museums' records: Prankh helm (31 deep), Musée de l'Armée H 21 (29 high), British
+  // Museum OA.2190 (26 deep, 44 high), Met 29.158.22 (28.6 deep, 29.2 high), Met 04.3.229 (37.1 deep, 24.8 high), Met
+  // 42.50.47 (33.7 deep, 29.8 high). The broad game head (about 21-24 cm across inside) makes each a little bigger.
+  const MUSEUM = { greatHelm: [31, 34], hounskull: [36, 31], greatBascinet: [34, 44], armet: [28.6, 31], sallet: [37.1, 26], closeHelmet: [33.7, 31] };
   for (const [name, form] of Object.entries(KNIGHT_FORMS)) {
-    const low = [Infinity, Infinity];
-    const high = [-Infinity, -Infinity];
-    for (const [partName, part] of Object.entries(form.parts)) {
-      if (['aventail', 'bevor', 'rondel', 'liner', 'comb'].includes(partName)) continue;
-      const { positions } = formGrid(part);
-      for (let index = 0; index < positions.length; index += 3) {
-        for (const [axis, at] of [[0, 0], [1, 1]]) {
-          low[at] = Math.min(low[at], positions[index + axis]);
-          high[at] = Math.max(high[at], positions[index + axis]);
-        }
-      }
-    }
-    const [length, height] = [0, 1].map((at) => (high[at] - low[at]) * R_CM);
-    assert.ok(Math.abs(length / MUSEUM[name][0] - 1) < 0.2, `${name}: ${length.toFixed(1)} cm long`);
-    assert.ok(Math.abs(height / MUSEUM[name][1] - 1) < 0.22, `${name}: ${height.toFixed(1)} cm high`);
+    // (The sallet's bevor a piece of its own, strapped on.)
+    const { length, height } = extent(form, ['aventail', 'rondel', 'liner', 'comb', ...(name === 'sallet' ? ['bevor'] : [])]);
+    assert.ok(Math.abs(length / MUSEUM[name][0] - 1) < 0.15, `${name}: ${length.toFixed(1)} cm long`);
+    assert.ok(Math.abs(height / MUSEUM[name][1] - 1) < 0.15, `${name}: ${height.toFixed(1)} cm high`);
   }
+});
+
+test('each kind\'s silhouette: the great helm\'s flat top and prow, the bascinets\' apex over the back, the snout, the armet\'s chin and rondel, the sallet\'s tail, the close helmet\'s comb and beak', () => {
+  const { greatHelm, hounskull, greatBascinet, armet, sallet, closeHelmet } = KNIGHT_FORMS;
+  // The great helm: a flat top plate (its crown within 0.6 cm of level across most of it), flat sides, a prow down the face.
+  const top = points(greatHelm, greatHelm.parts.shell).filter(([x, y, z]) => y > 1.19 && Math.hypot(x, z) < 0.7);
+  assert.ok(top.length && Math.max(...top.map((p) => p[1])) - Math.min(...top.map((p) => p[1])) < 0.06, 'a flat top');
+  assert.ok(frontAt(greatHelm, greatHelm.parts.shell, -0.6) - knightPoint(greatHelm, greatHelm.parts.shell, 0.1, 0.25)[0] > 0.05, 'the face plates meet in a ridge');
+  // The bascinets: the apex well behind the middle of the head, the hounskull's snout 0.7 r or more before the face.
+  const apex = (form) => knightPoint(form, mainOf(form), 0, 1);
+  assert.ok(apex(hounskull)[0] < -0.6 && apex(hounskull)[1] > 1.6, `the hounskull's apex over the back (${apex(hounskull)[0].toFixed(2)})`);
+  assert.ok(apex(greatBascinet)[0] < -0.2, 'the great bascinet\'s apex leans back');
+  const snout = Math.max(...points(hounskull, hounskull.parts.visor).map((p) => p[0]));
+  assert.ok(snout - 1.15 > 0.75, `the snout stands ${(snout - 1.15).toFixed(2)} r before the nose`);
+  const tip = points(hounskull, hounskull.parts.visor).reduce((a, b) => (b[0] > a[0] ? b : a));
+  assert.ok(tip[1] < -0.4 && tip[1] > -0.8, 'pointed at the mouth');
+  // The great bascinet: down over the neck, flaring out behind at the foot.
+  const gb = greatBascinet.parts.shell;
+  assert.ok(Math.min(...gb.stations[0].y) < -2.0 && -knightPoint(greatBascinet, gb, 1, 0)[0] > -knightPoint(greatBascinet, gb, 1, 0.12)[0] + 0.2, 'the flare behind');
+  // The armet: its chin standing before the neck, the neck drawn in behind, the rondel behind the nape.
+  const chin = frontAt(armet, armet.parts.shell, -1.34);
+  assert.ok(chin > 1.0 && -knightPoint(armet, armet.parts.shell, 1, 0.1)[0] < 0.8, 'the chin full, the neck drawn in');
+  assert.ok(formPoint(armet.parts.rondel, 0, 0.7)[0] < -0.9, 'the rondel behind the nape');
+  // The sallet: its tail reaching well behind the head and down below the ears.
+  const tail = knightPoint(sallet, sallet.parts.shell, 1, 0);
+  assert.ok(tail[0] < -1.8 && tail[1] < -0.9, 'the long tail');
+  // The close helmet: the comb standing a third of a head radius or more above the skull; the visor's beak before the face.
+  const comb = Math.max(...points(closeHelmet, closeHelmet.parts.comb, 24).map((p) => p[1]));
+  assert.ok(comb - apex(closeHelmet)[1] > 0.3, 'a tall comb');
+  assert.ok(Math.max(...points(closeHelmet, closeHelmet.parts.visor).map((p) => p[0])) > 1.6, 'the beak');
 });

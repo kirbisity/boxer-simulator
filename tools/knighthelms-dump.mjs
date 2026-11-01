@@ -5,16 +5,15 @@
 //
 //   node tools/knighthelms-dump.mjs > <dir>/knights.json
 
-import { formPoint } from '../src/helmforms.js';
-import { KNIGHT_FORMS } from '../src/knighthelms.js';
+import { KNIGHT_FORMS, knightPoint } from '../src/knighthelms.js';
 
 const N = 128;
 
-function sample(part) {
+function sample(form, part) {
   const rows = [];
   for (let j = 0; j <= N; j += 1) {
     const row = [];
-    for (let i = 0; i <= N; i += 1) row.push(formPoint(part, i / N, j / N));
+    for (let i = 0; i <= N; i += 1) row.push(knightPoint(form, part, i / N, j / N));
     rows.push(row);
   }
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -40,7 +39,7 @@ const out = {};
 for (const [style, form] of Object.entries(KNIGHT_FORMS)) {
   const parts = {};
   for (const [name, part] of Object.entries(form.parts)) {
-    if (part.region) parts[name] = { region: part.region, kind: part.kind, look: part.look, bake: part.bake ?? [], grid: sample(part) };
+    if (part.region) parts[name] = { region: part.region, kind: part.kind, look: part.look, bake: part.bake ?? [], grid: sample(form, part) };
   }
   out[style] = { sheet: form.sheet, regions: form.regions, parts };
 }

@@ -17,7 +17,7 @@ import { buildWarMask } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildTassel } from './chinahelmview.js';
 import { HONGYING_MOUNTS, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
-import { knightFormOf } from './knighthelms.js';
+import { knightFormOf, knightGrid } from './knighthelms.js';
 
 export const WARDROBE = {
   // How far (m, for a 1.8 m man) a sabaton's point runs on past the foot.
@@ -1970,6 +1970,18 @@ function hongying(r, { top, length, hull }, colour = TASSELS.hongying.colour, lo
   return buildTassel(spec, r, { at: [0, top, 0], hull, still: lowDetail, colour });
 }
 
+/** A knight's helmet's part as a mesh (knighthelms.js knightGrid: leaned as its design leans), its coordinates in its region of the sheet. */
+function knightMesh(form, part, material) {
+  const { positions, uvs, indices } = knightGrid(form, part);
+  const rect = part.region ? form.regions[part.region] : null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(rect ? uvs.map((value, index) => (index % 2 === 0 ? rect[0] + value * (rect[2] - rect[0]) : rect[1] + value * (rect[3] - rect[1]))) : uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(geometry, material);
+}
+
 /**
  * A knight's helmet in a design (knighthelms.js: the unit's own `head.design`, else `#knighthelm`), each part a measured
  * surface scaled to `r` wearing the design's sheet (the sights and breaths cut out), the dark arming cap inside, the mail
@@ -1981,7 +1993,7 @@ function buildKnightHelm(group, head, r, iron, lowDetail) {
   for (const [name, part] of Object.entries(form.parts)) {
     const side = part.double ? THREE.DoubleSide : THREE.FrontSide;
     const material = part.look === 'liner' ? surface(0x0d0c0b, { roughness: 1 }) : helmMaterial(iron, form.sheet, { side, cut: !!form.cut });
-    const mesh = formMesh(part, part.region ? form.regions[part.region] : null, material);
+    const mesh = knightMesh(form, part, material);
     mesh.name = `helm-${name}`;
     mesh.scale.setScalar(r);
     if (part.look === 'liner') mesh.userData.noOutline = true;
