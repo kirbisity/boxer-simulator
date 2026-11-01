@@ -173,8 +173,9 @@ function mingGarrisonDesign(label, vest, sash, wrap) {
 }
 // Brigandine: the coat's cloth, gilt rivets, the iron hat.
 // `look`: the same protection drawn as lamellar (`kind: 'mingLamellar'`, its `lace`).
-function mingBrigandineDesign(label, cloth, iron, look = {}) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+// `helm`: the hat's design and finish (chinahelms.js MING_HELMS, CHINA_FINISHES).
+function mingBrigandineDesign(label, cloth, iron, look = {}, helm = {}) {
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
@@ -1000,12 +1001,12 @@ export const OUTFITS = {
     protection: { blunt: 0.6, cut: 0.7, pierce: 0.5, bullet: { head: 0.3, torso: 0.5, limb: 0 } },
     courage: 0.2,
     designs: [
-      mingBrigandineDesign('Red', '#9a1f1a', '#8f949b'),
-      mingBrigandineDesign('Blue', '#22356a', '#8f949b'),
-      mingBrigandineDesign('Black', '#1c1c20', '#6f747c'),
-      mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }),
-      mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a', cord: '#22356a' }),
-      mingBrigandineDesign('Iron scale, red coat', '#9a1f1a', '#8f949b', { kind: 'mingScaleCoat', lace: '#3a1410' }),
+      mingBrigandineDesign('Red', '#9a1f1a', '#8f949b', {}, { design: 'yongBell', finish: 'red' }),
+      mingBrigandineDesign('Blue', '#22356a', '#8f949b', {}, { design: 'rivetedTube', finish: 'steel' }),
+      mingBrigandineDesign('Black', '#1c1c20', '#6f747c', {}, { design: 'cloudBell', finish: 'dark' }),
+      mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }, { design: 'plainPoint', finish: 'iron' }),
+      mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a', cord: '#22356a' }, { design: 'plainPoint', finish: 'dark' }),
+      mingBrigandineDesign('Iron scale, red coat', '#9a1f1a', '#8f949b', { kind: 'mingScaleCoat', lace: '#3a1410' }, { design: 'yongBell', finish: 'steel' }),
     ],
   },
   // Ming elite: the long brigandine coat to the knee reinforced with plates,

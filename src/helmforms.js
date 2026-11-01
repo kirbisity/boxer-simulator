@@ -73,9 +73,10 @@ const HELM_HEAD_KEYS = HELM_HEAD.rows[0][1].length;
 /**
  * A helmet kind's drawn span [front-back, height, side-to-side] about the head's centre. The fitted bowls are a touch
  * broader than the bare head-fit (still well under the old round bowls: about 21 cm across against 27); the Iron
- * Pagoda's bowl is drawn a little smaller and narrower, the steppe helmet narrower still (a tall, thin, pointed bowl).
+ * Pagoda's bowl is drawn a little smaller and narrower, the steppe helmet narrower still (a tall, thin, pointed bowl); the Ming
+ * elite's tall bowl a touch narrower side to side (6%).
  */
-export const HELM_SPAN = { arenaHelm: [1, 1, 1.07], kabuto: [1, 1, 1.07], pagodaHelm: [0.95, 0.95, 0.88], steppeHelm: [0.96, 1, 0.82] };
+export const HELM_SPAN = { arenaHelm: [1, 1, 1.07], kabuto: [1, 1, 1.07], pagodaHelm: [0.95, 0.95, 0.88], steppeHelm: [0.96, 1, 0.82], mingHelm: [1, 1, 0.94] };
 /** The cranium's half-breadth over the ears' tops (y > 0.15) the helmets are fitted to: a broader head widens them (render.js). */
 export const HELM_HEAD_BREADTH = Math.max(...HELM_HEAD.rows.filter(([y]) => y > 0.15).map(([, keys]) => keys[(HELM_HEAD_KEYS - 1) / 2]));
 
