@@ -2257,7 +2257,9 @@ function buildKabuto(group, head, r, steel, color) {
   if (head.hair) group.add(shagumaHair(form, r, head.hair));
   // A mask in a design under study (helmstyle.js `masks`), drawn with baked maps (menpo.js), set on the face (helmforms.js
   // MASK_FITS); the gorget under it, hanging from under the chin.
-  if (head.mask && HELM_STYLE.masks !== 'now' && helmMapsReady() && buildWarMask(group, HELM_STYLE.masks, r, head.mask === 'red' ? color : 0x141416, steel.envMap)) {
+  // `own`: the kit's own mask design (`maskDesign`; an oni somen for `mask: 'oni'`, else the commoner ressei-men).
+  const maskDesign = HELM_STYLE.masks === 'own' ? head.maskDesign ?? (head.mask === 'oni' ? 'oni' : 'ressei') : HELM_STYLE.masks;
+  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, head.mask === 'red' ? color : 0x141416, steel.envMap)) {
     const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : lace);
     throat.material = throat.material.clone();
     throat.material.side = THREE.DoubleSide;

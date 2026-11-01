@@ -583,8 +583,8 @@ export const KABUTO_FORM = (() => {
  * cupped under the chin. Relief stands off the mask as drawn.
  */
 export const MASK_FITS = {
-  oni: { R: 1.12, gap: 0.06, y: [[0.91, 0.3], [0.16, -0.07], [-0.37, -0.74], [-1.0, -1.42]] },
-  ressei: { R: 1.1, gap: 0.06, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
+  oni: { R: 1.12, gap: 0.06, span: 0.84, y: [[0.91, 0.3], [0.16, -0.07], [-0.37, -0.74], [-1.0, -1.42]] },
+  ressei: { R: 1.1, gap: 0.06, span: 0.84, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
   tengu: { R: 1.1, gap: 0.06, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
   // The masks as first drawn (`#masks=now`, or without the maps): the menpo and the oni's whole face.
   menpo: { R: 1.06, gap: 0.06, y: [[-0.067, -0.28], [-0.12, -0.45], [-0.34, -0.74], [-0.98, -1.42]] },
@@ -615,7 +615,8 @@ export function maskOnFace(fit, [x, y, z]) {
   while (segment < fit.y.length - 1 && y < fit.y[segment][0]) segment += 1;
   const [[a0, b0], [a1, b1]] = [fit.y[segment - 1], fit.y[segment]];
   const height = b0 + ((b1 - b0) * (y - a0)) / (a1 - a0);
-  const azimuth = Math.atan2(z, x);
+  // `span` (< 1) draws the mask in round the face: it reaches less far back over the cheeks, a narrower mask.
+  const azimuth = Math.atan2(z, x) * (fit.span ?? 1);
   const off = Math.hypot(x, z) - Math.sqrt(Math.max(0, fit.R * fit.R - y * y));
   const radius = headRadiusAt(azimuth, height) + fit.gap + off;
   return [radius * Math.cos(azimuth), height, radius * Math.sin(azimuth)];

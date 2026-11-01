@@ -2,7 +2,7 @@
 //
 //   #helmets=new|now     the gladiators' helmets (arenaview.js): new (the default), remodelled from the surviving helmets
 //                        (helmforms.js), the fine work in baked maps; now, the geometry as it was before, for comparison.
-//   #masks=now|oni|ressei|tengu   the samurai's face masks (menpo.js): now, the simple shapes as they were; an oni somen
+//   #masks=own|now|oni|ressei|tengu   the samurai's face masks (menpo.js): own, each kit's own (head.maskDesign); now, the simple shapes as they were; an oni somen
 //                        (the whole face, a demon's); a ressei-men (the fierce old man, a horsehair moustache); a karasu
 //                        tengu (a crow's beak). A mask other than `now` needs the detail maps (`#maps=off` draws `now`).
 //   #kettle=own|now|a|b|c  the helmets drawn in a measured design (helmforms.js HELM_DESIGNS, fitted over the head with their
@@ -19,7 +19,7 @@
 // `boxer.helmStyle({ helmets, masks, kettle, knight })` switches them in a running page and draws the fighters again.
 
 export const HELMET_STYLES = ['new', 'now'];
-export const MASK_STYLES = ['now', 'oni', 'ressei', 'tengu'];
+export const MASK_STYLES = ['own', 'now', 'oni', 'ressei', 'tengu'];
 export const KETTLE_STYLES = ['own', 'now', 'a', 'b', 'c'];
 export const KNIGHT_STYLES = ['now', '1', '2', '3', '4', '5', '6'];
 
