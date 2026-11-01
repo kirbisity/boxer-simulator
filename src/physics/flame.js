@@ -11,7 +11,7 @@
 // (plate over most of him keeps most of it off), harm a share of each part's injury capacity a second through physics.js addDamage (the
 // trunk's mark kills, as any injury does), a cry every second or so. Caught well alight, a man drops and rolls (the drilled more often:
 // rolling smothers it `roll` times as fast, rolled by pushes side to side) or panics and runs (`burning.running`: ai.js runs him from
-// it), letting go of his weapon. Water under him puts it out faster. A man on fire, a man burning near him, or the stream going past
+// it), letting go of his weapon. Water under him smothers his clothes, not the fuel, which floats and burns on. A man on fire, a man burning near him, or the stream going past
 // frightens him (`flameFright`, read by ai.js shockFear: fear as any other, so men break and run from it).
 //
 // A machine (a robot, a robot dog) has no flesh to burn and nothing to fear: the fuel on it burns off all the same, and what of the
@@ -41,22 +41,28 @@ export const FLAME = {
   // its flames reach `reach` m round it (and more as it holds more fuel, to `reachMost`). At most `most`, the oldest put out first.
   patch: { burn: 0.035, wet: 1.6, merge: 0.6, reach: 0.35, reachMost: 0.8, most: 80 },
   man: {
-    // The fuel on him burns off at `burn` kg/s (a pool fire's ~0.05 kg/m²·s over the ~0.5 m² of him alight); `cover` kg of it wraps
-    // him (full heat). His clothes, once caught, burn `clothes` s at `clothesHeat`. Plate over most of him (a cutProof kit) keeps
-    // `plate` of the heat off.
-    burn: 0.025, cover: 0.3, clothes: 4, clothesHeat: 0.5, plate: 0.6,
+    // The fuel on him burns off at `burn` kg/s: thickened fuel clings and burns slowly, a film soaked into his clothes and kit
+    // (napalm-type gels burn for minutes), so what sticks keeps burning until it has killed him; `cover` kg of it wraps him (full
+    // heat). His clothes, once caught, burn `clothes` s at `clothesHeat`. Plate over most of him (a cutProof kit) keeps `plate` of
+    // the heat off.
+    burn: 0.001, cover: 0.3, clothes: 4, clothesHeat: 0.5, plate: 0.6,
+    // A film of it, however thin, burns as hot as a soaking (`stuckHeat` at least, from `stuckFrom` kg): the gel burns where it
+    // clings, it does not thin out to a glow.
+    stuckHeat: 0.8, stuckFrom: 0.01,
     // The harm at full heat: a share of the part's injury capacity a second (physics.js addDamage; 2.5 of the trunk's kills).
     trunk: 0.14, limbs: 0.08, head: 0.06,
     // Alight past `catchFrom` (heat), he reacts once: drops and rolls (`rollShare` from the least skilled to the best), down `rollSeconds`
-    // s, pushed over each `rollEvery` s by `rollPush` N·s; or runs. Rolling puts it out `roll` times as fast, water `wet` times.
-    catchFrom: 0.25, rollShare: [0.2, 0.75], rollSeconds: 3, rollEvery: 0.45, rollPush: 9, roll: 3, wet: 4,
+    // s, pushed over each `rollEvery` s by `rollPush` N·s; or runs. Rolling and water smother burning clothes (`roll`, `wet` times
+    // as fast), not the thickened fuel: it sticks, floats and burns on (`fuelRoll`, `fuelWet`).
+    catchFrom: 0.25, rollShare: [0.2, 0.75], rollSeconds: 3, rollEvery: 0.45, rollPush: 9, roll: 3, wet: 4, fuelRoll: 1, fuelWet: 1,
     // A cry every `cryEvery` s while he burns.
     cryEvery: 1.6,
   },
   // A machine: of the fire's heat (`fuelHeat` J a kg of fuel burned), `absorbed` goes into it (the rest goes up with the flame); its
   // body holds `specificHeat` J/kg·K (aluminium, steel, plastic) and sheds `cooling` W/K to the air. Past `limit` K over the air its
   // motors' and battery's thermal cut-outs stop it. Standing in a burning patch heats it at `patch` of full.
-  machine: { fuelHeat: 43e6, absorbed: 0.05, specificHeat: 900, cooling: 15, limit: 60, patch: 0.3 },
+  // `burn`: on a hard shell the gel cannot soak in, so it burns off as fast as an open film (kg/s).
+  machine: { burn: 0.025, fuelHeat: 43e6, absorbed: 0.05, specificHeat: 900, cooling: 15, limit: 60, patch: 0.3 },
   // Fear: himself on fire, `self`; a man burning within `near` m, up to `nearby`; the stream (another side's) within `stream` m,
   // `passing`. It fades with a half-life of `halfLife` s.
   fright: { self: 1, nearby: 0.4, near: 8, passing: 0.5, stream: 2, halfLife: 3 },
@@ -335,10 +341,11 @@ function burnOnMan(world, fighter, dt) {
   const spec = FLAME.man;
   const burning = fighter.burning;
   const down = fighter.state === 'down' || fighter.state === 'out';
-  const smother = (down ? spec.roll : 1) * (inWaterNow(world, fighter) ? spec.wet : 1);
-  burning.fuel = Math.max(0, burning.fuel - spec.burn * smother * dt);
+  const wet = inWaterNow(world, fighter);
+  const smother = (down ? spec.roll : 1) * (wet ? spec.wet : 1);
+  burning.fuel = Math.max(0, burning.fuel - spec.burn * (down ? spec.fuelRoll : 1) * (wet ? spec.fuelWet : 1) * dt);
   burning.clothes = Math.max(0, burning.clothes - smother * dt);
-  burning.heat = Math.min(1, Math.max(burning.fuel / spec.cover, burning.clothes > 0 ? spec.clothesHeat : 0)) * fireExposure(fighter);
+  burning.heat = Math.min(1, Math.max(burning.fuel / spec.cover, burning.fuel >= spec.stuckFrom ? spec.stuckHeat : 0, burning.clothes > 0 ? spec.clothesHeat : 0)) * fireExposure(fighter);
   if (burning.heat <= 0.01) {
     fighter.burning = undefined;
     return;
@@ -359,7 +366,7 @@ function burnOnMan(world, fighter, dt) {
 }
 
 /** The heat a fire puts into a machine this moment (W): its share of the fire's, as much as it burns (`heat` 0..1). */
-const machineHeating = (heat) => heat * FLAME.man.burn * FLAME.machine.fuelHeat * FLAME.machine.absorbed;
+const machineHeating = (heat) => heat * FLAME.machine.burn * FLAME.machine.fuelHeat * FLAME.machine.absorbed;
 
 /** A machine's heat (K over the air) after `dt` s taking `watts` in, its heat capacity `capacity` J/K, cooling as it does. */
 function warmed(heatC, watts, capacity, dt) {
@@ -372,7 +379,7 @@ function burnOnMachine(world, fighter, dt) {
   const burning = fighter.burning;
   let heat = 0;
   if (burning) {
-    burning.fuel = Math.max(0, burning.fuel - FLAME.man.burn * (inWaterNow(world, fighter) ? FLAME.man.wet : 1) * dt);
+    burning.fuel = Math.max(0, burning.fuel - FLAME.machine.burn * (inWaterNow(world, fighter) ? FLAME.man.wet : 1) * dt);
     burning.clothes = Math.max(0, burning.clothes - dt);
     heat = Math.min(1, Math.max(burning.fuel / FLAME.man.cover, burning.clothes > 0 ? spec.patch : 0));
     burning.heat = heat;

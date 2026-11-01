@@ -88,13 +88,12 @@ test('the stream sets a man alight: burns to his trunk, fear, and he drops and r
   assert.ok(world.flame.patches.length > 0, 'fuel burning on the floor');
 });
 
-test('plate keeps most of the heat off; water puts it out sooner', () => {
+test('plate keeps most of the heat off; the thickened fuel sticks: neither rolling nor water puts it out', () => {
   const bare = douse('swordShield').man;
   const plate = douse('knight').man;
   assert.ok(plate.trauma.trunk < bare.trauma.trunk * 0.6, `${plate.trauma.trunk} against ${bare.trauma.trunk}`);
   const wet = douse('swordShield', 0.6, (world, man) => { man.wading = { act: 1 }; }).man;
-  assert.ok((wet.burning?.fuel ?? 0) < (bare.burning?.fuel ?? 0) || !wet.burning, 'water smothers it');
-  assert.ok(wet.trauma.trunk < bare.trauma.trunk, `${wet.trauma.trunk} against ${bare.trauma.trunk}`);
+  assert.ok(wet.burning && wet.burning.fuel > 0, 'it floats and burns on in the water');
 });
 
 test('a man burning frightens the men near him, of either side', () => {
