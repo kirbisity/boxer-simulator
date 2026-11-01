@@ -16,7 +16,7 @@ import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skinte
 import { detailMaterial } from './skindetail.js';
 import { DETAIL_ARMOUR, DETAIL_MAPS, clothCellOf, detailKindOf } from './detailmaps.js';
 import { armourDetailMaterial, clothAtlasTexture, clothDetailMaterial, preloadDetailMaps } from './detailtex.js';
-import { SKIN_TONES } from './skintones.js';
+import { lookSkinHex } from './skintones.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
 import { FACTIONS, factionOf, glovedFists, headgearOptions, outfitOf } from './outfits.js';
@@ -59,7 +59,7 @@ const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
 // porcelain: a pale, cold-toned complexion (powdered, gothic).
 export { SKIN_TONES } from './skintones.js';
 /** A look's skin colour: its own (`skinColor`: a gorilla's black skin, a robot's dark joints) or its tone's. */
-const skinHex = (look) => (look.skinColor ? new THREE.Color(look.skinColor).getHex() : SKIN_TONES[look.skinTone ?? 'medium']);
+const skinHex = (look) => (look.skinColor ? new THREE.Color(look.skinColor).getHex() : lookSkinHex(look));
 
 // Drawn characters carry slightly large heads; it is what makes them read
 // as characters rather than as small-headed mannequins.
