@@ -22,6 +22,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 SHEETS = {
     'formMurmillo': {'size': 512}, 'formThraex': {'size': 512}, 'formHoplomachus': {'size': 512},
     'formSecutor': {'size': 512}, 'formScissor': {'size': 512},
+    'formKettleRidged': {'size': 512}, 'formKettleBurgundian': {'size': 512, 'cut': True},
+    'formSalletGerman': {'size': 512, 'cut': True}, 'formBarbute': {'size': 512, 'cut': True},
     'maskOni': {'size': 512, 'alpha': True}, 'maskRessei': {'size': 512, 'alpha': True}, 'maskTengu': {'size': 512, 'alpha': True},
 }
 QUALITY = {'albedo': 84, 'normal': 86, 'orm': 78}
@@ -46,6 +48,11 @@ def pack(folder, name, spec, preview):
         lacquer = resample(load(folder, name, 'src_mask')[:, :, None], size)
         cut = resample(load(folder, name, 'src_cut')[:, :, None], size)
         out['albedo'] = webp(to8(np.concatenate([colour, lacquer], axis=2)), QUALITY['albedo'])
+        out['normal'] = webp(to8(np.concatenate([n, cut], axis=2)), QUALITY['normal'])
+    elif spec.get('cut'):
+        # A helmet with openings (a sight, a T): the cut-out in the normal map's alpha (helmmaps.js helmMaterial `cut`).
+        cut = resample(load(folder, name, 'src_cut')[:, :, None], size)
+        out['albedo'] = webp(to8(colour), QUALITY['albedo'])
         out['normal'] = webp(to8(np.concatenate([n, cut], axis=2)), QUALITY['normal'])
     else:
         out['albedo'] = webp(to8(colour), QUALITY['albedo'])
