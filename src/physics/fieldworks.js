@@ -827,25 +827,40 @@ export function horseFounders(horse, sunk) {
  */
 export function horseBalks(world, horse) {
   const works = worksOf(world.arena);
+  horse.hurdle = null;
   if (!works || horse.state !== 'up') return Infinity;
+  // (In the air, it is over whatever it jumped.)
+  if (horse.air) return Infinity;
   const spec = FIELDWORKS.horse;
   const f = [Math.cos(horse.yaw), -Math.sin(horse.yaw)];
   const front = spec.front * horse.withers;
+  // What a robot can jump (`clearance`, m: physics/mounted.js, its jump's height) it does not pull up for: the nearest
+  // such is its `hurdle` ({ distance, height }), for it to jump.
+  const clearance = horse.clearance ?? 0;
   let nearest = Infinity;
-  const ahead = (x, z) => {
+  const hurdle = (distance, height) => {
+    if (!horse.hurdle || distance < horse.hurdle.distance) horse.hurdle = { distance, height };
+  };
+  const ahead = (x, z, height) => {
     const dx = x - horse.at[0];
     const dz = z - horse.at[1];
     const along = dx * f[0] + dz * f[1] - front;
     if (along < -0.2 || along > spec.look) return;
     if (Math.abs(dx * f[1] - dz * f[0]) > spec.lane + 0.3 * horse.withers) return;
-    nearest = Math.min(nearest, Math.max(0, along));
+    if (height < clearance) hurdle(Math.max(0, along), height);
+    else nearest = Math.min(nearest, Math.max(0, along));
   };
-  for (const stake of works.stakes) if (stakeStanding(world, stake)) ahead(stake.tip[0], stake.tip[2]);
+  for (const stake of works.stakes) if (stakeStanding(world, stake)) ahead(stake.tip[0], stake.tip[2], stake.tip[1]);
   // A wall or a ditch's lip: felt along its line ahead, a step at a time.
   for (let along = 0; along <= spec.look; along += 0.5) {
     const x = horse.at[0] + f[0] * (front + along);
     const z = horse.at[1] + f[1] * (front + along);
-    if (works.walls.some((wall) => nearestOnWall(wall, x, z).distance < 0.3) || (works.ditches.length && Math.abs(reliefAt(works, x, z) - reliefAt(works, horse.at[0], horse.at[1])) > spec.step)) {
+    const wall = works.walls.find((each) => nearestOnWall(each, x, z).distance < 0.3);
+    if (wall && wall.height < clearance) {
+      hurdle(along, wall.height);
+      continue;
+    }
+    if (wall || (works.ditches.length && Math.abs(reliefAt(works, x, z) - reliefAt(works, horse.at[0], horse.at[1])) > spec.step)) {
       nearest = Math.min(nearest, along);
       break;
     }
@@ -865,8 +880,11 @@ export function horseOnWorks(world, horse, before, hurt) {
   const f = [Math.cos(horse.yaw), -Math.sin(horse.yaw)];
   const front = [horse.at[0] + f[0] * FIELDWORKS.horse.front * horse.withers, horse.at[1] + f[1] * FIELDWORKS.horse.front * horse.withers];
   const velocity = horse.velocity ?? [f[0] * horse.speed, 0, f[1] * horse.speed];
+  // (A robot in the air goes over a ditch's lip, and a wall lower than its feet: physics/mounted.js mountJump.)
+  const flying = horse.air?.phase === 'flight';
+  const feet = flying ? horse.lift ?? 0 : 0;
   // A ditch's lip or a bank's face before its chest: it does not go on.
-  if (works.ditches.length) {
+  if (works.ditches.length && !flying) {
     const here = reliefAt(works, horse.at[0], horse.at[1]);
     const ahead = reliefAt(works, front[0], front[1]);
     if (Math.abs(ahead - here) > FIELDWORKS.horse.step) {
@@ -875,6 +893,7 @@ export function horseOnWorks(world, horse, before, hurt) {
     }
   }
   for (const wall of works.walls) {
+    if (wall.height < feet) continue;
     const near = nearestOnWall(wall, front[0], front[1]);
     const reach = 0.25 * horse.withers;
     if (near.distance >= reach) continue;

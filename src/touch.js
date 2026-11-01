@@ -464,7 +464,7 @@ export function installFightControls(root, hooks) {
     // Jump dimmed while he cannot (in the air, crawling, down, hurt, too weak, getting his legs back after a landing).
     const canJump = !jumpNow(world, me).blocked;
     jump.classList.toggle('blocked', !canJump);
-    jump.classList.toggle('on', Boolean(me.jump));
+    jump.classList.toggle('on', Boolean(me.jump || me.mount?.air));
     // The player's own status, compact, low down.
     status.querySelector('.name').textContent = firstNameOf(me);
     status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';

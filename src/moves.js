@@ -1912,9 +1912,11 @@ const DOG_CORE = { ...BOT, hidden: true, fallback: 'dogRam', defences: {}, defen
 STYLES.dogRam = { ...DOG_CORE, label: 'Robot dog (ram)', attacks: {} };
 // (Its arm carried folded low over its back between grabs: `guardHeight`.)
 STYLES.dogGrip = { ...DOG_CORE, label: 'Robot dog (gripper arm)', stance: { ...BOT.stance, guardHeight: -0.6 }, attacks: { gripLeg: 1 } };
+// (Its shots ~0.9 s apart on average, `between` [least, + up to]: a semi-automatic rifle on a motor-laid mount that settles
+// from each kick within a few tenths of a second, fired as soon as it is laid again.)
 STYLES.dogTurret = {
   ...DOG_CORE, label: 'Robot dog (rifle turret)', weapon: 'turretRifle',
-  ranged: { flee: 0, rest: 0, runFor: 0, standFor: 2, close: 1.2, shotSeconds: 0.25, headShare: 0.2, between: [0.6, 1], move: 'fireRifle', holdGround: true, advance: 0.45, reloadSafe: Infinity },
+  ranged: { flee: 0, rest: 0, runFor: 0, standFor: 2, close: 1.2, shotSeconds: 0.25, headShare: 0.2, between: [0.5, 0.8], move: 'fireRifle', holdGround: true, advance: 0.45, reloadSafe: Infinity },
   weaponGuard: { hand: [0.2, 0.62, -0.14], dir: [1, -0.1, 0.05] },
   attacks: { fireRifle: 1 },
 };

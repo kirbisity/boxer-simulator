@@ -160,6 +160,8 @@ export function buildRobotDogView(view, horse) {
     const dark = surface(0x2b2f28, { roughness: 0.55 });
     const steel = surface(0x3a3d40, { roughness: 0.35 });
     carried.mount = dogDrum(0.07, 0.1, dark, [0, 0, 0], 'y');
+    // The yoke that pans on it (turned with the gun's heading, so the slew is seen), the cradle's trunnion across it.
+    carried.yoke = dogBox([0.12, 0.1, 0.16], dark);
     carried.dogBox = dogBox([0.3, 0.12, 0.12], dark);
     carried.barrel = dogLink(0.012, steel, 1);
     carried.optic = dogBox([0.16, 0.06, 0.05], surface(0x111214, { roughness: 0.3 }));
@@ -174,21 +176,27 @@ export function buildRobotDogView(view, horse) {
 export function updateRobotDogView(dogView, world = null) {
   const horse = dogView.horse;
   const drawn = dogView.drawn;
-  Object.assign(drawn, { at: horse.at, yaw: horse.yaw, speed: horse.speed, stride: horse.stride, state: horse.state, roll: horse.roll, fall: horse.fall, withers: horse.withers, bank: horse.bank });
+  // (Its jump's `lift` and `air`, its rocking on its legs from a recoil, `kick`, and a leg cut off, `severed`: as the physics has them.)
+  Object.assign(drawn, { at: horse.at, yaw: horse.yaw, speed: horse.speed, stride: horse.stride, state: horse.state, roll: horse.roll, fall: horse.fall, withers: horse.withers, bank: horse.bank, lift: horse.lift, air: horse.air, kick: horse.kick, severed: horse.severed });
   poseHorse(drawn);
   const W = horse.withers;
-  dogView.group.position.set(horse.at[0], drawn.bob ?? 0, horse.at[1]);
+  dogView.group.position.set(horse.at[0], (drawn.bob ?? 0) + (horse.lift ?? 0), horse.at[1]);
   dogView.group.rotation.order = 'YXZ';
   dogView.group.rotation.y = horse.yaw;
   dogView.group.rotation.x = horse.bank ?? 0;
   dogView.body.rotation.z = drawn.pitch ?? 0;
-  dogView.body.rotation.x = horse.roll ?? 0;
+  dogView.body.rotation.x = (horse.roll ?? 0) + (drawn.rock ?? 0);
   // Down: its legs fold and the body settles to the ground.
   const fall = horse.fall ?? 0;
   dogView.body.position.y = horse.shape.legs[0].root[1] * W * (1 - 0.6 * fall);
   for (const [key, pieces] of Object.entries(dogView.legs)) {
     const leg = drawn.legs[key];
     if (!leg) continue;
+    if (leg.severed) {
+      // Cut off: the leg lies where its piece fell (the debris), straight, its two links end to end.
+      layCutLeg(pieces, world?.debris?.[horse.severedDebris?.[key]]);
+      continue;
+    }
     dogLay(pieces.upper, leg.root, leg.knee);
     dogLay(pieces.lower, leg.knee, leg.hoof);
     pieces.knee.position.set(...leg.knee);
@@ -213,13 +221,19 @@ export function updateRobotDogView(dogView, world = null) {
     carried.jaw.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), dir);
   }
   if (carried.dogBox) {
-    // The turret: its mount on the back, the receiver at the rider's hand turned dogAlong the rifle, the barrel and suppressor to the muzzle.
+    // The turret: its mount on the back, the yoke panned to the gun's heading, the receiver on the trunnion turned along the
+    // rifle (its line as the turret's motors lay it and its cradle throws it: physics/mounted.js stepTurret), the barrel and
+    // suppressor to the muzzle. All from the robot's back and the gun's line, never the rider's (hidden) arm.
     const weapon = rider.weapon;
-    const hand = at(P.rHand);
     const dir = weapon?.dir ?? [Math.cos(horse.yaw), 0, -Math.sin(horse.yaw)];
     const seat = at(P.pelvis);
-    carried.mount.position.set(seat[0], seat[1] + 0.02, seat[2]);
+    const turret = weapon?.spec.turret;
+    const pivot = [seat[0], seat[1] + (turret?.height ?? 0.1), seat[2]];
     const aim = new THREE.Vector3(...dir).normalize();
+    const hand = [pivot[0] + aim.x * (turret?.grip ?? 0.05), pivot[1] + aim.y * (turret?.grip ?? 0.05), pivot[2] + aim.z * (turret?.grip ?? 0.05)];
+    carried.mount.position.set(seat[0], seat[1] + 0.02, seat[2]);
+    carried.yoke.position.set(seat[0], (seat[1] + pivot[1]) / 2 + 0.01, seat[2]);
+    carried.yoke.rotation.set(0, Math.atan2(-aim.z, aim.x), 0);
     const centre = [hand[0] - aim.x * 0.05, hand[1] - aim.y * 0.05, hand[2] - aim.z * 0.05];
     carried.dogBox.position.set(...centre);
     carried.dogBox.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), aim);
@@ -229,6 +243,21 @@ export function updateRobotDogView(dogView, world = null) {
     dogLay(carried.barrel, [hand[0] + aim.x * 0.1, hand[1] + aim.y * 0.1, hand[2] + aim.z * 0.1], muzzle);
     dogLay(carried.can, muzzle, [muzzle[0] + aim.x * 0.15, muzzle[1] + aim.y * 0.15, muzzle[2] + aim.z * 0.15]);
   }
+}
+
+const cutAxis = new THREE.Vector3();
+const cutTurn = new THREE.Quaternion();
+/** A cut-off leg's links laid along its piece (debris: middle `x`, turned `q`, its line `axis`, `half` its length); hidden if there is none. */
+function layCutLeg(pieces, debris) {
+  for (const mesh of Object.values(pieces)) mesh.visible = Boolean(debris);
+  if (!debris) return;
+  cutAxis.set(...debris.axis).applyQuaternion(cutTurn.set(...debris.q));
+  const end = (sign) => [debris.x[0] + cutAxis.x * debris.half * sign, debris.x[1] + cutAxis.y * debris.half * sign, debris.x[2] + cutAxis.z * debris.half * sign];
+  const [top, middle, foot] = [end(-1), debris.x, end(1)];
+  dogLay(pieces.upper, top, middle);
+  dogLay(pieces.lower, middle, foot);
+  pieces.knee.position.set(...middle);
+  pieces.foot.position.set(...foot);
 }
 
 /** Remove a robot dog's model. */

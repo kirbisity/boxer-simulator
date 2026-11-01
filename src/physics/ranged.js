@@ -13,7 +13,7 @@ import { vec, yawRotate } from '../pose.js';
 import { ARROW, BLADES, bleedToLose, bulletProof, bulletRegion, GUN, slerpDir, SUPPLY } from '../weapons.js';
 import { WORLD } from './config.js';
 import { BARDING } from '../horses.js';
-import { gaitAt, harmHorse } from './mounted.js';
+import { gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
 import { flamePulse } from './flame.js';
 
 /**
@@ -331,6 +331,8 @@ export function sightsOn(fighter) {
   const weapon = fighter.weapon;
   if (!weapon?.held || !fighter.punch?.aim) return true;
   const hand = point(fighter.x, P[`${weapon.main}Hand`]);
+  // A turret's fire control: the barrel laid on the mark and steady there (physics/mounted.js turretLaid).
+  if (weapon.spec.turret && weapon.turret) return turretLaid(weapon, weapon.turretMark ?? toWorld(fighter, fighter.punch.aim));
   const toMark = vec.normalize(vec.sub(toWorld(fighter, fighter.punch.aim), hand));
   if (vec.dot(toMark, weapon.dir) <= Math.cos(GUN.settled)) return false;
   // A shouldered gun is fired once it has stopped swinging onto the mark.
@@ -780,7 +782,9 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
   // shot. A long gun is braced in the shoulder and moves with the body (its
   // walk is `moving`): only its motion against the shoulder throws it.
   const handVelocity = point(fighter.v, handIndex);
-  const shaking = vec.length(weapon.spec.longGun ? vec.sub(handVelocity, point(fighter.v, P[`${weapon.main}Shoulder`])) : handVelocity);
+  // (A turret's own motion is in its barrel's line itself: its sight is on the gun, the round goes where the barrel lies.)
+  const turret = Boolean(weapon.spec.turret && weapon.turret);
+  const shaking = turret ? 0 : vec.length(weapon.spec.longGun ? vec.sub(handVelocity, point(fighter.v, P[`${weapon.main}Shoulder`])) : handVelocity);
   // A strong man holds a gun steady; a weak one shakes.
   const strength = fighter.body.strikeForce[handIndex];
   const recoil = WORLD.recoil;
@@ -791,7 +795,7 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
   // part of however far the barrel itself is off that line.
   const mark = aimedAt ?? (punch?.aim ? toWorld(fighter, punch.aim) : vec.add(muzzle, barrel));
   const sighted = vec.normalize(vec.sub(mark, muzzle));
-  const aimed = slerpDir(sighted, barrel, GUN.barrelShare);
+  const aimed = turret ? barrel : slerpDir(sighted, barrel, GUN.barrelShare);
   const dir = vec.normalize(vec.add(aimed, vec.add(vec.scale(up, gauss() * spread), vec.scale(across, gauss() * spread))));
   // A shotgun's pellets (`pellets`) open out round the aimed line (`pellet` rad); anything else is one round.
   for (let pellet = 0; pellet < (shot?.pellets ?? 1); pellet += 1) {
@@ -811,6 +815,11 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
     if (hit?.target === 'shield') event.effects.push('stopped by the shield');
     else if (hit) bulletHit(world, fighter, hit, flight, event, shot);
     else event.effects.push('missed');
+  }
+  // A turret's kick climbs its muzzle on the cradle and goes on through its mount into the robot (physics/mounted.js turretRecoil).
+  if (turret) {
+    turretRecoil(world, fighter, weapon, shot?.recoil ?? GUN.recoil);
+    return;
   }
   // The gun kicks up and back in the hand.
   // Into both hands (both on the gun in the stance), the arms and the shoulders: a heavy man barely moves, a light one rocks.
