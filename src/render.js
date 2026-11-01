@@ -30,7 +30,7 @@ import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
-import { HELM_HEAD_BREADTH } from './helmforms.js';
+import { HELM_HEAD_BREADTH, HELM_SPAN } from './helmforms.js';
 import { photoFaceFor } from './photoface.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
@@ -1985,7 +1985,9 @@ function detailedView(view, fighter, simple) {
   const headgear = buildHeadgear(body, dress.head, garmentColors, plainSteel, corner, { lowDetail: simple });
   if (headgear) {
     // A helmet fitted over the game's head (helmforms.js) widened to a broader one (a drawn head, #faces=off; a broad skull).
-    if (headgear.fitted && headView.breadth > HELM_HEAD_BREADTH) headgear.group.scale.z = headView.breadth / HELM_HEAD_BREADTH;
+    const [spanX, spanY, spanZ] = HELM_SPAN[dress.head?.kind] ?? [1, 1, 1];
+    const widen = headgear.fitted && headView.breadth > HELM_HEAD_BREADTH ? headView.breadth / HELM_HEAD_BREADTH : 1;
+    headgear.group.scale.set(spanX, spanY, spanZ * widen);
     headView.group.add(headgear.group);
     if (headgear.hidesHair) headView.hideHair({ beard: headgear.showsBeard });
   }

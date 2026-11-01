@@ -1028,23 +1028,26 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       // a plume, a lamellar aventail round the sides and back (open at the
       // face); the kheshig's with a gilt band and an iron face mask.
       const iron = metal(steel, color);
-      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
-      bowl.scale.y = 1.45;
+      // The bowl's profile (head radii): near upright above the brow band, then drawn in, its flanks a little hollow,
+      // to a tall narrow point, as on surviving Mongol and Central Asian bowls; HELM_SPAN narrows it side to side.
+      const profile = [[1.14, 0], [1.13, 0.2], [1.04, 0.5], [0.86, 0.82], [0.62, 1.12], [0.4, 1.42], [0.24, 1.72], [0.13, 2.0], [0.07, 2.25], [0.03, 2.42], [0, 2.46]];
+      const bowl = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x * r, y * r)), 20), iron);
+      bowl.material.side = THREE.DoubleSide;
       bowl.position.y = 0.06 * r;
       const band = new THREE.Mesh(new THREE.TorusGeometry(1.17 * r, 0.08 * r, 6, 24), metal(steel, head.gold ?? color));
       band.rotation.x = Math.PI / 2;
       band.position.y = 0.1 * r;
-      const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.03 * r, 0.08 * r, 0.6 * r, 8), iron);
-      spike.position.y = 1.95 * r;
+      const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.025 * r, 0.05 * r, 0.5 * r, 8), iron);
+      spike.position.y = 2.7 * r;
       group.add(bowl, band, spike);
       // A Ming rider's (`tassel`): the red horsehair tassel bound to the spike, falling round it.
       if (head.tassel) {
-        spike.scale.y = 1.6;
-        spike.position.y = 2.2 * r;
-        group.add(hongying(r, { top: 2.42, length: 0.75, spread: 0.62, colour: head.tassel }));
+        spike.scale.y = 1.4;
+        spike.position.y = 2.78 * r;
+        group.add(hongying(r, { top: 3.0, length: 0.75, spread: 0.62, colour: head.tassel }));
       } else if (head.plume) {
         const plume = new THREE.Mesh(new THREE.ConeGeometry(0.09 * r, 0.9 * r, 6), surface(head.plume, { roughness: 0.9 }));
-        plume.position.y = 2.6 * r;
+        plume.position.y = 3.2 * r;
         group.add(plume);
       }
       const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.7 * r, 1.25 * r, 22, 3, true, Math.PI * 0.8, Math.PI * 1.4), metal(steel, head.coif ?? color));
