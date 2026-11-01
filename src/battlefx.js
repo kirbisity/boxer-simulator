@@ -23,8 +23,11 @@ export const BATTLE_FX = {
   maxPuffs: 420,
   // Live glow sprites: sparks, flashes, glints and fire (flameview.js) together.
   maxGlows: 1100,
-  // A light breeze (m/s, x and z): the cloud drifts off at a slow walk.
+  // A light breeze (m/s, x and z): the cloud drifts off at a slow walk. (A view with a place's wind, wind.js via flameview.js
+  // `view.windAir`, drifts it with that instead, as much of it as gets in where each puff was made: `puff.shelter`.)
   wind: [0.35, 0.12],
+  // Smoke in a wind is torn and mixed faster: its spread grows by this share per m/s of the wind.
+  windSpread: 0.25,
   // Warm smoke rises, slowly (m/s), and loses it as it cools.
   rise: 0.14,
   // A cloud goes on spreading as it mixes with the air (m of size per s).
@@ -107,23 +110,27 @@ export function battleFxShotPuffs({ from, dir, powder, long, pan }, random = Mat
 
 /**
  * One step of a puff (plain numbers, mutated): its own motion dies away into
- * the breeze, it rises, and it ages. Returns its size and opacity now, or
- * null once it has thinned away.
+ * the breeze (`wind` [x, z] m/s, times the puff's `shelter`), it rises, and it
+ * ages. Returns its size and opacity now, or null once it has thinned away.
  */
-export function battleFxStepPuff(puff, dt, spec = BATTLE_FX) {
+export function battleFxStepPuff(puff, dt, spec = BATTLE_FX, wind = spec.wind) {
   puff.age = (puff.age ?? 0) + dt;
   if (puff.age >= puff.life) return null;
   const keep = Math.exp(-spec.drag * dt);
   const share = puff.age / puff.life;
   // Warm at first, it rises; cooling, it floats on the breeze.
   const rise = (puff.rise ?? spec.rise) * (1 - share);
-  const target = [spec.wind[0], rise, spec.wind[1]];
-  for (let axis = 0; axis < 3; axis += 1) {
-    puff.velocity[axis] = target[axis] + (puff.velocity[axis] - target[axis]) * keep;
-    puff.at[axis] += puff.velocity[axis] * dt;
-  }
-  // Billowing out at once, then spreading slowly on as it mixes with the air.
-  const size = puff.size0 + (puff.size1 - puff.size0) * (1 - Math.exp(-puff.age / puff.grow)) + spec.spread * puff.age;
+  const shelter = puff.shelter ?? 1;
+  const windX = wind[0] * shelter;
+  const windZ = wind[1] * shelter;
+  const velocity = puff.velocity;
+  velocity[0] = windX + (velocity[0] - windX) * keep;
+  velocity[1] = rise + (velocity[1] - rise) * keep;
+  velocity[2] = windZ + (velocity[2] - windZ) * keep;
+  for (let axis = 0; axis < 3; axis += 1) puff.at[axis] += velocity[axis] * dt;
+  // Billowing out at once, then spreading slowly on as it mixes with the air (faster in a wind).
+  const spread = spec.spread * (1 + (spec.windSpread ?? 0) * Math.hypot(windX, windZ));
+  const size = puff.size0 + (puff.size1 - puff.size0) * (1 - Math.exp(-puff.age / puff.grow)) + spread * puff.age;
   // In within a few hundredths of a second, then thinning as it spreads.
   const opacity = puff.alpha * Math.min(1, puff.age / 0.04) * (1 - share) ** 1.2;
   return { size, opacity };
@@ -461,6 +468,7 @@ export function battleFxShot(view, { from, dir, powder, long, pan }) {
     puff.spin = Math.random() * Math.PI * 2;
     puff.spinRate = (Math.random() - 0.5) * 0.4;
     puff.cell = Math.floor(Math.random() * 4);
+    puff.shelter = battleFxShelter(view, puff.at);
     fx.puffs.push(puff);
   }
 }
@@ -505,6 +513,7 @@ export function battleFxBlast(view, at, frag) {
     puff.spin = Math.random() * Math.PI * 2;
     puff.spinRate = (Math.random() - 0.5) * 0.4;
     puff.cell = Math.floor(Math.random() * 4);
+    puff.shelter = battleFxShelter(view, puff.at);
     fx.puffs.push(puff);
   }
 }
@@ -564,12 +573,16 @@ export function battleFxAddFire(view, at, size, colour, tail = null) {
 /** A puff of smoke ({ at, velocity, size0, size1, grow, alpha, life, rise?, soot? 0..1 }), with the shots' (the oldest gives way). */
 export function battleFxAddPuff(view, puff) {
   const fx = battleFxOf(view);
+  puff.shelter ??= battleFxShelter(view, puff.at);
   if (fx.puffs.length >= BATTLE_FX.maxPuffs) fx.puffs.shift();
   puff.spin = Math.random() * Math.PI * 2;
   puff.spinRate = (Math.random() - 0.5) * 0.4;
   puff.cell = Math.floor(Math.random() * 4);
   fx.puffs.push(puff);
 }
+
+/** How much of the place's wind gets in at `at` (flameview.js sets `view.windShelterAt`: wind.js windShelter), 1 without one. */
+const battleFxShelter = (view, at) => view.windShelterAt?.(at[0], at[1], at[2]) ?? 1;
 
 /** The flash's light lent to a fire this frame (at a point, as bright, out to `range` m, its colour), where the fire outshines the last shot's flash. */
 export function battleFxFireLight(view, at, intensity, range = BATTLE_FX.lightRange, colour = BATTLE_FX.flashColour) {
@@ -712,8 +725,9 @@ export function battleFxUpdate(view, dt, sparks = []) {
   const matrices = smoke.instanceMatrix.array;
   const puffData = smoke.geometry.attributes.aPuff.array;
   let drawn = 0;
+  const wind = view.windAir ?? BATTLE_FX.wind;
   fx.puffs = fx.puffs.filter((puff) => {
-    const now = battleFxStepPuff(puff, dt);
+    const now = battleFxStepPuff(puff, dt, BATTLE_FX, wind);
     if (!now) return false;
     puff.spin += puff.spinRate * dt;
     const base = drawn * 16;

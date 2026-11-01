@@ -13,6 +13,11 @@
 // The light: the fires near each other summed into a few clusters, and the brightest given real lights (warm, flickering): the
 // first the flash's light (battlefx.js), the next ones lights of the fire's own, made only while a flamethrower is in the fight
 // (each costs every lit pixel). The tanks on the carrier's back are three plain meshes, placed each frame.
+//
+// The air (wind.js): every flame rises by its buoyancy and leans with the air going past it, the place's wind (gusting, a draught
+// under a roof) less the speed of what burns, so a man running alight trails his flames behind him and a pool leans downwind; each
+// shakes a little, more as the air past it grows. The jet's fire is carried a little off its lumps downwind; the smoke goes with
+// the wind entirely (battlefx.js steps it in `view.windAir`), spreading faster in it.
 
 /* global THREE */
 
@@ -20,6 +25,8 @@ import { P } from './body.js';
 import { yawRotate } from './pose.js';
 import { battleFxAddPuff, battleFxFireLight, battleFxInstanced, battleFxSceneLight } from './battlefx.js';
 import { FLAME, patchReach } from './physics/flame.js';
+import { stormLook } from './levelmode/storm.js';
+import { flameAxis, placeWind, windFollowShare, windNow, windShelter } from './wind.js';
 
 export const FLAME_VIEW = {
   // At most this many flames a frame (the batch's size), by the picture's quality tier; how bright each kind is drawn.
@@ -44,7 +51,59 @@ export const FLAME_VIEW = {
   // Smoke, puffs a second: a patch (at its strength), a man (at full heat), a lump of the stream past `streamFrom` s; each puff's
   // life (s), rise (m/s), size (m, from and to) and opacity; `low` of them on a low tier.
   smoke: { patch: 3, man: 3.5, stream: 0.7, streamFrom: 0.3, life: 5, rise: 1.5, from: 0.35, to: 2.1, alpha: 0.55, low: 0.5 },
+  // The air (wind.js): the buoyant velocity (m/s) of a man's flames and a horse's (a pool's is worked out from its power and
+  // width: flameViewBuoyant); the jet's fire carried downwind off its lumps by `jetDrift` of how far the air has moved since it
+  // left the nozzle, at most `jetDriftMost` of its own size; a pool's tongues stood off downwind by `poolLean` of its reach at
+  // full lean; a move of more than `jump` m in a frame (a teleport) is no speed.
+  air: { man: 1.6, horse: 1.9, jetDrift: 0.35, jetDriftMost: 0.9, poolLean: 0.45, jump: 2 },
 };
+
+// Scratch (nothing allocated a frame): a flame's axis.
+const FLAME_VIEW_AXIS = [0, 1, 0];
+
+/** The air of the view's place now: its wind (gusting at the fight's time), the drift of the smoke, and how to read a roof's shelter. */
+function flameViewAir(view, world) {
+  const look = view.place === 'dunnottar' ? stormLook() : null;
+  if (!view.windBase || view.windFor !== view.place || view.windWeather !== (view.weather ?? null) || view.windLook !== look) {
+    view.windBase = placeWind(view.place, view.weather ?? null, look);
+    view.windFor = view.place;
+    view.windWeather = view.weather ?? null;
+    view.windLook = look;
+  }
+  const wind = windNow(view.windBase, world.time, (view.windGust ??= { x: 0, z: 0, speed: 0 }));
+  const air = (view.windAir ??= [0, 0]);
+  air[0] = wind.x;
+  air[1] = wind.z;
+  view.windWorld = world;
+  view.windShelterAt ??= (x, y, z) => windShelter(view.windWorld, x, y, z);
+  return wind;
+}
+
+/**
+ * The air going past something alight (`key`: whose; at x, z; `shelter`: the share of the wind reaching it), followed over `dt`
+ * s of the fight (wind.js WIND.follow): its own speed, read from where it was a frame ago, taken from the wind. Returns its state.
+ */
+export function flameViewAirPast(view, key, x, z, shelter, wind, dt) {
+  const states = (view.flameAir ??= new WeakMap());
+  let state = states.get(key);
+  if (!state) {
+    state = { x, z, airX: wind.x * shelter, airZ: wind.z * shelter };
+    states.set(key, state);
+  }
+  if (dt > 0) {
+    const dx = x - state.x;
+    const dz = z - state.z;
+    const jumped = dx * dx + dz * dz > FLAME_VIEW.air.jump * FLAME_VIEW.air.jump;
+    const share = windFollowShare(dt);
+    const targetX = wind.x * shelter - (jumped ? 0 : dx / dt);
+    const targetZ = wind.z * shelter - (jumped ? 0 : dz / dt);
+    state.airX += (targetX - state.airX) * share;
+    state.airZ += (targetZ - state.airZ) * share;
+  }
+  state.x = x;
+  state.z = z;
+  return state;
+}
 
 /** A flicker 0..1 from a seed and the time: a few sines, cheap and never in step. */
 const flameViewFlicker = (seed, time) => 0.5 + 0.25 * Math.sin(time * 13.1 + seed * 31.7) + 0.25 * Math.sin(time * 7.3 + seed * 17.9);
@@ -269,15 +328,25 @@ function flameViewLights(view, count) {
   return lights;
 }
 
-/** Sooty smoke off a fire at `at`, `rate` puffs a second over `dt` s of the fight (none while it is paused). */
-function flameViewSmoke(view, x, y, z, rate, dt, size = 1) {
+/**
+ * Sooty smoke off a fire at `at`, `rate` puffs a second over `dt` s of the fight (none while it is paused): off at once with as
+ * much of the wind as reaches there (`shelter`), as the air is (a running man leaves his smoke behind him).
+ */
+function flameViewSmoke(view, x, y, z, rate, dt, size = 1, shelter = 1) {
   const spec = FLAME_VIEW.smoke;
   if (Math.random() >= rate * dt) return;
   const jitter = () => (Math.random() - 0.5) * 0.5;
+  const windX = (view.windGust?.x ?? 0) * shelter;
+  const windZ = (view.windGust?.z ?? 0) * shelter;
   battleFxAddPuff(view, {
-    at: [x + jitter(), y + 0.4, z + jitter()], velocity: [jitter(), spec.rise, jitter()],
+    shelter, at: [x + jitter(), y + 0.4, z + jitter()], velocity: [windX + jitter(), spec.rise, windZ + jitter()],
     size0: spec.from * size, size1: spec.to * size * (0.8 + Math.random() * 0.5), grow: 1.6, alpha: spec.alpha, life: spec.life * (0.8 + Math.random() * 0.4), rise: spec.rise, soot: 1,
   });
+}
+
+/** A fire's buoyant velocity (m/s), (g Q / (rho cp T D))^(1/3), from its power (kW) and its width (m): about the wind it leans 45 degrees in. */
+export function flameViewBuoyant(kilowatts, width) {
+  return Math.max(0.5, Math.cbrt((9.81 * kilowatts * 1e3) / (1.2 * 1005 * 293 * Math.max(0.1, width))));
 }
 
 /** The height of a pool fire's flames (m): Heskestad's, from its power (kW) and its width (m). */
@@ -291,6 +360,7 @@ export function poolFlameHeight(kilowatts, width) {
  */
 export function updateFlames(view, world, tier = 'high') {
   const carriers = placeFlameTanks(view, world);
+  const wind = flameViewAir(view, world);
   const flame = world.flame;
   const lit = flame || world.fighters.some((fighter) => fighter.burning) || (world.horses ?? []).some((horse) => horse.burning);
   // The fire's own lights while a flamethrower is in the fight (made at its start: the lit programs change once, not at the first burst).
@@ -315,6 +385,9 @@ export function updateFlames(view, world, tier = 'high') {
     if (!burning || fighter.dormant) continue;
     const heat = burning.heat;
     const x = fighter.x;
+    const pelvis = P.pelvis * 3;
+    const shelter = windShelter(world, x[pelvis], x[pelvis + 1], x[pelvis + 2]);
+    const air = flameViewAirPast(view, fighter, x[pelvis], x[pelvis + 2], shelter, wind, dt);
     for (let spot = 0; spot < spots.length; spot += 1) {
       const lick = flameViewFlicker(fighter.id * 7 + spot, time);
       if (lick > 0.3 + 0.7 * heat + 0.15) continue;
@@ -322,25 +395,32 @@ export function updateFlames(view, world, tier = 'high') {
       const b = spots[spot][1] * 3;
       const share = spots[spot][2];
       const height = FLAME_VIEW.manFlame * (0.35 + 0.65 * heat) * (0.75 + 0.5 * lick);
+      const seed = fighter.id * 0.37 + spot * 0.13;
+      const axis = flameAxis(FLAME_VIEW_AXIS, air.airX, air.airZ, FLAME_VIEW.air.man, seed, time);
       flameViewPut(batch, x[a] + (x[b] - x[a]) * share, x[a + 1] + (x[b + 1] - x[a + 1]) * share - 0.05, x[a + 2] + (x[b + 2] - x[a + 2]) * share,
-        FLAME_VIEW.manWidth * (0.6 + 0.4 * heat), 0, height, 0, 0.55 + 0.4 * heat, FLAME_VIEW.bright.man, fighter.id * 0.37 + spot * 0.13, true);
+        FLAME_VIEW.manWidth * (0.6 + 0.4 * heat), axis[0] * height, axis[1] * height, axis[2] * height, 0.55 + 0.4 * heat, FLAME_VIEW.bright.man, seed, true);
     }
     const neck = P.neck * 3;
-    flameViewSmoke(view, x[neck], x[neck + 1], x[neck + 2], smoke.man * heat * smokeShare, dt);
+    flameViewSmoke(view, x[neck], x[neck + 1], x[neck + 2], smoke.man * heat * smokeShare, dt, 1, shelter);
     flameViewGlow(x[P.pelvis * 3], x[P.pelvis * 3 + 1] + 0.4, x[P.pelvis * 3 + 2], light.man * heat);
   }
   // A horse or a robot dog alight: tongues along its body's capsules (its legs too), as hot as it burns.
   for (const horse of world.horses ?? []) {
     const heat = horse.burning?.heat ?? 0;
     if (heat <= 0.01) continue;
+    const shelter = windShelter(world, horse.at[0], horse.withers, horse.at[1]);
+    const air = flameViewAirPast(view, horse, horse.at[0], horse.at[1], shelter, wind, dt);
     for (let spot = 0; spot < horse.capsules.length; spot += 1) {
       const capsule = horse.capsules[spot];
       const lick = flameViewFlicker(horse.id * 11 + spot, time);
       if (lick > 0.45 + 0.7 * heat) continue;
+      const height = FLAME_VIEW.manFlame * (0.35 + 0.65 * heat) * (0.75 + 0.5 * lick);
+      const seed = horse.id * 0.41 + spot * 0.17;
+      const axis = flameAxis(FLAME_VIEW_AXIS, air.airX, air.airZ, FLAME_VIEW.air.horse, seed, time);
       flameViewPut(batch, (capsule.a[0] + capsule.b[0]) / 2, (capsule.a[1] + capsule.b[1]) / 2, (capsule.a[2] + capsule.b[2]) / 2,
-        FLAME_VIEW.manWidth * (0.6 + 0.4 * heat), 0, FLAME_VIEW.manFlame * (0.35 + 0.65 * heat) * (0.75 + 0.5 * lick), 0, 0.55 + 0.4 * heat, FLAME_VIEW.bright.man, horse.id * 0.41 + spot * 0.17, true);
+        FLAME_VIEW.manWidth * (0.6 + 0.4 * heat), axis[0] * height, axis[1] * height, axis[2] * height, 0.55 + 0.4 * heat, FLAME_VIEW.bright.man, seed, true);
     }
-    flameViewSmoke(view, horse.at[0], horse.withers, horse.at[1], smoke.man * heat * smokeShare, dt);
+    flameViewSmoke(view, horse.at[0], horse.withers, horse.at[1], smoke.man * heat * smokeShare, dt, 1, shelter);
     flameViewGlow(horse.at[0], horse.withers + 0.3, horse.at[1], light.man * heat);
   }
   if (flame) {
@@ -349,13 +429,20 @@ export function updateFlames(view, world, tier = 'high') {
     let streamY = 0;
     let streamZ = 0;
     let streamCount = 0;
+    // The wind where the jet is (one reading of a roof for the whole stream: it is a few metres long).
+    const first = flame.blobs[0];
+    const jetShelter = first ? windShelter(world, first.x[0], first.x[1], first.x[2]) : 1;
+    const jetWindX = wind.x * jetShelter;
+    const jetWindZ = wind.z * jetShelter;
+    const windWay = Math.max(1e-6, wind.speed);
     for (const blob of flame.blobs) {
       const age = blob.age;
       const seed = (blob.viewSeed ??= Math.random());
       const fade = 1 - Math.max(0, (age - FLAME.life * 0.6) / (FLAME.life * 0.4));
-      const sx = -blob.v[0] * FLAME_VIEW.streak;
+      // Streaked along its flight through the air (its own speed less the wind's).
+      const sx = -(blob.v[0] - jetWindX) * FLAME_VIEW.streak;
       const sy = -blob.v[1] * FLAME_VIEW.streak;
-      const sz = -blob.v[2] * FLAME_VIEW.streak;
+      const sz = -(blob.v[2] - jetWindZ) * FLAME_VIEW.streak;
       if (age < FLAME_VIEW.dark) {
         // The fuel's rod, not yet alight: a dull orange thread lit by the igniter.
         flameViewPut(batch, blob.x[0], blob.x[1], blob.x[2], FLAME_VIEW.rod, sx, sy, sz, 0.3, 0.6, seed, false);
@@ -364,13 +451,20 @@ export function updateFlames(view, world, tier = 'high') {
       const grown = Math.min(1, (age - FLAME_VIEW.dark) / FLAME_VIEW.swellSeconds) ** 0.75;
       const size = FLAME_VIEW.size + FLAME_VIEW.swell * grown;
       const lift = FLAME_VIEW.lift * age * age;
+      // Its fire carried off it downwind, as far as the air has moved since it left the nozzle (a share), to a share of its own size.
+      const drift = Math.min(FLAME_VIEW.air.jetDriftMost * size, FLAME_VIEW.air.jetDrift * age * wind.speed * jetShelter);
+      const driftX = (wind.x / windWay) * drift;
+      const driftZ = (wind.z / windWay) * drift;
       const hot = FLAME_VIEW.hot + (FLAME_VIEW.cool - FLAME_VIEW.hot) * Math.min(1, age / 2);
-      flameViewPut(batch, blob.x[0], blob.x[1] + lift, blob.x[2], size, sx, sy, sz, hot, FLAME_VIEW.bright.stream * fade, seed, false);
+      flameViewPut(batch, blob.x[0] + driftX, blob.x[1] + lift, blob.x[2] + driftZ, size, sx, sy, sz, hot, FLAME_VIEW.bright.stream * fade, seed, false);
       if (age > FLAME_VIEW.billowFrom && Math.floor(seed * 1000) % FLAME_VIEW.billowEvery === 0) {
+        // A billow: cooler, lighter, carried twice as far, rolling up and over downwind.
         const roll = flameViewFlicker(seed * 50, time);
-        flameViewPut(batch, blob.x[0], blob.x[1] + lift + size * 0.35 * roll, blob.x[2], size * FLAME_VIEW.billow * (0.8 + 0.4 * roll), 0, size * 0.5, 0, hot * 0.62, FLAME_VIEW.bright.billow * fade, seed + 0.5, false);
+        const axis = flameAxis(FLAME_VIEW_AXIS, jetWindX, jetWindZ, FLAME_VIEW.air.man, seed, time);
+        flameViewPut(batch, blob.x[0] + driftX * 2, blob.x[1] + lift + size * 0.35 * roll, blob.x[2] + driftZ * 2, size * FLAME_VIEW.billow * (0.8 + 0.4 * roll),
+          axis[0] * size * 0.5, axis[1] * size * 0.5, axis[2] * size * 0.5, hot * 0.62, FLAME_VIEW.bright.billow * fade, seed + 0.5, false);
       }
-      if (age > smoke.streamFrom) flameViewSmoke(view, blob.x[0], blob.x[1] + lift + size * 0.5, blob.x[2], smoke.stream * smokeShare, dt, 0.8 + grown * 0.6);
+      if (age > smoke.streamFrom) flameViewSmoke(view, blob.x[0] + driftX * 2, blob.x[1] + lift + size * 0.5, blob.x[2] + driftZ * 2, smoke.stream * smokeShare, dt, 0.8 + grown * 0.6, jetShelter);
       if (age > 0.15) {
         streamX += blob.x[0];
         streamY += blob.x[1];
@@ -387,16 +481,22 @@ export function updateFlames(view, world, tier = 'high') {
       const kilowatts = FLAME.patch.burn * (patch.wet ? FLAME.patch.wet : 1) * FLAME.machine.fuelHeat * 1e-3 * strength;
       const tall = poolFlameHeight(kilowatts, reach * 2) * Math.min(1, 0.4 + strength);
       const tongues = Math.round(fewest + (most - fewest) * strength);
+      // It does not move: the roof over it is read once. Its flames lean by the wind over their own buoyant velocity.
+      const shelter = (patch.windShelter ??= windShelter(world, patch.x[0], patch.x[1], patch.x[2]));
+      const buoyant = flameViewBuoyant(kilowatts, reach * 2);
       for (let tongue = 0; tongue < tongues; tongue += 1) {
         const seed = patch.seed * 10 + tongue;
         const lick = flameViewFlicker(seed, time);
         const angle = seed * 2.4;
         const out = reach * 0.55 * (tongue / tongues);
         const height = tall * (0.55 + 0.6 * lick) * (tongue === 0 ? 1 : 0.75);
-        flameViewPut(batch, patch.x[0] + Math.cos(angle) * out, patch.x[1] - 0.12 * height, patch.x[2] + Math.sin(angle) * out,
-          reach * 2 * FLAME_VIEW.width * (0.75 + 0.35 * lick), 0, height * 1.12, 0, 0.5 + 0.25 * strength, FLAME_VIEW.bright.pool, patch.seed + tongue * 0.29, true);
+        const axis = flameAxis(FLAME_VIEW_AXIS, wind.x * shelter, wind.z * shelter, buoyant, patch.seed + tongue * 0.29, time);
+        // Leaning, the flames stand off over the pool's lee edge (flame drag): their base moved downwind as far as they lean.
+        const off = FLAME_VIEW.air.poolLean * reach;
+        flameViewPut(batch, patch.x[0] + Math.cos(angle) * out + axis[0] * off, patch.x[1] - 0.12 * height, patch.x[2] + Math.sin(angle) * out + axis[2] * off,
+          reach * 2 * FLAME_VIEW.width * (0.75 + 0.35 * lick), axis[0] * height * 1.12, axis[1] * height * 1.12, axis[2] * height * 1.12, 0.5 + 0.25 * strength, FLAME_VIEW.bright.pool, patch.seed + tongue * 0.29, true);
       }
-      flameViewSmoke(view, patch.x[0], patch.x[1] + tall * 0.6, patch.x[2], smoke.patch * strength * smokeShare, dt, 0.7 + 0.5 * strength);
+      flameViewSmoke(view, patch.x[0], patch.x[1] + tall * 0.6, patch.x[2], smoke.patch * strength * smokeShare, dt, 0.7 + 0.5 * strength, shelter);
       flameViewGlow(patch.x[0], patch.x[1] + light.lift, patch.x[2], light.patch * (0.35 + 0.65 * strength));
     }
     // The pilot flame at the nozzle of each wand held.

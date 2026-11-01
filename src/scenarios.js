@@ -42,9 +42,10 @@ export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], sekigahara: [1
 /**
  * Pier 9's sea fog at 2 a.m.: a light fog off the water, dim warm grey where
  * the sodium lamps light it, from 8 m gone by 45 (the cranes and the far
- * stacks fade into it); the lamps glow in it.
+ * stacks fade into it); the lamps glow in it. A light breeze off the water
+ * carries it in (wind.js).
  */
-const WEATHER_SEA_FOG = { fog: WEATHER_MIST.port, colour: 0x3c362e, sky: 0.85, halos: true };
+const WEATHER_SEA_FOG = { fog: WEATHER_MIST.port, colour: 0x3c362e, sky: 0.85, halos: true, wind: { speed: 2.5, gust: 0.2 } };
 
 /**
  * A scenario: where (an arena's floor half-sizes and the scene drawn round

@@ -39,6 +39,8 @@
 //   torch              how bright the torches and braziers burn (1: as built).
 //   shaft              a shaft of light through the cloud onto the castle: { colour, opacity, width (m) } or null.
 //   vignette           how dark the corners of the picture (0..1).
+//   wind               { speed: m/s at the cliff top, gust: how much it swells and drops (0..1) }: the fires lean and the smoke drifts with it
+//                      (wind.js; its way is the rain's slant, storm.js STORM.rain.slant). Under a roof it is a draught (wind.js WIND.indoors).
 
 export const STAGE_LOOKS = {
   stormBreak: {
@@ -66,6 +68,8 @@ export const STAGE_LOOKS = {
     lightning: { gap: [15, 35], strength: 0.75 },
     torch: 0.9,
     shaft: { colour: [255, 206, 150], opacity: 0.22, width: 70 },
+    // The wind at the cliff top (wind.js): a fresh wind off the sea behind the storm (Beaufort 5).
+    wind: { speed: 8, gust: 0.45 },
     vignette: 0.34,
   },
 
@@ -92,6 +96,8 @@ export const STAGE_LOOKS = {
     lightning: { gap: [9, 22], strength: 0.95 },
     torch: 1,
     shaft: null,
+    // The wind at the cliff top (wind.js): the squall's outflow: hard, in bursts.
+    wind: { speed: 12, gust: 0.6 },
     vignette: 0.36,
   },
 
@@ -117,6 +123,8 @@ export const STAGE_LOOKS = {
     lightning: { gap: [7, 16], strength: 1.1 },
     torch: 1.1,
     shaft: null,
+    // The wind at the cliff top (wind.js): strong and gusting under the deck.
+    wind: { speed: 10, gust: 0.55 },
     vignette: 0.42,
   },
 
@@ -142,6 +150,8 @@ export const STAGE_LOOKS = {
     lightning: { gap: [28, 55], strength: 0.4 },
     torch: 0.85,
     shaft: { colour: [255, 210, 150], opacity: 0.3, width: 60 },
+    // The wind at the cliff top (wind.js): a strong breeze.
+    wind: { speed: 6, gust: 0.4 },
     vignette: 0.38,
   },
 
@@ -167,6 +177,8 @@ export const STAGE_LOOKS = {
     lightning: { gap: [9, 24], strength: 1 },
     torch: 1,
     shaft: null,
+    // The wind at the cliff top (wind.js): a fresh wind off the sea.
+    wind: { speed: 8, gust: 0.45 },
     vignette: 0.38,
   },
 
@@ -192,6 +204,8 @@ export const STAGE_LOOKS = {
     lightning: { gap: [28, 55], strength: 0.3 },
     torch: 0.8,
     shaft: { colour: [255, 210, 150], opacity: 0.2, width: 70 },
+    // The wind at the cliff top (wind.js): a fresh breeze as the storm moves off.
+    wind: { speed: 5, gust: 0.35 },
     vignette: 0.3,
   },
 
@@ -217,6 +231,8 @@ export const STAGE_LOOKS = {
     lightning: null,
     torch: 1.4,
     shaft: null,
+    // The wind at the cliff top (wind.js): a light, steady breeze off the water (it carries the fog in).
+    wind: { speed: 2.5, gust: 0.2 },
     vignette: 0.12,
   },
 
@@ -242,6 +258,8 @@ export const STAGE_LOOKS = {
     lightning: { gap: [6, 15], strength: 1.5 },
     torch: 1.7,
     shaft: null,
+    // The wind at the cliff top (wind.js): a night squall, near a gale: hard, in bursts.
+    wind: { speed: 13, gust: 0.65 },
     vignette: 0.5,
   },
 
@@ -267,6 +285,8 @@ export const STAGE_LOOKS = {
     lightning: null,
     torch: 0.6,
     shaft: null,
+    // The wind at the cliff top (wind.js): a strong breeze, the usual on the cliffs.
+    wind: { speed: 6, gust: 0.35 },
     vignette: 0.1,
   },
 
@@ -292,6 +312,8 @@ export const STAGE_LOOKS = {
     lightning: null,
     torch: 0.9,
     shaft: { colour: [255, 190, 120], opacity: 0.14, width: 90 },
+    // The wind at the cliff top (wind.js): the wind dropping after the rain.
+    wind: { speed: 3, gust: 0.3 },
     vignette: 0.25,
   },
 
@@ -320,6 +342,8 @@ export const STAGE_LOOKS = {
     lightning: null,
     torch: 0.3,
     shaft: null,
+    // The wind at the cliff top (wind.js): a gentle breeze.
+    wind: { speed: 3, gust: 0.3 },
     vignette: 0.1,
   },
 
@@ -346,6 +370,8 @@ export const STAGE_LOOKS = {
     lightning: null,
     torch: 0.25,
     shaft: null,
+    // The wind at the cliff top (wind.js): a sea breeze.
+    wind: { speed: 3.5, gust: 0.3 },
     vignette: 0.08,
   },
 
@@ -372,6 +398,8 @@ export const STAGE_LOOKS = {
     lightning: null,
     torch: 0.35,
     shaft: { colour: [255, 226, 170], opacity: 0.12, width: 100 },
+    // The wind at the cliff top (wind.js): near calm (the haze lies in still air).
+    wind: { speed: 1.2, gust: 0.25 },
     vignette: 0.14,
   },
 
@@ -398,6 +426,8 @@ export const STAGE_LOOKS = {
     lightning: null,
     torch: 0.3,
     shaft: null,
+    // The wind at the cliff top (wind.js): a moderate breeze.
+    wind: { speed: 4, gust: 0.3 },
     vignette: 0.1,
   },
 };
