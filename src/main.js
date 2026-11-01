@@ -51,7 +51,7 @@ import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
 import { cameraTerrain, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
-import { attemptCount, attemptLog, attemptStory, bossStatus, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
+import { attemptCount, attemptLog, attemptStory, bossFightOn, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { snapshotGear } from './levelmode/checkpoints.js';
 import { applySandbox, heroClean, heroLoad, heroSave, sandboxBadge, sandboxPlaces, travelTo } from './levelmode/sandbox.js';
@@ -758,15 +758,16 @@ function audioScene() {
     drips: stage ? stageView?.sounding?.drips ?? null : null,
     waters: stage ? audioState.waters.list : null,
   });
-  // The music's moment: a menu over the fight, a boss's bar, how the bout or the stage ended (for the man played: watching, no fanfare).
+  // The music's moment: a menu over the fight, a boss fight on (its room sealed, or his bar up), how the bout or the stage ended (for the man
+  // played: watching, no fanfare). A stage's outcome is one occurrence each (`outcomeAt`): each death in a run has its own.
   const winner = state.finishedAt !== null && state.game !== 'home' ? world.verdict?.winner ?? null : null;
-  const kept = audioState.outcome?.world === world && realSeconds() - audioState.outcome.at < 15 ? audioState.outcome.outcome : null;
-  const boss = stage?.level ? bossStatus(world) : null;
+  const kept = audioState.outcome?.world === world && realSeconds() - audioState.outcome.at < 15 ? audioState.outcome : null;
   Object.assign(audioInfo.music, {
     menu: Boolean(document.body.dataset.overlay),
     game: state.game,
-    boss: Boolean(boss?.show && !boss.felled),
-    outcome: kept ?? (winner && me ? (me.corner === winner ? 'victory' : 'defeat') : null),
+    boss: Boolean(stage?.level && bossFightOn(world)),
+    outcome: kept?.outcome ?? (winner && me ? (me.corner === winner ? 'victory' : 'defeat') : null),
+    outcomeAt: kept?.at ?? null,
     scene: state.scenario ?? (stage ? stage.def.id ?? scene.place : scene.place),
   });
   return audioInfo;

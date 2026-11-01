@@ -8,7 +8,7 @@ import { normaliseInputs } from '../body.js';
 import { placeOnFloor } from '../physics.js';
 import { levelPreset } from './presets.js';
 import { createLevelWorld } from './level.js';
-import { mechanismsOf, setMechanism, updateStage } from './stage.js';
+import { mechanismsOf, resetSeals, setMechanism, updateStage } from './stage.js';
 import { comradesOf } from './team.js';
 import { endingOf } from './ending.js';
 
@@ -93,6 +93,8 @@ export function travelTo(world, place) {
       fighter.dormant = undefined;
     });
   }
+  // (Travelled out of a boss room, its seal lifts: walking back in begins the fight again.)
+  resetSeals(world);
   updateStage(world, true);
   return true;
 }

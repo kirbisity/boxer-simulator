@@ -41,7 +41,7 @@ import { LEVEL_CONFIG } from './config.js';
 import { levelOf, updateAction, updateTonics } from './items.js';
 import { noteDeath, playerStands, respawnPlayer, setCheckpoint, spawnDefinitions } from './checkpoints.js';
 import { levelAware, levelRoused } from './adapter.js';
-import { createStageWorld, SEAL } from './stage.js';
+import { createStageWorld, SEAL, sealedFight } from './stage.js';
 import { endingBusy, endingFinal, endingRelease, endingRespawn, finishEpilogue, watchEnding } from './ending.js';
 import { watchTeam } from './team.js';
 import { beginAttempt } from './attempts.js';
@@ -331,6 +331,17 @@ export function bossStatus(world) {
     }
   }
   return best ? best.status : none;
+}
+
+/**
+ * Whether a boss fight is on, for the music: from the moment a boss room's seal shuts on the player (the fight has begun, whether or not the
+ * boss has seen him yet) until the boss is out or the encounter begins again; or while a boss's bar shows (a boss with no seal: the yard's dummy).
+ */
+export function bossFightOn(world) {
+  if (!levelOf(world)) return false;
+  if (sealedFight(world)) return true;
+  const boss = bossStatus(world);
+  return boss.show && !boss.felled;
 }
 
 // ---- What the screen is told ------------------------------------------------------------------------------------

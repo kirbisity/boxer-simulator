@@ -15,7 +15,7 @@ import { horseParams } from '../src/audio/sfx/horse.js';
 import { shotParams, whizzParams } from '../src/audio/sfx/ranged.js';
 import { thunderParams } from '../src/audio/sfx/world.js';
 import { ambienceTargets } from '../src/audio/ambience.js';
-import { musicMoment } from '../src/audio/music.js';
+import { createMusic, musicMoment } from '../src/audio/music.js';
 import { exertionOf } from '../src/audio/engine.js';
 
 test('the level of a sound follows the energy it radiates: ten times the energy is 10 dB', () => {
@@ -103,4 +103,49 @@ test('music only at its moments', () => {
   assert.equal(musicMoment({ game: 'quick', worldId: 3, worldAge: 5 }).moment, null);
   assert.equal(musicMoment({ game: 'level', boss: true, worldId: 2, worldAge: 300 }).moment, 'boss');
   assert.equal(musicMoment({ game: 'level', boss: true, outcome: 'defeat', worldId: 2, worldAge: 300 }).moment, 'defeat');
+  // (Each death in a stage is its own occurrence: a second death in the boss fight has its defeat cue too, not silence.)
+  const first = musicMoment({ game: 'level', boss: true, outcome: 'defeat', outcomeAt: 61.2, worldId: 2, worldAge: 300 }).key;
+  const second = musicMoment({ game: 'level', boss: true, outcome: 'defeat', outcomeAt: 140.5, worldId: 2, worldAge: 400 }).key;
+  assert.notEqual(first, second);
+});
+
+/** A stand-in AudioContext for the music player: gains and buffer sources that only remember what they were told. */
+function fakeAudio() {
+  const param = () => ({ value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, setTargetAtTime() {}, cancelScheduledValues() {} });
+  const node = () => ({ connect() {}, disconnect() {} });
+  const ctx = {
+    currentTime: 0, started: [],
+    createGain: () => ({ ...node(), gain: param() }),
+    createBufferSource: () => ({ ...node(), start(when) { ctx.started.push({ buffer: this.buffer, when }); }, stop() {} }),
+    decodeAudioData: async (bytes) => ({ duration: 60, bytes: bytes.byteLength }),
+  };
+  return ctx;
+}
+
+test('music: the boss fight starts its cue (Dunnottar: the choir track), plays it through a retry, and a death changes it', async () => {
+  const ctx = fakeAudio();
+  const music = createMusic(ctx, { connect() {} });
+  const tick = async (info, when) => {
+    music.update({ ...musicMoment({ game: 'level', worldId: 7, worldAge: 300, ...info }), scene: 'dunnottar' }, when);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  };
+  await tick({}, 1);
+  assert.equal(music.status().id, null, 'no fight: no music');
+  await tick({ boss: true }, 2);
+  assert.equal(music.status().id, 'bossChoir');
+  assert.equal(music.status().moment, 'boss');
+  // He dies: the defeat cue; he wakes and walks back in: the choir again; dies again: a defeat again.
+  await tick({ boss: true, outcome: 'defeat', outcomeAt: 10 }, 3);
+  assert.equal(music.status().id, 'defeat');
+  await tick({}, 20);
+  await tick({ boss: true }, 40);
+  assert.equal(music.status().id, 'bossChoir', 'the retry has its music');
+  await tick({ boss: true, outcome: 'defeat', outcomeAt: 50 }, 50);
+  assert.equal(music.status().id, 'defeat', 'and the second death its own');
+  await tick({}, 70);
+  await tick({ boss: true }, 80);
+  assert.equal(music.status().id, 'bossChoir');
+  // The boss down: the cue goes.
+  await tick({}, 90);
+  assert.equal(music.status().id, null);
 });

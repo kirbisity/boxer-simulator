@@ -49,7 +49,8 @@
 //     // is in the room and the boss is awake; 'roused', the boss has noticed him, levelmode/awareness.js), every gate named in `gates` shuts
 //     // (each an ordinary gate of the stage, standing open: its `look.kind` says how it goes, a portcullis dropping, a door slamming, a sluice's
 //     // boards coming down, and how it sounds); they open when the boss is out. Never on a man of the player's side in a doorway: they wait
-//     // until every one is clear of every gate (`clear` m round its leaf). A death or a rest, which put him outside the room, open them again.
+//     // until every one is clear of every gate (`clear` m round its leaf). Shut, they are locked: nothing opens them (a lever, a hand, setMechanism)
+//     // and no stepping out of the room lifts them, until the boss is out, or the encounter begins again (resetSeals: a death, a rest, fast travel).
 //     // `text`: what is said as they shut (default SEAL.text).
 //     seals: [ { id: 'pitseal', room: region, boss: 'noname', when: 'roused', gates: ['pitwest', 'piteast'], clear: 0.6, text } ],
 //     // `activeOnly: true`: the drawing shows this section in detail only while it is active, not when it is merely seen through a portal.
@@ -360,8 +361,8 @@ function inDoorway(world, gate, clear) {
 
 /**
  * The seals of the boss rooms (a section's `seals`), every step: shut once the player is in the room, clear of every gate, and the fight is on;
- * open once the boss is out, or once the player is outside the room again (a death or a rest has made him new elsewhere; the boss is back at his
- * post). The comrades left outside as they shut are noted (`outside`: fighter ids; levelmode/awareness.js keeps them at the door). The seal's
+ * locked while the boss stands (sealLocks); open once the boss is out, or when the encounter begins again (resetSeals: a death or a rest has made
+ * him new elsewhere, the boss is back at his post). The comrades left outside as they shut are noted (`outside`: fighter ids; levelmode/awareness.js keeps them at the door). The seal's
  * state is `world.stage.seals` ([{ id, sealed, outside, ... }]); the gates are ordinary mechanisms (setMechanism: the sound, the drawing).
  */
 function keepSeals(world) {
@@ -381,14 +382,31 @@ function keepSeals(world) {
     else if (!seal.sealed) {
       const on = !boss.dormant && (seal.when === 'enter' || (run.aware ? ROUSED.has(mindState(world, boss.id)) : true));
       sealed = on && meIn && me.state !== 'out' && !seal.leaves.some((gate) => inDoorway(world, gate, seal.clear));
-    } else if (!meIn && me.state !== 'out') sealed = false;
-    if (sealed === seal.sealed) continue;
-    seal.sealed = sealed;
-    seal.outside = sealed ? world.fighters.filter((fighter) => fighter.id !== 0 && fighter.corner === 'red' && fighter.state !== 'out' && !inRoom(fighter, seal)).map((fighter) => fighter.id) : [];
-    for (const gate of seal.leaves) setMechanism(world, gate.id, sealed ? 'closed' : 'open');
-    world.events.push({ time: world.time, kind: sealed ? 'sealed' : 'unsealed', seal: seal.id, effects: [sealed ? 'the way out is shut' : 'the way out is open'] });
+    }
+    // (Shut, it stays shut while the boss stands, wherever the player stands: the strip of floor at the gate's foot is outside the room.)
+    if (sealed !== seal.sealed) setSeal(world, seal, sealed);
   }
 }
+
+/** Shut or open a seal: its gates (forced past the lock), the men left outside, the event. */
+function setSeal(world, seal, sealed) {
+  const inRoom = (fighter) => regionContains(seal.room, fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2], fighter.x[P.pelvis * 3 + 1]);
+  seal.sealed = sealed;
+  seal.outside = sealed ? world.fighters.filter((fighter) => fighter.id !== 0 && fighter.corner === 'red' && fighter.state !== 'out' && !inRoom(fighter)).map((fighter) => fighter.id) : [];
+  for (const gate of seal.leaves) setMechanism(world, gate.id, sealed ? 'closed' : 'open', { force: true });
+  world.events.push({ time: world.time, kind: sealed ? 'sealed' : 'unsealed', seal: seal.id, effects: [sealed ? 'the way out is shut' : 'the way out is open'] });
+}
+
+/** The encounter begins again (a death, a rest, fast travel: the player made new elsewhere, the boss back at his post): every shut seal opens. */
+export function resetSeals(world) {
+  for (const seal of world.stage?.seals ?? []) if (seal.sealed) setSeal(world, seal, false);
+}
+
+/** Whether a gate is held shut by a boss room's seal (locked: no hand or lever opens it until the fight is over). */
+export const sealLocks = (world, id) => Boolean(world.stage?.seals?.some((seal) => seal.sealed && seal.gates?.includes(id)));
+
+/** Whether a boss room's fight is on: a seal is shut on the player (its gates locked until the boss is out). */
+export const sealedFight = (world) => Boolean(world.stage?.seals?.some((seal) => seal.sealed));
 
 /** Whether a fighter of the player's side was left outside a sealed room (he waits at its door). */
 export const sealedOut = (world, fighter) => Boolean(world.stage?.seals?.some((seal) => seal.sealed && seal.outside.includes(fighter.id)));
@@ -479,12 +497,14 @@ function wake(fighter) {
 
 // ---- Mechanisms -------------------------------------------------------------------------
 
-/** Put a gate or ladder in a state (`'open'`...): the terrain follows at once. Returns false if there is no such state. */
-export function setMechanism(world, id, state) {
+/** Put a gate or ladder in a state (`'open'`...): the terrain follows at once. Returns false if there is no such state, or a seal locks it (`force`: the seal's own hand). */
+export function setMechanism(world, id, state, { force = false } = {}) {
   const run = world.stage;
   const mechanism = mechanismsOf(run.def).find((entry) => entry.id === id);
   if (!mechanism || !(state in mechanism.states)) return false;
   if (run.mechanisms[id] === state) return true;
+  // (A gate a boss room's seal holds shut is locked: only the seal itself opens it.)
+  if (!force && sealLocks(world, id)) return false;
   run.mechanisms[id] = state;
   world.arena.terrain = stageTerrain(run.def, run.active, run.mechanisms);
   world.events.push({ time: world.time, kind: 'mechanism', mechanism: id, state, effects: [`${id} ${state}`] });

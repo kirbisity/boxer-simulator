@@ -15,7 +15,7 @@ import { P } from '../body.js';
 import { reviveFighter } from '../physics.js';
 import { LEVEL_CONFIG } from './config.js';
 import { levelOf, say, feetFloor } from './items.js';
-import { regionContains, updateStage } from './stage.js';
+import { regionContains, resetSeals, updateStage } from './stage.js';
 import { levelResetMinds } from './adapter.js';
 import { endingRelease, endingRespawn } from './ending.js';
 import { beginAttempt, recordAttempt } from './attempts.js';
@@ -108,6 +108,8 @@ function reviveWorld(world, { followersAt = true } = {}) {
     }
   }
   world.hangFires = [];
+  // The boss rooms' seals lift: the encounter begins again (he walks back in and they come down again).
+  resetSeals(world);
   // Every mind starts over (the awareness AI), the followers are brought to his side.
   levelResetMinds(world);
   updateStage(world, true);

@@ -9,10 +9,12 @@ import assert from 'node:assert/strict';
 import { P } from '../src/body.js';
 import { AI, knowsNoFear, thinkAll } from '../src/ai.js';
 import { advance, createWorld, inFight, knockOut, placeFighter, placeOnFloor, throwPunch } from '../src/physics.js';
-import { activeSections, mechanismsOf, regionContains, sectionById, stageTerrain, updateStage } from '../src/levelmode/stage.js';
+import { activeSections, mechanismsOf, regionContains, sealLocks, sectionById, setMechanism, stageTerrain, updateStage } from '../src/levelmode/stage.js';
 import { mindState, rouse } from '../src/levelmode/awareness.js';
 import { levelPreset } from '../src/levelmode/presets.js';
-import { bossStatus, createLevelWorld, interactions, killBoss, levelOpponent, levelThink, respawnPlayer } from '../src/levelmode/level.js';
+import { bossFightOn, bossStatus, createLevelWorld, interactions, killBoss, levelOpponent, levelThink, respawnPlayer, restAtPoint } from '../src/levelmode/level.js';
+import { musicMoment } from '../src/audio/music.js';
+import { cueFor } from '../src/audio/music/manifest.js';
 import { NOTES } from '../src/levelmode/story.js';
 import { CRY_STRIKERS, createCryDirector } from '../src/audio/cries.js';
 import { readSounds } from '../src/audio/log.js';
@@ -106,6 +108,86 @@ test('seals: never on a man in the doorway (they wait until he is clear), and a 
   assert.equal(w.stage.mechanisms.cesspoolwest, 'open');
   assert.equal(w.stage.mechanisms.cesspooleast, 'open');
   assert.equal(mindState(w, noname.id), 'lurk', 'buried again');
+});
+
+// (The bug: the room's region stops a step short of the portcullis, so the player at its foot was 'outside the room' and it went up again.)
+test('seals: shut, the portcullis is locked while Vaelen stands: standing at its foot, a hand or a lever does not lift it; his fall does', () => {
+  const w = at(1, DN_Y.ladderRoom, -36);
+  const step = stepper(w);
+  const me = w.fighters[0];
+  step(0.5);
+  placeOnFloor(me, DN_CHAPEL.x1 - 2.5, DN_CHAPEL.axis, DN_Y.ladderRoom, Math.PI);
+  step(0.3);
+  assert.equal(w.stage.mechanisms.chapelportcullis, 'closed');
+  for (const off of [0.9, 0.7, 0.5]) {
+    placeOnFloor(me, DN_CHAPEL.x1 - off, DN_CHAPEL.axis, DN_Y.ladderRoom, Math.PI);
+    step(0.4);
+    assert.equal(w.stage.mechanisms.chapelportcullis, 'closed', `at its foot (${off} m from the wall): still down`);
+  }
+  assert.ok(sealLocks(w, 'chapelportcullis'), 'locked');
+  assert.equal(setMechanism(w, 'chapelportcullis', 'open'), false, 'nothing else opens it');
+  assert.equal(w.stage.mechanisms.chapelportcullis, 'closed');
+  assert.ok(!interactions(w).some((entry) => entry.id === 'gate:chapelportcullis' && !entry.disabled), 'nothing to open it with');
+  const terrain = stageTerrain(DUNNOTTAR, w.stage.active, w.stage.mechanisms);
+  assert.equal(findPath(terrain, { x: DN_CHAPEL.x1 - 0.7, z: DN_CHAPEL.axis, y: DN_Y.ladderRoom }, [3, DN_CHAPEL.axis], { toY: DN_Y.ladderRoom, reach: 20 }), null, 'no way out past it');
+  killBoss(w);
+  step(0.3);
+  assert.equal(w.stage.mechanisms.chapelportcullis, 'open', 'the boss out: up');
+  assert.ok(!sealLocks(w, 'chapelportcullis'));
+});
+
+test('seals: a death or a rest begins the encounter again: the portcullis up, and down again as he walks back in', () => {
+  const w = at(1, DN_Y.ladderRoom, -36);
+  const step = stepper(w);
+  const me = w.fighters[0];
+  step(0.5);
+  for (const retry of ['death', 'rest']) {
+    placeOnFloor(me, DN_CHAPEL.x1 - 2.5, DN_CHAPEL.axis, DN_Y.ladderRoom, Math.PI);
+    step(0.3);
+    assert.equal(w.stage.mechanisms.chapelportcullis, 'closed', `${retry}: in the nave, down`);
+    if (retry === 'death') {
+      knockOut(w, me, { time: w.time, effects: [] }, 'dies', 'killed');
+      step(0.3);
+      assert.equal(w.stage.mechanisms.chapelportcullis, 'closed', 'dead on the floor of the nave: still down');
+      respawnPlayer(w);
+    } else {
+      // (A rest out in the tower, by hand: the encounter begins again as it does after a death.)
+      placeOnFloor(me, 1, -36, DN_Y.ladderRoom, 0);
+      restAtPoint(w, { at: [1, DN_Y.ladderRoom, -36], name: 'test' });
+    }
+    step(0.5);
+    assert.equal(w.stage.mechanisms.chapelportcullis, 'open', `${retry}: up again`);
+    assert.ok(!sealLocks(w, 'chapelportcullis'));
+    assert.equal(bossFightOn(w), false, `${retry}: the fight is over for now`);
+  }
+});
+
+test('boss music: on from the moment the seal shuts (Vaelen not yet roused), through the fight, off when he falls; the stage\'s own track', () => {
+  const w = at(1, DN_Y.ladderRoom, -36);
+  const step = stepper(w);
+  const me = w.fighters[0];
+  const vaelen = by(w, 'vaelen');
+  const moment = () => musicMoment({ game: 'level', boss: bossFightOn(w), worldId: 1, worldAge: 300 });
+  step(0.5);
+  assert.equal(bossFightOn(w), false, 'outside: no fight');
+  assert.equal(moment().moment, null);
+  placeOnFloor(me, DN_CHAPEL.x1 - 2.5, DN_CHAPEL.axis, DN_Y.ladderRoom, Math.PI);
+  step(0.3);
+  assert.equal(w.stage.mechanisms.chapelportcullis, 'closed');
+  assert.equal(bossFightOn(w), true, 'the door is down: the fight is on');
+  assert.equal(moment().moment, 'boss');
+  assert.equal(cueFor('dunnottar', moment().moment), 'bossChoir', 'the user\'s choir track');
+  // Before he has seen the player (or whenever his mind leaves him: back to his post), no bar, but the music is the fight's, not his bar's.
+  w.stage.aware.minds[vaelen.id].state = 'idle';
+  assert.equal(bossStatus(w).show, false, 'no bar');
+  assert.equal(bossFightOn(w), true, 'the music plays on');
+  // Wherever he stands in the room it plays on.
+  placeOnFloor(me, DN_CHAPEL.x1 - 0.7, DN_CHAPEL.axis, DN_Y.ladderRoom, Math.PI);
+  step(1);
+  assert.equal(bossFightOn(w), true);
+  killBoss(w);
+  step(0.3);
+  assert.equal(bossFightOn(w), false, 'the boss out: the cue goes (the cutscene, then the ending\'s victory)');
 });
 
 // ---- Noname in his heap -----------------------------------------------------------------------------------------

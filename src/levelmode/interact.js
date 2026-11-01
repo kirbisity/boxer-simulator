@@ -20,7 +20,7 @@ import { collectItem, feetFloor, levelOf, say } from './items.js';
 import { bodiesWithin, looseWithin, takeLoose, takeOutfit } from './loot.js';
 import { restAtPoint, playerStands } from './checkpoints.js';
 import { levelAware, levelFreePrisoner } from './adapter.js';
-import { pullLever, regionContains, setMechanism } from './stage.js';
+import { pullLever, regionContains, sealLocks, setMechanism } from './stage.js';
 import { endingInteractions } from './ending.js';
 
 /** An awake enemy aware of the player, within `range` m (the context button hides while one is). */
@@ -63,6 +63,9 @@ const FROM_THE_FLOOR = new Set(['item', 'weapon', 'shield']);
 const ITEM_LABEL = { bandage: 'Take bandage', tonic: 'Take tonic', key: 'Take key', note: 'Read note' };
 const ITEM_ICON = { bandage: 'bandage', tonic: 'tonic', key: 'key', note: 'note' };
 
+/** What a gate or lever held by a boss room's seal says when tried. */
+const SEALED_TEXT = 'It will not move while the fight is on.';
+
 /**
  * Everything he could do from here, nearest first: [{ id, kind, label, icon, distance, disabled?, run }].
  * `kind`: item | weapon | shield | outfit | lever | gate | ladder | rest. `run(world)` does it (true if done).
@@ -85,21 +88,26 @@ export function interactions(world) {
     for (const lever of section.levers ?? []) {
       if (stage.mechanisms[lever.target] === lever.state) continue;
       const distance = nearAt(me, lever.at, LEVEL_CONFIG.interact.leverReach);
-      if (distance !== null) found.push({ id: `lever:${lever.id}`, kind: 'lever', label: lever.label ?? 'Pull lever', icon: 'lever', distance, run: (w) => { level.pulled.add(lever.id); say(w, { type: 'toast', text: 'The lever grinds over' }); return pullLever(w, lever.id); } });
+      if (distance === null) continue;
+      // (A lever on a gate a boss room's seal holds shut will not move until the fight is over.)
+      if (sealLocks(world, lever.target)) found.push({ id: `lever:${lever.id}`, kind: 'lever', label: 'Locked', icon: 'lock', distance, disabled: true, run: (w) => { say(w, { type: 'toast', text: SEALED_TEXT }); return false; } });
+      else found.push({ id: `lever:${lever.id}`, kind: 'lever', label: lever.label ?? 'Pull lever', icon: 'lever', distance, run: (w) => { level.pulled.add(lever.id); say(w, { type: 'toast', text: 'The lever grinds over' }); return pullLever(w, lever.id); } });
     }
     for (const gate of section.gates ?? []) {
       if (!gate.opensFrom && !gate.key) continue;
       if (stage.mechanisms[gate.id] === 'open') continue;
       const distance = mechanismDistance(me, gate);
       if (distance === null || distance > LEVEL_CONFIG.interact.mechanismReach || (gate.opensFrom && !regionContains(gate.opensFrom, here[0], here[2], me.x[P.pelvis * 3 + 1]))) continue;
-      const locked = gate.key && !level.keys.has(gate.key);
+      // (Locked by its key, or by a boss room's seal while the fight is on.)
+      const sealed = sealLocks(world, gate.id);
+      const locked = sealed || (gate.key && !level.keys.has(gate.key));
       found.push({
         id: `gate:${gate.id}`, kind: 'gate', label: locked ? 'Locked' : gate.label ?? (gate.key ? 'Unlock' : 'Open gate'), icon: locked ? 'lock' : 'gate', distance, disabled: Boolean(locked),
         run: (w) => {
           if (locked) {
             // (Heard: the door tried, and held by its lock.)
             if (w.ear) soundEvent(w, 'mech', { at: gate.at, kind: 'lock', state: 'locked', id: gate.id });
-            say(w, { type: 'toast', text: gate.lockedText ?? 'It is locked. The key is somewhere in this place.' });
+            say(w, { type: 'toast', text: sealed ? SEALED_TEXT : gate.lockedText ?? 'It is locked. The key is somewhere in this place.' });
             return false;
           }
           return openGate(w, gate);

@@ -50,7 +50,8 @@ test('cueFor covers every scenario, Dunnottar and the colosseum', () => {
     }
   }
   assert.ok(MUSIC_CUES[cueFor('dunnottar', 'boss')], 'no boss cue');
-  assert.equal(cueFor('legion', 'boss'), null);
+  // (A boss with no track of his own has the generated one: the yard's dummy; Battle Mode has no bosses, so never asks.)
+  assert.equal(cueFor('yard', 'boss'), 'boss');
   assert.equal(cueFor('nowhere', 'opening'), null);
   assert.equal(cueFor('ring', 'opening'), null);
   assert.equal(cueFor(null, 'menu'), 'menu');
