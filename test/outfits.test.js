@@ -30,12 +30,12 @@ test('every outfit has its picked design, a movement class, and traits as specif
   for (const kind of Object.keys(OUTFITS)) assert.deepEqual(Object.keys(gearTraits({ ...male, outfit: { kind } }).protection).filter((key) => key !== 'regions').sort(), ['blunt', 'bullet', 'cut', 'pierce']);
 });
 
-test('armour is real weight: riot gear adds 20%, plate 50%, and the man inside is the same man', () => {
+test('armour is real weight: riot gear adds 11%, plate 27.5%, and the man inside is the same man', () => {
   const plain = buildBody(wearing('heavy', 'casual'));
   const swat = buildBody(wearing('heavy', 'swat'));
   const knight = buildBody(wearing('heavy', 'knight'));
-  assert.ok(Math.abs(swat.massKg / plain.massKg - 1.2) < 0.01);
-  assert.ok(Math.abs(knight.massKg / plain.massKg - 1.5) < 0.01);
+  assert.ok(Math.abs(swat.massKg / plain.massKg - 1.11) < 0.01);
+  assert.ok(Math.abs(knight.massKg / plain.massKg - 1.275) < 0.01);
   assert.equal(knight.bodyMassKg, plain.massKg);
   assert.ok(Math.abs(knight.masses.reduce((a, b) => a + b, 0) - knight.massKg - 2 * 0.3) < 1, 'spread over the particles');
 });

@@ -204,7 +204,8 @@ export function starsOf(inputs) {
 }
 
 // A kit is armour if it weighs this share of the body or more, or turns this much of a cut.
-const ARMOURED = { mass: 0.1, cut: 0.5 };
+// (`mass` 0.055, was 0.1: all armour was cut to 0.55 of its weight, and the same kits stay armour.)
+const ARMOURED = { mass: 0.055, cut: 0.5 };
 
 /** How heavily a fighter is armoured: his kit's weight (share of his body's); 0 for no armour. */
 export function armourWeight(inputs) {

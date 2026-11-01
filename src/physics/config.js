@@ -254,8 +254,13 @@ export const WORLD = {
   // the blow over the whole trunk and into braced legs, so the same momentum
   // knocks him less and staggers him less. Poise = 1 + `mass` × (armour kg ÷
   // body kg) + `shell` × (its blunt protection on the trunk); the push his
-  // legs must take and a blow's stagger are divided by it.
-  poise: { mass: 2.5, shell: 2.5 },
+  // legs must take and a blow's stagger are divided by it. What he carries
+  // that is not armour (a flamethrower's tanks, `outfit.packKg`; an exoframe's
+  // frame or a robot's battery, its kit's `carriedShare`) counts at `carried`.
+  // `mass` 8.6 and `shell` 4.75 (were 2.5 and 2.5) after the armour was made
+  // 0.55 of its old weight: armour's poise ~1.9 times what it was (2.5 × 1.9
+  // ÷ 0.55 ≈ 8.6 a share; 2.5 × 1.9 = 4.75), loads' as it was.
+  poise: { mass: 8.6, shell: 4.75, carried: 2.5 },
   // Skill: how precisely a fighter places his blows (0..1), apart from his
   // body. 0.5 is an ordinary trained man and fights as before: above it the
   // scatter he has (a wild swinger's, a heavy weapon's) narrows, to none at 1;

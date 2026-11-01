@@ -33,7 +33,7 @@ test('the exoskeleton is a soldier in the armoured frame: his own body, the fram
   assert.equal(exo.heightM, 1.8);
   assert.ok(Math.abs(exo.bodyMassKg - man.bodyMassKg) < 1e-9, 'the man inside is unchanged');
   assert.ok(Math.abs(exo.bodyMassKg - 83) < 2, `operator ${exo.bodyMassKg.toFixed(1)} kg`);
-  assert.ok(Math.abs(exo.gearKg - 135 * exo.bodyMassKg / 83) < 1e-6, `frame ${exo.gearKg.toFixed(1)} kg`);
+  assert.ok(Math.abs(exo.gearKg - (100 + 35 * 0.55) * exo.bodyMassKg / 83) < 1e-6, `frame ${exo.gearKg.toFixed(1)} kg`);
   assert.ok(!exo.gear.machine, 'a man inside: he fears and bleeds');
   assert.ok(Math.abs(exo.motorForce[P.lKnee] - 2.4 * man.motorForce[P.lKnee]) < 1e-6);
   assert.ok(Math.abs(exo.strikeForce[P.rHand] - 4 * man.strikeForce[P.rHand]) < 1e-6);

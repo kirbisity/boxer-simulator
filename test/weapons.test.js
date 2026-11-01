@@ -18,8 +18,8 @@ test('armour stops each kind of harm by its own share, and adds its weight', asy
   assert.deepEqual(wearing('swat').protection, { blunt: 0.5, cut: 0.5, pierce: 0.3, bullet: { head: 0.6, torso: 0.9, limb: 0.1 }, regions: { head: { blunt: 0.7, cut: 0.8, pierce: 0.7 }, limb: { blunt: 0.6, cut: 0.3, pierce: 0.1 } } });
   assert.ok(wearing('specialForces').protection.bullet.torso > wearing('swat').protection.bullet.torso);
   assert.ok(wearing('specialForces').protection.cut < wearing('knight').protection.cut && wearing('specialForces').protection.regions.limb.cut < 0.2);
-  assert.deepEqual(wearing('knight').protection, { blunt: 0.6, cut: 1, pierce: 0.9, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } });
-  assert.deepEqual(wearing('samurai').protection, { blunt: 0.7, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 } });
+  assert.deepEqual(wearing('knight').protection, { blunt: 0.6, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } });
+  assert.deepEqual(wearing('samurai').protection, { blunt: 0.65, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 } });
   // A gladiator: the chest bare, the helmet, the arm and the legs covered, each its own way.
   const { protectionAt } = await import('../src/physics.js');
   const hoplomachus = wearing('hoplomachus');
@@ -27,9 +27,9 @@ test('armour stops each kind of harm by its own share, and adds its weight', asy
   assert.ok(protectionAt(hoplomachus, 'head').cut > 0.9 && protectionAt(hoplomachus, 'head').deflects);
   assert.ok(protectionAt(hoplomachus, 'lShank').deflects && !protectionAt(hoplomachus, 'lThigh').deflects);
   assert.ok(protectionAt(hoplomachus, 'rForearm').cut > 0.4 && protectionAt(hoplomachus, 'lForearm').cut === 0, 'the spear arm quilted, the shield arm bare');
-  assert.equal(wearing('knight').extraMass, 0.5);
-  assert.equal(wearing('samurai').extraMass, 0.4);
-  assert.equal(wearing('hoplomachus').extraMass, 0.3);
+  assert.equal(wearing('knight').extraMass, 0.275);
+  assert.equal(wearing('samurai').extraMass, 0.22);
+  assert.equal(wearing('hoplomachus').extraMass, 0.165);
   assert.equal(wearing('knight').deflects, true);
   assert.equal(wearing('samurai').deflects, false);
 });
@@ -352,8 +352,9 @@ test('weapon holders keep their arms forward: elbows seldom fall behind the shou
 test('a war hammer blow on plate staggers the knight: he reels, weaker, rather than falls', async () => {
   const { applyHeadDamage, armoured, chinNow, staggerShare } = await import('../src/physics.js');
   let staggered = 0;
+  // At his head: a side blow to the body, caught on his forearm, no longer staggers him since armour's poise was near doubled.
   for (const distance of [1.6, 1.8, 2.0]) {
-    const { world } = strikeAt('warhammer', 'hammerSide', 'body', distance, { outfit: 'knight' });
+    const { world } = strikeAt('warhammer', 'hammerSide', 'head', distance, { outfit: 'knight' });
     const knight = world.fighters[1];
     assert.ok(armoured(knight));
     if (knight.stagger > 0) {
