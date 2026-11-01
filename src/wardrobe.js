@@ -480,7 +480,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     }
     case 'greatHelm': {
       // A knight's helmet under study (helmstyle.js `knight`; knighthelms.js), fitted over the head, with its baked maps.
-      if (buildKnightHelm(group, head, r, metal(steel, color), lowDetail)) {
+      if (buildKnightHelm(group, head, r, metal(steel, color))) {
         fitted = true;
         break;
       }
@@ -569,7 +569,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       buildStechhelm(group, head, r, steel, { lowDetail });
       break;
     case 'bascinet': {
-      if (buildKnightHelm(group, head, r, metal(steel, color), lowDetail)) {
+      if (buildKnightHelm(group, head, r, metal(steel, color))) {
         fitted = true;
         break;
       }
@@ -663,7 +663,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     case 'kettleHat': {
       // In its design (helmforms.js HELM_DESIGNS: `head.design`, or the one helmstyle.js `kettle` asks for), fitted over the
       // head, with its baked maps.
-      const design = helmDesignOf(head, lowDetail);
+      const design = helmDesignOf(head);
       if (design && buildDesignHelm(group, design, r, metal(steel, color), { bevor: head.bevor !== false })) {
         fitted = true;
         // A mail coif under it.
@@ -735,7 +735,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     }
     case 'cabasset': {
       // In its design (the Spanish cabasset, helmforms.js HELM_DESIGNS), fitted over the head, its etching and rivets baked.
-      const design = helmDesignOf(head, lowDetail);
+      const design = helmDesignOf(head);
       if (design && buildDesignHelm(group, design, r, metal(steel, color))) {
         fitted = true;
         break;
@@ -1183,7 +1183,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     case 'chichak': {
       // In its design (helmforms.js HELM_DESIGNS: `head.design`, the Turkman turban helmet), fitted over the head, its
       // inlay, rivets and mail baked; the mail closing across the face below the eye arches.
-      const design = helmDesignOf(head, lowDetail);
+      const design = helmDesignOf(head);
       if (design && buildDesignHelm(group, design, r, metal(steel, color))) {
         fitted = true;
         break;
@@ -2032,10 +2032,11 @@ function knightMesh(form, part, material) {
 /**
  * A knight's helmet in a design (knighthelms.js: the unit's own `head.design`, else `#knighthelm`), each part a measured
  * surface scaled to `r` wearing the design's sheet (the sights and breaths cut out), the dark arming cap inside, the mail
- * aventail or the coif (`head.coif`) below. False for none, in a crowd or where the maps are not there (drawn as before).
+ * aventail or the coif (`head.coif`) below; a crowd's man in the same helmet. False for none or where the maps are not there
+ * (drawn as before).
  */
-function buildKnightHelm(group, head, r, iron, lowDetail) {
-  const form = lowDetail ? null : knightFormOf(head.kind, HELM_STYLE.knight, head.design);
+function buildKnightHelm(group, head, r, iron) {
+  const form = knightFormOf(head.kind, HELM_STYLE.knight, head.design);
   if (!form || !helmMapsReady() || !helmMapSheet(form.sheet)) return false;
   for (const [name, part] of Object.entries(form.parts)) {
     const side = part.double ? THREE.DoubleSide : THREE.FrontSide;
@@ -2057,11 +2058,11 @@ function buildKnightHelm(group, head, r, iron, lowDetail) {
 }
 
 /**
- * The design a helmet is drawn in (helmforms.js DESIGN_FORMS), or null (drawn as before): none in a crowd or under
- * `#kettle=now`; a kettle hat in the one `#kettle=a|b|c` asks for; otherwise the wearer's own (`head.design`).
+ * The design a helmet is drawn in (helmforms.js DESIGN_FORMS), or null (drawn as before): none under `#kettle=now`; a
+ * kettle hat in the one `#kettle=a|b|c` asks for; otherwise the wearer's own (`head.design`), a crowd's man's too.
  */
-function helmDesignOf(head, lowDetail) {
-  if (lowDetail || HELM_STYLE.kettle === 'now') return null;
+function helmDesignOf(head) {
+  if (HELM_STYLE.kettle === 'now') return null;
   const choice = head.kind === 'kettleHat' && HELM_STYLE.kettle !== 'own' ? HELM_STYLE.kettle : head.design;
   return choice ? designFormOf(head.kind, choice) : null;
 }

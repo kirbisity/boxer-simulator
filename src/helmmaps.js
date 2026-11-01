@@ -117,6 +117,8 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
     vertexColors: false, map: sheet.map, normalMap: sheet.normalMap, roughnessMap: sheet.ormMap, metalnessMap: sheet.ormMap,
     roughness: duller ? 1.25 : 1, metalness: Math.min(base.metalness ?? 1, duller ? 0.5 : 1), side,
   });
+  // In a crowd (crowdview.js bakePieces): the helmet's steel, without its sheet.
+  material.userData = { ...material.userData, crowdColor: base.color.getHex() };
   // A sheet with openings (a sight): the normal map's alpha cuts them out.
   if (cut) {
     material.onBeforeCompile = (shader) => {
@@ -145,6 +147,7 @@ export function maskMaterial(name, tint, envMap) {
     roughness: 1, metalness: 1, envMap: envMap ?? null, envMapIntensity: 1.1, side: THREE.DoubleSide,
   });
   const uniforms = { uMaskTint: { value: new THREE.Color(tint) } };
+  material.userData.crowdColor = new THREE.Color(tint).getHex();
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.fragmentShader = `uniform vec3 uMaskTint;\n${shader.fragmentShader}`.replace(

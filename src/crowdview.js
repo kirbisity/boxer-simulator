@@ -112,6 +112,7 @@ export function bakePieces(pieces) {
           vertex.fromBufferAttribute(positions, index).applyMatrix4(mesh.matrixWorld);
           normal.fromBufferAttribute(normals, index).applyMatrix3(normalMatrix).normalize().multiplyScalar(facing);
           if (vertexColors) color.fromBufferAttribute(geometry.attributes.color, index).multiply(material.color);
+          else if (material.userData?.crowdColor !== undefined) color.set(material.userData.crowdColor);
           else color.copy(material.color);
           out.positions.push(vertex.x, vertex.y, vertex.z);
           out.normals.push(normal.x, normal.y, normal.z);
@@ -247,7 +248,9 @@ export function simplifyTemplate(template, { cell = CROWD_VIEW.farCell, colorSte
 /** A plain, solid, untextured mesh: one that can be baked. */
 export function bakeable(mesh) {
   if (!mesh.isMesh || mesh.isSkinnedMesh || mesh.userData.outline || Array.isArray(mesh.material)) return false;
-  return !(mesh.material.map || mesh.material.transparent || mesh.material.wireframe);
+  if (mesh.material.transparent || mesh.material.wireframe) return false;
+  // A helmet or mask wearing a baked sheet bakes in its own colour (`crowdColor`): its shape is what tells a man in a crowd.
+  return !mesh.material.map || mesh.material.userData?.crowdColor !== undefined;
 }
 
 /** The world matrix of a frame placed at `origin` (default its own), as a Matrix4. */

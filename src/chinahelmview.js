@@ -312,6 +312,8 @@ function chinaFinish(steel, finish, sheet) {
   material.color = new THREE.Color(sheet ? 0xffffff : finish.colour);
   Object.assign(material, { vertexColors: false, metalness: finish.metalness, roughness: finish.roughness, side: THREE.DoubleSide });
   if (sheet) Object.assign(material, { map: sheet.map, normalMap: sheet.normalMap });
+  // In a crowd (crowdview.js bakePieces): the finish's own colour, without its sheet.
+  material.userData = { ...material.userData, crowdColor: new THREE.Color(finish.colour).getHex() };
   material.needsUpdate = true;
   return material;
 }
