@@ -1101,7 +1101,7 @@ export const OUTFITS = {
       mingEliteDesign('Imperial blue', '#1f2f6a', '#e8e0cc', '#a7adb6'),
       mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { mask: true, maskDesign: 'shoumian' }),
       mingEliteDesign('Gilt scale', '#5a1a14', '#7a1418', '#b8a066', {}, { kind: 'mingScale', lace: '#3a2016' }),
-      mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true, maskDesign: 'tiemian' }, { kind: 'mingScale', lace: '#1a1c24' }),
+      mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true, maskDesign: 'shoumian' }, { kind: 'mingScale', lace: '#1a1c24' }),
       // Qi Jiguang's and his household guards' (Qi Jiguang's level): the elite's protection drawn as
       // iron lamellar laced in crimson over the crimson coat. A level's, not dealt at random.
       { ...mingEliteDesign('Iron lamellar, crimson lacing', '#8a1418', '#8a1418', '#8f949b', {}, { kind: 'mingEliteLamellar', lace: '#8a1418' }), levelOnly: true },
@@ -1359,7 +1359,7 @@ export const OUTFITS = {
     courage: 0.4,
     designs: [
       steppeDesign('Gilt scale, black deel', { kind: 'kheshig', color: '#8f949b', lace: '#1c1a18' }, '#1c1a18', '#d6a743', { kind: 'steppeHelm', color: '#8f949b', coif: '#6a6d73', plume: '#1c1a18', mask: true, maskDesign: 'kipchak', gold: '#d6a743' }),
-      steppeDesign('Black scale, red deel', { kind: 'kheshig', color: '#34363a', lace: '#8a1418' }, '#7a1418', '#d6a743', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#b3161b', mask: true, maskDesign: 'horde', gold: '#d6a743' }),
+      steppeDesign('Black scale, red deel', { kind: 'kheshig', color: '#34363a', lace: '#8a1418' }, '#7a1418', '#d6a743', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#b3161b', mask: true, maskDesign: 'kipchak', gold: '#d6a743' }),
     ],
   },
   // ---- The horse peoples and the armies that met them (the Battle Mode levels of
@@ -1609,7 +1609,7 @@ export const OUTFITS = {
     designs: [
       { label: 'Steel, red kaftan', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#3a1012' }, armor: { kind: 'krug', color: '#a7adb6' }, head: { kind: 'chichak', design: 'turban', color: '#a7adb6', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
       { label: 'Gilt, blue kaftan', top: { kind: 'longsleeve', color: '#2a3a6a' }, bottom: { kind: 'pants', color: '#1c2238' }, armor: { kind: 'krug', color: '#b8a066' }, head: { kind: 'chichak', color: '#b8a066', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
-      { label: 'Dark steel, green kaftan', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#1c2a20' }, armor: { kind: 'krug', color: '#6a6d73' }, head: { kind: 'chichak', color: '#6a6d73', gold: '#b8a066', maskDesign: 'ventail' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+      { label: 'Dark steel, green kaftan', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#1c2a20' }, armor: { kind: 'krug', color: '#6a6d73' }, head: { kind: 'chichak', color: '#6a6d73', gold: '#b8a066', design: 'turban' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
     ],
   },
   // An alp of Osman's gazi band, c. 1300, a legend of an earlier age (not in

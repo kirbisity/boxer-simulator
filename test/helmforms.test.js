@@ -167,7 +167,7 @@ test('the samurai\'s masks sit on the face: off it by their gap, the chin cupped
   for (const [style, sheet] of Object.entries(MASK_SHEETS)) assert.equal(MASK_FITS[style].R, HELM_MAP_DATA[sheet].grid.R, style);
 });
 
-test('the guardian face is pinched in through the middle; the steppe face narrower than the rest, its sides straight', () => {
+test('the guardian face is straight-sided, neither pinched nor swelling at the middle; the steppe face narrower than the rest, its sides straight', () => {
   // The edge of a whole-face mask (drawn at 0.86 of its reach round) set on the face: its breadth (z) at a drawn height.
   const edge = (fit, y) => {
     const polar = Math.acos(y / fit.R);
@@ -175,7 +175,8 @@ test('the guardian face is pinched in through the middle; the steppe face narrow
     return maskOnFace(fit, [fit.R * Math.sin(polar) * Math.cos(azimuth), y, fit.R * Math.sin(polar) * Math.sin(azimuth)])[2];
   };
   const guardian = MASK_FITS.shoumian;
-  assert.ok(edge(guardian, -0.3) < edge(guardian, 0.6) - 0.05 && edge(guardian, -0.3) < edge(guardian, -0.8), 'pinched at the cheeks');
+  const sides = [0.6, 0.3, 0, -0.3, -0.6, -0.8].map((y) => edge(guardian, y));
+  assert.ok(Math.max(...sides) - Math.min(...sides) < 0.12, `straight-sided: ${sides.map((b) => b.toFixed(2))}`);
   const steppe = MASK_FITS.kipchak;
   const breadths = [0.6, 0.3, 0, -0.3, -0.6, -0.8, -0.9].map((y) => edge(steppe, y));
   assert.ok(Math.max(...breadths) - Math.min(...breadths) < 0.12, `straight-sided: ${breadths.map((b) => b.toFixed(2))}`);
@@ -186,16 +187,18 @@ test('the guardian face is pinched in through the middle; the steppe face narrow
 const WORLD_MASKS = ['tiemian', 'shoumian', 'kipchak', 'horde', 'ventail'];
 
 test('the war masks of China, the steppe and the sultanates: each worn by its kits, most designs bare-faced', () => {
-  const wearers = { mingElite: ['shoumian', 'tiemian'], kheshig: ['kipchak', 'horde'], ottomanHeavy: ['ventail'] };
+  // The picked ones: the guardian beast face and the steppe iron face (the others built, not worn).
+  const PICKED = ['shoumian', 'kipchak'];
+  const wearers = { mingElite: ['shoumian', 'shoumian'], kheshig: ['kipchak', 'kipchak'] };
   const worn = new Set();
   for (const [kit, masks] of Object.entries(wearers)) {
     const designs = OUTFITS[kit].designs.filter((design) => !design.levelOnly);
     assert.deepEqual(designs.map((design) => design.head.maskDesign).filter(Boolean), masks, kit);
     masks.forEach((mask) => worn.add(mask));
   }
-  assert.deepEqual([...worn].sort(), [...WORLD_MASKS].sort());
+  assert.deepEqual([...worn].sort(), [...PICKED].sort());
   // The mail veil is the Turkman turban helmet's own aventail (DESIGN_FORMS.turbanTurkman), on the Ottoman heavy's steel kit.
-  assert.deepEqual(OUTFITS.ottomanHeavy.designs.map((design) => design.head.design ?? null), ['turban', null, null]);
+  assert.deepEqual(OUTFITS.ottomanHeavy.designs.map((design) => design.head.design ?? null), ['turban', null, 'turban']);
   // Nowhere else: the other kits' faces as they were.
   for (const [kit, outfit] of Object.entries(OUTFITS)) {
     if (wearers[kit]) continue;

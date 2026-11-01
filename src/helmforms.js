@@ -653,7 +653,7 @@ export const MASK_FITS = {
   // mouth; the ventail as the half masks. (The mail veil is the Turkman turban helmet's own aventail: DESIGN_FORMS.)
   // The guardian face pinched in through the middle (broad at the brow and jaw); the steppe face narrower, squared.
   ...Object.fromEntries(['tiemian', 'horde'].map((name) => [name, { R: 1.12, gap: 0.06, span: 0.84, y: WORLD_FACE_Y }])),
-  shoumian: { R: 1.12, gap: 0.06, span: [0.95, 0.5, 0.92], y: WORLD_FACE_Y },
+  shoumian: { R: 1.12, gap: 0.06, span: [0.95, 0.63, 0.92], y: WORLD_FACE_Y },
   kipchak: { R: 1.12, gap: 0.06, span: [0.66, 0.62, 0.8], square: 0.15, y: WORLD_FACE_Y },
   ventail: { R: 1.1, gap: 0.07, span: 0.84, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
 };
