@@ -265,7 +265,7 @@ export const PRESETS = {
   // who led the Iron Pagoda (1140); Subutai, Chinggis Khan's general, in the
   // kheshig's armour; Turgut Alp, one of Osman's companions (c. 1300).
   ironPagoda: {
-    name: 'Wanyan Wuzhu', style: 'langyaShield', hero: true, sex: 'male', heightCm: 173, frame: 'large', age: 38, exercise: 0.6, calories: 4550,
+    name: 'Wanyan Wuzhu', style: 'langyaShield', hero: true, sex: 'male', heightCm: 173, frame: 'large', age: 38, exercise: 0.6, calories: 4550, skill: 0.6,
     outfit: { kind: 'ironPagoda', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -304,7 +304,7 @@ export const PRESETS = {
   // Bai's poems and Zhang Xu's script), and he fought with the jian on the
   // frontier. The wuxia hero: no armour, tall, strong, very quick.
   wuxia: {
-    name: 'Pei Min', style: 'wuxia', sex: 'male', heightCm: 180, frame: 'large', age: 30, exercise: 0.67, calories: 4500,
+    name: 'Pei Min', style: 'wuxia', sex: 'male', heightCm: 180, frame: 'large', age: 30, exercise: 0.67, calories: 4500, skill: 1,
     outfit: { kind: 'wuxia', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
