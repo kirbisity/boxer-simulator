@@ -8,7 +8,7 @@
 import { normaliseInputs, PRESETS } from './body.js';
 import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
-import { FACTION_KEYS, FACTIONS, factionOf, firstDesignOf, HEADGEAR, headgearOptions, outfitOf, outfitSets, OUTFITS, pickableSets, randomColors, setCard } from './outfits.js';
+import { CLOTH_COLORS, FACTION_KEYS, FACTIONS, factionOf, firstDesignOf, HEADGEAR, headgearOptions, helmChoices, helmSlotOf, outfitOf, outfitSets, OUTFITS, pickableSets, randomColors, setCard, setHelmSlot, wornCard } from './outfits.js';
 import { setCardElement } from './setcard.js';
 import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { photoFaceRegions } from './photoface.js';
@@ -532,14 +532,19 @@ export function installMenus(game) {
       const pick = (kind, key) => {
         gearTouched = true;
         const changed = kind !== outfit.kind;
-        inputs.outfit = { kind, design: firstDesignOf(kind, key), colors: changed ? randomColors(kind) : outfit.colors };
+        // (The helmet slot kept: a helm chosen stays on over whatever set is worn.)
+        inputs.outfit = { kind, design: firstDesignOf(kind, key), colors: changed ? randomColors(kind) : outfit.colors, ...(outfit.helm ? { helm: outfit.helm } : {}), ...(outfit.bareHead ? { bareHead: true } : {}) };
         if (changed) inputs.accessories = headgearOptions(kind).includes(inputs.accessories?.[0]) ? inputs.accessories : [];
         draw();
       };
       content.append(
-        setCardElement(setCard(worn.kind, worn.set), () => game.setPortrait?.(worn.kind, worn.set)),
+        setCardElement(wornCard(inputs), () => game.setPortrait?.(worn.kind, worn.set)),
+        el('div', { className: 'field' }, el('b', { textContent: 'Helmet' }), helmPicker()),
         ...(designs.length < 2 ? [] : [el('div', { className: 'field' }, el('b', { textContent: 'Finish' }), buttons(designs.map(([, at]) => String(at)), () => String(outfit.design ?? 0), (at) => { gearTouched = true; inputs.outfit = { ...outfit, design: Number(at) }; }, (at) => OUTFITS[outfit.kind].designs[at].label))]),
-        el('div', { className: 'field' }, el('b', { textContent: 'Colours' }), el('button', { type: 'button', className: 'chip', textContent: '🎨 Shuffle colours', onclick: () => { gearTouched = true; inputs.outfit = { ...inputs.outfit, colors: randomColors(outfit.kind) }; preview(); } })),
+        ...(['top', 'bottom'].some((part) => worn.look[part]) ? [
+          el('div', { className: 'field' }, el('b', { textContent: 'Top colour' }), clothPicker('top')),
+          el('div', { className: 'field' }, el('b', { textContent: 'Legs colour' }), clothPicker('bottom')),
+        ] : []),
         el('div', { className: 'field' }, el('b', { textContent: 'On the head' }), buttons(headgearOptions(outfit.kind), () => inputs.accessories?.[0] ?? 'none', (item) => { gearTouched = true; inputs.accessories = item === 'none' ? [] : [item]; }, (item) => (item === 'none' ? 'Nothing' : HEADGEAR[item].label))),
         ...FACTION_KEYS.map((faction) => [faction, sets.filter((each) => each.faction === faction)]).filter(([, group]) => group.length).map(([faction, group]) => el('div', { className: 'style-group' },
           el('b', { className: 'style-faction', textContent: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` }),
@@ -549,6 +554,30 @@ export function installMenus(game) {
             return card;
           })))),
       );
+    }
+    // The helmet slot: the set's own helm, none, or another kit's (outfits.js helmChoices), under the faction it comes from.
+    function helmPicker() {
+      const helms = helmChoices();
+      const select = el('select', { ariaLabel: 'Helmet' }, el('option', { value: 'own', textContent: "The set's own" }), el('option', { value: 'none', textContent: 'No helmet' }),
+        ...FACTION_KEYS.map((faction) => [faction, helms.filter((helm) => helm.faction === faction)]).filter(([, group]) => group.length).map(([faction, group]) => el('optgroup', { label: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` },
+          ...group.map((helm) => el('option', { value: helm.key, textContent: `${helm.name} (${helm.kg.toFixed(1)} kg)` })))));
+      select.value = helmSlotOf(inputs);
+      select.onchange = () => { gearTouched = true; setHelmSlot(inputs, select.value); draw(); };
+      return select;
+    }
+    // The colour of the clothes under the kit (`outfit.colors`): its own, or one picked from the cloth colours.
+    function clothPicker(part) {
+      const own = '#000001';
+      const palette = { "kit's own": own, ...CLOTH_COLORS };
+      const picker = swatches(palette, () => inputs.outfit?.colors?.[part] ?? own, (hex) => {
+        gearTouched = true;
+        const colors = { ...inputs.outfit?.colors };
+        if (hex === own) delete colors[part];
+        else colors[part] = hex;
+        inputs.outfit = { ...inputs.outfit, colors };
+      });
+      picker.firstChild.classList.add('own');
+      return picker;
     }
     // Where they are from (faceregions.js REGION_ORIGINS): the photo faces of their sex, by continent, whatever they wear or
     // fight with. Untouched it shows their kit's own (originOf) and writes nothing, so they are cast as that kit's men are;

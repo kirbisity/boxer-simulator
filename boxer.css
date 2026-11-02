@@ -1217,3 +1217,21 @@ body[data-game="lastgate"] .hud, body[data-game="lastgate"] .log { display: none
 .outfit .set-slot { grid-column: 1 / -1; }
 .outfit .set-card { grid-template-columns: 64px minmax(0, 1fr); }
 .outfit .set-portrait { width: 64px; }
+.set-charts { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.set-radar { flex: none; overflow: visible; }
+.set-radar text { font: 9px var(--mono); fill: var(--muted); }
+.set-radar .radar-ring { fill: none; stroke: var(--line); stroke-width: 0.7; }
+.set-radar .radar-shape { fill: rgba(255, 207, 74, 0.32); stroke: var(--gold); stroke-width: 1.4; stroke-linejoin: round; }
+.set-bars { display: grid; gap: 3px; flex: 1 1 150px; min-width: 0; font: 11px var(--mono); }
+.set-bar-row { display: grid; grid-template-columns: 40px repeat(3, minmax(0, 1fr)); gap: 4px; align-items: center; }
+.set-bar-row > span:first-child { color: var(--muted); }
+.set-bar-row.head-row span { color: var(--muted); font-size: 10px; }
+.set-bar { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.set-bar i { display: block; height: 100%; border-radius: 4px; }
+.set-bar.blunt i { background: #c98a4a; }
+.set-bar.cut i { background: #d4d8de; }
+.set-bar.pierce i { background: #c0453c; }
+.set-mini { display: flex; gap: 8px; align-items: center; }
+.set-mini .set-sum { line-height: 1.35; }
+.set-radar.small .radar-ring { stroke-width: 0.5; }
+.swatch.own { background: repeating-linear-gradient(45deg, #3a3f4c 0 5px, #8a8f9c 5px 10px) !important; }

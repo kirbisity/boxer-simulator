@@ -197,3 +197,9 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 @media (max-width: 700px) {
   .fight-ui:has(.fu-orders:not([hidden])) .lv-items { left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(184px + env(safe-area-inset-top, 0px)); }
 }
+.lv-item[data-item="kit"] { width: 48px; }
+.lv-item[data-item="kit"] .lv-icon { color: var(--gold); }
+.lv-kit { position: absolute; left: 50%; top: calc(70px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(440px, calc(100% - 32px)); max-height: calc(100% - 160px); overflow: auto; display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(10, 12, 18, 0.88); color: var(--fg); pointer-events: auto; z-index: 20; }
+.lv-kit-title { font: 700 13px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
+.lv-kit .lv-kit-card { grid-template-columns: minmax(0, 1fr); border: 0; padding: 0; background: none; }
+.lv-kit-close { font: 11px var(--mono); color: var(--muted); text-align: center; }

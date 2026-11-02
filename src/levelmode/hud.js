@@ -5,18 +5,21 @@
 //  - the action bar, over the pill's place, while a bandage goes on or a harness is changed;
 //  - a toast line for what just happened;
 //  - the boss's bar (story.js) kept at his health, while he is in the fight;
+//  - the kit button beside them (I): a sheet of what the player wears, its card and charts (setcard.js), over the fight;
 //  - the team (teamview.js): the comrades' names and health above the player's card, a pip over each one's head.
 // Plain DOM over the fight; nothing here knows the physics beyond level.js's answers.
 
 import { bossStatus, contextFor, interact, useItem } from './level.js';
 import { bossBar, storyBusy } from './story.js';
 import { createTeamView } from './teamview.js';
+import { wornCard } from '../outfits.js';
+import { setCardElement } from '../setcard.js';
 
 export const LEVEL_HUD = {
   // The toast stays this long (s).
   toastSeconds: 2.6,
   // The keys: E the context button, 1 a bandage, 2 a tonic.
-  keys: { context: 'e', bandage: '1', tonic: '2' },
+  keys: { context: 'e', bandage: '1', tonic: '2', kit: 'i' },
 };
 
 // Each icon: plain strokes in the control's colour (16 px).
@@ -61,6 +64,33 @@ export function installLevelHud(root, hooks) {
     });
     return [kind, button];
   }));
+  // What he wears, its card (setcard.js): opened from the item row, closed by a tap anywhere on it.
+  const kitButton = items.appendChild(levelElement('button', 'lv-item', `${levelIcon('outfit')}<kbd>${LEVEL_HUD.keys.kit.toUpperCase()}</kbd>`));
+  kitButton.type = 'button';
+  kitButton.dataset.item = 'kit';
+  kitButton.setAttribute('aria-label', 'Your kit');
+  const sheet = root.appendChild(levelElement('div', 'lv-kit'));
+  sheet.hidden = true;
+  const toggleKit = () => {
+    if (!sheet.hidden) { sheet.hidden = true; return; }
+    const me = hooks.world()?.fighters?.[0];
+    if (!me?.body?.inputs) return;
+    const card = setCardElement(wornCard(me.body.inputs, me.body.bodyMassKg ?? 75), null);
+    card.querySelector('.set-portrait').remove();
+    card.classList.add('lv-kit-card');
+    sheet.replaceChildren(levelElement('b', 'lv-kit-title', 'Your kit'), card, levelElement('span', 'lv-kit-close', 'Tap to close'));
+    sheet.hidden = false;
+  };
+  kitButton.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    press.stopPropagation();
+    if (hooks.active()) toggleKit();
+  });
+  sheet.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    press.stopPropagation();
+    sheet.hidden = true;
+  });
   const bar = root.appendChild(levelElement('div', 'lv-action', '<span class="lv-action-label"></span><i><b></b></i>'));
   bar.hidden = true;
   const team = createTeamView(root, hooks);
@@ -88,6 +118,10 @@ export function installLevelHud(root, hooks) {
       event.preventDefault();
       event.stopImmediatePropagation();
       useItem(world, key === LEVEL_HUD.keys.bandage ? 'bandage' : 'tonic');
+    } else if (key === LEVEL_HUD.keys.kit) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      toggleKit();
     } else if (key === LEVEL_HUD.keys.context && contextFor(world)) {
       // Only with something to do: otherwise E is the parry key as ever.
       event.preventDefault();
@@ -156,6 +190,7 @@ export function installLevelHud(root, hooks) {
     team.reset();
     pill.hidden = true;
     items.hidden = true;
+    sheet.hidden = true;
     bar.hidden = true;
     toastLine.hidden = true;
     shown = null;

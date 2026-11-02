@@ -15,7 +15,7 @@
 // be added and picked between again.
 // Colours may be hex or 'corner' (red or blue by side).
 
-import { OUTFIT_BLURBS, OUTFIT_SETS } from './outfitsets.js';
+import { HELM_NAMES, OUTFIT_BLURBS, OUTFIT_SETS } from './outfitsets.js';
 
 export const DAMAGE_TYPES = ['blunt', 'cut', 'pierce'];
 
@@ -2540,13 +2540,108 @@ export function outfitOf(inputs) {
   return { kind, design, set: set.key, spec: setSpec(kind, set.key), look };
 }
 
-/** The helm of another kit worn over this one (`outfit.helm`: { kind, design }), as { head (its look), spec (its kit) }, or null. */
+/** The helm of another kit worn over this one (`outfit.helm`: { kind, design }: the helmet slot, or a dead man's taken up), or null. */
 function wornHelm(inputs) {
   const from = inputs.outfit?.helm;
-  const spec = from && OUTFITS[from.kind];
-  if (!spec) return null;
-  const head = spec.designs[Math.max(0, Math.min(spec.designs.length - 1, from.design ?? 0))].head;
-  return head ? { head, spec } : null;
+  return from && OUTFITS[from.kind] ? helmPiece(from.kind, from.design ?? 0) : null;
+}
+
+/**
+ * A kit's helm as a piece worn on its own: its look (`head`), the set it comes from (`spec`: its gaps, its sight), how it meets
+ * a blow (`helmet`: HELMETS), and how it guards the head (`guard`: the set's head region, else the kit's whole; `bullet`).
+ */
+function helmPiece(kind, design) {
+  const designs = OUTFITS[kind].designs;
+  const at = Math.max(0, Math.min(designs.length - 1, design));
+  const head = designs[at].head;
+  if (!head) return null;
+  const spec = setSpec(kind, setOfDesign(kind, at).key);
+  const protection = { ...NO_PROTECTION, ...spec.protection };
+  const guard = protection.regions?.head ?? { blunt: protection.blunt, cut: protection.cut, pierce: protection.pierce, deflects: Boolean(protection.deflects ?? spec.deflects) };
+  return { kind, design: at, head, spec, helmet: spec.helmet ?? HELMETS[head.kind] ?? NO_HELMET, guard, bullet: protection.bullet?.head ?? 0 };
+}
+
+/** A head piece's key in HELM_NAMES: its kind, its design or style, and '+mask' with a face mask. */
+function helmKey(head) {
+  const variant = head.design ?? head.style;
+  return `${head.kind}${variant ? `:${variant}` : ''}${head.mask ? '+mask' : ''}`;
+}
+
+// The lightest piece the helmet slot offers (kg): a helmet, not a cap or a cloth turban.
+const HELM_SLOT_MIN_KG = 0.8;
+let helmChoiceList = null;
+/**
+ * The helms the helmet slot offers, one of each (sets that share a helm give it once), under the factions:
+ * { kind, design, key, name, faction, kg }. Not a helm bolted to its breastplate (`headLocked`), nor a machine's head.
+ */
+export function helmChoices() {
+  if (helmChoiceList) return helmChoiceList;
+  const seen = new Set();
+  helmChoiceList = [];
+  for (const each of pickableSets()) {
+    const spec = setSpec(each.kind, each.key);
+    if (spec.headLocked || spec.machine) continue;
+    const piece = helmPiece(each.kind, firstDesignOf(each.kind, each.key));
+    if (!piece || piece.helmet.mass < HELM_SLOT_MIN_KG) continue;
+    const key = helmKey(piece.head);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    helmChoiceList.push({ kind: each.kind, design: piece.design, key, name: HELM_NAMES[key] ?? each.name, faction: each.faction, kg: piece.helmet.mass });
+  }
+  return helmChoiceList;
+}
+
+/** The helmet slot as it stands: 'own' (the set's), 'none' (bare-headed), or the key of the helm worn (helmChoices). */
+export function helmSlotOf(inputs) {
+  if (inputs.outfit?.bareHead) return 'none';
+  const helm = wornHelm(inputs);
+  return helm ? helmKey(helm.head) : 'own';
+}
+
+/** The helmet slot set: 'own', 'none' or a helmChoices key; writes `outfit.helm` and `outfit.bareHead`. */
+export function setHelmSlot(inputs, key) {
+  const outfit = (inputs.outfit ??= { kind: 'boxing', design: 0 });
+  delete outfit.helm;
+  delete outfit.bareHead;
+  if (key === 'none') outfit.bareHead = true;
+  const choice = helmChoices().find((each) => each.key === key);
+  if (choice) outfit.helm = { kind: choice.kind, design: choice.design };
+}
+
+/** The helm a fighter has on as a card shows it: { name, kg, face, head (blunt, cut, pierce) }, or null for his set's own. */
+export function helmCardOf(inputs) {
+  if (inputs.outfit?.bareHead) return { name: 'No helmet', kg: 0, face: 'bare', head: { blunt: 0, cut: 0, pierce: 0 } };
+  const helm = wornHelm(inputs);
+  if (!helm) return null;
+  return { name: HELM_NAMES[helmKey(helm.head)] ?? helm.spec.label, kg: helm.helmet.mass, face: helm.helmet.face ?? (helm.head.mask ? 'closed' : 'open'), head: helm.guard };
+}
+
+/** The card of the kit a fighter has on (setCard), with the helm in his helmet slot in place of the set's own. */
+export function wornCard(inputs, bodyKg = 75) {
+  const { kind, set } = outfitOf(inputs);
+  const card = setCard(kind, set, bodyKg);
+  const helm = helmCardOf(inputs);
+  if (!helm) return card;
+  return { ...card, helm: helm.name, head: helm.head, helmetKg: helm.kg, face: helm.face, kg: Math.max(0, card.kg + helm.kg - card.helmetKg) };
+}
+
+// What a kit's own helm weighs is counted in its `extraMass` (a share of the body); a helm changed in the slot moves it by the
+// difference, reckoned on a man of this weight (kg) as the set cards are.
+const HELM_SLOT_BODY_KG = 75;
+
+/** The kit's own helm (its set's `helmet`, else HELMETS by its head), as a blow meets it. */
+function ownHelmet(spec, kind, design) {
+  return spec.helmet ?? HELMETS[OUTFITS[kind].designs[design]?.head?.kind] ?? NO_HELMET;
+}
+
+/** The kit's gaps with the head's changed: whether the throat is mail or closed goes with the helm worn (`helm`, or none). */
+function gapsWithHelm(gaps, helm) {
+  const strip = (zones) => (zones ?? []).filter((zone) => zone !== 'neck');
+  const adds = (list) => (helm?.spec.gaps?.[list]?.includes('neck') ? ['neck'] : []);
+  const closed = [...strip(gaps?.closed), ...adds('closed')];
+  const mail = [...strip(gaps?.mail), ...adds('mail')];
+  if (!gaps && !closed.length && !mail.length) return null;
+  return { ...gaps, closed, mail };
 }
 
 /**
@@ -2645,8 +2740,9 @@ const NO_HELMET = { mass: 0, padding: 0, curve: 0 };
 /** How his helmet keeps his face (HELMETS `face`): 'closed', 'sealed' or 'open'; 'bare' with nothing on his head. A mask closes an open helmet. */
 function helmFaceOf(inputs, spec, look) {
   if (inputs.outfit?.bareHead) return 'bare';
-  const helm = (wornHelm(inputs) ? null : spec.helmet) ?? HELMETS[look.head?.kind];
-  if (!helm) return 'bare';
+  const worn = wornHelm(inputs);
+  const helm = worn ? worn.helmet : spec.helmet ?? HELMETS[look.head?.kind];
+  if (!helm || helm.mass === 0) return 'bare';
   if (helm.face) return helm.face;
   return look.head?.mask ? 'closed' : 'open';
 }
@@ -2656,15 +2752,19 @@ function bareHeaded(protection) {
   return { ...protection, bullet: { ...protection.bullet, head: 0 }, regions: { ...protection.regions, head: { blunt: 0, cut: 0, pierce: 0, deflects: false } } };
 }
 
-/** A kit's protection with another kit's helm over the head (`outfit.helm`): the head as that kit guards it; the rest as it was. */
+/** A kit's protection with another kit's helm over the head (`outfit.helm`): the head as that helm guards it; the rest as it was. */
 function helmedBy(protection, helm) {
-  const head = helm?.spec.protection?.regions?.head;
-  if (!head) return protection;
-  return { ...protection, regions: { ...protection.regions, head } };
+  if (!helm) return protection;
+  return { ...protection, bullet: { ...protection.bullet, head: helm.bullet }, regions: { ...protection.regions, head: helm.guard } };
 }
 
 export function gearTraits(inputs) {
-  const { spec, look } = outfitOf(inputs);
+  const { kind, design, spec, look } = outfitOf(inputs);
+  // The helmet slot: another kit's helm (wornHelm) or none (`bareHead`) in place of the kit's own; its weight, its gaps.
+  const helm = wornHelm(inputs);
+  const bare = Boolean(inputs.outfit?.bareHead);
+  const headChanged = bare || Boolean(helm);
+  const helmShift = headChanged ? ((bare ? 0 : helm.helmet.mass) - ownHelmet(spec, kind, design).mass) / HELM_SLOT_BODY_KG : 0;
   const female = inputs.sex === 'female';
   const bySex = female ? spec.female ?? {} : {};
   const feet = (female && look.femaleFeet) || look.feet;
@@ -2676,13 +2776,13 @@ export function gearTraits(inputs) {
     heelLift: heelLift(feet?.heels, (inputs.heightCm ?? 175) / 100),
     kick: bySex.kick ?? spec.kick ?? 1,
     // The kit's weight as a share of the body's; a man's own (`outfit.extraMass`) before the kit's (a giant in a harness that weighs what a harness weighs).
-    extraMass: inputs.outfit?.extraMass ?? spec.extraMass ?? 0,
+    extraMass: inputs.outfit?.extraMass ?? Math.max(0, (spec.extraMass ?? 0) + helmShift),
     // The part of that weight that is not armour (an exoframe's frame, a robot's battery): poise counts it as a load (physics poiseOf).
     carriedShare: inputs.outfit?.carriedShare ?? spec.carriedShare ?? 0,
     protection: inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : helmedBy({ ...NO_PROTECTION, ...spec.protection }, wornHelm(inputs)),
     deflects: Boolean(spec.deflects),
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
-    headLocked: Boolean(spec.headLocked) && !inputs.outfit?.bareHead,
+    headLocked: Boolean(spec.headLocked) && !headChanged,
     // His skill in this kit, as a share of his own (a man who cannot turn his head fights by feel).
     skillFactor: spec.skillFactor ?? 1,
     // Poise beyond the armour's weight and shell (physics poiseOf): one rigid shell bolted together; or a man's own (`outfit.poise`: a fighter who
@@ -2699,14 +2799,14 @@ export function gearTraits(inputs) {
     // A fireproof suit (physics/flame.js FLAME.suit): { tpp, reflect, leak, breach }, or null.
     fireproof: spec.fireproof ?? null,
     // How far off his facing he sees (rad), where the kit narrows it (a hood's visor), unless his head is locked (headLocked's slit).
-    sight: inputs.outfit?.bareHead ? null : spec.sight ?? null,
+    sight: bare ? null : (helm ? helm.spec.sight : spec.sight) ?? null,
     // The kit's own say of the gaps in its rigid armour (BLADES.gaps): their chances, what is under them (`under`, `mail`), its
     // `lacing`, the zones it has none of (`closed`).
-    gaps: spec.gaps ?? null,
+    gaps: headChanged ? gapsWithHelm(spec.gaps, helm) : spec.gaps ?? null,
     // How much wider than the head what is worn on it is, where heads and bodies meet (not where blows land).
-    headBulk: spec.headBulk ?? 1,
+    headBulk: (helm ? helm.spec.headBulk : bare ? 1 : spec.headBulk) ?? 1,
     // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve; or the kit's own (`helmet`: a machine's head shell).
-    helmet: inputs.outfit?.bareHead ? NO_HELMET : (wornHelm(inputs) ? null : spec.helmet) ?? HELMETS[look.head?.kind] ?? NO_HELMET,
+    helmet: bare ? NO_HELMET : helm ? helm.helmet : spec.helmet ?? HELMETS[look.head?.kind] ?? NO_HELMET,
     // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
     breastplate: spec.breastplate ?? 0,
     // How the helmet keeps the face (HELMETS `face`; a mask closes an open one): 'closed', 'sealed', 'open'; 'bare' with none.

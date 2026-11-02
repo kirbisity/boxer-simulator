@@ -34,7 +34,7 @@ import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battle
 import { judgeBattle } from './battleend.js';
 import { createGeneralMarks } from './generalmark.js';
 import { leadOf, musterLevel } from './muster.js';
-import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setCard } from './outfits.js';
+import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, helmChoices, helmSlotOf, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setHelmSlot, wornCard } from './outfits.js';
 import { setCardElement } from './setcard.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
@@ -1995,6 +1995,18 @@ const colorName = (hex) => (hex ? Object.keys(PICKER_COLORS).find((name) => PICK
 const outfitField = (inputs) => (inputs.outfit ??= { kind: 'boxing', design: 0 });
 // Every outfit's sets by `kind/set`, named (a set no builder offers, Level Mode's own, is shown when worn).
 const SET_NAMES = Object.fromEntries(OUTFIT_KEYS.flatMap((kind) => outfitSets(kind).map((set) => [`${kind}/${set.key}`, set.name])));
+/** The helmet slot's options: the set's own, none, and every helm offered, under the faction it comes from. */
+function fillHelmOptions(select) {
+  const helms = helmChoices();
+  select.replaceChildren(new Option("The set's own", 'own'), new Option('No helmet', 'none'), ...FACTION_KEYS.map((faction) => {
+    const group = helms.filter((helm) => helm.faction === faction);
+    if (!group.length) return null;
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}`;
+    optgroup.append(...group.map((helm) => new Option(`${helm.name} (${helm.kg.toFixed(1)} kg)`, helm.key)));
+    return optgroup;
+  }).filter(Boolean));
+}
 /** The set picker's options: every set the builders offer, under its faction. */
 function fillSetOptions(select) {
   const sets = pickableSets();
@@ -2015,6 +2027,11 @@ const OUTFIT_FIELDS = [
       Object.assign(outfitField(inputs), { kind, design: firstDesignOf(kind, set), colors: changed ? randomColors(kind) : outfitField(inputs).colors });
       if (changed) inputs.accessories = defaultHeadgear(kind);
     },
+  },
+  {
+    // The helmet slot: the set's own helm, none, or another kit's (outfits.js helmChoices), under the factions (fillHelmOptions).
+    key: 'helm', label: 'Helmet', options: [], names: null,
+    get: (inputs) => helmSlotOf(inputs), set: (inputs, value) => setHelmSlot(inputs, value),
   },
   {
     // A finish of the set: its colours, crest, lacing; the same stats.
@@ -2144,18 +2161,12 @@ function buildCornerForm(corner) {
   }));
   looks.after(outfit);
   fillSetOptions(outfit.querySelector('[data-outfit="set"]'));
+  fillHelmOptions(outfit.querySelector('[data-outfit="helm"]'));
   outfit.querySelector('[data-outfit="set"]').closest('label').classList.add('set-row');
   // The set worn: its picture, description and stats (filled by fillCornerForm).
   const card = document.createElement('div');
   card.className = 'set-slot';
   outfit.append(card);
-  // New colours from this outfit's palette, as often as wanted.
-  const shuffle = Object.assign(document.createElement('button'), { type: 'button', className: 'shuffle', textContent: 'Shuffle colours' });
-  shuffle.addEventListener('click', () => {
-    shuffleColors(current(corner));
-    fillCornerForm(corner);
-  });
-  outfit.append(shuffle);
   form.querySelector('.copy').addEventListener('click', async () => {
     const code = btoa(unescape(encodeURIComponent(JSON.stringify(fighterFile(current(corner))))));
     const box = form.querySelector('.code');
@@ -2288,10 +2299,10 @@ function fillCornerForm(corner) {
   outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => new Option(option === 'none' ? 'None' : HEADGEAR[option].label, option)));
   for (const field of OUTFIT_FIELDS) showValue(outfit.querySelector(`[data-outfit="${field.key}"]`), field.get(inputs), field.names);
   const slot = outfit.querySelector('.set-slot');
-  const shown = `${kind}/${set.key}`;
+  const shown = `${kind}/${set.key}/${helmSlotOf(inputs)}`;
   if (slot.dataset.set !== shown) {
     slot.dataset.set = shown;
-    slot.replaceChildren(setCardElement(setCard(kind, set.key, buildBody(inputs).bodyMassKg), () => portrait(`set:${shown}`, setModel(kind, set.key))));
+    slot.replaceChildren(setCardElement(wornCard(inputs, buildBody(inputs).bodyMassKg), () => portrait(`set:${kind}/${set.key}`, setModel(kind, set.key))));
   }
   form.querySelector('.name-input').value = inputs.name;
   // Mounted is each fighter's own, and only if his kit rides (levels have no horses).

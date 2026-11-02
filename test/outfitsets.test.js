@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FACTION_KEYS, gearTraits, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, pickableSets, PICKABLE_OUTFIT_KEYS, setCard } from '../src/outfits.js';
+import { FACTION_KEYS, gearTraits, helmChoices, helmSlotOf, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, pickableSets, PICKABLE_OUTFIT_KEYS, setCard, setHelmSlot, wornCard } from '../src/outfits.js';
 import { OUTFIT_BLURBS, OUTFIT_SETS } from '../src/outfitsets.js';
 
 test('every design of an outfit belongs to exactly one of its sets', () => {
@@ -54,4 +54,29 @@ test('the builders\' sets come grouped by faction, in the factions\' order', () 
 
 test('Saladin wears the sipahi\'s pointed turban helmet', () => {
   for (const design of OUTFITS.saladin.designs) assert.deepEqual([design.head.kind, design.head.design], [OUTFITS.ottomanHeavy.designs[0].head.kind, 'turban']);
+});
+
+test('the helmet slot: another kit\'s helm brings its guard, weight, face and throat; none leaves the head bare', () => {
+  const keys = helmChoices().map((helm) => helm.key);
+  assert.equal(new Set(keys).size, keys.length, 'each helm offered once');
+  assert.ok(!keys.includes('stechhelm'), 'not a helm bolted to its breastplate');
+  const own = { outfit: { kind: 'footman', design: 0 } };
+  const swapped = structuredClone(own);
+  setHelmSlot(swapped, 'bascinet:closeHelmet');
+  assert.equal(helmSlotOf(swapped), 'bascinet:closeHelmet');
+  const before = gearTraits(own);
+  const after = gearTraits(swapped);
+  const close = gearTraits({ outfit: { kind: 'knight', design: 3 } });
+  assert.deepEqual(after.protection.regions.head, close.protection.regions.head);
+  assert.equal(after.protection.torso, before.protection.torso);
+  assert.equal(after.helmet.mass, close.helmet.mass);
+  assert.ok(after.extraMass > before.extraMass);
+  assert.equal(after.helmFace, 'closed');
+  assert.ok(after.gaps.closed.includes('neck'));
+  assert.equal(wornCard(swapped).helm, 'Close helmet');
+  setHelmSlot(swapped, 'none');
+  assert.equal(gearTraits(swapped).helmFace, 'bare');
+  assert.ok(gearTraits(swapped).extraMass < before.extraMass);
+  setHelmSlot(swapped, 'own');
+  assert.deepEqual(gearTraits(swapped), before);
 });
