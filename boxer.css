@@ -1238,3 +1238,8 @@ body[data-game="lastgate"] .hud, body[data-game="lastgate"] .log { display: none
 .set-blurb { font-style: italic; }
 .set-epigram { color: var(--fg); }
 .set-card.compact .set-blurb { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* A side's armour sheet over its stage (menu.js versus: the 📜 Armour button). Its words can be selected and copied. */
+.dw-lore { position: absolute; left: 6px; right: 6px; top: 44px; bottom: 96px; z-index: 4; overflow: auto; padding: 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(12, 14, 20, 0.94); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+.dw-lore .set-card { border: 0; background: none; padding: 0; }
+.dw-lore-close { position: absolute; top: 4px; right: 6px; width: 32px; height: 32px; border: 0; background: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+.set-blurb, .set-text b { user-select: text; -webkit-user-select: text; }

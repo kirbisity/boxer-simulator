@@ -240,6 +240,8 @@ export function installMenus(game) {
     const custom = { red: null, blue: null };
     // On horseback (each side's pick; only a man whose kit rides can: horses.js).
     const mounted = { red: false, blue: false };
+    // Each side's armour sheet (its set card: description, radar, bars) open over the stage, or not.
+    const lore = { red: false, blue: false };
     const body = screen('versus', 'Deadliest Warrior', null, home);
     body.parentElement.classList.add('dw');
     const roster = (corner) => WARRIORS.filter((warrior) => warrior.faction === faction[corner]);
@@ -344,8 +346,18 @@ export function installMenus(game) {
         mounted[corner] = !mounted[corner];
         draw(corner);
       };
-      // Under his name: on horseback or not, and making your own instead, side by side.
-      side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }), el('div', { className: 'dw-buttons' }, mount, side.own));
+      // His armour: its card (setcard.js) over the stage, its words selectable; the button opens and closes it.
+      const loreButton = el('button', { type: 'button', className: `dw-mount${lore[corner] ? ' on' : ''}`, textContent: '📜 Armour', title: 'What he wears: its story and its stats' });
+      loreButton.onclick = () => { lore[corner] = !lore[corner]; draw(corner); };
+      side.lore?.remove();
+      side.lore = null;
+      if (lore[corner]) {
+        const card = setCardElement(wornCard(shown.inputs), () => game.portrait(shown.key ?? `lore:${shown.title}`, shown.inputs));
+        side.lore = el('div', { className: 'dw-lore' }, card, el('button', { type: 'button', className: 'dw-lore-close', ariaLabel: 'Close', textContent: '×', onclick: () => { lore[corner] = false; draw(corner); } }));
+        side.section.append(side.lore);
+      }
+      // Under his name: on horseback or not, his armour, and making your own instead, side by side.
+      side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }), el('div', { className: 'dw-buttons' }, mount, loreButton, side.own));
       if (custom[corner]) side.title.prepend(el('em', { textContent: 'Your fighter' }));
     }
     const fightButton = el('button', { className: 'primary big dw-fight', type: 'button', textContent: 'Fight' });
