@@ -8,7 +8,8 @@
 import { normaliseInputs, PRESETS } from './body.js';
 import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
-import { FACTION_KEYS, FACTIONS, factionOf, HEADGEAR, headgearOptions, outfitOf, PICKABLE_OUTFIT_KEYS, OUTFITS, randomColors } from './outfits.js';
+import { FACTION_KEYS, FACTIONS, factionOf, firstDesignOf, HEADGEAR, headgearOptions, outfitOf, outfitSets, OUTFITS, pickableSets, randomColors, setCard } from './outfits.js';
+import { setCardElement } from './setcard.js';
 import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { photoFaceRegions } from './photoface.js';
 import { battleOf, SCENARIOS } from './scenarios.js';
@@ -58,7 +59,6 @@ const STYLE_NOTES = {
   rifle: 'The AR-15: fast, accurate, devastating; thirty rounds, then a magazine change.', shotgun: 'A pump shotgun: slow, a hard kick, nine pellets that devastate up close.',
   langyaShield: 'A wolf-tooth mace and an iron parry buckler: crushes armour.', maceShield: 'A flanged mace and kalkan: the answer to armour.', champi: 'The Inca star mace: a bronze star on a wooden haft, swung overhead and from the side.', steppeBow: 'A composite bow: a faster, harder arrow; the sabre up close.', kheshigBow: 'Up to five quick arrows, then straight in with the flanged mace.', swordShield: 'A curved sabre and a small round shield.', guandao: 'A heavy crescent blade on a long shaft: crushing cuts.',
 };
-const OUTFIT_GLYPH = { mma: '🥋', boxing: '🥊', sports: '🏃', sumo: '🍙', hiking: '🥾', casual: '👕', business: '👔', yakuza: '🐉', swat: '🛡️', infantry: '🪖', knight: '🏰', tournament: '🏇', samurai: '⛩️', hoplomachus: '🏛️', commoner: '🌾', mingGarrison: '🏮', mingBrigandine: '🏮', mingElite: '🐉', kungfu: '☯️', monk: '🧘', dobok: '🥋', archer: '🏹', conquistadorPlate: '⚔️', conquistadorQuilted: '⚔️', mexicaWarrior: '🦅', mexicaElite: '🐆', ronin: '🗡️', sohei: '📿', wokou: '🏴‍☠️', wokouArmoured: '🏴‍☠️', victorianLady: '🎩', victorianGent: '🎩', police: '🚓', specialForces: '🎖️', ironPagoda: '🏯', steppeLight: '🐎', steppeMedium: '🐎', mingIronLamellar: '🏮', kheshig: '🐎', azap: '🌙', janissary: '🌙', ottomanHeavy: '🌙', gaziAlp: '🌙', saladin: '🌙', joan: '⚜️', guanYu: '🐉', commodus: '🦁', lorarius: '🪢', hanSoldier: '🏮', wuxia: '🗡️', riot: '🛡️', thug: '🧢', legionary: '🦅', centurion: '🦅', silverback: '🦍', monkeyFur: '🐒', go2Dog: '🐕', spotDog: '🐕', vision60Dog: '🐕', humanoid: '🤖', miniHumanoid: '🤖', combatBot: '🤖', exoArmoured: '🦾' };
 const HAIR = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 const HAIR_STYLES = { male: ['cleanShort', 'fade', 'buzz', 'spiky', 'cornrows', 'midLong', 'long', 'dreads', 'topknot', 'bald'], female: ['bun', 'ponytail', 'cleanShort', 'midLong', 'long', 'dreads', 'topknot'] };
 /** A style's name, and its weapon when the name does not already say it. */
@@ -521,19 +521,33 @@ export function installMenus(game) {
         return card;
       }
     }
+    // Outfit sets (outfitsets.js) under their factions, each a card with its picture, description and stats; the one worn shown
+    // in full above them, with its finishes (colours, crests: the same stats).
     function stepGear(content) {
-      const kinds = PICKABLE_OUTFIT_KEYS;
       const outfit = inputs.outfit ?? { kind: 'boxing', design: 0 };
-      const designs = OUTFITS[outfit.kind].designs.map((design, at) => [design, at]).filter(([design]) => !design.levelOnly);
+      const worn = outfitOf(inputs);
+      const set = outfitSets(worn.kind).find((each) => each.key === worn.set);
+      const designs = set.designs.map((at) => [OUTFITS[worn.kind].designs[at], at]).filter(([design]) => !design.levelOnly);
+      const sets = pickableSets();
+      const pick = (kind, key) => {
+        gearTouched = true;
+        const changed = kind !== outfit.kind;
+        inputs.outfit = { kind, design: firstDesignOf(kind, key), colors: changed ? randomColors(kind) : outfit.colors };
+        if (changed) inputs.accessories = headgearOptions(kind).includes(inputs.accessories?.[0]) ? inputs.accessories : [];
+        draw();
+      };
       content.append(
-        el('div', { className: 'field' }, el('b', { textContent: 'Outfit' }), buttons(kinds, () => outfit.kind, (kind) => {
-          gearTouched = true;
-          inputs.outfit = { kind, design: 0, colors: randomColors(kind) };
-          inputs.accessories = headgearOptions(kind).includes(inputs.accessories?.[0]) ? inputs.accessories : [];
-        }, (kind) => `${OUTFIT_GLYPH[kind] ?? ''} ${OUTFITS[kind].label}`)),
-        designs.length > 1 ? el('div', { className: 'field' }, el('b', { textContent: 'Design' }), buttons(designs.map(([, at]) => String(at)), () => String(outfit.design ?? 0), (at) => { gearTouched = true; inputs.outfit = { ...outfit, design: Number(at) }; }, (at) => OUTFITS[outfit.kind].designs[at].label)) : null,
+        setCardElement(setCard(worn.kind, worn.set), () => game.setPortrait?.(worn.kind, worn.set)),
+        ...(designs.length < 2 ? [] : [el('div', { className: 'field' }, el('b', { textContent: 'Finish' }), buttons(designs.map(([, at]) => String(at)), () => String(outfit.design ?? 0), (at) => { gearTouched = true; inputs.outfit = { ...outfit, design: Number(at) }; }, (at) => OUTFITS[outfit.kind].designs[at].label))]),
         el('div', { className: 'field' }, el('b', { textContent: 'Colours' }), el('button', { type: 'button', className: 'chip', textContent: '🎨 Shuffle colours', onclick: () => { gearTouched = true; inputs.outfit = { ...inputs.outfit, colors: randomColors(outfit.kind) }; preview(); } })),
         el('div', { className: 'field' }, el('b', { textContent: 'On the head' }), buttons(headgearOptions(outfit.kind), () => inputs.accessories?.[0] ?? 'none', (item) => { gearTouched = true; inputs.accessories = item === 'none' ? [] : [item]; }, (item) => (item === 'none' ? 'Nothing' : HEADGEAR[item].label))),
+        ...FACTION_KEYS.map((faction) => [faction, sets.filter((each) => each.faction === faction)]).filter(([, group]) => group.length).map(([faction, group]) => el('div', { className: 'style-group' },
+          el('b', { className: 'style-faction', textContent: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` }),
+          el('div', { className: 'set-cards' }, ...group.map((each) => {
+            const card = setCardElement(setCard(each.kind, each.key), () => game.setPortrait?.(each.kind, each.key), { compact: true, tag: 'button', chosen: each.kind === worn.kind && each.key === worn.set });
+            card.onclick = () => pick(each.kind, each.key);
+            return card;
+          })))),
       );
     }
     // Where they are from (faceregions.js REGION_ORIGINS): the photo faces of their sex, by continent, whatever they wear or

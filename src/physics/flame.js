@@ -21,7 +21,7 @@
 import { soundVoice } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
 import { BODY, buildBody, P } from '../body.js';
-import { OUTFITS } from '../outfits.js';
+import { outfitOf, OUTFITS } from '../outfits.js';
 import { addDamage, dropWeapon, fall, knockOut, point, toWorld } from '../physics.js';
 import { vec } from '../pose.js';
 import { WORLD } from './config.js';
@@ -102,7 +102,7 @@ function flameStateOf(world) {
  */
 export function withTanks(inputs) {
   const own = buildBody({ ...inputs, outfit: { ...inputs.outfit, extraMass: 0 } }).bodyMassKg;
-  const base = inputs.outfit?.extraMass ?? OUTFITS[inputs.outfit?.kind]?.extraMass ?? 0;
+  const base = inputs.outfit?.extraMass ?? (OUTFITS[inputs.outfit?.kind] ? outfitOf(inputs).spec.extraMass : 0) ?? 0;
   const kept = Math.min(base, FLAME.keptKg / own);
   return { ...inputs, sidearm: inputs.sidearm ?? FLAME.sidearm, outfit: { ...inputs.outfit, extraMass: kept + FLAME.tanksKg / own, packKg: FLAME.tanksKg, carriedShare: 0 } };
 }

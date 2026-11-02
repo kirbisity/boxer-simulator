@@ -15,6 +15,8 @@
 // be added and picked between again.
 // Colours may be hex or 'corner' (red or blue by side).
 
+import { OUTFIT_BLURBS, OUTFIT_SETS } from './outfitsets.js';
+
 export const DAMAGE_TYPES = ['blunt', 'cut', 'pierce'];
 
 /** Movement classes: footwork speed, its acceleration, and limb swing speed. */
@@ -149,17 +151,17 @@ function templarDesign(label, cloth, cloth2, heraldry) {
 /**
  * Saladin's design: the kazaghand's silk (`silk`) and its second colour
  * (`trim`: the hem, the front edge and the sash), the gold of the tiraz bands
- * and the plaque belt, the robe (qaba) that shows at the wrists, the turban
- * wound round the helmet.
+ * and the plaque belt, the robe (qaba) that shows at the wrists.
  */
-function saladinDesign(label, { silk, trim, gold = '#c9a23a', robe, turban }) {
+function saladinDesign(label, { silk, trim, gold = '#c9a23a', robe }) {
   return {
     label,
     top: { kind: 'longsleeve', color: robe },
     // Wide trousers (sarawil) of undyed cotton, tucked into the boots.
     bottom: { kind: 'pants', color: '#cfc4a8' },
     armor: { kind: 'kazaghand', color: '#8d9097', mail: '#8d9097', cloth: silk, cloth2: trim, gold, leather: '#3a2618' },
-    head: { kind: 'ayyubidHelm', color: '#9ea4ac', gold, turban, mail: '#7c8087', openFace: true },
+    // The tall pointed Turkman turban helmet of the sipahi (ottomanHeavy's first design), in his steel and gold.
+    head: { kind: 'chichak', design: 'turban', color: '#9ea4ac', gold },
     feet: { kind: 'ridingBoot', color: '#5a3a22' },
   };
 }
@@ -1746,7 +1748,7 @@ export const OUTFITS = {
     horse: 'arabian',
     faction: 'ottomans',
     // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
-    label: 'Saladin — kazaghand over mail, turbaned helmet', movement: 'good', fists: 'bare',
+    label: 'Saladin — kazaghand over mail, turban helmet', movement: 'good', fists: 'bare',
     arrowproof: true,
     // The horseman's mace (dabbus) at the saddle, the Ayyubid emir's second weapon.
     sidearm: 'mace',
@@ -1764,15 +1766,17 @@ export const OUTFITS = {
         Shank: { blunt: 0.09, cut: 0.37, pierce: 0.15 },
       },
     },
-    // Two layers of mail and the aventail: a gap meets mail (the face is open).
+    // Two layers of mail and the aventail: a gap meets mail.
     gaps: { mail: 'all' },
+    // The sipahi's Turkman turban helmet (ottomanHeavy's): a tall pointed bowl, the turban wound round it, a mail veil over the face.
+    helmet: { mass: 2.4, padding: 0.65, curve: 0.88, face: 'closed' },
     courage: 0.4,
     designs: [
       // Saladin's own colour: the yellow of the Ayyubid banners.
-      saladinDesign('Ayyubid yellow', { silk: '#c8a23a', trim: '#8a1e1a', robe: '#e8dcc0', turban: '#f0ebe0' }),
+      saladinDesign('Ayyubid yellow', { silk: '#c8a23a', trim: '#8a1e1a', robe: '#e8dcc0' }),
       // Black, the Abbasid caliph's colour, in which the caliph's robes of honour came to him.
-      saladinDesign('Abbasid black', { silk: '#1e1c1e', trim: '#c9a23a', robe: '#e8dcc0', turban: '#f0ebe0' }),
-      saladinDesign('Crimson and green', { silk: '#7e1a1e', trim: '#2f5a3a', robe: '#d8cfb8', turban: '#ece4d0' }),
+      saladinDesign('Abbasid black', { silk: '#1e1c1e', trim: '#c9a23a', robe: '#e8dcc0' }),
+      saladinDesign('Crimson and green', { silk: '#7e1a1e', trim: '#2f5a3a', robe: '#d8cfb8' }),
     ],
   },
   // A Chinese martial artist's silk suit (tai chi, kung fu): loose jacket and
@@ -2448,14 +2452,92 @@ export function factionOf(inputs) {
   return outfitOf(inputs).spec.faction ?? 'ring';
 }
 
+// ---- Sets (outfitsets.js): the kits picked to wear, designs grouped by what guards the man, each with its own stats ----
+
+const setsByKind = new Map();
+/** The sets an outfit is worn in: those listed for it (OUTFIT_SETS), else one, its own, of all its designs. */
+export function outfitSets(kind) {
+  if (!setsByKind.has(kind)) {
+    const spec = OUTFITS[kind];
+    const listed = OUTFIT_SETS[kind];
+    setsByKind.set(kind, listed ?? [{ key: 'own', name: spec.label, blurb: OUTFIT_BLURBS[kind] ?? '', designs: spec.designs.map((_, index) => index), patch: {} }]);
+  }
+  return setsByKind.get(kind);
+}
+
+/** The set a design of this outfit belongs to (the first, for a design no set lists). */
+export function setOfDesign(kind, design) {
+  const sets = outfitSets(kind);
+  return sets.find((set) => set.designs.includes(design)) ?? sets[0];
+}
+
+/** Protection with a set's over it: each region it names merged into the outfit's own (or the kit's whole, where it had none). */
+function patchedProtection(base = {}, patch) {
+  if (!patch) return base;
+  const regions = { ...base.regions };
+  for (const [region, own] of Object.entries(patch.regions ?? {})) regions[region] = { ...base.regions?.[region], ...own };
+  return { ...base, ...patch, bullet: { ...base.bullet, ...patch.bullet }, ...(base.regions || patch.regions ? { regions } : {}) };
+}
+
+const setSpecs = new Map();
+/** An outfit as worn in one of its sets: the outfit's traits with the set's patch over them (kept, so it is the same object each time). */
+export function setSpec(kind, key) {
+  const id = `${kind}/${key}`;
+  if (!setSpecs.has(id)) {
+    const spec = OUTFITS[kind];
+    const set = outfitSets(kind).find((each) => each.key === key);
+    const patch = set?.patch ?? {};
+    setSpecs.set(id, !set || !Object.keys(patch).length && outfitSets(kind).length === 1 ? spec : { ...spec, ...patch, label: set.name, protection: patchedProtection(spec.protection, patch.protection) });
+  }
+  return setSpecs.get(id);
+}
+
+/** Every set the builders offer, grouped by faction in FACTION_KEYS order: { kind, key, name, faction }; a set of Level Mode's designs only is left out. */
+export function pickableSets() {
+  const sets = PICKABLE_OUTFIT_KEYS.flatMap((kind) => outfitSets(kind)
+    .filter((set) => set.designs.some((design) => !OUTFITS[kind].designs[design]?.levelOnly))
+    .map((set) => ({ kind, key: set.key, name: set.name, faction: OUTFITS[kind].faction ?? 'ring' })));
+  return FACTION_KEYS.flatMap((faction) => sets.filter((set) => set.faction === faction));
+}
+
+/** The first design of a set a builder may put on (not Level Mode's own). */
+export function firstDesignOf(kind, key) {
+  const set = outfitSets(kind).find((each) => each.key === key) ?? outfitSets(kind)[0];
+  return set.designs.find((design) => !OUTFITS[kind].designs[design]?.levelOnly) ?? set.designs[0];
+}
+
+/**
+ * A set's card: its name, description and what it does, for a man of `bodyKg`: the kit's weight, how he moves, the share of
+ * blunt, cut and pierce harm stopped on the trunk, the head and the arms, the helmet's mass and how it keeps the face.
+ */
+export function setCard(kind, key, bodyKg = 75) {
+  const set = outfitSets(kind).find((each) => each.key === key) ?? outfitSets(kind)[0];
+  const spec = setSpec(kind, set.key);
+  const protection = { ...NO_PROTECTION, ...spec.protection };
+  const at = (...names) => {
+    const own = names.map((name) => protection.regions?.[name]).find(Boolean);
+    return { blunt: own?.blunt ?? protection.blunt, cut: own?.cut ?? protection.cut, pierce: own?.pierce ?? protection.pierce };
+  };
+  const look = OUTFITS[kind].designs[set.designs[0]];
+  const helmet = spec.helmet ?? HELMETS[look.head?.kind] ?? null;
+  return {
+    kind, key: set.key, name: set.name, blurb: set.blurb, faction: spec.faction ?? 'ring',
+    kg: (spec.extraMass ?? 0) * bodyKg, movement: spec.movement ?? 'excellent',
+    torso: at('torso'), head: at('head'), arm: at('UpperArm', 'limb'),
+    helmetKg: helmet?.mass ?? 0, face: helmet && helmet.mass > 0.5 ? helmet.face ?? (look.head?.mask ? 'closed' : 'open') : 'bare',
+    finishes: set.designs.filter((design) => !OUTFITS[kind].designs[design]?.levelOnly).length,
+  };
+}
+
 export function outfitOf(inputs) {
   const kind = OUTFITS[inputs.outfit?.kind] ? inputs.outfit.kind : 'boxing';
   const design = Math.max(0, Math.min(OUTFITS[kind].designs.length - 1, inputs.outfit?.design ?? 0));
+  const set = setOfDesign(kind, design);
   // Level mode (a boss's second phase): `outfit.bareHead`, the helm taken off; the rest of the kit as it was.
   // (And `outfit.helm` { kind, design }: another kit's helm put on over this one, a dead man's taken up: levelmode/ending.js.)
   const helm = wornHelm(inputs);
   const look = inputs.outfit?.bareHead ? { ...OUTFITS[kind].designs[design], head: null } : helm ? { ...OUTFITS[kind].designs[design], head: helm.head } : OUTFITS[kind].designs[design];
-  return { kind, design, spec: OUTFITS[kind], look };
+  return { kind, design, set: set.key, spec: setSpec(kind, set.key), look };
 }
 
 /** The helm of another kit worn over this one (`outfit.helm`: { kind, design }), as { head (its look), spec (its kit) }, or null. */

@@ -18,8 +18,8 @@ import { strikeAt } from '../tools/weapon-strikes.js';
 import { pairing } from '../tools/gaps.js';
 
 /** A man of the knight's build in `kind`, standing a moment. */
-function standing(kind) {
-  const world = createWorld([{ ...structuredClone(PRESETS.knight), style: 'boxing', outfit: { kind, design: 0 }, accessories: [] }, { ...PRESETS.contender }], { seed: 1 });
+function standing(kind, design = 0) {
+  const world = createWorld([{ ...structuredClone(PRESETS.knight), style: 'boxing', outfit: { kind, design }, accessories: [] }, { ...PRESETS.contender }], { seed: 1 });
   advance(world, 0.5);
   return world.fighters[0];
 }
@@ -71,16 +71,18 @@ test('the middle of the breastplate, the back plate and the crown never have a g
 });
 
 test('the sights of a closed helm, the face of an open one; a clear visor none; the helmet\'s cheek and brow are steel', () => {
-  // A knight's visored bascinet, a masked tosei kabuto: the sights. A chichak with its nasal, an open kabuto: the face.
+  // A knight's visored bascinet, a masked tosei kabuto, a turban helmet's mail veil: the sights. A chichak with its nasal (the
+  // sipahi's second set), an open kabuto: the face.
   assert.equal(standing('knight').body.gear.helmFace, 'closed');
   assert.equal(standing('samuraiTosei').body.gear.helmFace, 'closed');
-  assert.equal(standing('ottomanHeavy').body.gear.helmFace, 'open');
+  assert.equal(standing('ottomanHeavy').body.gear.helmFace, 'closed');
+  assert.equal(standing('ottomanHeavy', 1).body.gear.helmFace, 'open');
   assert.equal(standing('oyoroi').body.gear.helmFace, 'open');
   assert.equal(standing('riot').body.gear.helmFace, 'sealed');
   assert.equal(zoneOnHead(standing('knight'), 0.15, 10), 'visor');
   assert.equal(zoneOnHead(standing('knight'), -0.3, 10), null, 'the bevor');
   assert.equal(zoneOnHead(standing('knight'), 0.15, 80), null, 'the side of the helm');
-  assert.equal(zoneOnHead(standing('ottomanHeavy'), -0.3, 30), 'face');
+  assert.equal(zoneOnHead(standing('ottomanHeavy', 1), -0.3, 30), 'face');
   assert.equal(zoneOnHead(standing('riot'), 0.15, 0), null);
   assert.equal(zoneOnHead(standing('riot'), -0.75, 0), 'neck');
 });

@@ -4,7 +4,7 @@
 
 import { normaliseInputs, PRESETS } from './body.js';
 import { STYLES } from './moves.js';
-import { factionOf, OUTFITS } from './outfits.js';
+import { factionOf, outfitOf, OUTFITS } from './outfits.js';
 import { RATINGS } from './ratings.js';
 import { WEAPONS } from './weapons.js';
 import { withTanks } from './physics/flame.js';
@@ -211,8 +211,9 @@ const ARMOURED = { mass: 0.055, cut: 0.5 };
 
 /** How heavily a fighter is armoured: his kit's weight (share of his body's); 0 for no armour. */
 export function armourWeight(inputs) {
-  const outfit = OUTFITS[inputs.outfit?.kind];
-  if (!outfit) return 0;
+  if (!OUTFITS[inputs.outfit?.kind]) return 0;
+  // As worn: the set of his design (outfitsets.js).
+  const outfit = outfitOf(inputs).spec;
   const mass = outfit.extraMass ?? 0;
   const cut = outfit.protection?.cut ?? 0;
   return mass >= ARMOURED.mass || cut >= ARMOURED.cut ? Math.max(mass, 0.01) : 0;

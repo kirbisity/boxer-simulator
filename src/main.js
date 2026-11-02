@@ -34,7 +34,8 @@ import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battle
 import { judgeBattle } from './battleend.js';
 import { createGeneralMarks } from './generalmark.js';
 import { leadOf, musterLevel } from './muster.js';
-import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, OUTFITS, PICKABLE_OUTFIT_KEYS, randomColors } from './outfits.js';
+import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setCard } from './outfits.js';
+import { setCardElement } from './setcard.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
 import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
@@ -1992,17 +1993,32 @@ const LOOK_FIELDS = [
 const PICKER_COLORS = { design: null, ...CLOTH_COLORS };
 const colorName = (hex) => (hex ? Object.keys(PICKER_COLORS).find((name) => PICKER_COLORS[name] === hex) ?? 'design' : 'design');
 const outfitField = (inputs) => (inputs.outfit ??= { kind: 'boxing', design: 0 });
+// Every outfit's sets by `kind/set`, named (a set no builder offers, Level Mode's own, is shown when worn).
+const SET_NAMES = Object.fromEntries(OUTFIT_KEYS.flatMap((kind) => outfitSets(kind).map((set) => [`${kind}/${set.key}`, set.name])));
+/** The set picker's options: every set the builders offer, under its faction. */
+function fillSetOptions(select) {
+  const sets = pickableSets();
+  select.replaceChildren(...FACTION_KEYS.map((faction) => {
+    const group = Object.assign(document.createElement('optgroup'), { label: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` });
+    group.append(...sets.filter((set) => set.faction === faction).map((set) => new Option(set.name, `${set.kind}/${set.key}`)));
+    return group;
+  }).filter((group) => group.children.length));
+}
 const OUTFIT_FIELDS = [
   {
-    key: 'kind', label: 'Outfit', options: PICKABLE_OUTFIT_KEYS, names: Object.fromEntries(PICKABLE_OUTFIT_KEYS.map((key) => [key, OUTFITS[key].label])),
-    get: (inputs) => outfitField(inputs).kind,
+    // The set worn (outfitsets.js): `kind/set`, offered under the factions (fillSetOptions); its first design put on.
+    key: 'set', label: 'Outfit', options: [], names: SET_NAMES,
+    get: (inputs) => `${outfitOf(inputs).kind}/${outfitOf(inputs).set}`,
     set: (inputs, value) => {
-      Object.assign(outfitField(inputs), { kind: value, design: 0, colors: randomColors(value) });
-      inputs.accessories = defaultHeadgear(value);
+      const [kind, set] = value.split('/');
+      const changed = kind !== outfitOf(inputs).kind;
+      Object.assign(outfitField(inputs), { kind, design: firstDesignOf(kind, set), colors: changed ? randomColors(kind) : outfitField(inputs).colors });
+      if (changed) inputs.accessories = defaultHeadgear(kind);
     },
   },
   {
-    key: 'design', label: 'Design', options: ['0', '1', '2'], names: null,
+    // A finish of the set: its colours, crest, lacing; the same stats.
+    key: 'design', label: 'Finish', options: ['0', '1', '2'], names: null,
     get: (inputs) => String(outfitField(inputs).design ?? 0), set: (inputs, value) => { outfitField(inputs).design = Number(value); },
   },
   {
@@ -2127,6 +2143,12 @@ function buildCornerForm(corner) {
     return row;
   }));
   looks.after(outfit);
+  fillSetOptions(outfit.querySelector('[data-outfit="set"]'));
+  outfit.querySelector('[data-outfit="set"]').closest('label').classList.add('set-row');
+  // The set worn: its picture, description and stats (filled by fillCornerForm).
+  const card = document.createElement('div');
+  card.className = 'set-slot';
+  outfit.append(card);
   // New colours from this outfit's palette, as often as wanted.
   const shuffle = Object.assign(document.createElement('button'), { type: 'button', className: 'shuffle', textContent: 'Shuffle colours' });
   shuffle.addEventListener('click', () => {
@@ -2255,7 +2277,9 @@ function fillCornerForm(corner) {
   const kind = outfitOf(inputs).kind;
   // One design picked per outfit: the choice shows only when there are more.
   const designSelect = outfit.querySelector('[data-outfit="design"]');
-  const offered = OUTFITS[kind].designs.map((design, index) => [design, index]).filter(([design, index]) => !design.levelOnly || index === outfitOf(inputs).design);
+  // The finishes of the set worn (its designs).
+  const set = outfitSets(kind).find((each) => each.key === outfitOf(inputs).set);
+  const offered = OUTFITS[kind].designs.map((design, index) => [design, index]).filter(([design, index]) => set.designs.includes(index) && (!design.levelOnly || index === outfitOf(inputs).design));
   designSelect.replaceChildren(...offered.map(([design, index]) => new Option(design.label, String(index))));
   designSelect.closest('label').hidden = offered.length < 2;
   // Headgear this outfit allows; anything else is taken off.
@@ -2263,6 +2287,12 @@ function fillCornerForm(corner) {
   if (!headOptions.includes((inputs.accessories ?? [])[0] ?? 'none')) inputs.accessories = [];
   outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => new Option(option === 'none' ? 'None' : HEADGEAR[option].label, option)));
   for (const field of OUTFIT_FIELDS) showValue(outfit.querySelector(`[data-outfit="${field.key}"]`), field.get(inputs), field.names);
+  const slot = outfit.querySelector('.set-slot');
+  const shown = `${kind}/${set.key}`;
+  if (slot.dataset.set !== shown) {
+    slot.dataset.set = shown;
+    slot.replaceChildren(setCardElement(setCard(kind, set.key, buildBody(inputs).bodyMassKg), () => portrait(`set:${shown}`, setModel(kind, set.key))));
+  }
   form.querySelector('.name-input').value = inputs.name;
   // Mounted is each fighter's own, and only if his kit rides (levels have no horses).
   const rides = canRide(inputs);
@@ -2860,6 +2890,11 @@ function enterSandbox() {
 // ---- Portraits: one fighter drawn alone, for the Deadliest Warrior cards ----------
 
 const portraits = new Map();
+// A set's portrait: one man of middling build in it, the same for every set (so the kits compare), in its first finish.
+const SET_MODEL = { name: 'Model', heightCm: 178, frame: 'medium', age: 30, exercise: 0.6, calories: 3400 };
+function setModel(kind, key) {
+  return normaliseInputs({ ...structuredClone(PRESETS.amateur), ...SET_MODEL, outfit: { kind, design: firstDesignOf(kind, key) }, accessories: [], mounted: false });
+}
 let portraitView = null;
 let portraitQueue = Promise.resolve();
 
@@ -3148,7 +3183,7 @@ tutorial = installTutorial($('#fight-ui'), {
 });
 tutorial.setDevice(fightControls.device);
 const menus = installMenus({
-  intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait,
+  intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait, setPortrait: (kind, key) => portrait(`set:${kind}/${key}`, setModel(kind, key)),
   // Level Mode: a stage from its card (levelmode/stages.js): its men built at once, the title card over the storm, the world held still behind it.
   onStage: (key) => { enterStage(key, { opening: true }); boxer.finishBuilding(); },
   // The Last Gate: the hero picked, straight into the run; its board for the menu.
