@@ -73,7 +73,10 @@ export function setCardElement(card, picture, { compact = false, chosen = false,
   const summary = compact
     ? `<div class="set-mini">${setRadarSvg(card, { small: true })}<span class="set-sum">${card.kg >= 0.5 ? `${Math.round(card.kg)} kg · ` : ''}${SET_MOVES[card.movement] ?? card.movement}<br>trunk ${setPercent(card.torso.blunt)}/${setPercent(card.torso.cut)}/${setPercent(card.torso.pierce)}<br>head ${setPercent(card.head.blunt)}/${setPercent(card.head.cut)}/${setPercent(card.head.pierce)}</span></div>`
     : setStatsHtml(card);
-  text.innerHTML = `<b>${card.name}</b><span class="set-blurb">${card.blurb}</span>${summary}`;
+  // The description in its paragraphs (lines of the blurb): all of them on a full card, the first (what it is) in a grid's.
+  const lines = (card.blurb ?? '').split('\n').filter(Boolean);
+  const blurb = (compact ? lines.slice(0, 1) : lines).map((line, at, shown) => `<span class="set-blurb${shown.length > 1 && at === shown.length - 1 ? ' set-epigram' : ''}">${line}</span>`).join('');
+  text.innerHTML = `<b>${card.name}</b>${blurb}${summary}`;
   element.append(image, text);
   // Drawn when it scrolls into view (a portrait takes a frame's work).
   const draw = () => picture?.()?.then((url) => { image.src = url; });

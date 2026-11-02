@@ -1235,3 +1235,6 @@ body[data-game="lastgate"] .hud, body[data-game="lastgate"] .log { display: none
 .set-mini .set-sum { line-height: 1.35; }
 .set-radar.small .radar-ring { stroke-width: 0.5; }
 .swatch.own { background: repeating-linear-gradient(45deg, #3a3f4c 0 5px, #8a8f9c 5px 10px) !important; }
+.set-blurb { font-style: italic; }
+.set-epigram { color: var(--fg); }
+.set-card.compact .set-blurb { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
