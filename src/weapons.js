@@ -642,6 +642,24 @@ export const WEAPONS = {
     // The ebira (the quiver on the back) held ~24 arrows.
     ammo: 36,
   },
+  // The Manchu bow of the Jurchen banners (Nurhaci's men at Sarhu, 1619; the Qing army's after 1636): a long
+  // composite of horn, bamboo and sinew, ~1.6-1.8 m strung, with long stiff ear-pieces (siyah) and string bridges,
+  // drawn to the ear at ~70-100 lb, more for a strong man (the Qing military exams tested bows of 8-12 li, ~100-160 lb).
+  // Its heavy limbs cast slowly: it shot long arrows (~1 m) of ~130-150 g with broad, heavy heads (the Qing war
+  // arrow's head up to a hand across) at close range, ~20-40 m, from the saddle or on foot. Against the steppe bow it
+  // throws its arrow slower (`arrowSpeed` ~45 m/s, the steppe bow's 62), but an arrow about twice the weight of
+  // ARROW's ~70 g war arrow (`arrowEnergy`, the shaft's weight against that one's: ~2.1), so it strikes with
+  // (45/55)² × 2.1 ≈ 1.4 times that arrow's ~100 J (~140 J, the steppe bow's ~1.27, the longbow's ~1.16): more
+  // energy behind a broader head, the more of it through a coat of plates. Drawn full only by a strong man
+  // (handling.js); its shots are slower than the light bow's, and the archer comes in close to make them (STYLES.manchuBow).
+  manchuBow: {
+    label: 'Manchu bow', hands: 'one', hand: 'l', length: 0.92, strikeFrom: 0.92, handle: 0.82, mass: 0.9, balance: 0, radius: 0.017,
+    harm: { swing: { blunt: 0.35 }, thrust: { blunt: 0.25 } },
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
+    drawN: 400, arrowSpeed: 45, arrowEnergy: 2.1,
+    // The quiver of a banner man: ~30 arrows (the Qing regulations' 30 to a quiver).
+    ammo: 30,
+  },
   // ---- Agincourt, Cerignola (the battle maps of 1415 and 1503) ----
   // The English war bow (the longbow of the Mary Rose's ~140 staves): a self bow of yew about 1.9 m long,
   // drawn to the ear at 100–185 lbf (most near 150, ~670 N; here 600 N, a common archer's), shooting a war

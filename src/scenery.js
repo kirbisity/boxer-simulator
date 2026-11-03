@@ -70,6 +70,13 @@ export const PLACE_SCENERY = {
     mountains: [],
     trees: { kind: 'none', count: 0, from: 0, to: 0, colour: 0x6a8a6a, bark: 0x4a3626 },
   },
+  // Sarhu (April 1619): the wooded hills by the Hun River, the Jiefan ridge beyond the far side, pine and larch on them.
+  sarhu: {
+    keepOut: [32, 22], groundColour: 0x8a7e52,
+    hills: { from: 48, to: 95, height: [4, 12], colour: 0x6a6e48, character: 'rolling' },
+    mountains: [],
+    trees: { kind: 'pine', count: 40, from: 60, to: 100, colour: 0x2a4430, bark: 0x4a3626 },
+  },
   // The Last Gate: low bare ridges and leafless woods about the field before the gate, lost in the dawn mist.
   lastgate: {
     keepOut: [20, 13], groundColour: 0x4a3e30,
@@ -211,6 +218,7 @@ export const PLACE_GROUND = {
   sengoku: { kind: 'trampled', about: 'autumn grass trampled to earth by armies, mud patches' },
   mobei: { kind: 'dry', about: 'the edge of the Gobi: short sparse steppe grass on grey-brown gravel and grit' },
   catalaunian: { kind: 'grass', about: 'the plain of Champagne in summer: grass gone green-gold, hoof-churned where the horse rode' },
+  sarhu: { kind: 'grass', about: 'the hills by the Hun River in April: last year\'s grass dead and brown, the ground thawing to mud where the armies met' },
   carrhae: { kind: 'dry', about: 'the plain below Harran in June: pale sand and gravel, camelthorn in low grey-green tufts' },
   colosseum: { kind: 'arena-sand', about: 'raked arena sand (harena), footprints, a few dark stains' },
   town: { kind: 'cobbles', about: 'a market square of worn cobbles, mud and straw in the joints' },

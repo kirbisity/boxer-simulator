@@ -63,6 +63,8 @@ export const PLACE_WIND = {
   // Mobei: the fighting ran on to dusk with a wind getting up off the Gobi.
   mobei: { toward: [0.94, 0.34], speed: 6, gust: 0.45 },
   catalaunian: { toward: [0.94, 0.34], speed: 2, gust: 0.3 },
+  // Sarhu in April: a raw wind down the Hun River valley.
+  sarhu: { toward: [0.94, 0.34], speed: 4, gust: 0.4 },
   carrhae: { toward: [0.8, -0.6], speed: 3, gust: 0.4 },
   agincourt: { toward: [0.94, 0.34], speed: 3, gust: 0.35 },
   // A cold still dawn in the mist.

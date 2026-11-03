@@ -12,7 +12,7 @@
 // ---- Shared ---------------------------------------------------------------
 
 /** Half the size of each place's ground plane: trees stay on it. */
-const TREES_GROUND_HALF = { meadow: 39, field: 69, plain: 64, sengoku: 54, mobei: 74, catalaunian: 74, carrhae: 74 };
+const TREES_GROUND_HALF = { meadow: 39, field: 69, plain: 64, sengoku: 54, mobei: 74, catalaunian: 74, carrhae: 74, sarhu: 74 };
 /** What already stands about the ground (x, z, radius): no tree on it. */
 const TREES_AVOID = {
   meadow: [[-13, -9, 4], [-6, -12, 4], [9, -11, 4], [14, 4, 4], [-14, 6, 4], [4, 12, 4], [-10, 2, 2], [11, -4, 2], [-3, 10, 2], [6, -9, 2]],
@@ -322,6 +322,8 @@ const TREES_HILL_WOODS = {
   // Champagne: a few woods on the far swells, thinner than the pasture's.
   catalaunian: { count: 90, from: 90, to: 230, perWood: 10 },
   sengoku: { count: 700, from: 40, to: 230, perWood: 28 },
+  // Liaodong: pine and larch woods on the hills about the Hun River.
+  sarhu: { count: 400, from: 70, to: 230, perWood: 20 },
 };
 
 /** One InstancedMesh per shape for the trees that use it. */

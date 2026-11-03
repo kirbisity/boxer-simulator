@@ -234,6 +234,25 @@ export const PRESETS = {
     outfit: { kind: 'mingElite', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
+  // The Eight Banners of the Later Jin (Sarhu, 1619): a banner archer of the Plain Yellow with the heavy Manchu bow
+  // and the saber at his belt; a big man of the Bordered Red with the guandao; Yangguri, the commander of Nurhaci's
+  // guard, a Bayara in the heavy coat, bow and saber. Jurchen hunters and herders fed on meat and grain, at the bow
+  // and on horse from boyhood: big for their day and hard (`exercise`, `calories`), not giants.
+  bannerBow: {
+    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 171, frame: 'large', age: 28, exercise: 0.82, calories: 4300,
+    outfit: { kind: 'bannerArmour', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  bannerGuandao: {
+    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 175, frame: 'large', age: 31, exercise: 0.8, calories: 4600,
+    outfit: { kind: 'bannerArmour', design: 5 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
+  bayara: {
+    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 173, frame: 'large', age: 40, exercise: 0.84, calories: 4500,
+    outfit: { kind: 'bayara', design: 1 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
   // Chen Fake, the Chen-style tai chi master: slight, old, rooted.
   taichi: {
     name: 'Chen Fake', style: 'taichi', sex: 'male', heightCm: 170, frame: 'medium', age: 52, exercise: 0.55, calories: 3250,

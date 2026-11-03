@@ -935,6 +935,8 @@ const LIVING_GREENS = {
   jiangnan: [0x4f7a30, 0x5c8a36, 0x46702c, 0x6a9440, 0x3f6428],
   // Champagne in high summer: the grass going over, green with gold through it.
   catalaunian: [0x6f8a3a, 0x8a9440, 0x9a9a48, 0x647e36, 0xa8a050],
+  // Liaodong in April, the snow just off it: last year's grass dead and straw-brown, the first green under it.
+  sarhu: [0x8a7e52, 0x9a8a5a, 0x7a7448, 0x6e7a42, 0xa4946a],
 };
 
 /**

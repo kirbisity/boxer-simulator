@@ -7,7 +7,7 @@ import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { SUBWAY_ARENA } from './props/subway.js';
-import { atahualpa, conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, incaMan, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, wokouSamurai, yakuza } from './cast.js';
+import { atahualpa, bannerman, conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, incaMan, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, wokouSamurai, yakuza } from './cast.js';
 import { gallicHorseman, gothWarrior, hunRider, infantrySoldier, lateRomanSoldier, parthianRider, republicanLegionary, xiongnuRider } from './cast.js';
 
 // Rome against Han: thirty-five a side (every level's armies are kept to about seventy men in all: the
@@ -37,7 +37,7 @@ export function legionSides(random, count = LEGION.perSide) {
  * square, a June dawn. Pyongyang uses the same place as Sekigahara, clear.
  * (Agincourt's grey morning after a night's rain is given with its level.)
  */
-export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], sekigahara: [12, 120], port: [8, 45] };
+export const WEATHER_MIST = { wokou: [5, 75], rebellion: [6, 75], sekigahara: [12, 120], port: [8, 45], sarhu: [8, 80] };
 
 /**
  * Pier 9's sea fog at 2 a.m.: a light fog off the water, dim warm grey where
@@ -125,6 +125,42 @@ function pyongyangSides(random) {
   red[0] = { ...red[0], name: 'Li Rusong' };
   blue[0] = { ...blue[0], name: 'Konishi Yukinaga' };
   return { red, blue };
+}
+
+// Sarhu, 14-15 April 1619 (Wanli 47, the third month). Yang Hao sent four Ming columns, some 88,000 men with Korean
+// allies, by four roads into Nurhaci's country to meet at Hetu Ala; the season's late snow held them, and the
+// columns could not keep together. Du Song's western column, the strongest, hurried ahead of the others, crossed the
+// Hun River, left half his men in the camp at Sarhu and went on against the Jurchen at Jiefan. Nurhaci massed his
+// eight banners (some 50-60,000) against that one column, broke the camp at Sarhu and then Du Song's men at Jiefan,
+// and over the next days destroyed Ma Lin's and Liu Ting's columns one at a time; Li Rubai's turned back. The Ming
+// had more guns than the banners, matchlocks, three-eyed guns and cannon, but the fighting went on in the dark and
+// the mist (the Ming lit torches the Jurchen archers shot by), the powder in the wet, the columns apart; it was won
+// by the banners' heavy foot and archers at close range and their armoured horse. Here, one fight of Du Song's
+// column: a few of his household elite, many regulars in brigandine and some garrison men, a few gunners in front;
+// against them the banners, every man in his banner's coat of plates, spear, saber and guandao before the archers
+// with the heavy bow, and three Bayara of the guard on horse on the flank. The two sides here about even, as they
+// were not that day: the banners won by being many where the Ming were few.
+const SARHU = {
+  ming: {
+    elite: { guandao: 1, swordShield: 1, threeEyed: 1 },
+    brigandine: { matchlock: 4, swordShield: 6, spear: 7 },
+    garrison: { matchlock: 2, spear: 5, dao: 3 },
+  },
+  banners: { spear: 10, dao: 4, guandao: 4, manchuBow: 10 },
+  bayara: { bayaraBow: 2, spear: 1 },
+};
+const SARHU_MING = 'ming';
+
+/** Du Song's men and the banners at Sarhu: the Ming's shooters in front of their line, the banners' archers behind theirs. */
+function sarhuSides(random) {
+  const ming = [];
+  for (const [rank, styles] of Object.entries(SARHU.ming)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) ming.push(mingSoldier(random, style, rank, { people: SARHU_MING }));
+  const banners = shootersBehind(company(SARHU.banners, (style) => bannerman(random, style)));
+  const red = shootersBehind(ming);
+  red[0] = { ...red[0], name: 'Du Song' };
+  // Nurhaci under his own banner, the Plain Yellow (the kit's first design), sixty that spring.
+  banners[0] = { ...bannerman(random, banners[0].style, 'banner', { design: 0 }), name: 'Nurhaci', age: 60 };
+  return { red, blue: banners };
 }
 
 /** `count` men from `make(style)`, for each style. */
@@ -573,6 +609,8 @@ const RHODES = {
  */
 const MING_PEOPLE = { pyongyang: 'ming', koxinga: 'mingSouth', coast: 'mingCoast', qi: 'qi' };
 const mingRank = (rank, people, design = null) => (random, style) => mingSoldier(random, style, rank, { people, design });
+// The banners' ranks: the banner men in the eight colours on foot, the Bayara of the guard on horse.
+const bannerRank = (rank, mounted = false) => (random, style) => bannerman(random, style, rank, { mounted });
 const sengokuArmy = (side) => ({
   ranks: {
     samurai: { label: 'Samurai', kinds: ['samurai', 'samuraiTosei'], styles: ['katana', 'naginata', 'yari', 'bow'], make: (random, style) => sengokuWarrior(random, side, style, 'samurai') },
@@ -621,6 +659,14 @@ export const ARMIES = {
       brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.pyongyang) },
       garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.pyongyang) },
       horse: { label: 'Liaodong horse', kinds: ['mingIronLamellar'], mounted: true, styles: ['dao', 'spear', 'threeEyed'], make: (random, style) => mingHorseman(random, style) },
+    },
+  },
+  banners: {
+    label: 'The Eight Banners',
+    ranks: {
+      banner: { label: 'Banner man', kinds: ['bannerArmour'], styles: ['spear', 'manchuBow', 'dao', 'guandao'], make: bannerRank('banner') },
+      bayara: { label: 'Bayara, mounted', kinds: ['bayara'], mounted: true, styles: ['bayaraBow', 'spear', 'dao'], make: bannerRank('bayara', true) },
+      bayaraFoot: { label: 'Bayara', kinds: ['bayara'], styles: ['bayaraBow', 'spear', 'dao'], make: bannerRank('bayara') },
     },
   },
   spanish: {
@@ -1223,6 +1269,31 @@ export const SCENARIOS = {
     },
     // The armies its sides may be set up from (ARMIES; muster.js).
     armies: { red: ['ming'], blue: ['west'] },
+    fighters: [],
+  },
+  sarhu: {
+    title: 'Sarhu',
+    place: 'Sarhu and Jiefan, by the Hun River, Liaodong · 14 April 1619',
+    blurb: "Du Song's column has crossed the Hun River ahead of the other three, and Nurhaci has brought his eight banners against it alone. Thirty of the Ming — a few of Du Song's household elite, regulars in brigandine and garrison men, a handful of gunners in front — meet twenty-eight banner men in studded coats of plates, spears, sabres and guandao before the archers with the heavy Manchu bow, and three Bayara of the guard riding on the flank. The Ming had more guns; the fight went on into the dusk and the mist, and wet powder and the columns' distance from each other did the rest.",
+    scene: 'sarhu',
+    weather: { fog: WEATHER_MIST.sarhu, sky: 0.6, pale: 0.6, sun: 0.7 },
+    arena: { halfX: 14, halfZ: 9 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
+    roster: 'Thirty Ming: three elite, seventeen in brigandine, ten garrison men · thirty-one of the Eight Banners, three of them Bayara on horse',
+    formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 8, loose: 0.2 } },
+    cast: (random) => sarhuSides(random),
+    wings: {
+      arena: { halfX: 28, halfZ: 15 },
+      camera: { yaw: -0.5, pitch: 0.42, distance: 26, maxDistance: 33 },
+      formation: { blue: { wings: { side: -1 } } },
+      cast: (random, sides) => {
+        const bayara = company(SARHU.bayara, (style) => bannerman(random, style, 'bayara', { mounted: true }));
+        bayara[0] = { ...bayara[0], name: 'Yangguri' };
+        return { red: sides.red, blue: [...sides.blue, ...bayara] };
+      },
+    },
+    // The armies its sides may be set up from (ARMIES; muster.js).
+    armies: { red: ['ming'], blue: ['banners'] },
     fighters: [],
   },
   cajamarca: {

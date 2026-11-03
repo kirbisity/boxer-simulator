@@ -86,6 +86,11 @@ export const WARRIORS = [
   warrior('mingCrossbow', 'Li Si', PRESETS.mingCrossbow),
   warrior('mingSpear', 'Wang Er', PRESETS.mingSpear),
   warrior('mingDao', 'Zhang San', PRESETS.mingDao),
+  // The Eight Banners of the Later Jin. The faction opens on the Bayara (`flagship`).
+  { ...warrior('bayara', 'Yangguri', PRESETS.bayara), flagship: true },
+  warrior('bannerArcher', 'Hūsun', PRESETS.bannerBow),
+  warrior('bannerGuandao', 'Baturu', PRESETS.bannerGuandao),
+  warrior('bannerSpear', 'Ilan', PRESETS.bannerBow, { name: 'Ilan', style: 'spear', outfit: { kind: 'bannerArmour', design: 6 } }),
   warrior('arquebus', 'Hans Brenner', PRESETS.contender, { name: 'Hans Brenner', calories: 4050, exercise: 0.75, sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] }),
   warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', calories: 4050, exercise: 0.75, sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
   warrior('ashigaruSpear', 'Gonbei', PRESETS.yari),

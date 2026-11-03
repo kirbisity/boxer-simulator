@@ -293,6 +293,28 @@ function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
   const scale = look.kind === 'mingScale';
   return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: scale ? steel : cloth, flapSteel: scale, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
+// The Eight Banners (the Later Jin's, 1615 on; the Qing's): the banner's coat in its colour (`cloth`), bound in its
+// border (`trim`: red, or white on the red banner; a plain banner's bound in its own colour, a shade darker), the
+// sleeves of the same studded cloth, the dark red robe beneath showing at the hem; the black helmet and its hood of
+// the coat's cloth, the hood's edges bound in the border too (chinahelms.js QING_HELMS bannerBowl, wardrobe.js qingHelm).
+function bannerDesign(label, cloth, trim = null) {
+  return {
+    label, top: { kind: 'longsleeve', color: shade(cloth, 0.85) }, bottom: { kind: 'pants', color: '#4a1418' },
+    armor: { kind: 'bannerCoat', color: '#8f949b', cloth, cloth2: trim ?? shade(cloth, 0.82), gold: '#a88a3c', leather: '#2a1d14' },
+    head: { kind: 'qingHelm', design: 'bannerBowl', color: '#17171b', gold: '#a88a3c', coif: cloth, ...(trim ? { trim } : {}) },
+    feet: { kind: 'compactBoot', color: '#141416' },
+  };
+}
+// The Bayara's: the same coat in a banner's brocade (`cloth`), bound in a darker silk (`trim`), gilt rivets, the steel
+// mirror, gilt shoulder plates and steel arm guards (loftbody.js bayaraCoat); the steel and gilt helmet, its hood of the coat's brocade.
+function bayaraDesign(label, cloth, trim) {
+  return {
+    label, top: { kind: 'longsleeve', color: shade(cloth, 0.8) }, bottom: { kind: 'pants', color: '#4a1418' },
+    armor: { kind: 'bayaraCoat', color: '#b4bac3', cloth, cloth2: trim, gold: '#d2aa4c', leather: '#2a1d14' },
+    head: { kind: 'qingHelm', design: 'bayaraBowl', color: '#c3c8cf', gold: '#d2aa4c', coif: cloth, trim },
+    feet: { kind: 'compactBoot', color: '#141416' },
+  };
+}
 // The steppe man's kit: his deel (the robe over all) and the robe under it
 // at the hem (`trim`), his hat or helmet, the tall black boots (gutal).
 function steppeDesign(label, armor, deel, trim, head, feet = '#141210') {
@@ -1292,6 +1314,65 @@ export const OUTFITS = {
       // Qi Jiguang's and his household guards' (Qi Jiguang's level): the elite's protection drawn as
       // iron lamellar laced in crimson over the crimson coat. A level's, not dealt at random.
       { ...mingEliteDesign('Iron lamellar, crimson lacing', '#8a1418', '#8a1418', '#8f949b', {}, { kind: 'mingEliteLamellar', lace: '#8a1418' }), levelOnly: true },
+    ],
+  },
+  // The Eight Banners of the Later Jin (Nurhaci's, the Jurchen state of 1616 that took the name Qing in 1636): the
+  // four plain banners of 1601 and the four bordered of 1615, yellow, white, red and blue, every company (niru) of
+  // them in its banner's colour. Their armour (mianjia, cloth armour) is the Ming brigandine's make, iron plates
+  // riveted inside a long studded coat with its apron and shoulder guards, under a black helmet with its studded
+  // hood: guarded as the brigandine is. What the banners had over the Ming regulars was not the coat but the men in
+  // it (cast.js PERIOD_BUILD jurchen): hunters fed on meat, drilled in their companies from boyhood, and steady
+  // (`courage`, above the Ming regular's and as high as their elite's), the front ranks at Sarhu in two coats.
+  bannerArmour: {
+    // Trained: a banner man was a soldier for life, his company's hunts its drill (`skill`: OUTFITS' tiers, the
+    // Ming regular's 0.35 and their elite's 0.6).
+    skill: 0.45,
+    faction: 'manchu',
+    label: 'Eight Banners (Later Jin) — banner armour', family: 'manchu', movement: 'good', fists: 'bare',
+    // The Manchu saber at his belt (drawn as the dao: a single-edged sabre a little more curved); a knife.
+    sidearm: 'dao',
+    spare: 'dagger',
+    // The Ming brigandine's weight and guard (the same make): ~12 kg on an 81 kg man.
+    extraMass: 0.143,
+    protection: { blunt: 0.63, cut: 0.8, pierce: 0.47, bullet: { head: 0.3, torso: 0.5, limb: 0 } },
+    gaps: { lacing: 0.1 },
+    courage: 0.4,
+    designs: [
+      bannerDesign('Plain Yellow', '#e0a51e'),
+      bannerDesign('Bordered Yellow', '#e6b02a', '#b3161b'),
+      bannerDesign('Plain White', '#e6e2d6'),
+      bannerDesign('Bordered White', '#e6e2d6', '#b3161b'),
+      bannerDesign('Plain Red', '#b0262a'),
+      bannerDesign('Bordered Red', '#b0262a', '#ece8dc'),
+      bannerDesign('Plain Blue', '#1f2f6a'),
+      bannerDesign('Bordered Blue', '#1f2f6a', '#b3161b'),
+    ],
+  },
+  // The Bayara (巴牙喇, the banners' guard, the Qing's hujun): picked men of each banner, mounted, the first into the
+  // gap, in the heaviest coat the banners had: brocade over plates, a steel mirror over the heart, gilt shoulder
+  // plates, steel arm guards, steel bands on the skirt, the steel and gilt helmet. Guarded as the Ming elite's
+  // household men (jiading) were, no better: the same coat of plates under silk.
+  bayara: {
+    // Rides (a Manchurian horse, the steppe's breed).
+    horse: 'steppe',
+    skill: 0.6,
+    faction: 'manchu', bulletRating: 650, plated: true,
+    label: 'Eight Banners (Later Jin) — Bayara guard', family: 'manchu', movement: 'good', fists: 'bare',
+    sidearm: 'dao',
+    spare: 'dagger',
+    deflects: true,
+    arrowproof: true,
+    // The Ming elite's weight (~18 kg on a 73 kg man).
+    extraMass: 0.25,
+    // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
+    protection: { blunt: 0.65, cut: 0.95, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    gaps: { lacing: 0.1 },
+    courage: 0.45,
+    designs: [
+      bayaraDesign('Blue brocade', '#5a78a6', '#1f2f5a'),
+      bayaraDesign('Yellow brocade', '#d9a524', '#7a1418'),
+      bayaraDesign('White brocade', '#e2ddcf', '#7a1418'),
+      bayaraDesign('Red brocade', '#a8242a', '#2a1a14'),
     ],
   },
   // The Iron Pagoda (tiefutu): the Jurchen Jin's armoured heavy horse of the
@@ -2590,6 +2671,8 @@ export const FACTIONS = {
   mexica: { label: 'Mexica', glyph: '🦅', standard: { weapon: 'pamitl', worn: true }, strangers: ['horse', 'gun'], blurb: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.' },
   inca: { label: 'Inca', glyph: '☀️', strangers: ['horse', 'gun'], blurb: 'Atahualpa\'s people at Cajamarca: lords and attendants in the woven uncu, the llautu round the head, the champi star mace.' },
   chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, lamellarCord: '#9e1a1c', blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
+  // The Later Jin's Eight Banners (the Qing's after 1636): led under the plain yellow banner, Nurhaci's own.
+  manchu: { label: 'Eight Banners', glyph: '🚩', standard: { weapon: 'banner', colour: '#d9a524' }, lamellarCord: '#9e1a1c', blurb: 'The Later Jin of Nurhaci, the Qing to be: banner men in studded coats of plates under the black helmet, with the heavy Manchu bow, saber, spear and guandao; the Bayara guard on horse.' },
   steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, lamellarCord: '#e9e2d0', blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, hardened leather lamellar, sabre, mace and composite bow; the Khan\'s kheshig in gilt scale.' },
   // Keyed `ottomans` (saves and levels name it); it holds the Turkish and Kurdish sultanates both, Saladin's Ayyubids of the 1100s and the Ottomans after them.
   ottomans: { label: 'Sultanates', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: 'Saladin\'s Ayyubids and the Ottoman Turks: Saladin in kazaghand and turbaned helmet; the Sultan\'s azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
@@ -2872,6 +2955,8 @@ export const HELMETS = {
   // Ming: the brimmed iron hat of the brigandine man; the elite's tall bowl. Han: an iron lamellar cap (Linzi), lightly lined.
   mingHat: { mass: 1.4, padding: 0.35, curve: 0.7 },
   mingHelm: { mass: 2.0, padding: 0.45, curve: 0.85 },
+  // The banners' helmet: a bowl of iron (~1.4 kg with its tube) and its padded, studded hood over the ears and neck.
+  qingHelm: { mass: 1.9, padding: 0.5, curve: 0.85 },
   hanHelm: { mass: 1.5, padding: 0.3, curve: 0.6 },
   // The Republic's bronze Montefortino (1–1.5 kg, a cast knob, a short brim) on a felt cap; the late Roman
   // ridge helmet (two iron halves on a ridge, broad cheek pieces, ~1.5 kg) on a padded lining; the Germanic and

@@ -136,6 +136,13 @@ const GENERATED_PLACES = {
     grass: 0xc2ac84, lush: 0xa89a70, woods: 0x7a7458, rock: 0x9a8a6e, dry: 0xd0b890,
     ridge: 0xa8906a, ridgeAngle: 0.9, tuft: 0x7e8458, bush: 0x6e7450, bushes: 200,
   },
+  // Sarhu: the hills about the Hun River in early spring, dead grass, dark pine woods, the Jiefan ridge beyond the far side.
+  sarhu: {
+    character: 'rolling', ramp: 28, slope: 0.12, scale: 95,
+    grass: 0x8a7e52, lush: 0x6e7444, woods: 0x2c4430, rock: 0x6e6a60, dry: 0x9a8a5a,
+    ridge: 0x4a5640, ridgeAngle: 0.8, tuft: 0x8e8458, bush: 0x34442e, bushes: 700,
+    volcanoes: [{ angle: -Math.PI / 2, distance: 72, height: 16, radius: 60, shape: 'ridge', snow: 99 }],
+  },
   sengoku: {
     character: 'forested', ramp: 22, slope: 0.2, scale: 85,
     grass: 0x6a7a40, lush: 0x4a6a34, woods: 0x2c4a2c, rock: 0x666660, dry: 0x7d8a4a,
@@ -163,6 +170,7 @@ const GENERATED_FOOTHILLS = {
   catalaunian: { ...GENERATED_PLACES.catalaunian, bump: 0.7, slope: 0.06, ramp: 14, radius: 360, cap: 16, farTint: 0x6a724c },
   carrhae: { ...GENERATED_PLACES.carrhae, bump: 0.35, slope: 0.03, ramp: 20, radius: 360, cap: 8, farTint: 0x9a908b },
   sengoku: { ...GENERATED_PLACES.sengoku, bump: 0.9, slope: 0.11, ramp: 12, radius: 360, cap: 32, farTint: 0x858759 },
+  sarhu: { ...GENERATED_PLACES.sarhu, bump: 0.8, slope: 0.08, ramp: 14, radius: 360, cap: 24, farTint: 0x858759 },
 };
 
 // The haze while foothills are shown: far enough to see the hills, near enough that their edge fades into the horizon.

@@ -1015,6 +1015,12 @@ export const STYLES = {
   // a minute (`between`, s, with the draw's own time: handling.js), six or so kept up for long (the archers' 'twelve a
   // minute' was the most a picked man could loose, not what a line kept up).
   longbow: { ...SHOOTING_STYLES.bow, label: 'Longbow', weapon: 'longbow', ranged: { ...SHOOTING_STYLES.bow.ranged, close: 2.2, holdGround: true, between: [4.6, 2] } },
+  // The banner archer: the heavy Manchu bow shot close, as the Jurchen shot it (Qing manuals and the Ming's
+  // accounts of Sarhu: within some fifty paces, aimed at the face and the gaps): beyond ~35 m (`reach`) he walks in
+  // to make his shot, never backing off as a steppe archer does (`holdGround`); a heavy draw and a heavy arrow, some
+  // eight aimed shafts a minute (`between`, with the draw's own time). With a man on him, the bow let fall for the
+  // saber at his belt (his kit's sidearm), as the longbowman's.
+  manchuBow: { ...SHOOTING_STYLES.bow, label: 'Manchu bow', weapon: 'manchuBow', ranged: { ...SHOOTING_STYLES.bow.ranged, close: 2, holdGround: true, reach: 35, between: [3.4, 2] } },
   // The dao: a one-handed curved sabre, used as a short sword is: cut and thrust in turn.
   dao: {
     label: 'Dao', weapon: 'dao', fallback: 'mix',
@@ -1951,6 +1957,14 @@ STYLES.kheshigBow = {
   label: "Khan's guard: bow and mace",
   fallback: 'mace',
   ranged: { ...STYLES.steppeBow.ranged, between: [0.25, 0.4], holdGround: true, charge: 3, volley: 5 },
+};
+
+// The Bayara (the banners' guard): a few heavy arrows from the Manchu bow at close range, standing his ground, then the
+// bow let fall and straight in with the saber at his belt (his kit's sidearm), as the guard rode into a broken line.
+STYLES.bayaraBow = {
+  ...STYLES.manchuBow,
+  label: 'Bayara: Manchu bow and saber',
+  ranged: { ...STYLES.manchuBow.ranged, volley: 3, charge: 3 },
 };
 
 // The Forger's own (Level Mode): the arming sword and an iron buckler held out to parry, a quicker and lighter hand than the heater.

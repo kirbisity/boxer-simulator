@@ -127,6 +127,8 @@ export const ARMOUR_TILES = {
   mingElite: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   mingScale: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   mingEliteLamellar: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
+  // The Bayara's arm guards and gilt shoulder plates: hammered lames, as the Ming elite's.
+  bayaraCoat: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   // Tosei gusoku: the solid do of lacquered horizontal lames; its kusazuri and sleeves in sugake.
   toseiDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
   roninDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
@@ -157,6 +159,7 @@ export const ARMOUR_COVERAGE = {
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
   mingVest: null, mingBrigandine: ['brigandine', 'bifu'], mingLamellar: ['lamellae', 'bifu'], mingScaleCoat: ['scale', 'bifu'],
+  bannerCoat: ['brigandine'], bayaraCoat: ['brigandine', 'plate', 'munitionPlate'],
   mingElite: ['brigandine', 'plate', 'munitionPlate'], mingScale: ['scale', 'plate', 'munitionPlate'], mingEliteLamellar: ['lamellae', 'plate', 'munitionPlate'],
   ironPagoda: ['lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,
   segmentata: ['segmentata'], centurion: ['mail', 'plate'], hauberk: ['mail'], hamata: ['mail'],
@@ -196,7 +199,7 @@ export function armourTileOf(kind, material, slot = null) {
 // Helmets (outfits.js `head.kind`) and the tile their metal wears (or, for a moulded shell, MOULDED_TILES, every opaque part):
 // wardrobe.js buildHeadgear. Not listed: none (cloth, fur, feathers, animal heads; the arena gladiators' helmets).
 export const HELMET_TILES = {
-  bascinet: 'plate', greatHelm: 'plate', stechhelm: 'plate', kettleHat: 'plate', kabuto: 'plate', jingasa: 'plate', mingHelm: 'plate',
+  bascinet: 'plate', greatHelm: 'plate', stechhelm: 'plate', kettleHat: 'plate', kabuto: 'plate', jingasa: 'plate', mingHelm: 'plate', qingHelm: 'plate',
   pagodaHelm: 'plate', hanHelm: 'plate', steppeHelm: 'plate', spangenhelm: 'plate', ridgeHelm: 'plate', montefortino: 'plate',
   chichak: 'plate', ayyubidHelm: 'plate', potHelmet: 'plate', galea: 'plate',
   morion: 'etched', cabasset: 'etched',
@@ -483,6 +486,9 @@ export const CLOTH_GARMENTS = {
     mingScaleCoat: { '*': 'cotton', armor: 'none' },
     mingScale: { '*': 'cotton', armor: 'none' },
     mingEliteLamellar: { '*': 'cloudSilk', armor: 'none' },
+    // The banners' coats: the rank and file's of cotton, the Bayara's of silk brocade, as the Ming regular's and elite's.
+    bannerCoat: { '*': 'cotton', armor: 'none' },
+    bayaraCoat: { '*': 'cloudSilk', armor: 'none' },
     ironPagoda: { '*': 'cloudSilk', armor: 'none', lace: 'leather' },
     guanYu: { '*': 'cloudSilk', armor: 'none' },
     hanLamellar: { '*': 'hemp', armor: 'none', lace: 'leather' },
@@ -524,7 +530,7 @@ export const CLOTH_GARMENTS = {
     clothWrap: 'cotton', eagleHelm: 'feathers', featherBand: 'feathers', feltHat: 'felt', flower: 'none', furHat: 'fur', galea: 'none',
     gorillaHead: 'fur', greatHelm: 'none', guanYuCap: 'cloudSilk', hachimaki: 'cotton', hanHelm: 'none', jaguarHelm: 'pelt', jingasa: 'none',
     kabuto: 'none', katozukin: 'cotton', kettleHat: 'none', lionHead: 'fur', llautu: 'camelid', loovuuz: 'fur', mingHat: 'none',
-    mingHelm: 'none', montefortino: 'none', morion: 'none', opsHelmet: 'cordura', pagodaHelm: 'none', policeCap: 'worsted', potHelmet: 'none',
+    mingHelm: 'none', qingHelm: 'none', montefortino: 'none', morion: 'none', opsHelmet: 'cordura', pagodaHelm: 'none', policeCap: 'worsted', potHelmet: 'none',
     ridgeHelm: 'none', riotHelmet: 'none', robotHead: 'none', spangenhelm: 'none', stechhelm: 'none', steppeHelm: 'none', tiltHat: 'felt',
     topHat: 'felt', turban: 'cotton', widowCap: 'cotton', proximityHood: 'aluminized',
     // The primates' heads are their coats.
@@ -542,6 +548,7 @@ export const CLOTH_BY_FACTION = {
   knights: { 'top.longsleeve': 'quiltedFine', 'top.tunic': 'wool', 'bottom.pants': 'wool', 'armor.escaupil': 'jack' },
   japanese: { 'top.longsleeve': 'hemp', 'bottom.pants': 'hemp', 'feet.sandal': 'straw' },
   chinese: { 'top.tunic': 'hemp', 'top.flannel': 'cotton' },
+  manchu: { 'top.tunic': 'hemp', 'top.flannel': 'cotton' },
   steppe: { 'top.longsleeve': 'wool', 'bottom.pants': 'wool' },
   goths: { 'top.longsleeve': 'wool', 'top.tunic': 'wool', 'bottom.pants': 'wool' },
   parthians: { 'top.longsleeve': 'wool', 'bottom.pants': 'wool' },

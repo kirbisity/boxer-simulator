@@ -77,6 +77,8 @@ export const SCENE_MUSIC = {
   mobei: 'china',
   catalaunian: 'roman',
   carrhae: 'roman',
+  // Sarhu: the Ming army's (the side the player leads).
+  sarhu: 'china',
 };
 
 // (Dunnottar's boss: the user's choir track; the generated 'boss' cue stays for any boss given no track of its own.)

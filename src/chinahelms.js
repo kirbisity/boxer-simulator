@@ -41,6 +41,11 @@ export const CHINA_FINISHES = {
   iron: { label: 'Plain iron', colour: '#6c6862', metalness: 0.6, roughness: 0.6 },
   red: { label: 'Vermilion lacquer, 勇 in gold', colour: '#b51f1a', metalness: 0.08, roughness: 0.42, glyph: '#ecd28c' },
   hanIron: { label: 'Dark iron, red lacing', colour: '#8a837a', accent: '#a09a90', metalness: 0.5, roughness: 0.45, lace: '#a1282a' },
+  // The banners' helmets (QING_HELMS): the rank and file's iron (or leather) bowl lacquered black, its band and
+  // visor gilt (`accent`); the Bayara's polished steel under gilt openwork (`gilt` the tube's and the finial's).
+  blackLacquer: { label: 'Black lacquer, gilt band', colour: '#17171b', accent: '#c9a24a', metalness: 0.15, roughness: 0.32 },
+  giltSteel: { label: 'Polished steel, gilt openwork', colour: '#c3c8cf', accent: '#d2aa4c', metalness: 0.95, roughness: 0.3 },
+  gilt: { label: 'Gilt', colour: '#c9a24a', metalness: 0.9, roughness: 0.32 },
 };
 
 // A bell: near upright sides above the brim, round shoulders, drawn in to a small flat top (y, scale of the foot ellipse).
@@ -108,6 +113,37 @@ export const HAN_HOOD = {
   plume: 'pheasant', rim: { r: 0.075, colour: '#e3d8bf' },
 };
 
+/**
+ * The Eight Banners' helmets (the Later Jin's of the 1610s-30s, and the Qing's after): a round bowl drawn up into a tall
+ * tube (盔管) that carries the plume, a narrow visor (眉庇) round the foot, gilt; the hood of studded cloth (the coat's
+ * own) hangs from it over the ears and the neck (wardrobe.js `qingHelm`). Drawn as the Ming helmets are (MING_HELMS'
+ * fields; `finial.finish` the tube's own finish). The rank and file's lacquered black with a black horsehair plume (the
+ * user's photographs of the eight banners' armours); the Bayara's polished steel under gilt openwork, a gilt tube and a
+ * hanging sable tassel (the user's photograph of a Qing guard's armour; the Palace Museum's).
+ */
+export const QING_HELMS = {
+  bannerBowl: {
+    label: 'Banner helmet', zh: '八旗盔', period: 'Later Jin and Qing, 17th c.', finish: 'blackLacquer',
+    note: 'A round bowl lacquered black rising to a tall gilt tube with a black horsehair plume, a gilt band and visor; after the user\'s photographs of the eight banners\' armours.',
+    profile: [[0.12, 1], [0.38, 1.02], [0.72, 0.98], [1.0, 0.88], [1.24, 0.71], [1.44, 0.5], [1.58, 0.3], [1.68, 0.12]],
+    ellipse: [1.14, 0.95], gap: 0.13,
+    brim: { reach: 0.2, fall: 0.02, lip: 0.02 },
+    plates: 0, band: true,
+    finial: { kind: 'tube', r: 0.08, h: 1.0, finish: 'gilt' },
+    plume: 'qingPlume',
+  },
+  bayaraBowl: {
+    label: 'Bayara helmet', zh: '护军盔', period: 'Later Jin and Qing, 17th c.', finish: 'giltSteel',
+    note: 'Polished steel in four plates under gilt openwork scrolls, a gilt band and visor, a gilt tube with a hanging sable tassel; after the user\'s photograph of a Qing guard\'s armour.',
+    profile: [[0.12, 1], [0.38, 1.02], [0.72, 0.98], [1.0, 0.88], [1.24, 0.71], [1.44, 0.5], [1.58, 0.3], [1.68, 0.12]],
+    ellipse: [1.14, 0.95], gap: 0.13,
+    brim: { reach: 0.24, fall: 0.03, lip: 0.025 },
+    plates: 4, scroll: true, band: true, rivets: true,
+    finial: { kind: 'tube', r: 0.09, h: 0.95, finish: 'gilt' },
+    plume: 'qingSable',
+  },
+};
+
 /** Which design the Ming brigandine man's hat is in: by its outfit design's `helm` (outfits.js), with its finish. */
 export const MING_HELM_ORDER = ['cloudBell', 'rivetedTube', 'plainPoint', 'yongBell'];
 
@@ -122,6 +158,10 @@ export const TASSELS = {
   hongying: { count: 120, length: 0.8, width: 0.06, tip: 0.55, rise: [-1.25, -0.75], spread: 0.05, droop: 0.5, lean: 0, colour: '#c0161c', vary: 0.18, stiffness: 70, damping: 4.2, hang: 0.6, reach: 0.75 },
   redTuft: { count: 64, length: 0.62, width: 0.08, tip: 0.35, rise: [1.05, 1.55], spread: 0.05, droop: 0.9, lean: 0, colour: '#d01a1e', vary: 0.15, stiffness: 140, damping: 6, hang: 0.15, reach: 0.6 },
   blackPlume: { count: 70, length: 1.15, width: 0.05, tip: 0.4, rise: [1.25, 1.5], spread: 0.03, droop: 3.6, lean: 0, fan: 1.6, colour: '#151414', vary: 0.25, stiffness: 55, damping: 3.5, hang: 0.45, reach: 0.9 },
+  // The banner helmet's plume: a tall bundle of black horsehair standing up from the tube's mouth, falling a little at the tips.
+  qingPlume: { count: 80, length: 1.2, width: 0.05, tip: 0.5, rise: [1.4, 1.57], spread: 0.02, droop: 0.7, lean: 0, colour: '#121214', vary: 0.2, stiffness: 120, damping: 5, hang: 0.12, reach: 0.5 },
+  // The Bayara's: a sable tassel hanging from the gilt tube, dark, a few red strands in it.
+  qingSable: { count: 90, length: 0.7, width: 0.07, tip: 0.5, rise: [-1.3, -0.8], spread: 0.06, droop: 0.4, lean: 0, colour: '#1c1e28', vary: 0.3, stiffness: 70, damping: 4.2, hang: 0.6, reach: 0.7 },
   pheasant: { count: 3, length: 2.3, width: 0.16, tip: 0.25, rise: [1.28, 1.42], spread: 0.02, droop: 0.35, lean: -0.35, colour: '#8a6a44', vary: 0.1, feather: true, stiffness: 120, damping: 2.5, hang: 0.1, reach: 0.5 },
 };
 

@@ -4,7 +4,7 @@
 
 /* global THREE */
 
-import { BRIM_V, brimGrid, CHINA_FINISHES, finialTop, HAN_HOOD, MING_HELMS, rimPath, shellEdge, shellGrid, shellV, SHELL_V, swingStep, SWING, tasselStrands, TASSELS } from './chinahelms.js';
+import { BRIM_V, brimGrid, CHINA_FINISHES, finialTop, HAN_HOOD, MING_HELMS, QING_HELMS, rimPath, shellEdge, shellGrid, shellV, SHELL_V, swingStep, SWING, tasselStrands, TASSELS } from './chinahelms.js';
 import { surface } from './toon.js';
 
 const CHINA_TURN = Math.PI * 2;
@@ -341,7 +341,8 @@ function chinaFinials(design, r, material) {
  * sheet, the brim, the finial and its plume, the chin cords. Returns the meshes it added.
  */
 export function buildMingDesignHelm(group, head, r, steel, { lowDetail = false } = {}) {
-  const design = MING_HELMS[head.design];
+  // (The banners' helmets are drawn the same way: QING_HELMS.)
+  const design = MING_HELMS[head.design] ?? QING_HELMS[head.design];
   if (!design) return false;
   const finish = CHINA_FINISHES[head.finish ?? design.finish];
   const sheet = chinaDesignSheet(head.design, design, head.finish ?? design.finish);
@@ -354,14 +355,18 @@ export function buildMingDesignHelm(group, head, r, steel, { lowDetail = false }
   group.add(bowl, brim);
   // The top: closed where nothing stands on it.
   const plain = chinaFinish(steel, finish, null);
-  for (const mesh of chinaFinials(design, r, plain)) group.add(mesh);
+  // A tube of its own finish (`finial.finish`: the banners' gilt tube on a black bowl).
+  const tube = design.finial?.finish ? chinaFinish(steel, CHINA_FINISHES[design.finial.finish], null) : plain;
+  for (const mesh of chinaFinials(design, r, tube)) group.add(mesh);
   if (!design.finial) {
     const tip = new THREE.Mesh(new THREE.SphereGeometry(0.04 * r, 8, 6), plain);
     tip.position.y = design.profile.at(-1)[0] * r;
     group.add(tip);
   }
-  if (design.plume && !lowDetail) group.add(buildTassel(TASSELS[design.plume], r, { at: [0, finialTop(design) - 0.03, 0] }));
-  else if (design.plume) group.add(buildTassel({ ...TASSELS[design.plume], count: 10 }, r, { at: [0, finialTop(design) - 0.03, 0], still: true }));
+  // The kit's own plume where it gives one (`head.plume`), else the design's.
+  const plume = TASSELS[head.plume] ? head.plume : design.plume;
+  if (plume && !lowDetail) group.add(buildTassel(TASSELS[plume], r, { at: [0, finialTop(design) - 0.03, 0] }));
+  else if (plume) group.add(buildTassel({ ...TASSELS[plume], count: 10 }, r, { at: [0, finialTop(design) - 0.03, 0], still: true }));
   if (design.cords) {
     // Red chin cords from under the brim at the sides to under the jaw.
     const cord = surface(0xa81a1a, { roughness: 0.85 });

@@ -8,6 +8,146 @@ export const RATINGS = {
  "bouts": 16,
  "totalBouts": 6210,
  "characters": {
+  "bayara": {
+   "title": "Yangguri",
+   "faction": "manchu",
+   "type": "bayaraBow|bayara",
+   "records": {
+    "maximus": {
+     "wins": 5,
+     "losses": 1,
+     "draws": 0
+    },
+    "mingGuandao": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "mingShield": {
+     "wins": 1,
+     "losses": 5,
+     "draws": 0
+    },
+    "sipahi": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    }
+   },
+   "score": 98,
+   "provisional": 98,
+   "kd": {
+    "maximus": 3.667,
+    "mingGuandao": 0.077,
+    "mingShield": 0.273,
+    "sipahi": 0.077
+   }
+  },
+  "bannerArcher": {
+   "title": "Hūsun",
+   "faction": "manchu",
+   "type": "manchuBow|bannerArmour",
+   "records": {
+    "maximus": {
+     "wins": 3,
+     "losses": 3,
+     "draws": 0
+    },
+    "kheshig": {
+     "wins": 1,
+     "losses": 5,
+     "draws": 0
+    },
+    "archer": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "mingGun": {
+     "wins": 5,
+     "losses": 1,
+     "draws": 0
+    }
+   },
+   "score": 89,
+   "provisional": 89,
+   "kd": {
+    "maximus": 1,
+    "kheshig": 0.273,
+    "archer": 0.077,
+    "mingGun": 3.667
+   }
+  },
+  "bannerGuandao": {
+   "title": "Baturu",
+   "faction": "manchu",
+   "type": "guandao|bannerArmour",
+   "records": {
+    "maximus": {
+     "wins": 4,
+     "losses": 2,
+     "draws": 0
+    },
+    "mingGuandao": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "mingShield": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "mingBrigSpear": {
+     "wins": 2,
+     "losses": 4,
+     "draws": 0
+    }
+   },
+   "score": 72,
+   "provisional": 72,
+   "kd": {
+    "maximus": 1.8,
+    "mingGuandao": 0.077,
+    "mingShield": 0.077,
+    "mingBrigSpear": 0.556
+   }
+  },
+  "bannerSpear": {
+   "title": "Ilan",
+   "faction": "manchu",
+   "type": "spear|bannerArmour",
+   "records": {
+    "maximus": {
+     "wins": 2,
+     "losses": 4,
+     "draws": 0
+    },
+    "mingBrigSpear": {
+     "wins": 2,
+     "losses": 4,
+     "draws": 0
+    },
+    "mingGuandao": {
+     "wins": 1,
+     "losses": 5,
+     "draws": 0
+    },
+    "janissary": {
+     "wins": 4,
+     "losses": 2,
+     "draws": 0
+    }
+   },
+   "score": 74,
+   "provisional": 74,
+   "kd": {
+    "maximus": 0.556,
+    "mingBrigSpear": 0.556,
+    "mingGuandao": 0.273,
+    "janissary": 1.8
+   }
+  },
   "exoArmoured": {
    "title": "Pvt. Owen Kade",
    "faction": "machines",
@@ -2117,6 +2257,10 @@ export const RATINGS = {
   "dao|wokou": 55,
   "taekwondo|dobok": 15,
   "judo|judogi": 1.8,
+  "bayaraBow|bayara": 98,
+  "manchuBow|bannerArmour": 89,
+  "guandao|bannerArmour": 72,
+  "spear|bannerArmour": 74,
   "street|casual": 6,
   "whip|lorarius": 27,
   "kickboxing|boxing": 8.4,

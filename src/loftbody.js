@@ -675,6 +675,28 @@ export const ARMOR_KINDS = {
     skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
     upperArm: [-0.26, 0.62, 1.52, { studded: 12, base: 'cloth', edge: 'cloth2' }], forearm: [-0.04, -0.03, 1.26, 'steel'],
   },
+  // The Eight Banners' armour (mianjia, cloth armour, the Jurchen's of the 1610s-30s; the Qing's after): the Ming
+  // brigandine's own make, iron plates riveted inside a long coat, the rivet heads in rows over it, and drawn as
+  // that coat is (its cloth the banner's colour, its binding `cloth2` the banner's border: red, or white on the red
+  // banner; on a plain banner the cloth's own colour), down the front too (`placket`, its half width round, rad);
+  // hanging from the waist over the skirt the apron panel (`apron`: from, to along it, half its width round), bound
+  // in the same; the skirt long, split before, behind and at the sides; the studded shoulder guards; the sleeves of
+  // the same studded cloth to the wrist.
+  bannerCoat: {
+    // (No belt shows: the apron hangs over it.) The front opening bound (`placket`); the collar of the same cloth, up under the helmet's hood.
+    trunk: [-0.06, 0.96, 1.2, { studded: 22, base: 'cloth', edge: 'cloth2', placket: 0.05 }], collar: 'cloth',
+    skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    upperArm: [-0.28, 0.66, 1.56, { studded: 12, base: 'cloth', edge: 'cloth2' }], forearm: [-0.04, -0.03, 1.22, { studded: 10, base: 'cloth', edge: 'cloth2' }],
+  },
+  // The Bayara (the banners' guard, mounted): the same coat in brocade, its rivets close and gilt, the round steel
+  // mirror over the heart in a gilt frame, the apron; the skirt with four steel bands across it (`bands`); gilt
+  // plates over the shoulders and steel arm guards (lames) to the wrist.
+  bayaraCoat: {
+    trunk: [-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', placket: 0.04, mirror: [0.62, 0.15, 'steel'] }], collar: 'cloth',
+    skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], bands: 4, gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    upperArm: [[-0.3, 0.5, 1.6, { rows: ['gold', 'gold'] }], [0.45, 1.02, 1.36, { lames: 6, base: 'steel2' }]], forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }],
+    mirrors: [[0.62, 0, 0.3, 1.36, 'steel']],
+  },
   // A conquistador: the breastplate over the doublet, short tassets, mail
   // sleeves and collar; the doublet's cloth shows below.
   conquistador: {
@@ -1078,6 +1100,11 @@ function paintFor(paint, armor) {
     if (paint.studded) {
       if ((paint.edge && index === 0) || (paint.opening && Math.cos(angle) > 1 - paint.opening) || inLamellaGap(paint, angle)) return paint.edge ?? paint.base;
       if (paint.studsDrawn) return paint.base;
+      // In a crowd (not drawn as faces of their own: apronOn, bandsOn): the apron panel's bound edges (`apron`: from, to up
+      // the piece, its half width round as the sine of the angle), and steel bands across a skirt (`bands`: how many).
+      if (paint.apron && apronEdge(paint.apron, ring.t, angle)) return paint.edge ?? paint.base;
+      if (paint.placket && Math.cos(angle) > Math.cos(paint.placket * 2)) return paint.edge ?? paint.base;
+      if (paint.bands && index > 0 && index % 2 === 0) return 'steel';
       return index % 2 === 1 && step % 2 === 0 ? 'gold' : paint.base;
     }
     // Lamellae drawn plainly (a crowd): rows of plates and their lacing; the robe in the splits.
@@ -1091,6 +1118,15 @@ function paintFor(paint, armor) {
     if (paint.rows) return paint.rows[index % paint.rows.length];
     return paint.base;
   };
+}
+
+/** Whether a place on a piece (its ring's t, the angle round it, 0 at the front) is on the binding round an apron panel ([from, to, half width]). */
+function apronEdge([from, to, half], t, angle) {
+  if (Math.cos(angle) <= 0) return false;
+  const across = Math.abs(Math.sin(angle));
+  const inside = t > from && t < to && across < half;
+  // (The binding at least a ring deep at the top and the bottom: in a crowd the rings are far apart.)
+  return inside && (across > half * 0.72 || t < from + 0.07 || t > to - 0.07);
 }
 
 /** Whether an angle round a piece (0 at the front) falls in one of its lamellar splits (`gaps`: centres and a half-width, rad). */
@@ -1444,11 +1480,62 @@ function studsOn(mesh, rings, inflate, paint, bones) {
     if (paint.edge && place < 0.6) continue;
     for (let column = 0; column < columns; column += 1) {
       const angle = ((column + (row % 2) * 0.5) / columns) * Math.PI * 2;
-      if (inLamellaGap(paint, angle) || (paint.opening && Math.cos(angle) > 1 - paint.opening * 3)) continue;
+      if (inLamellaGap(paint, angle) || (paint.opening && Math.cos(angle) > 1 - paint.opening * 3) || (paint.placket && Math.abs(Math.sin(angle)) < paint.placket * 1.5 && Math.cos(angle) > 0)) continue;
       addPatch(mesh, rings, [
         [place - spec.tall, angle - half, out], [place - spec.tall, angle + half, out],
         [place + spec.tall, angle + half, out], [place + spec.tall, angle - half, out],
       ], 'gold', bones);
+    }
+  }
+}
+
+/**
+ * A coat's apron panel hanging over its skirt (`paint.apron`: from, to along the piece, its half width round as the sine of the
+ * angle): its binding (the coat's `edge`) laid round its four sides, each a strip of faces of its own over the cloth,
+ * cut into short lengths so it follows the coat round.
+ */
+function apronOn(mesh, rings, inflate, paint, bones) {
+  const [from, to, half] = paint.apron;
+  const [low, high] = [placeAt(rings, from), placeAt(rings, to)];
+  const across = Math.asin(half);
+  const deep = 0.22;
+  const wide = 0.07;
+  const out = inflate + LOFT.studs.lift * 0.6;
+  const role = paint.edge ?? paint.base;
+  const lengths = 6;
+  for (let piece = 0; piece < lengths; piece += 1) {
+    const a = -across + (2 * across * piece) / lengths;
+    const b = -across + (2 * across * (piece + 1)) / lengths;
+    for (const [p0, p1] of [[low, low + deep], [high - deep, high]]) addPatch(mesh, rings, [[p0, a, out], [p0, b, out], [p1, b, out], [p1, a, out]], role, bones);
+  }
+  for (const [a, b] of [[-across, -across + wide], [across - wide, across]]) addPatch(mesh, rings, [[low, a, out], [low, b, out], [high, b, out], [high, a, out]], role, bones);
+}
+
+/** A coat's front opening bound (`paint.placket`, its half width round, rad): a strip of faces of its own, ring to ring. */
+function placketOn(mesh, rings, inflate, paint, bones) {
+  const half = paint.placket;
+  const out = inflate + LOFT.studs.lift * 0.6;
+  for (let place = 0; place < rings.length - 1; place += 1) addPatch(mesh, rings, [[place, -half, out], [place, half, out], [place + 1, half, out], [place + 1, -half, out]], paint.edge ?? paint.base, bones);
+}
+
+/**
+ * Steel bands riveted across a skirt (`paint.bands`: how many, evenly over its lower two thirds), each a strip of faces
+ * of its own over the cloth, broken at the skirt's splits and under the apron, under its rivet heads.
+ */
+function bandsOn(mesh, rings, inflate, paint, bones) {
+  const span = rings.length - 1;
+  const tall = 0.05 * span;
+  const out = inflate + LOFT.studs.lift * 0.5;
+  const steps = 40;
+  const front = paint.apron ? paint.apron[2] : 0;
+  for (let band = 0; band < paint.bands; band += 1) {
+    const place = span * (0.12 + (0.5 * band) / Math.max(1, paint.bands - 1));
+    for (let step = 0; step < steps; step += 1) {
+      const a = (step / steps) * Math.PI * 2;
+      const b = ((step + 1) / steps) * Math.PI * 2;
+      const middle = (a + b) / 2;
+      if (inLamellaGap(paint, middle) || (Math.cos(middle) > 0 && Math.abs(Math.sin(middle)) < front)) continue;
+      addPatch(mesh, rings, [[place - tall, a, out], [place - tall, b, out], [place + tall, b, out], [place + tall, a, out]], 'steel', bones);
     }
   }
 }
@@ -1823,6 +1910,9 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     // A brigandine with its tile: the cloth (its binding and opening) in one loft, the rivet heads in the picture.
     if (material === 'studded' && tile) {
       loft(mesh, rings, sides, { color: paintFor({ ...paint, studsDrawn: true, mirror: null, rivets: null }, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile) });
+      if (paint.apron) apronOn(mesh, rings, inflate, paint, boned);
+      if (paint.bands) bandsOn(mesh, rings, inflate, paint, boned);
+      if (paint.placket) placketOn(mesh, rings, inflate, paint, boned);
       return;
     }
     // A field tile of the kind's own (hoops, riveted lames, mail and plate, etching, a moulded shell): rows painted in a crowd
@@ -1840,8 +1930,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}) });
     // Laminated plate: each lame its own band of faces (not in a crowd).
     if (paint?.lames && !lowDetail) lamesOn(mesh, rings, inflate, paint, boned);
-    // A brigandine's rivet heads, each its own small square (not in a crowd).
+    // A brigandine's rivet heads, each its own small square (not in a crowd); its apron's binding and its skirt's steel bands.
     if (paint?.studded && !lowDetail) studsOn(mesh, rings, inflate, paint, boned);
+    if (paint?.apron && !lowDetail) apronOn(mesh, rings, inflate, paint, boned);
+    if (paint?.bands && !lowDetail) bandsOn(mesh, rings, inflate, paint, boned);
+    if (paint?.placket && !lowDetail) placketOn(mesh, rings, inflate, paint, boned);
   };
   // Lamellar: rows of lacquered scales, laced between rows and down each column.
   const laced = (ring, angle, index) => (index % 3 === 2 ? 'lace' : 'steel');

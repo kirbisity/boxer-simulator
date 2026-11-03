@@ -52,6 +52,8 @@ export const PLACE_AMBIENCE = {
   mobei: { wind: 54, birds: 1 },
   catalaunian: { wind: 46, birds: 5 },
   carrhae: { wind: 48, birds: 1 },
+  // The Hun River valley in April: a cold wind, a few birds.
+  sarhu: { wind: 52, birds: 2 },
   // Agincourt's wet field in October between two woods (the wind in the trees, few birds); Cerignola's vineyard slope at dusk.
   agincourt: { wind: 52, birds: 1 },
   cerignola: { wind: 42, birds: 4 },

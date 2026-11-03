@@ -339,12 +339,18 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     case 'bow':
     case 'longbow':
     case 'yumi':
+    case 'manchuBow':
     case 'compositeBow': {
       // A recurved stave bowed towards the mark (+z), bound at the grip; the
       // string runs tip to tip behind it, drawn to the hand as the shot comes.
       // The composite bow is short, its stiff ears (siyahs) bent sharply forward.
+      // The Manchu bow is long, its working limbs short and its ears very long
+      // and straight, standing forward of the string (on string bridges) at the ends.
       const bend = 0.16;
-      const stave = new THREE.CatmullRomCurve3(kind === 'compositeBow' ? [
+      const stave = new THREE.CatmullRomCurve3(kind === 'manchuBow' ? [
+        new THREE.Vector3(0, -spec.handle, 0.06), new THREE.Vector3(0, -spec.handle * 0.62, -0.1), new THREE.Vector3(0, -spec.handle * 0.3, -0.08),
+        new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, spec.length * 0.3, -0.08), new THREE.Vector3(0, spec.length * 0.62, -0.1), new THREE.Vector3(0, spec.length, 0.06),
+      ] : kind === 'compositeBow' ? [
         new THREE.Vector3(0, -spec.handle, 0.02), new THREE.Vector3(0, -spec.handle * 0.8, -0.12), new THREE.Vector3(0, -spec.handle * 0.45, -0.07),
         new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, spec.length * 0.45, -0.07), new THREE.Vector3(0, spec.length * 0.8, -0.12), new THREE.Vector3(0, spec.length, 0.02),
       ] : [

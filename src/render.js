@@ -134,7 +134,7 @@ export function setPlace(view, place, arena, weather = null) {
   const swapped = swapFloor(view, place, floor ?? dug);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -353,6 +353,8 @@ const PLACE_LIGHT = {
   mobei: { background: 0xd6d0bc, fog: [45, 150], key: 0xffe0b4, keyIntensity: 0.14, rim: 0xe8d8c0, sun: 0.95 },
   // Champagne in high summer: a mild clear day, soft haze on the far woods.
   catalaunian: { background: 0xbcd6ee, fog: [45, 150], key: 0xfff4e0, keyIntensity: 0.12, rim: 0xd6e6ff, sun: 1.0 },
+  // Sarhu in April: a low grey sky, snow not long gone, the light flat and cold.
+  sarhu: { background: 0xa8b0b4, fog: [30, 120], key: 0xe4ecf2, keyIntensity: 0.18, rim: 0xbcc8d4, sun: 0.65, hemi: 0.72 },
   // The plain below Harran in June: a hard white sun near overhead, the sky bleached pale, heat haze thick on the distance.
   carrhae: { background: 0xe2e2da, fog: [40, 130], key: 0xfff8ec, keyIntensity: 0.08, rim: 0xf0ece0, sun: 1.2 },
   // A level-mode stage: open sky and a sea below; the stage's own terrain stands in it (levelmode/terrainview.js).
@@ -410,6 +412,7 @@ export const PLACE_ARENAS = {
   mobei: { halfX: 30, halfZ: 20 },
   catalaunian: { halfX: 30, halfZ: 20 },
   carrhae: { halfX: 30, halfZ: 20 },
+  sarhu: { halfX: 30, halfZ: 20 },
   // A level-mode stage: the terrain is the floor (the box is only a far limit).
   stage: { halfX: 40, halfZ: 40 },
   dunnottar: { halfX: 40, halfZ: 40 },
@@ -799,6 +802,8 @@ function buildPlain(arena = PLACE_ARENAS.plain) {
  *   ridges; no props (the Han stand on the open Gobi, no wagons).
  * - catalaunian: the plain of Champagne (451): summer grass gone green-gold,
  *   rolling, a few woods far off; the ridge the armies fought for beyond the far side.
+ * - sarhu: the hills by the Hun River in Liaodong in April (1619): last year's
+ *   grass dead and brown, the ground thawing, pine woods on the hills; the Jiefan ridge beyond the far side.
  * - carrhae: the plain south of Carrhae towards Harran in June (53 BC): pale
  *   sand and gravel, camelthorn in low grey-green tufts, a few bare hills far
  *   off; the Parthian camel train behind their end of the floor.
@@ -814,6 +819,12 @@ export const OPEN_PLAINS = {
     ground: { base: '#7c8a44', speckle: [[100, 165], [110, 165], [40, 75]], strokes: 22000, repeat: [8, 8] },
     hills: { count: 9, radius: [16, 26], height: [0.14, 0.3], colour: 0x6f8444, distance: [62, 60] },
     litter: { grass: 0x9a9a4e, stone: 0x8a8478, tufts: 900, stones: 60 },
+    props: (arena) => [plainsRidge(arena)],
+  },
+  sarhu: {
+    ground: { base: '#8a7e52', speckle: [[100, 150], [95, 140], [60, 95]], strokes: 20000, repeat: [8, 8] },
+    hills: { count: 10, radius: [16, 26], height: [0.18, 0.36], colour: 0x5e6a44, distance: [62, 58] },
+    litter: { grass: 0x9a8a5a, stone: 0x6e6a60, tufts: 800, stones: 120 },
     props: (arena) => [plainsRidge(arena)],
   },
   carrhae: {

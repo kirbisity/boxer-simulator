@@ -127,8 +127,9 @@ test('empty, with a man on him, the gunner draws his own sidearm: a wakizashi fo
   }
 });
 
-test('characters fall into sixteen factions, by what they wear: knights, Japanese, Chinese, Mexica, Inca, steppe, Ottomans, gladiators, Rome, the Goths and Parthia among them', () => {
-  assert.equal(FACTION_KEYS.length, 16);
+test('characters fall into seventeen factions, by what they wear: knights, Japanese, Chinese, the Eight Banners, Mexica, Inca, steppe, Ottomans, gladiators, Rome, the Goths and Parthia among them', () => {
+  assert.equal(FACTION_KEYS.length, 17);
+  assert.deepEqual(['bannerBow', 'bannerGuandao', 'bayara'].map((key) => factionOf(PRESETS[key])), ['manchu', 'manchu', 'manchu'], 'the Later Jin\'s banners, by their banner coats');
   assert.ok(FACTION_KEYS.includes('goths') && FACTION_KEYS.includes('parthians'), 'the Goths and Parthia (the Catalaunian Plains, Carrhae)');
   assert.ok(FACTION_KEYS.includes('inca'), 'the Inca (Cajamarca), by the uncu');
   assert.deepEqual(['legionary', 'centurion'].map((key) => factionOf(PRESETS[key])), ['romans', 'romans']);

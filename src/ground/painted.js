@@ -989,6 +989,17 @@ const PAINTED_GROUND_PLACES = {
       return [Math.min(1, churn), f(x * 0.04, z * 0.04, 57) * 0.7 + f(x * 0.25, z * 0.25, 58) * 0.3, 0, 0];
     },
   },
+  // Sarhu: dead grass, the ground thawing to mud where the lines met.
+  sarhu: {
+    a: 'grass', b: 'mud:mixed', tiles: [1.4, 1.6], bomb: [1, 1], macro: PAINTED_GROUND_GRASS_MACRO, keepOut: [32, 22], match: 0.85,
+    layout: (x, z, f) => {
+      const ex = Math.abs(x) - 20 + (f(x * 0.1, z * 0.1, 63) - 0.5) * 6;
+      const ez = Math.abs(z) - 9 + (f(x * 0.15, z * 0.15, 64) - 0.5) * 5;
+      let churn = (1 - paintedGroundSmooth(-1, 2, ez)) * (1 - paintedGroundSmooth(-2, 3, ex));
+      churn *= 0.55 + 0.45 * f(x * 0.5, z * 0.5, 65);
+      return [Math.min(1, churn), f(x * 0.04, z * 0.04, 66) * 0.7 + f(x * 0.25, z * 0.25, 67) * 0.3, 0, 0];
+    },
+  },
   // Below Harran: sand over gravel, the gravel bared in patches.
   carrhae: {
     a: 'desert', b: 'gravel:pale', tiles: [1.8, 1.4], bomb: [2, 1], macro: PAINTED_GROUND_SAND_MACRO, keepOut: [32, 22], match: 0.7,

@@ -81,6 +81,8 @@ const SKYBALL_PHOTO_PLACES = {
   mobei: { photo: 'plain', turn: 0 },
   catalaunian: { photo: 'meadow', turn: 0 },
   carrhae: { photo: 'plain', turn: 0 },
+  // Liaodong's wooded hills by the Hun River: the forested valley's (Sekigahara's), in the mist.
+  sarhu: { photo: 'valley', turn: 0 },
 };
 
 const skyballPhotoTextures = {};

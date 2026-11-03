@@ -30,6 +30,8 @@ export const KIT_REGIONS = {
   mingGarrison: ['china', 'taiwan'], mingBrigandine: ['china', 'taiwan'], mingElite: ['china', 'taiwan'], mingIronLamellar: ['china', 'taiwan'],
   hanSoldier: ['china'], hanCavalry: ['china', 'mongolia'], kungfu: ['china', 'taiwan'], wuxia: ['china', 'taiwan'], guanYu: ['china'], monk: ['china'],
   ironPagoda: ['china', 'mongolia'],
+  // The Jurchen of the Later Jin (Manchuria: no composite of its own; the nearest, north China, Korea and Mongolia).
+  bannerArmour: ['china', 'korea', 'mongolia'], bayara: ['china', 'korea', 'mongolia'],
   // Korea
   dobok: ['korea'],
   judogi: ['japan'],
