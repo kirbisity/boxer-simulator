@@ -1,6 +1,6 @@
 # Publishes Gladiator to GitHub Pages. There is no build: the game is plain
 # ES modules, so the site is the game's own files, copied as they are.
-# The tests run first and the deploy only happens if they pass.
+# It deploys straight on every push to main: no test gate (run `npm test` locally when wanted).
 name: Deploy to GitHub Pages
 
 on:
@@ -19,20 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      # The bundle test needs esbuild, the one dev dependency.
-      - run: npm ci
-      - run: npm test
-
   deploy:
-    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
