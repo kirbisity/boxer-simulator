@@ -38,6 +38,9 @@ export const KIT_REGIONS = {
   // The steppe
   steppeLight: ['mongolia', 'uzbekistan', 'tibet'], steppeMedium: ['mongolia', 'uzbekistan'], kheshig: ['mongolia', 'tibet'],
   xiongnu: ['mongolia', 'uzbekistan'], hun: ['uzbekistan', 'mongolia'], hunNoble: ['uzbekistan', 'mongolia'],
+  // The Cumans (Kipchaks) of the Pontic steppe, west Eurasian and east mixed (no Kazakh composite: the nearest, Uzbekistan,
+  // and the Rus' and Hungarians they lived among and married into).
+  cumanHeavy: ['uzbekistan', 'ukraine', 'hungary'],
   // Rome and the arena
   legionary: ['italy', 'greece', 'spain'], republicanLegionary: ['italy'], centurion: ['italy', 'greece'], romanAuxiliary: ['spain', 'france', 'greece'], lateRoman: ['italy', 'greece', 'serbia'],
   maximus: ['spain', 'italy'], commodus: ['italy'], secutor: ['italy', 'greece'], murmillo: ['italy', 'france'], thraex: ['romania', 'serbia', 'greece'],

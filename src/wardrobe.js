@@ -1327,12 +1327,14 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       // sliding nasal bar, cheek plates and a mail aventail round the neck;
       // (`turban`) a turban wound round it, as an alp wore it.
       const iron = metal(steel, color);
-      // The bowl raised to a tall ogival point (CHICHAK: its profile), fluted from the band up as the Ottoman bowls are.
-      const bowlGeometry = new THREE.LatheGeometry(CHICHAK.profile.map(([out, up]) => new THREE.Vector2(out * r, up * r)), CHICHAK.sides);
+      // The bowl raised to a tall ogival point (CHICHAK: its profile), fluted from the band up as the Ottoman bowls are; a
+      // Kipchak bowl (`bowl: 'kipchak'`) its own taller faceted cone (CHICHAK.kipchak).
+      const form = { ...CHICHAK, ...(CHICHAK[head.bowl] ?? {}) };
+      const bowlGeometry = new THREE.LatheGeometry(form.profile.map(([out, up]) => new THREE.Vector2(out * r, up * r)), form.sides);
       const place = bowlGeometry.attributes.position;
       for (let index = 0; index < place.count; index += 1) {
         const [x, y, z] = [place.getX(index), place.getY(index), place.getZ(index)];
-        const swell = 1 + CHICHAK.flute * Math.cos(Math.atan2(z, x) * CHICHAK.flutes) * Math.min(1, y / (0.3 * r));
+        const swell = 1 + form.flute * Math.cos(Math.atan2(z, x) * form.flutes) * Math.min(1, y / (0.3 * r));
         place.setXYZ(index, x * swell, y, z * swell);
       }
       bowlGeometry.computeVertexNormals();
@@ -1344,9 +1346,9 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       band.position.y = 0.12 * r;
       // The finial: a gilt knop and spike on the point.
       const knop = new THREE.Mesh(new THREE.SphereGeometry(0.1 * r, 10, 8), gilt);
-      knop.position.y = (CHICHAK.profile.at(-1)[1] + 0.1) * r;
+      knop.position.y = (form.profile.at(-1)[1] + 0.1) * r;
       const finial = new THREE.Mesh(new THREE.ConeGeometry(0.06 * r, 0.45 * r, 8), gilt);
-      finial.position.y = (CHICHAK.profile.at(-1)[1] + 0.38) * r;
+      finial.position.y = (form.profile.at(-1)[1] + 0.38) * r;
       // The nasal: a bar sliding in its bracket on the brow, its foot widened into a leaf.
       const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 1.0 * r, 0.12 * r), iron);
       nasal.position.set(1.2 * r, -0.12 * r, 0);
@@ -1354,18 +1356,36 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       leaf.position.set(1.21 * r, -0.6 * r, 0);
       const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.1 * r, 0.3 * r, 0.2 * r), gilt);
       bracket.position.set(1.2 * r, 0.24 * r, 0);
-      group.add(bowl, band, knop, finial, nasal, leaf, bracket);
-      for (const side of [1, -1]) {
-        const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.6 * r, 0.8 * r, 0.06 * r), iron);
-        cheek.position.set(0.35 * r, -0.45 * r, side * 1.08 * r);
-        group.add(cheek);
+      group.add(bowl, band, knop, finial, bracket);
+      if (head.mask) {
+        // Masked (a Cuman's: the kipchak face or the gilt half-mask), as the Kipchak helmets are: the mask hung from
+        // the brow bracket in the nasal's place and pinned at each temple, no cheek plates (the mask is the face); the
+        // bracket's hinge plate and the temple hinges in brass (`hinge`).
+        const brass = metal(steel, head.hinge ?? head.gold ?? 0xa8873e);
+        const hingePlate = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, 0.16 * r, 0.3 * r), brass);
+        hingePlate.position.set(1.24 * r, 0.24 * r, 0);
+        group.add(hingePlate);
+        for (const side of [1, -1]) {
+          const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * r, 0.1 * r, 0.05 * r, 10), brass);
+          pin.rotation.x = Math.PI / 2;
+          pin.position.set(form.temple[0] * r, form.temple[1] * r, side * form.temple[2] * r);
+          group.add(pin);
+        }
+      } else {
+        group.add(nasal, leaf);
+        for (const side of [1, -1]) {
+          const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.6 * r, 0.8 * r, 0.06 * r), iron);
+          cheek.position.set(0.35 * r, -0.45 * r, side * 1.08 * r);
+          group.add(cheek);
+        }
       }
       const mailCloth = metal(steel, head.mail ?? 0x8d9097);
       mailCloth.side = THREE.DoubleSide;
       // The aventail hung from the bowl's foot round the sides and back to the shoulders, wearing the mail's rings (the
       // detail tile) where the maps are drawn.
-      const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.17 * r, 1.65 * r, CHICHAK.aventail * r, 22, 2, true, Math.PI * 0.75, Math.PI * 1.5), mailCloth);
-      aventail.position.y = (0.1 - CHICHAK.aventail / 2) * r;
+      // (Open at the face by `open`, rad, round the front.)
+      const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.17 * r, 1.65 * r, form.aventail * r, 22, 2, true, Math.PI / 2 + form.open / 2, Math.PI * 2 - form.open), mailCloth);
+      aventail.position.y = (0.1 - form.aventail / 2) * r;
       if (DETAIL_MAPS.on && !lowDetail) wearTile(aventail, 'mail', { moulded: true });
       group.add(aventail);
       worldMask(group, head, r, steel, color);
@@ -1903,7 +1923,17 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
 // `flutes` shallow flutes round it standing `flute` of the radius, and its mail aventail `aventail` long.
 const CHICHAK = {
   profile: [[1.17, 0], [1.2, 0.3], [1.16, 0.62], [1.04, 0.95], [0.84, 1.25], [0.58, 1.55], [0.32, 1.85], [0.14, 2.08], [0.04, 2.22], [0, 2.26]],
-  sides: 32, flutes: 16, flute: 0.025, aventail: 1.25,
+  sides: 32, flutes: 16, flute: 0.025, aventail: 1.25, open: Math.PI / 2,
+  // Where a face mask is pinned at each temple ([forward, up, out] in head radii): a masked bowl's (a Cuman's).
+  temple: [0.55, -0.1, 1.12],
+  // The Kipchak bowl of the 12th-13th-century Cuman graves (the Dnieper and Don kurgans; the Lipovets helmet): a tall
+  // cone, near upright over the brow and then drawn in with hollow flanks to a high point, raised in ten flat facets
+  // (`sides`, unfluted), the spike on its point; its mail aventail long, to the shoulders, and closed round the sides of
+  // the mask (`open` only its width).
+  kipchak: {
+    profile: [[1.2, 0], [1.21, 0.28], [1.13, 0.58], [0.94, 0.88], [0.7, 1.18], [0.47, 1.5], [0.28, 1.84], [0.14, 2.18], [0.05, 2.48], [0, 2.6]],
+    sides: 10, flute: 0, aventail: 2.1, open: Math.PI * 0.34,
+  },
 };
 
 const AYYUBID_HELM = {

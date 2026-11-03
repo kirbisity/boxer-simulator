@@ -589,6 +589,22 @@ const BALTEUS = [0.04, 0.24, 1.14, { rows: ['steel', 'gold', 'steel'] }];
 // half width round, rad) from below the apron's foot (`from`, t up the skirt), and the front panel from there down over
 // the split before (`front`: the t of its top, its half width round, rad).
 const BANNER_LEGS = { split: 0.16, from: -0.3, front: [-0.3, 0.26] };
+// The Cuman's plates (ARMOR_KINDS.cumanMail): `rows` narrow lames from `from` to `to` up the trunk (0 hips, 1 neck), each
+// `tall` of it (the rest of each step the dark rim between); the columns [centre angle, half width] round the trunk (0 the
+// front, π the back), a strip of mail left between each; standing `out` from the skin. The straps closing the split front
+// at these heights (`straps`), each `strap` tall and `across` half wide over the split.
+const CUMAN_LAMES = {
+  rows: 14, from: 0.04, to: 0.86, tall: 0.048, out: 1.18,
+  columns: [[0.3, 0.19], [-0.3, 0.19], [1.05, 0.36], [-1.05, 0.36], [2.42, 0.52], [-2.42, 0.52]],
+  straps: [0.33, 0.48, 0.63, 0.78], strap: 0.024, across: 0.17,
+};
+/** The Cuman's plates as the trunk's `plates` ([from t, to t, angle, half width, out, role, rim]), and the straps over the front. */
+function cumanLames() {
+  const { rows, from, to, tall, out, columns, straps, strap, across } = CUMAN_LAMES;
+  const step = (to - from) / rows;
+  const lames = Array.from({ length: rows }, (_, row) => from + row * step).flatMap((low) => columns.map(([angle, half]) => [low, low + tall, angle, half, out, 'steel', 'steel2']));
+  return [...lames, ...straps.map((t) => [t - strap / 2, t + strap / 2, 0, across, out + 0.05, 'leather'])];
+}
 
 export const ARMOR_KINDS = {
   // Tosei gusoku: a solid cuirass of riveted horizontal steel lames, laced
@@ -944,6 +960,18 @@ export const ARMOR_KINDS = {
     belt: [-0.02, 0.1, 1.22, 'leather'],
     discs: [[0.05, 0, 0.045, 1.25, 'steel', 'gold', 0.015]],
     upperArm: [[-0.3, 0.55, 1.15, MAIL], [-0.26, 0.34, 1.48, { lames: 4, base: 'steel' }]], forearm: [-0.04, -0.03, 1.3, 'steel'],
+  },
+  // The Cuman's mail and plates (12th-13th c.; OUTFITS.cumanHeavy): a mail shirt to mid-thigh, its sleeves to the elbow,
+  // and laced over it rows of narrow plain steel plates (CUMAN_LAMES) from the collarbone to the hips, in columns: one each
+  // side of the split front, one under each arm, two down the back, the dark mail showing in the strips between; the front
+  // buckled shut with leather straps (`plates` and their brass buckles, `studs`); a coloured sash wound at the waist under a
+  // red leather belt (the kit's `lace`), the bow case's strap across the chest; lames down the outside of the upper arm, hinged steel vambraces.
+  cumanMail: {
+    trunk: [[-0.1, 1.0, 1.12, MAIL], [0.1, 0.22, 1.27, 'cloth2'], [0.13, 0.19, 1.3, { buckle: 'gold', base: 'lace' }]], skirt: [0.62, 0.6, 1.24, MAIL], collar: 'mail',
+    plates: cumanLames(),
+    studs: CUMAN_LAMES.straps.map((t) => [t, 0.07, 0.05, 1.3, 'gold']),
+    straps: [[0.96, -0.75, 0.2, 1.3, 0.06, 1.29, 'leather']],
+    upperArm: [[-0.3, 1.0, 1.14, MAIL], [-0.2, 0.72, 1.42, { lames: 7, base: 'steel' }]], forearm: [-0.04, -0.03, 1.3, 'steel'],
   },
   // An alp's mail hauberk with round mirror plates laced over the breast and back (the char-aina's forerunners).
   mailMirror: {

@@ -366,6 +366,15 @@ export const PRESETS = {
     outfit: { kind: 'kheshig', design: 0 }, accessories: [], sidearm: 'mace',
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
+  // Konchak (fl. 1170s-1200s), khan of the Don Cumans, who took Prince Igor of Novgorod-Seversky on the Kayala in
+  // 1185 (the Igor Tale's 'Konchak's men'), at about forty, in his retinue's masked helmet and plated mail: a steppe
+  // rider of the Kipchak kurgans' measure (~167 cm, broad and hard from the saddle), the long hair and moustache of the
+  // Cuman stone figures; the Rus' named them Polovtsy, the pale ones, and the chroniclers saw many fair or brown-haired.
+  cuman: {
+    name: 'Konchak', style: 'cumanBow', sex: 'male', heightCm: 167, frame: 'large', age: 40, exercise: 0.68, calories: 4300,
+    outfit: { kind: 'cumanHeavy', design: 0 }, accessories: [],
+    look: { skinTone: 'light', hairStyle: 'long', hairColor: '#4a3020', facialHair: 'mustache', eyeColor: 'brown' },
+  },
   // Salah ad-Din Yusuf ibn Ayyub (1137–1193), Kurdish sultan of Egypt and
   // Syria, at fifty, the summer of Hattin (1187): of middle height, spare and
   // hard from a life in the saddle (the Franks' and his own chroniclers'

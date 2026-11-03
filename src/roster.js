@@ -59,6 +59,8 @@ export const WARRIORS = [
   // An iron-clad horse archer: the bow, then the sabre (his kit's sidearm) up close.
   warrior('steppeShield', 'Ganbold', PRESETS.saberShield),
   warrior('steppeArcher', 'Bayar', PRESETS.steppeBow),
+  // A Cuman (Kipchak) of the 12th-13th-century steppe: the bow, then the sabre, in plated mail and the masked helmet.
+  warrior('cuman', 'Konchak', PRESETS.cuman),
   // The sultanates' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
   { ...warrior('saladin', 'Saladin', PRESETS.saladin), flagship: true, legend: { order: 9, kicker: 'Sultan of Egypt and Syria', line: 'The straight Ayyubid sword and round shield: patient, quick to answer.' } },
   warrior('gaziAlp', 'Turgut Alp', PRESETS.gaziAlp),

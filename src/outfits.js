@@ -322,6 +322,18 @@ function bayaraDesign(label, cloth, trim) {
 function steppeDesign(label, armor, deel, trim, head, feet = '#141210') {
   return { label, top: { kind: 'longsleeve', color: deel }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { cloth: deel, cloth2: trim, leather: '#4a2e1a', ...armor }, head, feet: { kind: 'jinBoot', color: feet } };
 }
+// The Cuman's kit (OUTFITS.cumanHeavy): his coat under the mail showing at the elbow (`coat`), the mail shirt with its
+// plates in rows (loftbody.js cumanMail) in his `steel`, the sash (`sash`) under the leather belt (`belt`, drawn in the
+// `lace` role), the brown leather of the straps, brass buckles (`gold`); the pointed helmet (wardrobe.js chichak) in the same steel with its mail aventail, the face mask (`mask`:
+// menpo.js's kipchak or horde) hinged on it; the tall boots.
+function cumanDesign(label, { steel, coat, sash, belt, mask, gold = '#a8873e' }) {
+  return {
+    label, top: { kind: 'longsleeve', color: coat }, bottom: { kind: 'pants', color: '#2a2a30' },
+    armor: { kind: 'cumanMail', color: steel, mail: shade(steel, 0.55), cloth: coat, cloth2: sash, lace: belt, leather: '#6a3f22', gold },
+    head: { kind: 'chichak', bowl: 'kipchak', color: steel, gold: mask === 'horde' ? gold : steel, hinge: gold, mail: shade(steel, 0.55), mask: true, maskDesign: mask },
+    feet: { kind: 'jinBoot', color: '#2a1c14' },
+  };
+}
 // A rōnin: kosode, hakama, the cloak and his pieces of armour (roninDo); his sugegasa is worn loose (HEADGEAR kasa).
 // A sōhei, a warrior monk of the great temples (Enryakuji, Kōfukuji): the
 // white katō-zukin hood wrapped over the head and across the face to the
@@ -1649,6 +1661,52 @@ export const OUTFITS = {
       steppeDesign('Black scale, red deel', { kind: 'kheshig', color: '#34363a', lace: '#8a1418' }, '#7a1418', '#d6a743', { kind: 'steppeHelm', color: '#34363a', coif: '#2a2c30', plume: '#b3161b', mask: true, maskDesign: 'kipchak', gold: '#d6a743' }),
     ],
   },
+  // A Cuman (Kipchak, the Rus' Polovtsy) of a khan's retinue, 12th-13th centuries, the Turkic steppe the Mongols rode over
+  // at the Kalka (1223) and drove west into Hungary under Köten (1239): what the rich kurgans of the Dnieper and Don
+  // steppe hold and the Rus' chronicles tell of a Polovtsian lord. A mail shirt to mid-thigh with rows of narrow
+  // steel plates laced over the breast, back and belly, the front split and buckled shut with leather straps (`cumanMail`);
+  // mail sleeves with lames over the upper arm, hinged steel vambraces, mail mittens; a tall pointed helmet with a
+  // spike, its mail aventail closed round the throat, and the steel face mask hinged at the brow and the temples: the man's
+  // own face with joined brows and a long moustache (the Lipovets mask, Hermitage), or the gilt half-mask over the eyes
+  // and nose (Kyiv, АЗС-3607). A red leather belt over a coloured sash; the composite bow and its quiver, the sabre.
+  // The plates are the bekhter's make three centuries early (narrow steel laced on mail, the mail between): guarded as
+  // the Ottoman sipahi's bekhter is, a point stopped on the plates over the vitals and finding a ring between them,
+  // an edge turned by both, a blow spread poorly; the shins only in boot leather (Saladin's).
+  cumanHeavy: {
+    // Trained: a khan's retainer, raised to the bow in the saddle, at war or raiding every season (`skill`: OUTFITS'
+    // tiers; the Ottoman sipahi's).
+    skill: 0.6,
+    // Rides (the Cumans' small hardy steppe horse; no barding in the graves).
+    horse: 'steppe',
+    faction: 'steppe',
+    label: 'Cuman — mail and plates, masked helmet', movement: 'good', fists: 'gauntlet',
+    sidearm: 'saber',
+    arrowproof: true,
+    // Mail-and-plate shirt ~11 kg, vambraces ~1 kg, mail mittens ~0.5 kg, helmet, aventail and mask ~2.5 kg: ~15 kg on a
+    // 75 kg man.
+    extraMass: 0.2,
+    // As the bekhter's (ottomanHeavy's, OUTFIT_SETS `bekhter`): cut 0.98, pierce 0.72, blunt 0.42. The head: the chichak's
+    // bowl over a quilted cap (0.47 / 0.96 / 0.6), the steel mask closing the face (a point meets plate there, not mail):
+    // pierce 0.65, blunt and cut a little up. The shins only in boot leather (Saladin's).
+    protection: {
+      blunt: 0.42, cut: 0.98, pierce: 0.72, bullet: { head: 0.3, torso: 0.4, limb: 0.2 },
+      regions: {
+        head: { blunt: 0.5, cut: 0.97, pierce: 0.65, deflects: true },
+        Shank: { blunt: 0.09, cut: 0.37, pierce: 0.15 },
+      },
+    },
+    // Mail and plates: between the plates and wherever they part, the mail they are laced on.
+    gaps: { mail: 'all' },
+    // The pointed bowl (~1.8 kg) and its mask (~0.6 kg) over a quilted cap; the mask closes the face (helmFaceOf).
+    helmet: { mass: 2.4, padding: 0.5, curve: 0.85 },
+    courage: 0.35,
+    designs: [
+      cumanDesign('Steel, iron face, crimson coat', { steel: '#a4a9b2', coat: '#7a1a22', sash: '#d0802a', belt: '#7a1a22', mask: 'kipchak' }),
+      cumanDesign('Dark steel, iron face, blue coat', { steel: '#6f737a', coat: '#24365a', sash: '#a83a1e', belt: '#3a2216', mask: 'kipchak' }),
+      // A lord's: the gilt half-mask (horde) and a gilt band, brass on his straps.
+      cumanDesign('Steel and gilt half-mask, green coat', { steel: '#a4a9b2', coat: '#2f4a32', sash: '#c9a23a', belt: '#5a1a14', mask: 'horde', gold: '#c9a23a' }),
+    ],
+  },
   // ---- The horse peoples and the armies that met them (the Battle Mode levels of
   // Mobei, the Catalaunian Plains and Carrhae): the Xiongnu and the Huns, horse
   // archers in felt and leather; the late Roman foot and the Visigoths of 451;
@@ -2682,7 +2740,7 @@ export const FACTIONS = {
   chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, lamellarCord: '#9e1a1c', blurb: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.' },
   // The Later Jin's Eight Banners (the Qing's after 1636): led under the plain yellow banner, Nurhaci's own.
   manchu: { label: 'Eight Banners', glyph: '🚩', standard: { weapon: 'banner', colour: '#d9a524' }, lamellarCord: '#9e1a1c', blurb: 'The Later Jin of Nurhaci: banner men in studded coats of plates under the black helmet, with the heavy Manchu bow, saber, spear and guandao; the Bayara guard on horse.' },
-  steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, lamellarCord: '#e9e2d0', blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, hardened leather lamellar, sabre, mace and composite bow; the Khan\'s kheshig in gilt scale.' },
+  steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, lamellarCord: '#e9e2d0', blurb: 'Mongol, Oirat and Timurid warriors: archers in the deel, hardened leather lamellar, sabre, mace and composite bow; the Khan\'s kheshig in gilt scale; the Cumans of the Kipchak steppe in plated mail and the masked helmet.' },
   // Keyed `ottomans` (saves and levels name it); it holds the Turkish and Kurdish sultanates both, Saladin's Ayyubids of the 1100s and the Ottomans after them.
   ottomans: { label: 'Sultanates', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: 'Saladin\'s Ayyubids and the Ottoman Turks: Saladin in kazaghand and turbaned helmet; the Sultan\'s azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.' },
   gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.' },

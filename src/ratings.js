@@ -8,6 +8,41 @@ export const RATINGS = {
  "bouts": 16,
  "totalBouts": 6210,
  "characters": {
+  "cuman": {
+   "title": "Konchak",
+   "faction": "steppe",
+   "type": "cumanBow|cumanHeavy",
+   "records": {
+    "maximus": {
+     "wins": 5,
+     "losses": 1,
+     "draws": 0
+    },
+    "kheshig": {
+     "wins": 6,
+     "losses": 0,
+     "draws": 0
+    },
+    "steppeShield": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "sipahi": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    }
+   },
+   "score": 209,
+   "provisional": 209,
+   "kd": {
+    "maximus": 3.667,
+    "kheshig": 13,
+    "steppeShield": 0.077,
+    "sipahi": 0.077
+   }
+  },
   "bayara": {
    "title": "Yangguri",
    "faction": "manchu",
@@ -2261,6 +2296,7 @@ export const RATINGS = {
   "manchuBow|bannerArmour": 89,
   "guandao|bannerArmour": 72,
   "spear|bannerArmour": 74,
+  "cumanBow|cumanHeavy": 209,
   "street|casual": 6,
   "whip|lorarius": 27,
   "kickboxing|boxing": 8.4,

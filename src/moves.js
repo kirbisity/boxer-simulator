@@ -1959,6 +1959,15 @@ STYLES.kheshigBow = {
   ranged: { ...STYLES.steppeBow.ranged, between: [0.25, 0.4], holdGround: true, charge: 3, volley: 5 },
 };
 
+// A Cuman of a khan's retinue: the heavy horse archer's way, as the kheshig's (a quick volley standing his ground, then
+// in), the bow let fall for the sabre at his belt (his kit's sidearm), not a mace: the Cumans' graves hold the sabre.
+STYLES.cumanBow = {
+  ...STYLES.kheshigBow,
+  label: 'Cuman: bow and sabre',
+  // (As the bow's: his kit's sidearm first, rearm in physics.js.)
+  fallback: 'mix',
+};
+
 // The Bayara (the banners' guard): a few heavy arrows from the Manchu bow at close range, standing his ground, then the
 // bow let fall and straight in with the saber at his belt (his kit's sidearm), as the guard rode into a broken line.
 STYLES.bayaraBow = {
