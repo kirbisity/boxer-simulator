@@ -14,9 +14,9 @@
 
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
-import { ACTIONS, CONTROL, contextAction, crawlReady, lockCandidate, moveName, toggleCrawl } from './control.js';
+import { ACTIONS, CONTROL, contextAction, crawlReady, horseAction, lockCandidate, moveName, toggleCrawl } from './control.js';
 import { createRecognizer, GESTURE, screenZone } from './gesture.js';
-import { inFight, jumpNow, opponentFor, point, reachOf } from './physics.js';
+import { inFight, jumpNow, opponentFor, point, reachOf, sidearmSwapReady } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
 import { FIGHT_UI_CONTROL_ICONS } from './fightui/icons.js';
 import { fightUiCommandBar } from './fightui/command.js';
@@ -80,6 +80,14 @@ export function installFightControls(root, hooks) {
   const art = root.appendChild(uiElement('button', 'fight-button art-button'));
   art.innerHTML = '<b>✦</b><span class="label">Art</span><span class="why"></span><kbd>P</kbd>';
   art.hidden = true;
+  // The sidearm (the bow slung for it, and back: physics.js swapSidearm) and the horse (down from it, up onto one beside him:
+  // physics/mounted.js): small, beside the right-hand stack, there only while they can be pressed.
+  const swap = root.appendChild(uiElement('button', 'fight-button swap-button'));
+  swap.innerHTML = '<b>🗡</b><span class="label">Sidearm</span><kbd>.</kbd>';
+  swap.hidden = true;
+  const horseButton = root.appendChild(uiElement('button', 'fight-button horse-button'));
+  horseButton.innerHTML = '<b>🐎</b><span class="label">Dismount</span><kbd>/</kbd>';
+  horseButton.hidden = true;
   const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
   lock.innerHTML = '<b>◎</b><span class="label">Lock</span><span class="who"></span>';
   // Jump (above Lock) and Crawl (below Guard): round, in the right-hand stack.
@@ -274,7 +282,7 @@ export function installFightControls(root, hooks) {
   surface.addEventListener('lostpointercapture', drop);
   // No callout, selection, context menu or page zoom from the fight.
   for (const kind of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart', 'dblclick']) {
-    for (const target of [surface, guard, action, art, lock, jump, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
+    for (const target of [surface, guard, action, art, swap, horseButton, lock, jump, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
   }
 
   // Guard: held, the block; tapped, an evasion.
@@ -335,6 +343,26 @@ export function installFightControls(root, hooks) {
     pressCrawl();
     navigator.vibrate?.(12);
   });
+
+  // The sidearm and the horse: asked for with the orders, as the art is.
+  swap.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    if (active && !swap.hidden) askKit('swapWeapon');
+  });
+  horseButton.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    const name = horseAction(hooks.world(), hooks.player());
+    if (active && name) askKit(name);
+  });
+
+  /** The sidearm or the horse asked for (their buttons, or . and /): carried out with the orders (control.js doAction). */
+  function askKit(name) {
+    if (!name) return false;
+    (hooks.orders().actions ??= []).push(name);
+    signal('action', name);
+    navigator.vibrate?.(12);
+    return true;
+  }
 
   /** His weapon's art asked for (its button, or P): carried out with the orders, if it is charged (weaponarts.js). */
   function askArt() {
@@ -453,6 +481,17 @@ export function installFightControls(root, hooks) {
       art.querySelector('.why').textContent = winded ? 'winded' : '';
       art.setAttribute('aria-label', grenade ? `${label}: throw it` : winded ? `${label}: weapon art, too winded` : `${label}: weapon art`);
     }
+    // The sidearm button: while the bow can be slung for it (or taken up again); the horse button: while he can get down or up.
+    const swapping = sidearmSwapReady(me);
+    if (swap.hidden === swapping) swap.hidden = !swapping;
+    if (swapping) {
+      const label = me.stowed ? (me.stowed.weapon?.spec.label ?? 'Bow') : 'Sidearm';
+      if (swap.querySelector('.label').textContent !== label) swap.querySelector('.label').textContent = label;
+      swap.querySelector('b').textContent = me.stowed ? '🏹' : '🗡';
+    }
+    const riding = horseAction(world, me);
+    if (horseButton.hidden === Boolean(riding)) horseButton.hidden = !riding;
+    if (riding) horseButton.querySelector('.label').textContent = ACTIONS[riding].label;
     const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
     lock.classList.toggle('on', Boolean(locked));
     lock.querySelector('.label').textContent = locked ? 'Unlock' : 'Lock';
@@ -519,7 +558,7 @@ export function installFightControls(root, hooks) {
     commandBar.reset();
   }
 
-  return { update, setActive, reset, toggleLock, jump: askJump, toggleCrawl: pressCrawl, art: askArt, setDevice, get device() { return device; }, fightUi: fightUi.choose };
+  return { update, setActive, reset, toggleLock, jump: askJump, toggleCrawl: pressCrawl, art: askArt, swapWeapon: () => (sidearmSwapReady(hooks.player()) ? askKit('swapWeapon') : false), horse: () => askKit(horseAction(hooks.world(), hooks.player())), setDevice, get device() { return device; }, fightUi: fightUi.choose };
 }
 
 /** Keep a pointer's events coming here even off the element (a pointer the browser no longer knows is let be). */

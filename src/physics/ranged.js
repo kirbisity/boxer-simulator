@@ -554,6 +554,14 @@ function arrowBleed(victim, hit, key, through, scale) {
   return { rate: spec.rate.muscle * through * scale, what: null };
 }
 
+/** What a man's rigid armour is proof against, J (ARROW.rigidProof): plate's (the more for a kit rated against shot), or lamellar's. */
+function rigidProofOf(victim) {
+  const spec = ARROW.rigidProof;
+  const outfit = OUTFITS[outfitOf(victim.body.inputs).kind];
+  if (!outfit?.plated) return spec.lamellar;
+  return Math.max(spec.plate, spec.plateShare * (outfit.bulletRating ?? 0));
+}
+
 /**
  * An arrow strikes: off a shield, or off good armour (most of the time),
  * it glances; otherwise a piercing wound (cut by the armour's pierce
@@ -589,18 +597,25 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   }
   // Proof against arrows only where it is rigid (cut-proof plate or lamellar): an arm or leg left open is not.
   const proof = gear.arrowproof && (hit.throat || (protectionAt(gear, key).cut ?? 0) >= BLADES.gaps.rigidFrom);
+  const joules = energy * ARROW.joules;
+  let punched = 0;
   if (proof && world.random() < bounce) {
-    event.bounced = true;
-    event.effects.push('glances off the armour');
-    return;
+    // Heavy enough, it goes through the plate or the lamellae where it would have glanced (ARROW.rigidProof).
+    const rigid = rigidProofOf(victim);
+    if (!(world.random() < Math.max(0, (joules - rigid) / rigid))) {
+      event.bounced = true;
+      event.effects.push('glances off the armour');
+      return;
+    }
+    punched = Math.min(1, rigid / joules);
   }
   const region = hit.throat ? 'head' : bulletRegion(key);
   // Full armour (plate, lamellar) guards the throat with its gorget or aventail; a vest does not.
   // Short of plate, armour (mail, brigandine, a padded coat) stops its share of a war arrow's point, and of a heavier arrow only
   // as much as it is proof against (ARROW.proofJoules), as against a ball (bulletProof): a heavy bodkin or a crossbow's bolt
-  // drives the further through mail. Plate is not pierced: an arrow finds its gaps or glances (above).
-  const joules = energy * ARROW.joules;
-  const stopped = proof ? 1 - ARROW.gapHarm : hit.throat ? 0 : (protectionAt(gear, key).pierce ?? 0) * Math.min(1, ARROW.proofJoules / Math.max(1e-6, joules));
+  // drives the further through mail. Plate is pierced only by what is heavier than it is proof against (above, `punched`: what
+  // the plate took of it); else an arrow finds its gaps.
+  const stopped = punched ? punched : proof ? 1 - ARROW.gapHarm : hit.throat ? 0 : (protectionAt(gear, key).pierce ?? 0) * Math.min(1, ARROW.proofJoules / Math.max(1e-6, joules));
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
@@ -616,7 +631,7 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   Object.assign(event, { harm, region, pierce: harm * 60 });
   // Heard: the wound, as bad as its share of what kills.
   if (world.ear && harm > 0) soundWound(world, victim, 'stab', Math.min(1, harm), hit.point);
-  event.effects.push(proof ? `${region}: through a gap` : `${region}`);
+  event.effects.push(punched ? `${region}: through the armour` : proof ? `${region}: through a gap` : `${region}`);
   shooter.stats.landed += 1;
   if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key) && world.random() < 0.3) dropWeapon(world, victim, 'disarmed', dir);
   if (victim.gunshot >= 1 && victim.state !== 'out') knockOut(world, victim, event, region === 'head' ? 'an arrow through the head' : 'shot down by arrows', 'killed');
@@ -865,6 +880,17 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   // as it is proof against. The throat is covered only by full armour's gorget, as the body.
   const covered = hit.throat ? (victim.body.gear.arrowproof ? victim.body.gear.protection.bullet?.torso ?? 0 : 0) : victim.body.gear.protection.bullet?.[region] ?? 0;
   const armour = covered * (shot ? bulletProof(OUTFITS[kind].bulletRating, shot.energy) : 1);
+  // Plate proof against the ball (a plated kit rated at or past its energy: a short-barrelled three-eyed gun's on a harness) is not
+  // gone through: the ball dents it, staggers him, and on the helmet stuns him (GUN.plateKnock), and wounds nothing.
+  if (shot && covered > 0 && OUTFITS[kind].plated && (OUTFITS[kind].bulletRating ?? GUN.energy) >= shot.energy) {
+    Object.assign(event, { harm: 0, armour: 1, region, plate: kind });
+    event.effects.push(`${region}: the ball dents the plate`);
+    shooter.stats.landed += 1;
+    world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: shot.impulse ?? GUN.impulse });
+    if (region === 'head') victim.stun = Math.max(victim.stun ?? 0, GUN.plateKnock.stun * shot.energy / GUN.energy);
+    stagger(world, victim, WORLD.stagger.startAt + GUN.plateKnock.stagger * shot.energy / GUN.energy, event, true);
+    return;
+  }
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;

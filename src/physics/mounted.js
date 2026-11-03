@@ -18,7 +18,7 @@ import { BARDING, bardingAt, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
 import { DOG_JUMP } from '../robotdogs.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact } from '../weapons.js';
-import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
+import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
 
@@ -1051,6 +1051,60 @@ export function unhorse(world, fighter, reason, thrown, lost = null, carried = 1
     fighter.downTimer = WORLD.balance.fallSeconds;
   }
   world.events.push({ time: world.time, kind: 'unhorsed', fighter: fighter.id, horse: horse.id, effects: [reason] });
+}
+
+/** Whether he can get down from his horse now: in the saddle, up, and the horse at a walk or slower (WORLD.mount.dismount). */
+export function dismountReady(fighter) {
+  const horse = fighter.mount;
+  return Boolean(horse && fighter.state === 'up' && horse.state === 'up' && !horse.air && Math.abs(horse.speed) <= WORLD.mount.dismount.speed);
+}
+
+/** He gets down from his horse of his own will, onto his feet beside it on the side away from his weapon hand; the horse stands. */
+export function dismount(world, fighter) {
+  if (!dismountReady(fighter)) return false;
+  const horse = fighter.mount;
+  const side = yawRotate([0, 0, 1], horse.yaw);
+  const at = [horse.at[0] + side[0] * WORLD.mount.dismount.beside, horse.at[1] + side[2] * WORLD.mount.dismount.beside];
+  unhorse(world, fighter, 'gets down from his horse', false);
+  // (Not bolting: a horse its rider got down from stands where it is.)
+  horse.boltUntil = world.time;
+  horse.goal = { heading: horse.yaw, speed: 0 };
+  placeFighter(fighter, at[0], at[1]);
+  fighter.yaw = horse.yaw;
+  return true;
+}
+
+/** The riderless horse standing within reach of a man on his feet (WORLD.mount.dismount.reach), nearest first; null if none. */
+export function horseToMount(world, fighter) {
+  if (fighter.mount || fighter.state !== 'up' || fighter.crawling || fighter.punch || fighter.clinch) return null;
+  const at = point(fighter.x, P.pelvis);
+  let best = null;
+  let bestDistance = WORLD.mount.dismount.reach;
+  for (const horse of world.horses ?? []) {
+    if (horse.state !== 'up' || horse.rider !== null || Math.abs(horse.speed) > WORLD.mount.dismount.speed || horse.air) continue;
+    const distance = Math.hypot(horse.at[0] - at[0], horse.at[1] - at[2]);
+    if (distance < bestDistance) {
+      best = horse;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+/** Up into the saddle of a riderless horse beside him (horseToMount): it is his now, whoever rode it. */
+export function mountHorse(world, fighter, horse = horseToMount(world, fighter)) {
+  if (!horse || horseToMount(world, fighter) !== horse) return false;
+  horse.rider = fighter.id;
+  horse.corner = fighter.corner;
+  horse.goal = { heading: horse.yaw, speed: 0 };
+  horse.boltUntil = -1;
+  fighter.mount = horse;
+  fighter.yaw = horse.yaw;
+  fighter.running = false;
+  fighter.runMode = false;
+  seatRider(fighter, 1 / 60, true);
+  world.events.push({ time: world.time, kind: 'mounted', fighter: fighter.id, horse: horse.id, effects: ['swings up into the saddle'] });
+  return true;
 }
 
 /** A riderless horse: off at a canter away from the nearest man for a while, then it stands. */

@@ -511,6 +511,13 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 /* The buttons' column at the right edge, bottom to top: Crawl, Guard, Lock, Jump, the special action (each centred on the Guard's middle, 62px in). */
 .action-button { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 346px); width: 76px; height: 76px; }
 /* Jump (above Lock) and Crawl (below Guard): round, ringed like Guard; Crawl lit while he crawls, either greyed when it cannot be pressed. */
+.swap-button, .horse-button { right: calc(110px + env(safe-area-inset-right, 0px)); width: 58px; height: 58px; }
+.swap-button { bottom: calc(var(--controls-height, 56px) + 272px); }
+.horse-button { bottom: calc(var(--controls-height, 56px) + 352px); }
+.swap-button b, .horse-button b { font-size: 20px; }
+.swap-button .label, .horse-button .label { font-size: 9px; max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.swap-button kbd, .horse-button kbd { display: none; position: absolute; left: -4px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: 5px; background: rgba(10, 12, 18, 0.85); border: 1px solid rgba(255, 255, 255, 0.3); font: 600 9px var(--mono); color: var(--muted); }
+.fight-ui[data-device="mouse"] .swap-button kbd, .fight-ui[data-device="mouse"] .horse-button kbd { display: block; }
 .jump-button { right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 268px); width: 68px; height: 68px; }
 .crawl-button { right: calc(31px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 6px); width: 62px; height: 62px; }
 .jump-button b, .crawl-button b { display: block; width: 30px; height: 30px; }

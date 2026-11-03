@@ -1843,6 +1843,14 @@ window.addEventListener('keydown', (press) => {
       (state.orders.actions ??= []).push(action);
       tutorial.signal('action', action);
     }
+  } else if (key === '.') {
+    // The bow slung for the sidearm, and back (its button's).
+    press.preventDefault();
+    fightControls.swapWeapon?.();
+  } else if (key === '/') {
+    // Down from the horse, or up onto one beside him (its button's).
+    press.preventDefault();
+    fightControls.horse?.();
   } else if (key === ART_KEY) {
     // His weapon's art, whenever it is charged (its own button; F stays the special action's).
     press.preventDefault();

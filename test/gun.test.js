@@ -186,7 +186,8 @@ test('arrows fly, wound an unarmoured man, and mostly glance off plate', () => {
     return { wounds: hits.filter((event) => !event.bounced).length, glances: hits.filter((event) => event.bounced).length, target };
   };
   const bare = shoot(null);
-  assert.ok(bare.wounds >= 2, `${bare.wounds} wounds`);
+  // (A war arrow in the bare trunk drops him: one may be all it takes.)
+  assert.ok(bare.wounds >= 2 || (bare.wounds >= 1 && bare.target.state === 'out'), `${bare.wounds} wounds`);
   const plate = shoot('knight');
   assert.ok(plate.glances > plate.wounds, `plate: ${plate.glances} glanced, ${plate.wounds} through`);
 });

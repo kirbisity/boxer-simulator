@@ -26,8 +26,8 @@ import { vec } from './pose.js';
 // counted; physics/ranged.js ammoLeft): a crossbowman's quiver held ~18-20 bolts (the Genoese at Crécy, the
 // inventories of the Italian communes' companies). The Han nu-men's sheaves were bigger, ~50 (Li Ling's five
 // thousand loosed half a million bolts in a day, ~100 a man, the rest from the carts: SUPPLY).
-export const CROSSBOW = { bolt: true, speed: 50, energy: 1.7, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8, ammo: 20 };
-export const NU = { ...CROSSBOW, speed: 48, energy: 1.45, length: 0.42, bounce: 0.78, reloadSeconds: 6, ammo: 50 };
+export const CROSSBOW = { bolt: true, speed: 50, energy: 2, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8, ammo: 30 };
+export const NU = { ...CROSSBOW, speed: 48, energy: 1.6, length: 0.42, bounce: 0.78, reloadSeconds: 6, ammo: 75 };
 
 /**
  * A matchlock's shot, for its realism. A lead ball of ~13 g leaves the
@@ -125,7 +125,9 @@ export const MATCHLOCK = {
  * Dimensions are estimates (the sources give none): ~1.3 m, ~4 kg.
  */
 export const THREE_EYED = {
-  energy: 350,
+  // Its barrels are short (~30 cm, a hand cannon's): the charge burns out of the muzzle before it has driven the ball far, ~200 J
+  // (it was 350): proof plate holds it (a plated kit rated past it: physics/ranged.js bulletHit), it bruises and stuns.
+  energy: 200,
   lethal: { head: 0.95, torso: 0.6, limb: 0.25 },
   bleed: { head: 0.0016, torso: 0.0024, limb: 0.001 },
   limbBreak: 0.25,
@@ -612,8 +614,8 @@ export const WEAPONS = {
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.5, grip: 0.4, ranged: true, bow: true,
     // A war bow's draw weight (a yumi of ~26 kgf).
     drawN: 260,
-    // The arrows a foot archer carries (`ammo`, a kit's `quiver` before it): a sheaf of 24, a quiver's worth.
-    ammo: 24,
+    // The arrows a foot archer carries (`ammo`, a kit's `quiver` before it): a sheaf of 24 and a second in the belt, 36.
+    ammo: 36,
   },
   // The steppe composite bow (Mongol, Turkish): short and sharply recurved,
   // horn, wood and sinew, a heavy draw; it casts the same arrow faster than
@@ -626,7 +628,7 @@ export const WEAPONS = {
     // The steppe bow's heavier draw (~34 kgf, ~75 lb).
     drawN: 330,
     // The steppe quiver: thirty to forty arrows (the Strategikon's; a horse archer's kit says its own, outfits.js `quiver`).
-    ammo: 36,
+    ammo: 54,
   },
   // The yumi: the Japanese war bow, over two metres of laminated bamboo
   // and wood bound in rattan, gripped a third of the way up (`handle` the
@@ -638,7 +640,7 @@ export const WEAPONS = {
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
     drawN: 340,
     // The ebira (the quiver on the back) held ~24 arrows.
-    ammo: 24,
+    ammo: 36,
   },
   // ---- Agincourt, Cerignola (the battle maps of 1415 and 1503) ----
   // The English war bow (the longbow of the Mary Rose's ~140 staves): a self bow of yew about 1.9 m long,
@@ -654,7 +656,7 @@ export const WEAPONS = {
     drawN: 600, arrowSpeed: 52, arrowEnergy: 1.3,
     // Two sheaves of 24 (a sheaf at the belt and one stuck in the ground before him), the more brought up to the line by
     // the boys of the baggage (SUPPLY).
-    ammo: 48,
+    ammo: 72,
   },
   // The pike of the Swiss and the Landsknechts (and Gonzalo's Germans at Cerignola): an ash shaft of 5 m
   // (16–18 ft), a small leaf head on long langets, ~3.5 kg; held with both hands a third of the way up from
@@ -1387,6 +1389,9 @@ export const GUN = {
   energy: 520,
   // A heavy ball is seen to strike the armour (and not to enter) only where it stopped this much.
   platedHolds: 0.45,
+  // A ball the plate is proof against (physics/ranged.js bulletHit): it stuns for `stun` s on the helmet and staggers by `stagger`,
+  // each for a ball of GUN.energy and in proportion to its own.
+  plateKnock: { stun: 2, stagger: 0.5 },
 };
 
 /** The share of an outfit's bullet protection that holds against a shot of `energy` J. */
@@ -1405,7 +1410,9 @@ export function bulletProof(bulletRating, energy = GUN.energy) {
  */
 export const ARROW = {
   speed: 55, gravity: 9.81, spread: 0.02, length: 0.8,
-  lethal: { head: 0.85, torso: 0.4, limb: 0.13 },
+  // (Of what takes an 80 kg man out of the fight, as GUN's: a war arrow into a bare head or a bare trunk drops him, one in a limb
+  // a quarter of the way; raised 2026-11-03 from 0.85, 0.4, 0.13, at which a peasant took four arrows in the body.)
+  lethal: { head: 1.1, torso: 1, limb: 0.25 },
   // How an arrow (or a bolt) wound bleeds: by what it went through. The shaft and head stay in the track and plug
   // it, and the track is narrow (a point, not a ball's cavity), so through muscle and the body's soft parts a man
   // bleeds slowly, over hours (the surgeons of the Hundred Years' War and of the Napoleonic wars both drew arrows
@@ -1437,6 +1444,12 @@ export const ARROW = {
   // share × proofJoules / the arrow's (physics/ranged.js arrowHit): mail and its padding hold a ~100 J war arrow to a shallow
   // wound, a heavy war bow's ~130 J bodkin a little less so, a crossbow's ~170 J bolt drives on through a good deal deeper.
   proofJoules: 100,
+  // Rigid armour (plate, lamellar: `arrowproof`) a missile glances from or finds a gap in, unless it carries more than the armour
+  // is proof against: `rigidProof` J, plate's by its thickness (`plated`; a kit rated against balls, bulletRating, at `plateShare`
+  // of that when it is more) and lamellar's; past it, a share (joules − proof) / proof of the strikes that would glance goes
+  // through, spending proof / joules of itself on the armour. A war arrow (100-130 J) never does; a crossbow's 200 J bolt goes
+  // through lamellar a quarter of the time and thin plate a tenth; a harness proofed against shot, not at all.
+  rigidProof: { plate: 180, lamellar: 160, plateShare: 0.3 },
   // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (within `clear` m of its
   // line) by `above` m, at an elevation of `most` rad at most (the massed archery of a deep line: the rear ranks lob).
   over: { clear: 0.6, above: 0.35, most: 0.75 },

@@ -7,7 +7,8 @@
 import { P } from './body.js';
 import { AI, chooseDefence, hurtShare } from './ai.js';
 import { DEFENCES, MOVES, pointRoomOf, STYLES, moveRange } from './moves.js';
-import { aimPoint, BLOCKS, dropWeapon, holdGuard, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, throwPunch, WORLD } from './physics.js';
+import { aimPoint, BLOCKS, dropWeapon, holdGuard, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
+import { dismount, dismountReady, horseToMount, mountHorse } from './physics/mounted.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
@@ -937,7 +938,19 @@ export const ACTIONS = {
   // His weapon's art (weaponarts.js): not the special button's (it has its own, shown while the art is charged), but asked
   // for the same way, in `orders.actions`; its button names it (weaponarts.js artLabel).
   art: { label: 'Weapon art', icon: '✦' },
+  // Their own buttons too, apart from the special one (touch.js): the bow slung for the sidearm and back (physics.js swapSidearm),
+  // and getting down from a horse or up onto one (physics/mounted.js).
+  swapWeapon: { label: 'Sidearm', icon: '🗡' },
+  dismount: { label: 'Dismount', icon: '🐎' },
+  mount: { label: 'Mount', icon: '🐎' },
 };
+
+/** What the horse button does now: get down from his horse, up onto one beside him, or nothing. */
+export function horseAction(world, fighter) {
+  if (!fighter) return null;
+  if (fighter.mount) return dismountReady(fighter) ? 'dismount' : null;
+  return horseToMount(world, fighter) ? 'mount' : null;
+}
 
 /** Who holds him in a clinch, if anyone. */
 function holder(world, fighter) {
@@ -1060,6 +1073,9 @@ function steepUnder(world, fighter) {
 export function doAction(world, fighter, name) {
   // His weapon's art has its own button, apart from the special one: made whenever it is charged (weaponarts.js).
   if (name === 'art') return Boolean(fighter) && startArt(world, fighter);
+  if (name === 'swapWeapon') return Boolean(fighter) && swapSidearm(world, fighter);
+  if (name === 'dismount') return Boolean(fighter) && dismount(world, fighter);
+  if (name === 'mount') return Boolean(fighter) && mountHorse(world, fighter);
   if (!fighter || name !== contextAction(world, fighter)) return false;
   const style = STYLES[fighter.style];
   const opponent = opponentFor(world, fighter);
@@ -1091,6 +1107,8 @@ export function doAction(world, fighter, name) {
     return Boolean(move) && throwPunch(world, fighter, move, 'body');
   }
   if (name === 'drawSidearm') {
+    // The bow slung, not let fall (swapSidearm); one he cannot sling (a stake, a spent weapon) is let fall.
+    if (swapSidearm(world, fighter)) return true;
     dropWeapon(world, fighter, 'dropped');
     return true;
   }

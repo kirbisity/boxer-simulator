@@ -30,7 +30,7 @@ test('orders are for a side of four or more: not a one-on-one; every battle begi
   assert.equal(COMMAND.minSide, 4);
 });
 
-test('To me: his men leave the ranks and gather round him, all within a few metres, and stand there', () => {
+test('To me: his men leave the ranks and gather round him, all within a few metres', () => {
   const { world, player, men } = legion();
   const before = mean(men.map((fighter) => apart(at(fighter), at(player))));
   giveOrder(world, player, 'rally');
@@ -40,9 +40,8 @@ test('To me: his men leave the ranks and gather round him, all within a few metr
   const after = up.map((fighter) => apart(at(fighter), at(player)));
   assert.ok(mean(after) < 3.5 && mean(after) < before, `mean ${mean(after).toFixed(2)} m (was ${before.toFixed(2)})`);
   assert.ok(after.every((distance) => distance < 6), `all within 6 m: ${after.map((distance) => distance.toFixed(1)).join(' ')}`);
-  // Arrived, they stand (not milling about).
-  const speeds = up.map((fighter) => Math.hypot(...fighter.rootVelocity));
-  assert.ok(mean(speeds) < 0.4, `standing: ${mean(speeds).toFixed(2)} m/s`);
+  // (That they then stand still is not asserted: the Han crossbows shoot into them all the while, and since bolts drop a man
+  // (2026-11-03) the circle keeps closing up round the fallen.)
 });
 
 test('To me in a loose crowd (no drill): the raiders gather round their man', () => {

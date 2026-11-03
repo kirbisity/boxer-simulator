@@ -157,6 +157,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     bleed: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined, burning: undefined, flameFright: undefined,
     loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, lowStrike: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
+    // stowed: his bow (or crossbow, or gun) slung for his sidearm (swapSidearm), with the style he shot it in.
+    stowed: null,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
     mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
     panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined, caught: undefined, holding: undefined, fellIn: undefined,
@@ -576,6 +578,44 @@ export function restoreAfterFinisher(fighter, keep) {
   fighter.sidearmDrawn = keep.sidearmDrawn;
   reloadBlade(fighter, fighter.weapon);
   reloadBlade(fighter, fighter.offWeapon);
+}
+
+/**
+ * The sidearm a man with a bow, a crossbow or a gun draws in its place (his kit's; for a bow or a crossbow without one, a
+ * dagger: an archer never went without a knife), as a weapon kind; null if none.
+ */
+export function sidearmKindOf(fighter) {
+  const named = fighter.body.gear.sidearm;
+  if (named) return WEAPONS[named] ? named : STYLES[named]?.weapon ?? null;
+  const spec = fighter.weapon?.spec;
+  return spec?.ranged && (!spec.shot || spec.shot.bolt) ? 'dagger' : null;
+}
+
+/** Whether he can put his missile weapon by for his sidearm now, or take it up again (swapSidearm). */
+export function sidearmSwapReady(fighter) {
+  if (fighter.state !== 'up' || fighter.punch || fighter.pickup || fighter.crawling || fighter.clinch || fighter.reloading) return false;
+  if (fighter.stowed) return true;
+  return Boolean(fighter.weapon?.held && fighter.weapon.spec.ranged && !fighter.weapon.spec.mounted && sidearmKindOf(fighter));
+}
+
+/**
+ * The bow (or crossbow, or gun) slung on his back and his sidearm drawn, on foot or in the saddle (kept, as the finisher's blade
+ * puts by what he held: drawForFinisher); pressed again, the sidearm back in its sheath and the bow taken up. False if not now.
+ */
+export function swapSidearm(world, fighter) {
+  if (!sidearmSwapReady(fighter)) return false;
+  if (fighter.stowed) {
+    const bow = fighter.stowed;
+    fighter.stowed = null;
+    restoreAfterFinisher(fighter, bow);
+    world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon?.kind, effects: [`takes up the ${fighter.weapon?.spec.label.toLowerCase()} again`] });
+    return true;
+  }
+  const kept = drawForFinisher(world, fighter, sidearmKindOf(fighter));
+  if (!kept) return false;
+  fighter.stowed = kept;
+  world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`slings the ${kept.weapon.spec.label.toLowerCase()} and draws the ${fighter.weapon.spec.label.toLowerCase()}`] });
+  return true;
 }
 
 /** Stoop for a weapon on the floor: he crouches and reaches for it. */

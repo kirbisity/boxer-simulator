@@ -1147,6 +1147,9 @@ export const WORLD = {
   //   hardly ever leaned; at 0.6 he leans for the men a little further out (to ~40° at most) and the cuts meet them.
   mount: {
     startApart: 12,
+    // Getting down and up of his own will (physics/mounted.js dismount, mountHorse; the player's horse button): only with the horse
+    // at `speed` m/s or slower (a walk), set down `beside` m off its side; a riderless horse standing within `reach` m is mounted.
+    dismount: { speed: 1.8, beside: 0.9, reach: 1.6 },
     line: { spacing: 3, rankBack: 5, margin: 1.5 },
     seat: { speed: 3.8, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
     reach: { easy: 0.6, most: 0.7, steps: 14, inHz: 3, outHz: 1.2, damping: 1, seat: 0.35 },
