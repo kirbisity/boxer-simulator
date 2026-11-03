@@ -296,22 +296,24 @@ function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
 // The Eight Banners (the Later Jin's, 1615 on; the Qing's): the banner's coat in its colour (`cloth`), bound in its
 // border (`trim`: red, or white on the red banner; a plain banner's bound in its own colour, a shade darker), the
 // sleeves of the same studded cloth, the dark red robe beneath showing at the hem; the black helmet and its hood of
-// the coat's cloth, the hood's edges bound in the border too (chinahelms.js QING_HELMS bannerBowl, wardrobe.js qingHelm).
+// the coat's cloth (`hoodStuff` its stuff, the coat's cotton), studded as the coat is, the hood's edges bound in the
+// border too (chinahelms.js QING_HELMS bannerBowl and QING_HOOD, wardrobe.js qingHelm).
 function bannerDesign(label, cloth, trim = null) {
   return {
     label, top: { kind: 'longsleeve', color: shade(cloth, 0.85) }, bottom: { kind: 'pants', color: '#4a1418' },
     armor: { kind: 'bannerCoat', color: '#8f949b', cloth, cloth2: trim ?? shade(cloth, 0.82), gold: '#a88a3c', leather: '#2a1d14' },
-    head: { kind: 'qingHelm', design: 'bannerBowl', color: '#17171b', gold: '#a88a3c', coif: cloth, ...(trim ? { trim } : {}) },
+    head: { kind: 'qingHelm', design: 'bannerBowl', color: '#17171b', gold: '#a88a3c', coif: cloth, hoodStuff: 'cotton', ...(trim ? { trim } : {}) },
     feet: { kind: 'compactBoot', color: '#141416' },
   };
 }
 // The Bayara's: the same coat in a banner's brocade (`cloth`), bound in a darker silk (`trim`), gilt rivets, the steel
-// mirror, gilt shoulder plates and steel arm guards (loftbody.js bayaraCoat); the steel and gilt helmet, its hood of the coat's brocade.
+// mirror, gilt shoulder plates and steel arm guards (loftbody.js bayaraCoat); the steel and gilt helmet, its hood of the coat's
+// brocade (its cloud silk, `hoodStuff`).
 function bayaraDesign(label, cloth, trim) {
   return {
     label, top: { kind: 'longsleeve', color: shade(cloth, 0.8) }, bottom: { kind: 'pants', color: '#4a1418' },
     armor: { kind: 'bayaraCoat', color: '#b4bac3', cloth, cloth2: trim, gold: '#d2aa4c', leather: '#2a1d14' },
-    head: { kind: 'qingHelm', design: 'bayaraBowl', color: '#c3c8cf', gold: '#d2aa4c', coif: cloth, trim },
+    head: { kind: 'qingHelm', design: 'bayaraBowl', color: '#c3c8cf', gold: '#d2aa4c', coif: cloth, hoodStuff: 'cloudSilk', trim },
     feet: { kind: 'compactBoot', color: '#141416' },
   };
 }

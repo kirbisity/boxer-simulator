@@ -104,6 +104,10 @@ export const LOFT = {
   // A brigandine's rivet heads: three rows to a ring, each `size` of its column
   // across (and as tall, along the piece), a hair proud of the cloth.
   studs: { rowsPerRing: 3, size: 0.3, tall: 0.07, lift: 0.012 },
+  // A coat's skirt split into two leg panels with the front panel over the split (`legs`, legPanelsOn): the skirt drawn
+  // `fine` times as many sides round (so the splits are cut narrow), the front panel `finer` times, standing `stand` (share
+  // of the radius) out over the skirt; the bindings `wide` (rad round) and, across a panel's top, `deep` (places along).
+  legs: { fine: 2, finer: 4, stand: 0.025, wide: 0.07, deep: 0.22 },
   // A plate breastplate (`plate`, or a kit's `rigidBreastplate`: [waist, top]
   // up the trunk) is one rigid shell on the chest bone from its lower edge at
   // the waist to its top: the trunk under it, and whatever is worn between
@@ -202,7 +206,7 @@ function clothLoftUv(mesh, rings, sides, inflate, paint) {
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
-function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null, bend = null, uv = null, part = null, holes = null } = {}) {
+function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null, bend = null, uv = null, part = null, holes = null, weighAt = null } = {}) {
   const start = mesh.positions.length / 3;
   // A colour may be a pattern: a function of the ring (and its index), and
   // of the angle round it (0 at the front, as the depth axis points).
@@ -235,8 +239,11 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       mesh.positions.push(...p);
       // Weighted where the body's own surface is beneath it: cloth standing
       // off the skin would otherwise follow the bones less than the skin
-      // under it, and the skin would come through when a limb moves.
-      mesh.weightPositions.push(...vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(angle) * ring.depth), vec.scale(ring.widthAxis, Math.sin(angle) * ring.width))));
+      // under it, and the skin would come through when a limb moves. (Or,
+      // `weighAt`, where the body is beneath another angle round: a strip
+      // hung whole over a split, weighted as its middle, so it does not stretch.)
+      const weighed = weighAt ? weighAt(angle) : angle;
+      mesh.weightPositions.push(...vec.add(ring.center, vec.add(vec.scale(ring.depthAxis, Math.cos(weighed) * ring.depth), vec.scale(ring.widthAxis, Math.sin(weighed) * ring.width))));
       // (The seam's second column is painted as the first: the same place round.)
       mesh.colors.push(paint(ring, angle, ringIndex, step % sides));
       mesh.bones.push(bones(ring, Math.cos(angle)));
@@ -578,6 +585,11 @@ const ELITE_GORGET = [0.8, 1.0, 1.36, { lames: 3, base: 'steel2' }];
 // and lames down the upper arm (the forearm's to the wrist, in the kit).
 const ELITE_ARM = [[-0.24, 1.02, 1.42, { lames: 6, base: 'steel2' }], [-0.2, 0.38, 1.62, { lames: 3, base: 'steel2' }], [0.3, 0.62, 1.58, { lames: 3, base: 'steel2' }]];
 const BALTEUS = [0.04, 0.24, 1.14, { rows: ['steel', 'gold', 'steel'] }];
+// The banner coats' skirt in two leg panels (loftbody.js legSplit, legPanelsOn): split before and behind (`split`, the
+// half width round, rad) from below the apron's foot (`from`, t up the skirt), and the front panel from there down over
+// the split before (`front`: the t of its top, its half width round, rad).
+const BANNER_LEGS = { split: 0.16, from: -0.3, front: [-0.3, 0.26] };
+
 export const ARMOR_KINDS = {
   // Tosei gusoku: a solid cuirass of riveted horizontal steel lames, laced
   // skirt and sleeves, the war mask on the kabuto.
@@ -680,14 +692,17 @@ export const ARMOR_KINDS = {
   // that coat is (its cloth the banner's colour, its binding `cloth2` the banner's border: red, or white on the red
   // banner; on a plain banner the cloth's own colour), down the front too (`placket`, its half width round, rad);
   // hanging from the waist over the skirt the apron panel (`apron`: from, to along it, half its width round), bound
-  // in the same; the skirt long, split before, behind and at the sides; the studded shoulder guards; the sleeves of
-  // the same studded cloth to the wrist.
+  // in the same; the skirt long, in two leg panels, one over each leg, split before and behind and each bound at its
+  // edges, and over the split before the front panel (前裆) hanging from under the apron to the hem (`legs`:
+  // BANNER_LEGS; legPanelsOn; the user's photograph of a Qing armour, the strip down between the two halves); the
+  // studded shoulder guards; the sleeves of the same studded cloth to the wrist.
+  // (In a crowd the splits are painted, in the binding, as the other split skirts' are: `gaps`.)
   bannerCoat: {
     // Cut straight, loose over the waist as the Ming brigandine is not (the banners' coats in the user's photographs).
     straight: true,
     // (No belt shows: the apron hangs over it.) The front opening bound (`placket`); the collar of the same cloth, up under the helmet's hood.
     trunk: [-0.06, 0.96, 1.2, { studded: 22, base: 'cloth', edge: 'cloth2', placket: 0.05 }], collar: 'cloth',
-    skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], legs: BANNER_LEGS, gaps: [0, Math.PI], gapWidth: 0.17 }],
     upperArm: [-0.28, 0.66, 1.56, { studded: 12, base: 'cloth', edge: 'cloth2' }], forearm: [-0.04, -0.03, 1.22, { studded: 10, base: 'cloth', edge: 'cloth2' }],
   },
   // The Bayara (the banners' guard, mounted): the same coat in brocade, its rivets close and gilt, the round steel
@@ -696,7 +711,7 @@ export const ARMOR_KINDS = {
   bayaraCoat: {
     straight: true,
     trunk: [-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', placket: 0.04, mirror: [0.62, 0.15, 'steel'] }], collar: 'cloth',
-    skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], bands: 4, gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], bands: 4, legs: BANNER_LEGS, gaps: [0, Math.PI], gapWidth: 0.17 }],
     upperArm: [[-0.3, 0.5, 1.6, { rows: ['gold', 'gold'] }], [0.45, 1.02, 1.36, { lames: 6, base: 'steel2' }]], forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }],
     mirrors: [[0.62, 0, 0.3, 1.36, 'steel']],
   },
@@ -1469,9 +1484,9 @@ function breastplateOn(mesh, rings, inflate, shape, range, { lanceRest = false }
  * A brigandine's rivets: the heads of the rivets that hold its plates inside
  * the cloth, in rows (`LOFT.studs.rowsPerRing` to a ring), `paint.studded`
  * round, each row offset half a column from the last; none on the bound
- * edges, the front opening or the splits.
+ * edges, the front opening or the splits; only `within` (rad) of the front, where given (a front panel's).
  */
-function studsOn(mesh, rings, inflate, paint, bones) {
+function studsOn(mesh, rings, inflate, paint, bones, { within = null } = {}) {
   const spec = LOFT.studs;
   const columns = paint.studded;
   const rows = (rings.length - 1) * spec.rowsPerRing;
@@ -1483,7 +1498,8 @@ function studsOn(mesh, rings, inflate, paint, bones) {
     if (paint.edge && place < 0.6) continue;
     for (let column = 0; column < columns; column += 1) {
       const angle = ((column + (row % 2) * 0.5) / columns) * Math.PI * 2;
-      if (inLamellaGap(paint, angle) || (paint.opening && Math.cos(angle) > 1 - paint.opening * 3) || (paint.placket && Math.abs(Math.sin(angle)) < paint.placket * 1.5 && Math.cos(angle) > 0)) continue;
+      if (within !== null && Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) > within) continue;
+      if (inLamellaGap(paint, angle) || (paint.legs && fromSplit(angle) < paint.legs.split + LOFT.legs.wide * 1.5) || (paint.opening && Math.cos(angle) > 1 - paint.opening * 3) || (paint.placket && Math.abs(Math.sin(angle)) < paint.placket * 1.5 && Math.cos(angle) > 0)) continue;
       addPatch(mesh, rings, [
         [place - spec.tall, angle - half, out], [place - spec.tall, angle + half, out],
         [place + spec.tall, angle + half, out], [place + spec.tall, angle - half, out],
@@ -1521,6 +1537,66 @@ function placketOn(mesh, rings, inflate, paint, bones) {
   for (let place = 0; place < rings.length - 1; place += 1) addPatch(mesh, rings, [[place, -half, out], [place, half, out], [place + 1, half, out], [place + 1, -half, out]], paint.edge ?? paint.base, bones);
 }
 
+/** The angle (rad) from a place round a piece to the nearer of the leg panels' splits, before and behind. */
+const fromSplit = (angle) => Math.min(Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))), Math.abs(Math.atan2(Math.sin(angle - Math.PI), Math.cos(angle - Math.PI))));
+
+/** Where a loft of `sides` round cut where `within(angle)` (asked at each quad's middle) ends: the cut's half width (rad) about 0. */
+function cutEdge(sides, half) {
+  const step = (Math.PI * 2) / sides;
+  return Math.max(0, Math.floor(half / step - 0.5) + 1) * step;
+}
+
+/**
+ * A skirt split into two leg panels (`paint.legs`: `split` the half width of the splits before and behind, rad; `from` the
+ * t up the piece they open below, hidden above under the coat and the apron; `front` [t of its top, half width rad] the
+ * front panel over the split before): the skirt's sides round (LOFT.legs.fine as many), its `holes` (the splits cut out),
+ * the splits' `edge` (rad from the front and the back, where the cut quads end).
+ */
+function legSplit(paint, sides) {
+  const { split, from } = paint.legs;
+  const fine = sides * LOFT.legs.fine;
+  return { sides: fine, edge: cutEdge(fine, split), holes: (t, angle) => t < from && fromSplit(angle) < split };
+}
+
+/**
+ * The leg panels' make (legSplit): the splits' edges bound in the coat's binding (`paint.edge`), and the front panel (前裆)
+ * hanging from under the apron over the split before to the hem, a narrow strip of the skirt's own studded cloth standing a
+ * little out from it, cut from a finer loft over the same rings (LOFT.legs.finer as many sides), bound down both its edges
+ * and across its top (its hem bound as the skirt's is). `color` paints it as the skirt (without its splits); `uv` its tile.
+ */
+function legPanelsOn(mesh, rings, inflate, paint, bones, sides, split, color, uv = null) {
+  const spec = LOFT.legs;
+  const role = paint.edge ?? paint.base;
+  const out = inflate + LOFT.studs.lift * 0.6;
+  // A binding strip from place to place along the rings, between two angles round; a strip of the front panel's (`whole`) is
+  // weighted as the panel's middle, as the panel is.
+  const strip = (from, to, a, b, lift, whole = false) => {
+    for (let place = from; place < to - 1e-6; place = Math.min(to, Math.floor(place) + 1)) {
+      const next = Math.min(to, Math.floor(place) + 1);
+      const first = mesh.positions.length / 3;
+      addPatch(mesh, rings, [[place, a, lift], [place, b, lift], [next, b, lift], [next, a, lift]], role, bones);
+      if (whole) [place, place, next, next].forEach((at, corner) => mesh.weightPositions.splice((first + corner) * 3, 3, ...onRing(ringAt(rings, at), 0, 1)));
+    }
+  };
+  const opens = placeAt(rings, paint.legs.from);
+  for (const centre of [0, Math.PI]) {
+    strip(0, opens, centre + split.edge, centre + split.edge + spec.wide, out);
+    strip(0, opens, centre - split.edge - spec.wide, centre - split.edge, out);
+  }
+  const [top, half] = paint.legs.front;
+  const finer = sides * spec.finer;
+  const edge = cutEdge(finer, half);
+  const stand = inflate + spec.stand;
+  // (Weighted whole as its middle, between the legs: it swings with them both and does not stretch as they part.)
+  loft(mesh, rings, finer, { color, inflate: stand, capStart: false, capEnd: false, bones, holes: (t, angle) => t > top || Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) >= half, weighAt: () => 0, ...(uv ? { uv: uv(stand) } : {}) });
+  const lift = stand + LOFT.studs.lift * 0.6;
+  const high = placeAt(rings, top);
+  strip(0, high, edge - spec.wide, edge, lift, true);
+  strip(0, high, -edge, -edge + spec.wide, lift, true);
+  strip(Math.max(0, high - spec.deep), high, -edge, edge, lift, true);
+  return { edge, stand };
+}
+
 /**
  * Steel bands riveted across a skirt (`paint.bands`: how many, evenly over its lower two thirds), each a strip of faces
  * of its own over the cloth, broken at the skirt's splits and under the apron, under its rivet heads.
@@ -1533,11 +1609,14 @@ function bandsOn(mesh, rings, inflate, paint, bones) {
   const front = paint.apron ? paint.apron[2] : 0;
   for (let band = 0; band < paint.bands; band += 1) {
     const place = span * (0.12 + (0.5 * band) / Math.max(1, paint.bands - 1));
+    // On leg panels (`legs`) the bands run across each panel to its split (the front panel hangs over them), not under the apron.
+    const underApron = paint.legs ? paint.apron && place + tall > placeAt(rings, paint.apron[0]) - 0.05 : true;
     for (let step = 0; step < steps; step += 1) {
       const a = (step / steps) * Math.PI * 2;
       const b = ((step + 1) / steps) * Math.PI * 2;
       const middle = (a + b) / 2;
-      if (inLamellaGap(paint, middle) || (Math.cos(middle) > 0 && Math.abs(Math.sin(middle)) < front)) continue;
+      if (paint.legs && fromSplit(middle) < paint.legs.split + LOFT.legs.wide) continue;
+      if (inLamellaGap(paint, middle) || (underApron && Math.cos(middle) > 0 && Math.abs(Math.sin(middle)) < front)) continue;
       addPatch(mesh, rings, [[place - tall, a, out], [place - tall, b, out], [place + tall, b, out], [place + tall, a, out]], 'steel', bones);
     }
   }
@@ -1916,8 +1995,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       return;
     }
     // A brigandine with its tile: the cloth (its binding and opening) in one loft, the rivet heads in the picture.
+    // A skirt split into leg panels (`legs`): the splits cut from it, their edges bound, the front panel over the split before.
+    const split = paint?.legs && !lowDetail ? legSplit(paint, sides) : null;
+    const panel = (studsDrawn) => paintFor({ ...paint, studsDrawn, gaps: null, mirror: null, rivets: null }, armor);
     if (material === 'studded' && tile) {
-      loft(mesh, rings, sides, { color: paintFor({ ...paint, studsDrawn: true, mirror: null, rivets: null }, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile) });
+      loft(mesh, rings, split ? split.sides : sides, { color: paintFor({ ...paint, studsDrawn: true, mirror: null, rivets: null }, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile), ...(split ? { holes: split.holes } : {}) });
+      if (split) legPanelsOn(mesh, rings, inflate, paint, boned, sides, split, panel(true), (out) => tileUv(rings, out, tile));
       if (paint.apron) apronOn(mesh, rings, inflate, paint, boned);
       if (paint.bands) bandsOn(mesh, rings, inflate, paint, boned);
       if (paint.placket) placketOn(mesh, rings, inflate, paint, boned);
@@ -1935,7 +2018,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
-    loft(mesh, rings, sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}) });
+    loft(mesh, rings, split ? split.sides : sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), ...(split ? { holes: split.holes } : {}) });
+    if (split) {
+      const { edge, stand } = legPanelsOn(mesh, rings, inflate, paint, boned, sides, split, panel(studsDrawn));
+      // The front panel's own rivet heads, in columns down it as the skirt's.
+      if (studsDrawn) studsOn(mesh, rings.filter((ring) => ring.t <= paint.legs.front[0] + 0.05), stand, { ...paint, gaps: null, legs: null, apron: null, placket: null, opening: null, studded: paint.studded * 2 }, boned, { within: edge - LOFT.legs.wide * 1.5 });
+    }
     // Laminated plate: each lame its own band of faces (not in a crowd).
     if (paint?.lames && !lowDetail) lamesOn(mesh, rings, inflate, paint, boned);
     // A brigandine's rivet heads, each its own small square (not in a crowd); its apron's binding and its skirt's steel bands.

@@ -119,34 +119,142 @@ const QING_CONE = [[0.12, 1], [0.4, 0.97], [0.7, 0.87], [1.0, 0.7], [1.3, 0.51],
 
 /**
  * The Eight Banners' helmets (the Later Jin's of the 1610s-30s, and the Qing's after): a conical bowl drawn up to a point and a
- * tall spire (盔管) that carries the plume, a narrow visor (眉庇) round the foot, gilt; the hood of studded cloth (the coat's
- * own) hangs from it over the ears and the neck (wardrobe.js `qingHelm`). Drawn as the Ming helmets are (MING_HELMS'
- * fields; `finial.finish` the tube's own finish). The rank and file's lacquered black with a black horsehair plume (the
- * user's photographs of the eight banners' armours); the Bayara's polished steel under gilt openwork, a gilt tube and a
- * hanging sable tassel (the user's photograph of a Qing guard's armour; the Palace Museum's).
+ * tall spire (盔管) that carries the plume, standing in a tiered gilt finial; a flat peak (眉庇) standing straight out over the
+ * brow, the brim round the rest no more than the band's lip; the hood of studded cloth (the coat's own) hanging from it over
+ * the ears and the neck, and the collar round the throat (QING_HOOD; chinahelmview.js buildQingHood). Drawn as the Ming
+ * helmets are (MING_HELMS' fields; `finial.finish` the finial's own finish), and:
+ * - `finial.tiers`: the gilt stack round the point the spire stands in, from the bowl up ([foot y, top y, radius at the
+ *   foot, at the top, kind]: a `drum` of openwork, a stepped `ring`, a narrow `neck`, the lotus `cup` flaring up, its rim
+ *   cut in petals); `finial.rings`: raised rings up the spire (shares of its height), a knob on its top.
+ * - `peak`: the plate over the brow (head radii: how far it stands out, how wide, how thick; a second plate stepped under
+ *   it, `step` of its reach back and `drop` down; its `finish`, its edge's `edge`).
+ * - `glyphBand`: the band round the foot a row of raised gilt characters (the Lantsa letters of the Qing helmets) between
+ *   gilt fillets, `rise` tall, `count` round; in place of the plain band.
+ * - `swags`: gilt masks round the bowl (`count`, at `y` up it) with festoons of beads hanging `drop` between them and a
+ *   pendant under each, as the imperial helmets have.
+ * The rank and file's lacquered black with a black horsehair plume, the band and peak gilt (the user's photographs of the
+ * eight banners' armours); the Bayara's polished steel, the band of gilt characters and the swags, a gilt spire and a
+ * hanging sable tassel (the user's photographs of a Qing guard's armour and of the gilt helmets at the Met and Sotheby's).
  */
+const QING_TIERS = [[1.66, 2.0, 0.33, 0.27, 'drum'], [2.0, 2.06, 0.3, 0.29, 'ring'], [2.06, 2.2, 0.16, 0.12, 'neck'], [2.2, 2.44, 0.08, 0.23, 'cup']];
 export const QING_HELMS = {
   bannerBowl: {
     label: 'Banner helmet', zh: '八旗盔', period: 'Later Jin and Qing, 17th c.', finish: 'blackLacquer',
-    note: 'A cone lacquered black rising to a point and a tall gilt spire with a black horsehair plume, a gilt band and visor; after the user\'s photographs of the eight banners\' armours.',
+    note: 'A cone lacquered black rising to a point, a tiered gilt finial and a tall gilt spire with a black horsehair plume, a gilt band and a flat gilt peak over the brow; after the user\'s photographs of the eight banners\' armours.',
     profile: QING_CONE,
     ellipse: [1.08, 0.9], gap: 0.11,
-    brim: { reach: 0.12, fall: 0.02, lip: 0.02 },
+    brim: { reach: 0.035, fall: 0.0, lip: 0.018 },
     plates: 0, band: true,
-    finial: { kind: 'tube', r: 0.04, h: 0.7, finish: 'gilt' },
+    finial: { kind: 'tube', r: 0.04, h: 0.7, finish: 'gilt', tiers: QING_TIERS, rings: [0.35, 0.92] },
+    peak: { reach: 0.36, width: 0.78, thick: 0.035, step: 0.3, drop: 0.045, finish: 'gilt', edge: 'gilt' },
     plume: 'qingPlume',
   },
   bayaraBowl: {
     label: 'Bayara helmet', zh: '护军盔', period: 'Later Jin and Qing, 17th c.', finish: 'giltSteel',
-    note: 'A cone of polished steel in four plates under gilt openwork scrolls, a gilt band and visor, a gilt spire with a hanging sable tassel; after the user\'s photograph of a Qing guard\'s armour.',
+    note: 'A cone of polished steel in four plates, gilt masks and festoons round it, a band of gilt characters at its foot, a tiered gilt finial and spire with a hanging sable tassel, a flat steel peak edged in gilt; after the user\'s photographs of a Qing guard\'s armour and the gilt helmets at the Met and Sotheby\'s.',
     profile: QING_CONE,
     ellipse: [1.08, 0.9], gap: 0.11,
-    brim: { reach: 0.14, fall: 0.03, lip: 0.025 },
-    plates: 4, scroll: true, band: true, rivets: true,
-    finial: { kind: 'tube', r: 0.045, h: 0.65, finish: 'gilt' },
+    brim: { reach: 0.035, fall: 0.0, lip: 0.018 },
+    plates: 4, rivets: true,
+    glyphBand: { rise: 0.34, count: 20 },
+    swags: { count: 8, y: 1.3, drop: 0.36 },
+    finial: { kind: 'tube', r: 0.045, h: 0.65, finish: 'gilt', tiers: QING_TIERS, rings: [0.3, 0.9] },
+    peak: { reach: 0.38, width: 0.8, thick: 0.035, step: 0.3, drop: 0.045, finish: 'giltSteel', edge: 'gilt' },
     plume: 'qingSable',
   },
 };
+
+/**
+ * The banners' hood (the user's photographs of the Qing helmets at the Met and Sotheby's): padded cloth, the coat's own,
+ * studded in rows as the coat is and bound at every edge in its binding, hung inside the bowl's rim from `top`. Two narrow
+ * flaps over the ears hang straight down to the jaw (`flaps`: from, to round from the face, shares of π; their `hem`), an
+ * ear hole in each (`ear`: its height, radius, and where round, a share of π); a flap over the back of the neck (`back`:
+ * from, its hem); the face open between them. Below, the collar (护项) round the throat and the neck, standing a little off
+ * it about its `centre` (x, head radii), its top dipping under the chin (`top`: y at the front, at the back), its foot
+ * (`hem`) flaring out onto the shoulders, closed at the front (its split `open` wide each side, shares of π) by frog
+ * buttons (`frogs`: their heights). The sheets round an ellipse [front, side]: `ellipse` at their top, `flare` at their
+ * hem (the collar's its own). The studs (`studs`): rows `pitch` apart down and round (as close as the coat's rivet heads),
+ * clear of the binding by `margin`, `size` their radius; the binding `binding` wide.
+ */
+export const QING_HOOD = {
+  top: 0.2,
+  ellipse: [1.03, 0.87], flare: [1.08, 0.98],
+  flaps: { from: 0.3, to: 0.64, hem: -1.28 },
+  back: { from: 0.67, hem: -1.32 },
+  ear: { y: -0.22, r: 0.11, at: 0.5 },
+  collar: { centre: -0.08, top: [-1.36, -1.0], hem: -1.92, ellipse: [0.96, 0.74], flare: [1.3, 1.24], open: 0.02 },
+  frogs: [-1.47, -1.63, -1.79],
+  studs: { pitch: 0.21, margin: 0.13, size: 0.05 },
+  binding: 0.085,
+};
+
+/**
+ * The hood's sheets (QING_HOOD): each a band round the head's axis, `phi` [from, to] round from the face (rad; the left
+ * side +z), its top and hem (y) as functions of φ, its ellipse [front, side] at the top and at the hem, its `centre` (x),
+ * its `kind` (flap, back, collar).
+ */
+export function qingHoodSheets(hood = QING_HOOD) {
+  const flat = (y) => () => y;
+  const sheet = (phi, top, hem, ellipse, flare, centre = 0, kind = 'flap') => ({ phi, top, hem, ellipse, flare, centre, kind });
+  const { flaps, back, collar } = hood;
+  // The collar's top dips under the chin: lowest at the front, highest behind.
+  const collarTop = (phi) => collar.top[1] + (collar.top[0] - collar.top[1]) * Math.max(0, Math.cos(phi)) ** 2;
+  return [
+    sheet([flaps.from * Math.PI, flaps.to * Math.PI], flat(hood.top), flat(flaps.hem), hood.ellipse, hood.flare),
+    sheet([-flaps.to * Math.PI, -flaps.from * Math.PI], flat(hood.top), flat(flaps.hem), hood.ellipse, hood.flare),
+    sheet([back.from * Math.PI, (2 - back.from) * Math.PI], flat(hood.top), flat(back.hem), hood.ellipse, hood.flare, 0, 'back'),
+    sheet([collar.open * Math.PI, (2 - collar.open) * Math.PI], collarTop, flat(collar.hem), collar.ellipse, collar.flare, collar.centre, 'collar'),
+  ];
+}
+
+/** A point on a hood sheet (head radii): `phi` round, `s` down it (0 its top, 1 its hem), `out` beyond its surface. */
+export function qingHoodPoint(sheet, phi, s, out = 0) {
+  const top = sheet.top(phi);
+  const y = top + (sheet.hem(phi) - top) * s;
+  const a = sheet.ellipse[0] + (sheet.flare[0] - sheet.ellipse[0]) * s + out;
+  const b = sheet.ellipse[1] + (sheet.flare[1] - sheet.ellipse[1]) * s + out;
+  return [sheet.centre + a * Math.cos(phi), y, b * Math.sin(phi)];
+}
+
+/**
+ * The hood's studs (head radii): on every sheet in rows `pitch` apart down it and round it (each row offset half a stud
+ * from the last, as the coat's are), clear of the binding by `margin`, of the bowl's rim and of the ear holes.
+ */
+export function qingHoodStuds(hood = QING_HOOD) {
+  const { pitch, margin } = hood.studs;
+  const studs = [];
+  for (const sheet of qingHoodSheets(hood)) {
+    const [from, to] = sheet.phi;
+    const middle = (from + to) / 2;
+    const tall = Math.abs(sheet.hem(middle) - sheet.top(middle));
+    // The flaps' tops are inside the bowl: their studs start below its rim (y 0).
+    const start = sheet.kind === 'collar' ? margin / tall : (hood.top + 0.04) / tall;
+    const rows = Math.floor((tall * (1 - start) - margin) / pitch) + 1;
+    for (let row = 0; row < rows; row += 1) {
+      const s = start + (row * pitch) / tall;
+      const a = sheet.ellipse[0] + (sheet.flare[0] - sheet.ellipse[0]) * s;
+      const b = sheet.ellipse[1] + (sheet.flare[1] - sheet.ellipse[1]) * s;
+      // Radians to a stud's pitch here (by the ellipse's mean radius), so the studs are as far apart round as down.
+      const step = pitch / ((a + b) / 2);
+      const inset = margin / ((a + b) / 2);
+      const span = to - from - 2 * inset;
+      const columns = Math.max(1, Math.floor(span / step) + 1);
+      const shift = row % 2 && columns > 1 ? step / 2 : 0;
+      const offset = (span - (columns - 1) * step) / 2;
+      for (let column = 0; column < columns - (shift ? 1 : 0); column += 1) {
+        const phi = from + inset + offset + shift + column * step;
+        // Clear of the ear holes.
+        if (sheet.kind === 'flap') {
+          const { ear } = hood;
+          const y = sheet.top(phi) + (sheet.hem(phi) - sheet.top(phi)) * s;
+          if (Math.abs(Math.abs(phi) - ear.at * Math.PI) * ((a + b) / 2) < ear.r + 0.07 && Math.abs(y - ear.y) < ear.r + 0.07) continue;
+        }
+        studs.push(qingHoodPoint(sheet, phi, s, 0.012));
+      }
+    }
+  }
+  return studs;
+}
 
 /** Which design the Ming brigandine man's hat is in: by its outfit design's `helm` (outfits.js), with its finish. */
 export const MING_HELM_ORDER = ['cloudBell', 'rivetedTube', 'plainPoint', 'yongBell'];

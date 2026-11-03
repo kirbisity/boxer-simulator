@@ -4,7 +4,7 @@
 
 /* global THREE */
 
-import { BRIM_V, brimGrid, CHINA_FINISHES, finialTop, HAN_HOOD, MING_HELMS, QING_HELMS, rimPath, shellEdge, shellGrid, shellV, SHELL_V, swingStep, SWING, tasselStrands, TASSELS } from './chinahelms.js';
+import { BRIM_V, brimGrid, CHINA_FINISHES, finialTop, HAN_HOOD, MING_HELMS, QING_HELMS, QING_HOOD, qingHoodPoint, qingHoodSheets, qingHoodStuds, rimPath, shellEdge, shellGrid, shellRadius, shellV, SHELL_V, swingStep, SWING, tasselStrands, TASSELS } from './chinahelms.js';
 import { surface } from './toon.js';
 
 const CHINA_TURN = Math.PI * 2;
@@ -212,6 +212,106 @@ function chinaDesignSheet(key, design, finishName, lace) {
     c.globalAlpha = 1;
     if (design.rivets) for (let i = 0; i < 40; i += 1) rivet(((i + 0.5) / 40) * width, (y0 + y1) / 2, 0.035 * perU, '#e6e8ec');
   }
+  // The bowl's own breadth at a height (a share of the foot's): drawn round a narrower bowl, a mark is drawn wider on the sheet
+  // (the sheet's x runs once round at every height), so it is as wide as it is tall on the steel.
+  const breadthAt = (y) => {
+    const profile = design.profile;
+    for (let index = 1; index < profile.length; index += 1) {
+      if (y <= profile[index][0]) {
+        const [[y0, s0], [y1, s1]] = [profile[index - 1], profile[index]];
+        return Math.max(0.05, s0 + ((s1 - s0) * (y - y0)) / (y1 - y0));
+      }
+    }
+    return Math.max(0.05, profile.at(-1)[1]);
+  };
+  // The Qing band of gilt characters (`glyphBand`): the band the bowl's own steel between two gilt fillets, the Lantsa
+  // letters raised on it in a row round, each a headline bar with its strokes and curls hanging from it (seeded, so each
+  // differs and each design is drawn the same every time).
+  if (design.glyphBand) {
+    const { rise, count } = design.glyphBand;
+    const gold = finish.accent ?? '#d2aa4c';
+    const y0 = yOf(foot + rise);
+    const y1 = yOf(foot);
+    const fillet = Math.max(2, 0.03 * perV);
+    h.fillStyle = '#9c9c9c';
+    h.fillRect(0, y0, width, y1 - y0);
+    for (const y of [y0, y1 - fillet]) {
+      c.fillStyle = gold;
+      c.fillRect(0, y, width, fillet);
+      h.fillStyle = '#d8d8d8';
+      h.fillRect(0, y, width, fillet);
+    }
+    const letters = chinaViewSeeded(31);
+    const cell = width / count;
+    const tall = (y1 - y0) - fillet * 4;
+    for (let index = 0; index < count; index += 1) {
+      const cx = (index + 0.5) * cell;
+      const top = y0 + fillet * 2;
+      const wide = cell * 0.5;
+      const strokes = [
+        [[cx - wide / 2, top], [cx + wide / 2, top]],
+        [[cx + wide * (letters() * 0.4 - 0.1), top], [cx + wide * (letters() * 0.3 - 0.15), top + tall * 0.55], [cx + wide * 0.3, top + tall * 0.75]],
+        [[cx - wide * 0.4, top + tall * 0.3], [cx - wide * (0.1 + letters() * 0.2), top + tall * 0.55], [cx - wide * 0.35, top + tall * 0.9]],
+      ];
+      if (letters() < 0.6) strokes.push([[cx + wide * 0.1, top + tall * 0.6], [cx + wide * 0.45, top + tall * (0.75 + letters() * 0.2)], [cx + wide * 0.15, top + tall]]);
+      for (const [g, colour] of [[c, gold], [h, '#e8e8e8']]) {
+        g.strokeStyle = colour;
+        g.lineWidth = Math.max(2, wide * 0.18);
+        g.lineCap = 'round';
+        g.lineJoin = 'round';
+        for (const stroke of strokes) {
+          g.beginPath();
+          stroke.forEach(([x, y], k) => (k ? g.quadraticCurveTo((stroke[k - 1][0] + x) / 2 + wide * 0.12, (stroke[k - 1][1] + y) / 2, x, y) : g.moveTo(x, y)));
+          g.stroke();
+        }
+      }
+    }
+  }
+  // The imperial helmets' gilt masks round the bowl (`swags`), festoons of beads hanging between them, a pendant under each.
+  if (design.swags) {
+    const { count, y, drop } = design.swags;
+    const gold = finish.accent ?? '#d2aa4c';
+    const wideAt = (height) => perU / breadthAt(height);
+    const cy = yOf(y);
+    const size = 0.09;
+    for (const [g, colour] of [[c, gold], [h, '#e4e4e4']]) {
+      g.fillStyle = colour;
+      g.strokeStyle = colour;
+      g.lineCap = 'round';
+      for (let index = 0; index <= count; index += 1) {
+        const cx = (index / count) * width;
+        // The mask: a boss in a ring of its mane.
+        g.beginPath();
+        g.ellipse(cx, cy, size * wideAt(y), size * perV, 0, 0, CHINA_TURN);
+        g.fill();
+        g.lineWidth = Math.max(1.5, 0.025 * perV);
+        g.beginPath();
+        g.ellipse(cx, cy, size * 1.45 * wideAt(y), size * 1.45 * perV, 0, 0, CHINA_TURN);
+        g.stroke();
+        // The pendant: a cord and a drop.
+        const low = yOf(y - drop * 0.9);
+        g.beginPath();
+        g.moveTo(cx, cy + size * perV);
+        g.lineTo(cx, low);
+        g.stroke();
+        g.beginPath();
+        g.ellipse(cx, low + 0.05 * perV, 0.04 * wideAt(y - drop), 0.06 * perV, 0, 0, CHINA_TURN);
+        g.fill();
+        if (index === count) continue;
+        // Two festoons of beads to the next mask, the lower sagging further.
+        const next = ((index + 1) / count) * width;
+        g.setLineDash([Math.max(2, 0.02 * perV), Math.max(2, 0.018 * perV)]);
+        g.lineWidth = Math.max(2, 0.03 * perV);
+        for (const sag of [0.55, 1]) {
+          g.beginPath();
+          g.moveTo(cx, cy);
+          g.quadraticCurveTo((cx + next) / 2, yOf(y - drop * sag * 2), next, cy);
+          g.stroke();
+        }
+        g.setLineDash([]);
+      }
+    }
+  }
   // 勇 in gold on the front, where the Prince of Liang's helmet and the arsenals' have it: big, on the bowl's face.
   if (design.glyph && finish.glyph) {
     const tall = 0.95 * perV;
@@ -333,7 +433,89 @@ function chinaFinials(design, r, material) {
   tube.position.y = (top + finial.h / 2 - 0.02) * r;
   const collar = new THREE.Mesh(new THREE.CylinderGeometry(finial.r * 1.5 * r, finial.r * 2.4 * r, 0.06 * r, 12), material);
   collar.position.y = (top + 0.01) * r;
-  return [tube, collar];
+  return [tube, collar, ...chinaTiers(finial, top, r, material)];
+}
+
+// The tiered finial's work (chinahelms.js QING_HELMS `finial.tiers`): how many petals round the lotus cup's rim and how far
+// they stand up (head radii); the raised rims round the drum (their tube's radius).
+const CHINA_TIER_WORK = { petals: 8, petal: 0.05, rim: 0.018 };
+
+/**
+ * The gilt stack a banner helmet's spire stands in (`finial.tiers`, from the bowl up: the openwork drum with a raised rim
+ * at its foot and its top, the stepped ring, the neck, the lotus cup, its rim cut in petals), the raised rings up the
+ * spire (`finial.rings`) and the mouth at its top.
+ */
+function chinaTiers(finial, top, r, material) {
+  if (!finial.tiers) return [];
+  const meshes = [];
+  for (const [y0, y1, below, above, kind] of finial.tiers) {
+    const tall = y1 - y0;
+    const cup = kind === 'cup';
+    const geometry = new THREE.CylinderGeometry(above * r, below * r, tall * r, cup ? CHINA_TIER_WORK.petals * 4 : 18, 1, cup);
+    if (cup) {
+      // The petals: the rim's vertices raised in arcs between the petals' notches.
+      const position = geometry.attributes.position;
+      for (let index = 0; index < position.count; index += 1) {
+        if (position.getY(index) <= 0) continue;
+        const angle = Math.atan2(position.getZ(index), position.getX(index));
+        position.setY(index, position.getY(index) + Math.abs(Math.sin((angle * CHINA_TIER_WORK.petals) / 2)) * CHINA_TIER_WORK.petal * r);
+      }
+      geometry.computeVertexNormals();
+    }
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.y = ((y0 + y1) / 2) * r;
+    meshes.push(mesh);
+    if (kind === 'drum') {
+      for (const [y, radius] of [[y0, below], [y1, above]]) {
+        const rim = new THREE.Mesh(new THREE.TorusGeometry((radius + 0.005) * r, CHINA_TIER_WORK.rim * r, 5, 24), material);
+        rim.rotation.x = Math.PI / 2;
+        rim.position.y = y * r;
+        meshes.push(rim);
+      }
+    }
+  }
+  for (const share of finial.rings ?? []) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(finial.r * 1.05 * r, finial.r * 0.35 * r, 5, 14), material);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = (top + finial.h * share) * r;
+    meshes.push(ring);
+  }
+  const mouth = new THREE.Mesh(new THREE.CylinderGeometry(finial.r * 1.5 * r, finial.r * 1.1 * r, 0.07 * r, 12), material);
+  mouth.position.y = (top + finial.h - 0.05) * r;
+  meshes.push(mouth);
+  return meshes;
+}
+
+/**
+ * A banner helmet's peak (chinahelms.js QING_HELMS `peak`): a flat plate standing straight out over the brow from the bowl's
+ * foot, a narrower plate stepped on it, its front edge bound in its `edge` finish; its back edges run into the bowl.
+ */
+function chinaPeak(design, r, steel) {
+  const peak = design.peak;
+  const foot = design.profile[0][0];
+  const base = shellRadius(design, 0, foot);
+  const plate = chinaFinish(steel, CHINA_FINISHES[peak.finish], null);
+  const edge = chinaFinish(steel, CHINA_FINISHES[peak.edge], null);
+  // Its back edge sunk in the bowl, so it meets the curve of it all the way across.
+  const sunk = 0.12;
+  const add = (reach, wide, y, material, thick = peak.thick) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry((reach + sunk) * r, thick * r, wide * r), material);
+    mesh.position.set((base - sunk + (reach + sunk) / 2) * r, y * r, 0);
+    return mesh;
+  };
+  const low = foot - peak.thick / 2;
+  const meshes = [
+    add(peak.reach, peak.width, low, plate),
+    add(peak.reach * (1 - peak.step), peak.width * 0.86, low + peak.thick, plate, peak.thick * 0.8),
+    // The front edge's binding, a little thicker than the plate.
+    new THREE.Mesh(new THREE.BoxGeometry(0.035 * r, peak.thick * 1.4 * r, peak.width * r), edge),
+  ];
+  meshes[2].position.set((base + peak.reach - 0.0175) * r, low * r, 0);
+  // The lower plate stepped under the front (`drop`): the stepped shelf of the Sotheby's helmet.
+  const under = add(peak.reach * (1 - peak.step * 0.5), peak.width * 0.94, low - peak.drop, plate, peak.thick * 0.7);
+  meshes.push(under);
+  for (const mesh of meshes) mesh.name = 'helm-peak';
+  return meshes;
 }
 
 /**
@@ -358,6 +540,8 @@ export function buildMingDesignHelm(group, head, r, steel, { lowDetail = false }
   // A tube of its own finish (`finial.finish`: the banners' gilt tube on a black bowl).
   const tube = design.finial?.finish ? chinaFinish(steel, CHINA_FINISHES[design.finial.finish], null) : plain;
   for (const mesh of chinaFinials(design, r, tube)) group.add(mesh);
+  // The banners' flat peak over the brow.
+  if (design.peak) for (const mesh of chinaPeak(design, r, steel)) group.add(mesh);
   if (!design.finial) {
     const tip = new THREE.Mesh(new THREE.SphereGeometry(0.04 * r, 8, 6), plain);
     tip.position.y = design.profile.at(-1)[0] * r;
@@ -417,6 +601,113 @@ export function buildHanHood(group, head, r, steel, { lowDetail = false } = {}) 
   group.add(disc, cord, ...chinaFinials(design, r, plain));
   group.add(buildTassel(TASSELS[design.plume], r, { at: [0, finialTop(design) - 0.04, 0], still: lowDetail }));
   return true;
+}
+
+/** A stretch of a banner hood's sheet (chinahelms.js qingHoodSheets) as a mesh: `phi` and `s` its ranges, `out` beyond it. */
+function qingSheetMesh(sheet, [phi0, phi1], [s0, s1], out, material, r, { columns = 12, rows = 6 } = {}) {
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  for (let column = 0; column <= columns; column += 1) {
+    const phi = phi0 + ((phi1 - phi0) * column) / columns;
+    for (let row = 0; row <= rows; row += 1) {
+      const s = s0 + ((s1 - s0) * row) / rows;
+      positions.push(...qingHoodPoint(sheet, phi, s, out).map((value) => value * r));
+      uvs.push(column / columns, 1 - row / rows);
+    }
+  }
+  for (let column = 0; column < columns; column += 1) {
+    for (let row = 0; row < rows; row += 1) {
+      const a = column * (rows + 1) + row;
+      const b = a + rows + 1;
+      indices.push(a, a + 1, b, b, a + 1, b + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(geometry, material);
+}
+
+/**
+ * The banners' hood (chinahelms.js QING_HOOD) under the helmet: the flaps over the ears and the neck and the collar round
+ * the throat, of the coat's own cloth (`head.coif`; its meshes marked `userData.hoodCloth`, for the cloth atlas's stuff:
+ * wardrobe.js), studded in rows with gilt heads (`head.gold`) as the coat is, bound at every edge in the coat's binding
+ * (`bind`), an ear hole in each flap, the collar closed at the throat with frog buttons. Returns the meshes it added.
+ */
+export function buildQingHood(group, head, r, steel, bind, { lowDetail = false } = {}) {
+  const hood = QING_HOOD;
+  const cloth = surface(new THREE.Color(head.coif ?? 0x1f2a4a).getHex(), { roughness: 0.85 });
+  const binding = surface(new THREE.Color(bind).getHex(), { roughness: 0.8 });
+  const dark = surface(0x0d0d10, { roughness: 0.9 });
+  const gilt = chinaFinish(steel, { colour: head.gold ?? '#d2aa4c', metalness: 0.9, roughness: 0.32 }, null);
+  const meshes = [];
+  const add = (mesh) => {
+    group.add(mesh);
+    meshes.push(mesh);
+    return mesh;
+  };
+  const grain = lowDetail ? { columns: 6, rows: 3 } : { columns: 14, rows: 6 };
+  const lip = 0.012;
+  for (const sheet of qingHoodSheets(hood)) {
+    const [from, to] = sheet.phi;
+    const middle = (from + to) / 2;
+    const tall = Math.abs(sheet.hem(middle) - sheet.top(middle));
+    const radius = (sheet.ellipse[0] + sheet.ellipse[1]) / 2;
+    const across = hood.binding / radius;
+    const down = hood.binding / tall;
+    const body = add(qingSheetMesh(sheet, [from, to], [0, 1], 0, cloth, r, { ...grain, columns: Math.max(4, Math.round(grain.columns * (to - from))) }));
+    body.userData.hoodCloth = true;
+    body.name = `helm-hood-${sheet.kind}`;
+    // The binding: the hem, both edges, and the collar's top (the flaps' tops are inside the bowl).
+    const strips = [[[from, to], [1 - down, 1]], [[from, from + across], [0, 1]], [[to - across, to], [0, 1]]];
+    if (sheet.kind === 'collar') strips.push([[from, to], [0, down]]);
+    for (const [phi, s] of strips) add(qingSheetMesh(sheet, phi, s, lip, binding, r, { columns: Math.max(2, Math.round(grain.columns * (phi[1] - phi[0]))), rows: 2 })).userData.noOutline = true;
+    if (sheet.kind === 'flap' && !lowDetail) {
+      // The ear hole: dark, its edge bound.
+      const phi = Math.sign(middle) * hood.ear.at * Math.PI;
+      const s = (sheet.top(phi) - hood.ear.y) / (sheet.top(phi) - sheet.hem(phi));
+      const at = new THREE.Vector3(...qingHoodPoint(sheet, phi, s, lip * 0.5)).multiplyScalar(r);
+      const facing = at.clone().add(new THREE.Vector3(Math.cos(phi), 0, Math.sin(phi)));
+      const hole = add(new THREE.Mesh(new THREE.CircleGeometry(hood.ear.r * r, 16), dark));
+      const ring = add(new THREE.Mesh(new THREE.TorusGeometry(hood.ear.r * r, 0.022 * r, 5, 18), binding));
+      for (const mesh of [hole, ring]) {
+        mesh.position.copy(at);
+        mesh.lookAt(facing);
+        mesh.userData.noOutline = true;
+      }
+    }
+  }
+  // The studs: gilt heads, a little flattened against the cloth.
+  const studs = qingHoodStuds(hood);
+  const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(hood.studs.size * r, lowDetail ? 4 : 6, lowDetail ? 3 : 4), gilt, studs.length);
+  const place = new THREE.Object3D();
+  studs.forEach(([x, y, z], index) => {
+    place.position.set(x * r, y * r, z * r);
+    place.lookAt(place.position.clone().add(new THREE.Vector3(x, 0, z)));
+    place.scale.set(1, 1, 0.6);
+    place.updateMatrix();
+    heads.setMatrixAt(index, place.matrix);
+  });
+  heads.userData.noOutline = true;
+  heads.name = 'helm-hood-studs';
+  add(heads);
+  // The frog buttons closing the collar at the throat: a dark cord loop across the split, a gilt knot at its end.
+  const collar = qingHoodSheets(hood).find((sheet) => sheet.kind === 'collar');
+  const cord = surface(0x141416, { roughness: 0.85 });
+  for (const y of hood.frogs) {
+    const s = (collar.top(0) - y) / (collar.top(0) - collar.hem(0));
+    const [left, right] = [0.08, -0.08].map((phi) => new THREE.Vector3(...qingHoodPoint(collar, phi, s, lip * 2)).multiplyScalar(r));
+    const loop = add(new THREE.Mesh(new THREE.CylinderGeometry(0.018 * r, 0.018 * r, left.distanceTo(right), 5), cord));
+    loop.position.copy(left).add(right).multiplyScalar(0.5);
+    loop.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), right.clone().sub(left).normalize());
+    const knot = add(new THREE.Mesh(new THREE.SphereGeometry(0.04 * r, 8, 6), gilt));
+    knot.position.copy(right);
+    for (const mesh of [loop, knot]) mesh.userData.noOutline = true;
+  }
+  return meshes;
 }
 
 /** Whether a hood's edge leaves the face open at azimuth θ (tests, shots). */

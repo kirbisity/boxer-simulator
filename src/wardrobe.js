@@ -14,7 +14,7 @@ import { clothPropMaterial, wearTile } from './detailtex.js';
 import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
-import { buildHanHood, buildMingDesignHelm, buildTassel } from './chinahelmview.js';
+import { buildHanHood, buildMingDesignHelm, buildQingHood, buildTassel } from './chinahelmview.js';
 import { HONGYING_MOUNTS, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, headRadiusAt, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf, knightGrid } from './knighthelms.js';
@@ -1748,12 +1748,16 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     }
     case 'qingHelm': {
       // The Eight Banners' helmet (chinahelms.js QING_HELMS: `design`, its finish `finish`): the bowl drawn up into its
-      // tall gilt tube and plume, fitted over the head; and the hood of the coat's own studded cloth hanging from it
-      // over the ears and the neck to the shoulders, closer round the face than the Ming elite's flaps and hanging
-      // near straight down, narrow under the narrow cone, bound in
-      // the coat's binding (`trim`).
+      // tiered gilt finial, spire and plume, its peak over the brow, fitted over the head; and the hood under it of the
+      // coat's own cloth and rows of gilt studs (chinahelms.js QING_HOOD): narrow flaps hanging straight down over the
+      // ears and the neck, the collar round the throat, every edge bound in the coat's binding (`trim`; on a plain
+      // banner the cloth a shade darker, as the coat's own edges are: outfits.js bannerArmour), the cloth wearing the
+      // coat's stuff (`hoodStuff`: detailmaps.js CLOTH_MATERIALS) where the maps are drawn.
       buildMingDesignHelm(group, { ...head, design: head.design ?? 'bannerBowl' }, r, steel, { lowDetail });
-      studdedHood(group, head, r, steel, { open: Math.PI * 0.36, trim: head.trim ?? null, top: 1.08, bottom: 1.32 });
+      const bind = head.trim ?? new THREE.Color(head.coif ?? 0x1f2a4a).multiplyScalar(0.82).getHex();
+      for (const mesh of buildQingHood(group, head, r, steel, bind, { lowDetail })) {
+        if (mesh.userData.hoodCloth && head.hoodStuff && DETAIL_MAPS.on && !lowDetail) clothPropMaterial(mesh.material, head.hoodStuff);
+      }
       fitted = true;
       break;
     }
@@ -2165,8 +2169,8 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
 /**
  * Padded cloth flaps hanging from a helmet's rim over the cheeks, the ears and the neck to the shoulders, open over the face
  * (+x) by `open` (rad), flaring from `top` to `bottom` (head radii), rows of rivet heads over them (one instanced mesh): the Ming elite's, of the coat's own stuff (its
- * cloth, or its steel, `flapSteel`, where the coat is scale), and the banners' hood (`qingHelm`), its edges bound in the
- * coat's binding (`trim`) where it has one.
+ * cloth, or its steel, `flapSteel`, where the coat is scale), its edges bound in the coat's binding (`trim`) where it has one.
+ * (The banners' hood is its own: chinahelmview.js buildQingHood.)
  */
 function studdedHood(group, head, r, steel, { open = Math.PI * 0.5, trim = null, top = 1.2, bottom = 1.75 } = {}) {
   const start = Math.PI / 2 + open / 2;
