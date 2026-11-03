@@ -1433,6 +1433,10 @@ export const ARROW = {
   // What a long bow's war arrow carries (J; energy 1): a ~70 g shaft at ~55 m/s, ~100 J (a heavy war bow's bodkin, more:
   // the longbow's `arrowEnergy`). In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
   joules: 100,
+  // Armour short of plate is proof (its `pierce` share stopped) against an arrow of up to this many joules; past it, it stops that
+  // share × proofJoules / the arrow's (physics/ranged.js arrowHit): mail and its padding hold a ~100 J war arrow to a shallow
+  // wound, a heavy war bow's ~130 J bodkin a little less so, a crossbow's ~170 J bolt drives on through a good deal deeper.
+  proofJoules: 100,
   // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (within `clear` m of its
   // line) by `above` m, at an elevation of `most` rad at most (the massed archery of a deep line: the rear ranks lob).
   over: { clear: 0.6, above: 0.35, most: 0.75 },

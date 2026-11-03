@@ -596,7 +596,11 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   }
   const region = hit.throat ? 'head' : bulletRegion(key);
   // Full armour (plate, lamellar) guards the throat with its gorget or aventail; a vest does not.
-  const stopped = proof ? 1 - ARROW.gapHarm : hit.throat ? 0 : protectionAt(gear, key).pierce ?? 0;
+  // Short of plate, armour (mail, brigandine, a padded coat) stops its share of a war arrow's point, and of a heavier arrow only
+  // as much as it is proof against (ARROW.proofJoules), as against a ball (bulletProof): a heavy bodkin or a crossbow's bolt
+  // drives the further through mail. Plate is not pierced: an arrow finds its gaps or glances (above).
+  const joules = energy * ARROW.joules;
+  const stopped = proof ? 1 - ARROW.gapHarm : hit.throat ? 0 : (protectionAt(gear, key).pierce ?? 0) * Math.min(1, ARROW.proofJoules / Math.max(1e-6, joules));
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
