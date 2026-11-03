@@ -246,6 +246,12 @@ export const PRESETS = {
     outfit: { kind: 'dobok', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
+  // A judoka of the Kodokan: short and thick in the legs (1.72 m, ~79 kg), years on the mat.
+  judo: {
+    name: 'Saigo Shiro', style: 'judo', sex: 'male', heightCm: 172, frame: 'small', age: 26, exercise: 0.85, calories: 4500,
+    outfit: { kind: 'judogi', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
+  },
   // Tanzong, one of the thirteen Shaolin monks of the Tang tale, with the staff.
   staff: {
     name: 'Tanzong', style: 'staff', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.74, calories: 4125,

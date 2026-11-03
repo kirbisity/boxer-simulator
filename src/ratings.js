@@ -1601,6 +1601,41 @@ export const RATINGS = {
     "maximus": 1.267
    }
   },
+  "judo": {
+   "title": "Saigo Shiro",
+   "faction": "ring",
+   "type": "judo|judogi",
+   "records": {
+    "maximus": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "taichi": {
+     "wins": 0,
+     "losses": 6,
+     "draws": 0
+    },
+    "taekwondo": {
+     "wins": 1,
+     "losses": 5,
+     "draws": 0
+    },
+    "sumo": {
+     "wins": 1,
+     "losses": 5,
+     "draws": 0
+    }
+   },
+   "score": 1.8,
+   "provisional": 1.8,
+   "kd": {
+    "maximus": 0,
+    "taichi": 0,
+    "taekwondo": 0.2,
+    "sumo": 0.2
+   }
+  },
   "taekwondo": {
    "title": "Kim Min-jun",
    "faction": "ring",
@@ -2081,6 +2116,7 @@ export const RATINGS = {
   "sumo|sumo": 18,
   "dao|wokou": 55,
   "taekwondo|dobok": 15,
+  "judo|judogi": 1.8,
   "street|casual": 6,
   "whip|lorarius": 27,
   "kickboxing|boxing": 8.4,

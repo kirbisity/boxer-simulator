@@ -1806,6 +1806,15 @@ export const OUTFITS = {
       { label: 'Dobok', top: { kind: 'jacket', color: '#f2f2f0' }, bottom: { kind: 'pants', color: '#f2f2f0' }, feet: { kind: 'bare' } },
     ],
   },
+  // A judogi: the heavy double-woven jacket made to be gripped and thrown in, white or blue, bare feet.
+  judogi: {
+    faction: 'ring',
+    label: 'Judogi', movement: 'excellent', fists: 'bare',
+    designs: [
+      { label: 'White', top: { kind: 'jacket', color: '#f0efe8' }, bottom: { kind: 'pants', color: '#f0efe8' }, feet: { kind: 'bare' } },
+      { label: 'Blue', top: { kind: 'jacket', color: '#1f3f8a' }, bottom: { kind: 'pants', color: '#1f3f8a' }, feet: { kind: 'bare' } },
+    ],
+  },
   // A conquistador of the 1510s–20s: a steel breastplate with mail sleeves
   // and collar under a morion; a doublet and breeches. Proof against most
   // cuts and points; a gun's ball goes through it unless it is proofed.

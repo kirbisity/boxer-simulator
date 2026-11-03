@@ -32,6 +32,7 @@ export const KIT_REGIONS = {
   ironPagoda: ['china', 'mongolia'],
   // Korea
   dobok: ['korea'],
+  judogi: ['japan'],
   // The steppe
   steppeLight: ['mongolia', 'uzbekistan', 'tibet'], steppeMedium: ['mongolia', 'uzbekistan'], kheshig: ['mongolia', 'tibet'],
   xiongnu: ['mongolia', 'uzbekistan'], hun: ['uzbekistan', 'mongolia'], hunNoble: ['uzbekistan', 'mongolia'],

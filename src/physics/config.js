@@ -817,6 +817,12 @@ export const WORLD = {
   // A throw from the hold: `seconds` of the thrower's leg force, the top
   // of the man pulled across and `down`, his hips pushed back (`hipShare`).
   throw: { seconds: 0.3, down: 0.6, hipShare: 0.6 },
+  // A shoulder throw (judo's seoi nage: physics/grappling.js shoulderThrowOf): the legs bear his own weight and `bear` of the man's
+  // on his back, and what they push past that over `lift` m, with the arms' pull (`pullShare` of their push, over `pull` m), throws
+  // him, at `angle` rad above level, turning over a lever of `spin` m; a stall leaves the thrower off balance `stallSeconds`. Two of
+  // a weight (~75 kg, legs ~2× his weight): thrown at ~3.5 m/s off the shoulder; a man of 45 kg at ~5 m/s, a few metres; one of
+  // ~120 kg or more is not lifted at all.
+  shoulderThrow: { bear: 0.7, lift: 0.8, pullShare: 0.5, pull: 0.8, angle: 0.5, spin: 0.7, stallSeconds: 0.6 },
   // Hitting the floor or another body. A part meeting the floor faster than
   // `minSpeed` (m/s) takes the speed beyond it: the head as a blow to the
   // head (`head` of it, the arms and shoulders breaking part of a fall), the
@@ -964,9 +970,15 @@ export const WORLD = {
   // (`leanThigh` m): thick thighs meet and push the knees apart, so a thin man
   // crawls knees nearly together and a heavy one well apart; each foot `footOut` of his height further out, the
   // hands out from the shoulders by `armApart` of the arm's thickness.
-  // strike: a blow of the hand from his knees (only the player's chosen crawl: control.js toggleCrawl) has this share of the mass
+  // strike: a blow of the hand from his knees (only the player's: his own crawl, or one he was put to with his weapon still in hand) has this share of the mass
   // behind it, aimed low (in a stage he is seen the later for it: levelmode/awareness.js crawlSight). Crawling costs no stamina
   // (he gets his breath back as he would standing).
+  // A man on his feet walking or running into one on the floor (physics.js trodOver): `from` m/s closing the least that counts;
+  // `legDrive` the share of his weight behind his leg (the hips and the planted leg driving it on); `restitution` the bounce;
+  // a man on his knees shoved `flatFrom` m/s or more is knocked flat; a leg stopped by `tripFrom` m/s or more trips the walker.
+  // A walk (~1.4 m/s) into a man his weight trips no one: he is stopped; a heavy man jogging into a light one knocks him flat
+  // and keeps his feet; a light man running into a heavy one goes over him.
+  trod: { from: 0.8, legDrive: 0.25, restitution: 0.1, flatFrom: 0.5, tripFrom: 2 },
   crawl: { strike: 0.35, speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6, thighApart: 2, leanThigh: 0.06, footOut: 0.008, armApart: 0.8 },
   // A blow at a man low before him (lowstrike.js: lying, getting up, on his knees): made at a place on his body, not at a standing
   // man's chest in the air above him. The striker bends to it: `stoop` is the share (0 to 1) of the deepest bend he takes, enough

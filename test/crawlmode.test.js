@@ -116,11 +116,18 @@ test('a blow from his knees: only of the hand, low, and weak (WORLD.crawl.strike
   assert.equal(cut, true, 'a blow of the hand');
   assert.equal(me.punch.weak, WORLD.crawl.strike);
   assert.equal(me.punch.zone, 'legs', 'aimed low');
-  // A man crawling away of the old rules strikes nothing.
+  // The player put on his knees (not by his choice) keeps what is in his hand and still swings it, low and weak.
   const other = duel('samurai', 'yari');
   startCrawl(other, other.fighters[0], 'crawls away');
   other.fighters[0].crawlChosen = false;
-  assert.equal(throwPunch(other, other.fighters[0], 'jab', 'head'), false);
+  assert.ok(other.fighters[0].weapon?.held, 'the player keeps his weapon');
+  assert.equal(throwPunch(other, other.fighters[0], 'kesagiri', 'head') || throwPunch(other, other.fighters[0], 'shomen', 'head'), true);
+  assert.equal(other.fighters[0].punch.weak, WORLD.crawl.strike);
+  // Anyone else crawling away lets go of his weapon and strikes nothing.
+  const third = duel('samurai', 'yari');
+  startCrawl(third, third.fighters[1], 'crawls away');
+  assert.equal(third.fighters[1].weapon?.held ?? false, false);
+  assert.equal(throwPunch(third, third.fighters[1], 'jab', 'head'), false);
 });
 
 test('the AI still fights a man crawling by choice (not one crawling away)', async () => {

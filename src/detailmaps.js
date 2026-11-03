@@ -563,6 +563,7 @@ export const CLOTH_BY_OUTFIT = {
   victorianGent: { 'bottom.pants': 'worsted' },
   commoner: { 'top.tunic': 'hemp', 'bottom.pants': 'hemp' },
   dobok: { 'top.jacket': 'cotton' },
+  judogi: { 'top.jacket': 'cotton' },
   thug: { 'top.jacket': 'jersey' },
   sohei: { 'top.kosode': 'hemp' },
   // A fire-entry suit: the aluminized film over its quilted insulation.

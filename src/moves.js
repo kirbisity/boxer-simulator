@@ -1209,6 +1209,24 @@ export const STYLES = {
     plans: { pressure: 1.4, outboxer: 1.2, brawler: 0.6, counter: 0.3 },
     pressure: 0.3,
   },
+  // Judo: in close for the grip (collar and sleeve: the clinch) and, holding, the throw over the shoulder (`shoulderThrow`: the
+  // physics of it is WORLD.shoulderThrow, his legs against the man's weight); the odd push or jab to get in.
+  judo: {
+    label: 'Judo',
+    cadence: { work: 1.3, move: 0.6, burst: 0.7, mobility: 0.5 },
+    stance: { blade: 0.2, crouch: 0.05, width: 1.25, lean: 0.12, guardHeight: -0.12 },
+    idle: { bounce: 0.3, sway: 0.7, rock: 0.4 },
+    attacks: { clinch: 0.7, jab: 0.1, oshi: 0.1, rush: 0.1 },
+    combos: { 'jab clinch': 0.6, 'oshi clinch': 0.4 },
+    comboChance: 0.4,
+    tempo: 0.9,
+    defences: { guard: 0.4, stepBack: 0.35, parry: 0.25 },
+    defendChance: 0.4,
+    headMovement: 0.1,
+    plans: { pressure: 1.8, brawler: 0.8, outboxer: 0.4, counter: 0.6 },
+    pressure: 0.5,
+    shoulderThrow: { after: 0.35, rate: 2 },
+  },
   // The staff: quick strikes from either end and thrusts from both, the
   // hands sliding; always moving.
   staff: {

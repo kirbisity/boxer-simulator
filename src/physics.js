@@ -1882,7 +1882,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   }
   const drain = cost / fighter.body.aerobic;
   // On his knees by his own choice (the player's crawl), a blow of the hand is still his: low and weak (WORLD.crawl.strike).
-  const fromKnees = fighter.crawling && fighter.crawlChosen && fighter.player && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
+  const fromKnees = fighter.crawling && fighter.player && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
   if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
   // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
   if (blade && fighter.caught && blade === caughtBlade(fighter)) return false;
@@ -2637,8 +2637,9 @@ export function startCrawl(world, fighter, reason, { keep = false } = {}) {
   fighter.pickup = null;
   fighter.defence = null;
   fighter.running = false;
-  // (Down by his own choice, the player keeps hold of his weapon: `keep`.)
-  if (fighter.weapon?.held && !keep) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
+  // (Down by his own choice, the player keeps hold of his weapon: `keep`; put down on his knees, the player still holds on to
+  // what he had, to swing it low and weak from there: throwPunch fromKnees.)
+  if (fighter.weapon?.held && !keep && !fighter.player) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   world.events.push({ time: world.time, kind: 'crawl', fighter: fighter.id, effects: [reason] });
   return true;
 }
@@ -6083,6 +6084,79 @@ function pushApart(world, first, second) {
   // A shield held in front is what a body running into the man meets first.
   crashIntoShield(world, first, second);
   crashIntoShield(world, second, first);
+  // A man on his feet walking into one on the floor.
+  trodOver(world, first, second);
+  trodOver(world, second, first);
+}
+
+const TROD_LEGS = [['lShank', P.lKnee, P.lFoot], ['rShank', P.rKnee, P.rFoot], ['lThigh', P.lHip, P.lKnee], ['rThigh', P.rHip, P.rKnee]];
+const TROD_BODY = ['trunk', 'head'];
+
+/** A man on the floor: on his knees crawling, or lying there (come to rest on it: one still falling is no footing to trip on). */
+const lyingLow = (fighter) => (fighter.crawling && fighter.state === 'up') || lyingOnFloor(fighter, 'trunk');
+
+/**
+ * A man on his feet whose leg runs into one on the floor (WORLD.trod): the leg, with `legDrive` of his weight behind it, meets
+ * the body there at the speed they close (a collision of the two, `restitution`); the man on the floor holds by the grip of his
+ * weight on the ground (WORLD.crash.brace). Past that hold he is shoved, and one on his knees shoved `flatFrom` m/s or more is
+ * knocked flat; the leg stopped by `tripFrom` m/s or more (a heavy man on the floor, or one run into) trips the walker over him.
+ * Reckoned in a small fight (WORLD.tiers.full fighters or fewer) and, in a big one, only where the player is one of the two.
+ */
+function trodOver(world, walker, lying) {
+  const spec = WORLD.trod;
+  if (walker.state !== 'up' || walker.crawling || walker.mount || walker.air || !lyingLow(lying) || lying.mount) return;
+  if (world.fighters.length > WORLD.tiers.full && !walker.player && !lying.player) return;
+  if (runsUnder(walker) || runsUnder(lying)) return;
+  const key = `trod:${walker.id}:${lying.id}`;
+  world.bumps ??= new Map();
+  if (world.time - (world.bumps.get(key) ?? -Infinity) < WORLD.crash.cooldown) return;
+  const legs = walker.capsuleCache.byKey;
+  const body = lying.capsuleCache.byKey;
+  for (const [legKey, top, bottom] of TROD_LEGS) {
+    const leg = legs[legKey];
+    if (!leg) continue;
+    for (const partKey of TROD_BODY) {
+      const part = body[partKey];
+      if (!part) continue;
+      const [a1, b1] = capsuleEnds(walker, leg);
+      const [a2, b2] = capsuleEnds(lying, part);
+      const closest = closestBetween(a1, b1, a2, b2);
+      const offset = vec.sub(closest.onSecond, closest.onFirst);
+      const distance = vec.length(offset);
+      if (distance >= leg.radius + part.radius || distance < 1e-9) continue;
+      // (Level: what the leg drives into him along the ground.)
+      const along = [offset[0], 0, offset[2]];
+      const flat = vec.length(along);
+      if (flat < 1e-6) continue;
+      const direction = vec.scale(along, 1 / flat);
+      const legVelocity = vec.lerp(point(walker.v, top), point(walker.v, bottom), closest.s);
+      const closing = vec.dot(vec.sub(legVelocity, crashVelocity(lying, 'trunk')), direction);
+      if (closing < spec.from) continue;
+      world.bumps.set(key, world.time);
+      const legMass = walker.body.limbKg[`${legKey[0]}Leg`] + spec.legDrive * walker.body.massKg;
+      const floorMass = lying.body.massKg;
+      const exchanged = ((legMass * floorMass) / (legMass + floorMass)) * closing * (1 + spec.restitution);
+      const hold = WORLD.crash.brace.grip * floorMass * WORLD.gravity * WORLD.crash.brace.seconds;
+      // Held, he is as a wall to the leg: it is stopped against him as far as his hold goes.
+      const onLeg = exchanged > hold ? exchanged : Math.min(legMass * closing * (1 + spec.restitution), hold);
+      const shoved = Math.max(0, exchanged - hold);
+      const shovedSpeed = shoved / floorMass;
+      const legStopped = onLeg / legMass;
+      if (shoved > 0) world.pendingImpulses.push({ fighter: lying, shares: TRUNK_PARTICLES.map((index) => [index, 1]), direction, impulse: shoved });
+      world.pendingImpulses.push({ fighter: walker, shares: [[bottom, 1], [top, 0.5]], direction: vec.scale(direction, -1), impulse: onLeg });
+      const effects = [];
+      if (lying.crawling && lying.state === 'up' && shovedSpeed >= spec.flatFrom) {
+        fall(world, lying, 'knocked flat by a man walking into him');
+        effects.push('knocked flat');
+      }
+      if (legStopped >= spec.tripFrom) {
+        fall(world, walker, 'tripped over a man on the floor');
+        effects.push('tripped');
+      }
+      world.events.push({ time: world.time, kind: 'trod', attacker: walker.id, defender: lying.id, speed: closing, impulse: onLeg, shoved: shovedSpeed, legStopped, point: closest.onSecond, effects: effects.length ? effects : ['walks into a man on the floor'] });
+      return;
+    }
+  }
 }
 
 // ---- Crashes: bodies meeting ---------------------------------------------------

@@ -4,7 +4,8 @@
 import { soundVoice } from '../audio/log.js';
 import { P } from '../body.js';
 import { STYLES } from '../moves.js';
-import { addDamage, boneShare, dropWeapon, opponentFor, point, protectionAt, TRUNK_PARTICLES, wound } from '../physics.js';
+import { addDamage, boneShare, dropWeapon, fall, opponentFor, point, protectionAt, TRUNK_PARTICLES, wound } from '../physics.js';
+import { riseForces } from './rising.js';
 import { vec, yawRotate } from '../pose.js';
 import { WORLD } from './config.js';
 
@@ -23,6 +24,13 @@ export function holdClinch(world, fighter) {
       fighter.clinch.biteAt = world.time + style.bite.every;
       bite(world, fighter, target, style.bite);
     }
+  }
+  // Holding him by the collar and the sleeve, a judoka turns in for the throw over his shoulder (`shoulderThrow`).
+  const shoulder = style?.shoulderThrow;
+  if (shoulder && fighter.clinch.locked?.l && fighter.clinch.locked?.r && fighter.clinch.t > shoulder.after && target.state === 'up' && !target.mount
+    && world.random() < shoulder.rate * (world.lastDt / WORLD.substeps)) {
+    shoulderThrow(world, fighter, target);
+    return;
   }
   if (style?.clinchDrive && fighter.clinch.locked?.l && fighter.clinch.locked?.r) {
     driveClinch(world, fighter, target);
@@ -262,6 +270,59 @@ export function throwFromHold(world, fighter, target) {
   world.events.push({ time: world.time, kind: 'throw', attacker: fighter.id, defender: target.id, impulse, effects: ['thrown'] });
   // (Heard: the heave of the throw.)
   if (world.ear) soundVoice(world, fighter, 'effort', 1);
+}
+
+/**
+ * What a shoulder throw (judo's seoi nage) would do now (WORLD.shoulderThrow): the thrower turns in under the man and lifts him
+ * on his back with his legs, which must bear his own weight and `bear` of the other's; what they can push beyond that, over the
+ * `lift` (m) of the hips straightening, and his arms' pull (`pullShare` of their push, over `pull` m) on the collar and sleeve
+ * turning him over, is the work that throws him. `lifts` false when his legs cannot take the load (the man is too heavy for him);
+ * else `speed` (m/s) the man leaves his back at, from `energy` (J) over the man's mass.
+ */
+export function shoulderThrowOf(fighter, target) {
+  const spec = WORLD.shoulderThrow;
+  const strength = Math.max(0.3, fighter.motorScale ?? 1);
+  const { arm, leg, weight } = riseForces(fighter, strength);
+  const load = target.body.masses.reduce((sum, mass) => sum + mass, 0) * WORLD.gravity;
+  const spare = leg.l + leg.r - weight - spec.bear * load;
+  if (spare <= 0) return { lifts: false, spare, energy: 0, speed: 0 };
+  const energy = spare * spec.lift + (arm.l + arm.r) * spec.pullShare * spec.pull;
+  return { lifts: true, spare, energy, speed: Math.sqrt((2 * energy) / (load / WORLD.gravity)) };
+}
+
+/**
+ * A shoulder throw (shoulderThrowOf): lifted, the man goes over the thrower's hip and shoulder to the side he is pulled, up off
+ * his feet at the speed the throw gives him, turning head first (`spin`: the speed over the lever, m) so that he lands on his
+ * back and shoulders: the floor does the harm (groundImpact), as any fall's. Too heavy to lift, the throw stalls and the hold is
+ * broken; the thrower, bent under him, is off balance for a moment.
+ */
+export function shoulderThrow(world, fighter, target) {
+  const spec = WORLD.shoulderThrow;
+  const throwOf = shoulderThrowOf(fighter, target);
+  fighter.clinch = null;
+  if (!throwOf.lifts) {
+    world.events.push({ time: world.time, kind: 'throwFailed', attacker: fighter.id, defender: target.id, effects: ['cannot lift him'] });
+    fighter.stagger = Math.max(fighter.stagger ?? 0, spec.stallSeconds);
+    return false;
+  }
+  const side = world.random() < 0.5 ? 1 : -1;
+  const across = yawRotate([0, 0, side], fighter.yaw);
+  const up = [0, 1, 0];
+  const launch = vec.add(vec.scale(across, Math.cos(spec.angle) * throwOf.speed), vec.scale(up, Math.sin(spec.angle) * throwOf.speed));
+  // Turning about the thrower's facing, the top going the way he is thrown and down, the feet up and over.
+  const axis = [up[1] * across[2] - up[2] * across[1], up[2] * across[0] - up[0] * across[2], up[0] * across[1] - up[1] * across[0]];
+  const spin = throwOf.speed / spec.spin;
+  fall(world, target, 'thrown over the shoulder');
+  const centre = point(target.x, P.pelvis);
+  for (let index = 0; index < target.x.length / 3; index += 1) {
+    const r = vec.sub(point(target.x, index), centre);
+    const turn = [axis[1] * r[2] - axis[2] * r[1], axis[2] * r[0] - axis[0] * r[2], axis[0] * r[1] - axis[1] * r[0]];
+    for (let k = 0; k < 3; k += 1) target.v[index * 3 + k] += launch[k] + spin * turn[k];
+  }
+  target.lastHitBy = fighter.id;
+  world.events.push({ time: world.time, kind: 'throw', attacker: fighter.id, defender: target.id, speed: throwOf.speed, energy: throwOf.energy, effects: ['thrown over the shoulder'] });
+  if (world.ear) soundVoice(world, fighter, 'effort', 1);
+  return true;
 }
 
 /**

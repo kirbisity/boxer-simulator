@@ -78,6 +78,7 @@ export const WARRIORS = [
   warrior('jaguar', 'Ocelotl', PRESETS.tepoztopilli),
   warrior('mexica', 'Yaotl', PRESETS.contender, { name: 'Yaotl', calories: 4050, exercise: 0.75, sex: 'male', style: 'macuahuitl', outfit: { kind: 'mexicaWarrior', design: 0 }, accessories: [], look: { skinTone: 'medium', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
   warrior('taekwondo', 'Kim Min-jun', PRESETS.taekwondo),
+  warrior('judo', 'Saigo Shiro', PRESETS.judo),
   warrior('mingEliteGun', 'Wu Weizhong', PRESETS.guandao, { name: 'Wu Weizhong', style: 'matchlock', outfit: { kind: 'mingElite', design: 1 } }),
   warrior('mingShield', 'Chen Bao', PRESETS.swordShield),
   warrior('mingBrigSpear', 'Sun Qi', PRESETS.swordShield, { name: 'Sun Qi', style: 'spear', outfit: { kind: 'mingBrigandine', design: 2 } }),
