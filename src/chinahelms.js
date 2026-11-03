@@ -139,7 +139,7 @@ const QING_CONE = [[0.12, 1], [0.4, 0.97], [0.7, 0.87], [1.0, 0.7], [1.3, 0.51],
 const QING_TIERS = [[1.66, 2.0, 0.33, 0.27, 'drum'], [2.0, 2.06, 0.3, 0.29, 'ring'], [2.06, 2.2, 0.16, 0.12, 'neck'], [2.2, 2.44, 0.08, 0.23, 'cup']];
 export const QING_HELMS = {
   bannerBowl: {
-    label: 'Banner helmet', zh: '八旗盔', period: 'Later Jin and Qing, 17th c.', finish: 'blackLacquer',
+    label: 'Banner helmet', zh: '八旗盔', period: 'Later Jin, 17th c.', finish: 'blackLacquer',
     note: 'A cone lacquered black rising to a point, a tiered gilt finial and a tall gilt spire with a black horsehair plume, a gilt band and a flat gilt peak over the brow; after the user\'s photographs of the eight banners\' armours.',
     profile: QING_CONE,
     ellipse: [1.08, 0.9], gap: 0.11,
@@ -150,8 +150,8 @@ export const QING_HELMS = {
     plume: 'qingPlume',
   },
   bayaraBowl: {
-    label: 'Bayara helmet', zh: '护军盔', period: 'Later Jin and Qing, 17th c.', finish: 'giltSteel',
-    note: 'A cone of polished steel in four plates, gilt masks and festoons round it, a band of gilt characters at its foot, a tiered gilt finial and spire with a hanging sable tassel, a flat steel peak edged in gilt; after the user\'s photographs of a Qing guard\'s armour and the gilt helmets at the Met and Sotheby\'s.',
+    label: 'Bayara helmet', zh: '护军盔', period: 'Later Jin, 17th c.', finish: 'giltSteel',
+    note: 'A cone of polished steel in four plates, gilt masks and festoons round it, a band of gilt characters at its foot, a tiered gilt finial and spire with a hanging sable tassel, a flat steel peak edged in gilt; after the user\'s photographs of a Later Jin guard\'s armour and the gilt helmets at the Met and Sotheby\'s.',
     profile: QING_CONE,
     ellipse: [1.08, 0.9], gap: 0.11,
     brim: { reach: 0.035, fall: 0.0, lip: 0.018 },
