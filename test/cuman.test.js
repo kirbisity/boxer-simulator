@@ -62,9 +62,9 @@ test('the mail shirt carries rows of plates in columns, mail between them, strap
   assert.equal(kit.forearm[3], 'steel');
 });
 
-test('Konchak is on the roster, rated', () => {
+test('the Cuman is on the roster under his unit name, rated', () => {
   const konchak = WARRIORS.find((warrior) => warrior.key === 'cuman');
-  assert.equal(konchak.title, 'Konchak');
+  assert.equal(konchak.title, 'Iron-Faced Cuman');
   assert.equal(konchak.faction, 'steppe');
   assert.ok(RATINGS.characters.cuman.score > 0);
   assert.ok(RATINGS.types['cumanBow|cumanHeavy'] > 0);

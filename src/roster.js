@@ -22,6 +22,114 @@ const warrior = (key, title, base, changes = {}) => {
   return { key, title, inputs, faction: factionOf(inputs), line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
 };
 
+/**
+ * The name a character goes by, in the roster and over his head in a fight: what he is (a unit's name), not who
+ * (the user's choice, Dark Souls style). The legends and the machines keep their own names. Battles' soldiers
+ * (cast.js) keep their personal names.
+ */
+export const UNIT_NAMES = {
+  plate: 'Noble Knight',
+  templar: 'Templar Grand Master',
+  joan: 'Maid of Orléans',
+  maximilian: 'Jousting King',
+  crossbowman: 'Genoese Crossbowman',
+  tosei: 'One-Eyed Dragon',
+  hammer: 'Hammer Knight',
+  oyoroi: 'Tiger of Kai',
+  tametomo: 'Great-Bow Archer',
+  naginata: 'Glaive Maiden',
+  sohei: 'Warrior Monk',
+  odachi: 'Ōdachi Champion',
+  footSpear: 'Spear Footman',
+  archer: 'Fan-Shooter Archer',
+  teppo: 'Teppō Gunner',
+  mingGuandao: "General's Retainer",
+  mingThreeEyed: 'Three-Eyed Gunner',
+  shaolin: 'Shaolin Staff Monk',
+  taichi: 'Tai Chi Master',
+  kanabo: 'Kanabō Brute',
+  ironPagoda: 'Iron Pagoda',
+  hanCrossbow: 'Han Crossbowman',
+  wuxia: 'Wuxia Swordsman',
+  kheshig: 'Old Orlok',
+  esen: 'Oirat Warlord',
+  mandukhai: 'Warrior Queen',
+  steppeShield: 'Kheshig Archer',
+  steppeArcher: 'Steppe Horse Archer',
+  cuman: 'Iron-Faced Cuman',
+  gaziAlp: 'Frontier Gazi',
+  sipahi: 'Mace Sipahi',
+  janissary: 'Wall-Storming Janissary',
+  janissaryGun: 'Janissary Musketeer',
+  azapArcher: 'Azap Archer',
+  azapSpear: 'Azap Spearman',
+  ronin: 'Two-Sword Rōnin',
+  wokou: 'Wokou Pirate',
+  hidalgo: 'Conquistador Captain',
+  rodelero: 'Rodelero',
+  arquebusier: 'Conquistador Arquebusier',
+  vocMusketeer: 'Company Musketeer',
+  vocPikeman: 'Company Pikeman',
+  eagle: 'Eagle Warrior',
+  jaguar: 'Jaguar Warrior',
+  mexica: 'Mexica Warrior',
+  taekwondo: 'Taekwondo Black Belt',
+  judo: 'Judoka',
+  mingEliteGun: 'Ming Elite Musketeer',
+  mingShield: 'Ming Shield Soldier',
+  mingBrigSpear: 'Ming Spearman',
+  mingGun: 'Ming Musketeer',
+  mingCrossbow: 'Garrison Crossbowman',
+  mingSpear: 'Garrison Spearman',
+  mingDao: 'Garrison Swordsman',
+  bayara: 'Bayara Guard',
+  bannerArcher: 'Banner Archer',
+  bannerGuandao: 'Banner Glaive-Man',
+  bannerSpear: 'Banner Spearman',
+  arquebus: 'Arquebusier',
+  footBow: 'English Longbowman',
+  ashigaruSpear: 'Ashigaru Spearman',
+  ashigaruBow: 'Ashigaru Archer',
+  hoplomachus: 'Hoplomachus',
+  murmillo: 'Murmillo',
+  secutor: 'Secutor',
+  thraex: 'Rebel Thraex',
+  retiarius: 'Retiarius',
+  scissor: 'Scissor Gladiator',
+  lorarius: 'Arena Whip-Master',
+  legionary: 'Legionary',
+  centurion: 'Centurion',
+  peasant: 'Pitchfork Peasant',
+  starved: 'Starved Rebel',
+  pistol: 'SWAT Pistoleer',
+  baton: 'SWAT Baton Officer',
+  riot: 'Riot Shield Officer',
+  police: 'Patrol Officer',
+  policeBaton: 'Baton Patrolwoman',
+  swatShotgun: 'SWAT Breacher',
+  specialForces: 'Special Forces Rifleman',
+  infantry: 'Infantry Rifleman',
+  flamer: 'Flame Trooper',
+  firefighter: 'Fire-Suited Fireman',
+  knife: 'Yakuza Knifeman',
+  gorilla: 'Silverback',
+  chimp: 'Chimpanzee',
+  baboon: 'Chacma Baboon',
+  macaque: 'Temple Monkey',
+  boxer: 'Heavyweight Boxer',
+  kickboxer: 'Kickboxer',
+  muayThai: 'Muay Thai Fighter',
+  street: 'Street Brawler',
+  sumo: 'Sumo Grand Champion',
+  bat: 'Back-Alley Thug',
+  brawler: 'Cage Wrestler',
+  mix: 'Mixed Martial Artist',
+  unskilled: 'Rebel Peasant Leader',
+};
+
+/** A roster entry under its unit's name (UNIT_NAMES), where it has one. */
+const unitNamed = (entry) => (UNIT_NAMES[entry.key] ? { ...entry, title: UNIT_NAMES[entry.key], inputs: { ...entry.inputs, name: UNIT_NAMES[entry.key] } } : entry);
+
 // `legend`: shown in the intro on first load (intro.js), in `order`, with its
 // `kicker` (an epithet over the name) and `line`; `legend: true` alone will do
 // (after the numbered, his faction for the kicker, his kit for the line).
@@ -29,7 +137,7 @@ export const WARRIORS = [
   warrior('plate', 'Sir Edric', PRESETS.knight),
   // The knights' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
   { ...warrior('templar', 'Knights Templar', PRESETS.templar), flagship: true, legend: { order: 1, kicker: 'The Crusader', line: 'A warrior monk of the Crusades: arming sword, heater shield, mail and the great helm.' } },
-  { ...warrior('joan', 'Joan of Arc', PRESETS.joan), legend: { order: 2, kicker: 'The Maid of Orléans', line: 'White plate, bareheaded, the arming sword; she bears the standard when she leads.' } },
+  { ...warrior('joan', 'Joan of Arc', PRESETS.joan), legend: { order: 2, kicker: 'Joan of Arc', line: 'White plate, bareheaded, the arming sword; she bears the standard when she leads.' } },
   // Maximilian I, the great jouster, on foot in his Gestech harness with the lance: a legend, not the flagship.
   { ...warrior('maximilian', 'Maximilian I', PRESETS.maximilian), legend: { order: 2.5, kicker: 'The Last Knight', line: 'The jousting emperor in his Stechzeug: the frog-mouthed helm bolted to the breast, and the lance.' } },
   warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
@@ -49,7 +157,7 @@ export const WARRIORS = [
   warrior('shaolin', 'Tanzong', PRESETS.staff),
   warrior('taichi', 'Chen Fake', PRESETS.taichi),
   warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
-  { ...warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda), legend: { order: 5, kicker: 'The Iron Pagoda', line: 'The Jin heavy guard: wolf-tooth mace and iron buckler, armoured head to foot.' } },
+  { ...warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda), legend: { order: 5, kicker: 'Wanyan Wuzhu', line: 'The Jin heavy guard: wolf-tooth mace and iron buckler, armoured head to foot.' } },
   { ...warrior('guanYu', 'Guan Yu', PRESETS.guanYu), legend: { order: 6, kicker: 'God of War', line: 'The Green Dragon Crescent Blade: great sweeping cuts from far off.' } },
   warrior('hanCrossbow', 'Li Ling', PRESETS.hanCrossbow),
   warrior('wuxia', 'Pei Min', PRESETS.wuxia),
@@ -147,7 +255,7 @@ export const WARRIORS = [
   warrior('brawler', 'Hank Doyle', PRESETS.clinchBrawl),
   warrior('mix', preset('mix').name, preset('mix')),
   warrior('unskilled', preset('unskilled').name, preset('unskilled')),
-];
+].map(unitNamed);
 
 // Test units: built and rated, but not in the game's pickers until they are approved. `#flamer` in the address (with any other
 // flags: `#maps=off&flamer`) puts them in, for a test build; approved, they move up into WARRIORS (none waits now: the flag does nothing).
