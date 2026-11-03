@@ -113,9 +113,9 @@ export const HAN_HOOD = {
   plume: 'pheasant', rim: { r: 0.075, colour: '#e3d8bf' },
 };
 
-// The banner helmet's bowl: raised in an ogee from near upright sides to a tall point, as the Ottoman chichak is
+// The banner helmet's bowl: narrow, drawn in from the band in an ogee to a tall sharp point, as the Ottoman chichak is
 // (wardrobe.js CHICHAK), the gilt spire standing on the point.
-const QING_CONE = [[0.12, 1], [0.4, 1.01], [0.7, 0.96], [1.0, 0.84], [1.3, 0.64], [1.6, 0.4], [1.85, 0.2], [2.02, 0.08], [2.1, 0.04]];
+const QING_CONE = [[0.12, 1], [0.4, 0.97], [0.7, 0.87], [1.0, 0.7], [1.3, 0.51], [1.6, 0.33], [1.9, 0.18], [2.2, 0.07], [2.42, 0.015]];
 
 /**
  * The Eight Banners' helmets (the Later Jin's of the 1610s-30s, and the Qing's after): a conical bowl drawn up to a point and a
@@ -130,20 +130,20 @@ export const QING_HELMS = {
     label: 'Banner helmet', zh: '八旗盔', period: 'Later Jin and Qing, 17th c.', finish: 'blackLacquer',
     note: 'A cone lacquered black rising to a point and a tall gilt spire with a black horsehair plume, a gilt band and visor; after the user\'s photographs of the eight banners\' armours.',
     profile: QING_CONE,
-    ellipse: [1.14, 0.95], gap: 0.13,
-    brim: { reach: 0.2, fall: 0.02, lip: 0.02 },
+    ellipse: [1.08, 0.9], gap: 0.11,
+    brim: { reach: 0.12, fall: 0.02, lip: 0.02 },
     plates: 0, band: true,
-    finial: { kind: 'tube', r: 0.05, h: 0.75, finish: 'gilt' },
+    finial: { kind: 'tube', r: 0.04, h: 0.7, finish: 'gilt' },
     plume: 'qingPlume',
   },
   bayaraBowl: {
     label: 'Bayara helmet', zh: '护军盔', period: 'Later Jin and Qing, 17th c.', finish: 'giltSteel',
     note: 'A cone of polished steel in four plates under gilt openwork scrolls, a gilt band and visor, a gilt spire with a hanging sable tassel; after the user\'s photograph of a Qing guard\'s armour.',
     profile: QING_CONE,
-    ellipse: [1.14, 0.95], gap: 0.13,
-    brim: { reach: 0.24, fall: 0.03, lip: 0.025 },
+    ellipse: [1.08, 0.9], gap: 0.11,
+    brim: { reach: 0.14, fall: 0.03, lip: 0.025 },
     plates: 4, scroll: true, band: true, rivets: true,
-    finial: { kind: 'tube', r: 0.055, h: 0.7, finish: 'gilt' },
+    finial: { kind: 'tube', r: 0.045, h: 0.65, finish: 'gilt' },
     plume: 'qingSable',
   },
 };

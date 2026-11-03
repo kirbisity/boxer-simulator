@@ -1749,10 +1749,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     case 'qingHelm': {
       // The Eight Banners' helmet (chinahelms.js QING_HELMS: `design`, its finish `finish`): the bowl drawn up into its
       // tall gilt tube and plume, fitted over the head; and the hood of the coat's own studded cloth hanging from it
-      // over the ears and the neck to the shoulders, closer round the face than the Ming elite's flaps, bound in
+      // over the ears and the neck to the shoulders, closer round the face than the Ming elite's flaps and hanging
+      // near straight down, narrow under the narrow cone, bound in
       // the coat's binding (`trim`).
       buildMingDesignHelm(group, { ...head, design: head.design ?? 'bannerBowl' }, r, steel, { lowDetail });
-      studdedHood(group, head, r, steel, { open: Math.PI * 0.36, trim: head.trim ?? null });
+      studdedHood(group, head, r, steel, { open: Math.PI * 0.36, trim: head.trim ?? null, top: 1.08, bottom: 1.32 });
       fitted = true;
       break;
     }
@@ -2163,14 +2164,14 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
 
 /**
  * Padded cloth flaps hanging from a helmet's rim over the cheeks, the ears and the neck to the shoulders, open over the face
- * (+x) by `open` (rad), rows of rivet heads over them (one instanced mesh): the Ming elite's, of the coat's own stuff (its
+ * (+x) by `open` (rad), flaring from `top` to `bottom` (head radii), rows of rivet heads over them (one instanced mesh): the Ming elite's, of the coat's own stuff (its
  * cloth, or its steel, `flapSteel`, where the coat is scale), and the banners' hood (`qingHelm`), its edges bound in the
  * coat's binding (`trim`) where it has one.
  */
-function studdedHood(group, head, r, steel, { open = Math.PI * 0.5, trim = null } = {}) {
+function studdedHood(group, head, r, steel, { open = Math.PI * 0.5, trim = null, top = 1.2, bottom = 1.75 } = {}) {
   const start = Math.PI / 2 + open / 2;
   const span = Math.PI * 2 - open;
-  const [top, bottom, tall, at] = [1.2, 1.75, 1.4, -0.6];
+  const [tall, at] = [1.4, -0.6];
   const coif = new THREE.Mesh(new THREE.CylinderGeometry(top * r, bottom * r, tall * r, 22, 3, true, start, span), head.flapSteel ? metal(steel, new THREE.Color(head.coif).getHex()).clone() : surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
   coif.material.side = THREE.DoubleSide;
   coif.position.y = at * r;

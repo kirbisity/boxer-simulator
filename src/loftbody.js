@@ -683,6 +683,8 @@ export const ARMOR_KINDS = {
   // in the same; the skirt long, split before, behind and at the sides; the studded shoulder guards; the sleeves of
   // the same studded cloth to the wrist.
   bannerCoat: {
+    // Cut straight, loose over the waist as the Ming brigandine is not (the banners' coats in the user's photographs).
+    straight: true,
     // (No belt shows: the apron hangs over it.) The front opening bound (`placket`); the collar of the same cloth, up under the helmet's hood.
     trunk: [-0.06, 0.96, 1.2, { studded: 22, base: 'cloth', edge: 'cloth2', placket: 0.05 }], collar: 'cloth',
     skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
@@ -692,6 +694,7 @@ export const ARMOR_KINDS = {
   // mirror over the heart in a gilt frame, the apron; the skirt with four steel bands across it (`bands`); gilt
   // plates over the shoulders and steel arm guards (lames) to the wrist.
   bayaraCoat: {
+    straight: true,
     trunk: [-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', placket: 0.04, mirror: [0.62, 0.15, 'steel'] }], collar: 'cloth',
     skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', apron: [-0.32, 0.17, 0.42], bands: 4, gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
     upperArm: [[-0.3, 0.5, 1.6, { rows: ['gold', 'gold'] }], [0.45, 1.02, 1.36, { lames: 6, base: 'steel2' }]], forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }],
@@ -1776,6 +1779,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const depth = (u) => (u >= -0.12 ? bodyDepth(u) : bodyDepth(-0.12) * (hemDepth + (1 - hemDepth) * apron(u)));
   const lean = (u) => (u >= -0.12 ? bodyLean(u) : bodyLean(-0.12) + bodyDepth(-0.12) * 0.7 * (1 - apron(u)));
   const trunkRings = (from, to, rings) => tagged('trunk', along(at('pelvis'), at('neck'), forward, rings, from, to, depth, width, lean));
+  // A coat cut straight (a kit's `straight`), not tailored: it hangs from the chest to the hips without following the
+  // waist in, the body's width and depth between them never less than the line from the hip to the chest.
+  const chestAt = 0.7;
+  const unwaisted = (shape) => (u) => (u <= 0 || u >= chestAt ? shape(u) : Math.max(shape(u), shape(0) + (shape(chestAt) - shape(0)) * (u / chestAt)));
+  const straightRings = (from, to, rings) => tagged('trunk', along(at('pelvis'), at('neck'), forward, rings, from, to, unwaisted(depth), unwaisted(width), lean));
   // Skin weights go by distance; a wide belly lies nearer the hanging
   // forearms than the spine, so the abdomen is bound to the torso alone,
   // and the apron to the pelvis and spine, not the legs it hangs over.
@@ -2104,7 +2112,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // A field per pale is drawn sharp down the middle (paleOn), except in a crowd; a device over it (chargeOn) likewise.
   const sharpPale = (paint) => paint?.heraldry && armor?.heraldry === 'pale' && !lowDetail;
   for (const [from, to, inflate, paint] of armorPieces(kit, 'trunk', 'l')) {
-    const rings = trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from)))));
+    const rings = (kit.straight ? straightRings : trunkRings)(from, to, count(Math.max(4, Math.round(14 * (to - from)))));
     // A kit's steel breastplate (rigidBreastplate) is ridged, its borders roped.
     const ridgedPiece = kit?.rigidBreastplate && paint === 'steel';
     tablePiece(rings, inflate, ridgedPiece ? (ring, angle, index, step) => roped(ring, step) ?? 'steel' : sharpPale(paint) ? 'cloth' : paint, abdomen, ridgedPiece ? ridgedPlate : null, 'trunk', pieceMaterial(paint));
