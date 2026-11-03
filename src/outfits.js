@@ -1340,7 +1340,9 @@ export const OUTFITS = {
     // Near the Ming elite's weight and guard (~17 kg on a 79 kg man), the limbs a little less covered (studded
     // cloth sleeves, not the elite's steel arm guards).
     extraMass: 0.22,
-    protection: { blunt: 0.64, cut: 0.93, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.15 } },
+    // Blunt above the Ming elite's: mianjia is cotton armour, the plates set in thick quilted cotton many layers deep
+    // that spreads a club's or a mace's blow over the body as a thin coat of plates does not.
+    protection: { blunt: 0.72, cut: 0.93, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.15 } },
     gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [
@@ -1371,7 +1373,8 @@ export const OUTFITS = {
     // The Ming elite's weight (~18 kg on a 73 kg man).
     extraMass: 0.25,
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
-    protection: { blunt: 0.65, cut: 0.95, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
+    protection: { blunt: 0.72, cut: 0.95, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
     gaps: { lacing: 0.1 },
     courage: 0.45,
     designs: [

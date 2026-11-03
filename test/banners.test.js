@@ -19,10 +19,10 @@ test('the banner coat guards near the Ming elite\'s, above the regular brigandin
   const banner = OUTFITS.bannerArmour;
   const brigandine = OUTFITS.mingBrigandine;
   const elite = OUTFITS.mingElite;
-  for (const kind of ['blunt', 'cut', 'pierce']) {
-    assert.ok(banner.protection[kind] >= brigandine.protection[kind], kind);
-    assert.ok(Math.abs(banner.protection[kind] - elite.protection[kind]) <= 0.05, kind);
-  }
+  for (const kind of ['blunt', 'cut', 'pierce']) assert.ok(banner.protection[kind] >= brigandine.protection[kind], kind);
+  for (const kind of ['cut', 'pierce']) assert.ok(Math.abs(banner.protection[kind] - elite.protection[kind]) <= 0.05, kind);
+  // The thick quilted cotton takes a blunt blow better than the elite's coat.
+  assert.ok(banner.protection.blunt > elite.protection.blunt);
   assert.ok(banner.extraMass > brigandine.extraMass && banner.extraMass <= elite.extraMass);
   assert.deepEqual(banner.designs.map((design) => design.label), ['Plain Yellow', 'Bordered Yellow', 'Plain White', 'Bordered White', 'Plain Red', 'Bordered Red', 'Plain Blue', 'Bordered Blue']);
   // The bordered banners bound in red, the bordered red in white; the plain in their own colour.
@@ -84,7 +84,7 @@ test('the banners\' hood: side flaps, a back flap and a collar, all studded in r
 test('the Bayara is guarded as the Ming elite, no better; the banners braver than the Ming regulars, the men stronger', () => {
   const bayara = OUTFITS.bayara;
   const elite = OUTFITS.mingElite;
-  for (const kind of ['blunt', 'cut', 'pierce']) assert.ok(bayara.protection[kind] <= elite.protection[kind], kind);
+  for (const kind of ['cut', 'pierce']) assert.ok(bayara.protection[kind] <= elite.protection[kind], kind);
   assert.ok(bayara.skill <= elite.skill);
   assert.ok(bayara.horse, 'the guard rides');
   assert.ok(ARMOR_KINDS.bayaraCoat.mirrors.length === 1 && ARMOR_KINDS.bayaraCoat.skirt[3].bands, 'the mirror over the heart, steel bands on the skirt');
