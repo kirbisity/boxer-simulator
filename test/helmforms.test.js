@@ -198,7 +198,7 @@ test('the war masks of China, the steppe and the sultanates: each worn by its ki
   }
   assert.deepEqual([...worn].sort(), [...PICKED].sort());
   // The mail veil is the Turkman turban helmet's own aventail (DESIGN_FORMS.turbanTurkman), on the Ottoman heavy's steel kit.
-  assert.deepEqual(OUTFITS.ottomanHeavy.designs.map((design) => design.head.design ?? null), ['turban', null, 'turban']);
+  assert.deepEqual(OUTFITS.ottomanHeavy.designs.map((design) => design.head.design ?? null), ['turban', null, 'turban', null, null]);
   // Nowhere else: the other kits' faces as they were.
   for (const [kit, outfit] of Object.entries(OUTFITS)) {
     if (wearers[kit]) continue;

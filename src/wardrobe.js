@@ -1327,27 +1327,46 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       // sliding nasal bar, cheek plates and a mail aventail round the neck;
       // (`turban`) a turban wound round it, as an alp wore it.
       const iron = metal(steel, color);
-      const bowl = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
-      bowl.scale.y = 1.3;
-      bowl.position.y = 0.08 * r;
+      // The bowl raised to a tall ogival point (CHICHAK: its profile), fluted from the band up as the Ottoman bowls are.
+      const bowlGeometry = new THREE.LatheGeometry(CHICHAK.profile.map(([out, up]) => new THREE.Vector2(out * r, up * r)), CHICHAK.sides);
+      const place = bowlGeometry.attributes.position;
+      for (let index = 0; index < place.count; index += 1) {
+        const [x, y, z] = [place.getX(index), place.getY(index), place.getZ(index)];
+        const swell = 1 + CHICHAK.flute * Math.cos(Math.atan2(z, x) * CHICHAK.flutes) * Math.min(1, y / (0.3 * r));
+        place.setXYZ(index, x * swell, y, z * swell);
+      }
+      bowlGeometry.computeVertexNormals();
+      const bowl = new THREE.Mesh(bowlGeometry, iron);
+      bowl.position.y = 0.06 * r;
       const gilt = metal(steel, head.gold ?? 0xd6a743);
-      const band = new THREE.Mesh(new THREE.TorusGeometry(1.17 * r, 0.07 * r, 6, 24), gilt);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(1.19 * r, 0.07 * r, 6, 24), gilt);
       band.rotation.x = Math.PI / 2;
       band.position.y = 0.12 * r;
-      const finial = new THREE.Mesh(new THREE.ConeGeometry(0.08 * r, 0.6 * r, 8), gilt);
-      finial.position.y = 1.85 * r;
+      // The finial: a gilt knop and spike on the point.
+      const knop = new THREE.Mesh(new THREE.SphereGeometry(0.1 * r, 10, 8), gilt);
+      knop.position.y = (CHICHAK.profile.at(-1)[1] + 0.1) * r;
+      const finial = new THREE.Mesh(new THREE.ConeGeometry(0.06 * r, 0.45 * r, 8), gilt);
+      finial.position.y = (CHICHAK.profile.at(-1)[1] + 0.38) * r;
+      // The nasal: a bar sliding in its bracket on the brow, its foot widened into a leaf.
       const nasal = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 1.0 * r, 0.12 * r), iron);
-      nasal.position.set(1.18 * r, -0.12 * r, 0);
-      group.add(bowl, band, finial, nasal);
+      nasal.position.set(1.2 * r, -0.12 * r, 0);
+      const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, 0.22 * r, 0.22 * r), gilt);
+      leaf.position.set(1.21 * r, -0.6 * r, 0);
+      const bracket = new THREE.Mesh(new THREE.BoxGeometry(0.1 * r, 0.3 * r, 0.2 * r), gilt);
+      bracket.position.set(1.2 * r, 0.24 * r, 0);
+      group.add(bowl, band, knop, finial, nasal, leaf, bracket);
       for (const side of [1, -1]) {
         const cheek = new THREE.Mesh(new THREE.BoxGeometry(0.6 * r, 0.8 * r, 0.06 * r), iron);
         cheek.position.set(0.35 * r, -0.45 * r, side * 1.08 * r);
         group.add(cheek);
       }
-      const mailCloth = surface(head.mail ?? 0x8d9097, { roughness: 0.55 });
+      const mailCloth = metal(steel, head.mail ?? 0x8d9097);
       mailCloth.side = THREE.DoubleSide;
-      const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.15 * r, 1.6 * r, 1.1 * r, 22, 2, true, Math.PI * 0.75, Math.PI * 1.5), mailCloth);
-      aventail.position.y = -0.45 * r;
+      // The aventail hung from the bowl's foot round the sides and back to the shoulders, wearing the mail's rings (the
+      // detail tile) where the maps are drawn.
+      const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.17 * r, 1.65 * r, CHICHAK.aventail * r, 22, 2, true, Math.PI * 0.75, Math.PI * 1.5), mailCloth);
+      aventail.position.y = (0.1 - CHICHAK.aventail / 2) * r;
+      if (DETAIL_MAPS.on && !lowDetail) wearTile(aventail, 'mail', { moulded: true });
       group.add(aventail);
       worldMask(group, head, r, steel, color);
       if (head.turban) {
@@ -1885,6 +1904,14 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
 // `rivets` along each), the turban's coils [height, radius, thickness, tilt]
 // wound round the bowl's foot, its tail down the back, and the mail
 // aventail's rows from the rim down over neck and shoulders, open at the face.
+// The Ottoman chichak drawn plainly (no design): its bowl's profile ([out, up] in head radii, from the band to the point),
+// raised in an ogee to a tall point as on the Ottoman bowls of the 15th-16th centuries (the Askeri Müze's and Topkapı's),
+// `flutes` shallow flutes round it standing `flute` of the radius, and its mail aventail `aventail` long.
+const CHICHAK = {
+  profile: [[1.17, 0], [1.2, 0.3], [1.16, 0.62], [1.04, 0.95], [0.84, 1.25], [0.58, 1.55], [0.32, 1.85], [0.14, 2.08], [0.04, 2.22], [0, 2.26]],
+  sides: 32, flutes: 16, flute: 0.025, aventail: 1.25,
+};
+
 const AYYUBID_HELM = {
   bowl: [[1.17, -0.05], [1.2, 0.3], [1.14, 0.7], [0.98, 1.05], [0.74, 1.4], [0.46, 1.7], [0.2, 1.95], [0.05, 2.1]],
   ribs: 4,

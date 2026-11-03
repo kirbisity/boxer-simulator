@@ -161,7 +161,7 @@ export const ARMOUR_COVERAGE = {
   ironPagoda: ['lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,
   segmentata: ['segmentata'], centurion: ['mail', 'plate'], hauberk: ['mail'], hamata: ['mail'],
   mongolDeel: null, mongolLamellar: ['lamellae'], mongolIron: ['lamellae', 'plate'], kheshig: ['scale', 'plate'], girdle: null,
-  cataphract: ['scale', 'plate'], deel: null, dolama: null, krug: ['krug', 'mail', 'plate'], kazaghand: ['mail', 'plate'],
+  cataphract: ['scale', 'plate'], deel: null, dolama: null, krug: ['krug', 'mail', 'plate'], krugDisc: ['mail', 'plate'], bekhter: ['mail', 'plate'], mailMirror: ['mail', 'plate'], kazaghand: ['mail', 'plate'],
   conquistador: ['etched', 'mail', 'plate'], escaupil: null, ichcahuipilli: null, jaguarSuit: null, featherSuit: null,
   uncu: null, uncuChecks: null, uncuTocapu: null, uncuRoyal: null, corset: null, overbust: null, overbustSleeved: null,
   silverback: null, robot: ['panels'],
@@ -463,6 +463,9 @@ export const CLOTH_GARMENTS = {
     kazaghand: { '*': 'silk', armor: 'none' },
     dolama: { '*': 'broadcloth', lace: 'silk' },
     krug: { '*': 'none' },
+    krugDisc: { '*': 'none' },
+    bekhter: { '*': 'none' },
+    mailMirror: { '*': 'wool', armor: 'none' },
     // The Americas: quilted cotton, the jaguar's pelt, the eagle's feathers, the uncu's tapestry.
     ichcahuipilli: { '*': 'ichcahuipilli' },
     jaguarSuit: { '*': 'pelt' },

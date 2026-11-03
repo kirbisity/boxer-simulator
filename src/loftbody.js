@@ -885,6 +885,31 @@ export const ARMOR_KINDS = {
     trunk: [[-0.1, 1.0, 1.12, MAIL], [0.15, 0.85, 1.2, { rows: ['steel', 'steel', 'mail'] }]], skirt: [0.6, 0.45, 1.18, MAIL], collar: 'mail',
     upperArm: [-0.3, 0.55, 1.15, MAIL], forearm: [-0.04, -0.03, 1.3, 'steel'],
   },
+  // The krug of great plates (Ottoman, 16th century): a mail shirt to the knee, and over it the round domed plate on the
+  // belly with its boss, a plate across the breast, one at each side and two down the back, each a rigid piece with the
+  // shirt's heavy rings showing between (`plates`, `discs`: their borders gilt); plate shoulder pieces, iron vambraces.
+  krugDisc: {
+    trunk: [-0.1, 1.0, 1.12, MAIL], skirt: [0.95, 0.5, 1.16, MAIL], collar: 'mail',
+    plates: [[0.6, 0.9, 0, 0.62, 1.18, 'steel', 'gold'], [0.18, 0.62, 1.57, 0.36, 1.18, 'steel', 'gold'], [0.18, 0.62, -1.57, 0.36, 1.18, 'steel', 'gold'], [0.5, 0.9, Math.PI, 0.7, 1.18, 'steel', 'gold'], [0.12, 0.46, Math.PI, 0.7, 1.18, 'steel', 'gold']],
+    discs: [[0.35, 0, 0.105, 1.24, 'steel', 'gold', 0.022], [0.35, 0, 0.03, 1.24, 'steel', 'steel2', 0.038]],
+    upperArm: [[-0.3, 0.55, 1.15, MAIL], [-0.24, 0.14, 1.48, 'steel']], forearm: [-0.04, -0.03, 1.3, 'steel'],
+  },
+  // The bekhter: rows of narrow plates down the chest and back, set in the shirt's mail and gilt along their edges, the
+  // front open down the middle and buckled shut with leather straps (`plates`, their straps and buckles); laminated plates
+  // over the shoulders, a mail skirt, iron vambraces, and a round boss on the belt.
+  bekhter: {
+    trunk: [-0.1, 1.0, 1.12, MAIL], skirt: [0.75, 0.45, 1.16, MAIL], collar: 'mail',
+    plates: [0.3, 0.38, 0.46, 0.54, 0.62, 0.7, 0.78, 0.86].flatMap((t) => [[t - 0.07, t, 0.5, 0.42, 1.18, 'steel', 'gold'], [t - 0.07, t, -0.5, 0.42, 1.18, 'steel', 'gold'], [t - 0.07, t, Math.PI, 0.95, 1.18, 'steel', 'gold'], [t - 0.045, t - 0.025, 0, 0.2, 1.24, 'leather']]),
+    studs: [0.3, 0.38, 0.46, 0.54, 0.62, 0.7, 0.78, 0.86].map((t) => [t - 0.035, 0, 0.045, 1.27, 'gold']),
+    belt: [-0.02, 0.1, 1.22, 'leather'],
+    discs: [[0.05, 0, 0.045, 1.25, 'steel', 'gold', 0.015]],
+    upperArm: [[-0.3, 0.55, 1.15, MAIL], [-0.26, 0.34, 1.48, { lames: 4, base: 'steel' }]], forearm: [-0.04, -0.03, 1.3, 'steel'],
+  },
+  // An alp's mail hauberk with round mirror plates laced over the breast and back (the char-aina's forerunners).
+  mailMirror: {
+    trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.75, 0.4, 1.16, MAIL], collar: 'mail', upperArm: [-0.3, 1.0, 1.14, MAIL],
+    discs: [[0.62, 0, 0.075, 1.16, 'steel', 'gold', 0.015], [0.62, Math.PI, 0.08, 1.16, 'steel', 'gold', 0.012], [0.62, 0, 0.02, 1.16, 'steel', 'steel2', 0.028]],
+  },
   // A mail hauberk to the knees, long-sleeved.
   hauberk: {
     trunk: [-0.12, 1.0, 1.12, MAIL], skirt: [0.75, 0.4, 1.16, MAIL], collar: 'mail', upperArm: [-0.3, 1.0, 1.14, MAIL],
@@ -1152,6 +1177,39 @@ function addGrid(mesh, rings, grid, role, bones) {
       else mesh.indices.push(a, b, c, a, c, d);
     }
   }
+}
+
+/**
+ * A rigid plate's grid (addGrid) over a run of rings: from place `from` to `to` along it, `half` (rad) each side of `angle`,
+ * standing at `out` and a little more over its middle, so it reads as a curved plate laid on what is under it.
+ */
+function curvedPlate(from, to, angle, half, out) {
+  const rows = 4;
+  const columns = Math.max(3, Math.round(half * 10));
+  return Array.from({ length: rows + 1 }, (_, row) => Array.from({ length: columns + 1 }, (_, column) => {
+    const across = column / columns - 0.5;
+    return [from + ((to - from) * row) / rows, angle + across * 2 * half, out + 0.02 * (1 - (2 * across) ** 2)];
+  }));
+}
+
+/**
+ * A round domed plate's grid (addGrid) on a run of rings: rings out from its middle at place `centre` and `angle`, `radius`
+ * (m) across, kept round where the piece narrows (each point's angle and place from its own ring's width and spacing), its
+ * middle `dome` (m) proud of its rim at `out`.
+ */
+function domedDisc(rings, centre, angle, radius, out, dome) {
+  const turns = 18;
+  const spacing = vec.length(vec.sub(ringAt(rings, centre + 0.5).center, ringAt(rings, centre - 0.5).center)) || 0.025;
+  return Array.from({ length: 5 }, (_, ring) => {
+    const reach = ring / 4;
+    return Array.from({ length: turns + 1 }, (_, side) => {
+      const turn = (side / turns) * Math.PI * 2;
+      const place = centre + (Math.sin(turn) * radius * reach) / spacing;
+      const { width, depth } = ringAt(rings, place);
+      const across = Math.asin(Math.max(-0.95, Math.min(0.95, (Math.cos(turn) * radius * reach) / (width * out))));
+      return [place, angle + across, out + (dome * (1 - reach * reach)) / depth];
+    });
+  });
 }
 
 /**
@@ -2002,6 +2060,25 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       });
       addPatch(mesh, rings, disc(1.12, 0), 'gold', abdomen);
       addPatch(mesh, rings, disc(1, 0.01), role, abdomen);
+    }
+  }
+  // Rigid plates over the trunk ([from t, to t, centre angle, half-width rad, out, role, rim]): curved with it, standing
+  // proud of what is under them (the mail they are set in), a band of the rim's role round each (gilt, or the plate's own
+  // shadow); in a crowd, painted on as rows.
+  if (kit?.plates && !lowDetail) {
+    const rings = trunkRings(0, 1, 20);
+    for (const [from, to, angle, half, out, role, rim] of kit.plates) {
+      if (rim) addGrid(mesh, rings, curvedPlate(from * 20 - 0.25, to * 20 + 0.25, angle, half + 0.05, out - 0.01), rim, abdomen);
+      addGrid(mesh, rings, curvedPlate(from * 20, to * 20, angle, half, out), role, abdomen);
+    }
+  }
+  // Round domed plates on the trunk ([t, angle, radius m, out, role, rim, dome m]): a krug's belly plate and its boss, a
+  // mirror over the breast; `dome` how far its middle stands out, a band of the rim's role round it.
+  if (kit?.discs && !lowDetail) {
+    const rings = trunkRings(0, 1, 20);
+    for (const [t, angle, radius, out, role, rim, dome] of kit.discs) {
+      addGrid(mesh, rings, domedDisc(rings, t * 20, angle, radius * 1.12, out - 0.005, dome * 0.6), rim, abdomen);
+      addGrid(mesh, rings, domedDisc(rings, t * 20, angle, radius, out, dome), role, abdomen);
     }
   }
   if (kit?.tassels && !lowDetail) {

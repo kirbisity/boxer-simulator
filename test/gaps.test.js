@@ -139,7 +139,8 @@ test('mail under the gaps where history puts it: a harness\'s voiders, standard 
   // Mail-and-plate and mail coats: a gap meets mail, never more than the coat itself.
   const krug = protectionAt(standing('ottomanHeavy').body.gear, 'trunk');
   assert.equal(under('ottomanHeavy', 'armpit').pierce, Math.min(mail.pierce, krug.pierce));
-  assert.equal(under('gaziAlp', 'groin').pierce, protectionAt(standing('gaziAlp').body.gear, 'trunk').pierce);
+  // (The alp's mirror plates over the breast stop a point better than his rings: in a gap only the rings.)
+  assert.equal(under('gaziAlp', 'groin').pierce, Math.min(mail.pierce, protectionAt(standing('gaziAlp').body.gear, 'trunk').pierce));
   assert.equal(under('ottomanHeavy', 'face', 'head').pierce, 0, 'the chichak leaves the face');
   // No documented voiders: the coat's padding.
   assert.equal(under('mingElite', 'armpit').pierce, BLADES.gaps.under.pierce);

@@ -1751,7 +1751,13 @@ export const OUTFITS = {
     faction: 'ottomans',
     label: 'Ottoman — azap', movement: 'good', fists: 'bare',
     sidearm: 'saber',
+    // An army's azaps wear the iron cap (the first three: OUTFIT_SETS.azap `chichak`); the turbans are the builder's choice.
+    picked: [0, 1, 2],
     designs: [
+      // The plain iron chichak of the infantry (no gilt): a pointed bowl, the nasal, a short mail aventail.
+      { label: 'Red tunic, iron chichak', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'pants', color: '#3a2a22' }, head: { kind: 'chichak', color: '#7d8188', gold: '#7d8188', mail: '#7a7d84' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
+      { label: 'Green tunic, iron chichak', top: { kind: 'tunic', color: '#3a5a32' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'chichak', color: '#7d8188', gold: '#a08a52', mail: '#7a7d84' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
+      { label: 'Undyed tunic, iron chichak and turban', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#3a2a22' }, head: { kind: 'chichak', color: '#7d8188', gold: '#7d8188', mail: '#7a7d84', turban: '#ece4d0' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
       { label: 'Red tunic, white turban', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'pants', color: '#3a2a22' }, head: { kind: 'turban', color: '#ece4d0', cap: '#8a2a22' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
       { label: 'Green tunic', top: { kind: 'tunic', color: '#3a5a32' }, bottom: { kind: 'pants', color: '#2a2622' }, head: { kind: 'turban', color: '#ece4d0', cap: '#3a5a32' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
       { label: 'Undyed tunic, red cap', top: { kind: 'tunic', color: '#c8bc9e' }, bottom: { kind: 'pants', color: '#3a2a22' }, head: { kind: 'turban', color: '#b3161b', cap: '#b3161b' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
@@ -1764,14 +1770,25 @@ export const OUTFITS = {
     sidearm: 'yatagan',
     spare: 'dagger',
     courage: 0.15,
+    // An army's Janissaries in the chichak (the first three: OUTFIT_SETS.janissary `chichak`); the börk is the builder's choice.
+    picked: [0, 1, 2],
     designs: [
+      // The pointed chichak over the dolama: its gilt band and finial, the nasal and a mail aventail (issued from the
+      // regiments' armouries for a siege or a field battle).
+      { label: 'Blue dolama, chichak', top: { kind: 'longsleeve', color: '#2a3a6a' }, bottom: { kind: 'pants', color: '#8a1418' }, armor: { kind: 'dolama', color: '#2a3a6a', cloth: '#2a3a6a', cloth2: '#1c2850', lace: '#b3161b' }, head: { kind: 'chichak', color: '#9aa0a8', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
+      { label: 'Red dolama, chichak', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#2a3a6a' }, armor: { kind: 'dolama', color: '#8a1418', cloth: '#8a1418', cloth2: '#5a0e10', lace: '#2a3a6a' }, head: { kind: 'chichak', color: '#9aa0a8', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
+      { label: 'Green dolama, chichak', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#e4dcc8' }, armor: { kind: 'dolama', color: '#2f5a3a', cloth: '#2f5a3a', cloth2: '#1c3a24', lace: '#8a1418' }, head: { kind: 'chichak', color: '#9aa0a8', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#8a1418' } },
       { label: 'Blue dolama', top: { kind: 'longsleeve', color: '#2a3a6a' }, bottom: { kind: 'pants', color: '#8a1418' }, armor: { kind: 'dolama', color: '#2a3a6a', cloth: '#2a3a6a', cloth2: '#1c2850', lace: '#b3161b' }, head: { kind: 'bork', color: '#f0ece4', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
       { label: 'Red dolama', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#2a3a6a' }, armor: { kind: 'dolama', color: '#8a1418', cloth: '#8a1418', cloth2: '#5a0e10', lace: '#2a3a6a' }, head: { kind: 'bork', color: '#f0ece4', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
       { label: 'Green dolama', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#e4dcc8' }, armor: { kind: 'dolama', color: '#2f5a3a', cloth: '#2f5a3a', cloth2: '#1c3a24', lace: '#8a1418' }, head: { kind: 'bork', color: '#f0ece4', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#8a1418' } },
     ],
   },
   // Mail-and-plate (krug): rows of small plates riveted into a mail shirt,
-  // mail to the thighs, iron vambraces, and the turban helmet (chichak).
+  // mail to the thighs, iron vambraces, and the turban helmet (chichak); or
+  // the great plates of the 16th century linked by bands of mail: the krug
+  // of a round domed plate over the belly with plates at the breast, back and
+  // sides (`krugDisc`), or the bekhter's rows of narrow plates down the chest
+  // buckled shut, laminated shoulders (`bekhter`).
   ottomanHeavy: {
     // Rides (the sipahi: the Sultan's horsemen).
     horse: 'arabian',
@@ -1782,9 +1799,10 @@ export const OUTFITS = {
     arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.3): krug and chichak: ~12 kg on a 74 kg man (a mail-and-plate shirt ~10–12 kg).
     extraMass: 0.165,
-    // Mail-and-plate: cut 0.95 (was 0.92), the rings and plates proof against most edges; pierce 0.5 (was 0.75), a point
-    // parts the rings between the plates; blunt 0.42 (was 0.5), the mail moves with a blow. The chichak (uniform) the same.
-    protection: { blunt: 0.42, cut: 0.98, pierce: 0.5, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
+    // Mail-and-plate: cut 0.98, the rings and plates proof against most edges; pierce 0.72 (was 0.5): the plates over the
+    // vitals stop a point and the mail between them turns an edge, so a point must find a ring between plates; blunt 0.42
+    // (was 0.5): mail and its padding spread a blow poorly, the mail moving with it. The chichak (uniform) the same.
+    protection: { blunt: 0.42, cut: 0.98, pierce: 0.72, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
     // Mail-and-plate (krug): between the plates and wherever they part, the mail they are set in.
     gaps: { mail: 'all' },
     courage: 0.3,
@@ -1792,11 +1810,19 @@ export const OUTFITS = {
       { label: 'Steel, red kaftan', top: { kind: 'longsleeve', color: '#8a1418' }, bottom: { kind: 'pants', color: '#3a1012' }, armor: { kind: 'krug', color: '#a7adb6' }, head: { kind: 'chichak', design: 'turban', color: '#a7adb6', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
       { label: 'Gilt, blue kaftan', top: { kind: 'longsleeve', color: '#2a3a6a' }, bottom: { kind: 'pants', color: '#1c2238' }, armor: { kind: 'krug', color: '#b8a066' }, head: { kind: 'chichak', color: '#b8a066', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
       { label: 'Dark steel, green kaftan', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#1c2a20' }, armor: { kind: 'krug', color: '#6a6d73' }, head: { kind: 'chichak', color: '#6a6d73', gold: '#b8a066', design: 'turban' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+      // The krug of great plates (Askeri Müze; the Met's 'Shirt of Mail and Plate' of the 16th century): the round domed
+      // plate over the belly with its boss, plates at the breast, back and sides, all joined by bands of heavy rings; a
+      // long mail skirt, plate shoulder pieces; gilt inscriptions (`gold`) round the plates' borders.
+      { label: 'Krug: round plate in mail, crimson kaftan', top: { kind: 'longsleeve', color: '#7a1418' }, bottom: { kind: 'pants', color: '#2a1012' }, armor: { kind: 'krugDisc', color: '#9a9ea6', mail: '#55585e', gold: '#c9a23a' }, head: { kind: 'chichak', color: '#9a9ea6', gold: '#c9a23a', mail: '#55585e' }, feet: { kind: 'compactBoot', color: '#b08a2a' } },
+      // The bekhter (the Ottoman and Persian kind): rows of narrow plates down the chest and back, inscribed in gilt, joined
+      // by mail and buckled shut down the front with leather straps; laminated shoulder plates; a round boss on the belt.
+      { label: 'Bekhter: plates in rows, blue kaftan', top: { kind: 'longsleeve', color: '#1c2a4a' }, bottom: { kind: 'pants', color: '#1a1a22' }, armor: { kind: 'bekhter', color: '#a4a9b2', mail: '#5a5d63', gold: '#c9a23a', leather: '#2a1c14' }, head: { kind: 'chichak', color: '#a4a9b2', gold: '#c9a23a', mail: '#5a5d63' }, feet: { kind: 'compactBoot', color: '#2a1c14' } },
     ],
   },
   // An alp of Osman's gazi band, c. 1300, a legend of an earlier age (not in
-  // the levels): a mail hauberk, a conical helmet with a mail aventail and a
-  // turban wound round it.
+  // the levels): a mail hauberk with round mirror plates laced over the
+  // breast and back, a conical helmet with a mail aventail and a turban
+  // wound round it.
   gaziAlp: {
     // Trained: a frontier raider of a warrior band (`skill`: OUTFITS' tiers).
     skill: 0.7,
@@ -1807,15 +1833,16 @@ export const OUTFITS = {
     sidearm: 'saber',
     // Armour at 0.55 of its old weight (was 0.28): hauberk and helmet: ~11 kg on a 74 kg man (a mail hauberk ~10–12 kg).
     extraMass: 0.154,
-    // A mail hauberk: cut 0.9 (was 0.85), pierce 0.45 (was 0.5), blunt 0.38 (was 0.45): mail turns an edge, parts to a point,
-    // moves with a blow. The helmet (uniform) the same.
-    protection: { blunt: 0.38, cut: 0.9, pierce: 0.45, bullet: { head: 0.3, torso: 0.25, limb: 0.2 } },
+    // A mail hauberk with mirror plates over the breast and back (`mailMirror`): cut 0.94 (was 0.9) and pierce 0.65 (was 0.45):
+    // the plates over the vitals stop a point, the mail between and round them turns an edge; blunt 0.38 (was 0.45): mail and
+    // its padding spread a blow poorly, moving with it. The helmet (uniform) the same.
+    protection: { blunt: 0.38, cut: 0.94, pierce: 0.65, bullet: { head: 0.3, torso: 0.25, limb: 0.2 } },
     // A mail hauberk and aventail: a gap meets mail.
     gaps: { mail: 'all' },
     courage: 0.35,
     designs: [
-      { label: 'Mail, green coat', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#3a2a22' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#ece4d0' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
-      { label: 'Mail, red coat', top: { kind: 'longsleeve', color: '#7a1418' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#e8dcc0' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
+      { label: 'Mail, green coat', top: { kind: 'longsleeve', color: '#2f5a3a' }, bottom: { kind: 'pants', color: '#3a2a22' }, armor: { kind: 'mailMirror', color: '#8d9097', mail: '#6a6d73', gold: '#b8a066' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#ece4d0', mail: '#6a6d73' }, feet: { kind: 'compactBoot', color: '#5a3a22' } },
+      { label: 'Mail, red coat', top: { kind: 'longsleeve', color: '#7a1418' }, bottom: { kind: 'pants', color: '#2a2622' }, armor: { kind: 'mailMirror', color: '#8d9097', mail: '#6a6d73', gold: '#b8a066' }, head: { kind: 'chichak', color: '#8d9097', gold: '#b8a066', turban: '#e8dcc0', mail: '#6a6d73' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
     ],
   },
   // Salah ad-Din Yusuf ibn Ayyub (1137–1193), as the Ayyubid and Syrian
@@ -1847,10 +1874,12 @@ export const OUTFITS = {
     extraMass: 0.165,
     // The turban wound round the helmet: another man's head stays outside it in a clinch.
     headBulk: 1.25,
-    // Two layers of mail: cut 0.94 (was 0.9), pierce 0.45 (was 0.6), blunt 0.35 (was 0.4). The steel helmet is not mail:
-    // only the sultanates' cut up and blunt down (0.6 → 0.53, 0.92 → 0.95); the boots' leather by the same.
+    // Two layers of mail: cut 0.94 (was 0.9), blunt 0.35 (was 0.4); pierce 0.6 on the trunk (was 0.45): the second layer of
+    // rings and the quilting between them hold a point the first parts to, though mail and padding spread a blow poorly.
+    // The steel helmet is not mail: only the sultanates' cut up and blunt down (0.6 → 0.53, 0.92 → 0.95); the boots'
+    // leather by the same.
     protection: {
-      blunt: 0.35, cut: 0.94, pierce: 0.45, bullet: { head: 0.3, torso: 0.3, limb: 0.15 },
+      blunt: 0.35, cut: 0.94, pierce: 0.6, bullet: { head: 0.3, torso: 0.3, limb: 0.15 },
       regions: {
         head: { blunt: 0.53, cut: 0.95, pierce: 0.75, deflects: true },
         Shank: { blunt: 0.09, cut: 0.37, pierce: 0.15 },

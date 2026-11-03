@@ -121,6 +121,41 @@ export const OUTFIT_SETS = {
       patch: { extraMass: 0.065, protection: { bullet: { head: 0 }, regions: { head: { blunt: 0.03, cut: 0.05, pierce: 0, deflects: false } } } },
     },
   ],
+  // The Ottoman foot in the chichak (the army's own: OUTFITS `picked`), or in a turban or the börk as before. The chichak as the
+  // sipahi's (OUTFIT_SETS.ottomanHeavy `chichak`): a pointed bowl over a quilted cap, the nasal and the mail aventail; the face
+  // open. Its ~2 kg on a 60-65 kg man (extraMass ~0.03); nothing on the body but cloth.
+  azap: [
+    {
+      key: 'chichak', designs: [0, 1, 2], name: 'Ottoman — azap, iron chichak',
+      blurb: 'An Ottoman azap in a plain iron chichak: a pointed cap of hammered iron with a nose bar and a fringe of mail, over the same tunic he farmed in. The cheapest helmet the arsenal stocked, issued for a campaign and counted back in afterwards.\nWho got the better helmets? The men who came home to hand them back. The azaps went first at every breach, and the arsenal’s clerks wrote off their iron caps with the men, in one line.\n“A soldier with a helmet, or a line in the arsenal’s ledger. It all depended on which ditch he was sent to fill.”',
+      patch: {
+        extraMass: 0.03,
+        helmet: { mass: 2.0, padding: 0.45, curve: 0.85 },
+        protection: { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0.3, torso: 0, limb: 0 }, regions: { head: { blunt: 0.45, cut: 0.95, pierce: 0.6, deflects: true } } },
+      },
+    },
+    {
+      key: 'turban', designs: [3, 4, 5], name: 'Ottoman — azap, turban',
+      blurb: 'An Ottoman azap, a foot archer or marine: a plain tunic, a turban over a felt cap, a bow and a short sword, and no armour. A farmer who volunteered for one campaign and was paid by the day.\nYet who gets sent in first? At the siege of Constantinople in 1453 men like him went first in the final assault, to tire out the defenders and fill the ditch with their bodies. Then the elite troops walked in over them.\n“A day’s wages, or a body in the ditch. It all depended on which wave he was ordered into.”',
+      patch: {},
+    },
+  ],
+  janissary: [
+    {
+      key: 'chichak', designs: [0, 1, 2], name: 'Ottoman — Janissary, chichak',
+      blurb: 'A Janissary in his dolama under a gilt-banded chichak: a pointed steel bowl, a sliding nose bar, a curtain of mail at the neck. The Sultan’s own slaves, kept on a salary, and for a siege the regiments drew helmets from the armoury like rations.\nYet what keeps a salaried army loyal? The pay. When the coins came clipped, the Janissaries overturned their soup pots and the Sultan lost his throne, and sometimes his head. The helmet was the Sultan’s; the loyalty was on account.\n“The Sultan’s shield, or the Sultan’s end. It all depended on whether the silver in their pay was real.”',
+      patch: {
+        extraMass: 0.03,
+        helmet: { mass: 2.0, padding: 0.45, curve: 0.85 },
+        protection: { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0.3, torso: 0, limb: 0 }, regions: { head: { blunt: 0.47, cut: 0.96, pierce: 0.6, deflects: true } } },
+      },
+    },
+    {
+      key: 'bork', designs: [3, 4, 5], name: 'Ottoman — Janissary, börk',
+      blurb: 'A Janissary: a long coat and a tall white felt hat, no armour. Taken from a Christian family as a boy and raised to serve the Sultan alone, he was among Europe’s first troops drilled with guns — a slave turned backbone of the empire.\nWhat happens when the backbone has opinions? To topple a Sultan, they overturned their soup pots. In 1826 the Sultan shelled their barracks and called it the Auspicious Incident.\n“A kingmaker, or ashes in the barracks. It all depended on whether the soup pots went over before the cannons were loaded.”',
+      patch: {},
+    },
+  ],
   ottomanHeavy: [
     {
       key: 'turban', designs: [0, 2], name: 'Sipahi — mail and plate, turban helmet',
@@ -131,6 +166,21 @@ export const OUTFIT_SETS = {
       key: 'chichak', designs: [1], name: 'Sipahi — mail and plate, chichak',
       blurb: 'The Ottoman horseman’s mail and plate under a chichak, a lighter helmet with a sliding nose bar and an open face. Less protection, better view — the right trade once armies ran on cannon.\nAnd who had the cannon? At Mohács in 1526 the Hungarian knights charged the Ottoman guns and broke in an afternoon. Their young King Louis fled, fell into a flooded stream, and drowned in his very expensive armour.\n“A sharp-eyed rider, or an easy face to hit. It all depended on which side had brought the cannon.”',
       patch: { helmet: { mass: 2, padding: 0.45, curve: 0.85 }, protection: { regions: { head: { blunt: 0.47, cut: 0.96, pierce: 0.6, deflects: true } } } },
+    },
+    {
+      // The great plates of the 16th century joined by bands of heavy rings (Askeri Müze; the Met's Ottoman mail-and-plate):
+      // the round domed plate over the belly, plates at the breast, back and sides, a long mail skirt. Heavier than the
+      // shirt of small plates (~14 kg against ~12), the same mail between, its stops the shirt's.
+      key: 'krugDisc', designs: [3], name: 'Sipahi — krug of great plates, chichak',
+      blurb: 'The krug: big steel plates over the belly, the chest, the back and the sides, joined by bands of heavy rings, a long mail skirt to the knee, the round belly plate inscribed in gold with verses asking God for victory. A sipahi’s whole harvest went into one.\nYet what does the verse cost? The timar that paid for it was a village’s grain, taxed at the threshing floor. The peasants never saw the plate; they saw the tax collector, twice a year.\n“A shining belly-plate, or a village’s winter. It all depended on which side of the threshing floor he stood.”',
+      patch: { extraMass: 0.19, helmet: { mass: 2, padding: 0.45, curve: 0.85 }, protection: { regions: { head: { blunt: 0.47, cut: 0.96, pierce: 0.6, deflects: true } } } },
+    },
+    {
+      // The bekhter: narrow plates in rows down the chest and back, set in mail and buckled down the front, laminated shoulder
+      // plates (Ottoman and Persian, 16th-17th c.); its stops the shirt's, a little heavier.
+      key: 'bekhter', designs: [4], name: 'Sipahi — bekhter, chichak',
+      blurb: 'The bekhter: rows of narrow steel plates down the chest, each inscribed in gold, linked by mail and buckled shut with leather straps; plate shoulders in lames, a mail fringe from a pointed chichak. The plates lap like roof tiles, so a lance point skids from one to the next.\nYet who could afford a roof like that? Only the richest timar holders and the Sultan’s own household. The poorer sipahis rode beside them in a quilted coat, and the lances found them first.\n“A walking roof of steel, or the man next to it. It all depended on the size of his timar.”',
+      patch: { extraMass: 0.18, helmet: { mass: 2, padding: 0.45, curve: 0.85 }, protection: { regions: { head: { blunt: 0.47, cut: 0.96, pierce: 0.6, deflects: true } } } },
     },
   ],
   samurai: [
