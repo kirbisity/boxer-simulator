@@ -1322,21 +1322,25 @@ export const OUTFITS = {
   // four plain banners of 1601 and the four bordered of 1615, yellow, white, red and blue, every company (niru) of
   // them in its banner's colour. Their armour (mianjia, cloth armour) is the Ming brigandine's make, iron plates
   // riveted inside a long studded coat with its apron and shoulder guards, under a black helmet with its studded
-  // hood: guarded as the brigandine is. What the banners had over the Ming regulars was not the coat but the men in
-  // it (cast.js PERIOD_BUILD jurchen): hunters fed on meat, drilled in their companies from boyhood, and steady
+  // hood; but heavier made than the Ming regular's issue, its plates thicker and closer, often worn two coats deep
+  // in the front ranks, and known for it: guarded about as the Ming elite's coat is. And the men in it (cast.js
+  // PERIOD_BUILD jurchen): hunters fed on meat, drilled in their companies from boyhood, and steady
   // (`courage`, above the Ming regular's and as high as their elite's), the front ranks at Sarhu in two coats.
   bannerArmour: {
     // Trained: a banner man was a soldier for life, his company's hunts its drill (`skill`: OUTFITS' tiers, the
     // Ming regular's 0.35 and their elite's 0.6).
     skill: 0.45,
-    faction: 'manchu',
+    faction: 'manchu', bulletRating: 600, plated: true,
     label: 'Eight Banners (Later Jin) — banner armour', family: 'manchu', movement: 'good', fists: 'bare',
     // The Manchu saber at his belt (drawn as the dao: a single-edged sabre a little more curved); a knife.
     sidearm: 'dao',
     spare: 'dagger',
-    // The Ming brigandine's weight and guard (the same make): ~12 kg on an 81 kg man.
-    extraMass: 0.143,
-    protection: { blunt: 0.63, cut: 0.8, pierce: 0.47, bullet: { head: 0.3, torso: 0.5, limb: 0 } },
+    deflects: true,
+    arrowproof: true,
+    // Near the Ming elite's weight and guard (~17 kg on a 79 kg man), the limbs a little less covered (studded
+    // cloth sleeves, not the elite's steel arm guards).
+    extraMass: 0.22,
+    protection: { blunt: 0.64, cut: 0.93, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.15 } },
     gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [

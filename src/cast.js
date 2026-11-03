@@ -452,9 +452,9 @@ const PERIOD_BUILD = {
   steppe: { light: { heightCm: 164, weightKg: 84, exercise: 0.7 }, medium: { heightCm: 165, weightKg: 89, exercise: 0.66 }, heavy: { heightCm: 167, weightKg: 95, exercise: 0.62 } },
   // The Jurchen of the Later Jin (Nurhaci's banners, 1610s): hunters, herders and farmers of the Liaodong frontier,
   // fed on meat and millet, at the bow and on horse from boyhood and drilled in their companies (niru) on the great
-  // hunts; the Ming's men saw them as big and hard. About the height of the Ming's northern men and heavier, as
-  // strong as the Ming's picked elite (above), not more; the Bayara picked from them for strength and the bow.
-  jurchen: { banner: { heightCm: 169, weightKg: 71, exercise: 0.8 }, bayara: { heightCm: 171, weightKg: 74, exercise: 0.84 } },
+  // hunts; the Ming's men saw them as big and hard. Taller than the Ming's northern men and heavier, stronger than
+  // even the Ming's picked elite (above); the Bayara picked from them for strength and the bow.
+  jurchen: { banner: { heightCm: 174, weightKg: 79, exercise: 0.86 }, bayara: { heightCm: 177, weightKg: 83, exercise: 0.9 } },
   // Dutch soldiers of the 1660s, among Europe's taller men then.
   dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };

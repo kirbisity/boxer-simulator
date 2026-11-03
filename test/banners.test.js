@@ -15,11 +15,15 @@ import { WARRIORS } from '../src/roster.js';
 
 const energyOf = (bow) => ((bow.arrowSpeed ?? ARROW.speed) / ARROW.speed) ** 2 * (bow.arrowEnergy ?? 1);
 
-test('the banner coat is the Ming brigandine\'s make: the same guard and weight, in the eight banners\' colours', () => {
+test('the banner coat guards near the Ming elite\'s, above the regular brigandine, in the eight banners\' colours', () => {
   const banner = OUTFITS.bannerArmour;
   const brigandine = OUTFITS.mingBrigandine;
-  assert.deepEqual(banner.protection, brigandine.protection);
-  assert.equal(banner.extraMass, brigandine.extraMass);
+  const elite = OUTFITS.mingElite;
+  for (const kind of ['blunt', 'cut', 'pierce']) {
+    assert.ok(banner.protection[kind] >= brigandine.protection[kind], kind);
+    assert.ok(Math.abs(banner.protection[kind] - elite.protection[kind]) <= 0.05, kind);
+  }
+  assert.ok(banner.extraMass > brigandine.extraMass && banner.extraMass <= elite.extraMass);
   assert.deepEqual(banner.designs.map((design) => design.label), ['Plain Yellow', 'Bordered Yellow', 'Plain White', 'Bordered White', 'Plain Red', 'Bordered Red', 'Plain Blue', 'Bordered Blue']);
   // The bordered banners bound in red, the bordered red in white; the plain in their own colour.
   for (const design of banner.designs) {
@@ -162,5 +166,5 @@ test('Sarhu builds a world: both sides on the field, the banners\' armour on the
   for (const fighter of world.fighters) sides[fighter.corner] += 1;
   assert.ok(sides.red >= 25 && sides.blue >= 25, JSON.stringify(sides));
   const banner = world.fighters.find((fighter) => fighter.body.inputs.outfit.kind === 'bannerArmour');
-  assert.deepEqual(gearTraits(banner.body.inputs).protection.cut, OUTFITS.mingBrigandine.protection.cut);
+  assert.deepEqual(gearTraits(banner.body.inputs).protection.cut, OUTFITS.bannerArmour.protection.cut);
 });

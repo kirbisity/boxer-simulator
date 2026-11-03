@@ -237,19 +237,19 @@ export const PRESETS = {
   // The Eight Banners of the Later Jin (Sarhu, 1619): a banner archer of the Plain Yellow with the heavy Manchu bow
   // and the saber at his belt; a big man of the Bordered Red with the guandao; Yangguri, the commander of Nurhaci's
   // guard, a Bayara in the heavy coat, bow and saber. Jurchen hunters and herders fed on meat and grain, at the bow
-  // and on horse from boyhood: big for their day and hard (`exercise`, `calories`), not giants.
+  // and on horse from boyhood: big and strong for their day, taller and harder than the Ming's men (`exercise`, `calories`).
   bannerBow: {
-    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 171, frame: 'large', age: 28, exercise: 0.82, calories: 4300,
+    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 175, frame: 'large', age: 28, exercise: 0.86, calories: 4300,
     outfit: { kind: 'bannerArmour', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   bannerGuandao: {
-    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 175, frame: 'large', age: 31, exercise: 0.8, calories: 4600,
+    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 180, frame: 'large', age: 31, exercise: 0.85, calories: 4600,
     outfit: { kind: 'bannerArmour', design: 5 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   bayara: {
-    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 173, frame: 'large', age: 40, exercise: 0.84, calories: 4500,
+    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 177, frame: 'large', age: 40, exercise: 0.88, calories: 4500,
     outfit: { kind: 'bayara', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
