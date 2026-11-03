@@ -48,7 +48,10 @@ export function takeWind(fighter, demand, push) {
   const cap = push ? wind.pushCap : wind.blowCap;
   const share = push ? wind.pushShare : 1;
   const loss = cap * (1 - Math.exp(-(demand * share) / cap));
-  fighter.stamina = Math.min(fighter.stamina, Math.max(wind.floor, fighter.stamina - loss));
+  const after = Math.min(fighter.stamina, Math.max(wind.floor, fighter.stamina - loss));
+  // (What it took is owed back: physics.js gives it back over `returnSeconds`.)
+  fighter.windDebt = (fighter.windDebt ?? 0) + (fighter.stamina - after);
+  fighter.stamina = after;
 }
 
 /** The share of the usual recovery he gets now: a quarter below empty, all of it from empty up. */

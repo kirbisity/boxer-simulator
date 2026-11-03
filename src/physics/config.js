@@ -279,6 +279,9 @@ export const WORLD = {
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
   staminaRecovery: 0.07,
+  // The share of that he still gets in the middle of a blow of his own: he does not stop breathing to swing (at 0, as it was,
+  // a man swinging at three about him got next to nothing back, and wore out in seconds).
+  strikeRecovery: 0.6,
   // The guard held up (fighter.guardHeld: the player's guard button, control.js; an AI's block kept up through the blows coming,
   // ai.js keepGuard; both physics.js holdGuard): the block stays up, put back as each one runs out, set to meet the blow coming.
   // Held up, it is work, the same for anyone:
@@ -317,7 +320,10 @@ export const WORLD = {
   // - linger (s): an AI's answer to a blow is his guard, held up through the blows that follow (as the player's button), with
   //   the chance of his share (a master always, a man just past the threshold seldom; else his style's dodge: ai.js), and let
   //   down this long after the last blow at him (keepGuard).
-  guardRead: { untrainedBelow: 0.3, delay: [0.25, 0], lag: [0.09, 0.008], error: [0.06, 0.005], linger: 0.5 },
+  // - chance: how often an AI answers a blow with his guard at all (else his style's dodge, or nothing): `most` × his reading's share
+  //   raised to `power`. Not every blow can be blocked, even by a master; a half-trained man seldom tries.
+  // Reading was made harder (2026-11-02: delay, lag and error up; a master is no longer perfect) so a block is less sure.
+  guardRead: { untrainedBelow: 0.3, delay: [0.3, 0.02], lag: [0.11, 0.015], error: [0.08, 0.01], linger: 0.5, chance: { most: 0.85, power: 1.5 } },
   // The guard held up with bare arms (physics.js coverArms): the forearm nearer the blow goes onto its line this share of his
   // height out from what it is aimed at (~20 cm for a 1.8 m man: a forearm's length before the face or the ribs, where a boxer's
   // shell meets a punch).
@@ -359,7 +365,7 @@ export const WORLD = {
   // trunk recovers stamina slower and beaten arms punch weaker.
   // A blow to the head: share of a blocked blow that still reaches it
   // through the guard; the peak force (N) past which a fist splits the skin.
-  head: { blockedShare: 0.12, cutForce: 1800 },
+  head: { blockedShare: 0.2, cutForce: 1800 },
   // A blow's toll on the striking limb: of the speed change it suffers beyond
   // what the same blow on a man its own size would give, `share` counts as
   // damage to its bone (m/s, as a struck part's); a glove passes `gloved` of
@@ -377,7 +383,9 @@ export const WORLD = {
   // demand soft-capped at `blowCap` of the bar for a blow and `pushCap` for a shove or a bump (a body met on the shoulder or arms
   // takes `pushShare` of the demand: it is a push, not a punch to the belly). Hits alone never take him below `floor` of the bar;
   // only running, swinging and rising go on from there.
-  wind: { blowCap: 0.3, pushCap: 0.12, pushShare: 0.4, floor: 0.25 },
+  // What a blow knocked out comes back on its own (`returnSeconds`, the time constant: most of it in ~3 of them), swinging or not:
+  // a man is winded by a hit, not worn out by it, so blows from three men about him do not add up to an empty bar.
+  wind: { blowCap: 0.3, pushCap: 0.12, pushShare: 0.4, floor: 0.25, returnSeconds: 2.5 },
   // The player's stamina overdraft (physics/overdraft.js; only the man flagged `fighter.player`: every other fighter stops at
   // empty, as before). Past empty he goes on, weaker and slumping, down to `floor`, where he faints. `depth` below is how far
   // down he is, 0 at empty to 1 at the floor.

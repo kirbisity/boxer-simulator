@@ -1309,12 +1309,23 @@ export const BLADES = {
   shockStrength: 0.55,
   // Grip: hard knocks to the weapon arm or the weapon strain the grip by
   // impulse over (this × the hand's strike force); past 1 the weapon goes.
-  gripImpulsePerNewton: 0.1,
+  // Of a knock on the weapon, the hand has to stop only its own share: the
+  // weapon's mass takes the rest (`gripHold`: the forearm and hand's share
+  // of the arm, as a blow's effective mass reckons it; both arms on a
+  // two-handed weapon), so a heavy mace is hard to beat out of a fist and a
+  // light sword easy.
+  gripImpulsePerNewton: 0.12,
+  gripHold: 0.6,
   gripLeak: 0.5, // per second
   armHitShare: 0.6, // a blow to the forearm or upper arm, against one to the weapon
   // Blades meeting: how much bounce, and the closing speed (m/s) that counts as a clash.
   clashRestitution: 0.25,
   clashSpeed: 1.5,
+  // A blow parried by a blade much lighter (physics.js beatenThrough): the parrier's side counts `braced` times its effective
+  // mass (his wrist locked and shoulder set for it), and a blow keeping `from` or more of its speed through the meeting beats the
+  // blade back and goes on. Swords on swords, an odachi on a katana: stopped (~0.25-0.4 kept); a mace or a war hammer on a
+  // sword (~0.6-0.7), a kanabo on anything: through.
+  beatThrough: { braced: 1.5, from: 0.5 },
   // A blade that glances off plate is turned aside: this share of the
   // contact impulse sends the weapon along the plate, away from the cut.
   glanceShare: 0.6,

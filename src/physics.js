@@ -194,6 +194,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // less (WORLD.guardHeld). guardUntil: when an AI's held guard comes down with no blow at him (WORLD.guardRead.linger).
     // blowRead: how his block reads the blow it is made against ({ punch, point, at, off }: blowRead, WORLD.guardRead).
     guardHeld: undefined, guardUntil: undefined, guardLinger: undefined, blowRead: undefined,
+    // windDebt: the wind blows knocked out of him, coming back (WORLD.wind.returnSeconds).
+    windDebt: 0,
     // limbCache: limbShares worked out this step.
     limbCache: undefined,
   };
@@ -690,8 +692,11 @@ export function shattersOn(weapon, mode, protection, energy) {
 /** A blow jars the grip (of the weapon, or of the off hand's blade); strained past what the hand can hold, it goes. */
 export function strainGrip(world, fighter, impulse, push = [0, 0, 0], weapon = fighter.weapon) {
   if (!weapon?.held || impulse <= 0) return;
-  // A long lever off the hands is easier to tear away (`grip` < 1).
-  weapon.strain += impulse / (BLADES.gripImpulsePerNewton * (weapon.spec.grip ?? 1) * fighter.body.strikeForce[P[`${weapon.main}Hand`]]);
+  // A long lever off the hands is easier to tear away (`grip` < 1); the weapon's own mass soaks its share (BLADES.gripHold).
+  const limbs = fighter.body.limbKg;
+  const hands = BLADES.gripHold * (limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0));
+  const handShare = hands / (hands + (weapon.spec.mass ?? 0));
+  weapon.strain += (impulse * handShare) / (BLADES.gripImpulsePerNewton * (weapon.spec.grip ?? 1) * fighter.body.strikeForce[P[`${weapon.main}Hand`]]);
   if (weapon.strain < 1) return;
   // Torn from his hands, a weapon on a hose to his back (`tethered`) is not knocked away: it swings on the hose and he has it again.
   if (weapon.spec.tethered) {
@@ -1909,6 +1914,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     fired: undefined, drawn: undefined, hits: undefined, line: undefined, quick: undefined, rideOffset: undefined, low: undefined, rangeOff: undefined,
     // From his knees (the player's crawl: WORLD.crawl.strike): the blow's mass behind it is this share.
     weak: undefined,
+    // Beaten through a lighter blade's parry (beatenThrough): the share of its speed it kept, the mass behind it so much less.
+    beaten: undefined,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
   if (riposte) fighter.punch.riposte = true;
@@ -1920,7 +1927,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     const secondZone = second.zones[0];
     const secondMark = at ?? aimPoint(target, secondZone);
     const secondAim = vec.add(secondMark, vec.sub(aimed, mark));
-    fighter.punch.with = { type: spec.with, spec: second, zone: secondZone, t: -(spec.withDelay ?? 0), age: 0, aim: toLocal(fighter, secondAim), target: target?.id ?? null, landed: false, load: 0, at: at ? secondAim : null, edgeTilt: fighter.punch.edgeTilt, heavy: false };
+    fighter.punch.with = { type: spec.with, spec: second, zone: secondZone, t: -(spec.withDelay ?? 0), age: 0, aim: toLocal(fighter, secondAim), target: target?.id ?? null, landed: false, load: 0, at: at ? secondAim : null, edgeTilt: fighter.punch.edgeTilt, heavy: false, beaten: undefined };
     fighter.stats.dual = (fighter.stats.dual ?? 0) + 1;
   }
   if (blade && blade === fighter.offWeapon) fighter.stats.offStrikes = (fighter.stats.offStrikes ?? 0) + 1;
@@ -2025,11 +2032,23 @@ export function holdGuard(world, fighter, striker) {
   }
 }
 
+/**
+ * The share of its speed a blow keeps through a blade met across its line (its striking `mass` and the parrying blade's, both
+ * effective there: the one-dimensional collision, the parrier's side braced by BLADES.beatThrough.braced), if it beats through
+ * (keeps `from` or more); else 0, and the blade stops it.
+ */
+function beatenThrough(mass, against) {
+  const rule = BLADES.beatThrough;
+  const braced = against * rule.braced;
+  const kept = (mass - BLADES.clashRestitution * braced) / (mass + braced);
+  return kept >= rule.from ? kept : 0;
+}
+
 /** Whether an event is a blow taken on a block of his: on his arms or shield, fended off by his blade, or parried by it. */
 function blockerOf(event) {
   if (event.kind === 'blocked') return event.defender;
   if (event.kind === 'bladeBlock') return event.attacker;
-  if (event.kind === 'parry') return event.fighter;
+  if (event.kind === 'parry' || event.kind === 'beatenThrough') return event.fighter;
   return undefined;
 }
 
@@ -3655,6 +3674,7 @@ function faintAway(world, fighter) {
 function wakeFromFaint(fighter) {
   fighter.fainted = false;
   fighter.stamina = WORLD.overdraft.wakeStamina;
+  fighter.windDebt = 0;
   fighter.faintGrace = WORLD.overdraft.graceSeconds;
 }
 
@@ -4188,7 +4208,14 @@ function updateTimers(world, fighter, dt) {
   else {
     // His guard held up: a steady draw (WORLD.guardHeld), never past empty.
     if (fighter.guardHeld) fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - WORLD.guardHeld.staminaPerSecond * dt / fighter.body.aerobic);
-    if (!fighter.punch) fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.runMode ? WORLD.runMode.recovery : 1) * (fighter.guardHeld ? WORLD.guardHeld.recovery : 1) * recoveryShare(fighter.stamina) * dt);
+    // He breathes through a blow of his own too, only less (WORLD.strikeRecovery).
+    fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.punch ? WORLD.strikeRecovery : 1) * (fighter.runMode ? WORLD.runMode.recovery : 1) * (fighter.guardHeld ? WORLD.guardHeld.recovery : 1) * recoveryShare(fighter.stamina) * dt);
+    // The wind a blow knocked out of him comes back on its own in a few seconds (WORLD.wind.returnSeconds).
+    if (fighter.windDebt > 0) {
+      const back = fighter.windDebt * (1 - Math.exp(-dt / WORLD.wind.returnSeconds));
+      fighter.windDebt -= back;
+      fighter.stamina = Math.min(1, fighter.stamina + back);
+    }
   }
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
@@ -6803,7 +6830,7 @@ export function bladeStrike(attacker, weapon, punch, relative, distance, at = nu
   const limbs = attacker.body.limbKg;
   const arms = limbs[`${weapon.main}Arm`] + (weapon.twoHanded ? limbs[`${weapon.off}Arm`] : 0);
   // (A finisher's thrust is driven down with the whole weight of the kneeling man behind the dagger: finisher.js.)
-  const share = attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1);
+  const share = attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1) * (punch.beaten ?? 1);
   const armsKg = (spec.mass.arm ?? 0) * arms * share;
   const bodyKg = (punch.finisher?.body ?? thrustBodyShare(attacker, weapon, spec)) * attacker.body.massKg * share;
   const speed = vec.length(relative);
@@ -7351,8 +7378,15 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   world.pendingImpulses.push({ fighter: first, shares: [[mainA, 1], [P[`${a.main}Elbow`], 0.5]], direction: normal, impulse });
   world.pendingImpulses.push({ fighter: second, shares: [[mainB, 1], [P[`${b.main}Elbow`], 0.5]], direction: vec.scale(normal, -1), impulse });
   const parried = cutting(strokeA) && !strokeB ? [second, b, first, strokeA] : cutting(strokeB) && !strokeA ? [first, a, second, strokeB] : null;
+  // A blow met by a much lighter blade is not stopped by it: what speed the meeting leaves it (its effective mass against the
+  // blade's, braced: BLADES.beatThrough) it goes on with, the parrying blade driven back before it and his block broken.
+  const beaten = parried && beatenThrough(parried[2] === first ? massA : massB, parried[2] === first ? massB : massA);
   for (const stroke of [strokeA, strokeB]) {
     if (!stroke) continue;
+    if (beaten && stroke === parried[3]) {
+      stroke.beaten = Math.min(stroke.beaten ?? 1, beaten);
+      continue;
+    }
     stroke.landed = true;
     stroke.stopped = true;
   }
@@ -7360,7 +7394,12 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: met, normal, impulse, effects: ['blades meet'] });
   // Heard: how fast they met, what of each (an edge, a haft, a head), and whether a point was turned along the blade (a scrape).
   if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed, mass: Math.max(a.spec.mass ?? 1, b.spec.mass ?? 1) });
-  if (parried) {
+  if (beaten) {
+    const [parrier, blade, striker, stroke] = parried;
+    if (BLOCKS.has(parrier.defence?.name) || parrier.defence?.name === 'parry') parrier.defence = null;
+    const energy = 0.5 * ((massA * massB) / (massA + massB)) * Math.max(0, closing) ** 2;
+    world.events.push({ time: world.time, kind: 'beatenThrough', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, point: met, impulse, energy, kept: beaten, effects: [`beats through the ${blade.spec.label.toLowerCase()}`] });
+  } else if (parried) {
     const [parrier, blade, striker, stroke] = parried;
     // Parried while his other blade is on its way in: the parry and the cut together.
     const answering = parrier.punch && strokeOf(parrier, blade) === null && parrier.punch.t <= parrier.punch.spec.extendUntil;

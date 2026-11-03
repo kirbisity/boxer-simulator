@@ -2997,7 +2997,7 @@ function decide(world, fighter, dt) {
       if (style.riposte && fighter.offWeapon?.held && riposte(world, fighter, striker, style, distance)) return;
       // A trained man answers with his guard, held up through the blows that follow, as often as he is trained to read them
       // (WORLD.guardRead, keepGuard); a long point he still gets off the line of (AI.offLine).
-      const guards = !longPoint(striker, incoming) && random() < (guardReading(fighter) ?? 0);
+      const guards = !longPoint(striker, incoming) && random() < WORLD.guardRead.chance.most * (guardReading(fighter) ?? 0) ** WORLD.guardRead.chance.power;
       if (guards) name = blockFor(fighter);
       // A blade coming is got away from, not blocked with an arm.
       else if (incoming.spec.path === 'blade' && wary && name !== 'sidestep' && !longPoint(striker, incoming) && random() < AI.blade.stepBackChance) name = 'stepBack';
