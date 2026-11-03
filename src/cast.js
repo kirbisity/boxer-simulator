@@ -432,8 +432,8 @@ const PERIOD_BUILD = {
   // Castilian men of the early 1500s about 165 cm; the Mexica a few
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
   // The men who crossed to the Indies were picked and hardened (veterans of
-  // Italy, hidalgos raised to arms): a little above the Castilian mean, and strong.
-  spanish: { soldier: { heightCm: 168, weightKg: 70, exercise: 0.76 }, officer: { heightCm: 170, weightKg: 73, exercise: 0.78 } },
+  // Italy, hidalgos raised to arms): well above the Castilian mean, big hard men toughened by years of war.
+  spanish: { soldier: { heightCm: 172, weightKg: 72, exercise: 0.84 }, officer: { heightCm: 174, weightKg: 75, exercise: 0.86 } },
   mexica: { warrior: { heightCm: 160, weightKg: 58, exercise: 0.72 }, elite: { heightCm: 162, weightKg: 60, exercise: 0.82 } },
   // Andean men of the Inca period: from highland skeletons about 157–160 cm,
   // short and stocky, broad and deep in the chest (bodies made at 2,700 m and
@@ -446,7 +446,9 @@ const PERIOD_BUILD = {
   // from boyhood; their sergeants and gunners. Ottoman soldiers of the 1500s
   // about 165–168 cm; the Janissaries picked young (the devşirme) for build.
   hospitaller: { knight: { heightCm: 170, weightKg: 71, exercise: 0.75 }, sergeant: { heightCm: 167, weightKg: 66, exercise: 0.65 } },
-  ottoman: { azap: { heightCm: 165, weightKg: 60, exercise: 0.6 }, janissary: { heightCm: 169, weightKg: 65, exercise: 0.8 }, heavy: { heightCm: 168, weightKg: 67, exercise: 0.75 } },
+  // The fighting men above that: the Janissaries picked from the devşirme's tallest and strongest boys and drilled
+  // for life, the sipahis landholders fed on meat and at arms from boyhood; the azaps levied but sturdy peasants.
+  ottoman: { azap: { heightCm: 169, weightKg: 68, exercise: 0.7 }, janissary: { heightCm: 175, weightKg: 77, exercise: 0.88 }, heavy: { heightCm: 174, weightKg: 79, exercise: 0.84 } },
   // Medieval Mongol and Oirat men, from skeletons about 163–167 cm, lean and hard.
   // Steppe men: short and squat, heavy for their height (riders' bodies, fed on meat and milk).
   steppe: { light: { heightCm: 164, weightKg: 84, exercise: 0.7 }, medium: { heightCm: 165, weightKg: 89, exercise: 0.66 }, heavy: { heightCm: 167, weightKg: 95, exercise: 0.62 } },
