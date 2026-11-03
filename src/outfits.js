@@ -41,6 +41,85 @@ export const CLOTH_COLORS = {
   brown: '#6a4a30', wine: '#5a1a2a', purple: '#5a3a6a', slate: '#4a5560', linen: '#d8cfb8', undyed: '#c8bc9e', cream: '#ece4d0',
 };
 
+// ---- The metal's finish and its decoration, chosen over any design of a kit that offers them ----
+// (outfits' `finishes`: the steels and decorations offered, and which pieces they go on; the builder's Steel and Decoration
+// pickers; outfitOf puts them on the design's look, so everything drawn from it, the horse's bard too, wears them.)
+
+/** The finishes of the metal itself: its colour (the steel's, the lacquer's), over any design. */
+export const STEEL_FINISHES = {
+  // Polished bright ("white") steel, as the Gothic and the Maximilian harnesses were left.
+  bright: { label: 'Bright steel', color: '#c4c9d0' },
+  white: { label: 'Mirror-polished', color: '#d4d8de' },
+  // Heat-blued, and blackened (the Greenwich harnesses' dark ground for their gilt), and russeted (rusted on purpose and
+  // oiled, brown).
+  blued: { label: 'Blued steel', color: '#4f5a68' },
+  blackened: { label: 'Blackened steel', color: '#34363c' },
+  russet: { label: 'Russeted', color: '#6a4a3a' },
+  // Black lacquer over iron (the Ming officers' black and gold helmets).
+  blackLacquer: { label: 'Black lacquer', color: '#17171b' },
+};
+
+/**
+ * The decoration over the metal (`kind`: how render.js and helmmaps.js draw it: detailtex.js armourDecorMaterial), its gilt
+ * (`gold`). The Ming helmets' own are drawn as pieces (wardrobe.js MING_DECOR).
+ */
+export const ARMOUR_DECOR = {
+  // Broad bands of gilt etching down every plate, its borders gilt (the Greenwich harnesses of Henry VIII's armourers and
+  // the Earl of Pembroke's, c. 1550-60: Royal Armouries II.78, the Met's 32.130.6).
+  etched: { label: 'Gilt etched bands', kind: 'etched', gold: '#d6ab45' },
+  // Embossed in relief and gilt all over (Filippo Negroli's parade armours, Milan c. 1530-45).
+  embossed: { label: 'Gilt embossed', kind: 'embossed', gold: '#c9a04a' },
+  // The bright steel left plain, the borders brass (the Gothic harnesses of c. 1480: the Met's 29.150.9a-r).
+  brass: { label: 'Brass borders', kind: 'brass', gold: '#c9a23a' },
+  // The Ming helmets': the gilt lion-face (tunshou) on the brow, wings at the sides, a red-tasselled finial and pennons; and
+  // the black and gold of the parade helmets, gilt bands down the seams, guardian figures, a cloud-scrolled brim.
+  tunshou: { label: 'Lion face and wings', kind: 'tunshou', gold: '#d4a640' },
+  guardians: { label: 'Gilt bands and guardians', kind: 'guardians', gold: '#dcb048' },
+};
+
+// What the plate harnesses offer: every steel but the lacquer, and the three gilt and brass decorations.
+const PLATE_FINISHES = { steels: ['bright', 'white', 'blued', 'blackened', 'russet'], decors: ['etched', 'embossed', 'brass'], pieces: ['armor', 'head', 'feet'] };
+// The Ming helmets: bright or black lacquer, and their two decorations (on the helmet alone).
+const MING_FINISHES = { steels: ['bright', 'blackLacquer'], decors: ['tunshou', 'guardians'], pieces: ['head'] };
+
+/**
+ * A design's look in the steel and decoration the wearer chose (`outfit.steel`, `outfit.decor`), where its kit offers them
+ * (`finishes`): the pieces named take the steel's colour and the decoration (`decor`: { kind, gold }, and its gilt as the
+ * piece's `gold`). Anything else: the design as drawn.
+ */
+function finishedLook(kind, outfit, look) {
+  const finishes = OUTFITS[kind].finishes;
+  if (!finishes || !outfit) return look;
+  const steel = finishes.steels.includes(outfit.steel) ? STEEL_FINISHES[outfit.steel].color : null;
+  const chosen = finishes.decors.includes(outfit.decor) ? ARMOUR_DECOR[outfit.decor] : null;
+  if (!steel && !chosen) return look;
+  const decor = chosen ? { kind: chosen.kind, gold: chosen.gold } : null;
+  // (A foot only when it is steel: a sabaton, not a boot.)
+  const finished = (piece, slot) => (piece && finishes.pieces.includes(slot) && (slot !== 'feet' || piece.kind === 'sabaton')
+    ? { ...piece, ...(steel ? { color: steel } : {}), ...(decor ? { decor, gold: decor.gold } : {}) }
+    : piece);
+  return { ...look, armor: finished(look.armor, 'armor'), head: finished(look.head, 'head'), feet: finished(look.feet, 'feet') };
+}
+
+/**
+ * The steel and decoration pickers' choices for a kit (`finishes`), each [value, label], the first the design's own; null
+ * for a kit that offers none (the builder hides the picker).
+ */
+export function finishOptions(kind) {
+  const finishes = OUTFITS[kind]?.finishes;
+  if (!finishes) return { steel: null, decor: null };
+  return {
+    steel: [['own', "The finish's own"], ...finishes.steels.map((key) => [key, STEEL_FINISHES[key].label])],
+    decor: [['none', 'None'], ...finishes.decors.map((key) => [key, ARMOUR_DECOR[key].label])],
+  };
+}
+
+/** The outfit with its steel or decoration (`field`: 'steel' or 'decor') chosen: the design's own ('own', 'none') removes it. */
+export function withFinish(outfit, field, value) {
+  const { [field]: _dropped, ...rest } = outfit ?? {};
+  return value === 'own' || value === 'none' ? rest : { ...rest, [field]: value };
+}
+
 // ---- Armour designs, five of each type (three are kept; the game shuffles them) ----
 
 // A powered exoskeleton's kit (after Sarcos's Guardian XO: a full-body frame
@@ -74,12 +153,17 @@ function exoKit(label, frameKg, kit) {
   };
 }
 
+// A harness's sabatons by its helmet's period (wardrobe.js buildFootwear; none named: the plain 15th-century point,
+// WARDROBE.sabatonPoint): the Gothic harness of the 1470s-80s, worn with the sallet, has them à la poulaine, the toe drawn
+// out ~17 cm past the foot in a thin point over six lames riveted in brass (the Met's 29.150.9a,b; the Wallace's A 21).
+const SABATONS = { sallet: { point: 0.17, lames: 6, rivets: true } };
+
 /**
  * Knight plate in another finish, and its helmet (`helm`, knighthelms.js: the hounskull bascinet of the early harness, the
  * German sallet and bevor of the Gothic, the close helmet of the fluted Maximilian harness).
  */
 function plateDesign(label, steel, fluted, pointed, under, helm) {
-  return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'tights', color: under }, armor: { kind: 'plate', color: steel, fluted }, head: { kind: 'bascinet', color: steel, pointed, design: helm }, feet: { kind: 'sabaton', color: steel } };
+  return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'tights', color: under }, armor: { kind: 'plate', color: steel, fluted }, head: { kind: 'bascinet', color: steel, pointed, design: helm }, feet: { kind: 'sabaton', color: steel, ...SABATONS[helm] } };
 }
 
 /**
@@ -625,7 +709,8 @@ export const OUTFITS = {
     arrowproof: true,
     sidearm: 'dagger',
     defaultHeadgear: 'plume', movement: 'limited', fists: 'gauntlet',
-    headgear: ['plume'],
+    headgear: ['plume', 'ostrich', 'harpy'],
+    finishes: PLATE_FINISHES,
     palette: [['brown', 'brown'], ['wine', 'black'], ['navy', 'charcoal'], ['forest', 'brown']],
     // Armour at 0.55 of its old weight (was 0.5): ~23 kg on an 85 kg man, against a field harness's 25–30 kg.
     extraMass: 0.275,
@@ -647,7 +732,7 @@ export const OUTFITS = {
     picked: [0, 1, 2, 3],
     designs: [
       // The gothic shape — fluted plate, the German sallet and bevor — in bright polished steel.
-      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet' }, feet: { kind: 'sabaton', color: '#b7bcc4' } },
+      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet' }, feet: { kind: 'sabaton', color: '#b7bcc4', ...SABATONS.sallet } },
       // Italian plate of about 1400 under the visored (hounskull) bascinet and its mail.
       plateDesign('Milanese', '#a7adb6', false, false, '#3a2a22', 'hounskull'),
       plateDesign('Blackened', '#3a3d42', true, true, '#1c1a18', 'sallet'),
@@ -667,6 +752,7 @@ export const OUTFITS = {
     horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 650, plated: true,
     label: 'Joan of Arc — white harness', arrowproof: true, sidearm: 'dagger', movement: 'limited', fists: 'gauntlet',
+    finishes: PLATE_FINISHES,
     // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
     breastplate: 0.8,
     cutProof: true,
@@ -708,6 +794,8 @@ export const OUTFITS = {
     horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 1000, plated: true,
     label: 'Stechzeug — jousting harness',
+    // Any helm in any steel: the bright steel of the first designs, blued, blackened, the russet of the Gothic helm's.
+    finishes: PLATE_FINISHES,
     breastplate: 0.85,
     arrowproof: true,
     sidearm: 'longsword',
@@ -1161,6 +1249,8 @@ export const OUTFITS = {
     skill: 0.6,
     faction: 'chinese', bulletRating: 650, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
+    // The officer's helmet bright or black-lacquered, plain, with the lion face and wings, or gilt with guardians.
+    finishes: MING_FINISHES,
     sidearm: 'dao',
     spare: 'dagger',
     deflects: true,
@@ -2365,6 +2455,10 @@ export const HEADGEAR = {
   hat: { label: 'Hat', knock: 0.25, falls: true, icon: '🎩' },
   headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: '🧣' },
   plume: { label: 'Plume', knock: 0.45, falls: true, icon: '🪶' },
+  // A knight's parade crests (wardrobe.js HELM_CRESTS): the gilt winged harpy of the Negroli burgonets, and a spray of
+  // ostrich plumes from a small crown. Cast or wired on a bracket: a hard blow takes them off as it does a plume.
+  harpy: { label: 'Winged harpy crest', knock: 0.45, falls: true, icon: '🦅' },
+  ostrich: { label: 'Ostrich plumes and crown', knock: 0.45, falls: true, icon: '👑' },
   // A straw hat tied loosely under the chin: a hard blow or a fall takes it off.
   kasa: { label: 'Kasa', knock: 0.3, falls: true, icon: '👒' },
   // A cut on the helmet carrying at least `cutFrom` J of edge takes the crest off with it.
@@ -2545,8 +2639,8 @@ export function outfitOf(inputs) {
   // Level mode (a boss's second phase): `outfit.bareHead`, the helm taken off; the rest of the kit as it was.
   // (And `outfit.helm` { kind, design }: another kit's helm put on over this one, a dead man's taken up: levelmode/ending.js.)
   const helm = wornHelm(inputs);
-  const look = inputs.outfit?.bareHead ? { ...OUTFITS[kind].designs[design], head: null } : helm ? { ...OUTFITS[kind].designs[design], head: helm.head } : OUTFITS[kind].designs[design];
-  return { kind, design, set: set.key, spec: setSpec(kind, set.key), look };
+  const drawn = inputs.outfit?.bareHead ? { ...OUTFITS[kind].designs[design], head: null } : helm ? { ...OUTFITS[kind].designs[design], head: helm.head } : OUTFITS[kind].designs[design];
+  return { kind, design, set: set.key, spec: setSpec(kind, set.key), look: finishedLook(kind, inputs.outfit, drawn) };
 }
 
 /** The helm of another kit worn over this one (`outfit.helm`: { kind, design }: the helmet slot, or a dead man's taken up), or null. */

@@ -14,8 +14,8 @@ import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps,
 import { bodyCheck } from './skinworker.js';
 import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
-import { DETAIL_ARMOUR, DETAIL_MAPS, clothCellOf, detailKindOf, metalClothCell } from './detailmaps.js';
-import { armourDetailMaterial, clothAtlasTexture, clothDetailMaterial, preloadDetailMaps } from './detailtex.js';
+import { DETAIL_ARMOUR, DETAIL_MAPS, clothCellOf, detailKindOf, metalClothCell, tileSize } from './detailmaps.js';
+import { armourDecorMaterial, armourDetailMaterial, clothAtlasTexture, clothDetailMaterial, preloadDetailMaps } from './detailtex.js';
 import { lookSkinHex } from './skintones.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
@@ -1954,6 +1954,13 @@ function detailedView(view, fighter, simple) {
   const gloveMaterial = surface(corner, { roughness: 0.32 });
   const hands = handKind(body.inputs, glovedFists(body.inputs));
   const plainSteel = steelMaterial(view.steelEnv, { vertexColors: false, color: roleColors(dress, new THREE.Color(skinColor)).steel, ...lacquer });
+  // The decoration chosen over the metal (outfits.js ARMOUR_DECOR): on the gauntlets, sabatons and helmet drawn in this steel,
+  // and on any helmet's sheet made from it (helmmaps.js helmMaterial reads `userData.decor`).
+  const pieceDecor = dress.armor?.decor ?? dress.head?.decor;
+  if (pieceDecor) {
+    armourDecorMaterial(plainSteel, pieceDecor, { space: 'local' });
+    plainSteel.userData.decor = pieceDecor;
+  }
   const garmentColors = { ...roleColors(dress, new THREE.Color(skinColor)), accent: dress.feet.accent };
   for (const side of ['l', 'r']) {
     let hand;
@@ -1974,7 +1981,7 @@ function detailedView(view, fighter, simple) {
     } else hand = buildHand(body, side, hands, skinColor, plainSteel);
     layers.skin.add(hand);
     attachments.push({ object: hand, bone: BONE[`${side}Forearm`], at: P[`${side}Hand`] });
-    const shoe = buildFootwear(body, dress.feet.kind, garmentColors, skinColor, plainSteel, dress.feet.heels ?? null);
+    const shoe = buildFootwear(body, dress.feet.kind, garmentColors, skinColor, plainSteel, dress.feet.heels ?? null, dress.feet);
     layers.skin.add(shoe);
     attachments.push({ object: shoe, bone: BONE[`${side}Foot`], at: P[`${side}Foot`] });
   }
@@ -2141,6 +2148,9 @@ function skinNow(body, style) {
   return { ...built, positions: built.positions.slice() };
 }
 
+// The armour tiles a harness's decoration is drawn over (detailmaps.js DETAIL_ARMOUR): its plate, its fluting, its edges.
+const DECOR_TILES = ['plate', 'fluted', 'harnessEdge'];
+
 /**
  * A built skin made into meshes over the rig's bones: the body (toon, or the style's maps), the steel apart, their ink, the colours
  * painted, which segment each vertex is, and the soft shell that dents it.
@@ -2179,6 +2189,9 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   }
   const skinMesh = skinnedMesh(built, bones, baseColors.slice(), { indices: Uint32Array.from(bodyIndices) });
   const steel = doubleSided(steelMaterial(view.steelEnv, { skinning: true, ...lacquer }));
+  // The harness's decoration on its steel drawn without a tile (a gorget, the maps off), measured on the body as it stands.
+  const steelDecor = outfitOf(body.inputs).look.armor?.decor;
+  if (steelDecor) armourDecorMaterial(steel, steelDecor, { space: 'local' });
   let steelMesh = null;
   let steelOutline = null;
   if (steelIndices.length) {
@@ -2203,6 +2216,9 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
       const base = matte ? new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 1, metalness: 0 }) : steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
       const metalness = lacquer.metalness ?? (kind === 'kozane' ? 0.5 : 1);
       const material = doubleSided(armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness }));
+      // The decoration over a plate harness (outfits.js ARMOUR_DECOR): its bands along the plates' field and fluting, its
+      // borders gilt along the edge strips.
+      if (dress.armor?.decor && DECOR_TILES.includes(kind)) armourDecorMaterial(material, dress.armor.decor, { tile: tileSize(kind)[0], edge: kind === 'harnessEdge' });
       const mesh = skinnedMesh(built, bones, null, { indices: Uint32Array.from(indices), material, share: skinMesh.geometry });
       mesh.userData.detailMaps = kind;
       detailMeshes.push(mesh);

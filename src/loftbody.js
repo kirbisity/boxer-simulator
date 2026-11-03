@@ -10,7 +10,7 @@ import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { factionOf, glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
-import { ARMOUR_EDGES, armourTileOf, clothMaterialOf, clothUvAt, DETAIL_ARMOUR, DETAIL_MAPS, isLacedTile, mailUv, measureRings, pieceMaterial, plateUvAt, stripUv, tileUv } from './detailmaps.js';
+import { ARMOUR_EDGES, ARMOUR_TILES, armourTileOf, clothMaterialOf, clothUvAt, DETAIL_ARMOUR, DETAIL_MAPS, isLacedTile, mailUv, measureRings, pieceMaterial, plateUvAt, stripUv, tileUv } from './detailmaps.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
 import { ribDroop, RULES, rulesProfile, rulesShape, rulesTraits, trunkRule, trunkSilhouette } from './skinrules.js';
@@ -1717,9 +1717,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const armor = look.armor ?? null;
   // Steel drawn with the plate's maps (detailmaps.js), not in a crowd, not leather or horn.
   mesh.steelUv = DETAIL_MAPS.on && !lowDetail && Boolean(armor) && !armor.matte;
-  // Its kind's own tiles for its steel and its moulded shell (detailmaps.js ARMOUR_TILES), where they are drawn.
-  mesh.steelTile = mesh.steelUv ? armourTileOf(armor.kind, 'steel') : null;
-  mesh.shellTile = mesh.steelUv ? armourTileOf(armor.kind, 'armor') : null;
+  // Its kind's own tiles for its steel and its moulded shell (detailmaps.js ARMOUR_TILES), where they are drawn; a fluted
+  // harness's (`armor.fluted`, the Maximilian) its kind's fluted tiles where it has them, the flutes in the normal map.
+  const tileKind = armor?.fluted && ARMOUR_TILES[`${armor.kind}Fluted`] ? `${armor.kind}Fluted` : armor?.kind;
+  mesh.steelTile = mesh.steelUv ? armourTileOf(tileKind, 'steel') : null;
+  mesh.shellTile = mesh.steelUv ? armourTileOf(tileKind, 'armor') : null;
   // Cloth drawn with the cloth atlas's maps (detailmaps.js clothMaterialOf: each role's material), not in a crowd or faceted.
   const clothContext = { faction: factionOf(body.inputs), outfit: outfitOf(body.inputs).kind };
   mesh.clothOf = DETAIL_MAPS.on && !lowDetail && !faceted ? (role) => clothMaterialOf(look, role, clothContext) : null;
@@ -1731,7 +1733,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // A piece from the table: `slot` (trunk, skirt, upperArm...) and `material` (detailmaps.js pieceMaterial, from its paint) choose
   // the tile it wears where the detail maps are drawn (armourTileOf).
   const tablePiece = (rings, inflate, paint, bones, shape = null, slot = null, material = pieceMaterial(paint)) => {
-    const tile = DETAIL_MAPS.on && !lowDetail ? armourTileOf(armor?.kind, material, slot) : null;
+    const tile = DETAIL_MAPS.on && !lowDetail ? armourTileOf(tileKind, material, slot) : null;
     const boned = bones ?? (() => null);
     // Lamellae (and scales hung point down) drawn as plates over a backing of their dark lacing (the robe showing in the
     // splits), except in a crowd: with the maps, one shell in rows wearing its laced tile, or a field tile of the kind's own over
@@ -1926,7 +1928,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const shell = { riot: [-0.05, 0.97, 1.25], heavyRiot: [-0.08, 1.12, 1.3], carrier: [0.05, 0.9, 1.2], plate: [-0.12, 1.1, 1.17], lamellar: [-0.1, 1.02, 1.2] }[armor.kind];
     const role = (ring, angle, index, step) => {
       if (plate && ring.t < breastplate[0]) return index % 2 ? 'steel2' : 'steel';
-      if (plate) return roped(ring, step) ?? (armor.fluted && step % 2 ? 'steel2' : 'steel');
+      // (Fluted: with the maps the flutes are the fluted tile's; without, every other step darker.)
+      if (plate) return roped(ring, step) ?? (armor.fluted && !mesh.steelUv && step % 2 ? 'steel2' : 'steel');
       // The ō-yoroi's leather front panel, where the bowstring would catch.
       if (lamellar && armor.panel && ring.t > 0.3 && ring.t < 0.86 && Math.cos(angle) > 0.82) return 'leather';
       if (lamellar && armor.trim && index % 5 === 0) return 'gold';
@@ -1942,7 +1945,10 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       lacedShell(mesh, shellRings, shell[2], (row, rows) => (armor.trim && row === rows - 1 ? 'gold' : 'steel'), abdomen, sides + 6, 'kozane', armor.panel ? panel : null);
     } else if (shell) loft(mesh, shellRings, sides, { color: role, inflate: shell[2], capStart: false, capEnd: false, bones: abdomen, ...(plate ? { shape: ridgedPlate } : {}) });
     // (Under cloth worn over it, the plate's front is not seen: drawn plain.)
+    // (A fluted harness's breastplate fluted as the rest: its patches wear the fluted tile.)
+    mesh.patchTile = armor.fluted && mesh.steelUv ? mesh.steelTile : null;
     if (plate && !lowDetail && !armor.over) breastplateOn(mesh, shellRings, shell[2], ridgedPlate, breastplate, { lanceRest: true }, abdomen);
+    mesh.patchTile = null;
   }
   // A field per pale is drawn sharp down the middle (paleOn), except in a crowd; a device over it (chargeOn) likewise.
   const sharpPale = (paint) => paint?.heraldry && armor?.heraldry === 'pale' && !lowDetail;

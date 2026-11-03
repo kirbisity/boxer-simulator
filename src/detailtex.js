@@ -372,3 +372,71 @@ ${shader.fragmentShader}`
   target.needsUpdate = true;
   return target;
 }
+
+/**
+ * Gilt work over a piece's metal (outfits.js ARMOUR_DECOR, the wearer's `decor`), drawn by the shader over whatever the
+ * material already is (its tile, its sheet, its colour): `gold` the gilding's colour, `kind` the pattern ('etched' bands
+ * of gilt etching, 'embossed' gilt relief over the whole, 'brass' only the borders), and where it is measured (`space`):
+ *   'tile'  an armour tile's own coordinates (render.js: the plate's field, its fluting, its edge strips), `tile` (m) the
+ *           tile's side: the bands run along the piece (up the breastplate, down the limbs) every ARMOUR_DECOR_SHADER.pitch;
+ *           a strip (`edge`: the harness's turned borders) gilt whole under any decoration;
+ *   'local' the mesh's own position in metres (a helmet's parts, a sabaton, a gauntlet): bands from front to back over the
+ *           crown, every pitch across.
+ * The etched bands are gilt with the scrolls etched dark through them (the Greenwich harnesses: Royal Armouries II.78,
+ * the Met's 32.130.6); the embossed field gilt, its ground left steel in the hollows (the Negroli parade armours).
+ * `material` is changed and returned; its own onBeforeCompile (a sheet's cut-out, a tile's masks) runs first.
+ */
+// `pitch` (m) from band to band, `band` the share of it gilt, `scroll` the etching's frequencies (along, across), `ground`
+// how much of the embossed field is left steel (the scroll's level under which it shows; its relief drawn a little larger
+// than the etching, the hammer's work, and shaded by it), `hollow` how dark that ground lies in the relief's hollows.
+export const ARMOUR_DECOR_SHADER = { pitch: 0.2, band: 0.34, scroll: [110, 85], ground: 0.45, hollow: 0.55 };
+const DECOR_KINDS = { etched: 1, embossed: 2, brass: 3 };
+
+export function armourDecorMaterial(material, { kind, gold }, { space = 'tile', tile = 0.2, edge = false } = {}) {
+  const mode = DECOR_KINDS[kind];
+  if (!mode || (mode === 3 && !edge)) return material;
+  const spec = ARMOUR_DECOR_SHADER;
+  const uniforms = {
+    uDecorGold: { value: new THREE.Color(gold) },
+    uDecorTile: { value: tile / spec.pitch },
+  };
+  const before = material.onBeforeCompile;
+  const keyBefore = material.customProgramCacheKey?.bind(material);
+  const local = space === 'local';
+  material.onBeforeCompile = (shader, renderer) => {
+    if (before) before.call(material, shader, renderer);
+    Object.assign(shader.uniforms, uniforms);
+    if (local) {
+      shader.vertexShader = `varying vec3 vDecorPos;\n${shader.vertexShader}`.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vDecorPos = position * length(modelMatrix[0].xyz);');
+    }
+    // `at`: where in the pattern (pitches across, metres along for the scrolls); `across`: the share of the pitch.
+    const where = local
+      ? `vec2 at = vec2(vDecorPos.z / ${spec.pitch.toFixed(3)} * 2.2 + 0.5, (vDecorPos.x + vDecorPos.y) * 0.7);`
+      : `vec2 at = vec2(vUv.x * uDecorTile, vUv.y * uDecorTile * ${spec.pitch.toFixed(3)});`;
+    const pattern = edge
+      ? 'float decor = 1.0;'
+      : `${where}
+  float across = abs(fract(at.x) - 0.5);
+  ${mode === 2 ? 'at *= vec2(0.8, 0.8);' : ''}
+  float scroll = sin(at.y * ${spec.scroll[0].toFixed(1)} + sin(fract(at.x) * 18.0) * 2.2) * sin(fract(at.x) * 31.0 + at.y * ${spec.scroll[1].toFixed(1)});
+  float decor = ${mode === 1
+    ? `step(across, ${(spec.band / 2).toFixed(3)}) * (1.0 - step(abs(scroll), 0.2) * step(across, ${(spec.band / 2 - 0.02).toFixed(3)}))`
+    : `smoothstep(-${(spec.ground + 0.15).toFixed(2)}, -${spec.ground.toFixed(2)}, scroll)`};`;
+    shader.fragmentShader = `uniform vec3 uDecorGold;\nuniform float uDecorTile;\n${local ? 'varying vec3 vDecorPos;\n' : ''}${shader.fragmentShader}`.replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+  {
+  ${pattern}
+#ifdef USE_MAP
+  vec3 decorGilt = uDecorGold * mix(vec3(1.0), texelColor.rgb, 0.6) * 1.12;
+#else
+  vec3 decorGilt = uDecorGold;
+#endif
+  ${mode === 2 && !edge ? 'decorGilt *= 0.78 + 0.32 * scroll;' : ''}
+  diffuseColor.rgb = mix(diffuseColor.rgb * ${mode === 2 && !edge ? spec.hollow.toFixed(2) : '1.0'}, decorGilt, decor);
+  }`,
+    );
+  };
+  material.customProgramCacheKey = () => `${keyBefore ? keyBefore() : ''}-decor-${kind}-${space}-${edge ? 'edge' : 'field'}`;
+  return material;
+}

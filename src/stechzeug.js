@@ -4,6 +4,7 @@
 // rest). The body's plate itself (breast, pauldrons, tassets) is the loft's
 // (loftbody.js, `armor.joust`).
 
+import { armourDecorMaterial } from './detailtex.js';
 import { surface } from './toon.js';
 
 // The helm in head radii (head coordinates: x forward, y up, z left), as
@@ -107,6 +108,8 @@ export function buildStechhelm(group, head, r, steel, { lowDetail = false } = {}
   const iron = steel.clone();
   iron.color = new THREE.Color(head.color ?? '#c2c7ce');
   iron.side = THREE.DoubleSide;
+  // The decoration chosen over the harness's steel (render.js `userData.decor`), on the helm's own steel too.
+  if (head.decor) armourDecorMaterial(iron, head.decor, { space: 'local' });
   const brass = steel.clone();
   brass.color = new THREE.Color(head.gold ?? '#c9a23a');
   const dark = surface(0x050506);
@@ -591,6 +594,8 @@ function buildShapedStechhelm(group, head, r, steel, spec, { lowDetail = false }
   const iron = steel.clone();
   iron.color = new THREE.Color(head.color ?? '#c2c7ce');
   iron.side = THREE.DoubleSide;
+  // The decoration chosen over the harness's steel (render.js `userData.decor`), on the helm's own steel too.
+  if (head.decor) armourDecorMaterial(iron, head.decor, { space: 'local' });
   const brass = steel.clone();
   brass.color = new THREE.Color(spec.rivets.brass ? head.gold ?? '#c9a23a' : head.color ?? '#c2c7ce');
   const dark = surface(0x050506);

@@ -34,7 +34,7 @@ import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battle
 import { judgeBattle } from './battleend.js';
 import { createGeneralMarks } from './generalmark.js';
 import { leadOf, musterLevel } from './muster.js';
-import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, helmChoices, helmSlotOf, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setHelmSlot, wornCard } from './outfits.js';
+import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, finishOptions, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, helmChoices, helmSlotOf, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setHelmSlot, withFinish, wornCard } from './outfits.js';
 import { setCardElement } from './setcard.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
@@ -2047,6 +2047,16 @@ const OUTFIT_FIELDS = [
     get: (inputs) => String(outfitField(inputs).design ?? 0), set: (inputs, value) => { outfitField(inputs).design = Number(value); },
   },
   {
+    // The metal's finish and its decoration over any finish (outfits.js STEEL_FINISHES, ARMOUR_DECOR), where the kit offers
+    // them (filled per outfit: fillCornerForm).
+    key: 'steel', label: 'Steel', options: [], names: null,
+    get: (inputs) => outfitField(inputs).steel ?? 'own', set: (inputs, value) => { inputs.outfit = withFinish(outfitField(inputs), 'steel', value); },
+  },
+  {
+    key: 'decor', label: 'Decoration', options: [], names: null,
+    get: (inputs) => outfitField(inputs).decor ?? 'none', set: (inputs, value) => { inputs.outfit = withFinish(outfitField(inputs), 'decor', value); },
+  },
+  {
     key: 'top', label: 'Top', options: Object.keys(PICKER_COLORS),
     get: (inputs) => colorName(outfitField(inputs).colors?.top), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, top: PICKER_COLORS[value] ?? undefined }; },
   },
@@ -2305,6 +2315,12 @@ function fillCornerForm(corner) {
   const headOptions = headgearOptions(kind);
   if (!headOptions.includes((inputs.accessories ?? [])[0] ?? 'none')) inputs.accessories = [];
   outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => new Option(option === 'none' ? 'None' : HEADGEAR[option].label, option)));
+  // The steels and decorations this kit offers; none: the pickers hidden.
+  for (const [key, choices] of Object.entries(finishOptions(kind))) {
+    const select = outfit.querySelector(`[data-outfit="${key}"]`);
+    select.replaceChildren(...(choices ?? []).map(([value, label]) => new Option(label, value)));
+    select.closest('label').hidden = !choices;
+  }
   for (const field of OUTFIT_FIELDS) showValue(outfit.querySelector(`[data-outfit="${field.key}"]`), field.get(inputs), field.names);
   const slot = outfit.querySelector('.set-slot');
   const shown = `${kind}/${set.key}/${helmSlotOf(inputs)}`;

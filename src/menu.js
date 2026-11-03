@@ -8,7 +8,7 @@
 import { normaliseInputs, PRESETS } from './body.js';
 import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, weightOf } from './cast.js';
 import { STYLE_KEYS, STYLES } from './moves.js';
-import { CLOTH_COLORS, FACTION_KEYS, FACTIONS, factionOf, firstDesignOf, HEADGEAR, headgearOptions, helmChoices, helmSlotOf, outfitOf, outfitSets, OUTFITS, pickableSets, randomColors, setCard, setHelmSlot, wornCard } from './outfits.js';
+import { CLOTH_COLORS, FACTION_KEYS, FACTIONS, factionOf, finishOptions, firstDesignOf, HEADGEAR, headgearOptions, helmChoices, helmSlotOf, outfitOf, outfitSets, OUTFITS, pickableSets, randomColors, setCard, setHelmSlot, withFinish, wornCard } from './outfits.js';
 import { setCardElement } from './setcard.js';
 import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { photoFaceRegions } from './photoface.js';
@@ -553,6 +553,9 @@ export function installMenus(game) {
         setCardElement(wornCard(inputs), () => game.setPortrait?.(worn.kind, worn.set)),
         el('div', { className: 'field' }, el('b', { textContent: 'Helmet' }), helmPicker()),
         ...(designs.length < 2 ? [] : [el('div', { className: 'field' }, el('b', { textContent: 'Finish' }), buttons(designs.map(([, at]) => String(at)), () => String(outfit.design ?? 0), (at) => { gearTouched = true; inputs.outfit = { ...outfit, design: Number(at) }; }, (at) => OUTFITS[outfit.kind].designs[at].label))]),
+        // The metal's steel and its decoration, where the kit offers them (outfits.js finishOptions).
+        ...Object.entries(finishOptions(worn.kind)).filter(([, choices]) => choices).map(([field, choices]) => el('div', { className: 'field' }, el('b', { textContent: field === 'steel' ? 'Steel' : 'Decoration' }),
+          buttons(choices.map(([value]) => value), () => inputs.outfit?.[field] ?? choices[0][0], (value) => { gearTouched = true; inputs.outfit = withFinish(inputs.outfit, field, value); }, (value) => choices.find(([key]) => key === value)[1]))),
         ...(['top', 'bottom'].some((part) => worn.look[part]) ? [
           el('div', { className: 'field' }, el('b', { textContent: 'Top colour' }), clothPicker('top')),
           el('div', { className: 'field' }, el('b', { textContent: 'Legs colour' }), clothPicker('bottom')),

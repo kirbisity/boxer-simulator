@@ -205,7 +205,9 @@ test('each armoured outfit\'s body wears the tiles its kind is said to (and no o
       seen.set(`${key}|${kind}`, tiles);
       const listed = ARMOUR_COVERAGE[kind] ?? [];
       for (const tile of tiles) assert.ok(listed.includes(tile), `${key} (${kind}) wears ${tile}, not listed`);
-      for (const tile of listed) if (!(apart[kind] ?? []).includes(tile) && !look.armor.matte) assert.ok(tiles.includes(tile), `${key} (${kind}) is said to wear ${tile}: ${tiles}`);
+      // (The fluted tile only on a fluted harness: ARMOUR_TILES plateFluted.)
+      const worn = listed.filter((tile) => tile !== 'fluted' || look.armor.fluted);
+      for (const tile of worn) if (!(apart[kind] ?? []).includes(tile) && !look.armor.matte) assert.ok(tiles.includes(tile), `${key} (${kind}) is said to wear ${tile}: ${tiles}`);
     }
   }
 });

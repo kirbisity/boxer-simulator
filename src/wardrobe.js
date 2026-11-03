@@ -230,9 +230,10 @@ export function buildHand(body, side, kind, skinColor, steel) {
 /**
  * Footwear in the foot's frame (y along the foot, toes forward): soles and
  * uppers by kind, a heel block under a woman's business boot, steel
- * sabatons, or a bare foot.
+ * sabatons, or a bare foot. `feet`: the design's own (a sabaton's `point`,
+ * `lames` and `rivets`).
  */
-export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
+export function buildFootwear(body, kind, colors, skinColor, steel, heels, feet = {}) {
   const length = 0.25 * body.heightM / 1.8;
   const shoe = new THREE.Group();
   const upperColor = colors.boot.getHex();
@@ -370,15 +371,32 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
     }
   }
   if (kind === 'sabaton') {
-    // The pointed toe of a 15th-century sabaton: the steel drawn out past the
-    // foot to a point (WARDROBE.sabatonPoint: m beyond it, at this height), low over the ground.
-    const point = WARDROBE.sabatonPoint * body.heightM / 1.8;
+    // The pointed toe of a 15th-century sabaton: the steel drawn out past the foot to a point (`feet.point`, else
+    // WARDROBE.sabatonPoint: m beyond it, at this height), low over the ground.
+    const point = (feet.point ?? WARDROBE.sabatonPoint) * body.heightM / 1.8;
+    const cap = Math.min(point, WARDROBE.sabatonPoint * body.heightM / 1.8);
     const toe = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 12), steel);
-    toe.scale.set(spec.width * 0.62, point + length * 0.16, spec.height * 0.72);
-    toe.position.set(-spec.width * 0.42, length * 0.78 + (point - length * 0.16) / 2 + length * 0.16 * 0.5, 0);
+    toe.scale.set(spec.width * 0.62, cap + length * 0.16, spec.height * 0.72);
+    toe.position.set(-spec.width * 0.42, length * 0.78 + (cap - length * 0.16) / 2 + length * 0.16 * 0.5, 0);
     shoe.add(toe);
-    // Lames across the foot: thin steel rings following its section, narrowing towards the toe.
-    for (const along of [0.36, 0.46, 0.56]) {
+    // À la poulaine (the Gothic harness's, 1470s-80s: the Met's 29.150.9a,b; Wallace A 21): past the toe cap the point runs
+    // on as a thin spike, drawn down to near the ground.
+    if (point > cap) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 8), steel);
+      // From inside the cap's tip (0.86 of the foot's length past the cap) out to the point, tipped down a little.
+      const run = point - cap + length * 0.06;
+      const droop = 0.06;
+      spike.scale.set(spec.width * 0.26, run, spec.height * 0.2);
+      spike.rotation.z = droop;
+      spike.position.set(-spec.width * 0.42 - Math.sin(droop) * run * 0.5, length * 0.8 + cap + run / 2, 0);
+      shoe.add(spike);
+    }
+    // Lames across the foot (`feet.lames`, else three): thin steel rings following its section, narrowing towards the toe,
+    // and their brass rivets each side where the design has them (`feet.rivets`).
+    const lames = feet.lames ?? 3;
+    const brass = feet.rivets ? metal(steel, colors.gold?.getHex?.() ?? 0xd6a743) : null;
+    for (let index = 0; index < lames; index += 1) {
+      const along = lames === 3 ? [0.36, 0.46, 0.56][index] : 0.32 + (0.36 * index) / (lames - 1);
       const across = Math.sqrt(Math.max(0.05, 1 - ((along - 0.28) / 0.5) ** 2));
       const band = new THREE.Mesh(new THREE.TorusGeometry(1, 0.08, 4, 18), steel);
       band.rotation.x = Math.PI / 2;
@@ -386,6 +404,13 @@ export function buildFootwear(body, kind, colors, skinColor, steel, heels) {
       band.position.set(-0.012, length * along, 0);
       band.userData.noOutline = true;
       shoe.add(band);
+      if (!brass) continue;
+      for (const side of [1, -1]) {
+        const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.0045, 6, 4), brass);
+        rivet.position.set(-0.012, length * along, side * spec.width * across * 1.06);
+        rivet.userData.noOutline = true;
+        shoe.add(rivet);
+      }
     }
   }
   return finish(shoe);
@@ -1654,6 +1679,8 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         studs.userData.noOutline = true;
         group.add(coif, studs);
       }
+      // Its decoration, where one was chosen (outfits.js ARMOUR_DECOR: the lion face and wings, or the guardians).
+      if (head.decor) mingHelmDecor(group, head.decor, r, steel, profile, color);
       if (head.mask && !worldMask(group, head, r, steel, color)) {
         // A steel face mask from the brow to the chin, an eye slit across it.
         const mask = new THREE.Mesh(new THREE.SphereGeometry(1.12 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.44, Math.PI * 0.42), bowlSteel.clone());
@@ -2017,6 +2044,166 @@ function hongying(r, { top, length, hull }, colour = TASSELS.hongying.colour, lo
   return buildTassel(spec, r, { at: [0, top, 0], hull, still: lowDetail, colour });
 }
 
+// The Ming officer's helmet's two decorations (outfits.js ARMOUR_DECOR tunshou, guardians), in head radii on its bowl
+// (`profile` [radius, y] up the lathe):
+// - tunshou: the gilt lion face (吞兽) on the brow (`plaque`: its radius and height), gilt wings rising at each side
+//   (`wing`: feathers, their lengths), a gilt cap over the finial's foot, and two small spear-pointed pennons (`pennon`:
+//   their poles' height and the flag) beside the red tassel: the Ming generals' helmets of 出警入跸图 and their
+//   reconstructions (the user's drawing).
+// - guardians: gilt bands down the seams from finial to brim (`bands`), a gilt guardian (门神) on each panel between them
+//   (`figure`: its height up the bowl), a gilt band round the foot, a wide black brim edged in gilt cloud scrolls
+//   (`brim`: its reach and the scrolls), and a seated gilt figure on the finial between two cloud curls: the black-lacquered
+//   ray-skin parade helmets (the user's photograph of a reconstruction, after the Dingling and Mu family helmets).
+const MING_DECOR = {
+  tunshou: { plaque: { r: 0.36, y: 0.62 }, wing: { feathers: 6, length: [0.75, 1.35], y: 0.42 }, pennon: { height: 1.0, flag: [0.36, 0.24], colour: '#cfd6dc' } },
+  guardians: { bands: 8, figure: { y: 0.92, height: 0.5 }, brim: { reach: 0.62, scrolls: 22 }, footBand: [0.05, 0.36] },
+};
+
+/** The decoration of a Ming officer's helmet (MING_DECOR) over its bowl (`profile`), its brim in the bowl's `color`. */
+function mingHelmDecor(group, decor, r, steel, profile, color) {
+  const gilt = metal(steel, decor.gold ?? 0xd6a743);
+  const radiusAt = (y) => {
+    for (let index = 1; index < profile.length; index += 1) {
+      const [x0, y0] = profile[index - 1];
+      const [x1, y1] = profile[index];
+      if (y <= y1) return x0 + ((x1 - x0) * (y - y0)) / (y1 - y0);
+    }
+    return profile.at(-1)[0];
+  };
+  const add = (mesh) => {
+    group.add(mesh);
+    return mesh;
+  };
+  const top = profile.at(-1)[1];
+  if (decor.kind === 'tunshou') {
+    const spec = MING_DECOR.tunshou;
+    // The lion's face on the brow: a gilt boss, its mane a ring round it, brows, eyes, the snout and the fangs.
+    const plaque = new THREE.Group();
+    const { r: size, y } = spec.plaque;
+    plaque.position.set(radiusAt(y) * r, y * r, 0);
+    plaque.rotation.z = -0.12;
+    const disc = new THREE.Mesh(new THREE.SphereGeometry(size * r, 14, 10), gilt);
+    disc.scale.set(0.28, 1, 1.1);
+    plaque.add(disc);
+    const mane = new THREE.Mesh(new THREE.TorusGeometry(size * 0.92 * r, 0.06 * r, 6, 18), gilt);
+    mane.rotation.y = Math.PI / 2;
+    mane.scale.set(1, 1, 1.1);
+    plaque.add(mane);
+    const lump = (radius, at, scale = [1, 1, 1]) => {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius * r, 8, 6), gilt);
+      mesh.position.set(...at.map((value) => value * r));
+      mesh.scale.set(...scale);
+      plaque.add(mesh);
+    };
+    for (const side of [1, -1]) {
+      lump(0.07, [0.1, 0.08, 0.13 * side]);
+      lump(0.08, [0.07, 0.17, 0.15 * side], [0.6, 0.5, 1.4]);
+      lump(0.03, [0.1, -0.2, 0.08 * side], [1, 1.6, 1]);
+    }
+    lump(0.09, [0.13, -0.07, 0], [1.2, 0.8, 1.2]);
+    lump(0.07, [0.08, -0.22, 0], [0.8, 0.5, 2.2]);
+    add(plaque);
+    // The wings at the sides: a fan of gilt feathers each side, rising and curling back.
+    const { feathers, length, y: wingY } = spec.wing;
+    for (const side of [1, -1]) {
+      for (let index = 0; index < feathers; index += 1) {
+        const share = index / (feathers - 1);
+        const long = (length[0] + (length[1] - length[0]) * (1 - Math.abs(share - 0.6))) * r;
+        const feather = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), gilt);
+        feather.scale.set(0.12 * r, long, 0.035 * r);
+        feather.position.y = long / 2;
+        const pivot = new THREE.Group();
+        pivot.position.set(0.15 * r, wingY * r, side * radiusAt(wingY) * r);
+        pivot.rotation.set(side * (0.15 + share * 0.45), 0, 0.5 - share * 0.85);
+        pivot.add(feather);
+        add(pivot);
+      }
+      const boss = new THREE.Mesh(new THREE.SphereGeometry(0.13 * r, 10, 8), gilt);
+      boss.scale.set(1, 1, 0.45);
+      boss.position.set(0.15 * r, wingY * r, side * (radiusAt(wingY) + 0.03) * r);
+      add(boss);
+    }
+    // The gilt cap over the finial's foot, and the two pennons beside the tassel.
+    const cap = add(new THREE.Mesh(new THREE.CylinderGeometry(0.3 * r, 0.42 * r, 0.22 * r, 14), gilt));
+    cap.position.y = (top - 0.1) * r;
+    const { height, flag, colour } = spec.pennon;
+    const cloth = surface(new THREE.Color(colour).getHex(), { roughness: 0.8 });
+    cloth.side = THREE.DoubleSide;
+    for (const side of [1, -1]) {
+      const pole = add(new THREE.Mesh(new THREE.CylinderGeometry(0.018 * r, 0.018 * r, height * r, 5), gilt));
+      pole.position.set(0, (top + height / 2) * r, side * 0.32 * r);
+      const point = add(new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, 0.16 * r, 5), steel));
+      point.position.set(0, (top + height + 0.08) * r, side * 0.32 * r);
+      const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(-flag[0], -flag[1] * 0.3), new THREE.Vector2(-flag[0] * 0.7, -flag[1] * 0.55), new THREE.Vector2(-flag[0], -flag[1]), new THREE.Vector2(0, -flag[1] * 0.75)].map((v) => v.multiplyScalar(r)));
+      const pennant = add(new THREE.Mesh(new THREE.ShapeGeometry(shape), cloth));
+      pennant.position.set(-0.01 * r, (top + height - 0.04) * r, side * 0.32 * r);
+      pennant.rotation.y = side * 0.5;
+    }
+    return;
+  }
+  const spec = MING_DECOR.guardians;
+  // Gilt bands down every seam, a hair proud of the bowl, from under the finial to the foot.
+  for (let band = 0; band < spec.bands; band += 1) {
+    const turn = (band / spec.bands) * Math.PI * 2;
+    const path = new THREE.CatmullRomCurve3(profile.slice(0, -1).map(([x, y]) => new THREE.Vector3(Math.cos(turn) * (x + 0.05) * r, y * r, Math.sin(turn) * (x + 0.05) * r)));
+    add(new THREE.Mesh(new THREE.TubeGeometry(path, 12, 0.07 * r, 4), gilt));
+  }
+  // A guardian on each panel between the bands: robe, head and the halberd up beside him, in gilt relief.
+  const { y: figureY, height } = spec.figure;
+  for (let panel = 0; panel < spec.bands; panel += 1) {
+    const turn = ((panel + 0.5) / spec.bands) * Math.PI * 2;
+    const figure = new THREE.Group();
+    const out = radiusAt(figureY) + 0.02;
+    figure.position.set(Math.cos(turn) * out * r, figureY * r, Math.sin(turn) * out * r);
+    figure.rotation.set(0, -turn, -0.18);
+    const robe = new THREE.Mesh(new THREE.ConeGeometry(0.11 * r, height * 0.75 * r, 6), gilt);
+    robe.scale.set(0.35, 1, 0.35);
+    figure.add(robe);
+    const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.06 * r, 8, 6), gilt);
+    headMesh.position.y = height * 0.45 * r;
+    figure.add(headMesh);
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.012 * r, 0.012 * r, height * r, 4), gilt);
+    staff.position.set(0, height * 0.1 * r, 0.1 * r);
+    figure.add(staff);
+    add(figure);
+  }
+  // The gilt band round the foot.
+  const [from, to] = spec.footBand;
+  const foot = add(new THREE.Mesh(new THREE.CylinderGeometry((radiusAt(to) + 0.03) * r, (radiusAt(from) + 0.03) * r, (to - from) * r, 28, 1, true), gilt));
+  foot.material = gilt.clone();
+  foot.material.side = THREE.DoubleSide;
+  foot.position.y = ((from + to) / 2) * r;
+  // The wide black brim, edged in gilt cloud scrolls.
+  const { reach, scrolls } = spec.brim;
+  const inner = radiusAt(from);
+  const brim = add(new THREE.Mesh(new THREE.RingGeometry(inner * r, (inner + reach) * r, 36, 1), metal(steel, new THREE.Color(color).getHex())));
+  brim.material.side = THREE.DoubleSide;
+  brim.rotation.x = -Math.PI / 2;
+  brim.position.y = from * r;
+  const edge = add(new THREE.Mesh(new THREE.TorusGeometry((inner + reach) * r, 0.04 * r, 5, 40), gilt));
+  edge.rotation.x = Math.PI / 2;
+  edge.position.y = from * r;
+  for (let scroll = 0; scroll < scrolls; scroll += 1) {
+    const turn = (scroll / scrolls) * Math.PI * 2;
+    const curl = add(new THREE.Mesh(new THREE.TorusGeometry(0.07 * r, 0.02 * r, 4, 10, Math.PI * 1.4), gilt));
+    curl.rotation.x = -Math.PI / 2;
+    curl.position.set(Math.cos(turn) * (inner + reach - 0.09) * r, (from + 0.015) * r, Math.sin(turn) * (inner + reach - 0.09) * r);
+  }
+  // The seated figure on the finial, between two cloud curls.
+  const seat = add(new THREE.Mesh(new THREE.CylinderGeometry(0.2 * r, 0.24 * r, 0.12 * r, 12), gilt));
+  seat.position.y = (top + 0.48) * r;
+  const body = add(new THREE.Mesh(new THREE.SphereGeometry(0.17 * r, 10, 8), gilt));
+  body.scale.set(1, 1.15, 1.1);
+  body.position.y = (top + 0.7) * r;
+  const crown = add(new THREE.Mesh(new THREE.SphereGeometry(0.08 * r, 8, 6), gilt));
+  crown.position.y = (top + 0.95) * r;
+  for (const side of [1, -1]) {
+    const cloud = add(new THREE.Mesh(new THREE.TorusGeometry(0.11 * r, 0.03 * r, 5, 12, Math.PI * 1.5), gilt));
+    cloud.position.set(0, (top + 0.62) * r, side * 0.34 * r);
+    cloud.rotation.y = Math.PI / 2;
+  }
+}
+
 /** A knight's helmet's part as a mesh (knighthelms.js knightGrid: leaned as its design leans), its coordinates in its region of the sheet. */
 function knightMesh(form, part, material) {
   const { positions, uvs, indices } = knightGrid(form, part);
@@ -2038,9 +2225,11 @@ function knightMesh(form, part, material) {
 function buildKnightHelm(group, head, r, iron) {
   const form = knightFormOf(head.kind, HELM_STYLE.knight, head.design);
   if (!form || !helmMapsReady() || !helmMapSheet(form.sheet)) return false;
+  // The mail aventail is not gilt with the plates (render.js `userData.decor`).
+  const mailIron = iron.userData.decor ? Object.assign(iron.clone(), { userData: { ...iron.userData, decor: null } }) : iron;
   for (const [name, part] of Object.entries(form.parts)) {
     const side = part.double ? THREE.DoubleSide : THREE.FrontSide;
-    const material = part.look === 'liner' ? surface(0x0d0c0b, { roughness: 1 }) : helmMaterial(iron, form.sheet, { side, cut: !!form.cut });
+    const material = part.look === 'liner' ? surface(0x0d0c0b, { roughness: 1 }) : helmMaterial(part.look === 'mail' ? mailIron : iron, form.sheet, { side, cut: !!form.cut });
     const mesh = knightMesh(form, part, material);
     mesh.name = `helm-${name}`;
     mesh.scale.setScalar(r);
@@ -2421,6 +2610,145 @@ function setOnFace(fit, r, ...pieces) {
 const HEAD_DRESS_SCALE = 1.7;
 const PLUME_SCALE = 1.15;
 
+/**
+ * Where a crest or plume stands on a helmet (head radii times `r`): a knight's helmet in a design on its own crown or comb
+ * (knighthelms.js `top`), a bascinet on its point, any other on its crown.
+ */
+function crestTop(head, r) {
+  const knightly = knightFormOf(head.kind, HELM_STYLE.knight, head.design);
+  return knightly ? (knightly.top + 0.08) * r : head.kind === 'bascinet' ? (head.pointed ? 1.55 : 1.35) * r : 0.95 * r;
+}
+
+// The knights' parade crests (outfits.js HEADGEAR harpy, ostrich), in head radii:
+// - harpy (drawn `scale` times these measures): the winged harpy (a woman's head and breast on a bird's body, wings raised behind, a long tail curling down the
+//   helmet's back into a scroll) cast and gilt on the burgonet of the Negroli parade harness (the "harpy" or sphinx crests of
+//   Filippo Negroli's embossed armours, Milan c. 1530-45: the Met's 17.190.1720, the Real Armería's A 139). `tail`: the
+//   tail's run from the body back and down the skull, ending in its curl (`curl`: the scroll's radius and turns); `seat`:
+//   how far below the helmet's top its bracket is set (into the comb).
+// - ostrich: a spray of white ostrich plumes rising from a small gilt crown on the helmet's top (the fluted Maximilian
+//   harnesses' parade dress, and the Greenwich tournament harnesses' panaches): `plumes` feathers, each `length` long, rising
+//   and falling outward along `path` (out, up, in lengths), `width` across at its fullest, drawn in `segments` x 3 rings,
+//   round `spread` of the sides and back, the
+//   crown `crown` wide with its fleurons, set `seat` down over the top.
+export const HELM_CRESTS = {
+  harpy: { gilt: '#b8923a', scale: 1.5, seat: 0.22, tail: [[-0.15, 0.36], [-0.38, 0.12], [-0.69, -0.27], [-0.92, -0.81], [-1.04, -1.35], [-1.04, -1.7]], curl: [0.12, 1.25], wing: { feathers: 6, length: [0.42, 0.78] } },
+  ostrich: { gilt: '#d4aa48', feather: '#f3f0e8', seat: 0.24, plumes: 13, length: 2.2, segments: 8, width: 0.3, spread: 2.1, path: [[0, 0.05], [0.05, 0.42], [0.25, 0.7], [0.52, 0.68], [0.75, 0.42], [0.88, 0.05], [0.93, -0.22]], crown: { radius: 0.3, height: 0.12, fleurons: 8 } },
+};
+
+/** The gilt harpy standing on a helmet's crown, facing forward (+x), its tail down the back. */
+function harpyCrest(r, gilt) {
+  const spec = HELM_CRESTS.harpy;
+  const group = new THREE.Group();
+  const add = (geometry, [x, y, z], scale = [1, 1, 1], rotation = [0, 0, 0]) => {
+    const mesh = new THREE.Mesh(geometry, gilt);
+    mesh.position.set(x * r, y * r, z * r);
+    mesh.scale.set(...scale);
+    mesh.rotation.set(...rotation);
+    group.add(mesh);
+    return mesh;
+  };
+  // The bracket and its socket on the comb, the bird's feet clasping it.
+  add(new THREE.CylinderGeometry(0.05 * r, 0.08 * r, 0.24 * r, 8), [0, 0.1, 0]);
+  // The bird's body, low and long, its breast up and forward into the woman's bust.
+  add(new THREE.SphereGeometry(0.2 * r, 12, 8), [-0.04, 0.36, 0], [1.35, 0.8, 0.75], [0, 0, 0.35]);
+  add(new THREE.SphereGeometry(0.14 * r, 12, 8), [0.12, 0.58, 0], [0.85, 1.2, 1]);
+  for (const side of [1, -1]) add(new THREE.SphereGeometry(0.065 * r, 8, 6), [0.22, 0.6, 0.065 * side]);
+  // The neck, the head and the knot of hair behind it.
+  add(new THREE.CylinderGeometry(0.045 * r, 0.06 * r, 0.16 * r, 8), [0.15, 0.78, 0], [1, 1, 1], [0, 0, -0.2]);
+  add(new THREE.SphereGeometry(0.1 * r, 12, 10), [0.18, 0.92, 0], [1.05, 1.15, 0.9]);
+  add(new THREE.SphereGeometry(0.055 * r, 8, 6), [0.08, 1.0, 0]);
+  // The wings raised behind and up from the shoulders, each a fan of long feathers.
+  const { feathers, length } = spec.wing;
+  for (const side of [1, -1]) {
+    for (let index = 0; index < feathers; index += 1) {
+      const share = index / (feathers - 1);
+      const long = (length[0] + (length[1] - length[0]) * share) * r;
+      const feather = new THREE.Mesh(new THREE.BoxGeometry(0.07 * r, long, 0.015 * r), gilt);
+      feather.geometry.translate(0, long / 2, 0);
+      const pivot = new THREE.Group();
+      pivot.position.set(0.02 * r, 0.62 * r, 0.09 * side * r);
+      pivot.rotation.set(side * (0.25 + 0.05 * share), 0, 0.35 + 0.55 * share);
+      pivot.add(feather);
+      group.add(pivot);
+    }
+  }
+  // The tail: from the body back over the skull and down the back of the helmet, ending in a scroll.
+  const [radius, turns] = spec.curl;
+  const points = spec.tail.map(([x, y]) => new THREE.Vector3(x * r, y * r, 0));
+  const end = points.at(-1);
+  for (let step = 1; step <= 10; step += 1) {
+    const angle = (step / 10) * turns * Math.PI * 2;
+    const shrink = radius * (1 - (0.6 * step) / 10) * r;
+    points.push(new THREE.Vector3(end.x + shrink * Math.sin(angle), end.y - shrink * (1 - Math.cos(angle)), 0));
+  }
+  group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 40, 0.04 * r, 6, false), gilt));
+  return group;
+}
+
+/**
+ * One ostrich plume along its curve (in its own plane, x out and y up): a tube swelled in the middle and narrowed to its
+ * tip, flattened across its plane (the barbs hang either side of the quill, z), its surface ruffled so the barbs read as
+ * soft fronds, not a sausage. `seed`: each plume ruffled its own way.
+ */
+function ostrichPlume(curve, r, spec, seed) {
+  const rings = spec.segments * 3;
+  const sides = 8;
+  const geometry = new THREE.TubeGeometry(curve, rings, spec.width * r, sides, false);
+  const position = geometry.attributes.position;
+  const at = new THREE.Vector3();
+  const offset = new THREE.Vector3();
+  for (let ring = 0; ring <= rings; ring += 1) {
+    const t = ring / rings;
+    curve.getPointAt(t, at);
+    const swell = 0.25 + Math.sin(Math.min(1, t * 1.15) * Math.PI) ** 0.7;
+    for (let side = 0; side <= sides; side += 1) {
+      const index = ring * (sides + 1) + side;
+      offset.set(position.getX(index), position.getY(index), position.getZ(index)).sub(at);
+      // Flat across its plane, the fronds' tips ruffled.
+      const ruffle = 1 + 0.28 * Math.sin(ring * 2.3 + side * 1.7 + seed * 3.1);
+      offset.x *= 0.45;
+      offset.y *= 0.45;
+      offset.multiplyScalar(swell * ruffle);
+      position.setXYZ(index, at.x + offset.x, at.y + offset.y, at.z + offset.z);
+    }
+  }
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** A spray of ostrich plumes rising from a small gilt crown on a helmet's top. */
+function ostrichSpray(r, gilt, feather) {
+  const spec = HELM_CRESTS.ostrich;
+  const group = new THREE.Group();
+  const { radius, height, fleurons } = spec.crown;
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(radius * r, radius * 0.85 * r, height * r, 20, 1, true), gilt);
+  band.material = gilt.clone();
+  band.material.side = THREE.DoubleSide;
+  band.position.y = height * 0.5 * r;
+  group.add(band);
+  for (let index = 0; index < fleurons; index += 1) {
+    const angle = (index / fleurons) * Math.PI * 2;
+    const fleuron = new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, 0.14 * r, 5), gilt);
+    fleuron.position.set(Math.cos(angle) * radius * r, (height + 0.06) * r, Math.sin(angle) * radius * r);
+    group.add(fleuron);
+  }
+  // The plumes: each rising from inside the crown, arching out and falling (`path`, in plume lengths: out, up), round the sides
+  // and back (`spread`, rad either side of straight back: none before the face), each a run of soft tufts along its quill.
+  const { path, spread } = spec;
+  const curve = new THREE.CatmullRomCurve3(path.map(([out, up]) => new THREE.Vector3(out * spec.length * r, up * spec.length * r, 0)));
+  for (let index = 0; index < spec.plumes; index += 1) {
+    const angle = Math.PI - spread + (2 * spread * index) / (spec.plumes - 1);
+    const plume = new THREE.Group();
+    plume.rotation.y = -angle;
+    // Every other plume a little shorter and more upright: a full spray, not a ring.
+    plume.scale.setScalar(index % 2 ? 0.82 : 1);
+    plume.rotation.z = index % 2 ? 0.25 : 0;
+    plume.add(new THREE.Mesh(ostrichPlume(curve, r, spec, index), feather));
+    group.add(plume);
+  }
+  return group;
+}
+
 /** A kabuto's crest (maedate) on its holder at the brow, in head coordinates. */
 export function kabutoCrest(head, r, steel) {
   const gold = metal(steel, head.gold ?? 0xd6a743);
@@ -2616,12 +2944,26 @@ export function buildHeadProp(kind, body, dress, colors, steel, cornerHex) {
       }
       break;
     }
+    case 'harpy': {
+      if (!dress.head) return null;
+      const crest = harpyCrest(r, metal(steel, dress.head.gold ?? dress.armor?.gold ?? HELM_CRESTS.harpy.gilt));
+      crest.position.y = crestTop(dress.head, r) - HELM_CRESTS.harpy.seat * r;
+      crest.scale.setScalar(HELM_CRESTS.harpy.scale);
+      group.add(crest);
+      break;
+    }
+    case 'ostrich': {
+      if (!dress.head) return null;
+      const spray = ostrichSpray(r, metal(steel, dress.head.gold ?? dress.armor?.gold ?? HELM_CRESTS.ostrich.gilt), surface(HELM_CRESTS.ostrich.feather, { roughness: 1 }));
+      spray.position.y = crestTop(dress.head, r) - HELM_CRESTS.ostrich.seat * r;
+      spray.scale.setScalar(PLUME_SCALE);
+      group.add(spray);
+      break;
+    }
     case 'plume': {
       if (!dress.head) return null;
       // On the crown of the helm, sweeping back.
-      // (A knight's helmet in a design: on its own crown or comb, knighthelms.js.)
-      const knightly = knightFormOf(dress.head.kind, HELM_STYLE.knight, dress.head.design);
-      const top = knightly ? (knightly.top + 0.08) * r : dress.head.kind === 'bascinet' ? (dress.head.pointed ? 1.55 : 1.35) * r : 0.95 * r;
+      const top = crestTop(dress.head, r);
       const feather = surface(cornerHex, { roughness: 0.9 });
       // Built round its holder on the crown, then sized up as a whole.
       const plume = new THREE.Group();

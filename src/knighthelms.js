@@ -208,13 +208,16 @@ export const KNIGHT_FORMS = {
     // One piece: the skull raised over the whole head down over the face to the nose, the vue (the sight) a long narrow
     // slit cut across it nearly from ear to ear; out behind in the long tail. The fitted skull's foot is at the eyes before
     // and its flare carries it down past the nose (clear of it), below the ears at the sides, and out in the tail behind.
+    // As the Met's (04.3.229) stands: a rounded skull (no peak: `lift` small, the keel low), the face plate falling near
+    // straight to the upper lip with only a little kick out at its edge, the sides close down past the ears (not belled
+    // out), the lower edge running back and down from the face into the long tail, which flares out behind the nape.
     const shell = formFitPart({
       kind: 'loft', span: 1, seg: [20, 2], region: 'shell', look: 'metal',
-      fit: { foot: [-0.1, -0.2, -0.5, -0.42, -0.3], gap: 0.15, top: 0.2, lift: 0.1, rows: 6 },
+      fit: { foot: [-0.1, -0.2, -0.5, -0.42, -0.3], gap: 0.15, top: 0.17, lift: 0.03, rows: 6 },
       flare: [
-        { dy: [-0.68, -0.6, -0.28, -0.43, -0.7], out: [0.26, 0.22, 0.12, 0.5, 0.86] },
-        { dy: [-0.4, -0.35, -0.16, -0.3, -0.55], out: [0.15, 0.13, 0.06, 0.3, 0.56] },
-        { dy: [-0.12, -0.11, -0.06, -0.15, -0.3], out: [0.04, 0.04, 0.02, 0.12, 0.24] },
+        { dy: [-0.74, -0.68, -0.4, -0.52, -0.78], out: [0.2, 0.16, 0.09, 0.42, 0.95] },
+        { dy: [-0.44, -0.4, -0.24, -0.34, -0.58], out: [0.13, 0.1, 0.04, 0.24, 0.6] },
+        { dy: [-0.14, -0.13, -0.08, -0.16, -0.3], out: [0.05, 0.04, 0.01, 0.08, 0.24] },
       ],
       bake: [
         { kind: 'edge', at: 'start', w: 0.06, h: 0.04 },
@@ -249,8 +252,9 @@ export const KNIGHT_FORMS = {
             lower([-1.72, -1.66, -1.52], 1.26, 1.0, null, { prow: 0.08 }),
             lower([-1.38, -1.34, -1.24], 1.06, 0.93, null, { prow: 0.07 }),
             lower([-0.96, -0.94, -0.9], 1.14, 0.99, null, { prow: 0.1 }),
-            lower([-0.66, -0.68, -0.72], 1.2, 1.08, null, { prow: 0.1 }),
-            lower([-0.4, -0.44, -0.56], 1.17, 1.03, null, { prow: 0.07 }),
+            // Its top under the nose, well inside the sallet's face plate, which falls near straight over it.
+            lower([-0.7, -0.72, -0.76], 1.16, 1.07, null, { prow: 0.08 }),
+            lower([-0.55, -0.58, -0.64], 1.13, 1.04, null, { prow: 0.06 }),
           ],
           bake: [
             { kind: 'edge', at: 'start', w: 0.05, h: 0.035 },
@@ -263,7 +267,7 @@ export const KNIGHT_FORMS = {
             { kind: 'rivets', view: 'side', at: [[0.44, -0.96], [0.56, -0.96]], r: 0.03, h: 0.022 },
           ],
         },
-        comb: comb('shell', { front: 0.82, back: -1.0, high: 0.1, w: 0.035 }),
+        comb: comb('shell', { front: 0.82, back: -1.0, high: 0.06, w: 0.035 }),
         liner: true,
       },
     };
@@ -322,6 +326,9 @@ export const KNIGHT_FORMS = {
             { kind: 'bead', view: 'front', line: [[0, -0.42], [0, 0.42]], w: 0.05, h: 0.035 },
             // The sight: one long narrow slit along the visor's top, its lower lip turned out.
             { kind: 'vue', y: [-0.11, -0.02], to: 0.72, round: 0.02, lip: 0.025 },
+            // The breaths pierced in the beak below the sight, a block of small round holes each side (the Greenwich close
+            // helmets', Royal Armouries II.81, and the Met's 1508045b-type fluted ones).
+            { kind: 'holes', view: 'front', at: grid(span(0.16, 0.44, 4), span(-0.16, -0.32, 3)), r: 0.022, cut: true },
             // The visor's own pivot at the temple, its lifting peg on the right.
             { kind: 'boss', view: 'side', at: [0.3, 0.06], r: 0.075, h: 0.035 },
             { kind: 'rivets', view: 'side', at: [[0.62, -0.32]], r: 0.04, h: 0.035 },
@@ -355,7 +362,8 @@ export const KNIGHT_FORMS = {
         },
         comb: comb('shell', {
           front: 0.84, back: -1.04, high: 0.44, w: 0.04, seg: [6, 1], rise: [0.18, 0.62, 0.88, 1, 1, 0.92, 0.7, 0.28],
-          bake: [{ kind: 'edge', at: 'top', w: 0.03, h: 0.015 }],
+          // Its crest roped (turned and cut in a cable, as the Greenwich and the fluted harnesses' combs are).
+          bake: [{ kind: 'edge', at: 'top', w: 0.035, h: 0.02, roped: true }],
         }),
         liner: true,
       },

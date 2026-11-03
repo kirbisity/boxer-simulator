@@ -61,6 +61,7 @@
 /* global THREE */
 import { HELM_MAP_DATA } from './helmmaps-data.js';
 import { DETAIL_MAPS } from './detailmaps.js';
+import { armourDecorMaterial } from './detailtex.js';
 
 /** Whether the helmets' and masks' maps can be drawn (a browser, the maps on). */
 export function helmMapsReady() {
@@ -119,6 +120,9 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
   });
   // In a crowd (crowdview.js bakePieces): the helmet's steel, without its sheet.
   material.userData = { ...material.userData, crowdColor: base.color.getHex() };
+  // (The base's own shader hooks are its own: this material's are set below.)
+  material.onBeforeCompile = () => {};
+  material.customProgramCacheKey = () => 'helm';
   // A sheet with openings (a sight): the normal map's alpha cuts them out.
   if (cut) {
     material.onBeforeCompile = (shader) => {
@@ -132,6 +136,9 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
     };
     material.customProgramCacheKey = () => 'helm-cut';
   }
+  // The decoration chosen over the steel it is made from (render.js: `userData.decor`, outfits.js ARMOUR_DECOR), gilt over
+  // the sheet.
+  if (base.userData?.decor) armourDecorMaterial(material, base.userData.decor, { space: 'local' });
   return material;
 }
 
