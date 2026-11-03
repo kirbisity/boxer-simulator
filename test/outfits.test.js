@@ -147,10 +147,11 @@ test('three samurai, two knight and six gladiator armours, five designs each, ea
     const stats = new Set(kinds.map((kind) => JSON.stringify(OUTFITS[kind].protection)));
     assert.equal(stats.size, count, `${family}: each armour protects differently`);
     for (const kind of kinds) {
-      // Five to be dealt; a character's own (`special`) beyond them is never dealt.
-      const dealt = OUTFITS[kind].designs.filter((design) => !design.special);
+      // Five to be dealt; a character's own (`special`) beyond them is never dealt, nor a design only chosen in the builders
+      // (`chosen`: the tōsei gusoku's Nanban and zunari kabuto).
+      const dealt = OUTFITS[kind].designs.filter((design) => !design.special && !design.chosen);
       assert.equal(dealt.length, 5, kind);
-      for (let draw = 0; draw < 40; draw += 1) assert.ok(!OUTFITS[kind].designs[randomDesign(kind)].special, kind);
+      for (let draw = 0; draw < 40; draw += 1) assert.ok(!OUTFITS[kind].designs[randomDesign(kind)].special && !OUTFITS[kind].designs[randomDesign(kind)].chosen, kind);
     }
   }
   // Plate is proof against the edge and the point; the Templar's mail less so; the ashigaru is the lightest samurai.

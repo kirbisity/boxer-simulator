@@ -3,7 +3,7 @@
 // mesh — fists, footwear, headgear and the things that swing.
 
 import { Dangle } from './dangle.js';
-import { FACTIONS, factionOf, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
+import { FACTIONS, factionOf, HEADGEAR, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
 import { doubleSided, outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
@@ -16,7 +16,7 @@ import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildTassel } from './chinahelmview.js';
 import { HONGYING_MOUNTS, TASSELS } from './chinahelms.js';
-import { designFormOf, formGrid, formPoint, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
+import { designFormOf, formGrid, formPoint, headRadiusAt, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf, knightGrid } from './knighthelms.js';
 
 export const WARDROBE = {
@@ -2483,6 +2483,83 @@ function shagumaHair(form, r, colour) {
   return mane;
 }
 
+/** A path of points over the kabuto's fitted bowl (helmforms.js formPoint: u round from the face, v up), a little proud of it. */
+const overBowl = (form, r, points, out = 1.012) => new THREE.CatmullRomCurve3(points.map(([u, v]) => new THREE.Vector3(...formPoint(form.bowl, u, v).map((value, axis) => value * r * (axis === 1 ? 1 : out)))));
+
+// The Nanban kabuto's skull (the British Museum's, c. 1600; the Met's 36.25.88): a European cabasset's, raised in one piece to
+// a point over the crown with a ridge fore and aft, set on a narrow brim; [radius, height] up its outline (head radii, before
+// it is drawn in to the bowl's oval), the brim's reach, and the lining rivets' row round its foot.
+const NANBAN_SKULL = {
+  outline: [[1.16, 0.12], [1.15, 0.4], [1.08, 0.78], [0.92, 1.18], [0.66, 1.58], [0.36, 1.92], [0.1, 2.14], [0, 2.18]],
+  brim: 0.3, rivets: 14, rivetY: 0.24,
+};
+
+/** The Nanban kabuto's skull: a lathe of NANBAN_SKULL's outline drawn in to the bowl's oval, its brim and its rivets. */
+function nanbanSkull(r, material) {
+  const spec = NANBAN_SKULL;
+  const oval = KABUTO_FORM.side / KABUTO_FORM.front;
+  const skull = new THREE.Mesh(new THREE.LatheGeometry(spec.outline.map(([radius, y]) => new THREE.Vector2(radius * r, y * r)).reverse(), 24), material);
+  skull.scale.z = oval;
+  const [footRadius, footY] = spec.outline[0];
+  const brimMaterial = material.clone();
+  brimMaterial.side = THREE.DoubleSide;
+  // The brim: out nearly level, its edge turned down.
+  const brim = new THREE.Mesh(new THREE.LatheGeometry([[footRadius - 0.02, footY + 0.02], [footRadius + spec.brim, footY - 0.07], [footRadius + spec.brim + 0.02, footY - 0.13]].map(([radius, y]) => new THREE.Vector2(radius * r, y * r)), 28), brimMaterial);
+  // The ridge fore and aft over the point, and the lining's rivets round the foot.
+  const ridge = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(spec.outline.slice(1).concat(spec.outline.slice(1, -1).reverse().map(([radius, y]) => [-radius, y])).map(([radius, y]) => new THREE.Vector3(radius * r * 1.005, y * r, 0))), 24, 0.03 * r, 4, false), material);
+  const rivets = new THREE.InstancedMesh(new THREE.SphereGeometry(0.045 * r, 6, 4), material, spec.rivets);
+  const place = new THREE.Object3D();
+  for (let index = 0; index < spec.rivets; index += 1) {
+    const angle = (index / spec.rivets) * Math.PI * 2;
+    place.position.set(Math.cos(angle) * 1.15 * r, spec.rivetY * r, Math.sin(angle) * 1.15 * r);
+    place.updateMatrix();
+    rivets.setMatrixAt(index, place.matrix);
+  }
+  skull.add(brim, ridge, rivets);
+  return skull;
+}
+
+/**
+ * The kabuto's bowl in each construction (outfits.js `head.design`; none, the suji-bachi), and what it is dressed with
+ * over the fitted bowl (`dress`): whether it has the peak (mabizashi) over the brow (`peak`).
+ * - suji: the suji-bachi of the 16th c., plates riveted edge over edge, each join a standing rib (suji) gilt, the tehen's
+ *   ring at the crown.
+ * - nanban: the Nanban kabuto, a European cabasset's skull bought or copied from the Portuguese (nanbanSkull): one piece of
+ *   thicker steel, no seams for a blow to open, its brim in place of the peak.
+ * - zunari: the "head-shaped" bowl of three plain plates, the cheap strong helmet of the 1600s, its seam along the crown and
+ *   its brow embossed in a scowl's wrinkles (the Met's zunari kabuto with menpo, 17th c.).
+ */
+const KABUTO_BOWLS = {
+  suji: {
+    peak: true,
+    dress(group, { form, r, gold }) {
+      for (let rib = 0; rib < 12; rib += 1) {
+        const u = rib / 6 - (rib > 6 ? 2 : 0);
+        group.add(new THREE.Mesh(new THREE.TubeGeometry(overBowl(form, r, Array.from({ length: 9 }, (_, step) => [u, (step / 8) * 0.9])), 16, 0.025 * r, 4, false), gold));
+      }
+      const crown = new THREE.Mesh(new THREE.TorusGeometry(0.22 * r, 0.05 * r, 6, 14), gold);
+      crown.rotation.x = Math.PI / 2;
+      crown.position.y = (form.top - 0.03) * r;
+      group.add(crown);
+    },
+  },
+  nanban: { peak: false, dress() {} },
+  zunari: {
+    peak: true,
+    dress(group, { form, r, bowlSteel }) {
+      // The seam down the crown from brow to nape, and three wrinkles across the brow, rising to the temples.
+      group.add(new THREE.Mesh(new THREE.TubeGeometry(overBowl(form, r, [[0, 0.12], [0, 0.4], [0, 0.7], [0, 0.94], [1, 0.94], [1, 0.7], [1, 0.4], [1, 0.12]]), 16, 0.03 * r, 4, false), bowlSteel));
+      for (const v of [0.13, 0.22, 0.31]) {
+        const wrinkle = Array.from({ length: 9 }, (_, step) => {
+          const u = -0.3 + (step / 8) * 0.6;
+          return [u, v + 0.08 * Math.abs(u) / 0.3];
+        });
+        group.add(new THREE.Mesh(new THREE.TubeGeometry(overBowl(form, r, wrinkle, 1.008), 16, 0.035 * r, 4, false), bowlSteel));
+      }
+    },
+  },
+};
+
 /**
  * A samurai's kabuto, head coordinates (x forward, y up, z left; r the head
  * radius): a ribbed bowl, the shikoro (tiers of laced lames flaring down
@@ -2502,19 +2579,12 @@ function buildKabuto(group, head, r, steel, color) {
   bowlGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   bowlGeometry.setIndex(indices);
   bowlGeometry.computeVertexNormals();
-  const bowl = new THREE.Mesh(bowlGeometry, bowlSteel);
+  // The bowl in its construction (KABUTO_BOWLS): the suji-bachi's riveted plates, the Nanban's one-piece skull, the zunari.
+  const build = KABUTO_BOWLS[head.design] ?? KABUTO_BOWLS.suji;
+  const bowl = build === KABUTO_BOWLS.nanban ? nanbanSkull(r, bowlSteel) : new THREE.Mesh(bowlGeometry, bowlSteel);
   bowl.name = 'kabuto-bowl';
-  // Ribs down the plates' joins from the foot to the tehen's ring at the crown.
-  for (let rib = 0; rib < 12; rib += 1) {
-    const u = rib / 6 - (rib > 6 ? 2 : 0);
-    const path = [];
-    for (let step = 0; step <= 8; step += 1) path.push(new THREE.Vector3(...formPoint(form.bowl, u, (step / 8) * 0.9).map((value, axis) => value * r * (axis === 1 ? 1 : 1.012))));
-    group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(path), 16, 0.025 * r, 4, false), gold));
-  }
-  const crown = new THREE.Mesh(new THREE.TorusGeometry(0.22 * r, 0.05 * r, 6, 14), gold);
-  crown.rotation.x = Math.PI / 2;
-  crown.position.y = (form.top - 0.03) * r;
-  group.add(bowl, crown);
+  group.add(bowl);
+  build.dress(group, { form, r, gold, bowlSteel, steel });
   // Shikoro: tiers widening down and out, open at the face (`flare`: the
   // early great armour's flared out wide over the shoulders, `tiers` of it).
   // Each tier's radius front to back (x) and side to side (z): from just
@@ -2620,11 +2690,13 @@ function buildKabuto(group, head, r, steel, color) {
     edge.rotation.y = flap.rotation.y;
     group.add(flap, edge);
   }
-  // The peak over the brow.
-  const peak = new THREE.Mesh(new THREE.CylinderGeometry((form.front + 0.08) * r, (form.front + 0.16) * r, 0.06 * r, 20, 1, false, Math.PI * 0.2, Math.PI * 0.6), bowlSteel);
-  peak.position.set(0.05 * r, form.footY.front * r, 0);
-  peak.scale.z = (form.side + 0.1) / (form.front + 0.1);
-  group.add(peak);
+  // The peak over the brow (the Nanban skull has its brim instead).
+  if (build.peak) {
+    const peak = new THREE.Mesh(new THREE.CylinderGeometry((form.front + 0.08) * r, (form.front + 0.16) * r, 0.06 * r, 20, 1, false, Math.PI * 0.2, Math.PI * 0.6), bowlSteel);
+    peak.position.set(0.05 * r, form.footY.front * r, 0);
+    peak.scale.z = (form.side + 0.1) / (form.front + 0.1);
+    group.add(peak);
+  }
   // The crest (maedate) is headgear of its own (kabutoCrest): it can be knocked off.
   // Shaguma: the whole helmet dressed in long yak hair, a shaggy cap over the
   // bowl and a mane over the neck guard to the shoulders, open at the face.
@@ -2633,12 +2705,15 @@ function buildKabuto(group, head, r, steel, color) {
   // MASK_FITS); the gorget under it, hanging from under the chin.
   // `own`: the kit's own mask design (`maskDesign`; an oni somen for `mask: 'oni'`, else the commoner ressei-men).
   const maskDesign = HELM_STYLE.masks === 'own' ? head.maskDesign ?? (head.mask === 'oni' ? 'oni' : 'ressei') : HELM_STYLE.masks;
-  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, head.mask === 'red' ? color : 0x141416, steel.envMap)) {
+  const maskTint = head.mask === 'red' ? color : MENPO.black;
+  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, maskTint, steel.envMap)) {
     const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : lace);
     throat.material = throat.material.clone();
     throat.material.side = THREE.DoubleSide;
     throat.position.y = MASK_THROAT_Y * r;
     group.add(throat);
+    // A half mask (the ressei-men) made an oni's: a scowling brow over the eyes and tusks at the corners of the mouth.
+    if (MENPO.scowled.includes(maskDesign)) oniScowl(group, r, metal(steel, maskTint));
   } else if (head.mask === 'oni') {
   // An oni somen: the whole face in black iron, heavy brows, glaring eye
   // holes, a snarl with fangs, and two short horns at the brow.
@@ -2703,6 +2778,41 @@ function buildKabuto(group, head, r, steel, color) {
 
 // The gorget's (nodowa's) middle under a samurai's mask, head radii: hanging from the mask's foot under the chin.
 const MASK_THROAT_Y = -1.5;
+
+// The samurai's half masks read as an oni's face (the menpo of the 16th-17th c. were made to frighten: the Met's 13.112.15,
+// the British Museum's menpo with their hooked noses, open snarls and moustaches): `scowled`, the mask designs (menpo.js) given
+// a heavy scowling brow of iron over the eyes (its inner ends drawn down to the nose, two furrows between) and tusks at the
+// mouth's corners. `black`: black-lacquered iron, drawn a little lighter than black so the mask's relief reads.
+// `brow` [inner, outer] (z, y) of each brow on the face, head radii; `tusks` (z, y, height) on the lower lip.
+const MENPO = { scowled: ['ressei'], black: 0x2c2b2f, brow: [[0.06, -0.01], [0.46, 0.13]], stand: 0.1, thick: 0.065, tusks: [0.15, -0.86, 0.2] };
+
+/** The scowl and tusks on a half mask (MENPO), in `iron` the mask's own metal, on the face as the mask is (helmforms.js headRadiusAt). */
+function oniScowl(group, r, iron) {
+  const onFace = (z, y, stand) => {
+    const azimuth = Math.asin(Math.max(-0.95, Math.min(0.95, z / 1.05)));
+    const radius = headRadiusAt(azimuth, y) + stand;
+    return new THREE.Vector3(radius * Math.cos(azimuth) * r, y * r, radius * Math.sin(azimuth) * r);
+  };
+  const [[innerZ, innerY], [outerZ, outerY]] = MENPO.brow;
+  const bone = surface(0xe8e2d0, { roughness: 0.4 });
+  for (const side of [1, -1]) {
+    // The brow: thick at the nose and arched, its inner end low (the scowl).
+    const brow = Array.from({ length: 7 }, (_, step) => {
+      const t = step / 6;
+      return onFace(side * (innerZ + (outerZ - innerZ) * t), innerY + (outerY - innerY) * t + 0.035 * Math.sin(Math.PI * t), MENPO.stand);
+    });
+    group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(brow), 12, MENPO.thick * r, 5, false), iron));
+    // A furrow up from the nose between the brows.
+    const furrow = [onFace(side * 0.03, -0.06, MENPO.stand - 0.02), onFace(side * 0.045, 0.06, MENPO.stand - 0.01), onFace(side * 0.05, 0.13, MENPO.stand - 0.02)];
+    group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(furrow), 6, 0.022 * r, 4, false), iron));
+    // A tusk up from the corner of the mouth.
+    const [tuskZ, tuskY, tall] = MENPO.tusks;
+    const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, tall * r, 6), bone);
+    tusk.position.copy(onFace(side * tuskZ, tuskY + tall / 2, 0.17));
+    tusk.rotation.x = side * -0.25;
+    group.add(tusk);
+  }
+}
 
 // The metal each of the other war masks is drawn in (menpo.js): of the helmet's steel, bronze, its gilt, or its mail.
 const WORLD_MASK_METAL = {
@@ -2967,12 +3077,149 @@ export function kabutoCrest(head, r, steel) {
       }
       break;
     }
+    case 'flame': case 'halo': case 'rabbit': case 'wings': case 'fan': case 'buffalo':
+      KAWARI_CRESTS[head.crest](headSpace(crest, r), head, r, { gold, steel, lacquer: metal(steel, head.color ?? 0x17171a) });
+      break;
     default:
       break;
   }
   inkAll(crest);
   return crest;
 }
+
+/**
+ * A group inside a crest in the head's own coordinates (head radii times r about the head's middle): the crest stands at
+ * the brow and is drawn HEAD_DRESS_SCALE times bigger, so this one is put back and scaled down to match; the shapes that stand
+ * on the bowl's sides or crown (wakidate, ushirodate) are placed by where the bowl is.
+ */
+function headSpace(crest, r) {
+  const space = new THREE.Group();
+  space.scale.setScalar(1 / HEAD_DRESS_SCALE);
+  space.position.set((-crest.position.x) / HEAD_DRESS_SCALE, (-crest.position.y) / HEAD_DRESS_SCALE, 0);
+  crest.add(space);
+  return space;
+}
+
+/** A tapered horn or beam through `points` (head coordinates times r), from `from` thick to `to` at its tip. */
+function taperedHorn(points, from, to, material) {
+  const horn = new THREE.Group();
+  for (let index = 1; index < points.length; index += 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    const share = (index - 1) / (points.length - 1);
+    const next = index / (points.length - 1);
+    const length = a.distanceTo(b);
+    const piece = new THREE.Mesh(new THREE.CylinderGeometry(from + (to - from) * next, from + (to - from) * share, length * 1.04, 7), material);
+    piece.position.copy(a).add(b).multiplyScalar(0.5);
+    piece.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+    horn.add(piece);
+  }
+  return horn;
+}
+
+/** A flat shape (outline points [across, up], one half, mirrored) cut from plate `thick`, its face forward (+x). */
+function plateShape(half, thick, material) {
+  const shape = new THREE.Shape();
+  const outline = [...half, ...half.slice().reverse().map(([across, up]) => [-across, up])];
+  outline.forEach(([across, up], index) => (index ? shape.lineTo(across, up) : shape.moveTo(across, up)));
+  shape.closePath();
+  const mesh = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false }), material);
+  mesh.rotation.y = Math.PI / 2;
+  return mesh;
+}
+
+// The flame maedate's half outline (head radii, from its foot in the middle round its three tongues to the notch at its top).
+const FLAME_HALF = [[0, 0], [0.5, 0], [0.9, 0.12], [1.15, 0.35], [1.22, 0.68], [1.45, 1.02], [1.1, 0.86], [0.95, 0.6], [0.8, 0.74], [0.86, 1.16], [0.62, 0.96], [0.5, 0.7], [0.38, 0.96], [0.44, 1.42], [0.2, 1.12], [0.1, 0.82], [0, 0.96]];
+
+/**
+ * The kawari kabuto's crests (late 16th and 17th c.: the Met's and the Tokyo National Museum's), cheap shapes in head
+ * coordinates (`space`, times r): each `(space, head, r, { gold, steel, lacquer })`.
+ */
+const KAWARI_CRESTS = {
+  // A gilt flame (kaen) standing on a fretwork crescent at the brow, a smaller flame of bright steel before it.
+  flame(space, head, r, { gold, steel }) {
+    const crescent = new THREE.Mesh(new THREE.TorusGeometry(0.8 * r, 0.08 * r, 5, 20, Math.PI), gold);
+    crescent.rotation.set(0, Math.PI / 2, Math.PI);
+    crescent.scale.set(1, 0.45, 1.6);
+    crescent.position.set(1.2 * r, 0.95 * r, 0);
+    const outer = plateShape(FLAME_HALF.map(([a, b]) => [a * r, b * r]), 0.035 * r, gold);
+    outer.position.set(1.12 * r, 0.62 * r, 0);
+    const inner = plateShape(FLAME_HALF.map(([a, b]) => [a * 0.5 * r, b * 0.55 * r]), 0.035 * r, steel);
+    inner.position.set(1.17 * r, 0.72 * r, 0);
+    space.add(crescent, outer, inner);
+  },
+  // The tall eboshi (a court cap's peak, raised in lacquered papier-mâché over the bowl) and a gilt sun halo behind it.
+  halo(space, head, r, { gold, lacquer }) {
+    const peak = new THREE.Mesh(new THREE.ConeGeometry(0.7 * r, 1.9 * r, 18), lacquer);
+    peak.scale.z = 0.5;
+    peak.rotation.z = 0.12;
+    peak.position.set(-0.05 * r, 1.85 * r, 0);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(1.45 * r, 0.17 * r, 6, 36), gold);
+    halo.rotation.y = Math.PI / 2;
+    halo.scale.z = 0.3;
+    halo.position.set(-0.55 * r, 2.15 * r, 0);
+    space.add(peak, halo);
+  },
+  // A hare's two tall ears in black lacquer, standing from the crown and leaning back.
+  rabbit(space, head, r, { lacquer }) {
+    for (const side of [1, -1]) {
+      const shape = new THREE.Shape();
+      shape.absellipse(0, 1.25 * r, 0.24 * r, 1.25 * r, 0, Math.PI * 2, false, 0);
+      const ear = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.06 * r, bevelEnabled: false, curveSegments: 16 }), lacquer);
+      ear.rotation.set(side * 0.22, Math.PI / 2, 0);
+      const lean = new THREE.Group();
+      lean.rotation.z = 0.3;
+      lean.position.set(-0.05 * r, 0.95 * r, side * 0.36 * r);
+      lean.add(ear);
+      space.add(lean);
+    }
+  },
+  // An eagle's wings in black lacquered wood, spread up and out from either side of the bowl, a gilt boss at each root.
+  wings(space, head, r, { gold }) {
+    const black = surface(0x141416, { roughness: 0.45 });
+    const grey = surface(0x2c2c30, { roughness: 0.55 });
+    for (const side of [1, -1]) {
+      const wing = new THREE.Group();
+      wing.position.set(-0.15 * r, 0.8 * r, side * 0.88 * r);
+      wing.rotation.z = 0.35;
+      for (let feather = 0; feather < 7; feather += 1) {
+        const length = (1.5 + 0.22 * feather) * r;
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05 * r, length, 0.3 * r).translate(0, length / 2, 0), feather % 2 ? grey : black);
+        blade.rotation.x = side * (0.12 + feather * 0.17);
+        wing.add(blade);
+      }
+      const boss = new THREE.Mesh(new THREE.SphereGeometry(0.14 * r, 10, 8), gold);
+      boss.position.copy(wing.position);
+      space.add(wing, boss);
+    }
+  },
+  // Two gilt fans (ōgi), ribbed, standing up from either side of the bowl, their faces forward.
+  fan(space, head, r, { gold }) {
+    const leaf = gold.clone();
+    leaf.side = THREE.DoubleSide;
+    for (const side of [1, -1]) {
+      const fan = new THREE.Group();
+      fan.position.set(0.05 * r, 0.75 * r, side * 0.8 * r);
+      fan.rotation.set(side * 0.55, Math.PI / 2, 0);
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(1.4 * r, 18, Math.PI * 0.08, Math.PI * 0.84), leaf);
+      fan.add(disc);
+      for (let rib = 0; rib < 9; rib += 1) {
+        const angle = Math.PI * (0.1 + (0.8 * rib) / 8);
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4 * r, 0.05 * r, 0.05 * r).translate(0.7 * r, 0, 0.02 * r), gold);
+        bar.rotation.z = angle;
+        fan.add(bar);
+      }
+      space.add(fan);
+    }
+  },
+  // A water buffalo's horns in gilt, sweeping out from the sides of the bowl and up, the tips turned in.
+  buffalo(space, head, r, { gold }) {
+    for (const side of [1, -1]) {
+      const points = [[0.05, 0.7, 0.8], [0.12, 1.05, 1.55], [0.18, 1.9, 1.85], [0.12, 2.75, 1.5], [0.0, 3.1, 0.95]].map(([x, y, z]) => new THREE.Vector3(x * r, y * r, side * z * r));
+      space.add(taperedHorn(points, 0.3 * r, 0.04 * r, gold));
+    }
+  },
+};
 
 /**
  * Headgear worn over the head or the helmet, in head coordinates (r the
@@ -3126,8 +3373,14 @@ export function buildHeadProp(kind, body, dress, colors, steel, cornerHex) {
       crest.scale.setScalar(HEAD_DRESS_SCALE);
       return crest;
     }
-    default:
-      return null;
+    default: {
+      // A crest chosen in place of the design's own (HEADGEAR `maedate`), on the kabuto as its own is.
+      const maedate = HEADGEAR[kind]?.maedate;
+      if (!maedate || dress.head?.kind !== 'kabuto') return null;
+      const crest = kabutoCrest({ ...dress.head, crest: maedate }, r, steel);
+      crest.scale.setScalar(HEAD_DRESS_SCALE);
+      return crest;
+    }
   }
   inkAll(group);
   return group;

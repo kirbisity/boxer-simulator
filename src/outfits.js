@@ -250,6 +250,21 @@ function saladinDesign(label, { silk, trim, gold = '#c9a23a', robe }) {
   };
 }
 
+// The kabuto's crests a samurai may put on in place of his design's own (HEADGEAR's `maedate` entries, drawn by wardrobe.js
+// kabutoCrest): the gilt kuwagata horns, a flame, antlers, and the kawari kabuto's shapes of the late 16th century (a sun halo
+// round a tall eboshi, a hare's ears, an eagle's wings, gilt fans, buffalo horns).
+const KABUTO_CRESTS = ['crestKuwagata', 'crestFlame', 'crestAntlers', 'crestHalo', 'crestRabbit', 'crestWings', 'crestFan', 'crestBuffalo'];
+
+/**
+ * A tōsei gusoku in its kabuto's construction (`bowl`: wardrobe.js KABUTO_BOWLS; none, the riveted suji-bachi): the Nanban
+ * kabuto raised in one piece from a European cabasset, or the zunari of three plain plates; each with its menpo.
+ */
+function toseiBowlDesign(label, bowl, steel, lace, crest, under, more = {}) {
+  const design = toseiDesign(label, steel, lace, crest, 'red', under);
+  // `chosen`: worn when picked in the builders (a set of its own), never dealt to a samurai at random.
+  return { ...design, chosen: true, head: { ...design.head, design: bowl, ...more } };
+}
+
 function toseiDesign(label, steel, lace, crest, mask, under) {
   return { label, top: { kind: 'longsleeve', color: under }, bottom: { kind: 'pants', color: under }, armor: { kind: 'toseiDo', color: steel, lace, gold: '#d6a743' }, head: { kind: 'kabuto', color: steel, crest, mask, lace, gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } };
 }
@@ -920,7 +935,7 @@ export const OUTFITS = {
     arrowproof: true,
     sidearm: 'wakizashi',
     picked: [0, 1, 2, 3],
-    headgear: ['crest'],
+    headgear: ['crest', ...KABUTO_CRESTS],
     defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     // Armour at 0.55 of its old weight (was 0.4): ~17 kg on a 77 kg man, against an ō-yoroi's ~20–25 kg.
@@ -960,7 +975,7 @@ export const OUTFITS = {
     label: 'Ō-yoroi (great armour)', movement: 'good', fists: 'bare',
     arrowproof: true,
     sidearm: 'wakizashi',
-    headgear: ['crest'],
+    headgear: ['crest', ...KABUTO_CRESTS],
     defaultHeadgear: 'crest',
     // Armour at 0.55 of its old weight (was 0.42): ~17 kg on a 74 kg man, against an ō-yoroi's ~20–25 kg.
     extraMass: 0.23,
@@ -1000,7 +1015,7 @@ export const OUTFITS = {
     // Arrows glance off it.
     arrowproof: true,
     sidearm: 'wakizashi',
-    headgear: ['crest'],
+    headgear: ['crest', ...KABUTO_CRESTS],
     defaultHeadgear: 'crest',
     palette: [['black', 'black'], ['wine', 'wine'], ['navy', 'charcoal'], ['forest', 'black']],
     // Armour at 0.55 of its old weight (was 0.45): ~19 kg on a 77 kg man, against a tōsei gusoku's ~15–20 kg.
@@ -1023,6 +1038,11 @@ export const OUTFITS = {
       // kabuto dressed all round in grey yak hair (shaguma, as Edo-period
       // helmets were), and a black oni face (a full somen).
       { ...toseiDesign('Oni', '#8e1c16', '#141416', null, 'oni', '#2a0c0e'), special: true, head: { kind: 'kabuto', color: '#8e1c16', mask: 'oni', hair: '#7a766f', lace: '#141416', gold: '#c9a24a' } },
+      // The kabuto in other constructions (sets of their own: outfitsets.js): the Nanban kabuto, a European cabasset's skull
+      // raised in one piece, its narrow brim and rivets (the British Museum's, c. 1600); the zunari,
+      // the plain head-shaped bowl of three plates, its brow embossed in a scowl (the Met's, 17th c.).
+      toseiBowlDesign('Nanban kabuto: russet iron', 'nanban', '#5e3e2c', '#1d2a4f', null, '#1c1d26'),
+      toseiBowlDesign('Zunari kabuto: russet iron', 'zunari', '#5a3a28', '#1d2a3a', 'crescent', '#23202b'),
     ],
   },
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,
@@ -2494,6 +2514,15 @@ export const HEADGEAR = {
   // A lady's hair decoration (the design's own head piece, shown or not: OUTFITS optionalHead); never knocked off.
   hairDecor: { label: 'Hair decoration', knock: 0, falls: false, icon: '🌸' },
   crest: { label: 'Crest', knock: 0.5, falls: true, icon: '🌙', cutFrom: 6 },
+  // A kabuto's crest chosen in place of the design's own (`maedate`: wardrobe.js kabutoCrest's shapes), knocked and cut off as it.
+  crestKuwagata: { label: 'Crest: gilt kuwagata horns', knock: 0.5, falls: true, icon: '🌙', cutFrom: 6, maedate: 'kuwagataTall' },
+  crestFlame: { label: 'Crest: gilt flame', knock: 0.5, falls: true, icon: '🔥', cutFrom: 6, maedate: 'flame' },
+  crestAntlers: { label: 'Crest: stag antlers', knock: 0.5, falls: true, icon: '🦌', cutFrom: 6, maedate: 'antlers' },
+  crestHalo: { label: 'Crest: tall eboshi, gilt sun halo', knock: 0.5, falls: true, icon: '☀️', cutFrom: 6, maedate: 'halo' },
+  crestRabbit: { label: "Crest: hare's ears", knock: 0.5, falls: true, icon: '🐇', cutFrom: 6, maedate: 'rabbit' },
+  crestWings: { label: "Crest: eagle's wings", knock: 0.5, falls: true, icon: '🦅', cutFrom: 6, maedate: 'wings' },
+  crestFan: { label: 'Crest: gilt fans', knock: 0.5, falls: true, icon: '🪭', cutFrom: 6, maedate: 'fan' },
+  crestBuffalo: { label: 'Crest: buffalo horns', knock: 0.5, falls: true, icon: '🐃', cutFrom: 6, maedate: 'buffalo' },
 };
 
 /** What can be worn on the head with this outfit: a headset unless there is a helmet, and its own. */
@@ -2528,7 +2557,8 @@ export function randomColors(kind, random = Math.random) {
 export function randomDesign(kind, random = Math.random) {
   const spec = OUTFITS[kind];
   if (!spec) return 0;
-  const pool = spec.picked ?? spec.designs.map((design, index) => (design.levelOnly || design.special ? null : index)).filter((index) => index !== null);
+  // (Not a design of Level Mode's, a character's own, or one only chosen in the builders: `chosen`.)
+  const pool = spec.picked ?? spec.designs.map((design, index) => (design.levelOnly || design.special || design.chosen ? null : index)).filter((index) => index !== null);
   return pool[Math.floor(random() * pool.length)] ?? 0;
 }
 

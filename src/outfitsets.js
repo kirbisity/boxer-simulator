@@ -195,6 +195,29 @@ export const OUTFIT_SETS = {
       patch: { extraMass: 0.225, protection: { regions: { head: { blunt: 0.68, cut: 0.93, pierce: 0.66 } } } },
     },
   ],
+  // The tōsei gusoku's kabuto in its three constructions. Against the suji-bachi's riveted plates (the kit's own: head blunt 0.7,
+  // pierce 0.7, a ball 0.4; 2.8 kg), the Nanban kabuto's one-piece skull of thicker European steel, no seam for a blow to
+  // open and its high point turning one aside, guards the head better against a blow (blunt +0.12) and a ball (0.55: such
+  // skulls came proofed, a dent left as the mark), and weighs about half a kilogram more; the zunari's three plain plates,
+  // smooth and rounded, turn a blow a little better than the riveted bowl and less well than the one-piece skull, and weigh
+  // half a kilogram less (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; the Met's and the British Museum's).
+  samuraiTosei: [
+    {
+      key: 'sujiBachi', designs: [0, 1, 2, 3, 4, 5], name: 'Tōsei gusoku — suji-bachi kabuto',
+      blurb: 'Late samurai armour from the age of guns: a solid iron breastplate tested against musket fire, the bullet’s dent proudly left in the front. A quality certificate, hammered into the chest.\nYet what armour is proof against peace? The Tokugawa shoguns gave Japan two and a half centuries of it, and the armour sat in storerooms. When the samurai class was abolished in the 1870s, sets like this were sold by the kilo to foreign collectors.\n“A shield against the musket, or a curio in a foreign parlour. It all depended on which century he was born in.”',
+      patch: {},
+    },
+    {
+      key: 'nanban', designs: [6], name: 'Tōsei gusoku — Nanban kabuto',
+      blurb: 'The Nanban kabuto: a European helmet, a Spanish or Portuguese cabasset bought off the ships of the “southern barbarians” or hammered in copy of one, its skull raised in one piece of thick steel with no seam for a blow to open. Fashion and proof at once, for a lord who traded with the foreigners.\nYet what else came off the ships? The guns that made such helmets worth wearing, and the priests. Within a generation the shogun had banned the faith, crucified converts at Nagasaki and closed the ports to all but the Dutch.\n“A lord in foreign steel, or a martyr on a Nagasaki cross. It all depended on which gifts from the ships he kept.”',
+      patch: { extraMass: 0.256, helmet: { mass: 3.3, padding: 0.55, curve: 0.9 }, protection: { bullet: { head: 0.55 }, regions: { head: { blunt: 0.82, cut: 0.97, pierce: 0.8 } } } },
+    },
+    {
+      key: 'zunari', designs: [7], name: 'Tōsei gusoku — zunari kabuto',
+      blurb: 'The zunari kabuto: three plain plates riveted into a head-shaped bowl, its brow embossed in a frown, made fast and cheap by the thousand for the armies of the 1600s. It turned a blow nearly as well as a lord’s and cost a fraction.\nYet who needed so many helmets? Sekigahara in 1600 put some 160,000 men on one field in one morning. The winner, Tokugawa Ieyasu, then disarmed the country, and the cheap helmets went home with whoever had survived.\n“A veteran of Sekigahara, or a skull in its mound. It all depended on which lord changed sides at noon.”',
+      patch: { extraMass: 0.244, helmet: { mass: 2.3, padding: 0.5, curve: 0.8 }, protection: { bullet: { head: 0.45 }, regions: { head: { blunt: 0.76, cut: 0.95, pierce: 0.74 } } } },
+    },
+  ],
   wokouArmoured: [
     {
       key: 'do', designs: [0], name: 'Wokou — dō-maru',
@@ -332,7 +355,6 @@ export const OUTFIT_BLURBS = {
   mingIronLamellar: 'Ming border cavalry: iron plates over a Mongol-style coat, a pointed steppe helmet, a horse bow. They dressed like the enemy and were often the enemy’s cousins — a Great Wall built partly of borrowed loyalty.\nYet who guards the gate when the pay is late? Whole garrisons switched sides with the seasons. In 1644 general Wu Sangui opened the Wall’s main gate to the Manchus, who rode in and took the empire he was paid to protect.\n“A guardian of the Wall, or a turncoat at the gate. It all depended on which side last paid the garrison.”',
   ashigaru: 'A Japanese foot soldier: black-lacquered body armour of riveted iron strips and a cone-shaped hat with his lord’s crest. All of it mass-produced and lent from the castle store, with a spear or a musket — war on an industrial scale, staffed by farmers.\nWho counted the sets that never came back? At Sekigahara in 1600 thousands of nameless heads were buried in mounds, and the armour was collected and lent to the next man.\n“A soldier on loan, or a head in the burial mound. It all depended on which way the turncoat general turned at Sekigahara.”',
   oyoroi: 'The great early samurai armour in full: silk-laced plates, broad shoulder boards, a helmet with gilded horns. So heavy the noble archer inside could barely walk — luckily he owned a horse for that.\nYet what was inside it? At Ichi-no-Tani in 1184 a veteran knocked a fleeing enemy from his horse, pulled off the helmet, and found a boy of sixteen with a flute in his belt. He killed him anyway, wept, and became a monk.\n“A warrior’s glory, or a boy’s last breath. It all depended on whether the boy turned back to fight.”',
-  samuraiTosei: 'Late samurai armour from the age of guns: a solid iron breastplate tested against musket fire, the bullet’s dent proudly left in the front. A quality certificate, hammered into the chest.\nYet what armour is proof against peace? The Tokugawa shoguns gave Japan two and a half centuries of it, and the armour sat in storerooms. When the samurai class was abolished in the 1870s, sets like this were sold by the kilo to foreign collectors.\n“A shield against the musket, or a curio in a foreign parlour. It all depended on which century he was born in.”',
   ronin: 'A masterless samurai: a worn cloak over odd pieces of armour, a straw hat pulled low, and two swords he cannot bring himself to sell. His salary died with his lord.\nWhat does loyalty to a dead man cost? In 1703 forty-seven such men plotted for two years, killed their lord’s enemy in the snow, and laid the head on his grave. The government praised their loyalty, then ordered them all to kill themselves.\n“A legend of the stage, or a beggar on the road. It all depended on whether he kept his oath for two long years.”',
   sohei: 'A Buddhist warrior monk: a white hood wrapped up to the eyes, robes over lamellar armour, and a naginata as long as a doorway. For centuries they marched on Kyoto carrying holy shrines to bully the imperial court.\nYet who could control them? One emperor famously listed three things he could not command: the river, the dice, and the monks. The warlord Oda Nobunaga could. In 1571 he burned their mountain temple and killed its monks, women and children.\n“A holy terror, or a martyr in the flames. It all depended on whether the next warlord feared the gods.”',
   hoplomachus: 'The hoplomachus gladiator: a crested, brimmed helmet with a face grille, padded leggings and tall shin guards, a small round shield, a spear and a dagger for when the spear was gone. Dressed as a Greek soldier, for a Roman crowd.\nYet what happened to the real Greek heroes? Rome turned them into a costume, worn by slaves and prisoners. Gladiator gravestones, when they had any, list fights won and age at death — rarely over thirty.\n“The crowd’s favourite, or dust under the sand. It all depended on whether the crowd waved for mercy.”',
@@ -374,7 +396,8 @@ export const HELM_NAMES = {
   greatHelm: 'Great helm',
   'kettleHat:a': 'Kettle hat', 'kettleHat:b': 'Burgundian kettle hat', 'kettleHat:c': 'German sallet',
   morion: 'Morion', 'cabasset:spanish': 'Cabasset', potHelmet: 'Pot helmet',
-  kabuto: 'Kabuto', 'kabuto+mask': 'Kabuto and menpo', jingasa: 'Jingasa (iron hat)',
+  kabuto: 'Kabuto', 'kabuto+mask': 'Kabuto and menpo', 'kabuto:nanban+mask': 'Nanban kabuto and menpo', 'kabuto:zunari+mask': 'Zunari kabuto and menpo',
+  jingasa: 'Jingasa (iron hat)',
   jaguarHelm: 'Jaguar helmet', eagleHelm: 'Eagle helmet',
   'mingHat:yongBell': 'Ming bell helmet', 'mingHat:rivetedTube': 'Ming riveted helmet', 'mingHat:plainPoint': 'Ming pointed helmet',
   mingHelm: 'Ming elite helmet', 'mingHelm+mask': 'Ming elite helmet and mask', pagodaHelm: 'Iron Pagoda helmet', hanHelm: 'Han lamellar cap',

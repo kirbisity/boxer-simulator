@@ -97,8 +97,9 @@ export function redress(inputs, random = Math.random, { anyKind = false } = {}) 
   const current = inputs.outfit?.kind;
   const family = OUTFITS[current]?.family;
   if (!family && !OUTFITS[current]?.picked) return inputs;
-  // A character's own design (Kojima's oni armour) is his: not swapped for another.
-  if (OUTFITS[current]?.designs[inputs.outfit?.design]?.special) return inputs;
+  // A character's own design (Kojima's oni armour) is his, as is one chosen in the builders (`chosen`: a Nanban kabuto): not swapped.
+  const worn = OUTFITS[current]?.designs[inputs.outfit?.design];
+  if (worn?.special || worn?.chosen) return inputs;
   const kind = anyKind && family ? pickOne(familyKinds(family), random) : current;
   const accessories = (inputs.accessories ?? []).filter((item) => headgearOptions(kind).includes(item));
   return { ...inputs, outfit: { ...inputs.outfit, kind, design: randomDesign(kind, random) }, accessories: kind === current ? inputs.accessories : (accessories.length ? accessories : defaultHeadgear(kind)) };
