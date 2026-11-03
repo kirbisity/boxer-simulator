@@ -313,7 +313,7 @@ function shade(hex, share) {
 }
 
 // Conquistadors: the doublet, the breeches, the helmet (morion, cabasset, pot helmet).
-// The conquistadors' cabasset is drawn in its measured design (helmforms.js DESIGN_FORMS.cabassetSpanish); the morion as before.
+// The conquistadors' cabasset is drawn in its measured design (helmforms.js DESIGN_FORMS.cabassetSpanish); the comb morion by its own measures (wardrobe.js MORION).
 const helmDesign = (helmet) => (helmet === 'cabasset' ? { design: 'spanish' } : {});
 function conquistadorDesign(label, doublet, breeches, helmet, sash = null) {
   return { label, top: { kind: 'longsleeve', color: doublet }, bottom: { kind: 'pants', color: breeches }, armor: { kind: 'conquistador', color: '#a7adb6', mail: '#8d9097', cloth: doublet, cloth2: sash ?? doublet }, head: { kind: helmet, color: '#a7adb6', ...helmDesign(helmet) }, feet: { kind: 'compactBoot', color: '#2a1d14' } };

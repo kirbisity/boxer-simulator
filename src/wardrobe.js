@@ -445,6 +445,97 @@ const RIDGE_HELM = { bowl: 1.24, height: 1.08, lift: 0.18 };
 const SPANGENHELM = { plates: 6, base: 1.24, height: 1.6, brow: 0.16 };
 const BASHLYK = { fold: 0.9 };
 
+// The comb morion of c. 1560-80 (the Met's 14.25.629 and its etched Milanese and Brescian kind; RCIN 67373), in head radii:
+// - `skull`: raised in one piece, its foot an ellipse `long` before and behind and `broad` each side at height `foot`, its
+//   dome `high` over the foot: a narrow skull, longer than broad;
+// - `comb`: the skull drawn up in the middle plane into a tall crescent, a half-disc reaching `long` before and behind and
+//   `high` over the skull's foot (about half again the dome's height), `thick` through, its edge turned and roped;
+// - `brim`: out from the skull's foot `side` over the ears, nearly level there, drawn out `point` further and swept up `rise`
+//   at the front and back into points (a boat seen from the side), `sharp` how narrow the points are in plan, `sweep` how
+//   gradually the edge rises toward them from the sides (a crescent, not flaps), `drop` how far it dips over the ears; its
+//   edge turned and roped;
+// - `rivets`: the lining's brass-capped rivets round the skull just over the brim, `rise` above its foot;
+// - `plume`: the plume holder riveted on behind the left ear (`at`: rad round from the front), `long` tall.
+// The rope of the turned edges: `rope` thick, a twist every `twist` along it.
+const MORION = {
+  skull: { long: 1.22, broad: 1.04, foot: 0.12, high: 1.0 },
+  comb: { long: 1.3, high: 1.78, thick: 0.07 },
+  brim: { side: 0.4, point: 0.62, rise: 0.8, sharp: 6, sweep: 2.5, drop: 0.05 },
+  rivets: { count: 16, rise: 0.12, r: 0.05 },
+  plume: { at: 2.5, long: 0.42 },
+  rope: { r: 0.042, twist: 0.09 },
+  brass: 0xc9a04a,
+};
+
+/**
+ * A turned and roped edge along `points` (head-radius points times `r`): a tube `MORION.rope.r` thick whose radius swells and
+ * falls in a spiral, a twist every `MORION.rope.twist`, so it reads as the rope filed into the roll.
+ */
+function ropedEdge(points, r, material, closed = false) {
+  const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(x * r, y * r, z * r)), closed);
+  const segments = Math.max(16, Math.round(curve.getLength() / (MORION.rope.twist * r)) * 4);
+  const radial = 6;
+  const geometry = new THREE.TubeGeometry(curve, segments, MORION.rope.r * r, radial, closed);
+  const position = geometry.attributes.position;
+  const centre = new THREE.Vector3();
+  const vertex = new THREE.Vector3();
+  for (let along = 0; along <= segments; along += 1) {
+    curve.getPointAt((along % (closed ? segments : segments + 1)) / segments, centre);
+    for (let round = 0; round <= radial; round += 1) {
+      const index = along * (radial + 1) + round;
+      vertex.fromBufferAttribute(position, index).sub(centre);
+      vertex.multiplyScalar(1 + 0.35 * Math.sin((2 * Math.PI * along) / 4 + (2 * Math.PI * round) / radial));
+      position.setXYZ(index, centre.x + vertex.x, centre.y + vertex.y, centre.z + vertex.z);
+    }
+  }
+  geometry.computeVertexNormals();
+  return new THREE.Mesh(geometry, material);
+}
+
+/**
+ * The comb morion's brim (MORION.brim): from the skull's foot out to its edge, level over the ears and swept up into points
+ * before and behind; its texture coordinates round (u) and out (v) for the etched tile. Returns the mesh and its edge points.
+ */
+function morionBrim(r, material) {
+  const { long, broad, foot } = MORION.skull;
+  const { side, point, rise, sharp, sweep, drop } = MORION.brim;
+  const around = 64;
+  const rings = 4;
+  const positions = [];
+  const uvs = [];
+  const edge = [];
+  for (let ring = 0; ring <= rings; ring += 1) {
+    const share = ring / rings;
+    for (let step = 0; step <= around; step += 1) {
+      const angle = (step / around) * Math.PI * 2;
+      const ends = Math.abs(Math.cos(angle)) ** sharp;
+      const reach = (side + point * ends) * share;
+      // The sweep up gathers toward the edge (a curved, not a flat, brim).
+      const lift = (rise * Math.abs(Math.cos(angle)) ** sweep - drop) * share ** 1.6;
+      const p = [(long + reach) * Math.cos(angle), foot + lift, (broad + reach) * Math.sin(angle)];
+      positions.push(p[0] * r, p[1] * r, p[2] * r);
+      uvs.push(step / around, share);
+      if (ring === rings && step < around) edge.push(p);
+    }
+  }
+  const indices = [];
+  for (let ring = 0; ring < rings; ring += 1) {
+    for (let step = 0; step < around; step += 1) {
+      const a = ring * (around + 1) + step;
+      const b = a + around + 1;
+      indices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const surfaceMaterial = material.clone();
+  surfaceMaterial.side = THREE.DoubleSide;
+  return { mesh: new THREE.Mesh(geometry, surfaceMaterial), edge };
+}
+
 export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail = false } = {}) {
   if (!head) return null;
   const r = body.lengths.headRadius;
@@ -734,28 +825,47 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'morion': {
-      // The Spanish morion: a round crown with a tall comb front to back and a brim
-      // that sweeps up to points before and behind.
+      // The comb morion (MORION): a narrow skull raised in one piece into a tall crescent comb front to back, the brim
+      // level over the ears and swept up into points before and behind, every edge turned and roped, the lining's brass
+      // rivets round the skull's foot, a plume holder behind.
       const iron = metal(steel, color);
-      const crown = new THREE.Mesh(new THREE.SphereGeometry(1.16 * r, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
-      crown.scale.y = 1.15;
-      crown.position.y = 0.1 * r;
-      const comb = new THREE.Mesh(new THREE.CylinderGeometry(1.25 * r, 1.25 * r, 0.06 * r, 24, 1, false, Math.PI * 0.5, Math.PI), iron);
-      comb.rotation.x = Math.PI / 2;
-      comb.scale.set(1, 1, 0.75);
-      comb.position.y = 0.35 * r;
-      const brim = new THREE.Mesh(new THREE.TorusGeometry(1.35 * r, 0.12 * r, 6, 28), iron);
-      brim.rotation.x = Math.PI / 2;
-      brim.scale.set(1.45, 0.75, 1);
-      brim.position.y = 0.08 * r;
-      // The brim's points rise fore and aft.
-      for (const end of [1, -1]) {
-        const point = new THREE.Mesh(new THREE.ConeGeometry(0.16 * r, 0.6 * r, 8), iron);
-        point.position.set(end * 1.95 * r, 0.3 * r, 0);
-        point.rotation.z = end * -1.1;
-        group.add(point);
+      const brass = metal(steel, MORION.brass);
+      const { long, broad, foot, high } = MORION.skull;
+      const skull = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), iron);
+      skull.scale.set(long, high, broad);
+      skull.position.y = foot * r;
+      // The comb: a half-disc in the middle plane, its foot sunk in the skull; its edge roped from end to end.
+      const comb = MORION.comb;
+      const outline = (angle) => [comb.long * Math.cos(angle), foot + comb.high * Math.sin(angle)];
+      const disc = new THREE.Shape();
+      for (let step = 0; step <= 32; step += 1) {
+        const [x, y] = outline((step / 32) * Math.PI);
+        if (step === 0) disc.moveTo(x * r, y * r);
+        else disc.lineTo(x * r, y * r);
       }
-      group.add(crown, comb, brim);
+      const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(disc, { depth: comb.thick * r, bevelEnabled: false }), iron);
+      plate.position.z = (-comb.thick * r) / 2;
+      const crest = Array.from({ length: 25 }, (_, step) => {
+        const [x, y] = outline(0.12 + (step / 24) * (Math.PI - 0.24));
+        return [x, y, 0];
+      });
+      group.add(skull, plate, ropedEdge(crest, r, iron));
+      const brim = morionBrim(r, iron);
+      group.add(brim.mesh, ropedEdge(brim.edge, r, iron, true));
+      // The lining's rivets, brass-capped, round the skull just over the brim.
+      const rivets = MORION.rivets;
+      const ring = Math.sqrt(1 - (rivets.rise / high) ** 2);
+      for (let index = 0; index < rivets.count; index += 1) {
+        const angle = ((index + 0.5) / rivets.count) * Math.PI * 2;
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(rivets.r * r, 6, 4), brass);
+        cap.position.set(long * ring * Math.cos(angle) * r, (foot + rivets.rise) * r, broad * ring * Math.sin(angle) * r);
+        group.add(cap);
+      }
+      // The plume holder: a short brass tube riveted upright on the skull behind the left ear.
+      const holder = new THREE.Mesh(new THREE.CylinderGeometry(0.07 * r, 0.05 * r, MORION.plume.long * r, 8), brass);
+      holder.position.set(long * Math.cos(MORION.plume.at) * r, (foot + 0.32) * r, (broad + 0.03) * Math.sin(MORION.plume.at) * r);
+      holder.rotation.x = -0.25;
+      group.add(holder);
       break;
     }
     case 'cabasset': {
