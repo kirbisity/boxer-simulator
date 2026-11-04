@@ -448,7 +448,7 @@ const PERIOD_BUILD = {
   hospitaller: { knight: { heightCm: 170, weightKg: 71, exercise: 0.75 }, sergeant: { heightCm: 167, weightKg: 66, exercise: 0.65 } },
   // The fighting men above that: the Janissaries picked from the devşirme's tallest and strongest boys and drilled
   // for life, the sipahis landholders fed on meat and at arms from boyhood; the azaps levied but sturdy peasants.
-  ottoman: { azap: { heightCm: 169, weightKg: 68, exercise: 0.7 }, janissary: { heightCm: 175, weightKg: 77, exercise: 0.88 }, heavy: { heightCm: 174, weightKg: 79, exercise: 0.84 } },
+  ottoman: { azap: { heightCm: 175, weightKg: 80, exercise: 0.84 }, janissary: { heightCm: 181, weightKg: 89, exercise: 0.93 }, heavy: { heightCm: 181, weightKg: 92, exercise: 0.92 } },
   // Medieval Mongol and Oirat men, from skeletons about 163–167 cm, lean and hard.
   // Steppe men: short and squat, heavy for their height (riders' bodies, fed on meat and milk).
   steppe: { light: { heightCm: 164, weightKg: 84, exercise: 0.7 }, medium: { heightCm: 165, weightKg: 89, exercise: 0.66 }, heavy: { heightCm: 167, weightKg: 95, exercise: 0.62 } },
@@ -456,7 +456,7 @@ const PERIOD_BUILD = {
   // fed on meat and millet, at the bow and on horse from boyhood and drilled in their companies (niru) on the great
   // hunts; the Ming's men saw them as big and hard. Taller than the Ming's northern men and heavier, stronger than
   // even the Ming's picked elite (above); the Bayara picked from them for strength and the bow.
-  jurchen: { banner: { heightCm: 174, weightKg: 79, exercise: 0.86 }, bayara: { heightCm: 177, weightKg: 83, exercise: 0.9 } },
+  jurchen: { banner: { heightCm: 177, weightKg: 85, exercise: 0.9 }, bayara: { heightCm: 180, weightKg: 89, exercise: 0.93 } },
   // Dutch soldiers of the 1660s, among Europe's taller men then.
   dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };

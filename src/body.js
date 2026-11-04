@@ -239,17 +239,17 @@ export const PRESETS = {
   // guard, a Bayara in the heavy coat, bow and saber. Jurchen hunters and herders fed on meat and grain, at the bow
   // and on horse from boyhood: big and strong for their day, taller and harder than the Ming's men (`exercise`, `calories`).
   bannerBow: {
-    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 175, frame: 'large', age: 28, exercise: 0.86, calories: 4300,
+    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 178, frame: 'large', age: 28, exercise: 0.9, calories: 4800,
     outfit: { kind: 'bannerArmour', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   bannerGuandao: {
-    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 180, frame: 'large', age: 31, exercise: 0.85, calories: 4600,
+    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 183, frame: 'large', age: 31, exercise: 0.9, calories: 5100,
     outfit: { kind: 'bannerArmour', design: 5 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   bayara: {
-    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 177, frame: 'large', age: 40, exercise: 0.88, calories: 4500,
+    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 180, frame: 'large', age: 40, exercise: 0.92, calories: 5000,
     outfit: { kind: 'bayara', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -301,7 +301,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   gaziAlp: {
-    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 175, frame: 'large', age: 36, exercise: 0.85, calories: 3975,
+    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 181, frame: 'large', age: 36, exercise: 0.93, calories: 5000,
     outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -382,24 +382,24 @@ export const PRESETS = {
   // greying; the sayf, the turs, the kazaghand over his mail.
   saladin: {
     // His standard the Ayyubid yellow, when he leads.
-    name: 'Saladin', style: 'saladin', hero: true, sex: 'male', heightCm: 174, frame: 'medium', age: 50, exercise: 0.75, calories: 3400, standardColour: '#d8b030',
+    name: 'Saladin', style: 'saladin', hero: true, sex: 'male', heightCm: 178, frame: 'large', age: 50, exercise: 0.86, calories: 4400, standardColour: '#d8b030',
     outfit: { kind: 'saladin', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2e2620', facialHair: 'beard', eyeColor: 'brown' },
   },
   // The Ottomans: Ulubatlı Hasan, the Janissary who raised the banner on the
   // walls of Constantinople (1453); an azap archer; a heavy sipahi on foot.
   yatagan: {
-    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 178, frame: 'large', age: 25, exercise: 0.86, calories: 4175,
+    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 184, frame: 'large', age: 25, exercise: 0.94, calories: 5200,
     outfit: { kind: 'janissary', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   azap: {
-    name: 'Ali the azap', style: 'steppeBow', sex: 'male', heightCm: 170, frame: 'medium', age: 24, exercise: 0.72, calories: 2900,
+    name: 'Ali the azap', style: 'steppeBow', sex: 'male', heightCm: 176, frame: 'large', age: 24, exercise: 0.85, calories: 4200,
     outfit: { kind: 'azap', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   sipahi: {
-    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 176, frame: 'large', age: 34, exercise: 0.85, calories: 3975,
+    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 182, frame: 'large', age: 34, exercise: 0.93, calories: 5100,
     outfit: { kind: 'ottomanHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
