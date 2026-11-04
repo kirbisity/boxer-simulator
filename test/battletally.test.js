@@ -10,7 +10,7 @@ const say = (world, kind, fighter, extra = {}) => world.events.push({ time: worl
 
 test('a fresh battle: every man standing, nobody killed, wounded or gone', () => {
   const tally = battleTally(battle());
-  for (const corner of ['red', 'blue']) assert.deepEqual(tally[corner], { men: 5, killed: 0, wounded: 0, down: 0, cold: 0, broke: 0, crawled: 0, crawling: 0, fled: 0, rallied: 0, standing: 5 });
+  for (const corner of ['red', 'blue']) assert.deepEqual(tally[corner], { men: 5, killed: 0, wounded: 0, down: 0, broke: 0, crawled: 0, crawling: 0, fled: 0, rallied: 0, standing: 5 });
   assert.deepEqual(tallyRows(tally).map(([field]) => field), ['men', 'standing'], 'only the rows some side has any of');
 });
 
@@ -34,13 +34,12 @@ test('the dead, the knocked cold, the fled and the rallied are each counted once
   // (A man steadying where he stands is not a rally from the edge.)
   say(world, 'rally', b1.id, { effects: ['steadies'] });
   const tally = battleTally(world);
-  assert.equal(tally.red.killed, 3, 'killed, bled out and beheaded');
+  assert.equal(tally.red.killed, 4, 'killed, bled out, beheaded, and the knocked cold: finished where he lies');
   assert.equal(tally.red.down, 4, 'the level tool\'s down: every man on the ground, the dead too');
-  assert.equal(tally.red.cold, 1, 'down and alive: the knocked-cold one');
   assert.equal(tally.red.standing, 1);
   assert.deepEqual([tally.blue.broke, tally.blue.crawled, tally.blue.fled, tally.blue.rallied, tally.blue.standing], [2, 1, 1, 2, 4]);
   assert.equal(tally.blue.killed + tally.blue.down, 0);
-  assert.deepEqual(tallyRows(tally).map(([field]) => field), ['men', 'killed', 'cold', 'crawled', 'fled', 'rallied', 'standing']);
+  assert.deepEqual(tallyRows(tally).map(([field]) => field), ['men', 'killed', 'crawled', 'fled', 'rallied', 'standing']);
 });
 
 test('wounded: a man who lived and was really hurt, or has a bone broken; never the dead', () => {
@@ -59,13 +58,12 @@ test('wounded: a man who lived and was really hurt, or has a bone broken; never 
   assert.equal(battleTally(world).red.wounded, 2, 'the hurt who lived; the dead man is killed, not wounded');
 });
 
-test('how the beaten side lost: broke, cut down, or beaten down', () => {
-  const side = (fields) => ({ men: 10, killed: 0, cold: 0, down: 0, fled: 0, crawling: 0, broke: 0, standing: 0, ...fields });
-  assert.equal(howBeaten(side({ broke: 6, fled: 2, killed: 3, cold: 5 })), 'broke and ran', 'most of it broke, though most of the runners were caught');
+test('how the beaten side lost: broke, or cut down', () => {
+  const side = (fields) => ({ men: 10, killed: 0, down: 0, fled: 0, crawling: 0, broke: 0, standing: 0, ...fields });
+  assert.equal(howBeaten(side({ broke: 6, fled: 2, killed: 8 })), 'broke and ran', 'most of it broke, though most of the runners were caught');
   assert.equal(howBeaten(side({ broke: 9, fled: 7 })), 'broke and fled the field');
-  assert.equal(howBeaten(side({ broke: 2, killed: 6, cold: 4 })), 'were cut down');
+  assert.equal(howBeaten(side({ broke: 2, killed: 6 })), 'were cut down');
   assert.equal(howBeaten(side({ killed: 10 })), 'were cut down to the last man');
-  assert.equal(howBeaten(side({ killed: 2, cold: 8 })), 'were beaten down');
 });
 
 test('a notable fact: the most kills, else the most blows; the arrows and shots', () => {
@@ -76,6 +74,12 @@ test('a notable fact: the most kills, else the most blows; the arrows and shots'
   const facts = notableFacts(world, (fighter) => `man ${fighter.id}`);
   assert.deepEqual(facts.map((fact) => [fact.label, fact.name, fact.count]), [['Most kills', 'man 0', 2], ['Arrows loosed', undefined, 3]]);
   assert.deepEqual(notableFacts(battle()), [], 'nothing worth a line');
+  // A knockout is a kill; a man knocked out and then finished is one kill, to the first.
+  const brawl = battle();
+  const [boxer, other] = brawl.fighters;
+  for (const victim of brawl.fighters.slice(5, 7)) say(brawl, 'knockout', victim.id, { attacker: boxer.id });
+  say(brawl, 'killed', brawl.fighters[5].id, { attacker: other.id });
+  assert.deepEqual(notableFacts(brawl, (fighter) => `man ${fighter.id}`).map((fact) => [fact.label, fact.name, fact.count]), [['Most kills', 'man 0', 2]]);
   assert.equal(clock(151.4), '2:31');
   assert.equal(clock(9), '0:09');
 });

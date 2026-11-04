@@ -1,5 +1,6 @@
 // What a battle came to, side by side: for each side its men, how many were
-// killed, wounded, knocked down, broke, crawled away, fled the field, came
+// killed (the knocked cold among them: on a battlefield a man left senseless
+// is finished where he lies), wounded, broke, crawled away, fled the field, came
 // back, and were still standing at the end. Read from the world as the
 // battle left it and from its events, so the end-of-battle summary on the
 // page and the level tool (tools/levels.js), which fights the same battles
@@ -20,9 +21,12 @@ export const WOUNDED_AT = 0.25;
 /** The kinds of event that are a man's death: cut or shot down, bled out, drowned. */
 const DEATHS = new Set(['killed', 'bledOut', 'drowned']);
 
-/** Killed: a death among the events, or his head off (a severed neck goes down as 'out', but no man lives through it). */
+/** A death among the events, or his head off (a severed neck goes down as 'out', but no man lives through it). */
+const isDeath = (event) => DEATHS.has(event.kind) || (event.kind === 'severed' && event.joint === 'neck');
+
+/** Killed: a death among the events. */
 function killedIds(events) {
-  return new Set(events.filter((event) => DEATHS.has(event.kind) || (event.kind === 'severed' && event.joint === 'neck')).map((event) => event.fighter));
+  return new Set(events.filter(isDeath).map((event) => event.fighter));
 }
 
 /** Wounded: lived, and hurt past WOUNDED_AT, or a bone broken or a limb lost. */
@@ -33,10 +37,9 @@ export function wounded(fighter) {
 /**
  * Each side's tally at the end of a battle: { red, blue }, each
  * - men: how many it had;
- * - killed: dead (DEATHS, or beheaded);
+ * - killed: dead (DEATHS, or beheaded), or down on the field at the end (knocked cold, or past going on: counted with the dead);
  * - wounded: alive and wounded (wounded()), wherever he is: still up, down, or gone;
  * - down: on the ground at the end and still on the field (the dead too: the level tool's figure);
- * - cold: down but alive: knocked cold, or past going on;
  * - broke: broke at some point (a 'panic' event);
  * - crawled: went down on his knees to crawl away as his side broke (the rout's crawl);
  * - crawling: still crawling off at the end, out of the fight, though neither down nor fled;
@@ -58,10 +61,9 @@ export function battleTally(world) {
     const down = (fighter) => fighter.state === 'out' && !fighter.fled;
     tally[corner] = {
       men: men.length,
-      killed: count((fighter) => killed.has(fighter.id)),
-      wounded: count((fighter) => !killed.has(fighter.id) && wounded(fighter)),
+      killed: count((fighter) => killed.has(fighter.id) || down(fighter)),
+      wounded: count((fighter) => !killed.has(fighter.id) && !down(fighter) && wounded(fighter)),
       down: count(down),
-      cold: count((fighter) => down(fighter) && !killed.has(fighter.id)),
       broke: count((fighter) => broke.has(fighter.id)),
       crawled: count((fighter) => crawled.has(fighter.id)),
       crawling: count((fighter) => fighter.crawling && fighter.state !== 'out' && !fighter.fled),
@@ -76,13 +78,11 @@ export function battleTally(world) {
 /**
  * How the beaten side lost, in a few words. Half or more of it broke: it
  * broke and ran (and fled the field, if half or more got off it), whatever
- * then became of the runners; else by what took the most of its men: the
- * dead (cut down) or the knocked cold and the past going on (beaten down).
+ * then became of the runners; else it was cut down.
  */
 export function howBeaten(side) {
   if (side.broke * 2 >= side.men && side.broke > 0) return side.fled * 2 >= side.men ? 'broke and fled the field' : 'broke and ran';
-  if (side.killed >= side.cold) return side.killed === side.men ? 'were cut down to the last man' : 'were cut down';
-  return 'were beaten down';
+  return side.killed === side.men ? 'were cut down to the last man' : 'were cut down';
 }
 
 /** The summary's rows, in order: [field, label], each shown only when some side has any (men always). */
@@ -90,7 +90,6 @@ export const TALLY_ROWS = [
   ['men', 'Men'],
   ['killed', 'Killed'],
   ['wounded', 'Wounded'],
-  ['cold', 'Down'],
   ['crawled', 'Crawled away'],
   ['fled', 'Fled the field'],
   ['rallied', 'Rallied'],
@@ -116,7 +115,14 @@ export function notableFacts(world, nameOf = (fighter) => fighter.body.inputs.na
     for (const [id, count] of counts) if (count >= least && (!best || count > best.count)) best = { id, count };
     return best && { fighter: world.fighters[best.id], count: best.count };
   };
-  const kills = top((event) => DEATHS.has(event.kind), 2);
+  // A kill: the blow that put a man down for good, a knockout as much as a death; each man counted once, to the first.
+  const decided = new Set();
+  const kills = top((event) => {
+    if (!isDeath(event) && event.kind !== 'knockout') return false;
+    if (decided.has(event.fighter)) return false;
+    decided.add(event.fighter);
+    return true;
+  }, 2);
   const blows = kills ? null : top((event) => event.kind === 'landed', 3);
   if (kills) facts.push({ label: 'Most kills', who: kills.fighter, name: nameOf(kills.fighter), count: kills.count });
   else if (blows) facts.push({ label: 'Most blows', who: blows.fighter, name: nameOf(blows.fighter), count: blows.count });

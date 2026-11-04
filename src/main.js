@@ -1280,8 +1280,10 @@ function consumeEvents() {
     if (moment) {
       // Slow motion and the camera's push-in are for one man against
       // another; in a crowd something is always happening, and the icon says enough.
-      if (state.world.fighters.length <= 2 || moment.always) startMoment(state.drama, moment, realSeconds());
-      addIcon(state.drama, moment, realSeconds());
+      const crowd = state.world.fighters.length > 2;
+      if (!crowd || moment.always) startMoment(state.drama, moment, realSeconds());
+      // In a battle a man knocked senseless is finished where he lies: he reads as killed (battletally.js counts him so).
+      addIcon(state.drama, crowd && moment.kind === 'knockout' ? { ...moment, kind: 'killed' } : moment, realSeconds());
     }
     logEvent(event);
   }
@@ -1306,7 +1308,7 @@ function renderHud() {
     const blood = card.querySelector('.blood');
     blood.hidden = !(fighter.bloodLost > 0);
     blood.querySelector('i').style.width = `${Math.min(100, Math.round(((fighter.bloodLost ?? 0) / collapseAt()) * 100))}%`;
-    card.querySelector('.kd').textContent = fighter.state === 'out' ? 'OUT' : fighter.state === 'down' ? 'DOWN' : fighter.panicked ? 'PANIC' : fighter.dazed > 0 ? 'DAZED' : fighter.stagger > 0 ? 'REELING' : `KD ${fighter.knockdowns}`;
+    card.querySelector('.kd').textContent = fighter.state === 'out' ? (state.world.fighters.length > 2 ? 'KILLED' : 'OUT') : fighter.state === 'down' ? 'DOWN' : fighter.panicked ? 'PANIC' : fighter.dazed > 0 ? 'DAZED' : fighter.stagger > 0 ? 'REELING' : `KD ${fighter.knockdowns}`;
     const nerve = fighter.aiConfidence ?? 0;
     const mood = nerve > 0.35 ? ' · confident' : nerve < -0.35 ? ' · wary' : '';
     // The sandbox reads out fear and adrenaline; everywhere else, one health bar says enough.
