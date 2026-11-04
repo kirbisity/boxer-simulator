@@ -104,13 +104,17 @@ function horseMaterials(view) {
  */
 function bardMaterial(view, tile, finish) {
   view.bardMaterials ??= new Map();
-  const key = `${tile}|${finish?.steel ?? '-'}|${finish?.lace ?? '-'}`;
+  // A brigandine's facing (the `brigandine` tile) is the rider's cloth, studded in his gilt (horses.js mountOf `finish`).
+  const faced = tile === 'brigandine';
+  const key = `${tile}|${finish?.steel ?? '-'}|${finish?.lace ?? '-'}${faced ? `|${finish?.cloth ?? '-'}|${finish?.gold ?? '-'}` : ''}`;
   if (!view.bardMaterials.has(key)) {
     const base = steelMaterial(view.steelEnv, { vertexColors: true });
-    if (finish?.steel) base.color = new THREE.Color(finish.steel).lerp(new THREE.Color(0xffffff), 0.35);
+    if (faced && finish?.cloth) base.color = new THREE.Color(finish.cloth);
+    else if (finish?.steel) base.color = new THREE.Color(finish.steel).lerp(new THREE.Color(0xffffff), 0.35);
     const masks = DETAIL_ARMOUR[tile]?.masks;
     const lace = finish?.lace ? new THREE.Color(finish.lace) : new THREE.Color(0x6a1a14);
-    const cords = masks === 'lace' ? [lace, lace] : masks === 'gold' ? [new THREE.Color(0xffffff), new THREE.Color(0xffffff)] : null;
+    const gilt = faced && finish?.gold ? new THREE.Color(finish.gold) : new THREE.Color(0xffffff);
+    const cords = masks === 'lace' ? [lace, lace] : masks === 'gold' ? [gilt, gilt] : null;
     // (A bard's broad plates would mirror only the ground under them: a little less of a mirror than the rider's harness, which
     // turns every way; mail and lamellae less bright again.)
     const metalness = tile === 'lamellae' || tile === 'mail' ? 0.75 : 0.85;

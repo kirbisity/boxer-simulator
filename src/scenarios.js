@@ -138,8 +138,9 @@ function pyongyangSides(random) {
 // by the banners' heavy foot and archers at close range and their armoured horse. Here, one fight of Du Song's
 // column: a few of his household elite, many regulars in brigandine and some garrison men, a few gunners in front;
 // against them the banners, every man in his banner's coat of plates, spear, saber and guandao before the archers
-// with the heavy bow, and three Bayara of the guard on horse on the flank. The two sides here about even, as they
-// were not that day: the banners won by being many where the Ming were few.
+// with the heavy bow, and three Bayara of the guard on horse on the flank, their heavy spears couched
+// (WEAPONS.manchuLance). The two sides here about even, as they were not that day: the banners won by being many where
+// the Ming were few.
 const SARHU = {
   ming: {
     elite: { guandao: 1, swordShield: 1, threeEyed: 1 },
@@ -147,7 +148,7 @@ const SARHU = {
     garrison: { matchlock: 2, spear: 5, dao: 3 },
   },
   banners: { spear: 10, dao: 4, guandao: 4, manchuBow: 10 },
-  bayara: { bayaraBow: 2, spear: 1 },
+  bayara: { bayaraLance: 3 },
 };
 const SARHU_MING = 'ming';
 
@@ -596,7 +597,7 @@ const CARRHAE = {
 const RHODES = {
   hospitallers: { knight: { longsword: 6, warhammer: 2 }, sergeant: { spear: 4, matchlock: 3 } },
   // The whole army was a hundred thousand, but a breach is narrow: these are the men of one wave who reach the defenders.
-  ottomans: { heavy: { maceShield: 2, saberShield: 1 }, janissary: { yatagan: 4, matchlock: 3 }, azap: { spear: 4, steppeBow: 3 } },
+  ottomans: { heavy: { maceShield: 2, kilijShield: 1 }, janissary: { yatagan: 4, matchlock: 3 }, azap: { spear: 4, steppeBow: 3 } },
 };
 
 /**
@@ -672,8 +673,8 @@ export const ARMIES = {
     label: 'The Eight Banners',
     ranks: {
       banner: { label: 'Banner man', kinds: ['bannerArmour'], styles: ['spear', 'manchuBow', 'dao', 'guandao'], make: bannerRank('banner') },
-      bayara: { label: 'Bayara, mounted', kinds: ['bayara'], mounted: true, styles: ['bayaraBow', 'spear', 'dao'], make: bannerRank('bayara', true) },
-      bayaraFoot: { label: 'Bayara', kinds: ['bayara'], styles: ['bayaraBow', 'spear', 'dao'], make: bannerRank('bayara') },
+      bayara: { label: 'Bayara, mounted', kinds: ['bayara'], mounted: true, styles: ['bayaraLance', 'bayaraBow', 'spear', 'dao'], make: bannerRank('bayara', true) },
+      bayaraFoot: { label: 'Bayara', kinds: ['bayara'], styles: ['bayaraLance', 'bayaraBow', 'spear', 'dao'], make: bannerRank('bayara') },
     },
   },
   spanish: {
@@ -722,7 +723,7 @@ export const ARMIES = {
   ottomans: {
     label: 'The Ottomans',
     ranks: {
-      heavy: { label: 'Heavy', kinds: ['ottomanHeavy'], styles: ['maceShield', 'saberShield'], make: (random, style) => ottomanSoldier(random, style, 'heavy') },
+      heavy: { label: 'Heavy', kinds: ['ottomanHeavy'], styles: ['maceShield', 'kilijShield'], make: (random, style) => ottomanSoldier(random, style, 'heavy') },
       janissary: { label: 'Janissary', kinds: ['janissary'], styles: ['yatagan', 'matchlock'], make: (random, style) => ottomanSoldier(random, style, 'janissary') },
       azap: { label: 'Azap', kinds: ['azap'], styles: ['spear', 'steppeBow'], make: (random, style) => ottomanSoldier(random, style, 'azap') },
     },
@@ -1312,7 +1313,7 @@ export const SCENARIOS = {
   sarhu: {
     title: 'Sarhu',
     place: 'Sarhu and Jiefan, by the Hun River, Liaodong · 14 April 1619',
-    blurb: "Du Song's column has crossed the Hun River ahead of the other three, and Nurhaci has brought his eight banners against it alone. Thirty of the Ming — a few of Du Song's household elite, regulars in brigandine and garrison men, a handful of gunners in front — meet twenty-eight banner men in studded coats of plates, spears, sabres and guandao before the archers with the heavy Manchu bow, and three Bayara of the guard riding on the flank. The Ming had more guns; the fight went on into the dusk and the mist, and wet powder and the columns' distance from each other did the rest.",
+    blurb: "Du Song's column has crossed the Hun River ahead of the other three, and Nurhaci has brought his eight banners against it alone. Thirty of the Ming — a few of Du Song's household elite, regulars in brigandine and garrison men, a handful of gunners in front — meet twenty-eight banner men in studded coats of plates, spears, sabres and guandao before the archers with the heavy Manchu bow, and three Bayara of the guard riding on the flank with the heavy spear. The Ming had more guns; the fight went on into the dusk and the mist, and wet powder and the columns' distance from each other did the rest.",
     scene: 'sarhu',
     weather: { fog: WEATHER_MIST.sarhu, sky: 0.6, pale: 0.6, sun: 0.7 },
     arena: { halfX: 14, halfZ: 9 },

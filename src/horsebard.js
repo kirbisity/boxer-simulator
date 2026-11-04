@@ -25,6 +25,10 @@
 //   lamellar face, the whole neck in lamellae, a breast piece, a skirt down the flanks below the belly and over the rump,
 //   all of small round-headed lamellae in laced rows (the `lamellae` tile, laced in the rider's colour), bound at the edges
 //   in leather with a fringed cloth hem.
+// - brigandine: the Later Jin and Qing guard's bard, cut as the lamellar one (the same pieces, the horse fully clad) and
+//   made as the rider's coat is: cloth in his coat's colour over small iron plates, studded with their gilt rivet heads in
+//   rows (the `brigandine` tile, the rider's own: horseview.js colours it his cloth and his gilt), an iron brow plate
+//   over the face, bound in leather with a fringed hem; a red horsehair tassel at the poll (the Qing's 红缨).
 
 import { vec } from './pose.js';
 
@@ -40,6 +44,7 @@ const bdScale3 = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 export const BARD_TILES = {
   plate: { fluted: 'fluted', etched: 'etched', plain: 'plate', edge: 'harnessEdge', mail: 'mail' },
   lamellar: { field: 'lamellae', brow: 'munitionPlate' },
+  brigandine: { field: 'brigandine', brow: 'munitionPlate' },
 };
 
 /**
@@ -59,6 +64,8 @@ export const BARD_FIT = {
     crupper: { centre: -0.4, spread: 4.0, hem: [0.6, 0.46], gap: 0.03, flare: 0.36 },
   },
 };
+// (The brigandine bard is cut as the lamellar one: the same pieces, down below the belly.)
+BARD_FIT.brigandine = BARD_FIT.lamellar;
 
 // ---- Casting over the horse ---------------------------------------------------------------------------------------------
 
@@ -290,7 +297,7 @@ function bdRoundPlan({ centre, axisY, around, top, hem, upper, rows, lift }) {
 
 /**
  * Build a horse's bard into its parts: `ctx` from horsemesh.js buildHorseModel ({ spec, build, low, W, bodyFn, neckFn,
- * headFn, poll, neckPivot, tailRoot, colliders, prims, tileSize, add(part, kind, prim) }), `kind` 'plate' or 'lamellar'.
+ * headFn, poll, neckPivot, tailRoot, colliders, prims, tileSize, add(part, kind, prim) }), `kind` 'plate', 'lamellar' or 'brigandine'.
  * `add` takes 'metal' (plain steel), 'soft' (leather, cloth, plume) or 'detail:<tile>' (a shell carrying a tile's maps).
  */
 export function buildBard(ctx, kind) {
@@ -298,8 +305,11 @@ export function buildBard(ctx, kind) {
   const plate = kind === 'plate';
   const fit = BARD_FIT[kind];
   const style = ctx.spec.style ?? 'plain';
-  const field = plate ? BARD_TILES.plate[style] ?? 'plate' : BARD_TILES.lamellar.field;
-  const steel = plate ? [0.97, 0.98, 1] : [0.66, 0.67, 0.7];
+  const laced = plate ? null : BARD_TILES[kind] ?? BARD_TILES.lamellar;
+  const field = plate ? BARD_TILES.plate[style] ?? 'plate' : laced.field;
+  // (A brigandine's facing is coloured by its material, the rider's cloth: horseview.js bardMaterial; drawn here white.)
+  const studded = kind === 'brigandine';
+  const steel = plate ? [0.97, 0.98, 1] : studded ? [0.96, 0.96, 0.96] : [0.66, 0.67, 0.7];
   const edgeSteel = [0.9, 0.91, 0.94];
   const leather = [0.16, 0.1, 0.07];
   const cloth = ctx.dyed ? bdScale3(ctx.dyed, 0.7) : [0.22, 0.16, 0.12];
@@ -523,7 +533,7 @@ export function buildBard(ctx, kind) {
     }
   } else {
     // The brow plate of iron, the face below it in lamellae.
-    facePiece(-0.01, 0.14, BARD_TILES.lamellar.brow, [0.5, 0.5, 0.53], 0.016);
+    facePiece(-0.01, 0.14, laced.brow, [0.5, 0.5, 0.53], 0.016);
     facePiece(0.13, 0.32, field, shade(steel), 0.012);
   }
   if (!low) {
@@ -556,7 +566,7 @@ export function buildBard(ctx, kind) {
     ctx.add('head', 'metal', prims.hmTube([poll, socket], [0.009, 0.011], { sides: 6, color: edgeSteel }));
     piece = 'plume';
     const plume = { p: [], c: [], n: [], i: [] };
-    const feather = plate ? (ctx.dyed ? bdScale3(ctx.dyed, 0.8) : [0.08, 0.07, 0.07]) : [0.45, 0.28, 0.14];
+    const feather = plate ? (ctx.dyed ? bdScale3(ctx.dyed, 0.8) : [0.08, 0.07, 0.07]) : studded ? [0.62, 0.06, 0.07] : [0.45, 0.28, 0.14];
     for (let k = 0; k < 5; k += 1) {
       const lean = (k - 2) * 0.28;
       const tip = [socket[0] - 0.09 - 0.03 * Math.abs(k - 2), socket[1] + 0.2 - 0.03 * Math.abs(k - 2), Math.sin(lean) * 0.09];

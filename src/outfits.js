@@ -1381,8 +1381,9 @@ export const OUTFITS = {
   // plates, steel arm guards, steel bands on the skirt, the steel and gilt helmet. Guarded as the Ming elite's
   // household men (jiading) were, no better: the same coat of plates under silk.
   bayara: {
-    // Rides (a Manchurian horse, the steppe's breed).
-    horse: 'steppe',
+    // Rides (a Manchurian horse, the steppe's breed), the horse clad in brigandine as he is, in his coat's colours with its
+    // gilt studs (horses.js BARDING.brigandine, mountOf `finish`).
+    horse: 'steppe', barding: 'brigandine',
     skill: 0.6,
     faction: 'manchu', bulletRating: 650, plated: true,
     label: 'Eight Banners (Later Jin) — Bayara guard', family: 'manchu', movement: 'good', fists: 'bare',
@@ -1693,7 +1694,8 @@ export const OUTFITS = {
     horse: 'steppe',
     faction: 'steppe',
     label: 'Cuman — mail and plates, masked helmet', movement: 'good', fists: 'gauntlet',
-    sidearm: 'saber',
+    // The long, deep-curved sabre of the Kipchak kurgans (WEAPONS.kilij: the kılıç's forerunner), not the Mongol's gentler one.
+    sidearm: 'kilij',
     arrowproof: true,
     // Mail-and-plate shirt ~11 kg, vambraces ~1 kg, mail mittens ~0.5 kg, helmet, aventail and mask ~2.5 kg: ~15 kg on a
     // 75 kg man.
@@ -1933,7 +1935,8 @@ export const OUTFITS = {
     skill: 0.25,
     faction: 'ottomans',
     label: 'Ottoman — azap', movement: 'good', fists: 'bare',
-    sidearm: 'saber',
+    // The kılıç (WEAPONS.kilij), as every Ottoman soldier carried one who could.
+    sidearm: 'kilij',
     // An army's azaps wear the iron cap (the first three: OUTFIT_SETS.azap `chichak`); the turbans are the builder's choice.
     picked: [0, 1, 2],
     designs: [
@@ -1950,7 +1953,8 @@ export const OUTFITS = {
     skill: 0.5,
     faction: 'ottomans',
     label: 'Ottoman — Janissary', movement: 'good', fists: 'bare',
-    sidearm: 'yatagan',
+    // The kılıç (WEAPONS.kilij), the regiments' sword in the field: the gunner's when he has fired, the yatagan man's when his is lost.
+    sidearm: 'kilij',
     spare: 'dagger',
     courage: 0.15,
     // An army's Janissaries in the chichak (the first three: OUTFIT_SETS.janissary `chichak`); the börk is the builder's choice.
@@ -1978,7 +1982,8 @@ export const OUTFITS = {
     skill: 0.6,
     faction: 'ottomans',
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
-    sidearm: 'saber',
+    // The sipahi's kılıç at the saddle (WEAPONS.kilij), drawn when the mace is lost.
+    sidearm: 'kilij',
     arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.3): krug and chichak: ~12 kg on a 74 kg man (a mail-and-plate shirt ~10–12 kg).
     extraMass: 0.165,
@@ -2013,7 +2018,8 @@ export const OUTFITS = {
     horse: 'arabian',
     faction: 'ottomans',
     label: 'Alp — Osman\'s gazi', movement: 'good', fists: 'bare',
-    sidearm: 'saber',
+    // The kılıç at his belt, the gazi's long curved sword (WEAPONS.kilij).
+    sidearm: 'kilij',
     // Armour at 0.55 of its old weight (was 0.28): hauberk and helmet: ~11 kg on a 74 kg man (a mail hauberk ~10–12 kg).
     extraMass: 0.154,
     // A mail hauberk with mirror plates over the breast and back (`mailMirror`): cut 0.94 (was 0.9) and pierce 0.65 (was 0.45):

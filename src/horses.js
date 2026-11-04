@@ -57,16 +57,28 @@ export const HORSE_LOAD = { easy: 0.2, slows: 0.9, least: 0.6 };
  *   a skirt down the flanks below the belly and over the rump, all small iron lamellae laced in overlapping rows
  *   (~4.5 m², much of it doubled where the rows lap). No weights survive; at the 0.7–1 mm of the riders' own
  *   lamellae (Met 788894), ~38 kg.
+ * - brigandine, the Later Jin and Qing guard's bard (the horse armour of the Qing's ceremonial and guard harness, the
+ *   Palace Museum's and the Shenyang palace's; the Ming 'iron horse armour' of the Wubei zhi's cavalry before it), made as
+ *   the rider's own coat is: small iron plates riveted inside a cloth facing of his colours, the rivets' gilt heads
+ *   studding the outside in rows. The same pieces as the lamellar bard, the horse fully clad (a face piece under an iron
+ *   brow plate, the whole neck, the breast, a skirt down the flanks below the belly and over the rump). Guarded as a
+ *   brigandine is (the Ming brigandine's coat: the plates turn an edge, a point finds the seams between them, the cloth and
+ *   its quilting spread a blow a little less than lamellar's laced rows), no mail under it; the plates smaller and thinner
+ *   than the lamellar bard's (~0.7 mm, 48 x 24 mm): ~30 kg over ~4.5 m². Not plate: an edge is not turned aside (no
+ *   `deflects`), and proof enough against an edge (cut 0.82) that a slide along it parts nothing (weapons.js sliceGain).
  * - bare: a saddle and tack only.
  */
 const PLATE_BARD = { blunt: 0.55, cut: 1, pierce: 0.88, deflects: true };
 // The crinet: lames over the crest and upper sides, mail under the throat (a point goes through the mail's rings; mail spreads little of a blow).
 const CRINET = { blunt: 0.42, cut: 1, pierce: 0.72, deflects: true };
 const LAMELLAR_BARD = { blunt: 0.42, cut: 0.86, pierce: 0.7 };
+const BRIGANDINE_BARD = { blunt: 0.4, cut: 0.82, pierce: 0.55 };
 const NONE = { blunt: 0, cut: 0, pierce: 0 };
 export const BARDING = {
   plate: { label: 'Steel plate barding', mass: 36, parts: { head: PLATE_BARD, neck: CRINET, chest: { ...PLATE_BARD, from: 0.6 }, body: { ...PLATE_BARD, blunt: 0.45, from: 0.56 }, legs: NONE } },
   lamellar: { label: 'Steel lamellar barding', mass: 38, parts: { head: LAMELLAR_BARD, neck: LAMELLAR_BARD, chest: LAMELLAR_BARD, body: LAMELLAR_BARD, legs: NONE } },
+  // (`covering`: what a blow on it sounds like, audio/log.js COVERINGS: the small plates under cloth rattle as scale does.)
+  brigandine: { label: 'Brigandine barding', mass: 30, covering: 'scale', parts: { head: BRIGANDINE_BARD, neck: BRIGANDINE_BARD, chest: BRIGANDINE_BARD, body: BRIGANDINE_BARD, legs: NONE } },
   bare: { label: 'Bare horse', mass: 0, parts: { head: NONE, neck: NONE, chest: NONE, body: NONE, legs: NONE } },
   // (a robot dog's shell, robotdogs.js.)
   robotShell: ROBOT_SHELL,
@@ -92,7 +104,8 @@ export function canRide(inputs) {
 /**
  * His horse and its armour (null if he does not ride): { breed, barding, finish }. The bard is finished as his own
  * harness is (`finish`: `style` fluted, etched or plain plate; `steel` its colour; `lace` a laced bard's lacing, as his
- * lamellar's: his kit's cord, else his people's, else his lace).
+ * lamellar's: his kit's cord, else his people's, else his lace; `cloth` and `gold` a brigandine bard's facing and its
+ * studs, his own coat's: its cloth, else its colour, and its gilt).
  */
 export function mountOf(inputs) {
   const { spec, look } = outfitOf(inputs);
@@ -102,6 +115,8 @@ export function mountOf(inputs) {
     style: armor.fluted ? 'fluted' : armor.joust ? 'etched' : 'plain',
     steel: armor.color ?? null,
     lace: armor.cord ?? FACTIONS[factionOf(inputs)]?.lamellarCord ?? armor.lace ?? null,
+    cloth: armor.cloth ?? armor.color ?? null,
+    gold: armor.gold ?? null,
   };
   return { breed: spec.horse, barding: BARDING[spec.barding] ? spec.barding : 'bare', finish };
 }

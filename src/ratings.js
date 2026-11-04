@@ -186,7 +186,7 @@ export const RATINGS = {
   "bayara": {
    "title": "Bayara Guard",
    "faction": "manchu",
-   "type": "bayaraBow|bayara",
+   "type": "bayaraLance|bayara",
    "records": {
     "monk": {
      "wins": 11,
@@ -571,7 +571,7 @@ export const RATINGS = {
   "gaziAlp": {
    "title": "Frontier Gazi",
    "faction": "ottomans",
-   "type": "saberShield|gaziAlp",
+   "type": "kilijShield|gaziAlp",
    "records": {
     "maximus": {
      "wins": 0,
@@ -1424,6 +1424,7 @@ export const RATINGS = {
   "kanabo|samuraiTosei": 516,
   "guandao|mingElite": 280,
   "bayaraBow|bayara": 118,
+  "bayaraLance|bayara": 118,
   "joan|joan": 97,
   "guanYu|guanYu": 348,
   "yumi|oyoroi": 286,
@@ -1451,6 +1452,7 @@ export const RATINGS = {
   "thraex|thraex": 80,
   "legionary|legionary": 310,
   "saberShield|gaziAlp": 37,
+  "kilijShield|gaziAlp": 37,
   "matchlock|mingBrigandine": 138,
   "swordShield|mingBrigandine": 203,
   "spear|mingBrigandine": 183,

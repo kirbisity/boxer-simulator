@@ -11,17 +11,17 @@ import { HELM_NAMES } from '../src/outfitsets.js';
 import { RATINGS } from '../src/ratings.js';
 import { WARRIORS } from '../src/roster.js';
 
-test('the Cuman is of the steppe, rides a steppe horse, and carries the sabre', () => {
+test('the Cuman is of the steppe, rides a steppe horse, and carries the long, deep-curved sabre (the kilij)', () => {
   const kit = OUTFITS.cumanHeavy;
   assert.equal(kit.faction, 'steppe');
   assert.equal(factionOf(PRESETS.cuman), 'steppe');
   assert.equal(kit.horse, 'steppe');
-  assert.equal(kit.sidearm, 'saber');
+  assert.equal(kit.sidearm, 'kilij');
   assert.ok(kit.arrowproof);
   // The bow first, then the sabre at his belt (his kit's sidearm), not the kheshig's mace.
   assert.equal(STYLES.cumanBow.weapon, STYLES.kheshigBow.weapon);
   assert.notEqual(STYLES.cumanBow.fallback, 'mace');
-  assert.equal(gearTraits(PRESETS.cuman).sidearm, 'saber');
+  assert.equal(gearTraits(PRESETS.cuman).sidearm, 'kilij');
 });
 
 test('his mail and plates guard at least as the bekhter does, better against a blow and a point; the shins only in boot leather', () => {

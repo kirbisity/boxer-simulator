@@ -236,7 +236,7 @@ export const PRESETS = {
   },
   // The Eight Banners of the Later Jin (Sarhu, 1619): a banner archer of the Plain Yellow with the heavy Manchu bow
   // and the saber at his belt; a big man of the Bordered Red with the guandao; Yangguri, the commander of Nurhaci's
-  // guard, a Bayara in the heavy coat, bow and saber. Jurchen hunters and herders fed on meat and grain, at the bow
+  // guard, a Bayara in the heavy coat, with the banners' heavy spear (the bow his to choose). Jurchen hunters and herders fed on meat and grain, at the bow
   // and on horse from boyhood: big and strong for their day, taller and harder than the Ming's men (`exercise`, `calories`).
   bannerBow: {
     name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 180, frame: 'large', age: 28, exercise: 0.92, calories: 5200,
@@ -249,9 +249,15 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   bayara: {
-    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 182, frame: 'large', age: 40, exercise: 0.94, calories: 5400,
+    name: 'Yangguri', style: 'bayaraLance', sex: 'male', heightCm: 182, frame: 'large', age: 40, exercise: 0.94, calories: 5400,
     outfit: { kind: 'bayara', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+  },
+  // A Bayara who keeps to the heavy Manchu bow (the guard's archers, the bow his before the spear: STYLES.bayaraBow).
+  bayaraBow: {
+    name: 'Darhan', style: 'bayaraBow', sex: 'male', heightCm: 181, frame: 'large', age: 33, exercise: 0.94, calories: 5300,
+    outfit: { kind: 'bayara', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // Chen Fake, the Chen-style tai chi master: slight, old, rooted.
   taichi: {
@@ -301,7 +307,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   gaziAlp: {
-    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 184, frame: 'large', age: 36, exercise: 0.95, calories: 5500,
+    name: 'Turgut Alp', style: 'kilijShield', sex: 'male', heightCm: 184, frame: 'large', age: 36, exercise: 0.95, calories: 5500,
     outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },

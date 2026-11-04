@@ -132,7 +132,7 @@ test('the banners\' helmet: a black bowl with a gilt tube and plume, the Bayara\
 test('the Eight Banners are a faction of their own, labelled Later Jin, with their characters in the roster', () => {
   for (const kind of ['bannerArmour', 'bayara']) assert.match(OUTFITS[kind].label, /^Eight Banners \(Later Jin\)/);
   const banners = WARRIORS.filter((warrior) => warrior.faction === 'manchu');
-  assert.deepEqual(banners.map((warrior) => warrior.inputs.style).sort(), ['bayaraBow', 'guandao', 'manchuBow', 'spear']);
+  assert.deepEqual(banners.map((warrior) => warrior.inputs.style).sort(), ['bayaraLance', 'guandao', 'manchuBow', 'spear']);
   assert.ok(banners.some((warrior) => warrior.flagship));
 });
 

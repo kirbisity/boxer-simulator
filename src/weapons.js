@@ -244,7 +244,7 @@ export const TURRET_RIFLE = {
 };
 
 // `art`: the weapon art (moves.js, weaponarts.js) its family is made for, the move the player can make with it once his
-// blood is up: the katana's and ōdachi's draw-cut (iai), the long sword's pommel strike, the jian's and dao's drawing cut,
+// blood is up: the katana's and ōdachi's draw-cut (iai), the long sword's pommel strike, the jian's, dao's and kilij's drawing cut,
 // the polearm's wheel, the hammer's and kanabo's charged blow (a mace's, one-handed), the two-handed spear's step back and lunge (a spear in one hand, a shield on the other arm, cannot make it). No
 // gun or bow has one.
 export const WEAPONS = {
@@ -260,9 +260,10 @@ export const WEAPONS = {
     harm: { swing: { cut: 1, blunt: 0.5 }, thrust: { pierce: 1, cut: 0.15, blunt: 0.15 } },
     contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 17, zeta: 0.8 }, threat: 4, art: 'artPommel',
   },
-  // Two hands always: the sharper, shorter blade cuts deeper, stabs less.
+  // Two hands always: the sharper, shorter blade cuts deeper, stabs less. Its sori a shallow 2 cm (`curve`: BLADES.slice),
+  // the ōdachi's 3, the wakizashi's a little over 1.
   katana: {
-    label: 'Katana', hands: 'two', length: 0.8, strikeFrom: 0.12, handle: 0.27, spacing: 0.17, mass: 1.15, balance: 0.12, radius: 0.012,
+    label: 'Katana', hands: 'two', length: 0.8, strikeFrom: 0.12, handle: 0.27, spacing: 0.17, mass: 1.15, balance: 0.12, radius: 0.012, curve: 0.02,
     harm: { swing: { cut: 1.3, blunt: 0.4 }, thrust: { pierce: 0.7, cut: 0.15, blunt: 0.15 } },
     contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 20, zeta: 0.8 }, threat: 4.5, art: 'artIai',
   },
@@ -330,6 +331,30 @@ export const WEAPONS = {
     // Anything else (flesh, light armour, a shield) it goes into or skids off whole, and is kept, its jar taken up along the
     // shaft by the rest and the arm (no grip strain), to be couched again.
     shatters: { pierce: 0.7, joules: 250 },
+  },
+  // The banners' heavy spear (长枪, the Qing's qiang; the Bayara's, Nurhaci's guard's at Sarhu, 1619), between the war spear
+  // (`longSpear`) and the knight's lance: a horseman's spear fought as well on foot. A shaft of white-wax wood (白蜡杆,
+  // Chinese ash grown slow and straight, the wood the Chinese preferred for spear shafts because it bends far and springs
+  // back where a stiffer ash snaps) ~2.9 m overall, thicker than a foot spear's, with an iron butt cap; on it a long
+  // narrow iron head on a long socket, ~0.45 m of iron in all (a foot spear's leaf and socket ~0.25; the Qing
+  // regulations' cavalry spear heads, and those of the Shenyang palace collection, a chi and more), a tuft of red horsehair
+  // at its foot. ~3.4 kg: a kilo over the war spear's 2.3, under the lance's 5.2 (no vamplate, a shaft not swelled for the
+  // couch). Held as the lance is, the rear hand back by the butt (`hands` two, `handle` behind the front hand), couched
+  // under the arm from the saddle or levelled on foot. Its point: the long head is all point, narrow and four-sided at the
+  // tip, keener per joule than the war spear's leaf (`pierce` 1.6, the lance's narrow war point's, over the spear's 1.5;
+  // the weight behind it is in the blow's mass, not here); its long edges cut a little when swung. Its grip between the
+  // spear's and the lance's (`grip`); slower to turn than the spear, quicker than the lance (`wrist`).
+  // It breaks less easily than the lance (`shatters`): its springy shaft, shorter and unhollowed, takes up a charge's jar
+  // by bending, and snaps only on armour a point cannot go into at all (plate, `pierce` 0.85 and over: not on the heaviest
+  // lamellar, 0.72-0.8, or on mail) and only under a full charge's blow (`joules` 500: a gallop's couched point, 500-2,000
+  // J, not a trot's or anything on foot). A foot spear never breaks.
+  manchuLance: {
+    pointFrom: 0, label: 'Heavy spear', hands: 'two', length: 2.05, strikeFrom: 1.6, handle: 0.85, spacing: 0.45, mass: 3.4, balance: 0.5, radius: 0.021,
+    harm: { thrust: { pierce: 1.6, blunt: 0.3, cut: 0.15 }, swing: { blunt: 0.75, cut: 0.25 } },
+    contactSeconds: 0.005, rotation: 0.45, wrist: { omega: 10, zeta: 0.88 }, threat: 4, art: 'artSpear', grip: 0.7,
+    // The iron head's length along the shaft (m), as drawn (weaponview.js) and struck: `strikeFrom` to the tip.
+    head: 0.45,
+    shatters: { pierce: 0.85, joules: 500 },
   },
   // The yari, as the ashigaru carried it: the war spear's long straight head
   // with a cross blade (jūmonji) below the point. The side blades cut and
@@ -592,16 +617,36 @@ export const WEAPONS = {
     harm: { swing: { blunt: 1.3, pierce: 0.25 }, thrust: { blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.6, crush: 0.3,
   },
-  // The steppe and Turkish sabre (Mongol sabre, Ottoman kılıç): a long,
-  // gently curved single edge for the draw cut. The yatagan, the Janissary's
-  // short sword, curves forward instead, its weight out towards the point.
+  // The steppe sabre (the Mongol's, the Ming northern horse's): a long,
+  // gently curved single edge for the draw cut, its back bowed 6 cm off the
+  // line of the grip at the point (`curve`: BLADES.slice, sliceGain). The
+  // yatagan, the Janissary's short sword, curves forward instead (the edge on
+  // the inside of the curve), its weight out towards the point.
   saber: {
-    label: 'Sabre', hands: 'one', length: 0.82, strikeFrom: 0.12, handle: 0.14, mass: 1.0, balance: 0.13, radius: 0.012,
+    label: 'Sabre', hands: 'one', length: 0.82, strikeFrom: 0.12, handle: 0.14, mass: 1.0, balance: 0.13, radius: 0.012, curve: 0.06,
     harm: { swing: { cut: 1.05, blunt: 0.35 }, thrust: { pierce: 0.7, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 24, zeta: 0.8 }, threat: 3.3,
   },
+  // The kılıç (kilij) of the Sultan's men, and the long sabre of the Kipchak steppe before it: longer than the
+  // Mongol sabre and far more deeply curved. The Cuman kurgans' sabres run to ~0.9-1 m of blade (the Dnieper and Don
+  // finds, 12th-13th c.), and the Ottoman kılıç of the 15th-17th centuries (Topkapı and the Askeri Müze's; the Met's
+  // 36.25.1293) to ~0.75-0.9 m, bowed 8-12 cm off the line of the grip, its last third widened into the yelman, a
+  // false edge on the back that puts its weight out towards the point: here 0.9 m, 12 cm of curve (`curve`, twice the Mongol
+  // sabre's), ~1.2 kg
+  // balanced further out than the sabre (`balance`), so a little slower in the wrist. The curve presents the edge
+  // leaning back along the line of the cut, so it slides as it goes in and draws a long cut (BLADES.slice): most from the
+  // saddle, the horse carrying the hand past the man. It takes the point off the line of a thrust (`pierce` less than
+  // the sabre's); the yelman's back edge cuts on the backhand as well.
+  kilij: {
+    label: 'Kilij', hands: 'one', length: 0.9, strikeFrom: 0.12, handle: 0.14, mass: 1.2, balance: 0.18, radius: 0.012, curve: 0.12,
+    harm: { swing: { cut: 1.05, blunt: 0.38 }, thrust: { pierce: 0.6, cut: 0.15, blunt: 0.1 } },
+    contactSeconds: 0.004, rotation: 0.78, wrist: { omega: 21, zeta: 0.8 }, threat: 3.4,
+    // Its art the drawing cut (the dao's and the jian's, `artDrawCut`): the hilt pulled back through the cut, so the curve
+    // slides the edge along the wound instead of against the push of an arm straightening into a plain cut.
+    art: 'artDrawCut',
+  },
   yatagan: {
-    label: 'Yatagan', hands: 'one', length: 0.64, strikeFrom: 0.1, handle: 0.13, mass: 0.85, balance: 0.16, radius: 0.012,
+    label: 'Yatagan', hands: 'one', length: 0.64, strikeFrom: 0.1, handle: 0.13, mass: 0.85, balance: 0.16, radius: 0.012, curve: -0.04,
     harm: { swing: { cut: 1.05, blunt: 0.3 }, thrust: { pierce: 0.8, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2,
   },
@@ -701,14 +746,14 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 26, zeta: 0.8 }, threat: 3,
   },
   wakizashi: {
-    label: 'Wakizashi', hands: 'one', length: 0.5, strikeFrom: 0.08, handle: 0.16, mass: 0.7, balance: 0.08, radius: 0.012,
+    label: 'Wakizashi', hands: 'one', length: 0.5, strikeFrom: 0.08, handle: 0.16, mass: 0.7, balance: 0.08, radius: 0.012, curve: 0.012,
     harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.6, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 28, zeta: 0.8 }, threat: 3.2,
   },
   // The Ming dao (a liuyedao, "willow-leaf sabre"): one hand, a gently
   // curved single edge, a round guard. Cuts first, and thrusts.
   dao: {
-    label: 'Dao', hands: 'one', length: 0.75, strikeFrom: 0.12, handle: 0.15, mass: 0.95, balance: 0.1, radius: 0.012,
+    label: 'Dao', hands: 'one', length: 0.75, strikeFrom: 0.12, handle: 0.15, mass: 0.95, balance: 0.1, radius: 0.012, curve: 0.05,
     harm: { swing: { cut: 1.1, blunt: 0.35 }, thrust: { pierce: 0.78, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2, art: 'artDrawCut',
   },
@@ -736,7 +781,7 @@ export const WEAPONS = {
   // horse and men. Heavy for a sword, long in the reach, slow to recover.
   // The hands well apart on the long tsuka: the right at the tsuba, the left at the pommel.
   odachi: {
-    label: 'Ōdachi', hands: 'two', length: 1.08, strikeFrom: 0.15, handle: 0.42, spacing: 0.36, mass: 2.3, balance: 0.24, radius: 0.013,
+    label: 'Ōdachi', hands: 'two', length: 1.08, strikeFrom: 0.15, handle: 0.42, spacing: 0.36, mass: 2.3, balance: 0.24, radius: 0.013, curve: 0.03,
     harm: { swing: { cut: 1.4, blunt: 0.6 }, thrust: { pierce: 0.65, cut: 0.15, blunt: 0.2 } },
     contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 14, zeta: 0.82 }, threat: 4.9, art: 'artIai',
   },
@@ -789,7 +834,7 @@ export const WEAPONS = {
   },  // The thraex's sica: a short sword curved like a sickle (~0.42 m of blade),
   // made to reach round a shield's edge into the back and the legs.
   sica: {
-    label: 'Sica', hands: 'one', length: 0.46, strikeFrom: 0.08, handle: 0.12, mass: 0.7, balance: 0.14, radius: 0.012, curved: true,
+    label: 'Sica', hands: 'one', length: 0.46, strikeFrom: 0.08, handle: 0.12, mass: 0.7, balance: 0.14, radius: 0.012, curved: true, curve: -0.07,
     harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.7, cut: 0.25, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 26, zeta: 0.8 }, threat: 3.1,
   },
@@ -1307,6 +1352,16 @@ export const BLADES = {
   crushTrauma: 0.03,
   // Edge alignment: a cut needs the edge moving across the blade, not along it.
   cutAlignmentPower: 2,
+  // The draw of a curved edge (sliceGain; a blade's `curve`). An edge parts flesh with less push the faster it slides
+  // along itself as it goes in: with the slice/push ratio ξ (the speed along the edge over the speed into the cut) the
+  // push needed falls as 1/(1 + ξ²), the rest of the work drawn from the slide (Atkins, Xu and Jeronimidis 2004, cutting
+  // cheese and salami by 'pressing and slicing'; Atkins 2009, The Science and Engineering of Cutting), so the same press
+  // opens (1 + ξ²) the wound: longer, as deep. Measured cutting forces stop falling once the slide is about twice the
+  // push (Reyssat et al. 2012, 'Slicing softly with shear'): ξ is counted to `most`. A slide parts what is cut fibre by
+  // fibre (skin, flesh, cloth, quilting, leather), not steel: rings and plates are stopped by their hardness, however the
+  // edge meets them, so armour proof against an edge to `hardFrom` or more (mail, lamellar, scale, plate: BLADES.gaps
+  // `rigidFrom`) gives the slide nothing.
+  slice: { most: 2, hardFrom: 0.75 },
   // A thrust pierces only with the point: contact this far out along the striking length.
   pointShare: 0.78,
   // Bleeding (bleedRate): a wound bleeds only past `from` J of edge or point through the armour — what the log calls a
@@ -1605,6 +1660,42 @@ export function harmMix(spec, mode, along, at) {
     mix.pierce = 0;
   }
   return mix;
+}
+
+/**
+ * What a curved edge's draw adds to a cut (× the cut's harm; 1 for a straight blade), from the blade's motion where it met
+ * him: `relative` (m/s) its velocity against the part struck, `dir` the blade's line from the grip (the hilt's tangent:
+ * a sabre is drawn bowing back off it), `distance` (m) out along it from the hand, `protection` what it met there.
+ * A blade's `curve` (m) is how far its back bows off that line at the point, as a parabola from the hilt (+: the edge on
+ * the outside of the curve, the sabre's; −: inside it, the yatagan's forward curve). At the contact the edge leans
+ * back from the grip's line by α = 2·curve·s/L² (s out of L): the swing, coming in across the blade, meets an edge
+ * already sloping away, and slides along it at ξ = tan(θ ± α) where a straight blade's edge slides at tan θ (θ the angle
+ * of the blade's motion off square to it: the draw of the arm, and the speed of the horse under a rider whose blade
+ * trails). The rider's forward speed is in `relative` (physics.js handVelocityOf adds the horse's), so the curve turns
+ * that too into slide. A straight edge's slide is already the cut's alignment (harmMix, cutAlignmentPower): what is
+ * counted here is only what the curve adds, (1 + ξ²) / (1 + ξ₀²) (BLADES.slice). A blade pushed out towards its point as
+ * it cuts slides less with a curve (the curve leans back against the push), but a straight blade's slide was never
+ * counted as help to its cut (the alignment loses it), so there is none to take back: then the curve only squares the
+ * edge to the push, and the cut is the straight blade's (× 1). Nothing through mail or plate.
+ */
+export function sliceGain(spec, relative, dir, distance, protection = {}) {
+  const curve = spec.curve ?? 0;
+  const rule = BLADES.slice;
+  if (!curve || (protection.cut ?? 0) >= rule.hardFrom) return 1;
+  const chord = relative[0] * dir[0] + relative[1] * dir[1] + relative[2] * dir[2];
+  const across = Math.hypot(relative[0] - chord * dir[0], relative[1] - chord * dir[1], relative[2] - chord * dir[2]);
+  if (across < 1e-6) return 1;
+  const share = Math.max(0, Math.min(1, distance / spec.length));
+  const lean = Math.atan((2 * Math.abs(curve) * share) / spec.length);
+  // The edge leans away from the way it moves (a sabre's back bows away from its edge): it meets the motion's chord-wise
+  // part as a draw towards the hilt adds to it. A forward curve leans the other way.
+  const sign = Math.sign(curve);
+  const slide = Math.abs(chord * Math.cos(lean) - sign * across * Math.sin(lean));
+  const press = across * Math.cos(lean) + sign * chord * Math.sin(lean);
+  if (press <= 1e-6) return 1;
+  const ratio = Math.min(rule.most, slide / press);
+  const straight = Math.min(rule.most, Math.abs(chord) / across);
+  return Math.max(1, (1 + ratio * ratio) / (1 + straight * straight));
 }
 
 const addVec = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];

@@ -1828,6 +1828,8 @@ export function hurtShare(fighter) {
  */
 function couchedCharge(world, fighter, opponent, style, distance) {
   const charge = style.couchedCharge;
+  // (A spear couched only from the saddle, `saddleOnly`: on foot it is fought at the point as the style's attacks say.)
+  if (charge.saddleOnly && !fighter.mount) return false;
   if (fighter.couched === 'done' || !fighter.weapon?.held || fighter.weapon.kind !== style.weapon) return false;
   const punch = fighter.punch;
   if (fighter.couched === 'striking') {

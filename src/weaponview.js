@@ -943,6 +943,26 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       }
       break;
     }
+    case 'manchuLance': {
+      // The banners' heavy spear: a pale shaft of white-wax wood, thicker than a foot spear's, an iron butt cap; a long
+      // socket and a long narrow head (`spec.head` of iron in all, from `strikeFrom` to the tip), ridged and four-sided to
+      // its point; a ring of red horsehair (the tassel, 红缨) hung at the socket's foot, a gilt collar above it.
+      const pale = surface(0xb89a64, { roughness: 0.7 });
+      const headStart = spec.length - spec.head;
+      const socketLength = spec.head * 0.36;
+      group.add(cylinder(0.017, 0.021, -spec.handle, headStart + 0.02, pale, 10));
+      group.add(cylinder(0.022, 0.019, -spec.handle - 0.05, -spec.handle + 0.03, steel, 10));
+      group.add(cylinder(0.012, 0.019, headStart, headStart + socketLength, steel, 8));
+      const gilt = steelMaterial(envMap, { vertexColors: false, color: 0xc9a24a, roughness: 0.3 });
+      group.add(cylinder(0.021, 0.021, headStart - 0.005, headStart + 0.02, gilt, 10));
+      group.add(bladeMesh(bladeGeometry(headStart + socketLength - 0.01, spec.head - socketLength + 0.01, 0.034, 0.014, 0.12), polished));
+      // The tassel: a full skirt of red hair from the collar, falling back down the shaft.
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.17, 12, 1, true), surface(0xb3161b, { roughness: 0.95 }));
+      tassel.material.side = THREE.DoubleSide;
+      tassel.position.y = headStart - 0.07;
+      group.add(tassel);
+      break;
+    }
     case 'lance': {
       // The war lance: an ash shaft turned to swell behind the grip and
       // beyond the vamplate and taper to a socketed four-sided steel point;
@@ -992,7 +1012,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       // cord-wrapped grip and a red tassel from the pommel ring. Held, as a
       // sabre is, with its edge (and the curve's outside) away from the
       // wrist's top: the blade turned half round the grip from the katana's.
-      const sabre = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.036, 0.007, 0.14, (y) => -0.05 * ((y - 0.04) / (spec.length - 0.04)) ** 2), polished);
+      const sabre = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, 0.036, 0.007, 0.14, (y) => -spec.curve * ((y - 0.04) / (spec.length - 0.04)) ** 2), polished);
       sabre.rotation.y = Math.PI;
       group.add(sabre);
       const guard = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.01, 18), brass);
@@ -1062,13 +1082,46 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       }
       break;
     }
+    case 'kilij': {
+      // The kılıç: a long blade bowed deep back off the line of the grip (`spec.curve` at the point, as the physics has
+      // it: weapons.js sliceGain), bowing on to the point as the physics has it; its last third widened into the yelman, the back
+      // there ground to a second edge (a step on the spine, the widened piece over the blade); a brass cross with
+      // langets down the blade, a pistol grip of horn, its pommel bent down over the hand.
+      const length = spec.length - 0.04;
+      const bow = (y) => -spec.curve * ((y - 0.04) / length) ** 2;
+      const blade = bladeMesh(bladeGeometry(0.04, length, 0.033, 0.007, 0.16, bow), polished);
+      blade.rotation.y = Math.PI;
+      group.add(blade);
+      const yelmanFrom = 0.04 + length * 0.66;
+      // (The yelman's back stands off the blade's spine, its own false edge to the point.)
+      const yelman = bladeMesh(bladeGeometry(yelmanFrom, spec.length - yelmanFrom, 0.05, 0.006, 0.18, (y) => bow(y) - 0.009 * Math.sin(Math.PI * Math.min(1, (y - yelmanFrom) / (spec.length - yelmanFrom)) ** 0.7)), polished);
+      yelman.rotation.y = Math.PI;
+      group.add(yelman);
+      const guard = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.014, 0.02), brass);
+      guard.position.y = 0.032;
+      const langet = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.05, 0.022), brass);
+      langet.position.y = 0.06;
+      for (const side of [1, -1]) {
+        const end = new THREE.Mesh(new THREE.SphereGeometry(0.011, 8, 6), brass);
+        end.position.set(side * 0.066, 0.032, 0);
+        group.add(end);
+      }
+      const horn = surface(0x241812, { roughness: 0.45 });
+      const grip = cylinder(0.015, 0.017, -spec.handle + 0.03, 0.026, horn);
+      // The pommel: the grip's end turned down over the little finger.
+      const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.019, 10, 8), horn);
+      pommel.scale.set(1, 0.8, 1.25);
+      pommel.position.set(0, -spec.handle + 0.025, -0.012);
+      group.add(guard, langet, grip, pommel);
+      break;
+    }
     case 'saber':
     case 'yatagan': {
       // The sabre: a long, gently curved blade, a cross guard, a pistol grip.
       // The yatagan: shorter, curving forward towards the edge, no guard,
-      // its grip ending in two "ears".
+      // its grip ending in two "ears". Each bowed as far as the physics has it (`spec.curve`: weapons.js sliceGain).
       const forward = kind === 'yatagan';
-      const curve = (y) => (forward ? 0.04 : -0.06) * ((y - 0.04) / (spec.length - 0.04)) ** (forward ? 1.4 : 2);
+      const curve = (y) => -spec.curve * ((y - 0.04) / (spec.length - 0.04)) ** (forward ? 1.4 : 2);
       const blade = bladeMesh(bladeGeometry(0.04, spec.length - 0.04, forward ? 0.034 : 0.032, 0.007, 0.14, curve), polished);
       blade.rotation.y = Math.PI;
       group.add(blade);

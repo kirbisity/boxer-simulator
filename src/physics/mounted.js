@@ -17,7 +17,7 @@ import { BODY, P } from '../body.js';
 import { BARDING, bardingAt, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
 import { DOG_JUMP } from '../robotdogs.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
-import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact } from '../weapons.js';
+import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact, sliceGain } from '../weapons.js';
 import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
@@ -1216,7 +1216,8 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const protection = bardingAt(horse.barding, capsule.part, landsAt[1] + (horse.sunk ?? 0), horse.withers);
   const sharp = weapon.edge ?? 1;
   const blunt = energy * mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
-  const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp;
+  // (A curved edge's draw, as on a man: weapons.js sliceGain.)
+  const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp * (mix.cut > 0 ? sliceGain(wspec, relative, weapon.dir, distance, protection) : 1);
   const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0)) * sharp;
   const glanced = Boolean(protection.deflects) && mix.cut + mix.pierce > 0.2;
   const contactPoint = landsAt;
@@ -1242,7 +1243,7 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   // Heard: the blow on the horse (on its barding, or its hide), and an edge or a point in it makes it scream.
   if (world.ear) {
     const striker = mix.cut + mix.pierce <= mix.blunt ? 'blunt' : mix.pierce > mix.cut ? 'point' : 'blade';
-    soundEvent(world, 'hit', { at: contactPoint, energy, impulse, striker, covering: (protection.blunt ?? 0) > 0 ? horse.barding : 'flesh', part: capsule.key, braced: false, who: -1, by: attacker.id, horse: horse.id });
+    soundEvent(world, 'hit', { at: contactPoint, energy, impulse, striker, covering: (protection.blunt ?? 0) > 0 ? BARDING[horse.barding].covering ?? horse.barding : 'flesh', part: capsule.key, braced: false, who: -1, by: attacker.id, horse: horse.id });
     if (cut + pierce > 0.5) horseCry(world, horse, 'neigh');
   }
   return true;

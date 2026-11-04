@@ -1968,6 +1968,22 @@ STYLES.cumanBow = {
   fallback: 'mix',
 };
 
+// The kılıç of the Sultan's men (WEAPONS.kilij): the sabre's ways with the longer, deeper-curved blade, alone (the sidearm
+// drawn: `hidden`, as the sabre's) and with the kalkan (Osman's gazi, the sipahi's sabre men).
+STYLES.kilij = { ...STYLES.saber, label: 'Kilij', weapon: 'kilij' };
+STYLES.kilijShield = { ...STYLES.saberShield, label: 'Kilij and kalkan', weapon: 'kilij' };
+
+// The Bayara with the banners' heavy spear (WEAPONS.manchuLance): from the saddle, couched and driven home at the gallop
+// as the lance is (`couchedCharge`: physics/mounted.js, riding.js passLance), the long point kept after; on foot, fought
+// as the war spear is (the spear's thrusts and its keeping at the point), never couched at a run (`saddleOnly`: a man on
+// foot does not run at a line with a spear under his arm). Losing it, the dao at his belt (his kit's sidearm).
+STYLES.bayaraLance = {
+  ...STYLES.spear,
+  label: 'Bayara: heavy spear', weapon: 'manchuLance', fallback: 'mix',
+  weaponGuard: { hand: [-0.04, 0.6, -0.1], dir: [1, 0.1, 0] },
+  couchedCharge: { ...STYLES.lance.couchedCharge, saddleOnly: true },
+};
+
 // The Bayara (the banners' guard): a few heavy arrows from the Manchu bow at close range, standing his ground, then the
 // bow let fall and straight in with the saber at his belt (his kit's sidearm), as the guard rode into a broken line.
 STYLES.bayaraBow = {
