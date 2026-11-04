@@ -359,10 +359,10 @@ const QI = {
   // Squads side by side, this far (m) between their middles: the brushes of the two a gap of 0.7 m apart.
   squads: 2,
   squadWidth: 4.9,
-  // One colour to a kind: the brigandine's red cloth (as the garrison's
-  // regulars, WOKOU.design), and the iron lamellar laced in crimson for the
-  // guards of his household (OUTFITS mingElite's level design: the setup screen's, ARMIES.qi).
-  design: { brigandine: 0, elite: 5 },
+  // One colour to a kind: his squad men in iron lamellar laced red, with its arm guards (OUTFITS mingBrigandine's
+  // lamellar, the user's call: the sleeveless brigandine vest left their arms bare to the wokou's long swords), and the
+  // iron lamellar laced in crimson for the guards of his household (OUTFITS mingElite's level design: the setup screen's, ARMIES.qi).
+  design: { brigandine: 3, elite: 5 },
 };
 
 // How Qi's squads move and fight (formation.js drill): they stand and receive the raiders' rush, and
