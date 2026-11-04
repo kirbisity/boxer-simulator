@@ -6,9 +6,9 @@ import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volley
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { aimPoint, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
-import { WEAPONS } from './weapons.js';
+import { GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { startThrow, throwChoice } from './physics/throwable.js';
@@ -17,7 +17,7 @@ import { expectedGap, gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
-import { ammoLeft, emptied } from './physics/ranged.js';
+import { ammoLeft, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
 import { rayBlocked } from './physics/terrain.js';
 import { turretLaid } from './physics/mounted.js';
 
@@ -811,25 +811,26 @@ function keepPlace(world, fighter) {
 }
 
 /**
- * The guns before a squad (a drill with `squad`: Qi Jiguang's fowling
- * pieces) have one shot each before the rush is on them, and it is held
+ * The guns standing before a squad (a drill with `squad`, its guns in its
+ * front rank) have one shot each before the rush is on them, and it is held
  * for the squad's volley (DRILL.volley): until the word is given
  * (formation.volleyAt) the gunner stands with it ready, while the man he
  * has laid on is coming on (at a run, DRILL.runIn) too fast for the piece
  * to be loaded again before he arrives. Thrown away at long range, it is
  * the only shot his place gets: the matchlock takes 15 s to load and a rush
- * covers the ground in a few. A line of shooters that relieve each other
- * (the Han crossbowmen) shoots as it likes.
+ * covers the ground in a few. Guns behind the squad's front (Qi Jiguang's,
+ * behind his shields) fire by ranks (formation.js volleyDue), and a line of
+ * shooters that relieve each other (the Han crossbowmen) shoots as it likes.
  */
 function holdsFire(fighter, formation, distance) {
   const shot = fighter.weapon.spec.shot;
-  if (!formation.drill.squad || !shot || formation.volleyAt !== undefined) return false;
+  if (!formation.drill.squad || !shot || !fighter.inFront || formation.volleyAt !== undefined) return false;
   return distance < shot.reloadSeconds * DRILL.runIn;
 }
 
 /**
  * A squad's gunner whose volley is fired, with the enemy too near to load
- * again (DRILL.runIn), in a drill with `sidearm` (Qi Jiguang's): the shot done, he lets the
+ * again (DRILL.runIn), in a drill with `sidearm` (his guns before his squad): the shot done, he lets the
  * piece fall and draws his kit's sidearm (physics.js dropWeapon: the dao at a
  * brigandine man's belt), is a moment about it (DRILL.volley.draw: no blow
  * before), and falls in at his squad's front (formation.js fallIn). Returns
@@ -867,24 +868,42 @@ function holdRank(world, fighter, opponent, style, dt) {
     if (drawAfterVolley(world, fighter, formation, distance)) return true;
     const away = walkToSlot(fighter, formation, opponent);
     if (weapon.spec.shot && !weapon.loaded) {
+      // His shot fired, back into his place to load (DRILL.lean).
+      fighter.lean = 0;
       fighter.reloading = true;
       return true;
     }
-    // (A bow shoots from any rank: its arrow goes up over the heads in front, physics/ranged.js overHeads; a gun or a crossbow only from the front.)
-    if ((!fighter.inFront && !weapon.spec.bow) || fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
+    if (fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
+    if (holdsFire(fighter, formation, distance)) return true;
+    // A bow shoots from any rank: its arrow goes up over the heads in front (physics/ranged.js overHeads); his own
+    // men too near his man, or one too near to shoot over, it is held (shotFouled), and after a while at a man at
+    // grips with them, put by and the sidearm drawn (heldTooLong).
+    if (weapon.spec.bow) {
+      const fouled = shotFouled(world, fighter, opponent, { overHeads: true });
+      if (fouled) {
+        const other = clearMark(world, fighter, { overHeads: true });
+        if (other) fighter.focus = other.id;
+        else heldTooLong(world, fighter, fouled);
+        return true;
+      }
+      heldTooLong(world, fighter, null);
+    } else {
+      // A gun or a crossbow shoots flat, from any rank: between the files of the men before him, down a lane clear of
+      // their bodies (physics/ranged.js comradeInLane), and held (drill `holdFire`) until his man is within its
+      // effective range (DRILL.holdFire). Fouled, he lays on another man in range whose lane is clear (clearLane), or
+      // leans out of his place for one (DRILL.lean), or waits.
+      const within = formation.drill.holdFire ? effectiveRange(weapon) : AI.markWithin;
+      if (distance > within) return true;
+      const blocked = laneFouled(world, fighter, opponent);
+      if (blocked) {
+        const other = clearLane(world, fighter, within);
+        if (other) fighter.focus = other.id;
+        else leanForLane(fighter, blocked, dt);
+        return true;
+      }
+    }
     // A gun or a crossbow fires with its rank's volley (formation.js volleyDue).
     if (!volleyDue(world, formation, fighter)) return true;
-    if (holdsFire(fighter, formation, distance)) return true;
-    // His own men in the way (shotFouled; a bow's arrow goes over the heads before it): held, and after a while at a
-    // man at grips with them, the weapon put by and the sidearm drawn (heldTooLong).
-    const fouled = shotFouled(world, fighter, opponent, { overHeads: Boolean(weapon.spec.bow) });
-    if (fouled) {
-      const other = clearMark(world, fighter, { overHeads: Boolean(weapon.spec.bow) });
-      if (other) fighter.focus = other.id;
-      else heldTooLong(world, fighter, fouled);
-      return true;
-    }
-    heldTooLong(world, fighter, null);
     const zone = world.random() < gun.headShare ? 'head' : 'body';
     if (throwPunch(world, fighter, gun.move ?? 'shoot', zone)) {
       fighter.punch.quick = true;
@@ -2482,6 +2501,46 @@ function shotFouled(world, fighter, opponent, { overHeads = false } = {}) {
     if (along > 0.1 && along < length && across < lineOfFire + (mate.mount ? 0.5 : 0) && (mate.mount || along < AI.overHeadsFrom)) fouled = 'line';
   }
   return fouled;
+}
+
+/**
+ * How far (m) a drilled man holding his fire (DRILL.holdFire) lets the enemy come before he fires his gun or crossbow:
+ * where one deviation of the weapon's spread is half a man's breadth.
+ */
+export function effectiveRange(weapon) {
+  return DRILL.holdFire.halfBreadth / (weapon.spec.shot?.spread ?? GUN.spread);
+}
+
+/**
+ * The comrade whose body is in the lane of a flat shot (a gun's, a crossbow's) at his man, laid from his cheek to the
+ * man's chest and on past him (physics/ranged.js comradeInLane, FIRE_LANE), or null: the lane clear between the files
+ * of the men before him, the shot is his to fire.
+ */
+export function laneFouled(world, fighter, opponent) {
+  const weapon = fighter.weapon;
+  return comradeInLane(world, fighter, sightFrom(fighter, weapon), aimPoint(opponent, 'body'), weapon.spec.shot?.spread ?? GUN.spread, { beyond: true });
+}
+
+/** Another man within `within` m to lay on, the nearest of them whose lane is clear (laneFouled), or null. */
+function clearLane(world, fighter, within) {
+  const at = point(fighter.x, P.pelvis);
+  let best = null;
+  let nearest = within;
+  for (const other of world.fighters) {
+    if (!foeOf(fighter, other) || other.state !== 'up' || other.fled || other.hidden) continue;
+    const apart = Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[2]);
+    if (apart >= nearest || laneFouled(world, fighter, other)) continue;
+    best = other;
+    nearest = apart;
+  }
+  return best;
+}
+
+/** Leaning out of his place, away from the comrade in his lane (`blocked`, comradeInLane), for a clear one (DRILL.lean). */
+function leanForLane(fighter, blocked, dt) {
+  // (The line's left on the floor is the slot's own `across` when he faces the enemy down the formation's way.)
+  const lean = (fighter.lean ?? 0) - blocked.side * DRILL.leanPace * dt;
+  fighter.lean = Math.max(-DRILL.lean, Math.min(DRILL.lean, lean));
 }
 
 /**

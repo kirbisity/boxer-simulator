@@ -8,7 +8,7 @@ import { STYLES } from '../src/moves.js';
 import { WEAPONS } from '../src/weapons.js';
 import { advance, createWorld, perform, placeFighter, seededRandom, throwPunch } from '../src/physics.js';
 import { BRUSH, brushKeepsOff, brushTouch, heldOffAt } from '../src/physics/brush.js';
-import { SCENARIOS, battleOf, qiJiguangLevel } from '../src/scenarios.js';
+import { ARMIES, SCENARIOS, battleOf, qiJiguangLevel } from '../src/scenarios.js';
 import { reliefAt, stepOnWorks, worksOf } from '../src/physics/fieldworks.js';
 import { P } from '../src/body.js';
 import { levelBattle } from '../tools/levels.js';
@@ -37,19 +37,16 @@ test('the wokou raiders are mostly Japanese and charge with swords: rōnin and s
   for (const corner of ['red', 'blue']) assert.ok(SCENARIOS.wokou.formation[corner].front >= 8);
 });
 
-test("Qi Jiguang's army: Qi in the elite's lamellar with the guandao, three guards in the same, two mandarin-duck squads in the brigandine", () => {
+test("Qi Jiguang's army: two mandarin-duck squads in the brigandine, and no one idle behind them (his household guards, in the elite's lamellar, are the setup screen's)", () => {
   const { blue } = SCENARIOS.qiJiguang.cast(seededRandom(2));
-  const qi = blue.find((man) => man.name === 'Qi Jiguang');
-  assert.ok(qi, 'Qi Jiguang is there');
-  assert.equal(qi.style, 'guandao');
-  assert.equal(qi.outfit.kind, 'mingElite');
-  const look = OUTFITS.mingElite.designs[qi.outfit.design];
+  assert.equal(blue.filter((man) => man.outfit.kind === 'mingElite').length, 0, 'no guards behind the squads');
+  // The guards' kit kept for an army set up by hand (ARMIES.qi): the iron lamellar laced in crimson, a level design.
+  const guard = ARMIES.qi.ranks.elite.make(seededRandom(2), 'guandao');
+  const look = OUTFITS.mingElite.designs[guard.outfit.design];
   assert.equal(look.armor.kind, 'mingEliteLamellar');
   assert.ok(look.levelOnly, 'a level design, not dealt at random');
-  const elite = blue.filter((man) => man.outfit.kind === 'mingElite');
-  assert.equal(elite.length, 4, 'Qi and three guards');
-  assert.ok(elite.every((man) => man.outfit.design === qi.outfit.design), 'the guards in his kit');
   const squads = blue.filter((man) => man.outfit.kind === 'mingBrigandine');
+  assert.equal(squads.length, blue.length, 'every man in a squad');
   assert.equal(squads.length, 24, 'two squads of twelve');
   assert.equal(new Set(squads.map((man) => man.outfit.design)).size, 1, 'one coat colour');
   for (const squad of [squads.slice(0, 12), squads.slice(12)]) {
@@ -138,8 +135,13 @@ test('discipline takes fear down and puts breaking off', () => {
   assert.ok(held < loose * (1 - AI.morale.discipline * 0.9), `disciplined ${held.toFixed(2)} vs ${loose.toFixed(2)}`);
 });
 
-test('a squad drawn up by its level: its fowling pieces fall back behind it as the enemy comes near, and a wounded man in front changes places with a fresh one', () => {
-  const world = createWorld(SCENARIOS.qiJiguang.cast(seededRandom(5)).blue.map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'blue' })).concat(SCENARIOS.wokou.cast(seededRandom(5)).red.slice(0, 4).map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }))), { seed: 5, arena: SCENARIOS.qiJiguang.arena, formation: SCENARIOS.qiJiguang.formation });
+test('a squad with its fowling pieces drawn up before it: they fall back behind it as the enemy comes near, and a wounded man in front changes places with a fresh one', () => {
+  // (Qi's level draws its guns up behind the shields; drawn up before them, as a squad's guns may be, they fall back through it.)
+  const men = SCENARIOS.qiJiguang.cast(seededRandom(5)).blue;
+  const order = SCENARIOS.qiJiguang.formation.blue;
+  const layout = order.layout.map(([back, across], index) => (men[index].style === 'matchlock' ? [-2.4, across] : [back, across]));
+  const formationOrder = { ...SCENARIOS.qiJiguang.formation, blue: { ...order, layout } };
+  const world = createWorld(men.map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'blue' })).concat(SCENARIOS.wokou.cast(seededRandom(5)).red.slice(0, 4).map((inputs) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner: 'red' }))), { seed: 5, arena: SCENARIOS.qiJiguang.arena, formation: formationOrder });
   const formation = world.formations.blue;
   assert.ok(formation && formation.drill.squad, 'the squads formed up');
   const guns = world.fighters.filter((fighter) => fighter.style === 'matchlock');

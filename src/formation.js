@@ -12,7 +12,8 @@
 // (or a side's, given by its level: Qi Jiguang's army drilled as a whole).
 // A squad's drill (`drill.squad`) is fought as Qi Jiguang taught his
 // mandarin-duck squads: every man of it goes for the enemy at his place, its
-// guns fall back through it as the enemy comes on, its wounded are relieved.
+// guns, standing before it, fall back through it as the enemy comes on (standing
+// behind its front, they fire past it by ranks), its wounded are relieved.
 //
 // Wings: a side's horsemen (a level's `formation.wings`) are not in the ranks.
 // They stand on the flanks of the foot line, held, and are released to charge
@@ -57,7 +58,7 @@ export const DRILL = {
   reviewEvery: 0.25,
   // A shooter changes places at most this often (s).
   swapEvery: 1.5,
-  // The guns before a squad (a drill with `squad`) have one shot each before the rush is on them, and it
+  // The guns standing before a squad (a drill with `squad`, its guns in its front rank) have one shot each before the rush is on them, and it
   // is fired as one volley, on the word (formation.volleyAt), when the nearest of the enemy is `volley.at`
   // m from the guns' front as he would have to go on his feet (over a ditch and its bank, the climb
   // counted: physics/fieldworks.js walkingDistance), unless he is far enough off that a piece can be
@@ -70,7 +71,7 @@ export const DRILL = {
   // drawing the sword (`draw` s, below) as long again, while a raider runs 5-6 m/s; with ~2 m of a
   // sword's reach and a step left over, 2 + 6 × 1.6 ≈ 12 m. So the balls go off at 6-8 m (the trench
   // before the guns puts the raiders in it as they do), and the swords are out as the rush gets there.
-  // In a drill with `sidearm` (Qi Jiguang's) the gunners, their volley fired and no time to load again,
+  // In a drill with `sidearm` the gunners before a squad, their volley fired and no time to load again,
   // let the piece fall and draw their kit's sidearm (the dao at a brigandine man's belt: as quick as a
   // man drops a gun and pulls a sword, `draw` s before his first blow), and fall in at the front of the
   // hand-to-hand men, in their own files (fallIn): the shields' rank, beside the shields and before the
@@ -79,11 +80,29 @@ export const DRILL = {
   // through the squad: retireAt.)
   volley: { at: 12, draw: 0.8 },
   runIn: 5,
-  // Fire by ranks (the countermarch: the Spanish arquebusiers, the Han crossbows): the front rank
-  // of a formation's guns and crossbows fires together in a window `volleyWindow` s long, then holds while the ranks
-  // change, the next volley due a reload's time over the number of ranks after it (volleyDue): so with three ranks of
-  // matchlocks (15 s to load) a volley every five seconds, the fire never stopping. A bow is shot at will.
+  // Fire by ranks (the Spanish arquebusiers, the Han crossbows, Qi Jiguang's fowling pieces): one rank of a formation's
+  // guns and crossbows fires together in a window `volleyWindow` s long, then holds while the next makes ready, the next
+  // volley due a reload's time over the number of ranks after it (volleyDue): so with three ranks of matchlocks (15 s to
+  // load) a volley every five seconds, the fire never stopping. The rank that fires is the one whose men are ready
+  // first: the front rank, its men changing places with loaded men behind them in their files after each volley (the
+  // countermarch: relieveShooters), or, ranks standing in files of their own (Qi's), each rank in turn from where it
+  // stands, the first while the second loads. Slots within `rank` m of each other along the line are one rank. A bow is
+  // shot at will.
   volleyWindow: 1.2,
+  rank: 0.4,
+  // Holding fire (a drill with `holdFire`: Gonzalo's arquebusiers, Qi Jiguang's gunners): a gun or a crossbow is not
+  // fired at a man until he is within its effective range, where one deviation of its spread (the weapon's own
+  // `spread`, rad: physics/ranged.js fire) is no wider than half a man's breadth (`halfBreadth`, m), so that about two
+  // balls in five find his trunk: a matchlock (0.014 rad) at 14 m, a crossbow (0.012) at 17. Further off, a volley is
+  // mostly thrown away, and the pieces are empty when the enemy comes on. The drill of the day had the shot hold its
+  // fire until the enemy was close (the Jixiao xinshu: the fowling pieces not fired until he is within the range the
+  // gun carries true).
+  holdFire: { halfBreadth: 0.2 },
+  // A shooter in the ranks whose lane is fouled by a comrade's body (physics/ranged.js comradeInLane) and who has no
+  // other man to lay on leans and shifts out of his place, away from the man in his way, up to `lean` m across at
+  // `leanPace` m/s, for the gap between the files; his shot fired, he steps back into his place to load.
+  lean: 0.3,
+  leanPace: 0.6,
   // A squad's drill (a drill with `squad`, Qi Jiguang's):
   // shooters before a formation of other arms (the fowling pieces before
   // his squads): with the enemy within `retireAt` m of the front
@@ -208,6 +227,11 @@ export function moveFormations(world, dt, hurt = () => 0) {
     // (an arena's works: physics/fieldworks.js walkingDistance), the way round it or over it. The shooters change places
     // while he cannot be on them (relieveShooters).
     formation.reachGap = world.arena?.works ? walkingGap(world, corner, formation, front) : gap;
+    // Its shooters behind a rank of its own hand-to-hand men (the shot behind the pikes): screened, while the men
+    // before them hold the enemy off (relieveShooters).
+    let shotFront = -Infinity;
+    for (const fighter of standing) if (shoots(fighter)) shotFront = Math.max(shotFront, fighter.slot.ahead);
+    formation.screened = shotFront > -Infinity && shotFront < front - DRILL.frontDepth;
     // A squad's guns are given the word to fire (DRILL.volley) once the enemy is that near on his feet; it stands.
     if (formation.drill.squad && formation.volleyAt === undefined && formation.reachGap <= DRILL.volley.at) formation.volleyAt = world.time;
     let lag = 0;
@@ -286,20 +310,39 @@ function walkingGap(world, corner, formation, front) {
 const shoots = (fighter) => Boolean(fighter.weapon?.held && (fighter.weapon.spec.shot || fighter.weapon.spec.ranged));
 
 /**
- * Whether a drilled man in the front rank may fire his gun or crossbow now: in the window of his formation's
- * volley, which opens a reload's time over the ranks of its shooters after the last one opened (DRILL.volleyWindow).
+ * The ranks a formation's guns and crossbows stand in: the `ahead` of each (m), the foremost first; slots within
+ * DRILL.rank of each other along the line are one rank.
+ */
+function shotRanks(world, formation) {
+  const aheads = formation.members.map((id) => world.fighters[id]).filter((man) => man.weapon?.spec.shot).map((man) => man.slot.ahead).sort((a, b) => b - a);
+  const ranks = [];
+  for (const ahead of aheads) if (!ranks.length || ranks[ranks.length - 1] - ahead > DRILL.rank) ranks.push(ahead);
+  return ranks;
+}
+
+/** The rank (an index into shotRanks, the foremost 0) a slot stands in. */
+function rankOf(ranks, slot) {
+  let best = 0;
+  for (let index = 1; index < ranks.length; index += 1) if (Math.abs(ranks[index] - slot.ahead) < Math.abs(ranks[best] - slot.ahead)) best = index;
+  return best;
+}
+
+/**
+ * Whether a drilled man may fire his gun or crossbow now: in the window of his formation's volley, which opens a
+ * reload's time over the ranks of its shooters after the last one opened (DRILL.volleyWindow), for the rank of the
+ * first man ready to fire once it is due (loaded, his lane clear and his man in range: ai.js holdRank). Only that
+ * rank fires in it. (A squad's guns standing before it fire their one volley on the word: ai.js holdsFire.)
  */
 export function volleyDue(world, formation, fighter) {
   const shot = fighter.weapon?.spec.shot;
-  if (!shot || formation.drill.squad) return true;
-  const volley = (formation.volley ??= { opened: -Infinity, ranks: null });
-  if (world.time < volley.opened + DRILL.volleyWindow) return true;
-  if (volley.ranks === null) {
-    const ahead = new Set(formation.members.map((id) => world.fighters[id]).filter((man) => man.weapon?.spec.shot).map((man) => Math.round(man.slot.ahead * 4)));
-    volley.ranks = Math.max(1, ahead.size);
-  }
-  if (world.time < volley.opened + (shot.reloadSeconds ?? 0) / volley.ranks) return false;
+  if (!shot || (formation.drill.squad && fighter.inFront)) return true;
+  const volley = (formation.volley ??= { opened: -Infinity, rank: null, ranks: null });
+  volley.ranks ??= shotRanks(world, formation);
+  const rank = rankOf(volley.ranks, fighter.slot);
+  if (world.time < volley.opened + DRILL.volleyWindow) return rank === volley.rank;
+  if (world.time < volley.opened + (shot.reloadSeconds ?? 0) / Math.max(1, volley.ranks.length)) return false;
   volley.opened = world.time;
+  volley.rank = rank;
   return true;
 }
 
@@ -356,6 +399,11 @@ export function fallIn(world, fighter, formation) {
   fighter.fellIn = world.time;
 }
 
+/** Whether a man holding his place (and `accept`ed) stands before this slot in its file. */
+function aheadInFile(members, slot, accept = () => true) {
+  return members.some((fighter) => holding(fighter) && fighter.slot.ahead > slot.ahead + 1e-6 && Math.abs(fighter.slot.across - slot.across) <= DRILL.file && accept(fighter));
+}
+
 /** Swap two men's places. */
 function swapSlots(a, b) {
   const slot = a.slot;
@@ -376,16 +424,19 @@ function closeRanks(world, members) {
 }
 
 /**
- * A shooter in the front rank who has loosed changes places with the first
- * loaded man behind him in his file, and goes back to span again; not with
- * the enemy on the line (then the front rank fights with what it has), unless
- * a palisade or a ditch keeps him off it (moveFormations' `reachGap`).
+ * A shooter at the head of his file of shooters who has loosed changes places with the first loaded man behind him
+ * in his file, and goes back to span again (the countermarch); not with the enemy on the shooters' line (then they
+ * fight with what they have), unless a palisade or a ditch keeps him off it (moveFormations' `reachGap`), or a rank
+ * of their own hand-to-hand men stands before them and holds him there (`screened`: the shot behind the pikes
+ * changing places while the pikes keep the enemy at the line, until he is through them).
  */
 function relieveShooters(world, members, formation) {
-  if ((formation.reachGap ?? formation.gap) < DRILL.contact + 2) return;
+  const gap = formation.reachGap ?? formation.gap;
+  if (formation.screened ? gap <= 0 : gap < DRILL.contact + 2) return;
   for (const fighter of members) {
     const weapon = fighter.weapon;
-    if (!fighter.inFront || !fighting(fighter) || fighter.punch || !weapon?.held || !weapon.spec.shot || weapon.loaded) continue;
+    if (!fighting(fighter) || fighter.punch || !weapon?.held || !weapon.spec.shot || weapon.loaded) continue;
+    if (aheadInFile(members, fighter.slot, shoots)) continue;
     if (world.time - (fighter.swappedAt ?? -Infinity) < DRILL.swapEvery) continue;
     // In a squad, another shooter: its spearmen do not come forward into the guns' place.
     const loaded = behindInFile(members, fighter.slot, (other) => fighting(other) && other.weapon?.held && other.weapon.loaded && !other.punch && (!formation.drill.squad || shoots(other)));
@@ -401,7 +452,8 @@ function relieveShooters(world, members, formation) {
  * strafe across it. Returns how far the slot still is (m).
  */
 export function walkToSlot(fighter, formation, opponent) {
-  const slot = slotAt(formation, fighter.slot);
+  // (Leaning out of his place for a clear lane to shoot down: DRILL.lean.)
+  const slot = slotAt(formation, fighter.lean ? { ...fighter.slot, across: fighter.slot.across + fighter.lean } : fighter.slot);
   const me = at(fighter);
   const offset = [slot[0] - me[0], slot[1] - me[1]];
   const distance = Math.hypot(offset[0], offset[1]);

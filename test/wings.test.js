@@ -132,7 +132,8 @@ test('held, the wing stands still; released when the foot lines have closed (or 
   while (!released() && time < 40) {
     advance(world, 0.25, (current, dt) => thinkAll(current, dt));
     time += 0.25;
-    if (!released()) wing.forEach((fighter, index) => assert.ok(Math.hypot(spot(fighter)[0] - start[index][0], spot(fighter)[1] - start[index][1]) < 1.5, 'held where it stood'));
+    // (A rider whose horse is shot dead under him on the flank is no longer the wing's: he is on his feet, and goes.)
+    if (!released()) wing.forEach((fighter, index) => assert.ok(!fighter.mount || Math.hypot(spot(fighter)[0] - start[index][0], spot(fighter)[1] - start[index][1]) < 1.5, 'held where it stood'));
   }
   assert.ok(released(), 'released');
   assert.ok(time <= WINGS.by + 1, `by the time limit (${time} s)`);

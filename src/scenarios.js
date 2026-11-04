@@ -319,9 +319,11 @@ function wokouRaiders(random, mix = WOKOU.raiders) {
 // leader; two shields (the rattan shield and the dao) in front; two langxian
 // (the wolf-brush: a long bamboo with its branches left on, to entangle a
 // sword and keep a man off) at the shields' shoulders; four spears striking
-// past them; and fowling pieces that fire before the raiders reach the line
-// and fall back behind it. Qi himself, in elite armour, with his household
-// guards (jiading) behind his squads. What made them win nine battles in a
+// past them; and fowling pieces firing past the shields' shoulders at the
+// raiders as they come on and while the shields and the wolf-brushes hold
+// them at the line. Qi's command is in the drill and the law, not in a man
+// on the field: his household guards (jiading), standing idle behind the
+// squads, are not drawn up here. What made them win nine battles in a
 // month, with a handful of Ming dead against hundreds of raiders, was
 // discipline (his law: a squad that let its leader fall, or ran, was put to
 // death; drilled until they moved as one) and the squad's tactics, not
@@ -329,34 +331,43 @@ function wokouRaiders(random, mix = WOKOU.raiders) {
 // level's are (a band of 1561, more of them Chinese: WOKOU.raiders), and the soldiers wear the brigandine the garrison's regulars wear.
 const QI = {
   // A squad's men as they stand, [style, back, across]: m behind the front
-  // (the guns' line), m across from the squad's middle. The two shields
-  // side by side, the wolf-brushes (WEAPONS langxian) at their outer
-  // shoulders, the spears in the gaps behind; the leader behind the spears;
-  // the guns 2.4 m before the shields.
+  // (the shields' line), m across from the squad's middle (+ to the squad's
+  // right as it faces the enemy). Close order, the front a man every 0.7 m
+  // or so (shoulder to shoulder, room to swing the dao): the two shields side
+  // by side, the wolf-brushes (WEAPONS langxian) at their outer shoulders, the
+  // spears in the shields' files a metre behind them, a second pair behind
+  // those; the leader at the back. The fowling pieces stand in the gaps
+  // between the files, a clear lane before each past the shoulders of the men
+  // in front (physics/ranged.js FIRE_LANE), two ranks of them: the first a
+  // metre behind the shields, in the gaps between the shields and the
+  // brushes, the second behind it in the gap between the two shields. Each in
+  // the middle of his gap as it truly is: a shield (WEAPONS roundShield, 0.3 m
+  // across the rim) stands out on its bearer's left arm, and a gun is laid at
+  // its gunner's right cheek, so the lanes lie a little to the right of the
+  // middle between two men. They fire by ranks while the front holds
+  // (formation.js volleyDue).
   squad: [
-    ['matchlock', 0, -1.8], ['matchlock', 0, 0], ['matchlock', 0, 1.8],
-    ['swordShield', 2.4, -0.7], ['swordShield', 2.4, 0.7],
-    ['langxian', 2.9, -1.9], ['langxian', 2.9, 1.9],
-    ['spear', 3.5, -0.6], ['spear', 3.5, 0.6], ['spear', 4.5, -1.3], ['spear', 4.5, 1.3],
-    ['dao', 4.6, 0],
+    ['swordShield', 0, -0.7], ['swordShield', 0, 0.7],
+    ['langxian', 0.3, -2.1], ['langxian', 0.3, 2.1],
+    ['matchlock', 1.0, -1.65], ['matchlock', 1.0, 1.25], ['matchlock', 1.8, -0.25],
+    ['spear', 1.0, -0.7], ['spear', 1.0, 0.7], ['spear', 1.9, -0.7], ['spear', 1.9, 0.7],
+    ['dao', 2.6, 0.25],
   ],
-  // Squads side by side, this far (m) between their middles.
+  // Squads side by side, this far (m) between their middles: the brushes of the two a gap of 0.7 m apart.
   squads: 2,
-  squadWidth: 5,
-  // Qi Jiguang and his guards, behind the squads' middle: [style, back, across].
-  general: ['guandao', 6.2, 0],
-  guards: [['guandao', 5.8, -1.6], ['swordShield', 5.8, 1.6], ['spear', 6.8, 0]],
+  squadWidth: 4.9,
   // One colour to a kind: the brigandine's red cloth (as the garrison's
-  // regulars, WOKOU.design), and the iron lamellar laced in crimson for Qi
-  // and his guards (OUTFITS mingElite's level design).
+  // regulars, WOKOU.design), and the iron lamellar laced in crimson for the
+  // guards of his household (OUTFITS mingElite's level design: the setup screen's, ARMIES.qi).
   design: { brigandine: 0, elite: 5 },
 };
 
 // How Qi's squads move and fight (formation.js drill): they stand and receive the raiders' rush, and
 // do not run at them (`advance` false); each man of a squad goes for a raider come near his place (`squad`), not the front rank only;
-// the fowling pieces fire one volley on the word, close (DRILL.volley), then are let fall for the dao at the gunner's belt, and the
-// gunners fall in with the shields (`sidearm`: formation.js DRILL.volley).
-const QI_DRILL = { advance: false, squad: true, sidearm: true };
+// the fowling pieces behind the shields hold their fire until the raiders are within the range the gun carries true
+// (`holdFire`: formation.js DRILL.holdFire), then fire by ranks past the shields' shoulders, loading and firing again
+// while the front holds the raiders at the line; a gunner draws his dao only for a raider through to him.
+const QI_DRILL = { advance: false, squad: true, holdFire: true };
 // Qi's army's discipline (ai.js AI.morale): his law, and a year of drill.
 const QI_DISCIPLINE = 1;
 
@@ -374,7 +385,7 @@ const QI_DISCIPLINE = 1;
 // wide at that point). It does not stop a man (FIELDWORKS.climb: he goes down into it and up the bank at a
 // scramble) but it takes the run out of a rush at the squads' feet, the guns firing as it comes to it (QI_DRILL),
 // the squads waiting at the top. The Ming do not sally across it (formation `drill` advance false: they hold their
-// places), so it has no gaps. The bank's back foot stands `before` m short of the guns' line, so the squads' places
+// places), so it has no gaps. The bank's back foot stands `before` m short of the shields' line, so the squads' places
 // are on level ground, and the slabs are lifted `apron` m either side of what was dug (render.js leaves that unpaved).
 const QI_TRENCH = {
   before: 0.8,
@@ -384,13 +395,13 @@ const QI_TRENCH = {
 };
 
 /**
- * Qi's trench where the battle draws the guns' line to (`gunsAt`, m along x): its points moved so that the furthest
+ * Qi's trench where the battle draws the squads' front (the shields' line) to (`frontAt`, m along x): its points moved so that the furthest
  * back of its bank's foot is QI_TRENCH.before m short of it.
  */
-function qiTrench(gunsAt) {
+function qiTrench(frontAt) {
   const { profile, points, before, apron } = QI_TRENCH;
   const back = profile[profile.length - 1][0];
-  const line = gunsAt - before - Math.max(...points.map(([, off, , wide]) => off + back * wide));
+  const line = frontAt - before - Math.max(...points.map(([, off, , wide]) => off + back * wide));
   return { ditches: [{ points: points.map(([z, off, deep, wide]) => [line + off, z, deep, wide]), profile, apron }] };
 }
 
@@ -400,9 +411,9 @@ function qiTrench(gunsAt) {
 const QI_UNARMED_MIX = ['spear', 'dao', 'spear', 'dao', 'spear', 'spear', 'dao', 'spear', 'dao', 'spear', 'swordShield', 'spear'];
 
 /**
- * Qi Jiguang's army: its squads, then Qi and his guards, and where each man
- * stands (a formation `layout`). `weapons` false: the squads armed as the
- * garrison was (QI_UNARMED_MIX), for measuring what the arms did.
+ * Qi Jiguang's army: its squads, and where each man stands (a formation
+ * `layout`). `weapons` false: the squads armed as the garrison was
+ * (QI_UNARMED_MIX), for measuring what the arms did.
  */
 function qiArmy(random, { weapons = true } = {}) {
   const men = [];
@@ -414,11 +425,6 @@ function qiArmy(random, { weapons = true } = {}) {
       layout.push([back, middle + across]);
     }
   }
-  for (const [index, [style, back, across]] of [QI.general, ...QI.guards].entries()) {
-    const man = mingSoldier(random, style, 'elite', { people: MING_PEOPLE.qi, design: QI.design.elite });
-    men.push(index === 0 ? { ...man, name: 'Qi Jiguang' } : man);
-    layout.push([back, across]);
-  }
   return { men, layout };
 }
 
@@ -428,29 +434,28 @@ function qiArmy(random, { weapons = true } = {}) {
  * raiders and the same men in the same armour throughout.
  * - `morale`: Qi's discipline (world.discipline; ai.js AI.morale), or none (the garrison's);
  * - `tactics`: the squads drawn up and drilled as squads (formation `layout`
- *   and `drill`: places kept, shooters falling back, the wounded relieved,
+ *   and `drill`: places kept, the guns firing by ranks, the wounded relieved,
  *   several on one), or a crowd in rows as the garrison stood;
  * - `weapons`: the squad's arms (shields, spears, fowling pieces), or the garrison's;
  * - `trench`: the ditch and bank across the square before the squads (QI_TRENCH), or open ground.
  */
 export function qiJiguangLevel({ morale = true, tactics = true, weapons = true, trench = true } = {}) {
-  const gunsFront = WOKOU.front - 2.4;
   const drawnUp = tactics
-    ? { front: gunsFront, layout: qiArmy(() => 0.5, { weapons }).layout, loose: 0.1, drill: QI_DRILL }
+    ? { front: WOKOU.front, layout: qiArmy(() => 0.5, { weapons }).layout, loose: 0.1, drill: QI_DRILL }
     : { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6, perRow: 8, loose: 0.25 };
   // The trench is dug before the squads where the battle draws them (SPREAD: the lines start further apart than a level's
-  // own numbers put them, the works are not moved with them), the bank's back foot `before` m short of the guns.
-  const gunsAt = gunsFront * spreadScale({ red: WOKOU.front, blue: gunsFront });
-  const works = trench ? qiTrench(gunsAt) : null;
+  // own numbers put them, the works are not moved with them), the bank's back foot `before` m short of the shields.
+  const frontAt = WOKOU.front * spreadScale({ red: WOKOU.front, blue: WOKOU.front });
+  const works = trench ? qiTrench(frontAt) : null;
   return {
     title: "Qi Jiguang's army",
     place: 'Taizhou, Zhejiang · 1561',
-    blurb: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, fowling pieces holding their fire for one volley at close range, then the gunners drawing their dao. Qi stands behind them with his guards, in iron lamellar, with the guandao.",
+    blurb: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in close-ordered mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, and the fowling pieces in two ranks behind the shields, holding their fire until the raiders are close, then firing by ranks past the shields' shoulders while the front holds the raiders at the line.",
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9, ...(works ? { works } : {}) },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
-    roster: `Twenty-six raiders · ${QI.squads} squads of twelve, Qi Jiguang and ${QI.guards.length} guards`,
+    roster: `Twenty-six raiders · ${QI.squads} squads of twelve`,
     // Each man where his squad puts him; the squads drilled as a whole (formation.js), under Qi's discipline (ai.js AI.morale).
     formation: { red: WOKOU_RAIDERS_ORDER, blue: { ...drawnUp, discipline: morale ? QI_DISCIPLINE : 0 } },
     cast: (random) => ({ red: wokouRaiders(random), blue: qiArmy(random, { weapons }).men }),
@@ -979,9 +984,34 @@ const CERIGNOLA = {
   // (1.9 m from the bottom), the bank's back sloping down to the field. Dug by hand in an afternoon: a ditch a horse
   // could not cross, and a man only climbing.
   ditch: { x: 4, reach: 75, profile: [[-2.4, 0], [-1.6, -1.2], [-0.5, -1.2], [0.3, 0.7], [1.5, 0.7], [2.6, 0]] },
-  // The arquebusiers three deep behind the bank, a file every 1.9 m; the pikes and bucklers 2 m behind them.
-  shooters: { perRow: 6, spacing: 1.9, rowSpacing: 1.0, behind: 2 },
+  // The Spanish line, close-ordered: a rank of Landsknecht pikes along the back of the bank (`pikes` abreast, a file
+  // every `files` m: shoulder to shoulder, as pike files stood, a metre to a man), the pikes levelled over the ditch;
+  // the arquebusiers close behind them (`shot`: `ranks` deep, the first `behind` m behind the pikes, `rankSpacing` m
+  // between ranks), a file of guns in every `every`th gap between two pikes' files, firing between them past the
+  // pikemen's shoulders (physics/ranged.js FIRE_LANE) and changing places by ranks (formation.js volleyDue); the rest
+  // of the pikes and the sword-and-buckler men a body `reserve` m behind the guns, in the pikes' files, to step up into
+  // the front rank as it thins (formation.js closeRanks).
+  line: { pikes: 8, files: 1.0, shot: { ranks: 3, behind: 1.0, rankSpacing: 0.9, every: 2 }, reserve: 1.5, reserveSpacing: 1.0 },
 };
+
+/**
+ * The Spanish line at Cerignola (CERIGNOLA.line), a formation `layout` in cast order: the pikes (the front rank, then
+ * the reserve), the sword-and-buckler men (the reserve), the arquebusiers (in the gaps behind the pikes).
+ */
+function cerignolaLayout() {
+  const { spanish, line } = CERIGNOLA;
+  const fileAt = (file) => (file - (line.pikes - 1) / 2) * line.files;
+  const lanes = [];
+  for (let gap = 0; gap < line.pikes - 1; gap += line.shot.every) lanes.push(fileAt(gap + 0.5));
+  const shotRanks = Math.ceil(spanish.arquebusier / lanes.length);
+  const reserveFront = line.shot.behind + (shotRanks - 1) * line.shot.rankSpacing + line.reserve;
+  const layout = [];
+  const reserve = spanish.pike + spanish.rodelero - line.pikes;
+  for (let index = 0; index < line.pikes; index += 1) layout.push([0, fileAt(index)]);
+  for (let index = 0; index < reserve; index += 1) layout.push([reserveFront + Math.floor(index / line.pikes) * line.reserveSpacing, fileAt(index % line.pikes)]);
+  for (let index = 0; index < spanish.arquebusier; index += 1) layout.push([line.shot.behind + Math.floor(index / lanes.length) * line.shot.rankSpacing, lanes[index % lanes.length]]);
+  return layout;
+}
 
 /** Cerignola's works: the ditch and its bank before the Spanish line. */
 function cerignolaWorks() {
@@ -990,9 +1020,13 @@ function cerignolaWorks() {
   return { ditches: [{ from: [ditch.x, -ditch.reach], to: [ditch.x, ditch.reach], profile: ditch.profile }] };
 }
 
-// The defenders hold their ground and shoot (formation.js: drilled, not advancing): the arquebusiers
-// fire by ranks, each man who has fired changing places with a loaded man behind him (the countermarch).
+// The defenders hold their ground and shoot (formation.js: drilled, not advancing).
 const HOLD_GROUND = { advance: false };
+// Gonzalo's arquebusiers, behind his pikes: they hold their fire until the French are within its effective range
+// (`holdFire`: formation.js DRILL.holdFire), then fire by ranks, each man who has fired changing places with a loaded
+// man behind him in his file (the countermarch: formation.js volleyDue, relieveShooters), the pikes before them
+// holding the enemy off while they load and fire.
+const HOLD_AND_VOLLEY = { advance: false, holdFire: true };
 // The attackers' horse goes first, as it did in both: released from the flanks almost at once (formation.js WINGS).
 const HORSE_FIRST = { by: 3, release: 40 };
 
@@ -1023,7 +1057,7 @@ const AGINCOURT_LEVEL = {
 const CERIGNOLA_LEVEL = {
   title: 'Cerignola',
   place: 'Cerignola, Apulia · 28 April 1503',
-  blurb: "Gonzalo de Córdoba's arquebusiers line a fresh ditch and its bank on a vineyard slope, his German pikes and sword-and-buckler men behind them. At dusk the French gendarmes in plate on barded horses charge it, and the Swiss columns follow them in: the ditch stops the horse, the volleys come rank after rank. Thirty-five of Spain against eight gendarmes, twenty-two Swiss and five crossbowmen.",
+  blurb: "Gonzalo de Córdoba's men stand behind a fresh ditch and its bank on a vineyard slope: a rank of German pikes along the bank, his arquebusiers three deep close behind them firing between the pikemen's files, the rest of the pikes and the sword-and-buckler men behind. At dusk the French gendarmes in plate on barded horses charge it, and the Swiss columns follow them in: the ditch stops the horse, the pikes hold the bank, and the volleys come rank after rank. Thirty-five of Spain against eight gendarmes, twenty-two Swiss and five crossbowmen.",
   scene: 'cerignola',
   weather: { fog: [18, 110], sky: 0.35, pale: 0.3, sun: 0.7 },
   arena: { ...CERIGNOLA.arena, works: cerignolaWorks() },
@@ -1032,11 +1066,12 @@ const CERIGNOLA_LEVEL = {
   roster: 'Eight gendarmes, twenty-two Swiss pikes and five crossbowmen · twelve arquebusiers, fifteen pikes and eight sword-and-buckler men',
   formation: {
     red: { front: CERIGNOLA.front.french, spacing: 0.95, rowSpacing: 1.0, perRow: 8, loose: 0.2, wings: HORSE_FIRST },
-    blue: { front: CERIGNOLA.front.spanish, spacing: CERIGNOLA.shooters.spacing, rowSpacing: CERIGNOLA.shooters.rowSpacing, perRow: CERIGNOLA.shooters.perRow, shootersFront: CERIGNOLA.shooters.behind, drill: HOLD_GROUND },
+    blue: { front: CERIGNOLA.front.spanish, layout: cerignolaLayout(), drill: HOLD_AND_VOLLEY },
   },
   cast: (random) => ({
     red: [...company({ pike: CERIGNOLA.french.swiss }, (style) => pikeman(random, 'swiss', style)), ...company({ crossbow: CERIGNOLA.french.crossbow }, (style) => frenchFoot(random, style)), ...company({ lance: CERIGNOLA.french.gendarme }, (style) => frenchKnight(random, style, { mounted: true }))],
-    blue: shootersBehind([...company({ arquebusier: CERIGNOLA.spanish.arquebusier }, (type) => europeanSoldier(random, type)), ...company({ pike: CERIGNOLA.spanish.pike }, (style) => pikeman(random, 'landsknecht', style)), ...company({ rodelero: CERIGNOLA.spanish.rodelero }, (type) => europeanSoldier(random, type))]),
+    // In the order of their places (cerignolaLayout): the pikes, the sword-and-buckler men, the arquebusiers.
+    blue: [...company({ pike: CERIGNOLA.spanish.pike }, (style) => pikeman(random, 'landsknecht', style)), ...company({ rodelero: CERIGNOLA.spanish.rodelero }, (type) => europeanSoldier(random, type)), ...company({ arquebusier: CERIGNOLA.spanish.arquebusier }, (type) => europeanSoldier(random, type))],
   }),
   armies: { red: ['france1503'], blue: ['gonzalo'] },
   fighters: [],

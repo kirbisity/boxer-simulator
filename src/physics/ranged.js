@@ -96,8 +96,6 @@ export function raisedAim(fighter, mark, weapon = fighter.weapon) {
   return { hand: vec.add(shoulder, vec.scale(along, (lengths.upperArm + lengths.forearmToFist) * 0.97)), dir: along };
 }
 
-// `comradeClear` (m): a comrade this near the line of a heavy shot (more at
-// range, as the spread grows) holds it.
 // A long gun held to the cheek, in upper-arm lengths: the trigger hand
 // this far out along the line from the shoulder, and raised this much.
 // Reloading, the gun stands upright before him (`reloadHand`, heights,
@@ -107,7 +105,7 @@ export function raisedAim(fighter, mark, weapon = fighter.weapon) {
 // A muzzle-loading pistol is loaded held up before the chest (`pistolReloadHand`).
 // A crossbow is spanned nose-down before him (`spanHand`, along `spanDir`),
 // the string drawn from `spanFrom` m down the tiller up by `spanStroke` m.
-export const LONG_GUN = { comradeClear: 0.55, handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4, spanHand: [0.16, 0.5, -0.04], spanDir: [0.35, -1, 0.02], spanFrom: 0.45, spanStroke: 0.3, pistolReloadHand: [0.2, 0.6, 0.02] };
+export const LONG_GUN = { handOut: 0.55, cheekRise: 0.35, reloadHand: [0.14, 0.42, -0.04], ramFrom: 0.5, ramStroke: 0.22, ramPerSecond: 1.4, spanHand: [0.16, 0.5, -0.04], spanDir: [0.35, -1, 0.02], spanFrom: 0.45, spanStroke: 0.3, pistolReloadHand: [0.2, 0.6, 0.02] };
 
 // A revolver loaded at the cylinder (`shot.cylinder`): held at the waist, above a gown's hoop, before the
 // body (`hand`, heights), the muzzle tipped forward and down (`dir`); for
@@ -716,6 +714,64 @@ export function emptied(world, fighter) {
   world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: ['swings the empty gun as a club'] });
 }
 
+// A shot's lane past his own men. Drilled shot fired from behind a rank of their own (Gonzalo's arquebusiers behind
+// the pikes at Cerignola, Qi Jiguang's fowling pieces behind his shields): the files stood a metre or so apart, and the
+// ball went between them, past the shoulders of the men before (the Spanish and Dutch drill books of the next century
+// have the rear ranks fire "through the intervals" of the files, and over a front rank kneeling). Nothing stops a
+// ball but what is in its path: a comrade is in the way only if some part of his body (or his shield) is, give or take
+// `sway` m (what a man standing in the ranks moves between the shot being laid and going: a breath, a shift of his
+// feet, a pike's weight taken) and the ball's own wander, `deviations` of the weapon's spread at that distance (three:
+// all but one ball in a few hundred). A shooter weighs the lane past the man he is laid on as well (`beyond`, m): a ball
+// that misses him flies on, into whoever stands behind him. A shot whose lane is clear goes past the men before him
+// however close they stand; one whose lane is not is held (comradeInLine, ai.js laneFouled), as drilled men held theirs.
+export const FIRE_LANE = { sway: 0.1, deviations: 3, beyond: 5 };
+
+/** Where a shot is laid from as he sights along it: his gun shoulder, raised to the cheek (LONG_GUN). */
+export function sightFrom(fighter, weapon = fighter.weapon) {
+  const side = weapon?.main ?? 'r';
+  return vec.add(point(fighter.x, P[`${side}Shoulder`]), [0, LONG_GUN.cheekRise * fighter.body.lengths.upperArm, 0]);
+}
+
+/**
+ * The comrade whose body is in a shot's lane from `from` toward `to` (and FIRE_LANE.beyond past it when `beyond`),
+ * the nearest along it, with `side` the way he stands off the line (+1 to the line's left, on the floor), or null
+ * when the lane is clear (FIRE_LANE). `spread` (rad): the weapon's.
+ */
+export function comradeInLane(world, fighter, from, to, spread, { beyond = false } = {}) {
+  const line = vec.sub(to, from);
+  const reach = vec.length(line);
+  if (reach < 1e-6) return null;
+  const along = vec.scale(line, 1 / reach);
+  const length = reach + (beyond ? FIRE_LANE.beyond : 0);
+  const end = vec.add(from, vec.scale(along, length));
+  const room = (distance) => FIRE_LANE.sway + FIRE_LANE.deviations * spread * Math.max(0, distance);
+  let best = null;
+  for (const mate of world.fighters) {
+    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') continue;
+    const hips = point(mate.x, P.pelvis);
+    const s = Math.max(0, Math.min(length, vec.dot(vec.sub(hips, from), along)));
+    if (vec.length(vec.sub(hips, vec.add(from, vec.scale(along, s)))) > FAR_OFF_LINE + room(length)) continue;
+    let nearest = Infinity;
+    for (const capsule of capsules(mate)) {
+      const [a, b] = capsuleEnds(mate, capsule);
+      const meet = closestBetween(from, end, a, b);
+      const at = meet.s * length;
+      if (at <= 0) continue;
+      if (vec.length(vec.sub(meet.onFirst, meet.onSecond)) < capsule.radius + room(at)) nearest = Math.min(nearest, at);
+    }
+    if (mate.shield) {
+      const disc = shieldDisc(mate);
+      const at = vec.dot(vec.sub(disc.centre, from), along);
+      if (at > 0 && at < length && vec.length(vec.sub(disc.centre, vec.add(from, vec.scale(along, at)))) < disc.radius + room(at)) nearest = Math.min(nearest, at);
+    }
+    if (nearest < (best?.along ?? Infinity)) {
+      const across = (hips[0] - from[0]) * -along[2] + (hips[2] - from[2]) * along[0];
+      best = { fighter: mate, along: nearest, side: across >= 0 ? 1 : -1 };
+    }
+  }
+  return best;
+}
+
 /**
  * Whether the first man on the line the shot would take (through the sights
  * to the mark, as fire() aims it, less its random error), or near it, is on
@@ -728,16 +784,10 @@ export function comradeInLine(world, fighter, weapon = fighter.weapon, aimedAt =
   const dir = slerpDir(vec.normalize(vec.sub(mark, from)), weapon.dir, GUN.barrelShare);
   const hit = firstHit(world, fighter, from, vec.add(from, vec.scale(dir, GUN.range)));
   if (hit && hit.fighter.corner === fighter.corner && hit.fighter.state !== 'out') return true;
-  // The ball wanders: a comrade close beside the line, short of the mark, is at risk too.
+  // The ball wanders: a comrade's body close beside its path, short of the mark, is at risk too (FIRE_LANE): between
+  // the files of the men before him, clear of their shoulders, it goes.
   const reach = hit ? vec.length(vec.sub(hit.point, from)) : GUN.range;
-  return world.fighters.some((mate) => {
-    if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') return false;
-    const offset = vec.sub(point(mate.x, P.pelvis), from);
-    const along = vec.dot(offset, dir);
-    // The ball's spread widens with the range: three of its deviations, beyond a body's breadth.
-    const clear = LONG_GUN.comradeClear + 3 * (weapon.spec.shot?.spread ?? GUN.spread) * along;
-    return along > 0 && along < reach + 0.5 && vec.length(vec.sub(offset, vec.scale(dir, along))) < clear;
-  });
+  return Boolean(comradeInLane(world, fighter, from, vec.add(from, vec.scale(dir, reach + 0.5)), weapon.spec.shot?.spread ?? GUN.spread));
 }
 
 /**

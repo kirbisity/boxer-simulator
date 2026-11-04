@@ -260,7 +260,7 @@ test('an arrow or a ball strikes a horse: through its hide, a ball through any b
 });
 
 test('the battles with works (Agincourt, Cerignola, Qi Jiguang): the works where the lines are, the sides within the muster cap, each army one the setup screen has', () => {
-  for (const [key, defenders] of [['agincourt', 35], ['cerignola', 35], ['qiJiguang', 28]]) {
+  for (const [key, defenders] of [['agincourt', 35], ['cerignola', 35], ['qiJiguang', 24]]) {
     const level = battleOf(key);
     const cast = level.cast(seededRandom(2));
     assert.ok(cast.red.length <= MUSTER.cap && cast.blue.length <= MUSTER.cap, key);
