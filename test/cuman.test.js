@@ -1,6 +1,6 @@
 // The Cumans (Kipchaks) of the 12th-13th-century steppe: a khan's retainer in mail with rows of steel plates laced over
 // it, buckled down the front, lames on the upper arm, hinged vambraces, and the tall pointed helmet with its steel face
-// mask; of the steppe faction; guarded as the bekhter of the same make is.
+// mask; of the steppe faction; guarded better than the bekhter of the same make.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESETS } from '../src/body.js';
@@ -24,13 +24,14 @@ test('the Cuman is of the steppe, rides a steppe horse, and carries the sabre', 
   assert.equal(gearTraits(PRESETS.cuman).sidearm, 'saber');
 });
 
-test('his mail and plates guard as the bekhter of the same make does; the shins only in boot leather', () => {
+test('his mail and plates guard at least as the bekhter does, better against a blow and a point; the shins only in boot leather', () => {
   const kit = OUTFITS.cumanHeavy.protection;
   const bekhter = { ...OUTFITS.ottomanHeavy.protection, ...outfitSets('ottomanHeavy').find((set) => set.key === 'bekhter').patch.protection };
-  for (const kind of ['blunt', 'cut', 'pierce']) assert.equal(kit[kind], bekhter[kind], kind);
+  for (const kind of ['blunt', 'cut', 'pierce']) assert.ok(kit[kind] >= bekhter[kind], kind);
+  assert.ok(kit.blunt > bekhter.blunt && kit.pierce > bekhter.pierce);
   assert.ok(kit.regions.Shank.cut < 0.5);
-  // ~15 kg on a 75 kg man.
-  assert.ok(OUTFITS.cumanHeavy.extraMass >= 0.17 && OUTFITS.cumanHeavy.extraMass <= 0.23);
+  // ~18 kg on a 75 kg man.
+  assert.ok(OUTFITS.cumanHeavy.extraMass >= 0.2 && OUTFITS.cumanHeavy.extraMass <= 0.27);
   assert.deepEqual(OUTFITS.cumanHeavy.gaps, { mail: 'all' });
 });
 

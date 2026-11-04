@@ -301,7 +301,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   gaziAlp: {
-    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 181, frame: 'large', age: 36, exercise: 0.93, calories: 5000,
+    name: 'Turgut Alp', style: 'saberShield', sex: 'male', heightCm: 184, frame: 'large', age: 36, exercise: 0.95, calories: 5500,
     outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -371,7 +371,7 @@ export const PRESETS = {
   // rider of the Kipchak kurgans' measure (~167 cm, broad and hard from the saddle), the long hair and moustache of the
   // Cuman stone figures; the Rus' named them Polovtsy, the pale ones, and the chroniclers saw many fair or brown-haired.
   cuman: {
-    name: 'Konchak', style: 'cumanBow', sex: 'male', heightCm: 167, frame: 'large', age: 40, exercise: 0.68, calories: 4300,
+    name: 'Konchak', style: 'cumanBow', sex: 'male', heightCm: 181, frame: 'large', age: 40, exercise: 0.92, calories: 5300,
     outfit: { kind: 'cumanHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'long', hairColor: '#4a3020', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -382,24 +382,24 @@ export const PRESETS = {
   // greying; the sayf, the turs, the kazaghand over his mail.
   saladin: {
     // His standard the Ayyubid yellow, when he leads.
-    name: 'Saladin', style: 'saladin', hero: true, sex: 'male', heightCm: 178, frame: 'large', age: 50, exercise: 0.86, calories: 4400, standardColour: '#d8b030',
+    name: 'Saladin', style: 'saladin', hero: true, sex: 'male', heightCm: 181, frame: 'large', age: 50, exercise: 0.9, calories: 4900, standardColour: '#d8b030',
     outfit: { kind: 'saladin', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2e2620', facialHair: 'beard', eyeColor: 'brown' },
   },
   // The Ottomans: Ulubatlı Hasan, the Janissary who raised the banner on the
   // walls of Constantinople (1453); an azap archer; a heavy sipahi on foot.
   yatagan: {
-    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 184, frame: 'large', age: 25, exercise: 0.94, calories: 5200,
+    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 187, frame: 'large', age: 25, exercise: 0.96, calories: 5700,
     outfit: { kind: 'janissary', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   azap: {
-    name: 'Ali the azap', style: 'steppeBow', sex: 'male', heightCm: 176, frame: 'large', age: 24, exercise: 0.85, calories: 4200,
+    name: 'Ali the azap', style: 'steppeBow', sex: 'male', heightCm: 179, frame: 'large', age: 24, exercise: 0.89, calories: 4700,
     outfit: { kind: 'azap', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   sipahi: {
-    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 182, frame: 'large', age: 34, exercise: 0.93, calories: 5100,
+    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 185, frame: 'large', age: 34, exercise: 0.95, calories: 5600,
     outfit: { kind: 'ottomanHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },

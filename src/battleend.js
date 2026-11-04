@@ -37,8 +37,9 @@ export const BATTLE_END = {
   spent: 0.25,
   // …against at least this many times its strength.
   spentOutnumbered: 2,
-  // How long the collapse must hold (s): a couple of seconds, to see that the last man down stays down.
-  holdFor: 3,
+  // How long the collapse must hold (s): long enough to see that the last man down stays down, and for the winners to
+  // ride down some of the routed before it is called (the battle never runs on past its time limit).
+  holdFor: 6,
   // The battle's length (s of battle time): five minutes, and whoever has more fight left holds the field.
   timeLimit: 300,
   // At the time limit, strengths within this ratio of each other are a draw.

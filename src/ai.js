@@ -6,7 +6,7 @@ import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volley
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { aimPoint, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { aimPoint, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
@@ -204,7 +204,7 @@ export const AI = {
   // A man who has broken once breaks the easier: `breakAt` falls by
   // `brokeBefore` each time, to `breakAtLeast`.
   panic: {
-    settle: 2, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.83, rate: 0.5, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6,
+    settle: 2, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.86, rate: 0.42, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6,
     brokenArm: 0.2, brokenLeg: 0.3, armed: 0.35, lethalSpan: 4, ownWeapon: 0.92, dreadNear: 1.5, dreadFade: 5, dreadAtRange: 0.3, drilled: 0.7, unproven: 0.4, unprovenMismatch: 0.75, proven: 2, mismatch: 0.7, ring: 0.45, brokeBefore: 0.06, breakAtLeast: 0.5,
   },
   // Routs. Few battles are fought to the last man: as a side's men fall,
@@ -260,8 +260,11 @@ export const AI = {
   // edge of the field in a line doing nothing.
   rout: {
     minSide: 4, losses: 0.35, lossesFrom: 0.3, lossesFull: 0.75, contagion: 0.1, contagionMost: 0.3, within: 5, close: 1.5, behind: 0.35, behindFrom: 1, edge: 1.6, clearOf: 4,
-    follow: { beside: 3, rate: 1.5, followMost: 2, from: 0.3, discipline: 0.9 },
+    follow: { beside: 3, rate: 1.3, followMost: 2, from: 0.3, discipline: 0.9 },
     pace: 0.7,
+    // A man who breaks gives up defending: no guard held, no block, and (`shieldDrop` of the time) the shield thrown
+    // away to run the faster (the Greeks' rhipsaspis, the 'shield-thrower'); struck from behind as he runs.
+    flight: { shieldDrop: 0.7 },
     crawl: { share: 0.15, hurt: 0.9, tired: 0.35, afraid: 0.4, most: 0.85 },
     rally: { chance: 0.65, hurt: 1, again: 0.5, most: 2, nerve: 0.35, steadied: 0.35, steadyFor: 8, shaky: 10, pace: 0.6, hesitant: 0.7, guard: 0.5 },
   },
@@ -415,7 +418,8 @@ export const AI = {
   // (within `within` m), `chasers` of them at most; the rest let him go and
   // turn to whoever still stands to fight. A whole army did not run down one
   // fugitive: the winners kept their ground, and a few rode or ran after the runners.
-  pursuit: { within: 10, chasers: 2 },
+  // (Within 14 m, three after one man: the winners went after the routed, and most of a battle's dead fell in the rout.)
+  pursuit: { within: 14, chasers: 3 },
   // Team-mates keep this far apart (m), and treat one within this far of
   // the line to their man as in the line of fire.
   mateSpacing: 1.0,
@@ -1202,6 +1206,13 @@ function chooseFocus(world, fighter) {
   if (next.id !== fighter.focus) world.events.push({ time: world.time, kind: 'focus', fighter: fighter.id, target: next.id, effects: [] });
   fighter.focus = next.id;
   return next;
+}
+
+/** A broken man defends nothing: his held guard down, any block he had begun let go (AI.rout flight). */
+function giveUpGuard(fighter) {
+  fighter.guardHeld = false;
+  fighter.guardUntil = undefined;
+  fighter.defence = null;
 }
 
 /**
@@ -2343,8 +2354,10 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
       fighter.calmFor = 0;
       fighter.punch = null;
       fighter.clinch = null;
-      // Whatever is in his hands goes: he runs.
+      // Whatever is in his hands goes: he runs. Most throw the shield too (AI.rout flight).
       if (fighter.weapon?.held) dropWeapon(world, fighter, 'dropped');
+      if (fighter.shield && world.random() < AI.rout.flight.shieldDrop) dropShield(world, fighter, 'dropped');
+      giveUpGuard(fighter);
       world.events.push({ time: world.time, kind: 'panic', fighter: fighter.id, effects: ['breaks and runs'] });
       fighter.shakyUntil = undefined;
       fighter.steadyUntil = undefined;
@@ -2362,6 +2375,8 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
     if (world.random() < rate * dt) startCrawl(world, fighter, 'crawls away');
   }
   crawlOnBrokenLimb(world, fighter, dt);
+  // Running, he defends nothing (AI.rout flight).
+  giveUpGuard(fighter);
   // Once off the field he stays off.
   if (fighter.fled) return;
   fighter.calmFor = fighter.fear < spec.calmAt ? (fighter.calmFor ?? 0) + dt : 0;

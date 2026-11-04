@@ -102,9 +102,9 @@ test('a mixed fight runs: riders and men on foot close, and the world goes on', 
     advance(w, 1 / 60);
   }
   for (const fighter of w.fighters) for (const value of fighter.x) assert.ok(Number.isFinite(value));
-  // Closing: the nearest red-blue pair is much nearer than the 24 m they began.
+  // Closing: the nearest red-blue pair is much nearer than the 24 m they began (a man broken and running opens it again a little).
   const reds = w.fighters.filter((fighter) => fighter.corner === 'red');
   const blues = w.fighters.filter((fighter) => fighter.corner === 'blue');
   const near = Math.min(...reds.flatMap((red) => blues.map((blue) => between(red, blue))));
-  assert.ok(near < 8, `${near}`);
+  assert.ok(near < 10, `${near}`);
 });

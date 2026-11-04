@@ -1697,14 +1697,16 @@ export const OUTFITS = {
     arrowproof: true,
     // Mail-and-plate shirt ~11 kg, vambraces ~1 kg, mail mittens ~0.5 kg, helmet, aventail and mask ~2.5 kg: ~15 kg on a
     // 75 kg man.
-    extraMass: 0.2,
-    // As the bekhter's (ottomanHeavy's, OUTFIT_SETS `bekhter`): cut 0.98, pierce 0.72, blunt 0.42. The head: the chichak's
-    // bowl over a quilted cap (0.47 / 0.96 / 0.6), the steel mask closing the face (a point meets plate there, not mail):
-    // pierce 0.65, blunt and cut a little up. The shins only in boot leather (Saladin's).
+    extraMass: 0.24,
+    // Better than the bekhter's (ottomanHeavy's, OUTFIT_SETS `bekhter`: 0.42 / 0.98 / 0.72): a khan's retainer's harness,
+    // the plates heavier and closer, the mail over a thick quilted coat (the Cuman kurgans' finds are of the best armour
+    // of the steppe), so a blow is spread far better and a point meets plate, mail and padding: blunt 0.58, pierce 0.8.
+    // The head: the chichak's bowl over a quilted cap, the steel mask closing the face (a point meets plate there, not
+    // mail). The shins only in boot leather (Saladin's).
     protection: {
-      blunt: 0.42, cut: 0.98, pierce: 0.72, bullet: { head: 0.3, torso: 0.4, limb: 0.2 },
+      blunt: 0.58, cut: 0.98, pierce: 0.8, bullet: { head: 0.4, torso: 0.5, limb: 0.25 },
       regions: {
-        head: { blunt: 0.5, cut: 0.97, pierce: 0.65, deflects: true },
+        head: { blunt: 0.6, cut: 0.97, pierce: 0.75, deflects: true },
         Shank: { blunt: 0.09, cut: 0.37, pierce: 0.15 },
       },
     },
