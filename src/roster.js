@@ -19,7 +19,7 @@ const warrior = (key, title, base, changes = {}) => {
   const inputs = normaliseInputs(structuredClone({ ...base, ...changes, outfit: changes.outfit ?? base.outfit }));
   const style = STYLES[inputs.style];
   const armour = OUTFITS[inputs.outfit?.kind]?.label ?? '';
-  return { key, title, inputs, faction: factionOf(inputs), line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
+  return { key, title, base, inputs, faction: factionOf(inputs), line: [styleName(style), armour && !armour.startsWith(style.label) ? armour.replace(/^.* — /, '') : null].filter(Boolean).join(' · ') };
 };
 
 /**
@@ -128,7 +128,14 @@ export const UNIT_NAMES = {
 };
 
 /** A roster entry under its unit's name (UNIT_NAMES), where it has one. */
-const unitNamed = (entry) => (UNIT_NAMES[entry.key] ? { ...entry, title: UNIT_NAMES[entry.key], inputs: { ...entry.inputs, name: UNIT_NAMES[entry.key] } } : entry);
+// The character he was built from (PRESETS) goes by the same name wherever it is listed on its own (the sandbox's
+// pickers, the ghost), where he wears it as it is (no name of his own in the roster's changes).
+const unitNamed = ({ base, ...entry }) => {
+  const unit = UNIT_NAMES[entry.key];
+  if (!unit) return entry;
+  if (base && entry.inputs.name === base.name) base.name = unit;
+  return { ...entry, title: unit, inputs: { ...entry.inputs, name: unit } };
+};
 
 // `legend`: shown in the intro on first load (intro.js), in `order`, with its
 // `kicker` (an epithet over the name) and `line`; `legend: true` alone will do
