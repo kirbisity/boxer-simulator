@@ -310,11 +310,11 @@ function bannerDesign(label, cloth, trim = null) {
 // The Bayara's: the same coat in a banner's brocade (`cloth`), bound in a darker silk (`trim`), gilt rivets, the steel
 // mirror, gilt shoulder plates and steel arm guards (loftbody.js bayaraCoat); the steel and gilt helmet, its hood of the coat's
 // brocade (its cloud silk, `hoodStuff`).
-function bayaraDesign(label, cloth, trim) {
+function bayaraDesign(label, cloth, trim, helm = {}) {
   return {
     label, top: { kind: 'longsleeve', color: shade(cloth, 0.8) }, bottom: { kind: 'pants', color: '#4a1418' },
     armor: { kind: 'bayaraCoat', color: '#b4bac3', cloth, cloth2: trim, gold: '#d2aa4c', leather: '#2a1d14' },
-    head: { kind: 'qingHelm', design: 'bayaraBowl', color: '#c3c8cf', gold: '#d2aa4c', coif: cloth, hoodStuff: 'cloudSilk', trim },
+    head: { kind: 'qingHelm', design: 'bayaraBowl', color: '#c3c8cf', gold: '#d2aa4c', coif: cloth, hoodStuff: 'cloudSilk', trim, ...helm },
     feet: { kind: 'compactBoot', color: '#141416' },
   };
 }
@@ -1390,18 +1390,23 @@ export const OUTFITS = {
     spare: 'dagger',
     deflects: true,
     arrowproof: true,
-    // The Ming elite's weight (~18 kg on a 73 kg man).
-    extraMass: 0.25,
+    // The Ming elite's coat and a mail shirt under it (the 'three coats' of the Qing accounts: what is true of it is the
+    // mail under the brigandine): ~26 kg on an 89 kg man.
+    extraMass: 0.29,
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
     // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
-    protection: { blunt: 0.72, cut: 0.95, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
-    gaps: { lacing: 0.1 },
+    protection: { blunt: 0.72, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    // Between the coat's plates and wherever they part, the mail under it (not the lacing alone): a point meets rings there.
+    gaps: { mail: 'all' },
     courage: 0.45,
     designs: [
       bayaraDesign('Blue brocade', '#5a78a6', '#1f2f5a'),
       bayaraDesign('Yellow brocade', '#d9a524', '#7a1418'),
       bayaraDesign('White brocade', '#e2ddcf', '#7a1418'),
       bayaraDesign('Red brocade', '#a8242a', '#2a1a14'),
+      // One in three in the steel face of the steppe's masked helmets (OUTFIT_SETS bayara `masked`).
+      bayaraDesign('Blue brocade, steel face', '#5a78a6', '#1f2f5a', { mask: true, maskDesign: 'kipchak' }),
+      bayaraDesign('Yellow brocade, steel face', '#d9a524', '#7a1418', { mask: true, maskDesign: 'kipchak' }),
     ],
   },
   // The Iron Pagoda (tiefutu): the Jurchen Jin's armoured heavy horse of the

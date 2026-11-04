@@ -1778,6 +1778,8 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       for (const mesh of buildQingHood(group, head, r, steel, bind, { lowDetail })) {
         if (mesh.userData.hoodCloth && head.hoodStuff && DETAIL_MAPS.on && !lowDetail) clothPropMaterial(mesh.material, head.hoodStuff);
       }
+      // A Bayara's steel face (`mask`, `maskDesign`: the steppe's kipchak face), hung under the peak.
+      if (head.mask) worldMask(group, head, r, steel, head.color ?? color);
       fitted = true;
       break;
     }

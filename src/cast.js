@@ -456,7 +456,7 @@ const PERIOD_BUILD = {
   // fed on meat and millet, at the bow and on horse from boyhood and drilled in their companies (niru) on the great
   // hunts; the Ming's men saw them as big and hard. Taller than the Ming's northern men and heavier, stronger than
   // even the Ming's picked elite (above); the Bayara picked from them for strength and the bow.
-  jurchen: { banner: { heightCm: 177, weightKg: 85, exercise: 0.9 }, bayara: { heightCm: 180, weightKg: 89, exercise: 0.93 } },
+  jurchen: { banner: { heightCm: 179, weightKg: 89, exercise: 0.92 }, bayara: { heightCm: 182, weightKg: 93, exercise: 0.95 } },
   // Dutch soldiers of the 1660s, among Europe's taller men then.
   dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };

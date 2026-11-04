@@ -239,17 +239,17 @@ export const PRESETS = {
   // guard, a Bayara in the heavy coat, bow and saber. Jurchen hunters and herders fed on meat and grain, at the bow
   // and on horse from boyhood: big and strong for their day, taller and harder than the Ming's men (`exercise`, `calories`).
   bannerBow: {
-    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 178, frame: 'large', age: 28, exercise: 0.9, calories: 4800,
+    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 180, frame: 'large', age: 28, exercise: 0.92, calories: 5200,
     outfit: { kind: 'bannerArmour', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   bannerGuandao: {
-    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 183, frame: 'large', age: 31, exercise: 0.9, calories: 5100,
+    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 185, frame: 'large', age: 31, exercise: 0.92, calories: 5500,
     outfit: { kind: 'bannerArmour', design: 5 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   bayara: {
-    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 180, frame: 'large', age: 40, exercise: 0.92, calories: 5000,
+    name: 'Yangguri', style: 'bayaraBow', sex: 'male', heightCm: 182, frame: 'large', age: 40, exercise: 0.94, calories: 5400,
     outfit: { kind: 'bayara', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },

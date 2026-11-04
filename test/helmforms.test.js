@@ -189,7 +189,7 @@ const WORLD_MASKS = ['tiemian', 'shoumian', 'kipchak', 'horde', 'ventail'];
 test('the war masks of China, the steppe and the sultanates: each worn by its kits, most designs bare-faced', () => {
   // The picked ones: the guardian beast face, the steppe iron face, and the Cuman lord's gilt half-mask (the others built, not worn).
   const PICKED = ['shoumian', 'kipchak', 'horde'];
-  const wearers = { mingElite: ['shoumian', 'shoumian'], kheshig: ['kipchak', 'kipchak'], cumanHeavy: ['kipchak', 'kipchak', 'horde'] };
+  const wearers = { mingElite: ['shoumian', 'shoumian'], kheshig: ['kipchak', 'kipchak'], cumanHeavy: ['kipchak', 'kipchak', 'horde'], bayara: ['kipchak', 'kipchak'] };
   const worn = new Set();
   for (const [kit, masks] of Object.entries(wearers)) {
     const designs = OUTFITS[kit].designs.filter((design) => !design.levelOnly);
