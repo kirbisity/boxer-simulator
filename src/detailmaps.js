@@ -121,7 +121,6 @@ export const ARMOUR_TILES = {
   brigandine: { studded: 'euroBrigandine', steel: 'munitionPlate' },
   breastplate: { steel: 'munitionPlate' },
   // The Ming coats' arm guards: the bi fu's riveted lames over a plain bracer; the elite's arms, already lamed, hammered iron.
-  mingBrigandine: { 'forearm.steel': 'bifu' },
   mingLamellar: { 'forearm.steel': 'bifu' },
   mingScaleCoat: { 'forearm.steel': 'bifu' },
   mingElite: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
@@ -158,7 +157,7 @@ export const ARMOUR_COVERAGE = {
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
-  mingVest: null, mingBrigandine: ['brigandine', 'bifu'], mingLamellar: ['lamellae', 'bifu'], mingScaleCoat: ['scale', 'bifu'],
+  mingVest: null, mingBrigandine: ['brigandine'], mingLamellar: ['lamellae', 'bifu'], mingScaleCoat: ['scale', 'bifu'],
   bannerCoat: ['brigandine'], bayaraCoat: ['brigandine', 'plate', 'munitionPlate'],
   mingElite: ['brigandine', 'plate', 'munitionPlate'], mingScale: ['scale', 'plate', 'munitionPlate'], mingEliteLamellar: ['lamellae', 'plate', 'munitionPlate'],
   ironPagoda: ['lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,

@@ -251,7 +251,9 @@ const CAJAMARCA_INCA = 1 + Object.values(CAJAMARCA.inca).reduce((sum, styles) =>
 // regulars in brigandine, garrison troops, and a few Japanese.
 const ZEELANDIA = {
   dutch: { musketeer: 9, pikeman: 6, officer: 3 },
-  koxinga: { elite: { guandao: 4, swordShield: 2 }, brigandine: { swordShield: 4, spear: 3, matchlock: 3 }, garrison: { spear: 8, dao: 2, matchlock: 2 }, ronin: { ronin: 2 } },
+  // About a third of his regulars in iron lamellar with arm guards, units of their own (spears and shields); the rest in
+  // the brigandine vest.
+  koxinga: { elite: { guandao: 4, swordShield: 2 }, brigandine: { swordShield: 3, spear: 1, matchlock: 3 }, lamellar: { spear: 2, swordShield: 1 }, garrison: { spear: 8, dao: 2, matchlock: 2 }, ronin: { ronin: 2 } },
 };
 
 // A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders
@@ -704,7 +706,8 @@ export const ARMIES = {
     ranks: {
       // His iron men, every one masked, in scale (the elite's masked scale design).
       elite: { label: 'Iron man', kinds: ['mingElite'], styles: ['guandao', 'swordShield'], make: mingRank('elite', MING_PEOPLE.koxinga, 4) },
-      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.koxinga) },
+      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], designs: [0, 1, 2], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.koxinga) },
+      lamellar: { label: 'Iron lamellar', kinds: ['mingBrigandine'], designs: [3, 4], styles: ['spear', 'swordShield'], make: mingRank('brigandine', MING_PEOPLE.koxinga, 3) },
       garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.koxinga) },
       ronin: { label: 'Rōnin', kinds: ['ronin'], styles: ['ronin'], same: { nito: 'ronin' }, make: (random, style) => roninWarrior(random, style) },
     },
@@ -1352,7 +1355,7 @@ export const SCENARIOS = {
   zeelandia: {
     title: 'Fort Zeelandia',
     place: 'Baxemboy, Formosa · 1661',
-    blurb: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers and pikemen march out to meet his army on the sand: masked iron men in scale, brigandine regulars, garrison troops and a few Japanese.",
+    blurb: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers and pikemen march out to meet his army on the sand: masked iron men in scale, regulars in the brigandine vest and in iron lamellar, garrison troops and a few Japanese.",
     scene: 'coastFort',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
@@ -1363,10 +1366,11 @@ export const SCENARIOS = {
       // The iron men, every one masked, in scale (the elite's masked scale design).
       const ironMen = company(army.elite, (style) => mingSoldier(random, style, 'elite', { people: 'mingSouth', design: 4 }));
       const regulars = company(army.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingSouth' }));
+      const lamellar = company(army.lamellar, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingSouth', design: 3 + Math.floor(random() * 2) }));
       const garrison = company(army.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingSouth' }));
       return {
         red: shootersBehind(company(ZEELANDIA.dutch, (type) => europeanSoldier(random, type))),
-        blue: shootersBehind([...ironMen, ...regulars, ...garrison, ...company(army.ronin, (style) => roninWarrior(random, style))]),
+        blue: shootersBehind([...ironMen, ...regulars, ...lamellar, ...garrison, ...company(army.ronin, (style) => roninWarrior(random, style))]),
       };
     },
     // The armies its sides may be set up from (ARMIES; muster.js).

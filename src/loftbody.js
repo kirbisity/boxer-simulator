@@ -701,7 +701,8 @@ export const ARMOR_KINDS = {
   mingBrigandine: {
     trunk: [[-0.06, 0.96, 1.2, { studded: 22, base: 'cloth', edge: 'cloth2', opening: 0.012 }], [0.14, 0.24, 1.3, { buckle: 'gold', base: 'leather' }]],
     skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
-    upperArm: [-0.26, 0.62, 1.52, { studded: 12, base: 'cloth', edge: 'cloth2' }], forearm: [-0.04, -0.03, 1.26, 'steel'],
+    // Sleeveless: the rank and file's coat is a vest (the surviving bumianjia vests, the user's two photographs); the
+    // arms only in the quilted sleeves of the coat under it. (The elite's coat keeps its arm guards; the lamellar its own.)
   },
   // The Eight Banners' armour (mianjia, cloth armour, the Jurchen's of the 1610s-30s; the Qing's after): the Ming
   // brigandine's own make, iron plates riveted inside a long coat, the rivet heads in rows over it, and drawn as

@@ -282,8 +282,9 @@ function mingGarrisonDesign(label, vest, sash, wrap) {
 // Brigandine: the coat's cloth, gilt rivets, the iron hat.
 // `look`: the same protection drawn as lamellar (`kind: 'mingLamellar'`, its `lace`).
 // `helm`: the hat's design and finish (chinahelms.js MING_HELMS, CHINA_FINISHES).
-function mingBrigandineDesign(label, cloth, iron, look = {}, helm = {}) {
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
+// The vest's (no `look.kind`) arms in the quilted cotton sleeves of the coat under it, undyed; the lamellar's and the scale's under their arm guards in the coat's cloth.
+function mingBrigandineDesign(label, cloth, iron, look = {}, helm = {}, extra = {}) {
+  return { label, ...extra, top: { kind: 'longsleeve', color: look.kind ? shade(cloth, 0.7) : '#d6cbb2' }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
@@ -1277,11 +1278,16 @@ export const OUTFITS = {
     label: 'Ming — brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     sidearm: 'dao',
     spare: 'dagger',
-    // Armour at 0.55 of its old weight (was 0.26): ~12 kg on an 81 kg man, against a brigandine's 8–15 kg.
-    extraMass: 0.143,
+    // ~10 kg on an 81 kg man: the vest without the shoulder guards and bracers (a brigandine's 8–15 kg).
+    extraMass: 0.125,
     // Cut 0.8 and blunt 0.63 (were 0.7 and 0.6; under the elite's 0.65): plates riveted inside a padded coat turn an edge and spread a blow; pierce
-    // 0.47 (was 0.5): a point finds the rivet lines. The same over the head and the bracered limbs (uniform).
-    protection: { blunt: 0.63, cut: 0.8, pierce: 0.47, bullet: { head: 0.3, torso: 0.5, limb: 0 } },
+    // 0.47 (was 0.5): a point finds the rivet lines. Over the trunk and the skirt; the vest has no sleeves, so the arms have only the quilted
+    // cotton of the coat under it (a padded jack's sleeve: some of a blow spread, an edge slowed, a point little). The lamellar and the scale
+    // (outfitsets.js) keep their arm guards and their arms' protection.
+    protection: {
+      blunt: 0.63, cut: 0.8, pierce: 0.47, bullet: { head: 0.3, torso: 0.5, limb: 0 },
+      regions: { UpperArm: { blunt: 0.25, cut: 0.3, pierce: 0.15 }, Forearm: { blunt: 0.25, cut: 0.3, pierce: 0.15 } },
+    },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.2,
@@ -1289,9 +1295,11 @@ export const OUTFITS = {
       mingBrigandineDesign('Red', '#9a1f1a', '#8f949b', {}, { design: 'yongBell', finish: 'red' }),
       mingBrigandineDesign('Blue', '#22356a', '#8f949b', {}, { design: 'rivetedTube', finish: 'steel' }),
       mingBrigandineDesign('Black', '#1c1c20', '#6f747c', {}, { design: 'cloudBell', finish: 'dark' }),
-      mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }, { design: 'plainPoint', finish: 'iron' }),
-      mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a', cord: '#22356a' }, { design: 'plainPoint', finish: 'dark' }),
-      mingBrigandineDesign('Iron scale, red coat', '#9a1f1a', '#8f949b', { kind: 'mingScaleCoat', lace: '#3a1410' }, { design: 'yongBell', finish: 'steel' }),
+      // The lamellar and the scale: units of their own, with arm guards (outfitsets.js), never dealt at random to a
+      // brigandine man (`chosen`): Koxinga's army at Zeelandia brings its lamellar men (scenarios.js ZEELANDIA).
+      mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }, { design: 'plainPoint', finish: 'iron' }, { chosen: true }),
+      mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a', cord: '#22356a' }, { design: 'plainPoint', finish: 'dark' }, { chosen: true }),
+      mingBrigandineDesign('Iron scale, red coat', '#9a1f1a', '#8f949b', { kind: 'mingScaleCoat', lace: '#3a1410' }, { design: 'yongBell', finish: 'steel' }, { chosen: true }),
     ],
   },
   // Ming elite: the long brigandine coat to the knee reinforced with plates,

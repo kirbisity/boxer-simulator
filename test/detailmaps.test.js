@@ -218,8 +218,8 @@ test('the foot soldier\'s plate is munition plate with turned edges; the Ming co
     assert.ok(on.kinds.munitionPlate > 0 && on.kinds.harnessEdge > 0, `footman ${design}: ${JSON.stringify(on.kinds)}`);
     assert.equal(on.kinds.plate, undefined, `footman ${design}: no plain plate left`);
   }
-  // The Ming coats: the brigandine (designs 0-2), its lamellar (3, 4) and scale (5) variants.
-  for (const design of [0, 3, 5]) {
+  // The Ming coats with their steel bracers: the lamellar (3, 4) and scale (5) variants (the brigandine vest, 0-2, has none).
+  for (const design of [3, 5]) {
     const on = built({ ...structuredClone(PRESETS.knight), outfit: { kind: 'mingBrigandine', design } }, true);
     assert.ok(on.kinds.bifu > 0, `mingBrigandine ${design}: ${JSON.stringify(on.kinds)}`);
   }

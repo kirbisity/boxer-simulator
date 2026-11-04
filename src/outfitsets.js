@@ -268,17 +268,17 @@ export const OUTFIT_SETS = {
     {
       key: 'tube', designs: [1], name: 'Ming brigandine — riveted helmet',
       blurb: 'The same cotton vest with its hidden steel plates, under a tall helmet of riveted iron strips. The vest keeps its secrets; the helmet is there for all to see.\nWhy guard the head so honestly? Because inspectors counted helmets, and helmets are easy to count. The hidden plates were not, so quartermasters sold them to blacksmiths by the pound. Many men marched to the Wall with a solid helmet and an empty coat.\n“A guarded head, or a hollow chest. It all depended on which piece the inspector bothered to tap.”',
-      patch: { extraMass: 0.146, helmet: { mass: 1.6, padding: 0.35, curve: 0.75 }, protection: { regions: { head: { blunt: 0.58, cut: 0.87, pierce: 0.58 } } } },
+      patch: { extraMass: 0.128, helmet: { mass: 1.6, padding: 0.35, curve: 0.75 }, protection: { regions: { head: { blunt: 0.58, cut: 0.87, pierce: 0.58 } } } },
     },
     {
       key: 'lamellar', designs: [3, 4], name: 'Ming iron lamellar — pointed helmet',
       blurb: 'Iron plates laced in rows under a plain pointed helmet, a design older than the dynasty, every plate on the outside where anyone can check it. A border soldier might wear his grandfather’s.\nSo with nothing hidden to steal, what did the quartermaster skimp on? The laces. Cheap cord rotted in the rainy season. In Korea in 1593 Ming soldiers met Japanese swordsmen in the spring mud, and the soggy laces gave way like old promises.\n“A family heirloom, or a heap of loose plates. It all depended on how long the cord had sat in the rain.”',
-      patch: { extraMass: 0.15, protection: { blunt: 0.6, cut: 0.83, pierce: 0.5, regions: { head: { blunt: 0.54, cut: 0.86, pierce: 0.6 } } } },
+      patch: { extraMass: 0.15, protection: { blunt: 0.6, cut: 0.83, pierce: 0.5, regions: { head: { blunt: 0.54, cut: 0.86, pierce: 0.6 }, UpperArm: { blunt: 0.6, cut: 0.83, pierce: 0.5 }, Forearm: { blunt: 0.6, cut: 0.83, pierce: 0.5 } } } },
     },
     {
       key: 'scale', designs: [5], name: 'Ming iron scale coat',
       blurb: 'A coat of overlapping iron scales under the bell helmet, running down the chest like a fish’s side. A blade slides off it the way a fish slips out of your hand.\nYet what does a starving garrison sell first? Its most expensive coat. At Sarhu in 1619 the Ming sent four separate columns against the Manchus, who destroyed them one at a time, stripped the scales off the dead and wore them home.\n“A coat of iron scales, or a Manchu’s souvenir. It all depended on whether the four columns marched together.”',
-      patch: { extraMass: 0.15, protection: { blunt: 0.58, cut: 0.84, pierce: 0.44, regions: { head: { blunt: 0.55, cut: 0.85, pierce: 0.55 } } } },
+      patch: { extraMass: 0.15, protection: { blunt: 0.58, cut: 0.84, pierce: 0.44, regions: { head: { blunt: 0.55, cut: 0.85, pierce: 0.55 }, UpperArm: { blunt: 0.58, cut: 0.84, pierce: 0.44 }, Forearm: { blunt: 0.58, cut: 0.84, pierce: 0.44 } } } },
     },
   ],
   mingElite: [

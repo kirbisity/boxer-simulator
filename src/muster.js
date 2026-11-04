@@ -84,7 +84,9 @@ export function unitOf(units, inputs) {
   for (const unit of units) {
     const rank = ARMIES[unit.army].ranks[unit.rank];
     const style = rank.same?.[inputs.style] ?? inputs.style;
-    if (style === unit.style && rank.kinds.includes(inputs.outfit?.kind) && Boolean(rank.mounted) === Boolean(inputs.mounted)) return unit;
+    // A rank that shares its kit with another tells its men by their designs (`designs`: Koxinga's vests and his lamellar).
+    const design = !rank.designs || rank.designs.includes(inputs.outfit?.design ?? 0);
+    if (style === unit.style && rank.kinds.includes(inputs.outfit?.kind) && design && Boolean(rank.mounted) === Boolean(inputs.mounted)) return unit;
   }
   return null;
 }
