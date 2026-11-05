@@ -32,7 +32,7 @@ import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
 import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
-import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, stepHorse, stepTurret, strikeHorses } from './physics/mounted.js';
+import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
@@ -174,7 +174,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // What he has left to shoot (physics/ranged.js ammoLeft: arrows, or bolts and charges), and since when he has held a shot his own men foul (ai.js).
     arrows: undefined, rounds: undefined, holdingShot: undefined,
     aiFleeing: undefined, aiFleeSince: undefined, aiCharge: undefined,
-    mount: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
+    mount: undefined, rideYaw: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
     // Level mode (terrain.js, levelmode/stage.js): dormant (his section is not active: he is not simulated, thought for or drawn), air (off the ground, falling), landedAt (the last hard landing), spawn (his post in the stage).
     dormant: undefined, air: undefined, landedAt: undefined, spawn: undefined,
     // A jump (physics/jump.js: startJump): jump (the one under way: { phase, t, ... }), jumpReadyAt (when he can jump again), jumpBody (his body's jump, cached),
@@ -4513,6 +4513,8 @@ function integrate(fighter, h, time) {
   // The muscles hold each part up against gravity, except in the air (terrain): a man off a ledge falls.
   const holding = fighter.air ? 0 : WORLD.gravity;
   const ballistic = fighter.jump?.phase === 'air';
+  // In the saddle through a turn: what his lean into it carries of its push across (physics/mounted.js turnCarried).
+  const carried = fighter.mount ? turnCarried(fighter) : null;
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const info = PARTICLE_INFO[index];
     const base = index * 3;
@@ -4529,6 +4531,7 @@ function integrate(fighter, h, time) {
         // the part up against gravity — all within the muscle's force.
         want[axis] = omega * omega * (target[axis] - fighter.x[base + axis]) + 2 * zeta * omega * (velocity[axis] - fighter.v[base + axis]) + (axis === 1 ? holding : 0);
       }
+      if (carried) for (let axis = 0; axis < 3; axis += 1) want[axis] += carried[axis];
       // In a jump's flight the hips go as they were thrown: the stance follows them (jumpStance), the muscles only keep the pose.
       if (ballistic && info.anchor === null) want[1] = 0;
       const size = vec.length(want);
