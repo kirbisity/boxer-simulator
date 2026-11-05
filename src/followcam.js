@@ -79,6 +79,21 @@ export const FOLLOW_CAM = {
   roomSeconds: 0.5,
   // Locked on: both men in the picture, with this much (m) to spare beyond each.
   lockMargin: 0.5,
+  // Locked on a man further off than `from` m (all of it from `to` m: an archer's mark, a horse archer's, a man across a battle), the view
+  // is not backed out to fit him: it stands `distance` m behind the player (his zoom and a narrow screen's `minHalfWidth` as ever), `pitch`
+  // rad above him, turned off the line to his man just so far that, aimed between the two, the player stands `third` of the half-frame off
+  // its middle on one side and his man as far on the other (no more than `angleMost` rad off the line). Up and down it is aimed `tilt` of
+  // the way from the player's chest to his man's, and turned no further than keeps both inside `margin` of the half-frame. Between `from`
+  // and `to` the near framing becomes the far one smoothly (eased in and out).
+  lockFar: { from: 3, to: 12, distance: 4.4, pitch: 0.16, third: 0.33, tilt: 0.1, margin: 0.8, angleMost: 0.55 },
+  // Looking ahead, moving free (the stick or the keys, walking or running, not locked on, not down): the view turns into where he is going
+  // before his body has, as a man looks where he goes. The lead (rad of the view's yaw) is `turn` s of how fast his way of going turns
+  // (that way smoothed over `headingSeconds`), plus `intent` of the angle between the way the stick asks and the way he goes (faded out
+  // between `intentFrom` and `intentTo` rad: a stick pulled back towards the camera swings nothing), at most `most` rad (eased into). None
+  // under `still` m/s, the whole of it from `brisk` m/s, so that standing still it settles back to none. It is eased over `seconds` and
+  // changes no faster than `rate` rad/s: a swing, never a whip. The player's own drag of the view stops it at once; it comes back only
+  // `pause` s after the last of his drag, from nothing. A visitor who asks for less motion (prefers-reduced-motion) gets `reduced` of it.
+  ahead: { turn: 0.45, intent: 0.35, intentFrom: 1.4, intentTo: 2.2, most: 0.4, headingSeconds: 0.2, still: 0.6, brisk: 2.5, seconds: 0.3, rate: 0.7, pause: 1, reduced: 0.4 },
   fov: 40,
 };
 
@@ -121,10 +136,116 @@ export function runFollowGoal(yaw, facing, spec = FOLLOW_CAM) {
   return yaw + off * share * share * (3 - 2 * share);
 }
 
+const smoothstep = (from, to, value) => {
+  const u = Math.max(0, Math.min(1, (value - from) / (to - from)));
+  return u * u * (3 - 2 * u);
+};
+
 /**
- * A follow camera. Returns { update, look, zoom, reset, state }.
+ * How far (rad, of his facing yaw: + turns the view to his left) the view leads where he is going (FOLLOW_CAM.ahead): `heading` the way he
+ * goes (a facing yaw), `turnRate` how fast it turns (rad/s), `intent` the way the stick asks (a facing yaw, or null), `speed` m/s.
  */
-export function createFollowCam(spec = FOLLOW_CAM) {
+export function aheadLead({ heading, turnRate = 0, intent = null, speed = 0 }, spec = FOLLOW_CAM) {
+  const ahead = spec.ahead;
+  const asked = intent === null || intent === undefined ? 0 : wrap(intent - heading);
+  const toward = asked * (1 - smoothstep(ahead.intentFrom, ahead.intentTo, Math.abs(asked)));
+  return smoothstep(ahead.still, ahead.brisk, speed) * softCap(ahead.turn * turnRate + ahead.intent * toward, ahead.most);
+}
+
+/** The unit vector from a look point to the camera (cameraarm.js armDirection; render.js placeCamera). */
+const orbitDirection = (yaw, pitch) => [Math.cos(pitch) * Math.cos(yaw), Math.sin(pitch), Math.cos(pitch) * Math.sin(yaw)];
+
+/** Where an orbit { target, yaw, pitch, distance } puts the camera. */
+export function orbitCamera({ target, yaw, pitch, distance }) {
+  const out = orbitDirection(yaw, pitch);
+  return [target[0] + out[0] * distance, target[1] + out[1] * distance, target[2] + out[2] * distance];
+}
+
+/**
+ * Where `point` falls in the picture of an orbit (the camera at orbitCamera, looking at its target, up the world's up): [x, y] from −1 to 1
+ * across and up the screen, and `ahead` (m in front of the camera; ≤ 0 behind it).
+ */
+export function framePoint(orbit, point, aspect, spec = FOLLOW_CAM) {
+  const eye = orbitCamera(orbit);
+  const forward = orbitDirection(orbit.yaw, orbit.pitch).map((value) => -value);
+  const right = [-forward[2], 0, forward[0]];
+  const rightLength = Math.hypot(right[0], right[2]) || 1;
+  right[0] /= rightLength;
+  right[2] /= rightLength;
+  const up = [right[1] * forward[2] - right[2] * forward[1], right[2] * forward[0] - right[0] * forward[2], right[0] * forward[1] - right[1] * forward[0]];
+  const off = [point[0] - eye[0], point[1] - eye[1], point[2] - eye[2]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const ahead = dot(off, forward);
+  const tanV = Math.tan(((spec.fov / 2) * Math.PI) / 180);
+  return { x: dot(off, right) / (ahead * tanV * aspect), y: dot(off, up) / (ahead * tanV), ahead };
+}
+
+/**
+ * The orbit that frames the player and the man he is locked on (FOLLOW_CAM lockAt ... lockFar): `me` and `foe` [x, y, z] (their pelvises,
+ * smoothed), `aspect` the screen's width over height, `zoom` the player's. Near: behind him off the line, backed out to fit both, aimed
+ * between them. Far: kept near him, turned and aimed so that he is on one side of the picture and his man on the other. Returns
+ * { target, yaw, pitch, distance, far } (`far` the share of the far framing).
+ */
+export function lockFraming({ me, foe, aspect = 16 / 9, zoom = 1 }, spec = FOLLOW_CAM) {
+  const far = spec.lockFar;
+  const tanV = Math.tan(((spec.fov / 2) * Math.PI) / 180);
+  const across = aspect * tanV;
+  const gap = Math.hypot(foe[0] - me[0], foe[2] - me[2]);
+  const way = gap > 1e-6 ? [(foe[0] - me[0]) / gap, (foe[2] - me[2]) / gap] : [1, 0];
+  const line = Math.atan2(-way[1], -way[0]);
+  const height = me[1] + spec.aboveHips;
+  // Near: behind him, `lockAngle` off the line, aimed `lockAt` of the way to his man, backed out for both.
+  const apart = Math.min(gap, spec.lockReach);
+  const near = {
+    target: [me[0] + way[0] * apart * spec.lockAt, height, me[2] + way[1] * apart * spec.lockAt],
+    yaw: line + spec.lockAngle,
+    pitch: spec.pitch,
+    distance: Math.max(spec.distance + apart * spec.lockBack, (spec.lockMargin + apart * 0.5) / across) * zoom,
+  };
+  const share = smoothstep(far.from, far.to, gap);
+  if (share <= 0) return { ...near, far: 0 };
+  // Far: the camera `distance` behind his chest, turned off the line so that, from it, the two men are `third` of the half-frame either side of the middle.
+  const chest = [me[0], height, me[2]];
+  const mark = [foe[0], foe[1] + spec.aboveHips, foe[2]];
+  const back = Math.max(far.distance, spec.minHalfWidth / across) * zoom;
+  const flat = back * Math.cos(far.pitch);
+  const spread = 2 * Math.atan(far.third * across);
+  let angle = spread;
+  for (let pass = 0; pass < 6; pass += 1) angle = Math.min(far.angleMost, spread + Math.atan2(flat * Math.sin(angle), gap + flat * Math.cos(angle)));
+  const eye = orbitCamera({ target: chest, yaw: line + angle, pitch: far.pitch, distance: back });
+  // Aimed across between them; up and down `tilt` of the way from him to his man, kept so that both are inside `margin` of the frame.
+  const toMe = Math.atan2(chest[2] - eye[2], chest[0] - eye[0]);
+  const toFoe = Math.atan2(mark[2] - eye[2], mark[0] - eye[0]);
+  const look = toMe + wrap(toFoe - toMe) / 2;
+  const rise = (point) => Math.atan2(point[1] - eye[1], Math.hypot(point[0] - eye[0], point[2] - eye[2]));
+  const [meRise, foeRise] = [rise(chest), rise(mark)];
+  const room = Math.atan(far.margin * tanV);
+  let tilt = meRise + (foeRise - meRise) * far.tilt;
+  tilt = Math.min(meRise + room, Math.max(foeRise - room, tilt));
+  tilt = Math.max(meRise - room, Math.min(foeRise + room, tilt));
+  // As an orbit: the look point on that line as far off as he is, the camera looking back along it.
+  const reach = Math.hypot(chest[0] - eye[0], chest[1] - eye[1], chest[2] - eye[2]);
+  const ahead = [Math.cos(tilt) * Math.cos(look), Math.sin(tilt), Math.cos(tilt) * Math.sin(look)];
+  const farOrbit = {
+    target: [eye[0] + ahead[0] * reach, eye[1] + ahead[1] * reach, eye[2] + ahead[2] * reach],
+    yaw: look + Math.PI,
+    pitch: -tilt,
+    distance: reach,
+  };
+  const mix = (a, b) => a + (b - a) * share;
+  return {
+    target: near.target.map((value, axis) => mix(value, farOrbit.target[axis])),
+    yaw: near.yaw + wrap(farOrbit.yaw - near.yaw) * share,
+    pitch: mix(near.pitch, farOrbit.pitch),
+    distance: mix(near.distance, farOrbit.distance),
+    far: share,
+  };
+}
+
+/**
+ * A follow camera. Returns { update, look, zoom, reset, state }. `reduced`: the visitor asks for less motion (less of the look ahead).
+ */
+export function createFollowCam(spec = FOLLOW_CAM, { reduced = false } = {}) {
   const cam = { ready: false };
 
   function reset() {
@@ -146,14 +267,18 @@ export function createFollowCam(spec = FOLLOW_CAM) {
     cam.last = anchor.slice();
     cam.velocity = [0, 0, 0];
     cam.lead = 0;
+    cam.ahead = 0;
+    cam.heading = null;
+    cam.turning = 0;
     cam.subjectY = anchor[1];
     cam.room = 1;
     cam.foe = input.foe ? input.foe.slice() : null;
-    cam.facing = input.foe ? Math.atan2(anchor[2] - input.foe[2], anchor[0] - input.foe[0]) + spec.lockAngle : behindYaw(input.facing);
+    const framed = input.foe ? lockFraming({ me: anchor, foe: input.foe, aspect: input.aspect, zoom: cam.zoom }, spec) : null;
+    cam.facing = framed ? framed.yaw : behindYaw(input.facing);
     cam.goalYaw = cam.facing;
     cam.yaw = cam.goalYaw;
     cam.yawV = 0;
-    cam.pitch = spec.pitch;
+    cam.pitch = framed ? framed.pitch : spec.pitch;
     cam.pitchV = 0;
     cam.distance = null;
     cam.distanceV = 0;
@@ -166,7 +291,8 @@ export function createFollowCam(spec = FOLLOW_CAM) {
    * One frame. `input`: { me: [x, y, z] (his pelvis), facing (his yaw), down (on the floor or rising),
    * foe: [x, y, z] (the man locked on's pelvis, or null), moving (walking free), running (in run mode) and speed (m/s, for the
    * run's follow), velocity ([x, y, z] m/s, his walk's: optional, else it is read from the pelvis), room (the share of the arm the walls left
-   * the frame before: 1 in the open), aspect (the screen's width over height) },
+   * the frame before: 1 in the open), aspect (the screen's width over height), intent ([x, z] the way the stick or the keys ask him to go, or
+   * null: the look ahead's) },
    * `now` (s, real time) and `dt` (s). Returns { target, yaw, pitch, distance, subject }: the orbit, and for the arm (cameraarm.js)
    * the point it is kept clear from (his chest).
    */
@@ -203,6 +329,8 @@ export function createFollowCam(spec = FOLLOW_CAM) {
       if (!cam.foe) cam.foe = input.foe.slice();
       for (let axis = 0; axis < 3; axis += 1) cam.foe[axis] = lowPass(cam.foe[axis], input.foe[axis], spec.anchorSeconds, dt);
     } else cam.foe = null;
+    // Locked on: the orbit that frames both (near: backed out for both; far: turned and aimed, not backed out).
+    const framed = locked ? lockFraming({ me: cam.anchor, foe: cam.foe, aspect: input.aspect ?? 16 / 9, zoom: cam.zoom }, spec) : null;
     // Running free, the player's look holds the view only `run.pause` s; otherwise `holdSeconds` after it.
     const running = Boolean(input.running) && !locked && !input.down;
     const manual = now < (running ? Math.min(cam.manualUntil, cam.lastLook + spec.run.pause) : cam.manualUntil);
@@ -217,7 +345,7 @@ export function createFollowCam(spec = FOLLOW_CAM) {
       cam.facing = behindYaw(input.facing);
       cam.goalYaw = goalYaw;
     } else if (locked) {
-      goalYaw = Math.atan2(cam.anchor[2] - cam.foe[2], cam.anchor[0] - cam.foe[0]) + spec.lockAngle;
+      goalYaw = framed.yaw;
       cam.facing = goalYaw;
     } else {
       if (!input.down) cam.facing += wrap(behindYaw(input.facing) - cam.facing) * (1 - Math.exp(-dt / spec.facingSeconds));
@@ -243,22 +371,37 @@ export function createFollowCam(spec = FOLLOW_CAM) {
       if (dt > 0) cam.yaw += softCap((yaw - cam.yaw) / dt, spec.turnMost) * dt;
       cam.yawV = softCap(yawV, spec.turnMost);
     }
-    const goalPitch = manual ? cam.manualPitch : spec.pitch;
+    // Looking ahead: the way he goes (his smoothed velocity's), how fast it turns, and where the stick asks him to go lead the view into
+    // the turn (aheadLead), eased and rate-limited; none locked on, down, standing, or until `look.pause` s after the player's own look.
+    const look = spec.ahead;
+    if (speed > look.still * 0.5 && dt > 0) {
+      const heading = Math.atan2(-cam.velocity[2], cam.velocity[0]);
+      const turning = cam.heading === null ? 0 : wrap(heading - cam.heading) / dt;
+      cam.turning = lowPass(cam.turning, Math.max(-6, Math.min(6, turning)), look.headingSeconds, dt);
+      cam.heading = heading;
+    } else {
+      cam.turning = lowPass(cam.turning, 0, look.headingSeconds, dt);
+      if (speed <= look.still * 0.5) cam.heading = null;
+    }
+    const looksAhead = !locked && !input.down && !manual && (input.moving || running) && now >= cam.lastLook + look.pause && cam.heading !== null;
+    const intent = input.intent ? Math.atan2(-input.intent[1], input.intent[0]) : null;
+    const lead = looksAhead ? -aheadLead({ heading: cam.heading, turnRate: cam.turning, intent, speed }, spec) * (reduced ? look.reduced : 1) : 0;
+    if (dt > 0) {
+      const step = lowPass(cam.ahead, lead, look.seconds, dt) - cam.ahead;
+      cam.ahead += Math.max(-look.rate * dt, Math.min(look.rate * dt, step));
+    }
+    const shown = cam.yaw + cam.ahead;
+    const goalPitch = manual ? cam.manualPitch : framed ? framed.pitch : spec.pitch;
     if (!manual) [cam.pitch, cam.pitchV] = spring(cam.pitch, cam.pitchV, goalPitch, spec.pitchRate, dt);
     // What it looks at: over his shoulder (to the view's right), or between the two men.
-    const right = [Math.sin(cam.yaw), -Math.cos(cam.yaw)];
+    const right = [Math.sin(shown), -Math.cos(shown)];
     const across = (input.aspect ?? 16 / 9) * Math.tan(((spec.fov / 2) * Math.PI) / 180);
-    // How far back: further, the further apart they stand; his zoom (the walls come after).
-    const gap = locked ? Math.hypot(cam.foe[0] - cam.anchor[0], cam.foe[2] - cam.anchor[2]) : 0;
-    const apart = Math.min(gap, spec.lockReach);
-    const halfWidth = locked ? spec.lockMargin + apart * 0.5 : spec.minHalfWidth;
-    const wanted = Math.max(spec.distance + apart * spec.lockBack, halfWidth / across) * cam.zoom;
+    // How far back: locked on, as the framing says (lockFraming); else his zoom, and a narrow screen's room for him (the walls come after).
+    const wanted = locked ? framed.distance : Math.max(spec.distance, spec.minHalfWidth / across) * cam.zoom;
     if (cam.distance === null) cam.distance = wanted;
     const shoulder = Math.min(spec.shoulder, cam.distance * across * spec.shoulderShare) * cam.room;
     const height = cam.anchor[1] + spec.aboveHips;
-    const goalTarget = locked
-      ? [cam.anchor[0] + ((cam.foe[0] - cam.anchor[0]) / Math.max(gap, 1e-6)) * apart * spec.lockAt, height, cam.anchor[2] + ((cam.foe[2] - cam.anchor[2]) / Math.max(gap, 1e-6)) * apart * spec.lockAt]
-      : [cam.anchor[0] + right[0] * shoulder, height, cam.anchor[2] + right[1] * shoulder];
+    const goalTarget = locked ? framed.target.slice() : [cam.anchor[0] + right[0] * shoulder, height, cam.anchor[2] + right[1] * shoulder];
     // (The look point's spring lags a moving goal by 2 / rate s of its motion: so much of it is led.)
     const led = leadOf(2 / spec.targetRate);
     for (let axis = 0; axis < 3; axis += 1) goalTarget[axis] += led[axis];
@@ -268,7 +411,7 @@ export function createFollowCam(spec = FOLLOW_CAM) {
     [cam.distance, cam.distanceV] = spring(cam.distance, cam.distanceV, wanted, spec.distanceRate, dt);
     return {
       target: cam.target.slice(),
-      yaw: cam.yaw,
+      yaw: shown,
       pitch: cam.pitch,
       distance: cam.distance,
       subject: [me[0], cam.subjectY + spec.aboveHips, me[2]],
@@ -278,6 +421,9 @@ export function createFollowCam(spec = FOLLOW_CAM) {
   /** The player turns the view (rad of yaw and pitch): kept until `holdSeconds` after the last of it. */
   function look(dyaw, dpitch, now, locked = false) {
     if (!cam.ready) return;
+    // (The look ahead is folded into the view he takes hold of: it stops where it was, without a jump.)
+    cam.yaw += cam.ahead;
+    cam.ahead = 0;
     if (now >= cam.manualUntil || cam.following) {
       cam.manualYaw = cam.yaw;
       cam.manualPitch = cam.pitch;
