@@ -13,6 +13,7 @@ import { setCardElement } from './setcard.js';
 import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { photoFaceRegions } from './photoface.js';
 import { battleOf, SCENARIOS } from './scenarios.js';
+import { addBattleThumb } from './battlethumbs.js';
 import { musterScreen } from './musterview.js';
 import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
@@ -204,10 +205,13 @@ export function installMenus(game) {
   // Stage 1 starts through `game.onStage(key)` (main.js wires it; unwired, the card does nothing); the rest are shown, not open yet.
   function stages() {
     const body = screen('stages-screen', 'Level Mode', 'One fighter, one climb. Pick a stage.', home);
-    body.append(el('div', { className: 'choices levels stages' }, ...STAGE_LIST.map((stage) => choice({
-      glyph: stage.glyph, kicker: stage.kicker, title: stage.title, text: stage.blurb, tone: stage.ready ? 'storm' : '',
-      onClick: stage.ready ? () => { if (!game.onStage) return; close(); game.onStage(stage.key); } : null,
-    }))));
+    body.append(el('div', { className: 'choices levels stages' }, ...STAGE_LIST.map((stage) => {
+      const card = choice({
+        glyph: stage.glyph, kicker: stage.kicker, title: stage.title, text: stage.blurb, tone: stage.ready ? 'storm' : '',
+        onClick: stage.ready ? () => { if (!game.onStage) return; close(); game.onStage(stage.key); } : null,
+      });
+      return stage.ready ? addBattleThumb(card, stage.key) : card;
+    })));
     show('stages-screen');
   }
 
@@ -219,6 +223,7 @@ export function installMenus(game) {
     const yard = choice({ glyph: '🎯', kicker: 'Start here · two minutes', title: 'Tutorial', text: 'Every control, one at a time, against a knight who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
     const card = ([key, level]) => {
       const play = choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', agincourt: '🏹', cerignola: '🔥', sekigahara: '🏯', pyongyang: '🐉', cajamarca: '☀️', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } });
+      addBattleThumb(play, key);
       // A battle of armies (a `cast`) can be set up; a duel cannot.
       if (!level.cast) return play;
       return el('div', { className: 'level-card' }, play, el('button', { className: 'level-setup', type: 'button', textContent: '⚙ Set up', title: `Set up the armies of ${level.title}`, onclick: () => muster(key) }));

@@ -1055,6 +1055,14 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
 .level-card { position: relative; display: grid; min-width: 0; }
 .level-setup { position: absolute; top: 12px; right: 12px; padding: 7px 12px; border-radius: 999px; background: rgba(10, 12, 18, 0.82); border-color: rgba(255, 207, 74, 0.45); color: var(--gold); font-weight: 600; }
 .level-setup:hover, .level-setup:focus-visible { background: rgba(255, 207, 74, 0.16); }
+/* A battle's still (battlethumbs.js): a close shot of it across the card's top, in the glyph's place. */
+.choice.has-thumb { --thumb-pad: 18px; }
+.choice.has-thumb .glyph { display: none; }
+.choice .thumb { display: block; width: calc(100% + 2 * var(--thumb-pad)); max-width: none; margin: calc(-1 * var(--thumb-pad)) calc(-1 * var(--thumb-pad)) 0; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 13px 13px 0 0; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); }
+@media (max-width: 760px) {
+  .choice.has-thumb { --thumb-pad: 12px; }
+  .choice .thumb { aspect-ratio: 12 / 5; }
+}
 /* The whole screen, never scrolled: the map takes what room is left. */
 .screen.muster { overflow: hidden; align-content: stretch; justify-items: stretch; grid-template-rows: auto auto minmax(0, 1fr) auto auto auto; gap: 8px; background: rgba(5, 6, 10, 0.94); }
 .screen.muster > * { width: min(980px, 100%); justify-self: center; min-width: 0; }

@@ -10,6 +10,7 @@ function fakeDocument(ids) {
       tag, children: [], className: '', hidden: false, dataset: {}, style: {}, onclick: null, textContent: '', parent: null,
       classList: { add(name) { node.className += ` ${name}`; }, remove() {}, contains: (name) => node.className.split(' ').includes(name) },
       append(...items) { for (const item of items) { if (item && typeof item === 'object') item.parent = node; node.children.push(item); } },
+      prepend(...items) { for (const item of items) if (item && typeof item === 'object') item.parent = node; node.children.unshift(...items); },
       replaceChildren(...items) { node.children = []; node.append(...items); },
       addEventListener() {},
       get parentElement() { return node.parent ?? node; },
