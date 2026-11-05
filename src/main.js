@@ -410,9 +410,11 @@ function newBout() {
     names.set(entry.inputs.name, count);
     if (count > 1) entry.inputs = { ...entry.inputs, name: `${entry.inputs.name.split(" ")[0]} ${count}` };
   }
-  // Horsemen need room to charge and wheel: a place too small for it gives way to the open field.
+  // Horsemen need room to charge and wheel: a place too small for it gives way to the open field (not in the sandbox: there the
+  // place chosen is kept, riders and all).
   const mounted = [...sides[0], ...sides[1]].some((entry) => isMounted(entry.inputs));
-  const place = scenario?.scene ?? (mounted && (PLACE_ARENAS[state.place]?.halfX ?? 0) < PLACE_ARENAS.field.halfX * 0.6 ? 'field' : state.place);
+  const cramped = mounted && state.game !== 'sandbox' && (PLACE_ARENAS[state.place]?.halfX ?? 0) < PLACE_ARENAS.field.halfX * 0.6;
+  const place = scenario?.scene ?? (cramped ? 'field' : state.place);
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
   clearGore(scene);
@@ -1539,7 +1541,7 @@ function refreshMountButton() {
   button.dataset.all = String(riders.length > 0 && riding === riders.length);
   button.textContent = riders.length > 0 && riding === riders.length ? '🐎 Dismount all' : '🐎 Mount all';
   button.title = riders.length
-    ? `${riding} of the ${riders.length} who can ride are mounted. Each fighter's own Mounted choice is in Build fighters. A mounted fight in a small scene moves to the open field (the battle maps keep their own ground, with their cavalry already mounted).`
+    ? `${riding} of the ${riders.length} who can ride are mounted. Each fighter's own Mounted choice is in Build fighters. They ride in whatever scene is chosen (the battle maps keep their own ground, with their cavalry already mounted).`
     : 'Nobody here rides (knights, samurai, steppe, sultanates, Ming cavalry...)';
 }
 $('#mounted').addEventListener('click', () => {
