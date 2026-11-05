@@ -193,7 +193,7 @@ let tutorial = { signal() {}, update() {}, setDevice() {}, start() {}, stop() {}
 // `cameraWalls`: where it may stand in a place that keeps it inside (the Colosseum's oval, the subway's wall) or in a stage (the cutscene's and the ending's use).
 let cameraWalls = null;
 const cameraRoomTest = (x, z, y) => !cameraWalls || cameraWalls(x, z, y);
-const followCam = createFollowCam();
+const followCam = createFollowCam(undefined, { reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
 
 // The camera when watching (watchcam.js): framing everyone, or taken over by the viewer's zoom and tap.
 let watchCam = createWatchCam();
@@ -1109,6 +1109,8 @@ function followCamera(fighter, dt) {
     velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]],
     room: armRoom(),
     moving: Boolean(fighter.walking || ((state.orders.stick || state.orders.keyStick) && state.orders.lock === null)),
+    // (Where the stick or the keys ask him to go: the view looks ahead into it.)
+    intent: (state.orders.stick ?? state.orders.keyStick)?.dir ?? null,
     aspect: scene.camera.aspect,
     from: { yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance, target: [orbit.target.x, orbit.target.y, orbit.target.z] },
   }, realSeconds(), dt));
