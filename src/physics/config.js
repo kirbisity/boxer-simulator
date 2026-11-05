@@ -1007,7 +1007,10 @@ export const WORLD = {
   // sole comes down on, as a share of the stepper's leg (hip to sole): a leg lifted to a high step, the thigh near level
   // (a man's ~0.68 m: a chair's seat is a step, a crawler's back at ~0.6 m a high one, a man getting up, his head at a
   // metre, is no step at all: the leg meets his side, physics.js trodOver).
-  bodyFooting: { grip: 0.5, least: 0.03, most: 0.75 },
+  // `stepOver`: a man not hurrying (slower than `below` m/s: a walk, a jog, not a run) and not broken watches where he puts his
+  // feet and steps over a body lying low, no higher than `height` of his leg (a man lying flat, ~0.25-0.3 m: a long step over
+  // him); a crawler (moving under him, his back ~0.6 m) is not stepped over, and a man running or fleeing comes down where his stride lands.
+  bodyFooting: { grip: 0.5, least: 0.03, most: 0.75, stepOver: { below: 2.2, height: 0.45 } },
   // A blow at a man low before him (lowstrike.js: lying, getting up, on his knees): made at a place on his body, not at a standing
   // man's chest in the air above him. The striker bends to it: `stoop` is the share (0 to 1) of the deepest bend he takes, enough
   // that the striking part (the fist; the blade's contact point; the point) meets the place with the arm (or the leg) `fit` of

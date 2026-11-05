@@ -2908,6 +2908,10 @@ function footDown(world, fighter, foot) {
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   const under = partUnder(fighters, near, foot.planted[0], foot.planted[2], fighter.radius[foot.index], (other) => other === fighter, legLength);
   if (!under) return;
+  // Not hurrying, nor broken: he sees a man lying low where he goes and steps over him (WORLD.bodyFooting.stepOver; a crawler,
+  // moving under him, is met as before).
+  const over = WORLD.bodyFooting.stepOver;
+  if (!fighter.panicked && !under.fighter.crawling && Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) < over.below && under.height <= over.height * legLength) return;
   const side = foot.index === P.lFoot ? 'l' : 'r';
   const lying = under.fighter;
   const speed = Math.max(0, -fighter.v[foot.index * 3 + 1]);
