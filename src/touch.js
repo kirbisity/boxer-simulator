@@ -1,11 +1,13 @@
 // The fight's controls on screen, for a finger or a mouse: the game surface
-// (a drag begun in the top half turns the view, two fingers there zoom; a
-// drag begun in the bottom half is a floating stick; a mouse's right button
-// always turns the view; press and hold to shove, or to hold down a man on
-// the floor), the attack controls the player chose (fightui/: a tap on
-// his man himself where to hit, or a button for each kind of blow, with the
-// name of each attack he makes and how it went), a big Guard button, a Lock
-// button above it, Jump above Lock and Crawl below Guard, one special button in a fixed place, the weapon art's own
+// (the movement stick, a fixed pad low at the left drawn faintly at rest: a
+// drag begun on it moves; a drag begun anywhere else turns the view, two
+// fingers there zoom; a mouse's right button always turns the view; press
+// and hold to shove, or to hold down a man on the floor), the attack controls
+// the player chose (fightui/: a tap on his man himself where to hit, or a
+// button for each kind of blow, with the name of each attack he makes and how
+// it went), a big Guard button with Crawl (or Stand) under it, Lock to the
+// left of the two (low, under the right thumb), Jump over the Guard, one
+// special button in a fixed place, the weapon art's own
 // button (shown while the art is charged, weaponarts.js), and the fight-mode
 // HUD (the player's status low down, his man's over his head); in a battle,
 // a small column of orders to his men at the top left (fightui/command.js).
@@ -15,7 +17,7 @@
 import { P } from './body.js';
 import { hurtShare } from './ai.js';
 import { ACTIONS, CONTROL, contextAction, crawlReady, horseAction, lockCandidate, moveName, toggleCrawl } from './control.js';
-import { createRecognizer, GESTURE, screenZone } from './gesture.js';
+import { createRecognizer, stickZone } from './gesture.js';
 import { inFight, jumpNow, opponentFor, point, reachOf, sidearmSwapReady } from './physics.js';
 import { fightUiInstall } from './fightui/index.js';
 import { FIGHT_UI_CONTROL_ICONS } from './fightui/icons.js';
@@ -56,19 +58,28 @@ const uiElement = (tag, className, text) => Object.assign(document.createElement
  */
 export function installFightControls(root, hooks) {
   const surface = root.appendChild(uiElement('div', 'touch-surface'));
-  surface.setAttribute('aria-label', 'Fight: drag in the top half to look about, in the bottom half to move; tap your man where to hit him, press and hold to shove or hold a man down');
-  const gestures = createRecognizer(GESTURE, { zoneOf: (at) => {
-    const { top, height } = playArea();
-    return screenZone(at[1], top, height);
-  } });
-  // The two halves, named faintly until each has been used.
+  surface.setAttribute('aria-label', 'Fight: drag the stick at the bottom left to move, anywhere else to look about; tap your man where to hit him, press and hold to shove or hold a man down');
+  // The movement stick: a fixed pad, low at the left, its ring and knob drawn faintly at rest.
+  const stick = root.appendChild(uiElement('div', 'stick'));
+  stick.setAttribute('aria-hidden', 'true');
+  const knob = stick.appendChild(uiElement('i', 'knob'));
+  const stickPad = () => {
+    const box = stick.getBoundingClientRect();
+    return box.width > 0 ? { centre: [box.left + box.width / 2, box.top + box.height / 2], radius: box.width / 2 } : null;
+  };
+  const gestures = createRecognizer(undefined, {
+    zoneOf: (at) => {
+      const pad = stickPad();
+      return pad ? stickZone(at, pad.centre, pad.radius) : 'look';
+    },
+    stickPad,
+  });
+  // What the stick and the rest of the screen do, named faintly until each has been used.
   const hints = root.appendChild(uiElement('div', 'zone-hints'));
   hints.setAttribute('aria-hidden', 'true');
-  hints.innerHTML = '<span class="look"></span><i class="divider"></i><span class="move"></span>';
+  hints.innerHTML = '<span class="look"></span>';
+  const hintOf = { look: hints.querySelector('.look'), move: stick.appendChild(uiElement('span', 'move')) };
   const used = { look: false, move: false, at: null };
-  const stick = root.appendChild(uiElement('div', 'stick'));
-  stick.appendChild(uiElement('i', 'knob'));
-  stick.hidden = true;
   const mark = root.appendChild(uiElement('div', 'tap-mark'));
   mark.hidden = true;
   const guard = root.appendChild(uiElement('button', 'fight-button guard-button'));
@@ -89,8 +100,9 @@ export function installFightControls(root, hooks) {
   horseButton.innerHTML = '<b>🐎</b><span class="label">Dismount</span><kbd>/</kbd>';
   horseButton.hidden = true;
   const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
-  lock.innerHTML = '<b>◎</b><span class="label">Lock</span><span class="who"></span>';
-  // Jump (above Lock) and Crawl (below Guard): round, in the right-hand stack.
+  lock.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.lock}</b><span class="label">Lock</span><span class="who"></span><kbd>Tab</kbd>`;
+  lock.setAttribute('aria-label', 'Lock on');
+  // Jump (over the Guard) and Crawl (under it; Stand while he crawls: the one button both ways): round, in the right-hand stack.
   const jump = root.appendChild(uiElement('button', 'fight-button jump-button'));
   jump.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.jump}</b><span>Jump</span><kbd>Space</kbd>`;
   jump.setAttribute('aria-label', 'Jump');
@@ -194,7 +206,7 @@ export function installFightControls(root, hooks) {
         if (stickId !== event.id) continue;
         stickId = null;
         orders.stick = null;
-        stick.hidden = true;
+        restStick();
       } else if (event.type === 'tap') {
         // (With Body, a tap on his man strikes there.)
         fightUi.tap(event);
@@ -211,35 +223,34 @@ export function installFightControls(root, hooks) {
     }
   }
 
-  /** The fight's part of the surface: above the footer. */
-  function playArea() {
-    const box = surface.getBoundingClientRect();
-    const footer = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--controls-height')) || 0;
-    return { left: box.left, top: box.top, width: box.width, height: Math.max(1, box.height - footer) };
-  }
-
-  /** A half of the screen has been used: once both have, the hints fade. */
+  /** The stick or the look has been used: once both have, the hints fade. */
   function markUsed(zone) {
     if (used[zone]) return;
     used[zone] = true;
-    hints.querySelector(`.${zone}`).classList.add('used');
+    hintOf[zone].classList.add('used');
     if (used.look && used.move) used.at = hooks.now();
   }
 
   /** The hints in the words of the hand in use: a finger, or a mouse and keys. */
   function wordHints(mouse) {
-    hints.querySelector('.look').textContent = mouse ? 'Drag here or right-drag · look' : 'Drag here · look';
-    hints.querySelector('.move').textContent = mouse ? 'Drag here or WASD · move' : 'Drag here · move';
+    hintOf.look.textContent = mouse ? 'Drag or right-drag · look' : 'Drag anywhere · look';
+    hintOf.move.textContent = mouse ? 'WASD' : 'Move';
   }
 
+  /** The knob follows the thumb, out to the ring. */
   function showStick(event) {
-    stick.hidden = false;
-    const radius = GESTURE.stickRadius;
+    const radius = stick.offsetWidth / 2 || 1;
     const length = Math.hypot(event.dx, event.dy) || 1;
     const reach = Math.min(radius, length);
-    stick.style.transform = `translate(${event.origin[0]}px, ${event.origin[1]}px)`;
-    stick.firstChild.style.transform = `translate(${(event.dx / length) * reach}px, ${(event.dy / length) * reach}px)`;
+    knob.style.transform = `translate(${(event.dx / length) * reach}px, ${(event.dy / length) * reach}px)`;
+    stick.classList.add('held');
     stick.classList.toggle('running', event.amount >= CONTROL.stick.runFrom);
+  }
+
+  /** Let go: the knob back in the middle, the pad faint again. */
+  function restStick() {
+    knob.style.transform = '';
+    stick.classList.remove('held', 'running');
   }
 
   // The surface's own touches: captured, so a finger that strays over a button or off the edge keeps its gesture.
@@ -447,7 +458,9 @@ export function installFightControls(root, hooks) {
     const now = hooks.now();
     handle(gestures.tick(now));
     if (now - markAt > TOUCH.markSeconds) mark.hidden = true;
-    hints.classList.toggle('gone', used.at !== null && now - used.at > TOUCH.hintFade);
+    const faded = used.at !== null && now - used.at > TOUCH.hintFade;
+    hints.classList.toggle('gone', faded);
+    hintOf.move.classList.toggle('gone', faded);
     const world = hooks.world();
     const me = hooks.player();
     const orders = hooks.orders();
@@ -493,9 +506,14 @@ export function installFightControls(root, hooks) {
     if (horseButton.hidden === Boolean(riding)) horseButton.hidden = !riding;
     if (riding) horseButton.querySelector('.label').textContent = ACTIONS[riding].label;
     const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
+    // Lock: a target sight; locked, lit, saying so and on whom.
     lock.classList.toggle('on', Boolean(locked));
-    lock.querySelector('.label').textContent = locked ? 'Unlock' : 'Lock';
-    lock.querySelector('.who').textContent = locked ? firstNameOf(locked) : '';
+    const who = locked ? firstNameOf(locked) : '';
+    if (lock.querySelector('.who').textContent !== who || lock.querySelector('.label').textContent !== (locked ? 'Locked' : 'Lock')) {
+      lock.querySelector('.label').textContent = locked ? 'Locked' : 'Lock';
+      lock.querySelector('.who').textContent = who;
+      lock.setAttribute('aria-label', locked ? `Locked on ${who}: press to let go` : 'Lock on');
+    }
     // Crawl lit while he crawls, dimmed while it cannot be pressed (locked on, down, mounted); its word is what a press does.
     crawl.classList.toggle('on', Boolean(me.crawling));
     crawl.classList.toggle('blocked', !crawlReady(world, me, orders));
@@ -544,7 +562,7 @@ export function installFightControls(root, hooks) {
     stickId = null;
     guardDown = null;
     lastAction = undefined;
-    stick.hidden = true;
+    restStick();
     mark.hidden = true;
     guard.classList.remove('on');
     jump.classList.remove('on', 'blocked');

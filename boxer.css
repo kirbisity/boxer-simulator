@@ -8,6 +8,8 @@
   --red: #e0353b;
   --blue: #3a74ec;
   --gold: #ffcf4a;
+  /* The lock-on's own colour: its button, and the name over the man it is on. */
+  --lock: #ff5c7a;
   --green: #57d68d;
   --display: 'Oswald', 'Arial Narrow', Impact, sans-serif;
   --body: 'IBM Plex Sans', system-ui, sans-serif;
@@ -499,19 +501,26 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .tap-mark { position: fixed; left: 0; top: 0; width: 46px; height: 46px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.8); pointer-events: none; z-index: 2; animation: tap-mark 0.35s ease-out forwards; }
 .tap-mark.press { border-color: var(--gold); width: 64px; height: 64px; box-shadow: 0 0 18px rgba(255, 207, 74, 0.5); }
 @keyframes tap-mark { from { opacity: 1; scale: 0.6; } to { opacity: 0; scale: 1.25; } }
-.stick { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 2; }
-.stick::before { content: ''; position: absolute; left: -70px; top: -70px; width: 140px; height: 140px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.05); }
-.stick .knob { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 255, 255, 0.55); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
+/* The movement stick: a fixed pad low at the left (touch.js; the touch is the surface's, measured against the pad), its ring
+   and knob faint at rest, brighter while held; MOVE (WASD with a mouse) under the knob until the hints fade. */
+.stick { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 20px); width: 140px; height: 140px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.04); pointer-events: none; z-index: 2; transition: border-color 0.2s, background 0.2s; }
+.stick .knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba(255, 255, 255, 0.22); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); transition: background 0.2s; }
+.stick.held { border-color: rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.07); }
+.stick.held .knob { background: rgba(255, 255, 255, 0.6); transition: none; }
 .stick.running .knob { background: var(--gold); }
+.stick .move { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font: 600 10px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); transition: opacity 0.6s; }
+.stick .move.used { opacity: 0.6; }
+.stick .move.gone { opacity: 0; transition-duration: 0.8s; }
 .charge { position: fixed; left: 0; top: 0; width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--gold); pointer-events: none; z-index: 2; box-shadow: 0 0 18px rgba(255, 207, 74, 0.5); }
 .fight-button { position: absolute; pointer-events: auto; touch-action: none; display: grid; place-items: center; align-content: center; gap: 2px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); background: rgba(10, 12, 18, 0.35); color: var(--fg); padding: 0; }
 .fight-button b { font-size: 26px; line-height: 1; }
 .fight-button span { font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
 .guard-button { right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 76px); width: 96px; height: 96px; }
 .guard-button.on { background: rgba(120, 190, 255, 0.4); border-color: #9cd0ff; }
-/* The buttons' column at the right edge, bottom to top: Crawl, Guard, Lock, Jump, the special action (each centred on the Guard's middle, 62px in). */
-.action-button { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 346px); width: 76px; height: 76px; }
-/* Jump (above Lock) and Crawl (below Guard): round, ringed like Guard; Crawl lit while he crawls, either greyed when it cannot be pressed. */
+/* The buttons' column at the right edge, bottom to top: Crawl, Guard, Jump, the special action (each centred on the Guard's middle,
+   62px in); Lock to the left of Crawl and Guard, between them in height: where the right thumb rests. */
+.action-button { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 262px); width: 76px; height: 76px; }
+/* Jump (over Guard) and Crawl (under it; Stand while he crawls): round, ringed like Guard; Crawl lit while he crawls, either greyed when it cannot be pressed. */
 /* The sidearm and the horse: small, against the right edge over the column, clear of the field (each centred on the column's 62px). */
 .swap-button, .horse-button { right: calc(42px + env(safe-area-inset-right, 0px)); width: 40px; height: 40px; gap: 0; background: rgba(10, 12, 18, 0.28); border-width: 1px; }
 .swap-button { bottom: calc(var(--controls-height, 56px) + 430px); }
@@ -520,7 +529,7 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .swap-button .label, .horse-button .label { font-size: 6.5px; letter-spacing: 0.02em; max-width: 38px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .swap-button kbd, .horse-button kbd { display: none; position: absolute; left: -4px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: 5px; background: rgba(10, 12, 18, 0.85); border: 1px solid rgba(255, 255, 255, 0.3); font: 600 9px var(--mono); color: var(--muted); }
 .fight-ui[data-device="mouse"] .swap-button kbd, .fight-ui[data-device="mouse"] .horse-button kbd { display: block; }
-.jump-button { right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 268px); width: 68px; height: 68px; }
+.jump-button { right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 180px); width: 68px; height: 68px; }
 .crawl-button { right: calc(31px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 6px); width: 62px; height: 62px; }
 .jump-button b, .crawl-button b { display: block; width: 30px; height: 30px; }
 .jump-button .fu-icon, .crawl-button .fu-icon { width: 100%; height: 100%; display: block; }
@@ -531,10 +540,10 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .crawl-button.on { background: rgba(127, 224, 192, 0.42); border-color: #7fe0c0; color: #0d1f19; }
 .jump-button.blocked, .crawl-button.blocked { opacity: 0.4; }
 .action-button.idle { opacity: 0.3; }
-/* His weapon's art, its own button (weaponarts.js): at the left, over his status, where both layouts leave the screen free (the
-   right is the Guard's column or the attack buttons' cluster); there, glowing ember-red and named, from the moment it is
-   charged until it is made. Winded, dimmed, with the word under its name. */
-.art-button { left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 74px); width: 78px; height: 78px; border-color: #ff8a3d; background: rgba(90, 24, 6, 0.6); color: #ffd2a8; box-shadow: 0 0 14px rgba(255, 110, 40, 0.65); animation: art-glow 1.1s ease-in-out infinite, art-in 0.35s ease-out; }
+/* His weapon's art, its own button (weaponarts.js): at the left, over his status (itself over the stick), where both layouts
+   leave the screen free (the right is the Guard's column or the attack buttons' cluster); there, glowing ember-red and named,
+   from the moment it is charged until it is made. Winded, dimmed, with the word under its name. */
+.art-button { left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 246px); width: 78px; height: 78px; border-color: #ff8a3d; background: rgba(90, 24, 6, 0.6); color: #ffd2a8; box-shadow: 0 0 14px rgba(255, 110, 40, 0.65); animation: art-glow 1.1s ease-in-out infinite, art-in 0.35s ease-out; }
 .art-button b { font-size: 24px; color: #ffb070; text-shadow: 0 0 8px rgba(255, 140, 60, 0.9); }
 .art-button .label { max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
 .art-button .why { font: 600 8px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: #ffb59a; }
@@ -545,12 +554,20 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 @keyframes art-glow { 0%, 100% { box-shadow: 0 0 10px rgba(255, 110, 40, 0.45); } 50% { box-shadow: 0 0 20px rgba(255, 110, 40, 0.9); } }
 @keyframes art-in { from { scale: 0.6; opacity: 0; } to { scale: 1; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .art-button { animation: none; } }
-/* Lock: big and gold-edged above the guard, under the thumb; gold, with his name, while on. */
-.lock-button { right: calc(22px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 180px); width: 80px; height: 80px; border: 3px solid var(--gold); background: rgba(40, 32, 6, 0.55); color: var(--gold); box-shadow: 0 0 14px rgba(255, 207, 74, 0.35); }
-.lock-button b { font-size: 30px; }
-.lock-button .who { font: 600 10px var(--mono); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lock-button.on { background: var(--gold); color: #191300; box-shadow: 0 0 22px rgba(255, 207, 74, 0.8); }
-.player-status { position: absolute; left: calc(14px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 10px); width: min(220px, 34vw); display: grid; gap: 4px; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+/* Lock: a target sight in its own rose, its ring dashed while free; locked, filled and glowing, LOCKED and the man's name in it. */
+.lock-button { right: calc(92px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 24px); width: 72px; height: 72px; gap: 1px; border: 2px dashed var(--lock); background: rgba(48, 8, 18, 0.5); color: var(--lock); }
+.lock-button b { display: block; width: 28px; height: 28px; }
+.lock-button span { font-size: 10px; }
+.lock-button .who { font: 700 9px var(--mono); letter-spacing: 0.02em; max-width: 86%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ffffff; }
+.lock-button .who:empty { display: none; }
+.lock-button.on { border: 3px solid #ffd3dc; background: var(--lock); color: #ffffff; text-shadow: 0 1px 2px rgba(80, 0, 20, 0.6); box-shadow: 0 0 0 4px rgba(255, 92, 122, 0.3), 0 0 22px rgba(255, 92, 122, 0.85); animation: lock-on 1.6s ease-in-out infinite; }
+.lock-button.on b { width: 22px; height: 22px; }
+.lock-button kbd { display: none; position: absolute; left: -6px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: 5px; background: rgba(10, 12, 18, 0.85); border: 1px solid rgba(255, 92, 122, 0.6); font: 600 9px var(--mono); color: #ffd3dc; }
+.fight-ui[data-device="mouse"] .lock-button kbd { display: block; }
+@keyframes lock-on { 50% { box-shadow: 0 0 0 7px rgba(255, 92, 122, 0.12), 0 0 28px rgba(255, 92, 122, 0.95); } }
+@media (prefers-reduced-motion: reduce) { .lock-button.on { animation: none; } }
+/* The player's own status: low at the left, over the stick. */
+.player-status { position: absolute; left: calc(20px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 190px); width: min(220px, 34vw); display: grid; gap: 4px; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 .player-status .top { display: flex; justify-content: space-between; gap: 8px; font: 600 13px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .player-status .tag { color: var(--gold); }
 .player-status .bar.stamina { height: 4px; }
@@ -563,39 +580,48 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .target-marker { position: fixed; left: 0; top: 0; display: grid; gap: 3px; justify-items: center; width: 92px; pointer-events: none; transition: opacity 0.4s; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 .target-marker .name { font: 600 12px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .target-marker .bar { width: 100%; height: 5px; }
-.target-marker.locked .name { color: var(--gold); }
+.target-marker.locked .name { color: var(--lock); }
+.target-marker.locked .name::before { content: '◎ '; }
 @media (max-width: 560px), (max-height: 480px) {
-  /* A phone: the column smaller (centred 56px in): Crawl, Guard, Lock, Jump, the special action. */
+  /* A phone: the column smaller (centred 56px in): Crawl, Guard, Jump, the special action; Lock left of Crawl and Guard. */
   .crawl-button { right: calc(30px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 4px); width: 52px; height: 52px; }
   .guard-button { right: calc(18px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 62px); width: 76px; height: 76px; }
-  .lock-button { right: calc(24px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 144px); width: 64px; height: 64px; }
-  .lock-button b { font-size: 24px; }
-  .jump-button { right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 214px); width: 56px; height: 56px; }
-  .action-button { right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 276px); width: 60px; height: 60px; }
+  .lock-button { right: calc(82px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 18px); width: 64px; height: 64px; }
+  .lock-button b { width: 24px; height: 24px; }
+  .lock-button span { font-size: 9px; }
+  .lock-button.on b { width: 18px; height: 18px; }
+  .jump-button { right: calc(28px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 146px); width: 56px; height: 56px; }
+  .action-button { right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 212px); width: 60px; height: 60px; }
   .jump-button b, .crawl-button b { width: 24px; height: 24px; }
   .jump-button span, .crawl-button span { font-size: 9px; }
-  .art-button { width: 64px; height: 64px; bottom: calc(var(--controls-height, 56px) + 66px); }
+  /* The stick, the status over it (clear of the knob pushed to the ring) and the art over that, a little smaller. */
+  .stick { left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 14px); width: 120px; height: 120px; }
+  .stick .knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
+  .stick .move { bottom: 9px; }
+  .player-status { left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 158px); }
+  .art-button { left: calc(16px + env(safe-area-inset-left, 0px)); width: 64px; height: 64px; bottom: calc(var(--controls-height, 56px) + 208px); }
   .art-button b { font-size: 20px; }
   .swap-button, .horse-button { right: calc(36px + env(safe-area-inset-right, 0px)); }
   .swap-button { bottom: calc(var(--controls-height, 56px) + 346px); }
   .horse-button { bottom: calc(var(--controls-height, 56px) + 392px); }
 }
+/* A small phone: the stick a little smaller still, clear of the attack buttons' fan. */
+@media (max-width: 380px) { .stick { width: 108px; height: 108px; } }
 @media (max-height: 480px) {
-  /* A phone on its side: too little height for five; the special action goes beside Lock, to its left. */
-  .action-button { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 146px); }
-  /* The art: no height over his status for it (the attack legend is there), so beside the status, to its right, low. */
-  .art-button { left: calc(30px + min(220px, 34vw) + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 6px); width: 58px; height: 58px; }
+  /* A phone on its side. The art: no height over his status for it (the attack legend is there), so right of the stick, low. */
+  .art-button { left: calc(150px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 22px); width: 58px; height: 58px; }
   .art-button b { font-size: 18px; }
   /* The sidearm and the horse: in the top bar, left of the sound button. */
   .swap-button, .horse-button { bottom: auto; top: calc(10px + env(safe-area-inset-top, 0px)); }
   .swap-button { right: calc(60px + env(safe-area-inset-right, 0px)); }
   .horse-button { right: calc(106px + env(safe-area-inset-right, 0px)); }
 }
-/* The two halves of the surface: a drag in the top one looks, in the bottom one moves. Named faintly until used. */
-.zone-hints { position: absolute; left: 0; right: 130px; top: 0; bottom: var(--controls-height, 56px); display: grid; grid-template-rows: 1fr auto 1fr; pointer-events: none; transition: opacity 0.8s; }
-.zone-hints span { align-self: center; justify-self: center; padding: 4px 10px; border-radius: 999px; font: 600 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); background: rgba(10, 12, 18, 0.3); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); transition: opacity 0.6s; }
+/* The rest of the surface: a drag anywhere off the stick looks. Named faintly, once, until used (the stick names itself). */
+.zone-hints { position: absolute; left: 0; right: 0; top: calc(66px + env(safe-area-inset-top, 0px)); display: flex; justify-content: center; pointer-events: none; transition: opacity 0.8s; }
+/* A phone on its side: the clock and his man's name fill the top middle, so at the left, over the player's status. */
+@media (max-height: 480px) { .zone-hints { left: calc(16px + env(safe-area-inset-left, 0px)); right: auto; top: calc(72px + env(safe-area-inset-top, 0px)); } }
+.zone-hints span { padding: 4px 10px; border-radius: 999px; font: 600 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55); background: rgba(10, 12, 18, 0.3); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); transition: opacity 0.6s; }
 .zone-hints span.used { opacity: 0.45; }
-.zone-hints .divider { display: block; height: 0; border-top: 1px dashed rgba(255, 255, 255, 0.16); margin: 0 12px; }
 .zone-hints.gone { opacity: 0; }
 /* The attack just made: its name big, where it went and how it went small; a moment, then gone. */
 /* The man's own attack, small over his head. */
@@ -624,8 +650,10 @@ body[data-game="tutorial"] .hud, body[data-game="tutorial"] .log { display: none
   .tutorial-card .text { font-size: 13.5px; }
 }
 /* The step's own control stands out: the half of the screen, the attack controls, or the button to press. */
-body[data-tutorial-step="look"] .zone-hints, body[data-tutorial-step="move"] .zone-hints { opacity: 1; }
-body[data-tutorial-step="look"] .zone-hints .look, body[data-tutorial-step="move"] .zone-hints .move { opacity: 1; color: var(--gold); border: 1px solid rgba(255, 207, 74, 0.6); background: rgba(40, 32, 6, 0.55); }
+body[data-tutorial-step="look"] .zone-hints { opacity: 1; }
+body[data-tutorial-step="look"] .zone-hints .look { opacity: 1; color: var(--gold); border: 1px solid rgba(255, 207, 74, 0.6); background: rgba(40, 32, 6, 0.55); }
+body[data-tutorial-step="move"] .stick { border-color: var(--gold); animation: teach-pulse 1.1s ease-in-out infinite; }
+body[data-tutorial-step="move"] .stick .move { opacity: 1; color: var(--gold); }
 body[data-tutorial-step="strike"] .fu-target, body[data-tutorial-step="strike"] .fu-buttons .fu-btn, body[data-tutorial-step="combo"] .fu-target { animation: teach-pulse 1.1s ease-in-out infinite; }
 body[data-tutorial-step="lock"] .lock-button, body[data-tutorial-step="unlock"] .lock-button, body[data-tutorial-step="guard"] .guard-button, body[data-tutorial-step="pickUp"] .action-button, body[data-tutorial-step="jump"] .jump-button, body[data-tutorial-step="crawl"] .crawl-button { animation: teach-pulse 1.1s ease-in-out infinite; }
 @keyframes teach-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 207, 74, 0.7); } 50% { box-shadow: 0 0 0 12px rgba(255, 207, 74, 0); } }

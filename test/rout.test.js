@@ -110,7 +110,7 @@ test('the player can go down to crawl and is still in the fight; up again if his
   assert.equal(playerCrawl(world, me, true), true);
   assert.ok(me.crawling);
   assert.equal(inFight(me), true, 'his own choice: still in it');
-  assert.equal(contextAction(world, me), 'stand');
+  assert.equal(contextAction(world, me), null, 'the special button offers no Stand: the Crawl button (reading Stand) is the one way up');
   assert.equal(playerCrawl(world, me, false), true);
   assert.ok(!me.crawling);
   playerCrawl(world, me, true);

@@ -5,9 +5,9 @@
 // main.js and touch.js fill the orders, tests drive them directly.
 
 import { P } from './body.js';
-import { AI, chooseDefence, hurtShare } from './ai.js';
+import { AI, chooseDefence } from './ai.js';
 import { DEFENCES, MOVES, pointRoomOf, STYLES, moveRange } from './moves.js';
-import { aimPoint, BLOCKS, dropWeapon, holdGuard, hostile, inFight, legBroken, legShare, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
+import { aimPoint, BLOCKS, dropWeapon, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
 import { dismount, dismountReady, horseToMount, mountHorse } from './physics/mounted.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
@@ -45,8 +45,6 @@ export const CONTROL = {
   // far off: `foeWithin` m (a man at the other end of a courtyard is not a man to square up to). A man with a gun or bow
   // always faces his man (he aims); in a level stage only a man aware of him counts as near.
   facing: { foeWithin: 4.5 },
-  // The special button offers Crawl once he is this hurt (hurtShare, or his legs' damage), with nothing else to offer.
-  crawlOfferFrom: 0.35,
   // Crawling by choice onto a slope steeper than `crawlSteep` (rise over run, looked at `crawlLook` m along his way: a flight of
   // stairs is ~0.6, a ladder laid down steeper, the castle's ramps under 0.3), he gets up to climb it.
   crawlSteep: 0.4,
@@ -932,8 +930,6 @@ export const ACTIONS = {
   drawSidearm: { label: 'Draw sidearm', icon: '🗡' },
   pickUp: { label: 'Pick up', icon: '✋' },
   clinch: { label: 'Clinch', icon: '🫂' },
-  crawl: { label: 'Crawl', icon: '🐾' },
-  stand: { label: 'Stand', icon: '⤒' },
   finish: { label: 'Finish him', icon: '🔪' },
   // His weapon's art (weaponarts.js): not the special button's (it has its own, shown while the art is charged), but asked
   // for the same way, in `orders.actions`; its button names it (weaponarts.js artLabel).
@@ -986,8 +982,8 @@ function clinchMove(style) {
 /** What the special button does now, by the situation: the first that applies, or null. */
 export function contextAction(world, fighter) {
   if (!fighter || fighter.state !== 'up' || fighter.netted) return null;
-  // On his knees: up again, if his legs will bear him.
-  if (fighter.crawling) return legBroken(fighter) ? null : 'stand';
+  // On his knees: nothing here (the Crawl button, Stand while he crawls, is the one way down and up: playerCrawl).
+  if (fighter.crawling) return null;
   const style = STYLES[fighter.style];
   if (fighter.clinch) return style?.throws || style?.clinchDrive ? 'throw' : 'disengage';
   if (holder(world, fighter)) return 'disengage';
@@ -1005,8 +1001,6 @@ export function contextAction(world, fighter) {
   if (looseNearby(world, fighter)) return 'pickUp';
   // Within striking range: pressed, he steps in to take hold (goClinch).
   if (clinchMove(style) && opponent?.state === 'up' && distance < holdDistance(fighter, opponent) + CONTROL.clinchFrom) return 'clinch';
-  // Badly hurt (or the legs going) with nothing else to do: down on his knees to crawl.
-  if (Math.max(hurtShare(fighter), legShare(fighter)) > CONTROL.crawlOfferFrom) return 'crawl';
   return null;
 }
 
@@ -1120,7 +1114,6 @@ export function doAction(world, fighter, name) {
     fighter.orderClinchUntil = world.time + CONTROL.clinchSeconds;
     return true;
   }
-  if (name === 'crawl' || name === 'stand') return playerCrawl(world, fighter, name === 'crawl');
   if (name === 'finish') {
     const prey = finishTarget(world, fighter, { locked: fighter.focus });
     return Boolean(prey) && !fighter.punch && startFinisher(world, fighter, prey);

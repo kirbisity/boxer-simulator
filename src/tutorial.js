@@ -71,19 +71,19 @@ export function forgetTutorial() {
 export const TUTORIAL_STEPS = [
   {
     key: 'look', title: 'Look around',
-    touch: 'Drag on the <b>top half</b> of the screen to turn the view. Pinch there with two fingers to zoom.',
-    mouse: 'Drag with the <b>right mouse button</b> (or the left, in the top half) to turn the view. The wheel zooms.',
+    touch: 'Drag <b>anywhere</b> off the stick and the buttons to turn the view. Pinch with two fingers to zoom.',
+    mouse: 'Drag with the <b>right mouse button</b> (or the left, anywhere off the stick) to turn the view. The wheel zooms.',
     done: (progress) => progress.look >= TUTORIAL.lookFor,
   },
   {
     key: 'move', title: 'Move',
-    touch: 'Drag on the <b>bottom half</b>: a stick appears under your thumb. Push it to the edge to run while you hold it there (weapon down, no guard). Walk up to Edric.',
+    touch: 'Drag the <b>stick</b> at the bottom left. Push it to the edge to run while you hold it there (weapon down, no guard). Walk up to Edric.',
     mouse: '<b>W A S D</b> or the <b>arrow keys</b> walk the way the camera looks; <b>Shift</b> runs while held (weapon down, no guard). Walk up to Edric.',
     done: (progress) => progress.walked >= TUTORIAL.walkFor && progress.near,
   },
   {
     key: 'lock', title: 'Lock on',
-    touch: 'Tap <b>Lock ◎</b> (right edge). You face Edric as you move, and the camera keeps you both in view.',
+    touch: 'Tap <b>Lock</b> (the target sight, left of Crawl). You face Edric as you move, and the camera keeps you both in view.',
     mouse: 'Press <b>Tab</b> to lock on. You face Edric as you move, and the camera keeps you both in view.',
     done: (progress) => progress.locked,
   },
@@ -122,13 +122,13 @@ export const TUTORIAL_STEPS = [
   },
   {
     key: 'unlock', title: 'Let go',
-    touch: 'Tap <b>Unlock</b> to let go of Edric. The camera follows behind you again.',
+    touch: 'Tap the lit <b>Lock</b> again to let go of Edric. The camera follows behind you again.',
     mouse: 'Press <b>Tab</b> again to let go of Edric. The camera follows behind you again.',
     done: (progress) => !progress.locked,
   },
   {
     key: 'jump', title: 'Jump',
-    touch: 'Tap <b>Jump</b> (right edge, over Lock). How high you go is your body: legs, weight, armour, how tired. Jumps get you onto low ledges and over gaps.',
+    touch: 'Tap <b>Jump</b> (right edge, over Guard). How high you go is your body: legs, weight, armour, how tired. Jumps get you onto low ledges and over gaps.',
     mouse: 'Press <b>Space</b> to jump. How high you go is your body: legs, weight, armour, how tired. Jumps get you onto low ledges and over gaps.',
     done: (progress) => progress.landed >= 1,
   },

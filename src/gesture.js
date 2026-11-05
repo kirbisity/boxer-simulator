@@ -1,11 +1,13 @@
 // Touches on the fight, read as the player's gestures. Each touch starts
 // undecided; moved past `dragFrom` it is a drag for good and can never
 // become a tap or a press. What a drag does is decided by where it began:
-// in the top part of the screen it turns the view (two such drags at once
-// pinch to zoom), in the bottom part it is a floating stick, centred where
-// it began. Kept still: a tap if let go quickly (two quick taps near each
-// other, a double tap), a press if held past `holdFrom` (it acts the moment
-// it is reached), wherever it is. No DOM: positions in pixels, times in seconds.
+// on the stick (a fixed pad low at the left, touch.js) it moves him at once,
+// the stick's throw measured from the pad's centre; anywhere else it turns the
+// view (two such drags at once pinch to zoom). Without a fixed pad, a drag
+// begun in the 'move' zone is a floating stick, centred where it began. Kept
+// still: a tap if let go quickly (two quick taps near each other, a double
+// tap), a press if held past `holdFrom` (it acts the moment it is reached),
+// wherever it is. No DOM: positions in pixels, times in seconds.
 
 export const GESTURE = {
   // px a touch may wander and still be a tap or a press.
@@ -17,13 +19,20 @@ export const GESTURE = {
   doubleTapNear: 90,
   // px from the stick's centre to its full throw.
   stickRadius: 70,
-  // The share of the surface's height, from its top, where a drag looks about; below it, a drag moves.
+  // The share of the surface's height, from its top, where a drag looks about; below it, a drag moves (screenZone, a split screen).
   lookShare: 0.5,
+  // A touch this far past the fixed stick's ring (its radius times this) still takes the stick.
+  stickCatch: 1.3,
 };
 
 /** Which part of the surface a point is in: 'look' (the top `share` of it) or 'move'. */
 export function screenZone(y, top, height, share = GESTURE.lookShare) {
   return y - top < height * share ? 'look' : 'move';
+}
+
+/** Whether a touch at `at` takes the fixed stick (centred at `centre`, its ring `radius` px): 'move', or 'look' (the rest of the screen). */
+export function stickZone(at, centre, radius, spec = GESTURE) {
+  return Math.hypot(at[0] - centre[0], at[1] - centre[1]) <= radius * spec.stickCatch ? 'move' : 'look';
 }
 
 /**
@@ -37,9 +46,11 @@ export function screenZone(y, top, height, share = GESTURE.lookShare) {
  *   { type: 'tap', id, at, double }                      (let go quickly)
  *   { type: 'hold', id, at }                              (held still past holdFrom, once)
  * `zoneOf(at)` says which part of the surface a touch began in ('look' or
- * 'move'); without it every drag is a stick.
+ * 'move'); without it every drag is a stick. `stickPad()`, if given, is the
+ * fixed stick ({ centre, radius } px, or null): a touch begun in 'move' is the
+ * stick from the moment it lands (no tap or press there), thrown from that centre.
  */
-export function createRecognizer(spec = GESTURE, { zoneOf = () => 'move' } = {}) {
+export function createRecognizer(spec = GESTURE, { zoneOf = () => 'move', stickPad = null } = {}) {
   const touches = new Map();
   let lastTap = null;
   const lookers = () => [...touches.values()].filter((touch) => touch.state === 'drag' && touch.zone === 'look');
@@ -47,12 +58,19 @@ export function createRecognizer(spec = GESTURE, { zoneOf = () => 'move' } = {})
     const dx = at[0] - touch.origin[0];
     const dy = at[1] - touch.origin[1];
     const length = Math.hypot(dx, dy);
-    const amount = Math.min(1, length / spec.stickRadius);
+    const amount = Math.min(1, length / (touch.radius ?? spec.stickRadius));
     return { type: 'stick', id: touch.id, origin: touch.origin, at, dx, dy, amount };
   };
   return {
     /** A touch begins at `at` (px); `zone` overrides where it began (a mouse's right button always looks). */
     down(id, at, time, zone = zoneOf(at)) {
+      const pad = zone === 'move' ? stickPad?.() : null;
+      if (pad) {
+        // The fixed stick: a drag from the first touch, its throw from the pad's centre.
+        const touch = { id, origin: pad.centre, radius: pad.radius, at, start: time, state: 'drag', zone };
+        touches.set(id, touch);
+        return [stickOf(touch, at)];
+      }
       touches.set(id, { id, origin: at, at, start: time, state: 'pending', zone });
       return [];
     },

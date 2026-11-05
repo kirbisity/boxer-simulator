@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { attackLayout, attackWhere, keyStick, MOVE_NAMES, moveName, strikeOutcome } from '../src/control.js';
-import { createRecognizer, GESTURE, screenZone } from '../src/gesture.js';
+import { createRecognizer, GESTURE, screenZone, stickZone } from '../src/gesture.js';
 import { createArm, roomWorld } from '../src/cameraarm.js';
 import { behindYaw, cameraRoom, createFollowCam, FOLLOW_CAM, spring } from '../src/followcam.js';
 import { createTutorialRun, TUTORIAL, TUTORIAL_STEPS } from '../src/tutorial.js';
@@ -30,6 +30,30 @@ test('screen split: a drag begun in the top half turns the view, one begun in th
   assert.equal(stick.type, 'stick');
   assert.deepEqual(stick.origin, [200, 600], 'the stick floats: centred where the thumb landed');
   assert.deepEqual(gestures.up(2, [200, 540], 3).map((event) => event.type), ['stickEnd']);
+});
+
+test('the fixed stick: a touch on its pad moves at once, thrown from its centre; a drag anywhere else looks; taps off it still strike', () => {
+  const pad = { centre: [90, 700], radius: 60 };
+  const gestures = createRecognizer(GESTURE, { zoneOf: (at) => stickZone(at, pad.centre, pad.radius), stickPad: () => pad });
+  assert.equal(stickZone([90, 700], pad.centre, pad.radius), 'move');
+  assert.equal(stickZone([90 + 60 * GESTURE.stickCatch - 1, 700], pad.centre, pad.radius), 'move', 'a thumb just off the ring still takes it');
+  assert.equal(stickZone([300, 700], pad.centre, pad.radius), 'look', 'low on the screen but off the stick: the view');
+  const [first] = gestures.down(1, [120, 700], 0);
+  assert.deepEqual([first.type, first.dx, first.dy, first.amount], ['stick', 30, 0, 0.5], 'landing off-centre moves at once, from the pad\'s centre, measured by its ring');
+  const [pushed] = gestures.move(1, [90, 580]);
+  assert.deepEqual([pushed.type, pushed.amount], ['stick', 1]);
+  assert.deepEqual(pushed.origin, pad.centre, 'the stick does not float');
+  gestures.tick(5);
+  assert.deepEqual(gestures.up(1, [90, 580], 5).map((event) => event.type), ['stickEnd'], 'held on the stick: never a press');
+  // Anywhere else: a drag looks (low on the screen too); a tap is a tap; the stick and the look at once.
+  gestures.down(2, [300, 720], 6);
+  assert.equal(gestures.move(2, [340, 720])[0].type, 'look');
+  gestures.down(3, [90, 700], 6);
+  assert.equal(gestures.move(3, [90, 650])[0].type, 'stick', 'a thumb on each: one moves, one looks');
+  gestures.up(2, [340, 720], 7);
+  gestures.up(3, [90, 650], 7);
+  gestures.down(4, [300, 300], 8);
+  assert.equal(gestures.up(4, [300, 300], 8.05)[0].type, 'tap');
 });
 
 test('screen split: both thumbs at once (look and move), two fingers on the view zoom, and taps strike anywhere', () => {

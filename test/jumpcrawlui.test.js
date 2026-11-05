@@ -106,10 +106,13 @@ function layout(width, height, design) {
     if (design === 'buttons' && rule.selector === '.fight-ui[data-fightui="buttons"]' && rule.props['--fu-raise']) vars['fu-raise'] = px(rule.props['--fu-raise'], {});
   }
   const placed = {};
-  for (const name of ['guard', 'lock', 'action', 'jump', 'crawl']) {
+  // The right-hand buttons, and at the left the movement stick (its ring) and the weapon art's button.
+  for (const name of ['guard', 'lock', 'action', 'jump', 'crawl', 'art', 'stick']) {
     const box = {};
-    for (const rule of all) if (matches(rule.selector, `.${name}-button`)) for (const key of ['right', 'bottom', 'width']) if (rule.props[key]) box[key] = px(rule.props[key], vars);
-    placed[name] = { x: box.right + box.width / 2, y: height - (box.bottom + box.width / 2), r: box.width / 2 };
+    const selector = name === 'stick' ? '.stick' : `.${name}-button`;
+    for (const rule of all) if (matches(rule.selector, selector)) for (const key of ['left', 'right', 'bottom', 'width']) if (rule.props[key]) box[key] = px(rule.props[key], vars);
+    const right = box.right ?? width - box.left - box.width;
+    placed[name] = { x: right + box.width / 2, y: height - (box.bottom + box.width / 2), r: box.width / 2 };
   }
   if (design === 'buttons') {
     const slots = JSON.parse(read('src/fightui/buttons.js').match(/FIGHT_UI_SLOTS = (\[[^;]*\]);/)[1]);
@@ -120,9 +123,9 @@ function layout(width, height, design) {
   return placed;
 }
 
-const SCREENS = { desktop: [1400, 700], laptop: [1280, 720], 'phone upright': [390, 844], 'small phone upright': [375, 667], 'phone on its side': [844, 390], 'small phone on its side': [667, 375] };
+const SCREENS = { desktop: [1400, 700], laptop: [1280, 720], 'laptop 1280x800': [1280, 800], 'phone upright': [390, 844], 'small phone upright': [375, 667], 'phone on its side': [844, 390], 'small phone on its side': [667, 375] };
 
-test('the right-hand stack: Jump over Lock, Crawl under Guard; no button over another and all on the screen, at every size, in both controls', () => {
+test('the right-hand stack: Jump over Guard, Crawl under it, Lock left of Crawl (above it, below Guard); the stick and the art clear of all; none over another and all on the screen, at every size, in both controls', () => {
   for (const [screen, [width, height]] of Object.entries(SCREENS)) {
     for (const design of ['target', 'buttons']) {
       const placed = layout(width, height, design);
@@ -140,9 +143,15 @@ test('the right-hand stack: Jump over Lock, Crawl under Guard; no button over an
         }
       }
       if (design === 'target') {
-        assert.ok(placed.jump.y < placed.lock.y, `${screen}: Jump above Lock`);
+        assert.ok(placed.jump.y < placed.guard.y, `${screen}: Jump above Guard`);
         assert.ok(placed.crawl.y > placed.guard.y, `${screen}: Crawl below Guard`);
       }
+      // Lock: left of Crawl, its middle above Crawl's and below Guard's (the right thumb's rest).
+      assert.ok(placed.lock.x > placed.crawl.x, `${screen} ${design}: Lock left of Crawl`);
+      assert.ok(placed.lock.y < placed.crawl.y && placed.lock.y > placed.guard.y, `${screen} ${design}: Lock above Crawl, below Guard (${placed.lock.y}, crawl ${placed.crawl.y}, guard ${placed.guard.y})`);
+      // The stick at the left, low; touch targets a finger's size.
+      assert.ok(placed.stick.x > width / 2 && placed.stick.y > height / 2, `${screen} ${design}: the stick low at the left`);
+      for (const name of names) assert.ok(placed[name].r * 2 >= 44, `${screen} ${design}: ${name} at least 44 px`);
     }
   }
 });

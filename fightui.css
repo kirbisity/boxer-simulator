@@ -75,13 +75,16 @@ body:not(.playing) .fu-pick { display: none; }
 .fight-ui[data-device="mouse"] .fu-btn kbd { display: block; }
 .fu-btn.fu-flash[data-fu-flash="asked"] { animation: fu-press 0.45s ease-out; }
 @keyframes fu-press { 0% { scale: 0.9; box-shadow: 0 0 0 0 var(--fu-lit), inset 0 0 0 40px color-mix(in srgb, var(--fu-lit) 70%, transparent); } 35% { scale: 1.12; } 100% { scale: 1; box-shadow: 0 0 0 20px transparent, inset 0 0 0 40px transparent; } }
-/* The cluster stands `--fu-raise` up off the footer to leave Crawl its place under the Guard; Jump is over Lock. */
+/* The cluster stands `--fu-raise` up off the footer to leave Crawl its place under the Guard, and Lock its place left of Crawl
+   (a little higher, under the Guard's height: the right thumb's rest); Jump is over the cluster. */
 .fight-ui[data-fightui="buttons"] { --fu-raise: 50px; }
 .fight-ui[data-fightui="buttons"] .guard-button { width: 104px; height: 104px; right: calc(14px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 12px); }
 .fight-ui[data-fightui="buttons"] .crawl-button { width: 54px; height: 54px; right: calc(39px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 4px); }
-.fight-ui[data-fightui="buttons"] .lock-button { width: 66px; height: 66px; right: calc(19px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 268px); }
-.fight-ui[data-fightui="buttons"] .lock-button b { font-size: 24px; }
-.fight-ui[data-fightui="buttons"] .jump-button { width: 58px; height: 58px; right: calc(23px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 342px); }
+.fight-ui[data-fightui="buttons"] .lock-button { width: 60px; height: 60px; right: calc(102px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 18px); }
+.fight-ui[data-fightui="buttons"] .lock-button b { width: 22px; height: 22px; }
+.fight-ui[data-fightui="buttons"] .lock-button span { font-size: 9px; }
+.fight-ui[data-fightui="buttons"] .lock-button.on b { width: 16px; height: 16px; }
+.fight-ui[data-fightui="buttons"] .jump-button { width: 58px; height: 58px; right: calc(23px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 272px); }
 .fight-ui[data-fightui="buttons"] .action-button { width: 70px; height: 70px; right: calc(105px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 250px); }
 .fight-ui[data-fightui="buttons"] .swap-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 412px); }
 .fight-ui[data-fightui="buttons"] .horse-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 458px); }
@@ -90,20 +93,20 @@ body:not(.playing) .fu-pick { display: none; }
   .fight-ui[data-fightui="buttons"] { --fu-raise: 46px; }
   .fight-ui[data-fightui="buttons"] .guard-button { width: 92px; height: 92px; }
   .fight-ui[data-fightui="buttons"] .crawl-button { width: 48px; height: 48px; right: calc(36px + env(safe-area-inset-right, 0px)); }
-  .fight-ui[data-fightui="buttons"] .lock-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 240px); }
-  .fight-ui[data-fightui="buttons"] .jump-button { width: 52px; height: 52px; right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 312px); }
+  .fight-ui[data-fightui="buttons"] .lock-button { width: 56px; height: 56px; right: calc(94px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 18px); }
+  .fight-ui[data-fightui="buttons"] .jump-button { width: 52px; height: 52px; right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 244px); }
   .fight-ui[data-fightui="buttons"] .action-button { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 226px); }
   .fight-ui[data-fightui="buttons"] .swap-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 376px); }
   .fight-ui[data-fightui="buttons"] .horse-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 422px); }
 }
 @media (max-height: 480px) {
   /* A phone on its side: no room under the cluster, so Crawl sits at the bottom to the left of it (past the lowest coloured
-     buttons); Lock, Jump and the special action in a row over the cluster. */
+     buttons) and Lock left of Crawl, a little higher; Jump and the special action in a row over the cluster. */
   .fight-ui[data-fightui="buttons"] { --fu-raise: 0px; }
   .fight-ui[data-fightui="buttons"] .guard-button { width: 84px; height: 84px; }
-  .fight-ui[data-fightui="buttons"] .crawl-button { width: 48px; height: 48px; right: calc(324px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 20px); }
-  .fight-ui[data-fightui="buttons"] .lock-button { width: 56px; height: 56px; right: calc(84px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 230px); }
-  .fight-ui[data-fightui="buttons"] .jump-button { width: 50px; height: 50px; right: calc(148px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 236px); }
+  .fight-ui[data-fightui="buttons"] .crawl-button { width: 48px; height: 48px; right: calc(276px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 6px); }
+  .fight-ui[data-fightui="buttons"] .lock-button { width: 56px; height: 56px; right: calc(336px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 22px); }
+  .fight-ui[data-fightui="buttons"] .jump-button { width: 50px; height: 50px; right: calc(90px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 232px); }
   .fight-ui[data-fightui="buttons"] .action-button { width: 58px; height: 58px; right: calc(206px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 228px); }
   .fight-ui[data-fightui="buttons"] .swap-button, .fight-ui[data-fightui="buttons"] .horse-button { bottom: auto; }
 }
@@ -139,7 +142,7 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 
 /* ==== Level Mode: the player (src/levelmode/hud.js) ==== */
 /* The run threshold shows on the stick: past it the ring and the knob go gold, and the Guard button is greyed (a man running does not guard). */
-.stick.running::before { border-color: var(--gold); background: rgba(255, 207, 74, 0.08); }
+.stick.running { border-color: var(--gold); background: rgba(255, 207, 74, 0.08); }
 .guard-button.blocked { opacity: 0.45; }
 /* The context pill: bottom centre, above the controls and the player's status; only where something can be done. */
 .lv-context { position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 66px); display: flex; align-items: center; gap: 8px; height: 46px; min-width: 132px; max-width: calc(100vw - 200px); padding: 0 16px 0 14px; border-radius: 23px; pointer-events: auto; touch-action: none; border: 1px solid rgba(255, 207, 74, 0.7); background: rgba(10, 12, 18, 0.7); color: var(--gold); font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 1px 10px rgba(0, 0, 0, 0.45), 0 0 14px rgba(255, 207, 74, 0.18); cursor: pointer; animation: lv-pill-in 0.18s ease-out; }
@@ -167,13 +170,16 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 .lv-toast { position: absolute; left: 50%; translate: -50% 0; top: calc(72px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 32px); padding: 4px 14px; border-radius: 999px; background: rgba(10, 12, 18, 0.62); font: 600 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; text-align: center; }
 .lv-toast-in { animation: lv-toast 2.6s ease-out forwards; }
 @keyframes lv-toast { 0% { opacity: 0; translate: -50% -4px; } 10% { opacity: 1; translate: -50% 0; } 80% { opacity: 1; } 100% { opacity: 0; } }
-/* A phone held upright: the attack buttons fan out over the middle, so the pill and the action bar keep to the left, over the player's status (clear of the fan, the thumb's other side). */
+/* A phone held upright: the attack buttons fan out over the middle, so the pill and the action bar keep to the left, over the
+   stick, the player's status and the art (clear of the fan, the thumb's other side). */
 @media (max-width: 520px) {
-  .lv-context, .lv-action { left: calc(10px + env(safe-area-inset-left, 0px)); translate: 0 0; }
+  .lv-context, .lv-action { left: calc(10px + env(safe-area-inset-left, 0px)); translate: 0 0; bottom: calc(var(--controls-height, 56px) + 282px); }
   .lv-context { min-width: 0; max-width: 156px; padding: 0 12px 0 10px; gap: 6px; font-size: 11px; letter-spacing: 0.04em; animation-name: lv-pill-in-left; }
   .lv-action { width: 150px; }
 }
 @keyframes lv-pill-in-left { from { opacity: 0; translate: 0 6px; } }
+/* A phone on its side: over Lock's place, left of the cluster. */
+@media (max-height: 480px) { .lv-context, .lv-action { bottom: calc(var(--controls-height, 56px) + 92px); } }
 .banner:not([hidden]) ~ .fight-ui .lv-context, .banner:not([hidden]) ~ .fight-ui .lv-items, .banner:not([hidden]) ~ .fight-ui .lv-action { visibility: hidden; }
 
 /* ---- Level Mode: the team ---- the comrades: names and health, top right (clear of the thumbs and of the pill), and a soft green pip with a name over each one's head. */

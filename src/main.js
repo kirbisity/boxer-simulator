@@ -1079,7 +1079,7 @@ function blendWorld(world, before, share) {
 
 // Third person (followcam.js): over his shoulder from behind, or locked on,
 // on both men; following a smoothed anchor with critically damped springs.
-// The player's drag of the view (touch.js: the top half, or the right
+// The player's drag of the view (touch.js: anywhere off the stick, or the right
 // button) is kept a while, then eased back.
 
 /** The follow camera's last answer (followcam.js update). */
