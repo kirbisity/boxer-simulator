@@ -782,13 +782,14 @@ function blowRead(world, fighter, punch, threat) {
   if (share === null) return null;
   const spec = WORLD.guardRead;
   const by = ([novice, master]) => novice + (master - novice) * share;
-  if ((punch.age ?? punch.t) < by(spec.delay)) return null;
+  const art = punch.spec.art ? spec.art : null;
+  if ((punch.age ?? punch.t) < by(spec.delay) + (art?.delay ?? 0)) return null;
   const read = fighter.blowRead;
   if (read?.punch !== punch) {
-    const error = by(spec.error) * fighter.body.heightM;
+    const error = by(spec.error) * (art?.error ?? 1) * fighter.body.heightM;
     fighter.blowRead = { punch, point: threat, at: world.time, off: [0, 1, 2].map(() => (world.random() * 2 - 1) * error) };
   } else {
-    read.point = vec.lerp(read.point, threat, 1 - Math.exp(-(world.time - read.at) / by(spec.lag)));
+    read.point = vec.lerp(read.point, threat, 1 - Math.exp(-(world.time - read.at) / (by(spec.lag) * (art?.lag ?? 1))));
     read.at = world.time;
   }
   return vec.add(fighter.blowRead.point, fighter.blowRead.off);
@@ -1914,7 +1915,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   // Raising a weapon heavier than heavyFrom is work in proportion to its mass.
   // (and the harder, the weaker he is for it: handling.js)
   const lift = blade?.held ? Math.max(1, blade.spec.mass / WORLD.weapons.heavyFrom) / (blade.handling?.speed ?? 1) : 1;
-  const cost = spec ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) * lift : 0;
+  // (A weapon art draws none: the surge it spends pays for it, weaponarts.js.)
+  const cost = spec && !spec.art ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) * lift : 0;
   // An empty gun is not fired: the same button starts loading it (no mark needed).
   if (spec?.path === 'aim' && fighter.weapon?.held && fighter.weapon.spec.shot && !fighter.weapon.loaded) {
     if (fighter.state === 'up' && !fighter.punch) fighter.reloading = true;
@@ -1932,7 +1934,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   // (Couched, the body carries it: only `couched.wander` of that, the point bobbing with his stride.)
   const heft = blade?.held ? Math.max(0, blade.spec.mass / WORLD.weapons.heavyFrom - 1) * (spec?.couched ? spec.couched.wander : 1) : 0;
   // His skill: how near the mark his blow goes (a point needs it most; a gun aims by its own spread).
-  const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft);
+  const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft) * (spec?.art ? WORLD.skill.artScatter : 1);
   // What of it is the weapon's weight (a point that wanders so finds a gap in armour the less: BLADES.gaps.size).
   const wander = heft > 0 ? skillScatter(fighter, spec, WORLD.weapons.heavyAimJitter * heft) : 0;
   const mark = at ?? aimPoint(target, aimZone, spec);

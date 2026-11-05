@@ -235,6 +235,18 @@ export const MOVES = {
   // right back to the rear hip; then the whole body thrown forward in a long lunge behind the point, a third of his weight
   // behind it: it needs the room it made, and from there it goes in deeper than a thrust from where he stood.
   artSpear: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'two', art: true, retreat: 0.6, from: { hand: [-0.34, 0.56, -0.12], dir: [1, 0.06, 0] }, windup: 0.32, extendUntil: 0.72, duration: 1.1, twist: -0.6, lean: 0.3, shift: 0.24, depth: 0.8, step: 3.2, cost: 0.18, extendShare: 0.55, mass: { arm: 0.85, body: 0.32 }, rotation: 0.5, zones: ['body', 'head'], reach: 'weapon' },
+  // The thrusting sword's and the dagger's art (a flèche): the hips wound back (`coil`), then a long running lunge, the back
+  // foot driving the body in behind the point, a fifth of him behind it, as a spear's art puts a third behind its own.
+  artFleche: { kind: 'strike', limb: 'rHand', path: 'blade', mode: 'thrust', grip: 'one', art: true, from: { hand: [0.12, 0.66, -0.16], dir: [1, 0.05, 0.02] }, windup: 0.18, extendUntil: 0.46, duration: 0.85, twist: -1, coil: 0.4, lean: 0.35, shift: 0.28, depth: 0.45, step: 3, extendShare: 0.6, cost: 0.12, mass: { arm: 0.6, body: 0.2 }, rotation: 0.4, zones: ['body', 'head'], reach: 'weapon', lunge: 0.2, counterArm: [-0.3, 0.74, 0.14] },
+  // The empty hand's art: the overhand right, looped over his guard. The hips wound back (`coil`), a step in launched by the
+  // legs a moment first (`stepLead`), the shoulder and the body dropping in behind the fist (`dip`, `lean`): the whole of
+  // him turning through it, more of his weight behind it than a cross from where he stands has.
+  artOverhand: { kind: 'strike', limb: 'rHand', path: 'straight', art: true, windup: 0.22, extendUntil: 0.46, duration: 0.78, twist: -1.05, coil: 0.5, lean: 0.25, dip: 0.06, shift: 0.18, step: 1.6, stepLead: 0.05, cost: 0.1, mass: { arm: 0.75, body: 0.05 }, rotation: 1, zones: ['head', 'body'], reach: 'arm' },
+  // The kicker's art: a roundhouse with the hips wound back first and a step across to launch it, the whole body turning
+  // through the shin.
+  artRoundhouse: { kind: 'strike', limb: 'rFoot', path: 'roundhouse', art: true, windup: 0.2, extendUntil: 0.46, duration: 0.95, twist: -1.45, coil: 0.5, lean: -0.26, step: 1.2, cost: 0.12, mass: { leg: 0.6, body: 0.04 }, rotation: 1.55, zones: ['body', 'head'], reach: 'leg' },
+  // An ape's art: the arm flung right up and the whole trunk brought down behind it, a lunge carrying him in.
+  artSlam: { kind: 'strike', limb: 'rHand', path: 'club', art: true, windup: 0.26, extendUntil: 0.5, duration: 0.85, twist: -0.5, coil: 0.4, lean: 0.3, dip: 0.12, shift: 0.12, step: 1.4, cost: 0.1, mass: { arm: 0.9, body: 0.07 }, rotation: 0.5, contactSeconds: 0.012, zones: ['head', 'body'], reach: 'close' },
   // Whole-body moves.
   // A charge runs until it meets the other body or runs out of steam.
   rush: { kind: 'rush', duration: 1.2, cost: 0.05 },
@@ -335,6 +347,7 @@ const SHOOTING_STYLES = {
 
 export const STYLES = {
   boxing: {
+    art: 'artOverhand',
     label: 'Boxing',
     cadence: { work: 1.55, move: 0.48, burst: 0.6, mobility: 0.6 },
     stance: { blade: 0.55, crouch: 0.03, width: 1, lean: 0.14, guardHeight: 0 },
@@ -355,6 +368,7 @@ export const STYLES = {
     pressure: 0.3, // share of the time spent working inside
   },
   kickboxing: {
+    art: 'artRoundhouse',
     label: 'Kickboxing',
     cadence: { work: 1, move: 1, burst: 0.45, mobility: 0.5 },
     stance: { blade: 0.42, crouch: 0.02, width: 1.12, lean: 0.1, guardHeight: 0.01 },
@@ -368,6 +382,7 @@ export const STYLES = {
   // No training to speak of: wide looping hooks and big rear hands, guard
   // dropping, charging in; defence is covering up or backing off.
   street: {
+    art: 'artOverhand',
     label: 'Street',
     cadence: { work: 1.2, move: 0.7, burst: 0.8, mobility: 0.25 },
     stance: { blade: 0.3, crouch: 0.01, width: 0.95, lean: 0.06, guardHeight: -0.05 },
@@ -384,6 +399,7 @@ export const STYLES = {
     pressure: 0.25,
   },
   muayThai: {
+    art: 'artRoundhouse',
     label: 'Muay Thai',
     cadence: { work: 1.2, move: 0.8, burst: 0.3, mobility: 0.3 },
     // Square and upright, weight back, guard high and long.
@@ -401,6 +417,7 @@ export const STYLES = {
   // body behind each blow: `technique`) and poor aim (`aimJitter`, m). No
   // blocking, no slipping: at best a late flinch back (`reactionSlow`, s).
   unskilled: {
+    art: 'artOverhand',
     label: 'Unskilled',
     cadence: { work: 1.2, move: 0.6, burst: 0.5, mobility: 0.15 },
     stance: { blade: 0.12, crouch: 0, width: 0.9, lean: 0.02, guardHeight: -0.14 },
@@ -421,6 +438,7 @@ export const STYLES = {
   // Sumo: low and wide, hands forward; thrusts, drives and charges to push
   // a man off his feet, and in the clinch (`clinchDrive`) walks him back.
   sumo: {
+    art: 'artOverhand',
     label: 'Sumo',
     cadence: { work: 1.5, move: 0.5, burst: 0.75, mobility: 0.2 },
     stance: { blade: 0.05, crouch: 0.07, width: 1.45, lean: 0.22, guardHeight: -0.08 },
@@ -445,6 +463,7 @@ export const STYLES = {
   // the back of the neck with one hand (`collarTie`) and hammers hooks and
   // uppercuts with the other (`clinchStrikes`), face to face, trading.
   clinchBrawl: {
+    art: 'artOverhand',
     label: 'Clinch brawler',
     cadence: { work: 1.8, move: 0.35, burst: 1, mobility: 0.15 },
     stance: { blade: 0.25, crouch: 0.03, width: 1.05, lean: 0.1, guardHeight: -0.04 },
@@ -479,6 +498,7 @@ export const STYLES = {
   // Mixed: switches every so often between the unarmed styles in `mix`, so
   // it boxes for a while, then kicks, then clinches and knees, then pushes.
   mix: {
+    art: 'artOverhand',
     label: 'Mix',
     mix: ['boxing', 'kickboxing', 'muayThai', 'sumo'],
     cadence: { work: 1.2, move: 0.8, burst: 0.55, mobility: 0.5 },
@@ -499,6 +519,7 @@ export const STYLES = {
   // about and throws him down (`clinch`, `clinchDrive`, `throws`); and,
   // holding him, bites (`bite`). No craft in defence but to cover and back off.
   gorilla: {
+    art: 'artSlam',
     label: 'Gorilla',
     cadence: { work: 1.6, move: 0.45, burst: 1, mobility: 0.2 },
     stance: { blade: 0.1, crouch: 0.1, width: 1.35, lean: 0.34, guardHeight: -0.22 },
@@ -541,6 +562,7 @@ export const STYLES = {
   // are long, ~5-10 cm; a macaque's and a chimpanzee's bites shorter tears); how often, as quick as the kind
   // bites (a macaque in a frenzy two a second).
   macaque: {
+    art: 'artSlam',
     label: 'Rhesus macaque',
     cadence: { work: 1.8, move: 0.9, burst: 1, mobility: 0.9 },
     stance: { blade: 0.1, crouch: 0.08, width: 1.3, lean: 0.25, guardHeight: -0.25 },
@@ -560,6 +582,7 @@ export const STYLES = {
     pressure: 0.7,
   },
   baboon: {
+    art: 'artSlam',
     label: 'Chacma baboon',
     cadence: { work: 1.7, move: 0.8, burst: 1, mobility: 0.7 },
     stance: { blade: 0.1, crouch: 0.08, width: 1.3, lean: 0.25, guardHeight: -0.22 },
@@ -581,6 +604,7 @@ export const STYLES = {
     pressure: 0.7,
   },
   chimp: {
+    art: 'artSlam',
     label: 'Chimpanzee',
     cadence: { work: 1.7, move: 0.6, burst: 1, mobility: 0.45 },
     stance: { blade: 0.1, crouch: 0.12, width: 1.3, lean: 0.3, guardHeight: -0.2 },
@@ -1182,6 +1206,7 @@ export const STYLES = {
   // every attack (a parry turns it, a step takes the body off its line) and
   // answers with palms and pushes that carry little harm.
   taichi: {
+    art: 'artOverhand',
     label: 'Tai chi',
     cadence: { work: 0.6, move: 1.2, burst: 0.3, mobility: 0.35 },
     stance: { blade: 0.5, crouch: 0.12, width: 1.35, lean: 0.02, guardHeight: -0.06 },
@@ -1201,6 +1226,7 @@ export const STYLES = {
   // spinning ones among them, from out of range. Every big kick leaves him
   // open, and he defends little.
   taekwondo: {
+    art: 'artRoundhouse',
     label: 'Taekwondo',
     cadence: { work: 1.3, move: 0.8, burst: 0.7, mobility: 0.7 },
     stance: { blade: 0.7, crouch: 0.01, width: 1.05, lean: 0.02, guardHeight: -0.1 },
@@ -1218,6 +1244,7 @@ export const STYLES = {
   // Judo: in close for the grip (collar and sleeve: the clinch) and, holding, the throw over the shoulder (`shoulderThrow`: the
   // physics of it is WORLD.shoulderThrow, his legs against the man's weight); the odd push or jab to get in.
   judo: {
+    art: 'artOverhand',
     label: 'Judo',
     cadence: { work: 1.3, move: 0.6, burst: 0.7, mobility: 0.5 },
     stance: { blade: 0.2, crouch: 0.05, width: 1.25, lean: 0.12, guardHeight: -0.12 },

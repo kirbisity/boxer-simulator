@@ -250,6 +250,7 @@ export const TURRET_RIFLE = {
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
   baton: {
+    art: 'artCrushOne',
     label: 'Police baton', hands: 'one', length: 0.58, strikeFrom: 0.12, handle: 0.08, mass: 0.6, balance: 0.24, radius: 0.019,
     harm: { swing: { blunt: 1 }, thrust: { blunt: 1 } },
     contactSeconds: 0.005, rotation: 1.15, wrist: { omega: 62, zeta: 0.6 }, threat: 1.6,
@@ -268,6 +269,7 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 20, zeta: 0.8 }, threat: 4.5, art: 'artIai',
   },
   knife: {
+    art: 'artFleche',
     label: 'Knife', hands: 'one', length: 0.21, strikeFrom: 0.05, handle: 0.1, mass: 0.22, balance: 0, radius: 0.01,
     harm: { thrust: { pierce: 0.65, blunt: 0.35 }, swing: { cut: 0.42, blunt: 0.22 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 45, zeta: 0.8 }, threat: 2.2,
@@ -275,6 +277,7 @@ export const WEAPONS = {
   // The hoplomachus's hasta: held near its balance in one hand, long ahead
   // of the hand and a good way behind it; made to thrust.
   spear: {
+    art: 'artSpear',
     pointFrom: 0, label: 'Spear', hands: 'one', length: 1.3, strikeFrom: 0.9, handle: 0.6, mass: 1.6, balance: 0.18, radius: 0.016,
     harm: { thrust: { pierce: 1.3, cut: 0.1, blunt: 0.2 }, swing: { cut: 0.2, blunt: 0.6 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.5,
@@ -322,6 +325,7 @@ export const WEAPONS = {
   // no edge; swung, the heavy shaft clubs (`swing` blunt). Slow to turn (`wrist`). The swell and the burr behind the grip
   // hold it in the hand against a blow on the long shaft (`grip`) better than a spear.
   lance: {
+    art: 'artSpear',
     pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, vamplate: 0.13,
     harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
     contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 7, zeta: 0.9 }, threat: 4, grip: 0.8,
@@ -375,6 +379,7 @@ export const WEAPONS = {
   // swept across, it lashes (`swing`, little harm); the iron head is
   // driven at the face (`thrust`, the last fifth: `pointFrom`).
   langxian: {
+    art: 'artSpear',
     pointFrom: 0.8, label: 'Langxian', hands: 'two', length: 3.3, strikeFrom: 1.3, handle: 1.4, spacing: 0.55, mass: 4, balance: 0.9, radius: 0.15,
     harm: { thrust: { pierce: 1, blunt: 0.35, cut: 0.05 }, swing: { blunt: 0.45, cut: 0.05 } },
     contactSeconds: 0.008, rotation: 0.45, wrist: { omega: 6, zeta: 0.9 }, threat: 3.4, grip: 0.6,
@@ -386,6 +391,7 @@ export const WEAPONS = {
   // made to fight. Blunt tines that pierce poorly and knock a man about;
   // a farm tool held loosely, easily knocked from the hands.
   pitchfork: {
+    art: 'artSpear',
     pointFrom: 0, label: 'Pitchfork', hands: 'two', length: 1.6, strikeFrom: 1.3, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.017,
     harm: { thrust: { pierce: 0.85, blunt: 0.45, cut: 0.03 }, swing: { blunt: 0.7, cut: 0.05 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3, grip: 0.3,
@@ -412,6 +418,7 @@ export const WEAPONS = {
   // is a rope hung from its end, and only its tip strikes (`rope`). `reach`:
   // how far it strikes, beyond the handle's own length.
   whip: {
+    art: 'artCrushOne',
     label: 'Whip', hands: 'one', length: 0.3, strikeFrom: 0.3, handle: 0.05, mass: 0.45, balance: 0.1, radius: 0.012,
     harm: { swing: { blunt: 0.2 }, thrust: { blunt: 0.2 } },
     contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 34, zeta: 0.6 }, threat: 2.6, grip: 0.3,
@@ -535,6 +542,7 @@ export const WEAPONS = {
   // only: blunt harm, a softer contact than steel; its length makes it quick
   // at the ends, a little more than a baton.
   staff: {
+    art: 'artCrushClub',
     label: 'Staff', hands: 'two', length: 0.95, strikeFrom: -0.85, handle: 0.85, spacing: 0.5, leadAhead: true, mass: 1.6, balance: 0.05, radius: 0.016,
     harm: { swing: { blunt: 1 }, thrust: { blunt: 0.8 } },
     contactSeconds: 0.007, rotation: 0.9, wrist: { omega: 18, zeta: 0.8 }, threat: 3.8, grip: 0.6,
@@ -542,6 +550,7 @@ export const WEAPONS = {
   // The Spanish espada: a one-handed cut-and-thrust sword of Toledo steel,
   // a little longer than a short sword, made for the thrust.
   espada: {
+    art: 'artDrawCut',
     label: 'Espada', hands: 'one', length: 0.85, strikeFrom: 0.12, handle: 0.14, mass: 1.1, balance: 0.12, radius: 0.011,
     harm: { thrust: { pierce: 0.95, cut: 0.2, blunt: 0.1 }, swing: { cut: 0.9, blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 24, zeta: 0.8 }, threat: 3.4,
@@ -549,6 +558,7 @@ export const WEAPONS = {
   // The rapier: a long, slender thrusting sword with a swept hilt. Its point
   // is everything (`pierce`); its narrow edge cuts a little, it barely bruises.
   rapier: {
+    art: 'artFleche',
     label: 'Rapier', hands: 'one', length: 1.05, strikeFrom: 0.1, handle: 0.14, mass: 1.15, balance: 0.1, radius: 0.008,
     harm: { thrust: { pierce: 1.6, cut: 0.08, blunt: 0.03 }, swing: { cut: 0.4, blunt: 0.05 } },
     contactSeconds: 0.003, rotation: 0.5, wrist: { omega: 26, zeta: 0.8 }, threat: 3.8,
@@ -564,6 +574,7 @@ export const WEAPONS = {
   // share of the cut that goes on into bone). The thin oak paddle is light
   // and flexes, so it bruises less than a club (`blunt`).
   macuahuitl: {
+    art: 'artDrawCut',
     label: 'Macuahuitl', hands: 'one', length: 0.7, strikeFrom: 0.18, handle: 0.16, mass: 1.15, balance: 0.36, radius: 0.028, brittle: 0.55, cleave: 0.4,
     harm: { swing: { cut: 1.0, blunt: 0.4 }, thrust: { blunt: 0.3 } },
     contactSeconds: 0.004, rotation: 0.85, wrist: { omega: 21, zeta: 0.8 }, threat: 3.2,
@@ -572,6 +583,7 @@ export const WEAPONS = {
   // short shaft, more a thrusting club than a steel spear: the flakes cut
   // shallow and the wooden point goes in less than iron.
   tepoztopilli: {
+    art: 'artSpear',
     pointFrom: 0, label: 'Tepoztopilli', hands: 'two', length: 1.3, strikeFrom: 0.98, handle: 0.38, spacing: 0.4, leadAhead: true, mass: 1.7, balance: 0.58, radius: 0.02, brittle: 0.55, cleave: 0.4,
     harm: { thrust: { pierce: 0.65, cut: 0.3, blunt: 0.15 }, swing: { cut: 0.7, blunt: 0.3 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 14, zeta: 0.85 }, threat: 3.4, grip: 0.5,
@@ -613,6 +625,7 @@ export const WEAPONS = {
   // than an iron mace (a bronze star of ~0.6 kg, `mass` with the haft), so
   // less crush against steel; its points bite as it lands (`pierce`).
   champi: {
+    art: 'artCrushOne',
     label: 'Champi', hands: 'one', length: 0.74, strikeFrom: 0.62, handle: 0.12, mass: 1.25, balance: 0.74, radius: 0.05,
     harm: { swing: { blunt: 1.3, pierce: 0.25 }, thrust: { blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.6, crush: 0.3,
@@ -623,6 +636,7 @@ export const WEAPONS = {
   // yatagan, the Janissary's short sword, curves forward instead (the edge on
   // the inside of the curve), its weight out towards the point.
   saber: {
+    art: 'artDrawCut',
     label: 'Sabre', hands: 'one', length: 0.82, strikeFrom: 0.12, handle: 0.14, mass: 1.0, balance: 0.13, radius: 0.012, curve: 0.06,
     harm: { swing: { cut: 1.05, blunt: 0.35 }, thrust: { pierce: 0.7, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 24, zeta: 0.8 }, threat: 3.3,
@@ -646,6 +660,7 @@ export const WEAPONS = {
     art: 'artDrawCut',
   },
   yatagan: {
+    art: 'artDrawCut',
     label: 'Yatagan', hands: 'one', length: 0.64, strikeFrom: 0.1, handle: 0.13, mass: 0.85, balance: 0.16, radius: 0.012, curve: -0.04,
     harm: { swing: { cut: 1.05, blunt: 0.3 }, thrust: { pierce: 0.8, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2,
@@ -728,6 +743,7 @@ export const WEAPONS = {
   // round (`wrist`), and a blow on its long shaft levers it from the hands easily (`grip`). Set against a
   // horse's charge with the butt to the ground, the man's weight is behind its point (WORLD.mount.brace).
   pike: {
+    art: 'artSpear',
     pointFrom: 0, label: 'Pike', hands: 'two', length: 3.4, strikeFrom: 3.1, handle: 1.6, spacing: 0.6, leadAhead: true, mass: 3.5, balance: 0.7, radius: 0.017,
     harm: { thrust: { pierce: 1.5, blunt: 0.25, cut: 0.1 }, swing: { blunt: 0.6, cut: 0.1 } },
     contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 8, zeta: 0.9 }, threat: 4, grip: 0.45,
@@ -736,16 +752,19 @@ export const WEAPONS = {
   // a knight's rondel dagger, made to find the gaps in plate; a man-at-arms'
   // short sword; a samurai's wakizashi, the short companion of the katana.
   dagger: {
+    art: 'artFleche',
     label: 'Dagger', hands: 'one', length: 0.3, strikeFrom: 0.06, handle: 0.11, mass: 0.35, balance: 0, radius: 0.01,
     harm: { thrust: { pierce: 0.8, blunt: 0.3 }, swing: { cut: 0.35, blunt: 0.2 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 40, zeta: 0.8 }, threat: 2.5,
   },
   shortSword: {
+    art: 'artFleche',
     label: 'Short sword', hands: 'one', length: 0.6, strikeFrom: 0.1, handle: 0.12, mass: 0.85, balance: 0.08, radius: 0.012,
     harm: { thrust: { pierce: 0.85, cut: 0.2, blunt: 0.15 }, swing: { cut: 0.8, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 26, zeta: 0.8 }, threat: 3,
   },
   wakizashi: {
+    art: 'artDrawCut',
     label: 'Wakizashi', hands: 'one', length: 0.5, strikeFrom: 0.08, handle: 0.16, mass: 0.7, balance: 0.08, radius: 0.012, curve: 0.012,
     harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.6, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 28, zeta: 0.8 }, threat: 3.2,
@@ -788,6 +807,7 @@ export const WEAPONS = {
   // A wooden baseball bat (~84 cm, ~0.9 kg), swung two-handed: all its
   // harm blunt, its weight out in the barrel.
   bat: {
+    art: 'artCrushOne',
     label: 'Baseball bat', hands: 'two', length: 0.6, strikeFrom: 0.32, handle: 0.24, spacing: 0.09, mass: 0.9, balance: 0.42, radius: 0.033,
     harm: { swing: { blunt: 1.25 }, thrust: { blunt: 0.4 } },
     contactSeconds: 0.005, rotation: 1.0, wrist: { omega: 16, zeta: 0.85 }, threat: 3.4,
@@ -804,6 +824,7 @@ export const WEAPONS = {
   // Fierbois): one hand, ~0.8 m of stiff tapering blade, a straight cross and
   // a wheel pommel; made to thrust into the gaps of plate as much as to cut.
   armingSword: {
+    art: 'artDrawCut',
     label: 'Arming sword', hands: 'one', length: 0.8, strikeFrom: 0.12, handle: 0.13, mass: 1.15, balance: 0.12, radius: 0.011,
     harm: { thrust: { pierce: 1, cut: 0.2, blunt: 0.12 }, swing: { cut: 0.95, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 24, zeta: 0.8 }, threat: 3.4,
@@ -814,6 +835,7 @@ export const WEAPONS = {
   // short cross with langets, a cap pommel; a horseman's sword, made to cut
   // from the saddle more than to thrust, so its balance a little further out.
   sayf: {
+    art: 'artDrawCut',
     label: 'Sayf', hands: 'one', length: 0.84, strikeFrom: 0.12, handle: 0.12, mass: 1.15, balance: 0.16, radius: 0.012,
     harm: { swing: { cut: 1.0, blunt: 0.4 }, thrust: { pierce: 0.85, cut: 0.2, blunt: 0.12 } },
     contactSeconds: 0.004, rotation: 0.72, wrist: { omega: 23, zeta: 0.8 }, threat: 3.4,
@@ -822,18 +844,21 @@ export const WEAPONS = {
   // of knotted wood thickening to its end, ~0.9 m and 2 kg, no iron on it.
   // Only blunt; its weight out at the head.
   clava: {
+    art: 'artCrushOne',
     label: 'Club', hands: 'one', length: 0.78, strikeFrom: 0.42, handle: 0.12, mass: 2.0, balance: 0.6, radius: 0.04,
     harm: { swing: { blunt: 1.35 }, thrust: { blunt: 0.4 } },
     contactSeconds: 0.005, rotation: 0.95, wrist: { omega: 13, zeta: 0.85 }, threat: 3.6, crush: 0.35,
   },
   // His backup: a short sword that cuts and stabs.
   gladius: {
+    art: 'artFleche',
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,
     harm: { thrust: { pierce: 0.9, cut: 0.2, blunt: 0.15 }, swing: { cut: 0.8, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 26, zeta: 0.8 }, threat: 3,
   },  // The thraex's sica: a short sword curved like a sickle (~0.42 m of blade),
   // made to reach round a shield's edge into the back and the legs.
   sica: {
+    art: 'artDrawCut',
     label: 'Sica', hands: 'one', length: 0.46, strikeFrom: 0.08, handle: 0.12, mass: 0.7, balance: 0.14, radius: 0.012, curved: true, curve: -0.07,
     harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.7, cut: 0.25, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 26, zeta: 0.8 }, threat: 3.1,
@@ -842,6 +867,7 @@ export const WEAPONS = {
   // One hand while the other holds the net; both once it is thrown. The
   // prongs are short and spread: they wound wide rather than deep.
   trident: {
+    art: 'artSpear',
     label: 'Trident', hands: 'hybrid', length: 1.15, strikeFrom: 0.95, handle: 0.55, spacing: 0.4, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.016, tines: 3,
     harm: { thrust: { pierce: 0.85, cut: 0.2, blunt: 0.3 }, swing: { blunt: 0.55 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.8, grip: 0.5,
@@ -853,6 +879,7 @@ export const WEAPONS = {
   // man with a shield, longer than the legion's old gladius. As the arming
   // sword (a sword of the same kind a thousand years on) in all but the hilt.
   spatha: {
+    art: 'artDrawCut',
     label: 'Spatha', hands: 'one', length: 0.82, strikeFrom: 0.12, handle: 0.12, mass: 1.2, balance: 0.13, radius: 0.011,
     harm: { thrust: { pierce: 0.95, cut: 0.2, blunt: 0.12 }, swing: { cut: 0.95, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.72, wrist: { omega: 23, zeta: 0.8 }, threat: 3.4,
@@ -864,6 +891,7 @@ export const WEAPONS = {
   // and a little heavier than the knight's war lance (`lance`), as much of it
   // behind the grip; its grip a two-handed one, firmer than a spear's.
   kontos: {
+    art: 'artSpear',
     pointFrom: 0.78, label: 'Kontos', hands: 'two', length: 2.65, strikeFrom: 1.5, handle: 1.05, spacing: 0.55, mass: 5.6, balance: 0.2, radius: 0.025,
     harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
     contactSeconds: 0.005, rotation: 0.38, wrist: { omega: 6.5, zeta: 0.9 }, threat: 4, grip: 0.75,
@@ -894,6 +922,8 @@ export const WEAPONS = {
     label, flag, hands: 'two', length: 1.75, strikeFrom: -0.6, handle: 0.85, spacing: 0.45, leadAhead: true, mass: 3.5, balance: 0.75, radius: 0.018,
     harm: { swing: { blunt: 1 }, thrust: { blunt: 0.7, pierce: 0.3 } },
     contactSeconds: 0.008, rotation: 1.4, wrist: { omega: 10, zeta: 0.9 }, threat: 2, grip: 0.5,
+    // Its finial driven in as a spear's point is.
+    art: 'artSpear',
   }])),
 };
 

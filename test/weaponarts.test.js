@@ -5,7 +5,7 @@ import { MOVES, STYLES } from '../src/moves.js';
 import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
 import { contextAction, directFighter, doAction, newOrders } from '../src/control.js';
 import { WEAPONS } from '../src/weapons.js';
-import { ARTS, artBlocked, artCost, artOf, artPrimed, artReady, feelAdrenaline, startArt } from '../src/weaponarts.js';
+import { ARTS, artBlocked, artOf, artPrimed, artReady, feelAdrenaline, startArt } from '../src/weaponarts.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 
 /** The player (red, `style`) and a man before him `distance` m off, settled; the orders drive red, nobody thinks for blue. */
@@ -39,9 +39,8 @@ test('weapon arts: none below the adrenaline it wants; offered and made above it
   step(1 / 60);
   assert.equal(me.punch?.type, 'artIai');
   assert.ok(world.events.some((event) => event.kind === 'art' && event.attacker === me.id));
-  // A lot of stamina (five or six plain cuts' worth), and the surge spent.
-  assert.ok(stamina - me.stamina > 0.9 * artCost(me, 'artIai'), `stamina ${stamina} → ${me.stamina}`);
-  assert.ok(artCost(me, 'artIai') > 4 * MOVES.kesagiri.cost / me.body.aerobic);
+  // No stamina (the surge pays for it), and the surge spent.
+  assert.ok(me.stamina >= stamina - 1e-6, `stamina ${stamina} → ${me.stamina}`);
   assert.ok(me.adrenaline < adrenaline - ARTS.spend + 0.01, `adrenaline ${adrenaline} → ${me.adrenaline}`);
   assert.equal(artReady(me), false, 'not again at once');
   assert.equal(me.artCharged, false, 'the charge spent');
@@ -81,18 +80,15 @@ test('weapon arts: a man out of reach does not stop it: it is made toward him', 
   assert.equal(me.artCharged, false);
 });
 
-test('weapon arts: winded, the button stays (dimmed) and the art waits; pressed while busy, it is made when he is free', () => {
+test('weapon arts: winded, it is made all the same; pressed while busy, it is made when he is free', () => {
   const near = bout('naginata', 2);
   near.me.adrenaline = 0.9;
   near.step(1 / 60);
-  near.me.stamina = artCost(near.me, 'artWheel') * 0.5;
-  assert.equal(artReady(near.me), false, 'winded');
-  assert.equal(artPrimed(near.me), true, 'its button still there');
-  assert.equal(artBlocked(near.me), 'winded', 'and says why');
+  near.me.stamina = 0.01;
+  assert.equal(artReady(near.me), true, 'no stamina asked');
   near.orders.actions = ['art'];
   near.step(1 / 60);
-  assert.notEqual(near.me.punch?.type, 'artWheel');
-  assert.equal(near.me.artCharged, true, 'the charge kept');
+  assert.equal(near.me.punch?.type, 'artWheel');
 
   // A plain cut in flight near its end, then the art pressed: kept asked a moment (ARTS.askedFor) and made once he is free.
   const busy = bout('katana', 1.5);

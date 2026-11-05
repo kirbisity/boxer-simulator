@@ -108,6 +108,9 @@ export const AI = {
   reactionSeconds: 0.15,
   reactionTrained: 0.08,
   reactionJitter: 0.04,
+  // A weapon art (the player's: weaponarts.js) comes disguised: seen `readLate` s later than a plain blow, and met with the
+  // guard (WORLD.guardRead's chance) `guardRead` times as often; its read once guarded is physics.js blowRead's.
+  art: { readLate: 0.12, guardRead: 0.5 },
   // A couched point carried in at a run is watched, not answered, until it
   // is within `couchedWatch` m of him (its gap, physics couchedGap): from then
   // the reaction runs as to any blow starting.
@@ -3047,7 +3050,7 @@ function decide(world, fighter, dt) {
   if (incoming && fighter.seenPunch !== incoming) {
     fighter.seenPunch = incoming;
     const skill = fighter.body.inputs.exercise;
-    fighter.reactAt = AI.reactionSeconds - AI.reactionTrained * skill + (random() - 0.5) * 2 * AI.reactionJitter + (style.reactionSlow ?? 0) + WORLD.daze.reaction * dazedShare(fighter);
+    fighter.reactAt = AI.reactionSeconds - AI.reactionTrained * skill + (random() - 0.5) * 2 * AI.reactionJitter + (style.reactionSlow ?? 0) + WORLD.daze.reaction * dazedShare(fighter) + (incoming.spec.art ? AI.art.readLate : 0);
     fighter.reacted = false;
   }
   // Seen from when it starts to move, loading included; not while committed.
@@ -3073,7 +3076,7 @@ function decide(world, fighter, dt) {
       if (style.riposte && fighter.offWeapon?.held && riposte(world, fighter, striker, style, distance)) return;
       // A trained man answers with his guard, held up through the blows that follow, as often as he is trained to read them
       // (WORLD.guardRead, keepGuard); a long point he still gets off the line of (AI.offLine).
-      const guards = !longPoint(striker, incoming) && random() < WORLD.guardRead.chance.most * (guardReading(fighter) ?? 0) ** WORLD.guardRead.chance.power;
+      const guards = !longPoint(striker, incoming) && random() < WORLD.guardRead.chance.most * (guardReading(fighter) ?? 0) ** WORLD.guardRead.chance.power * (incoming.spec.art ? AI.art.guardRead : 1);
       if (guards) name = blockFor(fighter);
       // A blade coming is got away from, not blocked with an arm.
       else if (incoming.spec.path === 'blade' && wary && name !== 'sidestep' && !longPoint(striker, incoming) && random() < AI.blade.stepBackChance) name = 'stepBack';

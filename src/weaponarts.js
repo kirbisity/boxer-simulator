@@ -1,8 +1,11 @@
 // Weapon arts: the player's special attacks, one for each family of weapon (weapons.js `art`, a move in
 // moves.js marked `art`), to be made only with his blood up — adrenaline very high — and at the cost of
-// an all-out effort (a lot of stamina) and of the surge itself (it is spent in the doing). Nothing here
+// the surge itself (it is spent in the doing; the stamina of an all-out effort is not counted against him: the surge
+// pays for it). Nothing here
 // makes a blow stronger: an art is a move like any other, carried out by the same physics, and it is
-// stronger only for how it is made (moves.js, physics/arts.js). No gun or bow has one. The AI does not
+// stronger only for how it is made (moves.js, physics/arts.js); it comes disguised (read late, its guard hard to meet:
+// ai.js AI.art) and laid on its mark with more care (physics/config.js WORLD.skill.artScatter). Every hand-to-hand weapon has
+// one, and every unarmed style (moves.js STYLES `art`); no gun or bow. The AI does not
 // make them: they are the player's (an AI man's adrenaline is ai.js's own, for his fear).
 //
 // The charge: once his adrenaline reaches ARTS.ready with a weapon that has an art, the art is charged (`artCharged`) and
@@ -21,7 +24,7 @@
 
 import { AI, adrenalineGain, surge } from './ai.js';
 import { P } from './body.js';
-import { MOVES } from './moves.js';
+import { MOVES, STYLES } from './moves.js';
 import { hostile, inFight, opponentFor, point, reachOf, throwPunch } from './physics.js';
 import { startThrow, throwableOf, throwBlocked } from './physics/throwable.js';
 
@@ -47,20 +50,18 @@ export const ARTS = {
   // made the moment he is free, so a press a beat early is not lost.
   askedFor: 0.4,
   // The art's name on its button.
-  labels: { artIai: 'Iai', artPommel: 'Pommel', artDrawCut: 'Draw cut', artWheel: 'Wheel', artCrush: 'Crush', artCrushClub: 'Crush', artCrushOne: 'Crush', artSpear: 'Lunge' },
+  labels: { artIai: 'Iai', artPommel: 'Pommel', artDrawCut: 'Draw cut', artWheel: 'Wheel', artCrush: 'Crush', artCrushClub: 'Crush', artCrushOne: 'Crush', artSpear: 'Lunge', artFleche: 'Flèche', artOverhand: 'Overhand', artRoundhouse: 'Roundhouse', artSlam: 'Slam' },
 };
 
-/** The art his weapon has (a move's name), or null: none for an empty hand, a gun, a bow, or from the saddle. */
+/** The art his weapon has (a move's name), or his style's with an empty hand, or null: none for a gun, a bow, or from the saddle. */
 export function artOf(fighter) {
-  const weapon = fighter?.weapon?.held ? fighter.weapon : null;
-  if (!weapon || weapon.spec.ranged || weapon.spec.shot || weapon.spec.bow || fighter.mount) return null;
-  const name = weapon.spec.art;
+  if (!fighter || fighter.mount) return null;
+  const weapon = fighter.weapon?.held ? fighter.weapon : null;
+  if (weapon && (weapon.spec.ranged || weapon.spec.shot || weapon.spec.bow)) return null;
+  // Empty-handed: his style's, or (a weapon style disarmed) the style he falls back on.
+  const style = STYLES[fighter.style];
+  const name = weapon ? weapon.spec.art : style?.art ?? STYLES[style?.fallback]?.art;
   return name && MOVES[name]?.art ? name : null;
-}
-
-/** The stamina an art draws from him (as throwPunch draws it: its cost over his aerobic fitness). */
-export function artCost(fighter, name) {
-  return MOVES[name].cost / fighter.body.aerobic;
 }
 
 /** Whether his art is charged (its button shown, glowing): a weapon with an art, and the charge banked (or his blood up now). */
@@ -71,8 +72,7 @@ export function artPrimed(fighter) {
 }
 
 /**
- * Why a charged art cannot be made this instant, or null when it can: 'winded' (not the stamina for it: the button dims and
- * says so), 'busy' (a blow in flight, a flinch, held, down: a press is kept a moment, ARTS.askedFor), or 'none' (no art, or
+ * Why a charged art cannot be made this instant, or null when it can: 'busy' (a blow in flight, a flinch, held, down: a press is kept a moment, ARTS.askedFor), or 'none' (no art, or
  * not charged).
  */
 export function artBlocked(fighter) {
@@ -80,12 +80,11 @@ export function artBlocked(fighter) {
   if (throwableOf(fighter)) return throwBlocked(fighter);
   const name = artOf(fighter);
   if (!name || !artPrimed(fighter)) return 'none';
-  if (fighter.stamina < artCost(fighter, name)) return 'winded';
   if (fighter.state !== 'up' || fighter.punch || fighter.crawling || fighter.netted || fighter.pain || fighter.clinch || fighter.rush) return 'busy';
   return null;
 }
 
-/** Whether he can make his art now: charged, on his feet and free, with the stamina for it. */
+/** Whether he can make his art now: charged, on his feet and free. */
 export function artReady(fighter) {
   return artBlocked(fighter) === null;
 }
@@ -121,7 +120,7 @@ export function artLabel(fighter) {
 
 /**
  * Make his art: at his man if he is within reach, else into the air toward the nearest enemy (or ahead). The move is
- * thrown as any blow is (its stamina drawn by throwPunch); the charge and ARTS.spend of the adrenaline are spent. An art
+ * thrown as any blow is (no stamina drawn: throwPunch); the charge and ARTS.spend of the adrenaline are spent. An art
  * that wants a true edge (`trueEdge`: the jian's drawing cut) is cut with it whatever his skill. Returns whether it was made.
  */
 export function startArt(world, fighter) {

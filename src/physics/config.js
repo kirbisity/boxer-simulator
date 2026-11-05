@@ -274,7 +274,8 @@ export const WORLD = {
   // `flatBlunt` of it as a blow); gaps in armour are found × (0.5 + skill);
   // `draw`: a master draws the edge through and drives the point straight,
   // the cut and the stab biting × (1 + draw) at 1, × (1 − draw) at 0.
-  skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25 },
+  // `artScatter`: a weapon art is laid on its mark with care (measured to his distance, made with his blood up): its scatter × this.
+  skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25, artScatter: 0.6 },
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
@@ -323,7 +324,10 @@ export const WORLD = {
   // - chance: how often an AI answers a blow with his guard at all (else his style's dodge, or nothing): `most` × his reading's share
   //   raised to `power`. Not every blow can be blocked, even by a master; a half-trained man seldom tries.
   // Reading was made harder (2026-11-02: delay, lag and error up; a master is no longer perfect) so a block is less sure.
-  guardRead: { untrainedBelow: 0.3, delay: [0.3, 0.02], lag: [0.11, 0.015], error: [0.08, 0.01], linger: 0.5, chance: { most: 0.85, power: 1.5 } },
+  guardRead: { untrainedBelow: 0.3, delay: [0.3, 0.02], lag: [0.11, 0.015], error: [0.08, 0.01], linger: 0.5, chance: { most: 0.85, power: 1.5 },
+    // A weapon art comes disguised (weaponarts.js): its wind-up hides where it is going (the blade laid back behind him, the hips
+    // turned away), so it is read `delay` s later and `error` times as far off its line, and trails it `lag` times as far.
+    art: { delay: 0.1, error: 2.5, lag: 1.8 } },
   // The guard held up with bare arms (physics.js coverArms): the forearm nearer the blow goes onto its line this share of his
   // height out from what it is aimed at (~20 cm for a 1.8 m man: a forearm's length before the face or the ribs, where a boxer's
   // shell meets a punch).
