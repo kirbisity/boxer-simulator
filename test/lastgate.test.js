@@ -1,5 +1,5 @@
 // The Last Gate (lastgate.js): the four modes (their heroes and kit, their men, their hordes), the rebels' kits and their
-// desperation, the androids, the lance kept, the horse archer's arrows that never run out, the waves' ramp, the breach
+// desperation, the ladders their waves climb, the androids, the lance kept, the horse archer's arrows that never run out, the waves' ramp, the breach
 // and the gate's fall, the pool that never grows however long the run, the boards of best runs, and the line to share.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { buildBody, P } from '../src/body.js';
 import { deriveStats } from '../src/physiology.js';
 import { advance, placeOnFloor, seededRandom } from '../src/physics.js';
 import { ammoCarried } from '../src/physics/ranged.js';
-import { createLastGate, createLastGateBoard, LAST_GATE, LAST_GATE_BOARD, LAST_GATE_MODE_KEYS, LAST_GATE_MODES, lastGateBoardKey, lastGateFed, lastGateRank, lastGateRebel, lastGateRebelKind, lastGateResult, lastGateShareText, lastGateWaveValue, stepLastGate } from '../src/lastgate.js';
+import { createLastGate, createLastGateBoard, LAST_GATE, LAST_GATE_BOARD, LAST_GATE_MODE_KEYS, LAST_GATE_MODES, lastGateBoardKey, LAST_GATE_FOES, lastGateFoe, lastGateRank, lastGateRebel, lastGateRebelKind, lastGateResult, lastGateRung, lastGateShareText, lastGateWaveValue, lgRamp, stepLastGate } from '../src/lastgate.js';
 
 const think = (world, dt) => {
   stepLastGate(world, dt);
@@ -58,42 +58,80 @@ test('four modes, each its own hero, his kit and his men: the samurai in tōsei 
   assert.ok(Number.isFinite(ammoCarried(officer)), 'rounds counted');
 });
 
-test('the rebels: most bare-handed, some with a staff, a few with a spear and a quilted jack; all starved, all desperate; each mode its own mix', () => {
-  for (const key of ['samurai', 'knight', 'mongol']) {
-    const pool = LAST_GATE_MODES[key].pool;
-    const total = Object.values(pool).reduce((sum, count) => sum + count, 0);
-    assert.equal(total, LAST_GATE.pool, key);
-    assert.ok(pool.unarmed >= total * 0.4 && pool.staff >= pool.spear && pool.spear <= total / 4, `${key}: ${JSON.stringify(pool)}`);
-  }
+test('the rebels: the starved with bare hands, a staff, or a spear and a quilted jack; all desperate; the pool all starved at first', () => {
   const world = createLastGate('samurai', { companions: 0, seed: 3 });
   const rebels = world.fighters.filter((fighter) => fighter.corner === 'blue');
   assert.equal(rebels.length, LAST_GATE.pool);
-  const random = seededRandom(5);
-  for (const kind of ['unarmed', 'staff', 'spear']) {
-    const inputs = lastGateRebel(random, kind);
-    const man = rebels.find((rebel) => rebel.body.inputs.style === inputs.style) ?? null;
-    assert.ok(man, `a ${kind} rebel in the pool`);
-    assert.equal(man.weapon?.kind ?? null, { unarmed: null, staff: 'staff', spear: 'longSpear' }[kind]);
-    assert.equal(man.body.inputs.outfit.kind, kind === 'spear' ? 'levy' : 'rags');
-    if (kind === 'spear') assert.ok(man.body.gear.protection.cut > 0, 'a little armour');
-    else assert.equal(man.body.gear.protection.cut, 0, 'rags turn nothing');
-  }
   for (const rebel of rebels) {
     assert.equal(rebel.body.gear.courage, LAST_GATE.desperate);
     const bmi = deriveStats(rebel.body).bmi;
     assert.ok(bmi < 16, `starved: BMI ${bmi.toFixed(1)}`);
+    assert.equal(rebel.body.inputs.outfit.kind, 'rags');
   }
-  // The waves: the first all bare hands; later most still bare-handed, some staffs, a few spears.
-  const mix = (wave, mode = 'samurai') => {
-    const counts = { unarmed: 0, staff: 0, spear: 0 };
-    for (let k = 0; k < 1000; k += 1) counts[lastGateRebelKind(wave, (k + 0.5) / 1000, mode)] += 1;
-    return counts;
+  const random = seededRandom(5);
+  for (const kind of ['unarmed', 'staff', 'spear']) {
+    const man = buildBody(lastGateRebel(random, kind));
+    assert.equal(man.inputs.style, { unarmed: 'unskilled', staff: 'staff', spear: 'spear' }[kind]);
+    assert.equal(man.inputs.outfit.kind, kind === 'spear' ? 'levy' : 'rags');
+    if (kind === 'spear') assert.ok(man.gear.protection.cut > 0, 'a little armour');
+    else assert.equal(man.gear.protection.cut, 0, 'rags turn nothing');
+  }
+});
+
+test('each rebel mode climbs its faction\'s ladder from the starved rebel: each rung harder by who he is (fed, drilled, armoured), none by a multiplier', () => {
+  const ladders = {
+    samurai: ['unarmed', 'staff', 'spear', 'ashigaru', 'samurai'],
+    knight: ['unarmed', 'staff', 'spear', 'footman', 'knight', 'hammerKnight'],
+    mongol: ['unarmed', 'staff', 'spear', 'mingGarrison', 'mingBrigandine', 'mingElite'],
   };
-  assert.deepEqual(mix(1), { unarmed: 1000, staff: 0, spear: 0 });
-  const late = mix(10);
-  assert.ok(late.unarmed > 300 && late.staff > late.spear && late.spear > 0 && late.spear <= 300, JSON.stringify(late));
-  // The Jacquerie's peasants come better armed than the famine rebels, from the first wave.
-  assert.ok(mix(1, 'knight').staff + mix(1, 'knight').spear > 100 && mix(6, 'knight').spear > mix(6, 'samurai').spear);
+  const kits = { ashigaru: 'ashigaru', samurai: ['samurai', 'samuraiTosei'], footman: 'footman', knight: 'knight', hammerKnight: 'knight', mingGarrison: 'mingGarrison', mingBrigandine: 'mingBrigandine', mingElite: 'mingElite' };
+  for (const [mode, rungs] of Object.entries(ladders)) {
+    assert.deepEqual(LAST_GATE_MODES[mode].ladder.rungs, rungs, mode);
+    // Every rung a man of the cast, desperate; the soldiers fed and drilled past the starved, in their faction's kit.
+    const random = seededRandom(11);
+    let lastSkill = -1;
+    for (const kind of rungs) {
+      assert.ok(LAST_GATE_FOES[kind], kind);
+      const man = buildBody(lastGateFoe(random, kind));
+      assert.equal(man.gear.courage, LAST_GATE.desperate, kind);
+      if (kits[kind]) {
+        assert.ok([kits[kind]].flat().includes(man.inputs.outfit.kind), `${kind} in ${man.inputs.outfit.kind}`);
+        assert.ok(deriveStats(man).bmi > 19, `${kind} fed`);
+        assert.ok(man.inputs.skill >= lastSkill, `${mode}: ${kind} trained at least as the rung below`);
+        lastSkill = man.inputs.skill;
+      }
+    }
+    // The best rung armoured and trained as the faction's best: a knight's plate, the samurai's armour, the Ming elite's.
+    const best = buildBody(lastGateFoe(seededRandom(2), rungs[rungs.length - 1]));
+    assert.ok(best.gear.protection.cut >= 0.9 && best.inputs.skill >= 0.6, `${mode}'s best: cut ${best.gear.protection.cut}, skill ${best.inputs.skill}`);
+    // The waves climb it: the first from the bottom (all starved), never down, to the top by four minutes.
+    const kinds = (wave) => {
+      const counts = {};
+      for (let k = 0; k < 1000; k += 1) {
+        const kind = lastGateRebelKind(wave, (k + 0.5) / 1000, mode);
+        counts[kind] = (counts[kind] ?? 0) + 1;
+      }
+      return counts;
+    };
+    assert.ok(rungs.indexOf(lastGateRebelKind(1, 0, mode)) === 0, `${mode} starts from the starved`);
+    assert.ok(kinds(1).unarmed >= 500, `${mode}: ${JSON.stringify(kinds(1))}`);
+    for (let wave = 2; wave <= 12; wave += 1) assert.ok(lastGateRung(wave, mode) >= lastGateRung(wave - 1, mode), `${mode} climbs`);
+    assert.deepEqual(kinds(9), { [rungs[rungs.length - 1]]: 1000 }, `${mode} at the top by 4:00`);
+    // Before two minutes only the starved; soldiers after.
+    assert.ok(lastGateRung(4, mode) < 3 && lastGateRung(6, mode) >= 3, `${mode}: rung ${lastGateRung(4, mode)} at 1:30, ${lastGateRung(6, mode)} at 2:30`);
+  }
+  // The Jacques better armed from the first than the famine rebels.
+  assert.ok(lastGateRung(1, 'knight') > lastGateRung(1, 'samurai'));
+  // A foe woken late is his rung's man: a samurai in the samurai's kit, trained as one, not a starved man trained up.
+  const world = createLastGate('samurai', { companions: 5, seed: 3 });
+  world.lastGate.time = 30 * 8;
+  const before = new Set(world.fighters.filter((fighter) => !fighter.dormant).map((fighter) => fighter.id));
+  stepLastGate(world, 0.1);
+  const woken = world.fighters.find((fighter) => fighter.corner === 'blue' && !fighter.dormant && !before.has(fighter.id));
+  assert.ok(woken, 'one woken');
+  assert.ok(['samurai', 'samuraiTosei'].includes(woken.body.inputs.outfit.kind), woken.body.inputs.outfit.kind);
+  assert.equal(woken.weapon?.kind, 'katana');
+  assert.ok(deriveStats(woken.body).bmi > 19 && woken.body.gear.courage === LAST_GATE.desperate);
 });
 
 test('Night Shift\'s horde: service androids (the humanoid robot, not the combat bot): bare hands, no blood, no fear', () => {
@@ -151,22 +189,17 @@ test('each mode\'s waves: intense from the first (foes on the field, one woken e
     // The steep part begins at two minutes (wave steepFrom + 1).
     assert.equal(waves.seconds * waves.steepFrom, 120, key);
     assert.ok(at('alive', 1) >= 2 && at('every', 1) <= 4, `${key}: ${at('alive', 1)} on the field, one every ${at('every', 1)} s`);
-    // Before two minutes the horde grows; after, it grows faster (to the cap) and comes quicker, faster and better trained.
+    // Before two minutes the horde grows; after, it grows faster and comes quicker and faster.
     const early = at('alive', waves.steepFrom) - at('alive', 1);
     const late = Math.min(LAST_GATE.liveCap, at('alive', waves.steepFrom + 2)) - at('alive', waves.steepFrom);
     assert.ok(early > 0 && late / 2 > early / (waves.steepFrom - 1), `${key}: +${early} in the first two minutes, +${late} in the next minute`);
     assert.ok(at('every', waves.steepFrom + 2) < at('every', waves.steepFrom) && at('every', waves.steepFrom) < at('every', 1));
     assert.ok(at('run', waves.steepFrom + 2) - at('run', waves.steepFrom) > at('run', waves.steepFrom) - at('run', waves.steepFrom - 2), `${key}: running`);
-    assert.ok(at('skill', waves.steepFrom + 2) > at('skill', waves.steepFrom), `${key}: trained`);
     assert.ok(at('pace', 8) <= 1 && at('run', 20) <= 1);
-    // The rebels' later waves bring fed men among the starving (none before two minutes); the androids need no feeding.
-    if (key === 'police') assert.equal(at('fed', 8), null);
-    else assert.ok(at('fed', waves.steepFrom) === 0 && at('fed', waves.steepFrom + 2) > 0.2, `${key}: fed`);
   }
-  const starving = lastGateRebel(seededRandom(3), 'staff');
-  const fed = lastGateFed(starving);
-  assert.ok(deriveStats(buildBody(fed)).bmi > 20 && deriveStats(buildBody(starving)).bmi < 16);
-  assert.equal(fed.style, starving.style, 'his arms as they were');
+  // The androids learn (their skill by the wave); a man's skill is his own (his rung's).
+  assert.ok(lastGateWaveValue('police', 'skill', 6) > lastGateWaveValue('police', 'skill', 4));
+  for (const key of ['samurai', 'knight', 'mongol']) assert.equal(lastGateWaveValue(key, 'skill', 6), null);
   // A foe woken later is trained to his wave's skill.
   const world = createLastGate('police', { companions: 5, seed: 3 });
   world.lastGate.time = 200;
@@ -175,6 +208,20 @@ test('each mode\'s waves: intense from the first (foes on the field, one woken e
   const woken = world.fighters.find((fighter) => fighter.corner === 'blue' && !fighter.dormant && !before.has(fighter.id));
   assert.ok(woken, 'one woken');
   assert.ok(Math.abs(woken.body.inputs.skill - lastGateWaveValue('police', 'skill', world.lastGate.wave)) < 1e-9);
+});
+
+test('the rebels come fewer than the old horde, each wave growing slowly: at most a third of the old count late, never more than 9', () => {
+  // The rebels' waves before the ladder (alive: [at wave 1, early slope, late slope, least, most]), to 18 by 2:30–3:00.
+  const before = { samurai: [3, 1.5, 4, 1, 18], knight: [4, 1.6, 4.5, 1, 18], mongol: [2.5, 1.4, 4.5, 1, 18] };
+  for (const [key, old] of Object.entries(before)) {
+    const steepFrom = LAST_GATE_MODES[key].waves.steepFrom;
+    const now = (wave) => Math.round(lastGateWaveValue(key, 'alive', wave));
+    const then = (wave) => Math.min(LAST_GATE.liveCap, Math.round(lgRamp(old, wave, steepFrom)));
+    for (let wave = 1; wave <= 12; wave += 1) assert.ok(now(wave) <= then(wave), `${key} wave ${wave}: ${now(wave)} against ${then(wave)}`);
+    // Its growth over the run a fraction of the old.
+    assert.ok(now(10) - now(1) <= (then(10) - then(1)) / 2, `${key}: +${now(10) - now(1)} by wave 10, was +${then(10) - then(1)}`);
+    assert.ok(now(7) <= then(7) / 2 && now(20) <= 9, `${key}: ${now(7)} at 3:00 (was ${then(7)}), ${now(20)} at most`);
+  }
 });
 
 test('a foe through the gate is a breach; at LAST_GATE.breachesToFall the gate falls and the run is over', () => {
@@ -206,12 +253,12 @@ test('a foe through the gate is a breach; at LAST_GATE.breachesToFall the gate f
 });
 
 test('a long run never has more foes on their feet than the cap, and the fighter list never grows', () => {
-  // The waves sped up (one every 8 s), so the cap is reached within the two minutes.
-  const waves = LAST_GATE_MODES.samurai.waves;
+  // The waves sped up (one every 8 s), so the cap is reached within the two minutes (the androids': theirs reaches LAST_GATE.liveCap).
+  const waves = LAST_GATE_MODES.police.waves;
   const seconds = waves.seconds;
   waves.seconds = 8;
   try {
-    const world = createLastGate('samurai', { companions: 5, seed: 7 });
+    const world = createLastGate('police', { companions: 5, seed: 7 });
     const count = world.fighters.length;
     assert.equal(count, 6 + LAST_GATE.pool);
     let most = 0;
@@ -223,7 +270,7 @@ test('a long run never has more foes on their feet than the cap, and the fighter
       assert.equal(world.fighters.length, count);
     }
     assert.ok(most >= LAST_GATE.liveCap - 4, `the horde grew to ${most}`);
-    assert.ok(world.lastGate.kills.total > 0, 'rebels fell');
+    assert.ok(world.lastGate.kills.total > 0, 'foes fell');
   } finally {
     waves.seconds = seconds;
   }

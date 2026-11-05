@@ -10,13 +10,15 @@
 // Out of the mist they come, wave on wave, and every one that gets past the gate's line is a breach: the gate falls at
 // LAST_GATE.breachesToFall, or when the defenders are all down.
 //
-// Nothing here makes a foe weak or a hero strong but their bodies and kit: the rebels are cast.js starvedRebel's men
-// (starved to a BMI of 14–15.5, which takes their strength and wind: body.js, physiology.js), most with bare hands, some with
-// a staff, a few with a spear and a quilted jack; the androids the humanoid robot (body.js PRESETS.humanoid); the heroes their
-// presets, trained to a hero's skill. The rebels never break: they have nothing left to lose (their kit's `courage` set to 1,
-// the same path as a machine's fearlessness: ai.js fearTarget). A mode's difficulty is all in its foes (`waves`): how many
-// at once, how fast they come, what they carry, how fast they walk and run, how well they fight; intense from the start and
-// steeply harder from `steepFrom` (two minutes in), so a run is over in some three or four minutes.
+// Nothing here makes a foe weak or a hero strong but their bodies and kit: the rebels begin as cast.js starvedRebel's men
+// (starved to a BMI of 14–15.5, which takes their strength and wind: body.js, physiology.js), bare-handed; each wave climbs
+// its mode's `ladder` of foes (LAST_GATE_FOES), the starved with a staff, then with a spear and a quilted jack, then the
+// faction's soldiers who have gone over to the rising, rung by rung up to its best (the samurai, the knight in plate, the
+// Ming's elite): each man as hard as his build, his drill and his kit make him, nothing added. The androids the humanoid
+// robot (body.js PRESETS.humanoid); the heroes their presets, trained to a hero's skill. The horde never breaks: they have
+// nothing left to lose (their kit's `courage` set to 1, the same path as a machine's fearlessness: ai.js fearTarget). A mode's
+// difficulty is all in its foes (`waves`, `ladder`): how many at once (few, and growing slowly), who they are (the ladder),
+// how fast they come, how fast they walk and run; intense from the start and steeper from `steepFrom` (two minutes in).
 //
 // The horde is shown without its cost: a fixed pool of foes (the world's fighter list never grows), a capped number of them
 // awake near the gate, the rest dormant (as a level's sleeping men are) and woken one by one just inside the mist, fresh
@@ -28,11 +30,10 @@
 // his stands (command.js orders govern otherwise); a rider is kept at his by his horse's reins (its goal).
 // No DOM here: main.js and lastgateview.js draw it.
 
-import { FRAMES, normaliseInputs, P, PRESETS } from './body.js';
-import { englishManAtArms, footSoldier, sengokuWarrior, starvedRebel, steppeWarrior, swatOfficer } from './cast.js';
+import { normaliseInputs, P, PRESETS } from './body.js';
+import { englishManAtArms, footSoldier, frenchKnight, mingSoldier, sengokuWarrior, starvedRebel, steppeWarrior, swatOfficer } from './cast.js';
 import { STYLES } from './moves.js';
 import { createWorld, inFight, placeOnFloor, reviveFighter, seededRandom } from './physics.js';
-import { caloriesForWeight } from './physiology.js';
 import { placeMounted } from './physics/mounted.js';
 
 export const LAST_GATE = {
@@ -93,11 +94,8 @@ export const LAST_GATE = {
   ],
   // A puddle's ground: a few cm of rain over a firm bed (sinkage `depth`, firm `firm`, m), water's viscosity, wet clay's grip (`footing`, of a dry foot's).
   puddleGround: { depth: 0.02, firm: 0.05, viscosity: 1, footing: 0.8, water: 0.035 },
-  // A rebel has nothing left to lose: his kit's courage (outfits.js gearTraits `outfit.courage`; 1 is a machine's: no fear at all).
+  // A man of the horde has nothing left to lose: his kit's courage (outfits.js gearTraits `outfit.courage`; 1 is a machine's: no fear at all).
   desperate: 1,
-  // A fed man among the later waves (a mode's `fed` share: a deserter, a soldier gone over to the rising): fed to a BMI of
-  // `bmi` (a fit working man's, against the starving 14–15.5) at `exercise` (a working man's), his strength and wind with it.
-  fed: { bmi: 21.5, exercise: 0.5 },
 };
 
 /**
@@ -117,67 +115,67 @@ const LG_TEAM = ['shotgun', 'handgun', 'baton', 'baton', 'baton'];
 /**
  * The four scenarios. The card's words: `title` (the scenario), `label` (the hero), his `weapon` and `strength`, `blurb`,
  * and his foes (`foe`, `foes`, how they go down: `felled`). The hero (`hero()`: his preset in his kit, trained to
- * LAST_GATE.heroSkill) and his men (`companion(random, index)`). The horde: `enemy(random, kind)` makes a foe of a kind,
- * `pool` how many of each kind the pool holds, `kinds` the kit of each one woken ([kind, share ramp] in order, the last
- * the rest), and `waves`: a wave every `seconds`; wave w keeps `alive` foes on the field (at most LAST_GATE.liveCap), wakes
- * one every `every` s while short, walks them at `pace` of a full walk, `run` of them running, trained to `skill`, `fed` of
- * them fed men (LAST_GATE.fed); each an lgRamp, steep from wave `steepFrom` on (wave 5 is 2:00–2:30 at 30 s a wave).
+ * LAST_GATE.heroSkill) and his men (`companion(random, index)`). The horde: `enemy(random, kind)` makes a foe of a kind
+ * (LAST_GATE_FOES); `ladder` the kinds from the weakest to the best (`rungs`) and how far up them wave w has climbed
+ * (`climb`, an lgRamp of the rung: at 2.4, 60% of those woken are of rung 2 and 40% of rung 3: lastGateRebelKind); and
+ * `waves`: a wave every `seconds`; wave w keeps `alive` foes on the field (at most LAST_GATE.liveCap), wakes one every
+ * `every` s while short, walks them at `pace` of a full walk, `run` of them running, trained to `skill` (the androids only:
+ * a man's skill is his own, his rung's); each an lgRamp, steep from wave `steepFrom` on (wave 5 is 2:00–2:30 at 30 s a wave).
+ * The rebels' modes stay few in number and climb the ladder instead: fewer men each wave than a horde of the starved, each harder.
  */
 export const LAST_GATE_MODES = {
   samurai: {
     title: 'The Rice Riot', label: 'Samurai', glyph: '⛩️', weapon: 'Ōdachi', foe: 'rebel', foes: 'rebels', felled: 'cut down',
     strength: 'Tōsei gusoku and the longest blade: cuts them down before they close.',
-    blurb: 'A famine ikki: starving peasants at the castle gate.',
+    blurb: 'A famine ikki: starving peasants at the castle gate, then the ashigaru and samurai who join them.',
     // Makara Naotaka in the later armour of the Sengoku (outfits.js samuraiTosei: the riveted steel cuirass, the menpo, its
     // crest), the ōdachi in both hands.
     hero: () => ({ ...structuredClone(PRESETS.odachi), outfit: { kind: 'samuraiTosei', design: 0 }, accessories: ['crest'], skill: LAST_GATE.heroSkill }),
     companion: (random, index) => (index < 2 ? sengokuWarrior(random, LG_SAMURAI_SIDE, 'katana', 'samurai') : sengokuWarrior(random, LG_SAMURAI_SIDE, 'spear', 'ashigaru')),
-    enemy: (random, kind) => lastGateRebel(random, kind),
-    pool: { unarmed: 11, staff: 7, spear: 6 },
-    // Bare hands at first; staves from the second wave, spears from the third, more of both after two minutes.
-    kinds: [['spear', [-0.02, 0.02, 0.08, 0, 0.3]], ['staff', [0, 0.05, 0.08, 0, 0.35]], ['unarmed']],
+    enemy: (random, kind) => lastGateFoe(random, kind),
+    // The ikki up the Japanese ladder: the starved bare-handed, with a staff, with a spear; the ashigaru with the yari (the
+    // roster's Ashigaru Spearman: okegawa-dō, jingasa, a levy's drill); the samurai with the katana in ō-yoroi or tōsei
+    // gusoku (a lifetime's training): the jizamurai and rōnin who led the risings. Staves by 0:30, spears by 1:00, ashigaru
+    // from 1:30, samurai from 2:30, all samurai by 3:30.
+    ladder: { rungs: ['unarmed', 'staff', 'spear', 'ashigaru', 'samurai'], climb: [0, 0.5, 0.75, 0, 4] },
     waves: {
       seconds: 30, steepFrom: 4,
-      // On the field: 3 at first, 7–8 by 1:30; then four more each half-minute, to the cap by 3:00.
-      alive: [3, 1.5, 4, 1, 18],
+      // On the field: 3 at first, 4 by 1:30, then one more a minute or so, 8 at most (was 18 by 3:00): fewer, each harder.
+      alive: [3, 0.35, 0.6, 1, 8],
       // One woken every 3 s at first, every 1.8 s by 1:30; then every second and less.
       every: [3, -0.4, -0.5, 0.6, 5],
       // A shamble at first, a full walk by 3:00; none run in the first half-minute, half by 2:30.
       pace: [0.65, 0.05, 0.1, 0, 1],
       run: [0, 0.07, 0.25, 0, 0.9],
-      // The hungriest first (a starving peasant's 0.1–0.2); after two minutes the men who had fought (a levy's drill, then a soldier's by 4:00).
-      skill: [0.15, 0.02, 0.15, 0, 0.8],
-      // None fed in the first two minutes; then the men who had eaten (deserters, soldiers gone over), a third by 3:00.
-      fed: [0, 0, 0.15, 0, 0.6],
     },
   },
   knight: {
     title: 'The Jacquerie', label: 'Knight', glyph: '🛡️', weapon: 'Lance', foe: 'rebel', foes: 'rebels', felled: 'ridden down',
     strength: 'Full plate on a destrier: the lance runs them through and is couched again.',
-    blurb: '1358: the peasants of the Beauvaisis rise against their lords.',
+    blurb: '1358: the peasants of the Beauvaisis rise against their lords; footmen and knights of the free companies join them.',
     // On his destrier in its steel bard (his kit's), the lance couched; were it broken (on heavy armour only), the mace.
     hero: () => ({ ...structuredClone(PRESETS.knight), style: 'lance', mounted: true, sidearm: 'mace', skill: LAST_GATE.heroSkill }),
     companion: (random, index) => (index < 2 ? englishManAtArms(random, index === 0 ? 'longsword' : 'warhammer') : footSoldier(random, 'spear')),
-    enemy: (random, kind) => lastGateRebel(random, kind),
-    // The Jacques took up what they had: more staves and spears (and the levy's jacks) than the famine rebels elsewhere.
-    pool: { unarmed: 10, staff: 8, spear: 6 },
-    kinds: [['spear', [0.05, 0.04, 0.07, 0, 0.35]], ['staff', [0.15, 0.05, 0.07, 0, 0.4]], ['unarmed']],
+    enemy: (random, kind) => lastGateFoe(random, kind),
+    // The Jacquerie up the European ladder: the starved bare-handed, with a staff, with a spear in the levy's jack; the
+    // footman with the spear in whatever armour he has (the roster's Spear Footman: a soldier's build and drill); the
+    // man-at-arms in full plate with the long sword, then with the war hammer (the Noble Knight, the Hammer Knight: French
+    // knights, built as they were): Guillaume Cale had the free companies' men among his. The Jacques took up what they
+    // had, a little better armed from the first (`climb` from 0.4: staves among them from the start); knights from 2:30.
+    ladder: { rungs: ['unarmed', 'staff', 'spear', 'footman', 'knight', 'hammerKnight'], climb: [0.4, 0.5, 0.75, 0, 5] },
     waves: {
       seconds: 30, steepFrom: 4,
-      // More of them sooner (a rider cannot be everywhere): 4 at first, 8–9 by 1:30, the cap by 2:30.
-      alive: [4, 1.6, 4.5, 1, 18],
+      // A few more than the samurai's (a rider cannot be everywhere): 3–4 at first, 9 at most (was 18 by 2:30).
+      alive: [3.5, 0.4, 0.7, 1, 9],
       every: [2.6, -0.35, -0.5, 0.55, 5],
       pace: [0.7, 0.05, 0.1, 0, 1],
       run: [0.05, 0.07, 0.18, 0, 0.85],
-      skill: [0.15, 0.02, 0.15, 0, 0.8],
-      // None fed in the first two minutes; then the men who had eaten (deserters, soldiers gone over), a third by 3:00.
-      fed: [0, 0, 0.15, 0, 0.6],
     },
   },
   mongol: {
     title: 'The Red Turbans', label: 'Mongol archer', glyph: '🏹', weapon: 'Composite bow', foe: 'rebel', foes: 'rebels', felled: 'shot down',
     strength: 'Iron lamellar on a steppe horse: arrows from the saddle, never short of them; the mace up close.',
-    blurb: '1351: famine and the Yellow River\'s flood raise the Red Turbans against the Yuan.',
+    blurb: '1351: famine and the Yellow River\'s flood raise the Red Turbans against the Yuan; their armies grow into soldiers.',
     // A horse archer of the Yuan's guard in iron lamellar to the knees, cut as the Mongols wore it (outfits.js
     // mingIronLamellar: the mongolIron coat, the spiked helmet with its lamellar aventail), on his steppe horse; the composite
     // bow, his quiver kept full from the gate's stores behind him (`endlessAmmo`: outfits.js gearTraits), and the mace
@@ -185,20 +183,20 @@ export const LAST_GATE_MODES = {
     hero: () => ({ ...structuredClone(PRESETS.kheshig), name: 'Jebe', style: 'kheshigBow', outfit: { kind: 'mingIronLamellar', design: 0 }, mounted: true, sidearm: 'mace', endlessAmmo: true, skill: LAST_GATE.heroSkill }),
     // His men on foot at the gate: two archers (shooting over him, then the sabre), one with sabre and shield, two with the mace.
     companion: (random, index) => steppeWarrior(random, index < 2 ? 'steppeBow' : index === 2 ? 'saberShield' : 'maceShield', 'medium'),
-    enemy: (random, kind) => lastGateRebel(random, kind),
-    // Rebels who come on fast at men who shoot them: more running, fewer staves, as many spears as the Jacquerie's.
-    pool: { unarmed: 12, staff: 6, spear: 6 },
-    kinds: [['spear', [0.03, 0.03, 0.08, 0, 0.3]], ['staff', [0.08, 0.04, 0.06, 0, 0.3]], ['unarmed']],
+    enemy: (random, kind) => lastGateFoe(random, kind),
+    // The Red Turbans up the Chinese ladder (the armies they became were the Ming's): the starved bare-handed, with a staff,
+    // with a spear in a quilted jack; the garrison spearman in his padded coat (the roster's Garrison Spearman); the
+    // spearman in brigandine and iron hat (Ming Spearman); the elite with the guandao in the long coat (General's Retainer).
+    // Garrison men from 1:00, brigandine from 2:00, the elite from 2:30.
+    ladder: { rungs: ['unarmed', 'staff', 'spear', 'mingGarrison', 'mingBrigandine', 'mingElite'], climb: [0.2, 0.5, 0.75, 0, 5] },
     waves: {
       seconds: 30, steepFrom: 4,
-      alive: [2.5, 1.4, 4.5, 1, 18],
+      // Rebels who come on fast at men who shoot them (`run`): 2–3 at first, 8 at most (was 18 by 3:00).
+      alive: [2.5, 0.35, 0.6, 1, 8],
       every: [2.8, -0.4, -0.5, 0.55, 5],
       pace: [0.75, 0.05, 0.1, 0, 1],
       // Running at him from the start (a man shot at runs), most of them by 2:30.
       run: [0.05, 0.1, 0.25, 0, 0.95],
-      skill: [0.15, 0.02, 0.15, 0, 0.8],
-      // None fed in the first two minutes; then the men who had eaten (deserters, soldiers gone over), a third by 3:00.
-      fed: [0, 0, 0.15, 0, 0.6],
     },
   },
   police: {
@@ -209,8 +207,8 @@ export const LAST_GATE_MODES = {
     hero: () => ({ ...structuredClone(PRESETS.handgun), style: 'rifle', sidearm: 'baton', skill: LAST_GATE.heroSkill }),
     companion: (random, index) => ({ ...swatOfficer(random, LG_TEAM[index] ?? 'baton'), sidearm: 'baton' }),
     enemy: (random) => lastGateAndroid(random),
-    pool: { android: 24 },
-    kinds: [['android']],
+    // One kind: the depot's androids, all alike (they get better by `skill`: they learn).
+    ladder: { rungs: ['android'], climb: [0, 0, 0, 0, 0] },
     waves: {
       seconds: 30, steepFrom: 4,
       // Machines that never tire: fewer at first (each takes several rounds), then the depot empties.
@@ -249,22 +247,40 @@ export function lastGateRebel(random, kind = 'unarmed') {
   return normaliseInputs({ ...man, style: kind === 'staff' ? 'staff' : 'unskilled', outfit: { ...man.outfit, courage: LAST_GATE.desperate } });
 }
 
-/** The same man fed (LAST_GATE.fed): a fit working man's weight on his frame, a working man's exercise; his kit and arms as they were. */
-export function lastGateFed(inputs) {
-  const spec = LAST_GATE.fed;
-  const man = { ...inputs, exercise: Math.max(inputs.exercise ?? 0, spec.exercise) };
-  man.calories = Math.round(caloriesForWeight(man, spec.bmi * (man.heightCm / 100) ** 2, (FRAMES[man.frame] ?? FRAMES.medium).lean));
-  return man;
+// The rebels' colours: none of a lord's (their soldiers' kits in their own plain designs, no banner on the back).
+const LG_REBEL_SIDE = { tint: null, banner: null };
+
+/**
+ * The horde's men, by kind (a mode's `ladder` rungs): each a man of the cast (cast.js) as his kind are built, drilled and
+ * kitted, nothing changed but his desperation (lastGateFoe). The starved first (lastGateRebel), then each faction's soldiers.
+ */
+export const LAST_GATE_FOES = {
+  // The starved (cast.js starvedRebel, BMI 14–15.5, skill 0.05–0.2): bare hands; a staff; a spear in a quilted jack and kettle hat.
+  unarmed: (random) => lastGateRebel(random, 'unarmed'),
+  staff: (random) => lastGateRebel(random, 'staff'),
+  spear: (random) => lastGateRebel(random, 'spear'),
+  // Japanese (cast.js sengokuWarrior, built as each was): an ashigaru with the yari in okegawa-dō and jingasa; a samurai with the katana in ō-yoroi or tōsei gusoku.
+  ashigaru: (random) => sengokuWarrior(random, LG_REBEL_SIDE, 'spear', 'ashigaru'),
+  samurai: (random) => sengokuWarrior(random, LG_REBEL_SIDE, 'katana', 'samurai'),
+  // European: a footman with the spear in whatever armour he has (cast.js footSoldier); a French man-at-arms in full plate with the long sword, or the war hammer (cast.js frenchKnight).
+  footman: (random) => footSoldier(random, 'spear'),
+  knight: (random) => frenchKnight(random, 'longsword'),
+  hammerKnight: (random) => frenchKnight(random, 'warhammer'),
+  // Chinese (cast.js mingSoldier): a garrison spearman in his padded coat; a spearman in brigandine and iron hat; an elite with the guandao in the long coat.
+  mingGarrison: (random) => mingSoldier(random, 'spear', 'garrison'),
+  mingBrigandine: (random) => mingSoldier(random, 'spear', 'brigandine'),
+  mingElite: (random) => mingSoldier(random, 'guandao', 'elite'),
+};
+
+/** A man of the horde of this kind (LAST_GATE_FOES), as desperate as the rest: whatever he was, he has thrown in with the rising. */
+export function lastGateFoe(random, kind = 'unarmed') {
+  const man = (LAST_GATE_FOES[kind] ?? LAST_GATE_FOES.unarmed)(random);
+  return normaliseInputs({ ...man, outfit: { ...man.outfit, courage: LAST_GATE.desperate } });
 }
 
 /** An android of the depot: the humanoid robot (body.js PRESETS.humanoid, not the combat bot), a unit number of its own. */
 export function lastGateAndroid(random) {
   return normaliseInputs({ ...structuredClone(PRESETS.humanoid), name: `H-1 Unit ${100 + Math.floor(random() * 900)}` });
-}
-
-/** A mode's pool of kits, in order. */
-function lgPoolKinds(mode) {
-  return Object.entries(lgMode(mode).pool).flatMap(([kind, count]) => Array(count).fill(kind));
 }
 
 const lgHips = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
@@ -282,8 +298,9 @@ export function createLastGate(mode, { companions = LAST_GATE.companionsMax, see
   const random = seededRandom(seed * 7919 + 17);
   const men = Math.max(0, Math.min(LAST_GATE.companionsMax, companions));
   const defenders = [normaliseInputs(spec.hero()), ...Array.from({ length: men }, (_, index) => normaliseInputs(spec.companion(random, index)))];
-  const kinds = lgPoolKinds(key);
-  const foes = kinds.map((kind) => spec.enemy(random, kind));
+  // The pool, each slot a man of the ladder's first rung; woken, he is made afresh as his wave's rung (lgWakeRebel).
+  const first = spec.ladder.rungs[0];
+  const foes = Array.from({ length: LAST_GATE.pool }, () => spec.enemy(random, first));
   const entries = [...defenders.map((inputs) => ({ inputs, corner: 'red' })), ...foes.map((inputs) => ({ inputs, corner: 'blue' }))];
   const world = createWorld(entries, { seed, arena: lastGateArena(), rules: { noStandards: true } });
   const gate = LAST_GATE.gate;
@@ -296,7 +313,7 @@ export function createLastGate(mode, { companions = LAST_GATE.companionsMax, see
     placeOnFloor(fighter, post[0], post[1], 0, 0);
     if (fighter.mount) placeMounted(fighter, post[0], post[1], 0);
   });
-  const pool = world.fighters.filter((fighter) => fighter.corner === 'blue').map((fighter, index) => ({ id: fighter.id, kind: kinds[index], inputs: foes[index] }));
+  const pool = world.fighters.filter((fighter) => fighter.corner === 'blue').map((fighter) => ({ id: fighter.id }));
   pool.forEach((slot, index) => {
     const fighter = world.fighters[slot.id];
     fighter.dormant = true;
@@ -314,7 +331,6 @@ export function createLastGate(mode, { companions = LAST_GATE.companionsMax, see
     rebuilds: [], news: [],
   };
   // The first few are already coming out of the mist.
-  const first = spec.kinds[spec.kinds.length - 1][0];
   for (let index = 0; index < LAST_GATE.opening.count; index += 1) lgWakeRebel(world, first, LAST_GATE.opening.x + index * 1.5);
   lgCountAwake(world);
   return world;
@@ -347,16 +363,19 @@ export function lastGateWave(time, mode = 'samurai') {
   return 1 + Math.floor(time / lgMode(mode).waves.seconds);
 }
 
-/** The kit of the next foe woken in wave `wave` of this mode: by the kits' shares in order (`roll` 0–1), else the last. */
-export function lastGateRebelKind(wave, roll, mode = 'samurai') {
+/** How far up its ladder this mode's wave has climbed (a rung, fractional: 2.4 is between rungs 2 and 3). */
+export function lastGateRung(wave, mode = 'samurai') {
   const spec = lgMode(mode);
-  let below = 0;
-  for (const [kind, share] of spec.kinds) {
-    if (!share) return kind;
-    below += lgRamp(share, wave, spec.waves.steepFrom);
-    if (roll < below) return kind;
-  }
-  return spec.kinds[spec.kinds.length - 1][0];
+  return lgRamp(spec.ladder.climb, wave, spec.waves.steepFrom);
+}
+
+/**
+ * The kind of the next foe woken in wave `wave` of this mode (`roll` 0–1): the rung below the climb or the one above it,
+ * the upper by the climb's fraction (at 2.4, 40% of rung 3).
+ */
+export function lastGateRebelKind(wave, roll, mode = 'samurai') {
+  const rungs = lgMode(mode).ladder.rungs;
+  return rungs[Math.max(0, Math.min(rungs.length - 1, Math.floor(lastGateRung(wave, mode) + roll)))];
 }
 
 /** Foes awake and not down for good. */
@@ -383,19 +402,17 @@ function lgCountAwake(world) {
   return { awake, rebels };
 }
 
-/** Wake a dormant foe of this kit (else of any kit) just inside the mist, fresh, trained to the wave's skill (fed, by its share); returns him, or null if the pool is spent. */
+/** Wake a dormant slot of the pool just inside the mist as a fresh man of this kind (trained to the wave's skill, where the mode sets one); returns him, or null if the pool is spent. */
 function lgWakeRebel(world, kind, x = LAST_GATE.spawn.x) {
   const run = world.lastGate;
-  const free = run.pool.filter((slot) => world.fighters[slot.id].dormant);
-  const slot = free.find((entry) => entry.kind === kind) ?? free[0];
+  const slot = run.pool.find((entry) => world.fighters[entry.id].dormant);
   if (!slot) return null;
   const fighter = world.fighters[slot.id];
   const z = (run.random() * 2 - 1) * LAST_GATE.spawn.spread;
   const wave = lastGateWave(run.time, run.mode);
   const skill = lastGateWaveValue(run.mode, 'skill', wave);
-  const fed = lastGateWaveValue(run.mode, 'fed', wave);
-  let inputs = skill === null ? slot.inputs : { ...slot.inputs, skill };
-  if (fed && run.random() < fed) inputs = lastGateFed(inputs);
+  const man = lgMode(run.mode).enemy(run.random, kind);
+  const inputs = skill === null ? man : { ...man, skill };
   reviveFighter(world, fighter, inputs, { at: [x + run.random() * 2, 0, z], yaw: Math.PI });
   fighter.dormant = undefined;
   run.lastHitBy.delete(fighter.id);
