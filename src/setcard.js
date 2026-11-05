@@ -61,12 +61,14 @@ export function setStatsHtml(card) {
 
 /**
  * A set's card element: `card` (outfits.js setCard), `picture` a function giving a promise of its portrait's URL (drawn only
- * once the card is on screen), `compact` for a card in a grid (the description, a small radar and a one-line summary).
+ * once the card is on screen), `compact` for a card in a grid (the description, a small radar and a one-line summary),
+ * `tile` for a choice in a picker (the picture, the name and its weight and movement only: the rest in its pop-up).
  */
-export function setCardElement(card, picture, { compact = false, chosen = false, tag = 'div' } = {}) {
+export function setCardElement(card, picture, { compact = false, tile = false, chosen = false, tag = 'div' } = {}) {
   const element = document.createElement(tag);
-  element.className = `set-card${compact ? ' compact' : ''}${chosen ? ' on' : ''}`;
+  element.className = `set-card${tile ? ' tile' : compact ? ' compact' : ''}${chosen ? ' on' : ''}`;
   if (tag === 'button') element.type = 'button';
+  if (tile) element.title = card.name;
   const image = Object.assign(document.createElement('img'), { alt: '', draggable: false, className: 'set-portrait' });
   const text = document.createElement('div');
   text.className = 'set-text';
@@ -76,7 +78,9 @@ export function setCardElement(card, picture, { compact = false, chosen = false,
   // The description in its paragraphs (lines of the blurb): all of them on a full card, the first (what it is) in a grid's.
   const lines = (card.blurb ?? '').split('\n').filter(Boolean);
   const blurb = (compact ? lines.slice(0, 1) : lines).map((line, at, shown) => `<span class="set-blurb${shown.length > 1 && at === shown.length - 1 ? ' set-epigram' : ''}">${line}</span>`).join('');
-  text.innerHTML = `<b>${card.name}</b>${blurb}${summary}`;
+  text.innerHTML = tile
+    ? `<b>${card.name}</b><span class="set-sum">${card.kg >= 0.5 ? `${Math.round(card.kg)} kg · ` : ''}${SET_MOVES[card.movement] ?? card.movement}</span>`
+    : `<b>${card.name}</b>${blurb}${summary}`;
   element.append(image, text);
   // Drawn when it scrolls into view (a portrait takes a frame's work).
   const draw = () => picture?.()?.then((url) => { image.src = url; });
