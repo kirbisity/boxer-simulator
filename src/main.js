@@ -36,6 +36,7 @@ import { createGeneralMarks } from './generalmark.js';
 import { leadOf, musterLevel } from './muster.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, finishOptions, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, helmChoices, helmSlotOf, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setHelmSlot, withFinish, wornCard } from './outfits.js';
 import { setCardElement } from './setcard.js';
+import { withInfo } from './infopop.js';
 import { addIcon, dramaCamera, momentFor, momentPlaying, resetDrama, startMoment, timeScale, updateIcons } from './drama.js';
 import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
 import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
@@ -2203,7 +2204,7 @@ function buildCornerForm(corner) {
   fillSetOptions(outfit.querySelector('[data-outfit="set"]'));
   fillHelmOptions(outfit.querySelector('[data-outfit="helm"]'));
   outfit.querySelector('[data-outfit="set"]').closest('label').classList.add('set-row');
-  // The set worn: its picture, description and stats (filled by fillCornerForm).
+  // The set worn: its picture and name, its description and stats in a pop-up (filled by fillCornerForm).
   const card = document.createElement('div');
   card.className = 'set-slot';
   outfit.append(card);
@@ -2348,7 +2349,13 @@ function fillCornerForm(corner) {
   const shown = `${kind}/${set.key}/${helmSlotOf(inputs)}`;
   if (slot.dataset.set !== shown) {
     slot.dataset.set = shown;
-    slot.replaceChildren(setCardElement(wornCard(inputs, buildBody(inputs).bodyMassKg), () => portrait(`set:${kind}/${set.key}`, setModel(kind, set.key))));
+    const card = wornCard(inputs, buildBody(inputs).bodyMassKg);
+    const picture = () => portrait(`set:${kind}/${set.key}`, setModel(kind, set.key));
+    const tile = setCardElement(card, picture, { tile: true, tag: 'button' });
+    const pick = withInfo(tile, () => setCardElement(card, picture), `${card.name}: its story and its stats`);
+    pick.classList.add('worn');
+    tile.onclick = pick.openInfo;
+    slot.replaceChildren(pick);
   }
   form.querySelector('.name-input').value = inputs.name;
   // Mounted is each fighter's own, and only if his kit rides (levels have no horses).

@@ -10,6 +10,7 @@ import { GLADIATORS, randomBoxer, randomCharacter, randomGladiator, redress, wei
 import { STYLE_KEYS, STYLES } from './moves.js';
 import { CLOTH_COLORS, FACTION_KEYS, FACTIONS, factionOf, finishOptions, firstDesignOf, HEADGEAR, headgearOptions, helmChoices, helmSlotOf, outfitOf, outfitSets, OUTFITS, pickableSets, randomColors, setCard, setHelmSlot, withFinish, wornCard } from './outfits.js';
 import { setCardElement } from './setcard.js';
+import { openInfoPop, withInfo } from './infopop.js';
 import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { photoFaceRegions } from './photoface.js';
 import { battleOf, SCENARIOS } from './scenarios.js';
@@ -245,8 +246,6 @@ export function installMenus(game) {
     const custom = { red: null, blue: null };
     // On horseback (each side's pick; only a man whose kit rides can: horses.js).
     const mounted = { red: false, blue: false };
-    // Each side's armour sheet (its set card: description, radar, bars) open over the stage, or not.
-    const lore = { red: false, blue: false };
     const body = screen('versus', 'Deadliest Warrior', null, home);
     body.parentElement.classList.add('dw');
     const roster = (corner) => WARRIORS.filter((warrior) => warrior.faction === faction[corner]);
@@ -351,16 +350,9 @@ export function installMenus(game) {
         mounted[corner] = !mounted[corner];
         draw(corner);
       };
-      // His armour: its card (setcard.js) over the stage, its words selectable; the button opens and closes it.
-      const loreButton = el('button', { type: 'button', className: `dw-mount${lore[corner] ? ' on' : ''}`, textContent: '📜 Armour', title: 'What he wears: its story and its stats' });
-      loreButton.onclick = () => { lore[corner] = !lore[corner]; draw(corner); };
-      side.lore?.remove();
-      side.lore = null;
-      if (lore[corner]) {
-        const card = setCardElement(wornCard(shown.inputs), () => game.portrait(shown.key ?? `lore:${shown.title}`, shown.inputs));
-        side.lore = el('div', { className: 'dw-lore' }, card, el('button', { type: 'button', className: 'dw-lore-close', ariaLabel: 'Close', textContent: '×', onclick: () => { lore[corner] = false; draw(corner); } }));
-        side.section.append(side.lore);
-      }
+      // His armour: its card (setcard.js) in a pop-up (infopop.js), its words selectable.
+      const loreButton = el('button', { type: 'button', className: 'dw-mount', textContent: '📜 Armour', title: 'What he wears: its story and its stats' });
+      loreButton.onclick = () => openInfoPop(setCardElement(wornCard(shown.inputs), () => game.portrait(shown.key ?? `lore:${shown.title}`, shown.inputs)), { label: `${shown.title}: armour` });
       // Under his name: on horseback or not, his armour, and making your own instead, side by side.
       side.title.replaceChildren(el('b', { textContent: shown.title }), starLine, el('span', { textContent: shown.line }), el('div', { className: 'dw-buttons' }, mount, loreButton, side.own));
       if (custom[corner]) side.title.prepend(el('em', { textContent: 'Your fighter' }));
@@ -518,13 +510,13 @@ export function installMenus(game) {
       const groups = FACTION_KEYS.map((faction) => [faction, styles.filter((key) => STYLE_FACTION(key) === faction)]).filter(([, keys]) => keys.length);
       content.append(...groups.map(([faction, keys]) => el('div', { className: 'style-group' },
         el('b', { className: 'style-faction', textContent: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` }),
-        el('div', { className: 'cards' }, ...keys.map(styleCard)))));
+        el('div', { className: 'cards compact' }, ...keys.map(styleCard)))));
     }
     function styleCard(key) {
       {
         const style = STYLES[key];
-        const card = el('button', { type: 'button', className: inputs.style === key ? 'card-choice on' : 'card-choice' },
-          el('b', { textContent: style.label }), el('span', { textContent: STYLE_NOTES[key] ?? '' }));
+        // Its name only; what it is, in its pop-up (the ⓘ, a long press or a right-click).
+        const card = el('button', { type: 'button', className: inputs.style === key ? 'card-choice on' : 'card-choice' }, el('b', { textContent: style.label }));
         card.onclick = () => {
           inputs.style = key;
           // Dressed for it, unless they have already chosen what to wear.
@@ -535,11 +527,11 @@ export function installMenus(game) {
           }
           draw();
         };
-        return card;
+        return withInfo(card, () => el('div', { className: 'style-info' }, el('b', { textContent: style.label }), el('p', { textContent: STYLE_NOTES[key] ?? '' })), `${style.label}: what it is`);
       }
     }
-    // Outfit sets (outfitsets.js) under their factions, each a card with its picture, description and stats; the one worn shown
-    // in full above them, with its finishes (colours, crests: the same stats).
+    // Outfit sets (outfitsets.js) under their factions, each a small tile (its picture and name), its description and stats in
+    // a pop-up; the one worn above them (a tap: its card), with its finishes (colours, crests: the same stats).
     function stepGear(content) {
       const outfit = inputs.outfit ?? { kind: 'boxing', design: 0 };
       const worn = outfitOf(inputs);
@@ -554,8 +546,13 @@ export function installMenus(game) {
         if (changed) inputs.accessories = headgearOptions(kind).includes(inputs.accessories?.[0]) ? inputs.accessories : [];
         draw();
       };
+      const full = (card, kind, key) => () => setCardElement(card, () => game.setPortrait?.(kind, key));
+      const wornTile = setCardElement(wornCard(inputs), () => game.setPortrait?.(worn.kind, worn.set), { tile: true, tag: 'button' });
+      const wornPick = withInfo(wornTile, full(wornCard(inputs), worn.kind, worn.set), 'What they wear: its story and its stats');
+      wornPick.classList.add('worn');
+      wornTile.onclick = wornPick.openInfo;
       content.append(
-        setCardElement(wornCard(inputs), () => game.setPortrait?.(worn.kind, worn.set)),
+        wornPick,
         el('div', { className: 'field' }, el('b', { textContent: 'Helmet' }), helmPicker()),
         ...(designs.length < 2 ? [] : [el('div', { className: 'field' }, el('b', { textContent: 'Finish' }), buttons(designs.map(([, at]) => String(at)), () => String(outfit.design ?? 0), (at) => { gearTouched = true; inputs.outfit = { ...outfit, design: Number(at) }; }, (at) => OUTFITS[outfit.kind].designs[at].label))]),
         // The metal's steel and its decoration, where the kit offers them (outfits.js finishOptions).
@@ -569,9 +566,10 @@ export function installMenus(game) {
         ...FACTION_KEYS.map((faction) => [faction, sets.filter((each) => each.faction === faction)]).filter(([, group]) => group.length).map(([faction, group]) => el('div', { className: 'style-group' },
           el('b', { className: 'style-faction', textContent: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` }),
           el('div', { className: 'set-cards' }, ...group.map((each) => {
-            const card = setCardElement(setCard(each.kind, each.key), () => game.setPortrait?.(each.kind, each.key), { compact: true, tag: 'button', chosen: each.kind === worn.kind && each.key === worn.set });
-            card.onclick = () => pick(each.kind, each.key);
-            return card;
+            const card = setCard(each.kind, each.key);
+            const tile = setCardElement(card, () => game.setPortrait?.(each.kind, each.key), { tile: true, tag: 'button', chosen: each.kind === worn.kind && each.key === worn.set });
+            tile.onclick = () => pick(each.kind, each.key);
+            return withInfo(tile, full(card, each.kind, each.key), `${card.name}: its story and its stats`);
           })))),
       );
     }
