@@ -2077,7 +2077,7 @@ export const OUTFITS = {
     // Two layers of mail and the aventail: a gap meets mail.
     gaps: { mail: 'all' },
     // The sipahi's Turkman turban helmet (ottomanHeavy's): a tall pointed bowl, the turban wound round it, a mail veil over the face.
-    helmet: { mass: 2.4, padding: 0.65, curve: 0.88, face: 'closed' },
+    helmet: { mass: 2.4, padding: 0.65, curve: 0.88, face: 'closed', hold: 'half' },
     courage: 0.4,
     designs: [
       // Saladin's own colour: the yellow of the Ayyubid banners.
@@ -2969,10 +2969,12 @@ function ownHelmet(spec, kind, design) {
 
 /** The kit's gaps with the head's changed: whether the throat is mail or closed goes with the helm worn (`helm`, or none). */
 function gapsWithHelm(gaps, helm) {
+  // (A kit's `mail: 'all'`, mail under every gap, the throat with them, is kept as it is.)
   const strip = (zones) => (zones ?? []).filter((zone) => zone !== 'neck');
-  const adds = (list) => (helm?.spec.gaps?.[list]?.includes('neck') ? ['neck'] : []);
-  const closed = [...strip(gaps?.closed), ...adds('closed')];
-  const mail = [...strip(gaps?.mail), ...adds('mail')];
+  const adds = (list) => (helm?.spec.gaps?.[list]?.includes?.('neck') ? ['neck'] : []);
+  const zones = (list) => (gaps?.[list] === 'all' ? 'all' : [...strip(gaps?.[list]), ...adds(list)]);
+  const closed = zones('closed');
+  const mail = zones('mail');
   if (!gaps && !closed.length && !mail.length) return null;
   return { ...gaps, closed, mail };
 }
@@ -2995,6 +2997,11 @@ function gapsWithHelm(gaps, helm) {
  *   not square to it skids off (only its part along the surface normal goes
  *   in) and the slide does not wrench the head round, where skin would grip.
  *   A domed or pointed bowl is high; a flat-sided can or a soft cap low.
+ * - `hold`: how it is kept on the head against a blow that would knock it off (physics.js knockHelmetOff, WORLD.helmetOff):
+ *   'open' sits on the head with a chin strap at most (kettle hat, morion, jingasa, the Ming iron hat); 'half' is deep or
+ *   tied on (the kabuto's cords and neck guard, the Ming elite helm's hood, a sallet and its bevor; any helm with a mask
+ *   strapped to it); 'enclosed' closes round the whole head, riveted or laced to a gorget or bevor, or held in a harness
+ *   (the bascinet and close helmet, the great helm, the gladiators' helms, the riot and combat helmets).
  * Masses from surviving pieces and reconstructions; kinds not listed are no helmet.
  */
 export const HELMETS = {
@@ -3004,57 +3011,57 @@ export const HELMETS = {
   // worn with an open helmet (`mask` on its look: a menpo, a Ming or a Kipchak face) closes it.
   headguard: { mass: 0.45, padding: 0.9, curve: 0.3 },
   // Modern: a riot helmet (thick liner, smooth shell); a combat helmet (pads, rounded aramid shell).
-  riotHelmet: { mass: 1.5, padding: 0.85, curve: 0.75, face: 'sealed' },
+  riotHelmet: { mass: 1.5, padding: 0.85, curve: 0.75, face: 'sealed', hold: 'enclosed' },
   // A firefighter's helmet (~1.4 kg, its suspension and liner) under the aluminized hood.
-  proximityHood: { mass: 1.9, padding: 0.8, curve: 0.6, face: 'sealed' },
-  opsHelmet: { mass: 1.4, padding: 0.85, curve: 0.85 },
+  proximityHood: { mass: 1.9, padding: 0.8, curve: 0.6, face: 'sealed', hold: 'enclosed' },
+  opsHelmet: { mass: 1.4, padding: 0.85, curve: 0.85, hold: 'enclosed' },
   // The great helm (2–3 kg) over a mail coif and a padded arming cap: the best padded of all; flat sides, a low crown.
-  greatHelm: { mass: 2.6, padding: 0.85, curve: 0.35, face: 'closed' },
+  greatHelm: { mass: 2.6, padding: 0.85, curve: 0.35, face: 'closed', hold: 'enclosed' },
   // The bascinet: a pointed globular bowl on a padded lining and a mail aventail (in play visored: the hounskull, the sallet
   // and its bevor, the close helmet: all closed but for the sights).
-  bascinet: { mass: 2.3, padding: 0.65, curve: 0.85, face: 'closed' },
+  bascinet: { mass: 2.3, padding: 0.65, curve: 0.85, face: 'closed', hold: 'enclosed' },
   // A kabuto: a riveted bowl (2.5–3 kg with its neck guard) on a cloth lining and a hachimaki.
-  kabuto: { mass: 2.8, padding: 0.55, curve: 0.7 },
-  jingasa: { mass: 1.0, padding: 0.3, curve: 0.85 },
+  kabuto: { mass: 2.8, padding: 0.55, curve: 0.7, hold: 'half' },
+  jingasa: { mass: 1.0, padding: 0.3, curve: 0.85, hold: 'open' },
   // Gladiators' helmets were heavy (3–4 kg, Pompeii finds), brimmed and grilled; the secutor's smooth egg made to turn the trident.
-  arenaHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed' },
-  gladiatorHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed' },
-  secutorHelm: { mass: 3.2, padding: 0.5, curve: 0.95, face: 'closed' },
-  galea: { mass: 1.6, padding: 0.4, curve: 0.7 },
+  arenaHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed', hold: 'enclosed' },
+  gladiatorHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed', hold: 'enclosed' },
+  secutorHelm: { mass: 3.2, padding: 0.5, curve: 0.95, face: 'closed', hold: 'enclosed' },
+  galea: { mass: 1.6, padding: 0.4, curve: 0.7, hold: 'open' },
   // Sixteenth-century infantry: the combed morion, the almond cabasset, the pot helmet, the kettle hat.
-  morion: { mass: 2.0, padding: 0.4, curve: 0.75 },
-  cabasset: { mass: 1.8, padding: 0.4, curve: 0.8 },
-  potHelmet: { mass: 2.2, padding: 0.4, curve: 0.7 },
-  kettleHat: { mass: 2.0, padding: 0.45, curve: 0.6 },
+  morion: { mass: 2.0, padding: 0.4, curve: 0.75, hold: 'open' },
+  cabasset: { mass: 1.8, padding: 0.4, curve: 0.8, hold: 'open' },
+  potHelmet: { mass: 2.2, padding: 0.4, curve: 0.7, hold: 'open' },
+  kettleHat: { mass: 2.0, padding: 0.45, curve: 0.6, hold: 'open' },
   // The stechhelm (frog-mouthed jousting helm): ~9 kg of thick steel (the
   // Vienna and Nuremberg examples run 8–10 kg) standing well off the head on
   // a thick padded cap laced into it; its smooth, sweeping planes turn a
   // point aside.
-  stechhelm: { mass: 9, padding: 0.95, curve: 0.8, face: 'closed' },
+  stechhelm: { mass: 9, padding: 0.95, curve: 0.8, face: 'closed', hold: 'enclosed' },
   // The Iron Pagoda: a tall bowl and its rolled lamellar aventail (~4 kg together) over a padded cap.
   // (Its aventail rolled up round the face, only the eyes showing: closed.)
-  pagodaHelm: { mass: 4.0, padding: 0.6, curve: 0.8, face: 'closed' },
+  pagodaHelm: { mass: 4.0, padding: 0.6, curve: 0.8, face: 'closed', hold: 'enclosed' },
   // Steppe and Ottoman pointed bowls (the chichak with its brim and nasal).
-  steppeHelm: { mass: 1.8, padding: 0.45, curve: 0.85 },
-  chichak: { mass: 2.0, padding: 0.45, curve: 0.85 },
+  steppeHelm: { mass: 1.8, padding: 0.45, curve: 0.85, hold: 'open' },
+  chichak: { mass: 2.0, padding: 0.45, curve: 0.85, hold: 'open' },
   // The Ayyubid helmet: a pointed bowl of riveted segments (~1.6 kg) and its mail aventail (~0.8 kg) on a
   // quilted cap, the turban's wraps round its foot padding it further; steel above the turban, cloth over the rest.
-  ayyubidHelm: { mass: 2.6, padding: 0.65, curve: 0.75 },
+  ayyubidHelm: { mass: 2.6, padding: 0.65, curve: 0.75, hold: 'half' },
   // Ming: the brimmed iron hat of the brigandine man; the elite's tall bowl. Han: an iron lamellar cap (Linzi), lightly lined.
-  mingHat: { mass: 1.4, padding: 0.35, curve: 0.7 },
-  mingHelm: { mass: 2.0, padding: 0.45, curve: 0.85 },
+  mingHat: { mass: 1.4, padding: 0.35, curve: 0.7, hold: 'open' },
+  mingHelm: { mass: 2.0, padding: 0.45, curve: 0.85, hold: 'half' },
   // The banners' helmet: a bowl of iron (~1.4 kg with its tube) and its padded, studded hood over the ears and neck.
-  qingHelm: { mass: 1.9, padding: 0.5, curve: 0.85 },
-  hanHelm: { mass: 1.5, padding: 0.3, curve: 0.6 },
+  qingHelm: { mass: 1.9, padding: 0.5, curve: 0.85, hold: 'open' },
+  hanHelm: { mass: 1.5, padding: 0.3, curve: 0.6, hold: 'open' },
   // The Republic's bronze Montefortino (1–1.5 kg, a cast knob, a short brim) on a felt cap; the late Roman
   // ridge helmet (two iron halves on a ridge, broad cheek pieces, ~1.5 kg) on a padded lining; the Germanic and
   // Hunnic spangenhelm, a pointed bowl of riveted plates.
-  montefortino: { mass: 1.3, padding: 0.35, curve: 0.85 },
-  ridgeHelm: { mass: 1.5, padding: 0.4, curve: 0.75 },
-  spangenhelm: { mass: 1.6, padding: 0.4, curve: 0.85 },
+  montefortino: { mass: 1.3, padding: 0.35, curve: 0.85, hold: 'open' },
+  ridgeHelm: { mass: 1.5, padding: 0.4, curve: 0.75, hold: 'open' },
+  spangenhelm: { mass: 1.6, padding: 0.4, curve: 0.85, hold: 'open' },
   // Mexica war helmets: carved wood and quilted cotton, animal-headed (flat planes, little curve).
-  jaguarHelm: { mass: 1.0, padding: 0.45, curve: 0.35 },
-  eagleHelm: { mass: 1.0, padding: 0.45, curve: 0.35 },
+  jaguarHelm: { mass: 1.0, padding: 0.45, curve: 0.35, hold: 'open' },
+  eagleHelm: { mass: 1.0, padding: 0.45, curve: 0.35, hold: 'open' },
   // Soft headwear: little mass; a turban's many wraps and a fur hat pad a little.
   lionHead: { mass: 0.6, padding: 0.3, curve: 0.15 },
   turban: { mass: 0.6, padding: 0.45, curve: 0.2 },
@@ -3071,6 +3078,25 @@ export const HELMETS = {
   feltHat: { mass: 0.15, padding: 0.1, curve: 0 },
 };
 const NO_HELMET = { mass: 0, padding: 0, curve: 0 };
+
+/**
+ * How what is on his head is held there against a blow (HELMETS `hold`): 'open', 'half' or 'enclosed'; null for nothing that
+ * could be knocked off (no helmet, a cap or a cloth under HELM_SLOT_MIN_KG, a helm bolted to the cuirass, a machine's head).
+ * The helmet's own `hold` (a set's), else its kind's, else from its face (closed or sealed: enclosed); a mask strapped to an
+ * open helmet ties it on as a half-enclosed one is.
+ */
+function helmetHoldOf(spec, helmet, head) {
+  if (!head || spec.headLocked || spec.machine || !(helmet.mass >= HELM_SLOT_MIN_KG)) return null;
+  const hold = helmet.hold ?? HELMETS[head.kind]?.hold ?? (helmet.face ? 'enclosed' : 'open');
+  return hold === 'open' && head.mask ? 'half' : hold;
+}
+
+/** The name of the helmet on his head (HELM_NAMES, as the helmet slot calls it), else his kit's; null with none. */
+export function helmetNameOf(inputs) {
+  const { spec, look } = outfitOf(inputs);
+  if (!look.head) return null;
+  return HELM_NAMES[helmKey(look.head)] ?? wornHelm(inputs)?.spec.label ?? spec.label ?? 'helmet';
+}
 
 /** How his helmet keeps his face (HELMETS `face`): 'closed', 'sealed' or 'open'; 'bare' with nothing on his head. A mask closes an open helmet. */
 function helmFaceOf(inputs, spec, look) {
@@ -3142,6 +3168,8 @@ export function gearTraits(inputs) {
     headBulk: (helm ? helm.spec.headBulk : bare ? 1 : spec.headBulk) ?? 1,
     // What is on his head, as a blow there meets it (HELMETS): its mass, padding and curve; or the kit's own (`helmet`: a machine's head shell).
     helmet: bare ? NO_HELMET : helm ? helm.helmet : spec.helmet ?? HELMETS[look.head?.kind] ?? NO_HELMET,
+    // How that helmet is held on (HELMETS `hold`: 'open', 'half', 'enclosed'), or null for nothing a blow could knock off.
+    helmetHold: bare ? null : helm ? helmetHoldOf(helm.spec, helm.helmet, helm.head) : helmetHoldOf(spec, spec.helmet ?? HELMETS[look.head?.kind] ?? NO_HELMET, look.head),
     // A plate breastplate's curve (0 none, 1 a full globose breast): a blow or an arrow not square on it skids off, as off a helmet.
     breastplate: spec.breastplate ?? 0,
     // How the helmet keeps the face (HELMETS `face`; a mask closes an open one): 'closed', 'sealed', 'open'; 'bare' with none.

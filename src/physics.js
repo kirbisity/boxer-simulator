@@ -8,7 +8,7 @@
 import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
-import { factionOf, FACTIONS, glovedFists, HEADGEAR, headgearOptions, outfitOf } from './outfits.js';
+import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
 import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
@@ -5393,8 +5393,59 @@ function cutOffHeadgear(world, fighter, event, edgeJoules, contact) {
   }
 }
 
-/** A prop leaves the head: along the blow (or simply dropped), spinning, with the event that did it. */
-function launchProp(world, fighter, prop, event, headDeltaV, effect) {
+/**
+ * What a blow to the head does to the helmet on it (WORLD.helmetOff): the head is snapped along by `headDeltaV` and the
+ * helmet slips on it by that times `caught` (more where the blow catches its rim, less on the crown, which drives it
+ * down onto the head); `energy` (J) is the helmet's kinetic energy in that slip, `joules` what its hold takes up before it
+ * lets go (its class's, over the dial `ease`). Null when nothing on his head can come off (none, a cap, a helm bolted on).
+ */
+export function helmetSlip(fighter, event) {
+  const gear = fighter.body.gear;
+  if (!gear.helmetHold || fighter.helmetOff || !event.point || !(event.headDeltaV > 0)) return null;
+  const spec = WORLD.helmetOff;
+  const off = vec.sub(event.point, point(fighter.x, P.head));
+  const h = Math.max(-1, Math.min(1, off[1] / (vec.length(off) || 1)));
+  const grip = spec.catch;
+  const caught = grip.base + grip.rim * Math.exp(-(((h - grip.rimAt) / grip.rimWidth) ** 2)) - grip.seat * Math.max(0, h - grip.rimAt) + grip.lift * Math.max(0, -h);
+  const energy = 0.5 * gear.helmet.mass * (event.headDeltaV * Math.max(0, caught)) ** 2;
+  const joules = (spec.holds[gear.helmetHold] * (gear.helmet.mass / spec.refKg) ** spec.fit) / spec.ease;
+  return { energy, joules: spec.ease > 0 ? joules : Infinity, hold: gear.helmetHold, h, caught };
+}
+
+/**
+ * A blow that slips the helmet past what holds it on knocks it off (helmetSlip): it flies from his head as a prop
+ * (`kind: 'helmet'`, with the look of it, `head`, for the views to draw), and for the rest of the fight he is bare-headed:
+ * no helmet's mass on the head, nor its padding, curve, guard (blunt, cut, pierce, bullet), narrowed sight or closed face
+ * (his inputs say `bareHead`, so a view built again draws him so).
+ */
+function knockHelmetOff(world, fighter, event) {
+  const slip = helmetSlip(fighter, event);
+  if (!slip) return;
+  event.helmetSlip = slip.energy / slip.joules;
+  if (slip.energy < slip.joules) return;
+  const body = fighter.body;
+  const inputs = body.inputs;
+  const head = outfitOf(inputs).look.head;
+  const name = (helmetNameOf(inputs) ?? 'helmet').toLowerCase();
+  const bare = { ...inputs, outfit: { ...inputs.outfit, bareHead: true } };
+  const now = gearTraits(bare);
+  body.headEffectiveMass -= body.gear.helmet.mass;
+  body.gear = { ...body.gear, protection: now.protection, helmet: now.helmet, helmetHold: null, sight: now.sight, headBulk: now.headBulk, helmFace: now.helmFace, gaps: now.gaps };
+  body.inputs = bare;
+  fighter.helmetOff = { time: world.time, hold: slip.hold, name };
+  fighter.damageVersion += 1;
+  const prop = { kind: 'helmet', owner: fighter.id, attached: true, head: { ...head }, radius: HELMET_PROP_RADIUS, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false };
+  (world.props ??= []).push(prop);
+  event.effects.push(`${name} knocked off`);
+  launchProp(world, fighter, prop, event, event.headDeltaV, `${name} knocked off`, { item: name, icon: HELMET_ICON, helmet: true, hold: slip.hold });
+}
+
+const HELMET_ICON = '🪖';
+// How high a helmet's middle (the head's, as it was worn) stands off the floor it lies on (m).
+const HELMET_PROP_RADIUS = 0.05;
+
+/** A prop leaves the head: along the blow (or simply dropped), spinning, with the event that did it. `told`: the event's item and icon, else the headgear's. */
+function launchProp(world, fighter, prop, event, headDeltaV, effect, told = null) {
   const gear = HEADGEAR[prop.kind] ?? HEADGEAR.headset;
   const spec = WORLD.props;
   const head = point(fighter.x, P.head);
@@ -5408,7 +5459,7 @@ function launchProp(world, fighter, prop, event, headDeltaV, effect) {
   } else prop.v = vec.add(headVelocity, [0, 0.4, 0]);
   const random = world.random;
   prop.spin = [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (spec.spinMin + random() * spec.spinRange));
-  world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: gear.icon, effects: [effect] });
+  world.events.push({ time: world.time, kind: 'accessory', fighter: fighter.id, item: prop.kind, icon: gear.icon, ...told, effects: [effect] });
 }
 
 /** Worn props ride on the head; free ones fly, tumble, bounce and settle. */
@@ -5423,7 +5474,7 @@ function moveProps(world, dt) {
     prop.v[1] -= WORLD.gravity * dt;
     prop.x = vec.add(prop.x, vec.scale(prop.v, dt));
     prop.turn = vec.add(prop.turn, vec.scale(prop.spin, dt));
-    const propFloor = spec.radius + floorUnder(world.arena, prop.x[2], prop.x[0], prop.x[1]);
+    const propFloor = (prop.radius ?? spec.radius) + floorUnder(world.arena, prop.x[2], prop.x[0], prop.x[1]);
     if (prop.x[1] < propFloor) {
       prop.x[1] = propFloor;
       prop.v = [prop.v[0] * spec.slide, -prop.v[1] * spec.restitution, prop.v[2] * spec.slide];
@@ -6737,6 +6788,7 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     event.harmDeltaV = (event.headDeltaV * harm * concentration) / Math.sqrt(padded);
     applyHeadDamage(world, defender, event);
     knockOff(world, defender, event);
+    knockHelmetOff(world, defender, event);
     const cutting = peakForce * (1 - protectionAt(defender.body.gear, 'head').cut);
     if ((cuts && cutting > WORLD.head.cutForce) || cutting > cutForce) {
       defender.cuts = (defender.cuts ?? 0) + 1;

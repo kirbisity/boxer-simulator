@@ -6,7 +6,7 @@
 // says how its stats differ from the outfit's (`patch`, merged over the outfit: outfits.js setSpec):
 //   protection   by kind and by region (head, torso, limb, or a part: UpperArm, Shank...), merged region by region;
 //   extraMass    the kit's weight as a share of the body's (in place of the outfit's);
-//   helmet       what is on the head as a blow meets it (outfits.js HELMETS: mass, padding, curve, face);
+//   helmet       what is on the head as a blow meets it (outfits.js HELMETS: mass, padding, curve, face, hold);
 //   gaps, breastplate, movement, courage: as on an outfit.
 // An outfit with no entry here is one set: its own label, with `OUTFIT_BLURBS` for its description.
 // The differences are kept small and historical: the same man in a better helmet, not a different man.
@@ -60,7 +60,7 @@ export const OUTFIT_SETS = {
     {
       key: 'brigandineSallet', designs: [1], name: 'Brigandine and German sallet',
       blurb: 'The same riveted coat under a deep German sallet with an eye slit. A foot soldier with spare money spent it on his head, which was where the axes usually went.\nBut who was he fighting for? German mercenaries in this kit served emperor, king and pope in turn, whoever paid. In 1527 the emperor’s own army, years behind on wages, paid itself by looting Rome and stabling horses in the Vatican.\n“A loyal soldier, or a looter of Rome. It all depended on whether the pay chest showed up on time.”',
-      patch: { helmet: { mass: 2.2, padding: 0.45, curve: 0.75 }, protection: { regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 } } } },
+      patch: { helmet: { mass: 2.2, padding: 0.45, curve: 0.75, hold: 'half' }, protection: { regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 } } } },
     },
     {
       key: 'brigandineBurgundian', designs: [4], name: 'Brigandine and Burgundian kettle',
@@ -77,7 +77,7 @@ export const OUTFIT_SETS = {
       blurb: 'A plain steel breastplate, stamped out by the hundred for army stores, with a sallet on top. The lord’s armour got custom fitting; the levy got sizes small, medium and whatever was left.\nYet what is pike-proof steel against a lead bullet? At Bicocca in 1522 the Swiss charged across a sunken road into four ranks of Spanish gunmen. Bullets went through steel and man alike, and three thousand fell in half an hour.\n“A pikeman’s shield, or a gunman’s bullseye. It all depended on who reached the sunken road first.”',
       patch: {
         extraMass: 0.14, breastplate: 0.6,
-        helmet: { mass: 2.2, padding: 0.45, curve: 0.75 },
+        helmet: { mass: 2.2, padding: 0.45, curve: 0.75, hold: 'half' },
         protection: { blunt: 0.5, cut: 0.9, pierce: 0.8, regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 } } },
       },
     },
@@ -96,7 +96,7 @@ export const OUTFIT_SETS = {
     {
       key: 'sallet', designs: [3], name: 'Archer — jack and sallet',
       blurb: 'The archer’s padded jacket under a sallet of good steel, far too fine for a farmer’s son. It sits a little loose, and the lining is stained with someone else’s sweat.\nWhere does a poor archer get a helmet like that? From the battlefield, going through the dead with a knife. The heralds carefully counted the noblemen who fell. Nobody counted what was taken off them — the only way the newest steel ever trickled down.\n“A lucky find, or a dead man’s curse. It all depended on whose blood was still drying in the lining.”',
-      patch: { extraMass: 0.046, helmet: { mass: 2.1, padding: 0.4, curve: 0.75 }, protection: { regions: { head: { blunt: 0.52, cut: 0.9, pierce: 0.66 } } } },
+      patch: { extraMass: 0.046, helmet: { mass: 2.1, padding: 0.4, curve: 0.75, hold: 'half' }, protection: { regions: { head: { blunt: 0.52, cut: 0.9, pierce: 0.66 } } } },
     },
   ],
   conquistadorPlate: [
@@ -172,7 +172,7 @@ export const OUTFIT_SETS = {
     {
       key: 'turban', designs: [0, 2], name: 'Sipahi — mail and plate, turban helmet',
       blurb: 'Mail and plate of an Ottoman cavalryman, under a tall turban helmet engraved with Qur’an verses. He held his land from the Sultan only while he turned up to fight — a holy warrior, on a lease.\nYet who takes the blame when the war is lost? At Vienna in 1683 these horsemen watched the Polish cavalry charge down into their camp. The Grand Vizier who had led them there was strangled with a silk cord that Christmas, for losing.\n“A holy warrior, or a scapegoat’s bodyguard. It all depended on whose prayers were answered at Vienna.”',
-      patch: { helmet: { mass: 2.4, padding: 0.5, curve: 0.88, face: 'closed' }, protection: { regions: { head: { blunt: 0.5, cut: 0.97, pierce: 0.6, deflects: true } } } },
+      patch: { helmet: { mass: 2.4, padding: 0.5, curve: 0.88, face: 'closed', hold: 'half' }, protection: { regions: { head: { blunt: 0.5, cut: 0.97, pierce: 0.6, deflects: true } } } },
     },
     {
       key: 'chichak', designs: [1], name: 'Sipahi — mail and plate, chichak',
