@@ -71,6 +71,8 @@ import { createHitFeel, hitFeelFromHash, loadHitFeel, saveHitFeel } from './hitf
 import { createHitFeelView } from './hitfeelview.js';
 import { createArtDrama } from './artdrama.js';
 import { createArtDramaView } from './artdramaview.js';
+import { createChargeFeel } from './chargefeel.js';
+import { createChargeFeelView } from './chargefeelview.js';
 import { installMuteButton, installUiSounds } from './audio/controls.js';
 import { installSoundBench } from './audio/bench.js';
 import { DEFAULT_STAGE_LOOK, STAGE_LOOKS, stageLookNames } from './levelmode/stagelooks.js';
@@ -174,6 +176,13 @@ const hitFeelView = createHitFeelView(scene, { layer: $('#hit-vignette'), audio,
 const artDrama = createArtDrama({ reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
 const artDramaView = createArtDramaView(scene, { flash: $('#art-flash'), caption: $('#art-name'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
 // A flashbang's white-out and a near frag's glare over the stage, for the man played (blastview.js).
+// The player's mounted charge at his man shown as speed (chargefeel.js): the lens widened, streaks at the edges; no widening for a visitor who asks for less motion.
+const chargeFeel = createChargeFeel({ reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
+const chargeFeelView = createChargeFeelView(scene, { layer: $('#charge-lines') });
+const resetChargeFeel = () => {
+  chargeFeel.reset();
+  chargeFeelView.reset();
+};
 const blastScreen = createBlastScreen($('#blast-flash'), { reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
 
 // The tutorial's card (tutorial.js); installed below, once the yard it stages is defined.
@@ -396,6 +405,7 @@ function newBout() {
   state.eventCursor = 0;
   state.finishedAt = null;
   resetDrama(state.drama);
+  resetChargeFeel();
   $('#log').replaceChildren();
   $('#banner').hidden = true;
   renderHud();
@@ -495,6 +505,7 @@ function newLastGateRun() {
   state.eventCursor = 0;
   state.finishedAt = null;
   resetDrama(state.drama);
+  resetChargeFeel();
   $('#log').replaceChildren();
   $('#banner').hidden = true;
   hideSummary();
@@ -1175,6 +1186,10 @@ function drawWorld(dt, drawIt = true) {
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);
+  // His charge on horseback at his man (chargefeel.js): the lens widened (before the blows' narrowing, which zooms the lens it finds) and the streaks; the lens only when it is his own camera.
+  const ownLens = Boolean(followed) && !cutsceneDirector.active && !endingCam;
+  chargeFeel.update(world, ownLens ? followed : null, state.orders, state.paused ? 0 : dt);
+  chargeFeelView.apply(chargeFeel, state.paused ? 0 : dt, { camera: ownLens });
   // The player's blows felt (hitfeel.js): the camera's jolt along the blow, the narrowing, the dark edges, the mist.
   hitFeelView.apply(hitFeel, realSeconds(), state.paused ? 0 : dt);
   // A weapon art's push-in, tilt and shake (the camera only when it is the player's own), its gleam, trail, dust, glare and name.
@@ -2803,6 +2818,7 @@ function enterStage(key, { opening = false, sandbox = null, ghost: asGhost = fal
   state.eventCursor = 0;
   state.finishedAt = null;
   resetDrama(state.drama);
+  resetChargeFeel();
   $('#log').replaceChildren();
   $('#banner').hidden = true;
   state.orders = newOrders();
@@ -3068,6 +3084,7 @@ function preview(inputs, event) {
   state.finishedAt = null;
   state.eventCursor = 0;
   resetDrama(state.drama);
+  resetChargeFeel();
   rebuildViews();
   // On a phone the panel fills the lower part, so the camera stands back and
   // aims below the feet: the whole fighter sits in the top third.
@@ -3108,6 +3125,7 @@ const introStage = {
     state.finishedAt = null;
     state.eventCursor = 0;
     resetDrama(state.drama);
+    resetChargeFeel();
     $('#banner').hidden = true;
     $('#log').replaceChildren();
     if (plan?.legends?.length) prefetchSkins(createWorld(plan.legends.map((legend) => ({ inputs: normaliseInputs(structuredClone(legend.inputs)), corner: 'red' })), { seed: 3, arena: INTRO_ARENA }).fighters.map((fighter) => fighter.body));
@@ -3398,6 +3416,7 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
   state.finishedAt = null;
   state.paused = paused;
   resetDrama(state.drama);
+  resetChargeFeel();
   $('#banner').hidden = true;
   rebuildViews();
   return state.world.fighters.map((fighter) => fighter.style);
@@ -3613,6 +3632,9 @@ const boxer = window.boxer = {
   // The weapon arts' drama (artdrama.js): what it is doing now; its view.
   artDrama,
   artDramaView,
+  // The mounted charge's feel (chargefeel.js): its level now; its view.
+  chargeFeel,
+  chargeFeelView,
   throw: (move, zone, who = 0) => throwPunch(state.world, state.world.fighters[who], move, zone),
   // Knock a fighter's weapon out of his hand, sideways.
   disarm: (who = 0) => dropWeapon(state.world, state.world.fighters[who], 'disarmed', [0, 1.2, 2.2]),
