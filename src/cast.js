@@ -5,13 +5,16 @@
 
 import { buildBody, FRAMES, normaliseInputs, PRESETS } from './body.js';
 import { defaultHeadgear, familyKinds, headgearOptions, OUTFITS, randomColors, randomDesign } from './outfits.js';
-import { caloriesForWeight } from './physiology.js';
+import { caloriesForWeight, settleComposition } from './physiology.js';
 import { STYLES } from './moves.js';
 
 export const CAST = {
-  // How much a variation strays: height (cm), daily calories (share), age
-  // (years), fitness (share), and how often the sex is the other.
-  height: 7, calories: 0.12, age: 6, exercise: 0.12, otherSex: 0.4,
+  // How much a variation strays: height (cm), build (`bmi`: a share of his model's BMI, each way: his weight follows his
+  // height at that build, as builtLike's men do, never a calorie drift that fattens a soldier past 100 kg), age (years),
+  // fitness (share), and how often the sex is the other (`otherSex`: women in arms were few, and are in modern units).
+  height: 7, bmi: 0.06, age: 6, exercise: 0.12, otherSex: 0.05,
+  // A woman's build against a man's of the same kind (her BMI × this).
+  sexBuild: 0.92,
   // A woman of the same build is about this much shorter.
   sexHeight: 12,
   looks: {
@@ -47,7 +50,6 @@ export function varyCharacter(inputs, random = Math.random, { sex: wanted = null
     name: pickOne(CAST.names[sex], random),
     // (No shorter than 1.5 m, unless he was to start with: the G1's 1.32 m.)
     heightCm: Math.round(Math.min(205, Math.max(Math.min(150, base.heightCm), base.heightCm + sexShift + jitter(random) * CAST.height))),
-    calories: Math.round(base.calories * (1 + jitter(random) * CAST.calories) * (sex === base.sex ? 1 : sex === 'female' ? 0.85 : 1.15)),
     age: Math.round(Math.min(55, Math.max(18, base.age + jitter(random) * CAST.age))),
     exercise: Math.min(1, Math.max(0.05, base.exercise + jitter(random) * CAST.exercise)),
     look: {
@@ -59,6 +61,8 @@ export function varyCharacter(inputs, random = Math.random, { sex: wanted = null
       facialHair: sex === 'female' ? 'none' : pickOne(looks.facialHair, random),
     },
   };
+  const build = sex === base.sex ? 1 : sex === 'female' ? CAST.sexBuild : 1 / CAST.sexBuild;
+  Object.assign(varied, { calories: atBuild(varied, bmiOf(base) * build * (1 + jitter(random) * CAST.bmi)).calories });
   // A skill of his own stays his; otherwise it is his kit's (normaliseInputs), whatever kit he is put in.
   if (inputs.skill === undefined) delete varied.skill;
   // Someone like a hero is not the hero.
@@ -78,14 +82,25 @@ export function varyCharacter(inputs, random = Math.random, { sex: wanted = null
  */
 export function drilledSoldier(preset, random = Math.random, { name = null } = {}) {
   const base = normaliseInputs(structuredClone(preset));
-  return normaliseInputs({
+  const soldier = {
     ...base,
     name: name ?? pickOne(CAST.names[base.sex], random),
     heightCm: Math.round(Math.min(200, Math.max(150, base.heightCm + jitter(random) * CAST.height))),
-    calories: Math.round(base.calories * (1 + jitter(random) * CAST.calories)),
     age: Math.round(Math.min(45, Math.max(18, base.age + jitter(random) * CAST.age))),
     exercise: Math.min(1, Math.max(0.05, base.exercise + jitter(random) * CAST.exercise)),
-  });
+  };
+  return atBuild(soldier, bmiOf(base) * (1 + jitter(random) * CAST.bmi));
+}
+
+/** His BMI as his inputs settle him (physiology.js settleComposition: the same body buildBody makes, cached). */
+function bmiOf(inputs) {
+  return settleComposition(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean).bmi;
+}
+
+/** Fed to a build: the calories that settle him at this BMI for his height. */
+function atBuild(inputs, bmi) {
+  const metres = inputs.heightCm / 100;
+  return atWeight(inputs, bmi * metres * metres);
 }
 
 /**
@@ -154,17 +169,17 @@ export function randomGladiator(random = Math.random, key = pickOne(GLADIATORS, 
  */
 export function rebel(random = Math.random) {
   const base = varyCharacter(PRESETS.spear, random);
-  const stout = 0.75 + random() * 0.6;
-  return normaliseInputs({
+  // Thin or stout as the poor of 1381 were: BMI 18.5 (a lean labourer) to 25 (a well-fed miller), never fat on a peasant's fare.
+  const bmi = 18.5 + random() * 6.5;
+  return atBuild({
     ...base,
     name: `${base.name} the ${pickOne(['Miller', 'Smith', 'Thatcher', 'Carter', 'Cooper', 'Tanner', 'Fletcher', 'Reeve'], random)}`,
     age: Math.round(16 + random() * 40),
     heightCm: Math.round(base.heightCm + jitter(random) * 6),
-    calories: Math.round(base.calories * stout),
     exercise: 0.25 + random() * 0.4,
     accessories: random() < 0.6 ? ['headWrap'] : [],
     simple: true,
-  });
+  }, bmi);
 }
 
 // The starved rebels: a peasant's name and byname; their builds (BMI, and how hard they still work: `exercise`), the share of
@@ -448,15 +463,15 @@ const PERIOD_BUILD = {
   hospitaller: { knight: { heightCm: 170, weightKg: 71, exercise: 0.75 }, sergeant: { heightCm: 167, weightKg: 66, exercise: 0.65 } },
   // The fighting men above that: the Janissaries picked from the devşirme's tallest and strongest boys and drilled
   // for life, the sipahis landholders fed on meat and at arms from boyhood; the azaps levied but sturdy peasants.
-  ottoman: { azap: { heightCm: 178, weightKg: 85, exercise: 0.88 }, janissary: { heightCm: 184, weightKg: 94, exercise: 0.96 }, heavy: { heightCm: 184, weightKg: 97, exercise: 0.95 } },
+  ottoman: { azap: { heightCm: 175, weightKg: 80, exercise: 0.88 }, janissary: { heightCm: 180, weightKg: 88, exercise: 0.96 }, heavy: { heightCm: 180, weightKg: 91, exercise: 0.95 } },
   // Medieval Mongol and Oirat men, from skeletons about 163–167 cm, lean and hard.
   // Steppe men: short and squat, heavy for their height (riders' bodies, fed on meat and milk).
-  steppe: { light: { heightCm: 164, weightKg: 84, exercise: 0.7 }, medium: { heightCm: 165, weightKg: 89, exercise: 0.66 }, heavy: { heightCm: 167, weightKg: 95, exercise: 0.62 } },
+  steppe: { light: { heightCm: 164, weightKg: 74, exercise: 0.7 }, medium: { heightCm: 165, weightKg: 78, exercise: 0.66 }, heavy: { heightCm: 167, weightKg: 83, exercise: 0.62 } },
   // The Jurchen of the Later Jin (Nurhaci's banners, 1610s): hunters, herders and farmers of the Liaodong frontier,
   // fed on meat and millet, at the bow and on horse from boyhood and drilled in their companies (niru) on the great
   // hunts; the Ming's men saw them as big and hard. Taller than the Ming's northern men and heavier, stronger than
   // even the Ming's picked elite (above); the Bayara picked from them for strength and the bow.
-  jurchen: { banner: { heightCm: 179, weightKg: 89, exercise: 0.92 }, bayara: { heightCm: 182, weightKg: 93, exercise: 0.95 } },
+  jurchen: { banner: { heightCm: 176, weightKg: 84, exercise: 0.92 }, bayara: { heightCm: 179, weightKg: 88, exercise: 0.95 } },
   // Dutch soldiers of the 1660s, among Europe's taller men then.
   dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
 };
@@ -628,7 +643,8 @@ export function mountedKnight(random = Math.random, style = 'longsword') {
 
 /** A foot soldier in whatever armour he has, with a spear, a bow, a long sword or a war hammer. */
 export function footSoldier(random = Math.random, style = 'spear') {
-  const base = varyCharacter(PRESETS.contender, random, { sex: 'male' });
+  // A man of the time (PERIOD_BUILD.french.foot: ~167 cm), not the contender's build made male.
+  const base = builtLike(varyCharacter(PRESETS.contender, random, { sex: 'male' }), PERIOD_BUILD.french.foot, random);
   const name = `${pickOne(['Will', 'Tom', 'Jack', 'Rob', 'Hal', 'Ned', 'Wat', 'Dick'], random)} ${pickOne(['Archer', 'Baker', 'Cotton', 'Fowler', 'Mason', 'Ward', 'Turner', 'Webb'], random)}`;
   return normaliseInputs({ ...base, sex: 'male', name, style, outfit: { kind: 'footman', design: randomDesign('footman', random) }, accessories: [] });
 }

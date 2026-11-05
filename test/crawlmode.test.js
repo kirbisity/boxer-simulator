@@ -135,8 +135,13 @@ test('the AI still fights a man crawling by choice (not one crawling away)', asy
   const me = world.fighters[0];
   const foe = world.fighters[1];
   toggleCrawl(world, me, newOrders());
-  for (let index = 0; index < 120; index += 1) advance(world, 1 / 60, (current, dt) => thinkAll(current, dt, new Set([0])));
-  assert.equal(foe.focus, me.id, 'he is still the man to fight');
+  // Fought until he is cut down (then there is no one left to fight).
+  let fought = true;
+  for (let index = 0; index < 120 && me.state !== 'out'; index += 1) {
+    advance(world, 1 / 60, (current, dt) => thinkAll(current, dt, new Set([0])));
+    if (me.state !== 'out' && foe.focus !== me.id) fought = false;
+  }
+  assert.ok(fought, 'he is still the man to fight');
 });
 
 // ---- Level mode ----------------------------------------------------------------------------------------

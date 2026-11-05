@@ -158,7 +158,7 @@ export const PRESETS = {
     look: { skinTone: 'tan', hairStyle: 'spiky', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   unskilled: {
-    name: 'Wat Tyler', style: 'unskilled', sex: 'male', heightCm: 172, frame: 'medium', age: 35, exercise: 0.25, calories: 2900,
+    name: 'Wat Tyler', style: 'unskilled', sex: 'male', heightCm: 172, frame: 'medium', age: 35, exercise: 0.5, calories: 3100,
     outfit: { kind: 'commoner', design: 0 }, accessories: ['headWrap'],
     look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#6b4a2a', facialHair: 'beard', eyeColor: 'green' },
   },
@@ -176,7 +176,7 @@ export const PRESETS = {
   },
   // An archer: the bow, side-on and keeping away; the wakizashi when closed with.
   bow: {
-    name: 'Nasu no Yoichi', style: 'bow', sex: 'male', heightCm: 168, frame: 'medium', age: 24, exercise: 0.7, calories: 4025,
+    name: 'Nasu no Yoichi', style: 'bow', sex: 'male', heightCm: 160, frame: 'medium', age: 24, exercise: 0.7, calories: 3150,
     outfit: { kind: 'samurai', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -239,23 +239,23 @@ export const PRESETS = {
   // guard, a Bayara in the heavy coat, with the banners' heavy spear (the bow his to choose). Jurchen hunters and herders fed on meat and grain, at the bow
   // and on horse from boyhood: big and strong for their day, taller and harder than the Ming's men (`exercise`, `calories`).
   bannerBow: {
-    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 180, frame: 'large', age: 28, exercise: 0.92, calories: 5200,
+    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 177, frame: 'large', age: 28, exercise: 0.92, calories: 5025,
     outfit: { kind: 'bannerArmour', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   bannerGuandao: {
-    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 185, frame: 'large', age: 31, exercise: 0.92, calories: 5500,
+    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 182, frame: 'large', age: 31, exercise: 0.92, calories: 5325,
     outfit: { kind: 'bannerArmour', design: 5 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   bayara: {
-    name: 'Yangguri', style: 'bayaraLance', sex: 'male', heightCm: 182, frame: 'large', age: 40, exercise: 0.94, calories: 5400,
+    name: 'Yangguri', style: 'bayaraLance', sex: 'male', heightCm: 179, frame: 'large', age: 40, exercise: 0.94, calories: 5225,
     outfit: { kind: 'bayara', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   // A Bayara who keeps to the heavy Manchu bow (the guard's archers, the bow his before the spear: STYLES.bayaraBow).
   bayaraBow: {
-    name: 'Darhan', style: 'bayaraBow', sex: 'male', heightCm: 181, frame: 'large', age: 33, exercise: 0.94, calories: 5300,
+    name: 'Darhan', style: 'bayaraBow', sex: 'male', heightCm: 178, frame: 'large', age: 33, exercise: 0.94, calories: 5125,
     outfit: { kind: 'bayara', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -302,12 +302,12 @@ export const PRESETS = {
   },
   kheshig: {
     // The Khan's guard rode as heavy archers first: a quick volley, then in with the sabre (his own, carried with the leather lamellar).
-    name: 'Subutai', style: 'kheshigBow', hero: true, sex: 'male', heightCm: 165, frame: 'large', age: 44, exercise: 0.65, calories: 4300,
+    name: 'Subutai', style: 'kheshigBow', hero: true, sex: 'male', heightCm: 165, frame: 'large', age: 44, exercise: 0.65, calories: 3925,
     outfit: { kind: 'steppeMedium', design: 0 }, accessories: [], sidearm: 'saber',
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   gaziAlp: {
-    name: 'Turgut Alp', style: 'kilijShield', sex: 'male', heightCm: 184, frame: 'large', age: 36, exercise: 0.95, calories: 5500,
+    name: 'Turgut Alp', style: 'kilijShield', sex: 'male', heightCm: 180, frame: 'large', age: 36, exercise: 0.95, calories: 5250,
     outfit: { kind: 'gaziAlp', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -326,7 +326,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   hanCrossbow: {
-    name: 'Li Ling', style: 'nu', sex: 'male', heightCm: 172, frame: 'medium', age: 35, exercise: 0.7, calories: 4125,
+    name: 'Li Ling', style: 'nu', sex: 'male', heightCm: 169, frame: 'medium', age: 35, exercise: 0.7, calories: 3750,
     outfit: { kind: 'hanSoldier', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -353,7 +353,7 @@ export const PRESETS = {
   // emperor at Tumu (1449); Mandukhai Khatun, who led the Mongols in armour in
   // the 1470s–90s; an Oirat archer and a lancer.
   maceShield: {
-    name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 167, frame: 'large', age: 42, exercise: 0.6, calories: 4350,
+    name: 'Esen Taishi', style: 'maceShield', sex: 'male', heightCm: 167, frame: 'large', age: 42, exercise: 0.6, calories: 3950,
     outfit: { kind: 'steppeMedium', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -363,12 +363,12 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   steppeBow: {
-    name: 'Bayar', style: 'steppeBow', sex: 'male', heightCm: 164, frame: 'large', age: 26, exercise: 0.7, calories: 4275,
+    name: 'Bayar', style: 'steppeBow', sex: 'male', heightCm: 164, frame: 'large', age: 26, exercise: 0.7, calories: 3950,
     outfit: { kind: 'steppeLight', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
   saberShield: {
-    name: 'Ganbold', style: 'kheshigBow', sex: 'male', heightCm: 165, frame: 'large', age: 29, exercise: 0.65, calories: 4275,
+    name: 'Ganbold', style: 'kheshigBow', sex: 'male', heightCm: 165, frame: 'large', age: 29, exercise: 0.65, calories: 3875,
     outfit: { kind: 'kheshig', design: 0 }, accessories: [], sidearm: 'mace',
     look: { skinTone: 'lightTan', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -377,7 +377,7 @@ export const PRESETS = {
   // rider of the Kipchak kurgans' measure (~167 cm, broad and hard from the saddle), the long hair and moustache of the
   // Cuman stone figures; the Rus' named them Polovtsy, the pale ones, and the chroniclers saw many fair or brown-haired.
   cuman: {
-    name: 'Konchak', style: 'cumanBow', sex: 'male', heightCm: 181, frame: 'large', age: 40, exercise: 0.92, calories: 5300,
+    name: 'Konchak', style: 'cumanBow', sex: 'male', heightCm: 177, frame: 'large', age: 40, exercise: 0.92, calories: 5050,
     outfit: { kind: 'cumanHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'long', hairColor: '#4a3020', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -395,17 +395,17 @@ export const PRESETS = {
   // The Ottomans: Ulubatlı Hasan, the Janissary who raised the banner on the
   // walls of Constantinople (1453); an azap archer; a heavy sipahi on foot.
   yatagan: {
-    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 187, frame: 'large', age: 25, exercise: 0.96, calories: 5700,
+    name: 'Ulubatlı Hasan', style: 'yatagan', sex: 'male', heightCm: 183, frame: 'large', age: 25, exercise: 0.96, calories: 5450,
     outfit: { kind: 'janissary', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   azap: {
-    name: 'Ali the azap', style: 'steppeBow', sex: 'male', heightCm: 179, frame: 'large', age: 24, exercise: 0.89, calories: 4700,
+    name: 'Ali the azap', style: 'steppeBow', sex: 'male', heightCm: 175, frame: 'large', age: 24, exercise: 0.89, calories: 4475,
     outfit: { kind: 'azap', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   sipahi: {
-    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 185, frame: 'large', age: 34, exercise: 0.95, calories: 5600,
+    name: 'Davud the sipahi', style: 'maceShield', sex: 'male', heightCm: 181, frame: 'large', age: 34, exercise: 0.95, calories: 5350,
     outfit: { kind: 'ottomanHeavy', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -459,7 +459,7 @@ export const PRESETS = {
   },
   // The patrol officer: uniform and soft vest, the service pistol, the baton on his belt.
   police: {
-    name: 'Officer Mike Kowalski', style: 'handgun', sex: 'male', heightCm: 178, frame: 'medium', age: 38, exercise: 0.45, calories: 2900,
+    name: 'Officer Mike Kowalski', style: 'handgun', sex: 'male', heightCm: 178, frame: 'medium', age: 38, exercise: 0.45, calories: 3600,
     outfit: { kind: 'police', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#5a4a3a', facialHair: 'mustache', eyeColor: 'blue' },
   },
@@ -522,7 +522,7 @@ export const PRESETS = {
   // A firefighter of an airport crash crew in his aluminized proximity suit and breathing set, his pike pole (the ceiling hook
   // on its 1.8 m pole, fought as a staff) in his hands.
   firefighter: {
-    name: 'Lt. Joe Brennan', style: 'staff', sex: 'male', heightCm: 180, frame: 'large', age: 36, exercise: 0.6, calories: 3600,
+    name: 'Lt. Joe Brennan', style: 'staff', sex: 'male', heightCm: 180, frame: 'large', age: 36, exercise: 0.6, calories: 4200,
     outfit: { kind: 'proximity', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'cleanShort', hairColor: '#3a2a1c', facialHair: 'mustache', eyeColor: 'blue' },
   },
@@ -572,7 +572,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },
   samurai: {
-    name: 'Takeda Shingen', style: 'katana', sex: 'male', heightCm: 172, frame: 'medium', age: 34, exercise: 0.74, calories: 4125,
+    name: 'Takeda Shingen', style: 'katana', sex: 'male', heightCm: 163, frame: 'medium', age: 34, exercise: 0.74, calories: 3650,
     outfit: { kind: 'samurai', design: 1 }, accessories: ['crest'],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
@@ -615,7 +615,7 @@ export const PRESETS = {
   },
   // A peasant up in arms with his hay fork (the rebels are built on him).
   spear: {
-    name: 'Hob Miller', style: 'pitchfork', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,
+    name: 'Hob Miller', style: 'pitchfork', sex: 'male', heightCm: 170, frame: 'medium', age: 30, exercise: 0.5, calories: 3050,
     outfit: { kind: 'commoner', design: 0 }, accessories: ['headWrap'],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'hazel' },
   },
@@ -630,7 +630,7 @@ export const PRESETS = {
   },
   // An ashigaru spearman with his yari: Hob Miller's build, a foot soldier's drill.
   yari: {
-    name: 'Gonbei', style: 'yari', sex: 'male', heightCm: 176, frame: 'medium', age: 30, exercise: 0.5, calories: 3200,
+    name: 'Gonbei', style: 'yari', sex: 'male', heightCm: 157, frame: 'medium', age: 30, exercise: 0.5, calories: 2500,
     outfit: { kind: 'ashigaru', design: 0 }, accessories: [],
     look: { skinTone: 'tan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'hazel' },
   },

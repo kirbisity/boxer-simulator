@@ -126,10 +126,10 @@ test('the skin left out is only what a closed piece covers: what stays is the op
 test('the crowd\'s body (the low-detail loft) is byte for byte what it was', () => {
   const hash = (mesh) => createHash('sha256').update(Buffer.from(mesh.positions.buffer)).update(Buffer.from(mesh.normals.buffer)).update(Buffer.from(mesh.indices.buffer)).update(Buffer.from(mesh.skinIndex.buffer)).update(Buffer.from(mesh.skinWeight.buffer)).digest('hex').slice(0, 16);
   const paint = (mesh) => createHash('sha256').update(`${mesh.regions.join(',')}|${mesh.rigid.join(',')}`).digest('hex').slice(0, 16);
-  // Made before V7 came into the game (the low-detail loft of these presets).
+  // Made before V7 came into the game (the low-detail loft of these presets); samurai and hanCrossbow since re-cut to their period's build (163 and 169 cm).
   const before = {
-    contender: ['65f215b325a9747e', 'a132c7944de33631'], knight: ['74e8bb3e895e0175', '1dd77ca0785dcb63'], samurai: ['bf9b788dce59f68d', '984738ad34524b74'],
-    hanCrossbow: ['78545d437116c7bc', '721b46fd40ea145d'], crossbow: ['ff8ef72c410e4834', 'ba8f41a002601561'], templar: ['93aea5cbdd2ae832', '9d1016be266f106f'], heavy: ['366ae5ce1cdb70b4', '8d77b60ca133d7e4'],
+    contender: ['65f215b325a9747e', 'a132c7944de33631'], knight: ['74e8bb3e895e0175', '1dd77ca0785dcb63'], samurai: ['cbd3a27ee0c71065', '984738ad34524b74'],
+    hanCrossbow: ['791c5d2068efd4ca', '721b46fd40ea145d'], crossbow: ['ff8ef72c410e4834', 'ba8f41a002601561'], templar: ['93aea5cbdd2ae832', '9d1016be266f106f'], heavy: ['366ae5ce1cdb70b4', '8d77b60ca133d7e4'],
   };
   for (const [preset, [geometry, regions]] of Object.entries(before)) {
     const mesh = buildLoftBody(buildBody(PRESETS[preset]), { lowDetail: true });

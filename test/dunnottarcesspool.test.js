@@ -243,7 +243,8 @@ test('cesspool: Noname is a little harder than he was (body and drill, never a m
   assert.ok(inputs.exercise >= 0.85 && inputs.skill >= 0.9);
   assert.ok(!('damage' in inputs) && !('health' in inputs) && !('multiplier' in inputs), 'no hidden multiplier');
   const body = noname(inCesspool()).body;
-  assert.ok(body.muscleKg >= 37, `${body.muscleKg.toFixed(1)} kg of muscle`);
+  // (36.5: a fed body keeps ~8% fat, physiology.js PHYSIOLOGY.fedFat, which took a little of his lean.)
+  assert.ok(body.muscleKg >= 36.5, `${body.muscleKg.toFixed(1)} kg of muscle`);
   assert.ok(body.bodyMassKg > 78 && body.bodyMassKg < 82, `${body.bodyMassKg.toFixed(1)} kg: still a fit 80-kg gladiator`);
 });
 

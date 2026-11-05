@@ -1349,7 +1349,7 @@ export const OUTFITS = {
   bannerArmour: {
     // Trained: a banner man was a soldier for life, his company's hunts its drill (`skill`: OUTFITS' tiers, the
     // Ming regular's 0.35 and their elite's 0.6).
-    skill: 0.45,
+    skill: 0.55,
     faction: 'manchu', bulletRating: 600, plated: true,
     label: 'Eight Banners (Later Jin) — banner armour', family: 'manchu', movement: 'good', fists: 'bare',
     // The Manchu saber at his belt (drawn as the dao: a single-edged sabre a little more curved); a knife.

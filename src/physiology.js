@@ -43,6 +43,10 @@ export const PHYSIOLOGY = {
   // last muscle), as a share of sedentary baseline lean; and essential fat.
   minimumLeanShare: 0.36,
   essentialFatKg: { male: 0.6, female: 2 },
+  // The fat a fed body keeps (a share of its weight): a hard-training man eats to his work, and below ~8% (a woman ~15%) hunger
+  // and the hormones defend it; contest bodybuilders get under it for days, not years. Only a body fed to at least
+  // `fedFromBmi`: the starving go on down to essential fat.
+  fedFat: { male: 0.08, female: 0.15, fedFromBmi: 18.5 },
   bmi: { min: 10, max: 100 },
   weeksSimulated: 780, // fifteen years: enough for any diet to settle
   // Bone density as a T-score: loading from exercise and from carried mass
@@ -88,7 +92,20 @@ function leanCurve(inputs, frameLean) {
 }
 
 /** Split stored energy (kcal above zero) into lean and fat along the curve. */
+/** A fed body's split held at its fat floor (PHYSIOLOGY.fedFat): the same weight, less of it lean, more of it fat. */
+function fedFloor(inputs, { lean, fat }) {
+  const weight = lean + fat;
+  const height = inputs.heightCm / 100;
+  const floor = PHYSIOLOGY.fedFat[inputs.sex] ?? PHYSIOLOGY.fedFat.male;
+  if (weight / (height * height) < PHYSIOLOGY.fedFat.fedFromBmi || fat >= floor * weight) return { lean, fat };
+  return { lean: weight * (1 - floor), fat: weight * floor };
+}
+
 function compositionForEnergy(inputs, energy, frameLean) {
+  return fedFloor(inputs, energyComposition(inputs, energy, frameLean));
+}
+
+function energyComposition(inputs, energy, frameLean) {
   const minFat = PHYSIOLOGY.essentialFatKg[inputs.sex];
   const leanAt = leanCurve(inputs, frameLean);
   const stored = (fat) => PHYSIOLOGY.leanKcalPerKg * leanAt(fat) + PHYSIOLOGY.fatKcalPerKg * fat;
@@ -161,6 +178,10 @@ function simulateComposition(inputs, frameLean) {
 }
 
 function scaleToWeight(inputs, weight, frameLean) {
+  return fedFloor(inputs, curveAtWeight(inputs, weight, frameLean));
+}
+
+function curveAtWeight(inputs, weight, frameLean) {
   const leanAt = leanCurve(inputs, frameLean);
   let low = PHYSIOLOGY.essentialFatKg[inputs.sex];
   if (leanAt(low) + low >= weight) return { lean: weight - low, fat: low };

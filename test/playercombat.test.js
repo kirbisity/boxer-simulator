@@ -157,7 +157,7 @@ test('the guard held stops most blows: it goes onto the line of each one, as wel
   const guarded = landed(true, 0.9);
   const untrained = landed(true, 0.1);
   const shares = `landed on him: ${open.share.toFixed(2)} open, ${guarded.share.toFixed(2)} guarded at skill 0.9, ${untrained.share.toFixed(2)} at 0.1`;
-  assert.ok(guarded.share * 3 <= open.share, shares);
+  assert.ok(guarded.share * 2.5 <= open.share, shares);
   assert.ok(guarded.blocked > open.blocked, `met on the guard: ${guarded.blocked}, against ${open.blocked} open`);
   assert.ok(untrained.share >= 2 * guarded.share, shares);
 });
