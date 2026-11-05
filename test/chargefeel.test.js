@@ -121,3 +121,21 @@ test('charge feel: a real charge ordered from the saddle is felt on the run at h
   assert.ok(most > 0.5, `felt on the run (${most.toFixed(2)})`);
   assert.equal(afterwards, 0, 'over');
 });
+
+test('a charge ordered is felt at once, from a standstill, and dies away into the gallop\'s own feel', () => {
+  const world = riderAndMan('sabre', 'knight', 1);
+  const [rider, man] = world.fighters;
+  const feel = createChargeFeel();
+  const orders = newOrders();
+  feel.update(world, rider, orders, 1 / 60);
+  assert.equal(feel.level, 0, 'nothing ordered, standing');
+  orders.charge = { target: man.id, phase: 'charge' };
+  feel.update(world, rider, orders, 1 / 60);
+  assert.ok(feel.level >= CHARGEFEEL.order.level * 0.95, `felt at the order: ${feel.level}`);
+  for (let frame = 0; frame < 180; frame += 1) feel.update(world, rider, orders, 1 / 60);
+  assert.ok(feel.level < 0.05, `died away with the horse still standing: ${feel.level}`);
+  // The same order kept is not felt again; a new one is.
+  orders.charge = { target: man.id, phase: 'charge' };
+  feel.update(world, rider, orders, 1 / 60);
+  assert.ok(feel.level >= CHARGEFEEL.order.level * 0.95);
+});

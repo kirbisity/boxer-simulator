@@ -30,6 +30,10 @@ export const CHARGEFEEL = {
   // the corner, on an ellipse of the screen's shape: the inner part of the screen stays clear), their length (a share of that way), and how fast they fly
   // outward (that way per second).
   lines: { count: 44, opacity: 0.7, inner: 0.5, length: 0.3, flow: 1.6 },
+  // The moment the charge is ordered (a tap on his man from the saddle): the feel surges to `level` at once, whatever the
+  // horse's pace, and dies away over `seconds` (a time constant) while the gallop's own level takes over as the horse
+  // gathers speed: the order is felt as the spurs going in.
+  order: { level: 0.8, seconds: 0.7 },
   // Toned down for prefers-reduced-motion: each a share of the full effect (the streaks held still).
   reduced: { widen: 0, lines: 0.5, flow: 0 },
 };
@@ -84,9 +88,19 @@ export function easeCharge(level, goal, dt) {
  */
 export function createChargeFeel({ reduced = false } = {}) {
   const tone = reduced ? CHARGEFEEL.reduced : { widen: 1, lines: 1, flow: 1 };
+  let pace = 0;
+  let surge = 0;
+  let ordered = null;
   let level = 0;
   function update(world, fighter, orders, dt) {
-    level = easeCharge(level, fighter ? chargeGoal(world, fighter, orders) : 0, dt);
+    pace = easeCharge(pace, fighter ? chargeGoal(world, fighter, orders) : 0, dt);
+    // A charge newly ordered at a man he can ride at: the surge.
+    const charge = orders?.charge ?? null;
+    if (charge && charge !== ordered && fighter?.mount && chargeQuarry(world, fighter, orders)) surge = CHARGEFEEL.order.level;
+    ordered = charge;
+    if (dt > 0) surge *= Math.exp(-dt / CHARGEFEEL.order.seconds);
+    if (surge < 1e-3) surge = 0;
+    level = Math.max(pace, surge);
     return level;
   }
   return {
@@ -99,6 +113,9 @@ export function createChargeFeel({ reduced = false } = {}) {
     lines: () => CHARGEFEEL.lines.opacity * tone.lines * level,
     flow: () => CHARGEFEEL.lines.flow * tone.flow * level,
     reset() {
+      pace = 0;
+      surge = 0;
+      ordered = null;
       level = 0;
     },
   };

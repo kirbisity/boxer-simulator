@@ -153,14 +153,6 @@ export function fightUiKit(root, hooks) {
     const orders = hooks.orders();
     const now = world()?.time ?? 0;
     orders.requests.push({ move: entry.move, zone, strength: 'quick', at: now, ...(target !== null ? { target } : {}) });
-    // A rider's tap on a man far off is a charge (control.js chargeOrder): his blow comes as they pass, seconds on, and is marked
-    // then (update: a blow not asked here); the closing ring and how it went are the blow's, not the order's.
-    if (target !== null && me()?.mount) {
-      asked = null;
-      navigator.vibrate?.(8);
-      hooks.signal?.('tap', entry.move);
-      return true;
-    }
     asked = { move: entry.move, entry, zone, side, source, at: hooks.clock?.() ?? hooks.now() };
     markAim(entry, zone, side, target);
     navigator.vibrate?.(8);
@@ -187,6 +179,7 @@ export function fightUiKit(root, hooks) {
       const entry = moves().find((item) => item.move === punch.type) ?? null;
       strike = { punch, move: punch.type, entry, source: mine?.source ?? null, since: fightWorld.time - (punch.age ?? 0) - 1 / 60, start: now, outcome: null, outcomeAt: null };
       // A blow not asked for here (a key): marked as it begins.
+      // (At the man it is made at: a rider's blow in passing, seconds after his charge tap marked that man, is marked on him again.)
       if (!mine && entry) markAim(entry, punch.zone ?? fightUiZoneOf(entry), entry.side, punch.target ?? null);
       asked = null;
       const colour = entry ? fightUiColour(entry.group) : '#ffffff';
