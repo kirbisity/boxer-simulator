@@ -1377,6 +1377,11 @@ function logEvent(event) {
   else if (event.kind === 'horseHit') text = `${event.attacker < 0 ? `A ${event.weapon}` : `<b>${name(event.attacker)}</b>`} ${event.punch ?? (event.weapon === 'stake' ? 'meets' : 'hits')} → ${steed(event)} (${event.target}) · ${event.speed === undefined ? '' : `${event.speed.toFixed(1)} m/s · `}${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
   else if (event.kind === 'horseCrash') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} · ${event.speed.toFixed(1)} m/s · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'trampled') text =`🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  // A man's foot on one on the floor (physics.js footDown): logged when it did something.
+  else if (event.kind === 'trodden') {
+    if (!event.flattened && !event.harmed && !event.fell && !event.effects.includes('stumbles')) return;
+    text = `<b>${name(event.attacker)}</b> treads on <b>${name(event.defender)}</b> (${event.part}) · <em>${event.effects.join(', ')}</em>`;
+  }
   else if (event.kind === 'crash') text = `💥 <b>${name(event.defender)}</b> crashed into${event.attacker === undefined ? '' : ` by <b>${name(event.attacker)}</b>`} (${event.target}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J · ${(event.force / 1000).toFixed(1)} kN${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   // A strike's line needs its numbers; anything else without a line of its own is not logged.
