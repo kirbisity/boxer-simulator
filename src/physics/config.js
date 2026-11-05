@@ -1198,6 +1198,12 @@ export const WORLD = {
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
     brace: { length: 1.5, still: 0.5, share: 0.5 },
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
+    // A horse will not run into another horse if it can help it (a herd animal, and a rider rides his line knee to knee, not
+    // into his comrade): each horse looks `ahead` s along its way (at least `nearest` m) at the horses of its own side and, where
+    // one will come within `clear` m of it (barrel to barrel: two horses' widths and a knee's room), it swerves off by up to
+    // `swerve` rad (the more the nearer the miss and the sooner), to the side the other is not, and if the other is in its path
+    // ahead goes no faster than it plus `gain` m/s. Looked again every `every` s (a horse sees and answers in a few tenths).
+    avoid: { ahead: 1.5, nearest: 3, clear: 1.8, swerve: 0.6, gain: 0.5, every: 0.1 },
     stamina: { gallopSeconds: 60, restSeconds: 90, slows: 0.3, easy: 0.5 },
     // The horse's turning (physics/mounted.js stepHorse).
     // - into (s): the time it takes to get into its sharpest turn at its pace, or out of it: its yaw rate changes no faster

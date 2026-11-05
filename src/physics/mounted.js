@@ -98,6 +98,8 @@ export function createHorse(fighter, id, random) {
     accel: breed.accel * breed.mass / (breed.mass + load) * (1 + HORSE_LOAD.easy),
     at: [fighter.root[0], fighter.root[1]], yaw: fighter.yaw, speed: 0, yawRate: 0, shove: [0, 0], shock: 0,
     goal: { heading: fighter.yaw, speed: 0 }, goalAt: -Infinity,
+    // Its comrades' horses swerved from (friendlyAvoid): { at, turn, speed }, looked again every WORLD.mount.avoid `every` s.
+    avoid: null,
     stride: 0, state: 'up', fall: 0, roll: 0, bleed: 0, bloodLost: 0, trauma: 0, wounds: {},
     capsules: [], legs: {},
     // Its shape and gaits (a robot dog's are its own: robotdogs.js).
@@ -347,7 +349,9 @@ export function stepHorse(world, horse, h) {
     // (What a robot could jump, short of its jump's height, it does not pull up for: it jumps it: riding.js robotJumps.)
     if (mire && horse.spec?.legs) horse.clearance = 0.85 * (mountJumpOf(world, horse)?.height ?? 0);
     const balk = mire ? horseBalks(world, horse) : Infinity;
-    const wanted = Math.max(-1, Math.min(top, balk, goal.speed));
+    // A horse of its own side about to be run into: swerved from, and followed no faster than it (WORLD.mount.avoid).
+    const avoid = friendlyAvoid(world, horse);
+    const wanted = Math.max(-1, Math.min(top, balk, avoid.speed, goal.speed));
     const change = wanted - horse.speed;
     // Pulling up is harder than getting away (a horse sits back on its hocks).
     const most = horse.accel * (change < 0 ? 1.4 : 1) * h;
@@ -360,7 +364,7 @@ export function stepHorse(world, horse, h) {
     const effort = Math.max(0, Math.min(1, (Math.abs(horse.speed) / horse.paces.gallop - stamina.easy) / (1 - stamina.easy)));
     // (A robot runs on its battery, hours of it: robotdogs.js `battery`.)
     if (!horse.spec?.robot) horse.tire = Math.max(0, Math.min(1, (horse.tire ?? 0) + h * (effort / stamina.gallopSeconds - (1 - effort) / stamina.restSeconds)));
-    let turn = goal.heading - horse.yaw;
+    let turn = goal.heading + avoid.turn - horse.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     const rate = turnRateAt(horse, horse.speed);
     // Its yaw rate changes only as fast as it can be: a horse cannot snap its turn round, it sets itself onto its inside legs and
@@ -1790,6 +1794,44 @@ function trodOn(world, horse) {
       world.events.push({ time: world.time, kind: 'trampled', fighter: man.id, horse: horse.id, attacker: rider?.id, speed: Math.abs(horse.speed), hoofSpeed: speed, part: under.key, impulse: tread.impulse, crawling, fell: tread.flattened || undefined, harmed: Boolean(tread.harm), horseJolt: jolted, effects });
     }
   }
+}
+
+/**
+ * How a horse answers the horses of its own side about to cross its way (WORLD.mount.avoid): { turn (rad, added to the way it is
+ * ridden), speed (m/s, the most it goes) }. Each comrade's closest approach is found from the two horses' ways and paces; one
+ * that will come within `clear` m inside the look ahead is swerved from (the nearer the miss and the sooner, the harder), and
+ * one in the path ahead is followed at its own pace. Looked again every `every` s.
+ */
+function friendlyAvoid(world, horse) {
+  const spec = WORLD.mount.avoid;
+  if (horse.avoid && world.time - horse.avoid.at < spec.every && world.time >= horse.avoid.at) return horse.avoid;
+  const way = [Math.cos(horse.yaw), -Math.sin(horse.yaw)];
+  const mine = [way[0] * horse.speed, way[1] * horse.speed];
+  const look = Math.max(spec.nearest, Math.abs(horse.speed) * spec.ahead);
+  let turn = 0;
+  let speed = Infinity;
+  for (const other of world.horses) {
+    if (other === horse || other.corner !== horse.corner || other.state !== 'up') continue;
+    const rel = [other.at[0] - horse.at[0], other.at[1] - horse.at[1]];
+    const distance = Math.hypot(rel[0], rel[1]);
+    if (distance > look + spec.clear) continue;
+    const theirs = [Math.cos(other.yaw) * other.speed, -Math.sin(other.yaw) * other.speed];
+    const closing = [theirs[0] - mine[0], theirs[1] - mine[1]];
+    const closingSquared = closing[0] * closing[0] + closing[1] * closing[1];
+    const when = closingSquared > 1e-6 ? Math.max(0, -(rel[0] * closing[0] + rel[1] * closing[1]) / closingSquared) : 0;
+    if (when > spec.ahead) continue;
+    const miss = Math.hypot(rel[0] + closing[0] * when, rel[1] + closing[1] * when);
+    if (miss >= spec.clear) continue;
+    // The harder the nearer the miss and the sooner it comes; away from the side he is on (+: to the left, as yaw turns).
+    const urgency = (1 - miss / spec.clear) * (1 - when / spec.ahead);
+    const side = way[0] * rel[1] - way[1] * rel[0];
+    turn += (side > 0 ? 1 : -1) * spec.swerve * urgency;
+    // In the path ahead: no faster than him.
+    const along = way[0] * rel[0] + way[1] * rel[1];
+    if (along > 0 && Math.abs(side) < spec.clear) speed = Math.min(speed, Math.max(0, other.speed * (way[0] * Math.cos(other.yaw) - way[1] * Math.sin(other.yaw))) + spec.gain);
+  }
+  horse.avoid = { at: world.time, turn: Math.max(-spec.swerve, Math.min(spec.swerve, turn)), speed };
+  return horse.avoid;
 }
 
 /**

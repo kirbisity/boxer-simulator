@@ -406,8 +406,18 @@ test('horses of one side brushing, or crowded together at a pace, only ease apar
   // Parallel at the same pace, barrels overlapping a little: nothing.
   const brush = meet(0.7, false);
   assert.equal(brush.events.filter((e) => ['horseDown', 'unhorsed', 'horseCrash'].includes(e.kind)).length, 0);
-  // Friends head-on at a gallop: both go down.
-  const head = meet(0, true);
+  // Friends riding head-on at each other: each swerves off (WORLD.mount.avoid) and they pass; none goes down.
+  const passed = meet(0, true);
+  assert.equal(passed.events.filter((e) => ['horseDown', 'horseCrash'].includes(e.kind)).length, 0, 'they ride round each other');
+  // Not swerving (no room to, no time): friends meeting hard head-on crash all the same, both down.
+  const clear = WORLD.mount.avoid.clear;
+  WORLD.mount.avoid.clear = 0;
+  let head;
+  try {
+    head = meet(0, true);
+  } finally {
+    WORLD.mount.avoid.clear = clear;
+  }
   assert.equal(head.events.filter((e) => e.kind === 'horseDown').length, 2);
   assert.ok(WORLD.mount.crash.alliedFrom > 1 && WORLD.mount.crash.alliedFrom < WORLD.mount.crash.fall);
 });
