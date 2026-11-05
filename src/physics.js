@@ -1635,7 +1635,9 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     const placeRows = (group, back) => group.forEach((fighter, index) => {
       const row = Math.floor(index / perRow);
       const inRow = Math.min(perRow, group.length - row * perRow);
-      let across = ((index % perRow) - (inRow - 1) / 2) * spacing;
+      // A team with no order of its own (the sandbox's) stands with its lead in the middle of the line, the rest out from him.
+      const slot = order ? index % perRow : centreOut(index % perRow, inRow);
+      let across = (slot - (inRow - 1) / 2) * spacing;
       let x = sign * Math.min(arena.halfX - 0.4, front + back + row * rowSpacing);
       if (order?.loose) {
         across += (random() * 2 - 1) * order.loose;
@@ -1706,6 +1708,15 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
 }
 
 /**
+ * The place (0 at one end of a line of `count`) of the `index`th man of a team that forms on its lead: the lead in the
+ * middle, then one on either side in turn, outward. Six stand 6 4 2 1 3 5; five 4 2 1 3 5.
+ */
+export function centreOut(index, count) {
+  const middle = Math.floor(count / 2);
+  return index % 2 ? middle - (index + 1) / 2 : middle + index / 2;
+}
+
+/**
  * A team in a fight with riders in it, in one line `apart` m from the middle (`sign`: -1 for red):
  * the men on foot abreast at the team spacing, rows behind at the row spacing; the riders on the
  * flanks, alternating sides outward; those who do not fit across the field in a rank behind the
@@ -1722,7 +1733,7 @@ function lineUpMounted(team, sign, apart, arena, rides) {
   foot.forEach((fighter, index) => {
     const row = Math.floor(index / perRow);
     const inRow = Math.min(perRow, foot.length - row * perRow);
-    at(fighter, row * WORLD.teamRowSpacing, ((index % perRow) - (inRow - 1) / 2) * WORLD.teamSpacing);
+    at(fighter, row * WORLD.teamRowSpacing, (centreOut(index % perRow, inRow) - (inRow - 1) / 2) * WORLD.teamSpacing);
   });
   const width = foot.length ? (Math.min(perRow, foot.length) - 1) * WORLD.teamSpacing : 0;
   const rows = Math.ceil(foot.length / perRow);

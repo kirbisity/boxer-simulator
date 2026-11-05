@@ -353,6 +353,31 @@ function ensureRoster(corner, scenario) {
   }
 }
 
+/**
+ * A side resized from `before` to `after` fighters, its mix kept in proportion: each of the `before` taking its share of the
+ * `after` places (one fighter alone: all of them him), the men there kept as they are and the new places their copies, renamed.
+ * Nobody beyond the new size is kept (growing again repeats the mix, not men who were dropped).
+ */
+function resizeRoster(corner, before, after) {
+  const current = state.rosters[corner].slice(0, Math.max(1, before));
+  const used = new Set();
+  const taken = new Set([...state.rosters.red, ...state.rosters.blue].map((fighter) => fighter.name));
+  const roster = [];
+  for (let index = 0; index < after; index += 1) {
+    const model = current[Math.floor((index * current.length) / after)];
+    if (!used.has(model)) {
+      used.add(model);
+      roster.push(model);
+      continue;
+    }
+    let name = model.name;
+    for (let count = 2; taken.has(name); count += 1) name = `${model.name.split(' ')[0]} ${count}`;
+    taken.add(name);
+    roster.push({ ...structuredClone(model), name });
+  }
+  state.rosters[corner] = roster;
+}
+
 /** A side's fighters for a bout: its roster, as many as the side has. */
 function teamFor(corner, scenario) {
   ensureRoster(corner, scenario);
@@ -1473,7 +1498,10 @@ for (const corner of ['red', 'blue']) {
   const select = $(`#team-${corner}`);
   select.append(...Array.from({ length: 50 }, (_, index) => new Option(String(index + 1), String(index + 1))));
   select.addEventListener('change', () => {
+    const before = state.teamSizes[corner];
     state.teamSizes[corner] = Number(select.value);
+    resizeRoster(corner, before, state.teamSizes[corner]);
+    state.editing[corner] = Math.min(state.editing[corner], state.teamSizes[corner] - 1);
     refreshBuilder();
     newBout();
   });

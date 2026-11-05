@@ -8,8 +8,8 @@ import { createWorld, placeFighter } from '../src/physics.js';
 const man = (corner) => ({ inputs: normaliseInputs({ name: 'x', sex: 'male', heightCm: 170, weightKg: 65, age: 28, style: 'spear', outfit: { kind: 'mingGarrison', design: 0 } }), corner });
 
 /** `red` men against `blue`, in two lines facing each other. */
-function battle(red, blue) {
-  const world = createWorld([...Array(red).fill('red'), ...Array(blue).fill('blue')].map(man), { seed: 3, arena: { halfX: 20, halfZ: 12 } });
+function battle(red, blue, rules = {}) {
+  const world = createWorld([...Array(red).fill('red'), ...Array(blue).fill('blue')].map(man), { seed: 3, arena: { halfX: 20, halfZ: 12 }, rules });
   for (const corner of ['red', 'blue']) {
     world.fighters.filter((fighter) => fighter.corner === corner).forEach((fighter, index) => placeFighter(fighter, corner === 'red' ? -3 : 3, index - 3));
   }
@@ -71,7 +71,8 @@ test('a duel and a small fight end only with their last man, as before', () => {
 });
 
 test('heavily outnumbered on the field, every man of the side is afraid; at even odds nobody', () => {
-  const world = battle(6, 6);
+  // (No standards: a bearer, his flag in hand, is the weaker for it, and the odds here are of like men.)
+  const world = battle(6, 6, { noStandards: true });
   thinkAll(world, 0.01);
   const [me] = side(world, 'red');
   assert.equal(outnumberedFear(world, me), 0, 'even: nothing');
