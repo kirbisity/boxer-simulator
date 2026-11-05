@@ -1192,8 +1192,32 @@ export const WORLD = {
     brace: { length: 1.5, still: 0.5, share: 0.5 },
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     stamina: { gallopSeconds: 60, restSeconds: 90, slows: 0.3, easy: 0.5 },
+    // The horse's turning (physics/mounted.js stepHorse).
+    // - into (s): the time it takes to get into its sharpest turn at its pace, or out of it: its yaw rate changes no faster
+    //   than that turn rate over `into` (so the push across its legs, v × yaw rate, builds to its `lateral` over `into` at
+    //   any pace). Set against its stride (~0.4 s at a gallop, ~0.55 s at a canter): it sets itself onto its inside legs
+    //   within about half a stride (a polo pony's or a cutting horse's quickest change of direction). It was instant: the
+    //   turn rate snapped round as the reins asked (a slalom's reversal flipped it from +1.1 to −1.1 rad/s in one step), the
+    //   saddle was yanked across and the rider's trunk whipped out. No slower: the riding AI's passes, the charge assist and
+    //   the player's own line steer by it (0.45 s left them weaving past their man; tools/mounted-reach.js).
+    // - settle (/s): how fast it closes the last of a turn onto its heading (the old gain, kept).
+    // - bank: its lean into the turn (atan(v·ω/g), as a runner's) reached by a critically damped spring of `hz` (`damping` 1):
+    //   ~0.3 s behind its turn (2/ω), its rate never jumping (the saddle, ~1.6 m up, swings across with it: a faster lean
+    //   swings it harder, 2 Hz doubled the rider's jerk); it was a first-order lag of 0.25 s, whose rate jumped as a turn began.
+    turn: { into: 0.3, settle: 4, bank: { hz: 1, damping: 1 } },
+    // The rider's balance in a turn (physics/mounted.js turnBalance): he leans his trunk in toward the turn's centre by the
+    // angle that balances gravity against the turn's push across (atan(v·ω/g)), for the turn the horse will be making `lead`
+    // s from now (the turn he asked for with the reins, as fast as the horse can come into it: `into`): the lean starts as the
+    // reins ask, with the horse's first step into the turn, not after it. The lean he means is eased in over `shift` s (his
+    // weight going over: a new turn asked for does not start his trunk with a jolt) and reached by a critically damped
+    // spring of `hz`. Each a range [novice, master] over his `skill` (0..1): a master looks ~0.6 s ahead (the reins' cue
+    // and the horse gathering under him are felt that early) and gets there fast (2 Hz: ~0.16 s); a novice leans for the
+    // turn only once it is made, slower (1 Hz) and short of the balance (`share` 0.6), so the rest of the turn's push is
+    // taken by his muscles holding his trunk on the seat, and he sways out (physics.js integrate: a lean of θ carries
+    // g·tan θ of the push down his spine).
+    balance: { lead: [0, 0.6], hz: [1, 2], share: [0.6, 1], shift: 0.06 },
     motion: {
-      blend: 0.5, bankLag: 0.25,
+      blend: 0.5,
       stand: { bob: [0, 2, 0], pitch: [0, 0], rock: [0, 1, 0] },
       walk: { bob: [0.005, 2, 0.12], pitch: [0.025, 0.9], rock: [0.025, 1, 0.25] },
       trot: { bob: [0.024, 2, 0.475], pitch: [0.012, 0.1], rock: [0.012, 2, 0.2] },

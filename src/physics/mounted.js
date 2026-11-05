@@ -113,7 +113,7 @@ export function createHorse(fighter, id, random) {
 export function placeMounted(fighter, x, z, yaw) {
   const horse = fighter.mount;
   if (!horse) return;
-  Object.assign(horse, { at: [x, z], yaw, speed: 0, yawRate: 0, shove: [0, 0], goal: { heading: yaw, speed: 0 } });
+  Object.assign(horse, { at: [x, z], yaw, speed: 0, yawRate: 0, yawWant: 0, bank: 0, bankRate: 0, shove: [0, 0], goal: { heading: yaw, speed: 0 } });
   fighter.yaw = yaw;
   poseHorse(horse);
   seatRider(fighter, 1 / 60, true);
@@ -132,6 +132,20 @@ export function turnRadius(horse, speed) {
 
 function turnRateAt(horse, speed) {
   return Math.min(horse.spec.spin, horse.spec.lateral / Math.max(Math.abs(speed), 0.1));
+}
+
+/**
+ * How fast its turn rate can change (rad/s²): a robot's feet twist it round at its `yawAccel`; a horse gets into its sharpest turn
+ * at its pace in WORLD.mount.turn `into` s (so the push across, v × yaw rate, builds at its `lateral` over that, at any pace).
+ */
+export function yawAccelOf(horse) {
+  return horse.spec?.yawAccel ?? turnRateAt(horse, horse.speed) / WORLD.mount.turn.into;
+}
+
+/** Its turn rate `seconds` from now (rad/s), if it is still asked for the turn it is now (stepHorse `yawWant`): as fast as it can change. */
+export function turnAhead(horse, seconds) {
+  const most = yawAccelOf(horse) * seconds;
+  return horse.yawRate + Math.max(-most, Math.min(most, (horse.yawWant ?? horse.yawRate) - horse.yawRate));
 }
 
 const forwardOf = (yaw) => yawRotate([1, 0, 0], yaw);
@@ -215,12 +229,15 @@ export function horseMotion(horse) {
   return motion;
 }
 
-/** The horse's velocity at a point of it (its run and its turning). */
+/** The horse's velocity at a point of it (its run, its turning, and its leaning into the turn). */
 export function horseVelocityAt(horse, at) {
   const f = forwardOf(horse.yaw);
   const r = [at[0] - horse.at[0], 0, at[2] - horse.at[1]];
+  // Leaning over about its hooves' line: a point `at[1]` m up swings across at that times the lean's rate (to its left).
+  const swing = (horse.bankRate ?? 0) * at[1];
+  const l = leftOf(horse.yaw);
   // ω about the vertical: v = ω × r.
-  return [f[0] * horse.speed + horse.yawRate * r[2] + horse.shove[0], 0, f[2] * horse.speed - horse.yawRate * r[0] + horse.shove[1]];
+  return [f[0] * horse.speed + horse.yawRate * r[2] + l[0] * swing + horse.shove[0], 0, f[2] * horse.speed - horse.yawRate * r[0] + l[2] * swing + horse.shove[1]];
 }
 
 /**
@@ -310,6 +327,7 @@ export function stepHorse(world, horse, h) {
     horse.speed *= Math.exp(-h * 2.5);
     horse.yawRate = 0;
     horse.bank = 0;
+    horse.bankRate = 0;
     if (horse.state === 'falling') {
       horse.fall = Math.min(1, horse.fall + h / 0.9);
       horse.roll = horse.side * (Math.PI / 2) * horse.fall * horse.fall;
@@ -345,17 +363,23 @@ export function stepHorse(world, horse, h) {
     let turn = goal.heading - horse.yaw;
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     const rate = turnRateAt(horse, horse.speed);
-    const twist = horse.spec?.yawAccel;
-    if (twist) {
-      // A robot (robotdogs.js `yawAccel`): its yaw rate changes only as fast as its feet can twist its body round, and it
-      // brakes the turn in time to stop on its heading (the fastest turn its feet allow); near it, it eases on.
-      const want = Math.sign(turn) * Math.min(rate, Math.sqrt(2 * twist * Math.abs(turn)), 2 * Math.sqrt(twist) * Math.abs(turn));
-      horse.yawRate += Math.max(-twist * h, Math.min(twist * h, want - horse.yawRate));
-    } else horse.yawRate = Math.max(-rate, Math.min(rate, turn * 4));
+    // Its yaw rate changes only as fast as it can be: a horse cannot snap its turn round, it sets itself onto its inside legs and
+    // gets into a turn (or out of it) over WORLD.mount.turn `into`; a robot (robotdogs.js `yawAccel`) as fast as its feet can
+    // twist its body round. It brakes a turn in time to stop on its heading, and near it eases on.
+    const twist = yawAccelOf(horse);
+    const ease = horse.spec?.yawAccel ? 2 * Math.sqrt(twist) : WORLD.mount.turn.settle;
+    const want = Math.sign(turn) * Math.min(rate, Math.sqrt(2 * twist * Math.abs(turn)), ease * Math.abs(turn));
+    horse.yawWant = want;
+    horse.yawRate += Math.max(-twist * h, Math.min(twist * h, want - horse.yawRate));
     horse.yaw += horse.yawRate * h;
     // It leans into the turn, as a runner does (gait.js bankOf): the push through its legs is v × yaw rate, positive to the right.
+    // (Reached by a critically damped spring, WORLD.mount.turn `bank`: the lean's own rate never jumps, so neither does the
+    // saddle's swing across, high over its hooves.)
+    const bank = WORLD.mount.turn.bank;
+    const omega = 2 * Math.PI * bank.hz;
     const leanWanted = -Math.sign(horse.yawRate) * Math.atan(Math.abs(horse.speed * horse.yawRate) / WORLD.gravity);
-    horse.bank = (horse.bank ?? 0) + (leanWanted - (horse.bank ?? 0)) * Math.min(1, h / WORLD.mount.motion.bankLag);
+    horse.bankRate = (horse.bankRate ?? 0) + (omega * omega * (leanWanted - (horse.bank ?? 0)) - 2 * bank.damping * omega * (horse.bankRate ?? 0)) * h;
+    horse.bank = (horse.bank ?? 0) + horse.bankRate * h;
     // Driven faster than a walk through mud that holds its legs, it founders now and then (fieldworks.js horseFounders): down it goes, its rider thrown.
     const founders = horseFounders(horse, horse.sunk);
     if (founders > 0 && world.random() < 1 - Math.exp(-founders * h)) bringDown(world, horse, 'founders in the mud');
@@ -792,8 +816,53 @@ export function ridingLean(fighter, dt) {
     carry.leanV += (omega * omega * (target - carry.lean) - 2 * spec.damping * omega * carry.leanV) * (dt / steps);
     carry.lean += carry.leanV * (dt / steps);
   }
-  // (His trunk goes in with the horse's lean into a turn: his seat is on the leaned horse and he sits to its line.)
-  return { lean: carry.lean, roll: -0.6 * (horse.rock ?? 0) + (horse.bank ?? 0) };
+  // (His trunk goes in with the turn by his own balance, turnBalance; and a little across with the horse's rock.)
+  return { lean: carry.lean, roll: -0.6 * (horse.rock ?? 0) + turnBalance(fighter, horse, carry, dt) };
+}
+
+/**
+ * The rider's lean into a turn (rad, positive to his left), once a step (WORLD.mount.balance): toward the turn's centre by the
+ * angle that balances gravity against the turn's push across, atan(v·ω/g), for the turn the horse will be making `lead` s
+ * from now (its turn rate as fast as it can change toward the turn the reins ask: stepHorse `yawWant`), a `share` of it,
+ * reached by a critically damped spring; by his skill. Kept on `carry.turn` (`lean`, `rate`) for his muscles (physics.js integrate).
+ */
+function turnBalance(fighter, horse, carry, dt) {
+  const spec = WORLD.mount.balance;
+  const skill = Math.max(0, Math.min(1, fighter.body.skill ?? 0.5));
+  const by = (range) => range[0] + (range[1] - range[0]) * skill;
+  const turn = (carry.turn ??= { aim: 0, lean: 0, rate: 0 });
+  let wanted = 0;
+  if (horse.state === 'up' && !horse.air) {
+    const ahead = turnAhead(horse, by(spec.lead));
+    wanted = -Math.sign(ahead) * Math.atan(Math.abs(horse.speed * ahead) / WORLD.gravity) * by(spec.share);
+  }
+  const omega = 2 * Math.PI * by(spec.hz);
+  // (Sub-stepped, as the gait's lean. The lean he means to take is itself eased in over `shift` s, his weight going over:
+  // a new turn asked for does not start his trunk with a jolt.)
+  const steps = Math.max(1, Math.ceil(dt / 0.004));
+  const ease = 1 - Math.exp(-dt / steps / spec.shift);
+  for (let k = 0; k < steps; k += 1) {
+    turn.aim += (wanted - turn.aim) * ease;
+    turn.rate += (omega * omega * (turn.aim - turn.lean) - 2 * omega * turn.rate) * (dt / steps);
+    turn.lean += turn.rate * (dt / steps);
+  }
+  return turn.lean;
+}
+
+/**
+ * What of the turn's push across (m/s², a world vector toward the turn's centre) his lean carries down his spine to the seat
+ * (a trunk leaned in by θ, held up against gravity, is pushed in by g·tan θ): no more than the turn asks, and none for a lean
+ * the other way. The rest his muscles must give, holding his trunk over the seat (and it sways out as they do).
+ */
+export function turnCarried(fighter) {
+  const horse = fighter.mount;
+  const lean = fighter.seated?.turn?.lean ?? 0;
+  if (!horse || horse.state !== 'up' || !lean) return null;
+  // The push toward the centre (a positive yaw rate turns right: the centre is on his right, −left).
+  const push = -horse.speed * horse.yawRate;
+  if (Math.sign(push) !== Math.sign(lean)) return null;
+  const size = Math.sign(push) * Math.min(Math.abs(push), WORLD.gravity * Math.tan(Math.abs(lean)));
+  return vec.scale(leftOf(horse.yaw), size);
 }
 
 /**
@@ -929,6 +998,10 @@ export function seatRider(fighter, h, settle = false) {
  */
 export function riderFacing(fighter, at, dt) {
   const horse = fighter.mount;
+  // The horse carries him round as it turns (his seat turns with it): he keeps his twist off its line, and turns from there.
+  const was = fighter.rideYaw;
+  if (was?.horse === horse.id) fighter.yaw += Math.atan2(Math.sin(horse.yaw - was.yaw), Math.cos(horse.yaw - was.yaw));
+  fighter.rideYaw = { horse: horse.id, yaw: horse.yaw };
   let want = horse.yaw;
   if (at) {
     const from = point(fighter.x, P.pelvis);

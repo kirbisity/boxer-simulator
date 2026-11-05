@@ -359,7 +359,8 @@ test('a rider does not ride round his man for ever: a man standing in his turnin
   for (const seed of [11, 12, 13, 14]) {
     const w = world(rider('saber'), footman('street', { style: 'unskilled' }), seed);
     advance(w, 40, thinkAll);
-    assert.ok(w.events.some((event) => event.kind === 'landed' && event.attacker === 0), `seed ${seed}: the rider struck his man`);
+    // (Struck: a blow landed, or one that cut through his guard and put him out.)
+    assert.ok(w.events.some((event) => (event.kind === 'landed' || event.kind === 'out') && event.attacker === 0), `seed ${seed}: the rider struck his man`);
   }
   // Two the same, each trying to get at the other: symmetric, until their draws differ.
   for (const seed of [21, 22, 23, 24]) {

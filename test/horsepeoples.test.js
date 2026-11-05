@@ -152,7 +152,9 @@ test('Crassus\'s square: drilled as a square, its outer ring the front every way
   assert.ok(formation.drill.square && !formation.drill.advance);
   const legion = w.fighters.filter((fighter) => fighter.formation === 'red' && fighter.state === 'up');
   const outer = legion.filter((fighter) => fighter.inFront);
-  assert.ok(outer.length >= 24 && outer.length < legion.length, `${outer.length} of ${legion.length} in the outer ring`);
+  // (Less any of the ring the Parthians' arrows have already dropped: the horse archers are shooting from the first second.)
+  const shot = w.fighters.filter((fighter) => fighter.formation === 'red').length - legion.length;
+  assert.ok(outer.length >= 24 - shot && outer.length < legion.length, `${outer.length} of ${legion.length} in the outer ring`);
   // The outer ring is all round: men in front of the middle, behind it and to both sides.
   const middle = legion.reduce((sum, fighter) => vec.add(sum, [at(fighter)[0] / legion.length, 0, at(fighter)[1] / legion.length]), [0, 0, 0]);
   const sides4 = new Set(outer.map((fighter) => { const dx = at(fighter)[0] - middle[0]; const dz = at(fighter)[1] - middle[2]; return Math.abs(dx) > Math.abs(dz) ? Math.sign(dx) : 2 * Math.sign(dz); }));
