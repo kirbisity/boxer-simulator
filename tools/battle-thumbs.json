@@ -1,0 +1,79 @@
+{
+  "_": "The battle pickers' stills (tools/battle-thumbs.mjs): per battle, over the default, when to take it and how. time: s of the battle at least. focus 'clash': on until two foes stand within `close` m (the thickest press of them: the pair with most men near), `hold` s more, never past `limit` s; 'red' or 'blue': that side's man nearest its middle at `time` (with `front`, its man nearest a foe; `man`: the nth such instead). yaw: rad round from side-on to the clash's line. distance: m out; height: of the eye, m over the man's floor; aim: the height looked at; fov: deg. seed: another cast. stage: a Level Mode stage's key (its card's still), its player stood at `at` ([x, y, z]) facing `facing` rad, its men left to come to him.",
+  "default": {
+    "time": 4,
+    "focus": "clash",
+    "close": 1.6,
+    "hold": 2,
+    "limit": 120,
+    "yaw": 0.5,
+    "distance": 4.2,
+    "height": 1.7,
+    "aim": 1.1,
+    "fov": 42
+  },
+  "legion": {},
+  "mobei": {},
+  "carrhae": {},
+  "catalaunian": {
+    "focus": "blue",
+    "front": true,
+    "time": 22,
+    "yaw": 0.4,
+    "distance": 5,
+    "height": 2.2,
+    "aim": 1.6
+  },
+  "rebellion": {},
+  "agincourt": {},
+  "cerignola": {
+    "focus": "blue",
+    "front": true,
+    "time": 30,
+    "yaw": -0.6,
+    "distance": 4.5
+  },
+  "sekigahara": {},
+  "pyongyang": {},
+  "sarhu": {},
+  "cajamarca": {},
+  "zeelandia": {},
+  "rhodes": {},
+  "wokou": {},
+  "qiJiguang": {},
+  "port": {
+    "distance": 3.4
+  },
+  "pride": {
+    "time": 0.5,
+    "close": 1.6,
+    "hold": 0,
+    "distance": 3.2,
+    "height": 1.9,
+    "aim": 1.5
+  },
+  "subway": {
+    "time": 0.5,
+    "close": 1.6,
+    "hold": 0,
+    "distance": 3.2,
+    "yaw": -0.4,
+    "aim": 1.4
+  },
+  "dunnottar": {
+    "stage": "dunnottar",
+    "at": [
+      -26.5,
+      0,
+      44.5
+    ],
+    "time": 1,
+    "close": 3.5,
+    "hold": 0,
+    "limit": 30,
+    "distance": 5,
+    "yaw": 2.7,
+    "height": 2.2,
+    "aim": 1.2
+  }
+}
