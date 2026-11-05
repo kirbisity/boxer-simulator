@@ -140,6 +140,21 @@ export const WORLD = {
   // to grazing; `slide`: the share of its twist that slides off instead of
   // turning the head. `glancedBelow`: a blow keeping less than this is told as glancing.
   helmet: { paddingStretch: 2.5, glance: 0.9, slide: 0.8, glancedBelow: 0.75 },
+  // A helmet knocked off by a blow (physics.js knockHelmetOff). The blow snaps the head along; the helmet, held on only by
+  // what fastens it, is carried along with it or goes on alone: it slips with the head's speed change (headDeltaV) times
+  // `catch` (where the blow lands on it), and its kinetic energy in that slip, ½·mass·(Δv·catch)² (J), against what its hold
+  // takes up before it lets go (`holds`, J, by HELMETS `hold`: a chin strap; cords, a bevor or a mask tied on; a helm closed
+  // round the head and riveted or laced to its gorget, or a harness), comes off or stays. `ease`: the one dial: every hold
+  // divided by it (2: helmets come off twice as easily in energy; 0: never). `catch` by the contact's height on the head
+  // (h: −1 the chin, 0 the brow's level, 1 the crown): `base` anywhere; up to `rim` more where the blow catches the
+  // rim or brim (h near `rimAt`, within `rimWidth`); less above it, a blow on the crown driving the bowl down onto the
+  // head (`seat` per unit of height above the rim); a blow from below (h < 0) lifts it by `lift` per unit of depth.
+  // A helmet is made and strapped for its weight (a heavier bowl sits deeper, its strap stouter): its hold grows with its
+  // mass as (mass / `refKg`)^`fit`, a little slower than the load does, so a heavy helmet still comes off a little sooner.
+  // Calibrated by tools/helmet-off.js: knockouts by heavy head blows take an open helmet off about half the time, a
+  // half-enclosed one about a fifth, an enclosed one almost never (10 seeds, 2026-11-04: open 49.8% of 2647 knockouts,
+  // half 19.4% of 1802, enclosed 0.2% of 1688).
+  helmetOff: { ease: 1, holds: { open: 6.6, half: 31, enclosed: 100 }, refKg: 2, fit: 0.9, catch: { base: 1, rim: 0.6, rimAt: 0.3, rimWidth: 0.25, seat: 0.8, lift: 0.3 } },
   // Dazed: a head blow past `from` of the chin (short of a knockdown) leaves
   // him dazed for `minSeconds`–`maxSeconds` by how near the knockdown it
   // came: slower to react (`reaction` s), his muscles at (1 − `strength`),

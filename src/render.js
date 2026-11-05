@@ -2098,6 +2098,8 @@ function detailedView(view, fighter, simple) {
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells,
     baseColors, vertexSegment, damageVersion: -1, headProps, dangles, swings: headgear?.swings ?? [], steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
+    // The helmet as worn (lifted off and thrown when a blow knocks it off: updateProps), and whether it hid the face.
+    helmetWorn: headgear?.group ?? null, faceHidden,
   };
   if (later) queueSkin(fighterView, wanted);
   return fighterView;
@@ -3215,7 +3217,12 @@ function reddenBrokenBones(fighterView) {
  */
 export function updateProps(view, fighterViews, world) {
   updateWorksView(view, world);
+  dropLooseHelmets(view, world);
   for (const prop of world.props ?? []) {
+    if (prop.kind === 'helmet') {
+      flyHelmet(view, fighterViews, world, prop);
+      continue;
+    }
     const owner = fighterViews.find((entry) => entry.fighter.id === prop.owner);
     const worn = owner?.headProps?.find((entry) => entry.kind === prop.kind);
     if (!worn) continue;
@@ -3227,6 +3234,82 @@ export function updateProps(view, fighterViews, world) {
     }
     worn.loose.position.set(...prop.x);
     worn.loose.rotation.set(...prop.turn);
+  }
+}
+
+/**
+ * A helmet knocked off (physics.js knockHelmetOff, a `kind: 'helmet'` prop): the worn one is lifted off his head as it
+ * was and flies where the physics throws it (the hair or face it hid shows again); a man drawn as one of a crowd has his
+ * helmet baked into his body, so a copy is made from the prop's look (`head`) and his body drawn again bare-headed
+ * (main.js, on the 'accessory' event).
+ */
+function flyHelmet(view, fighterViews, world, prop) {
+  view.looseHelmets ??= new Map();
+  let loose = view.looseHelmets.get(prop);
+  if (!loose) {
+    const owner = fighterViews.find((entry) => entry.fighter.id === prop.owner);
+    loose = owner?.helmetWorn?.parent ? liftHelmet(view, owner) : copyHelmet(view, world.fighters[prop.owner], prop.head);
+    if (!loose) return;
+    view.looseHelmets.set(prop, loose);
+  }
+  loose.object.position.set(...prop.x);
+  // Tumbling from the way it was worn; come to rest, upright on its rim (physics.js moveProps), turned as it lay.
+  if (prop.resting) loose.object.quaternion.setFromAxisAngle(UP, loose.yaw + prop.turn[1]);
+  else loose.object.quaternion.copy(loose.worn).premultiply(HELMET_SPUN.setFromEuler(HELMET_TURN.set(...prop.turn)));
+}
+const HELMET_SPUN = new THREE.Quaternion();
+const HELMET_TURN = new THREE.Euler();
+
+/** The worn helmet taken off the head, its place, turn and size kept, into the scene; what it hid shown. */
+function liftHelmet(view, owner) {
+  const object = owner.helmetWorn;
+  object.updateWorldMatrix(true, false);
+  const worn = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  object.matrixWorld.decompose(new THREE.Vector3(), worn, scale);
+  object.parent.remove(object);
+  object.matrixAutoUpdate = true;
+  object.scale.copy(scale);
+  object.visible = true;
+  view.scene.add(object);
+  owner.helmetWorn = null;
+  owner.swings = [];
+  if (owner.faceHidden) owner.head.group.traverse((part) => {
+    if (part.isMesh && !part.userData.outline) part.visible = true;
+  });
+  owner.head.showHair?.();
+  // (Its materials are the man's own steel: the view that drew him frees them.)
+  const facing = new THREE.Vector3(1, 0, 0).applyQuaternion(worn);
+  return { object, worn, yaw: Math.atan2(-facing.z, facing.x), own: false };
+}
+
+/** A helmet made from its look (a crowd man's, baked into his body), as his own was drawn. */
+function copyHelmet(view, fighter, head) {
+  if (!fighter || !head) return null;
+  const body = fighter.body;
+  const corner = CORNER_COLORS[fighter.corner];
+  const dress = dressFor(body.inputs, corner);
+  const colors = { ...roleColors(dress, new THREE.Color(skinHex(lookOf(body.inputs)))), accent: dress.feet.accent };
+  const built = buildHeadgear(body, head, colors, steelMaterial(view.steelEnv, { vertexColors: false, color: colors.steel }), corner, { lowDetail: true });
+  if (!built) return null;
+  const [spanX, spanY, spanZ] = HELM_SPAN[head.kind] ?? [1, 1, 1];
+  built.group.scale.set(spanX * HEAD_SCALE, spanY * HEAD_SCALE, spanZ * HEAD_SCALE);
+  doubleSided(built.group);
+  view.scene.add(built.group);
+  // Upright, turned the way he faced.
+  const yaw = fighter.yaw ?? 0;
+  return { object: built.group, worn: new THREE.Quaternion().setFromAxisAngle(UP, yaw), yaw, own: true };
+}
+
+/** Helmets of a world gone (a new bout): out of the scene, and what was made for them freed. */
+function dropLooseHelmets(view, world) {
+  if (!view.looseHelmets?.size) return;
+  const live = new Set(world.props ?? []);
+  for (const [prop, loose] of view.looseHelmets) {
+    if (live.has(prop)) continue;
+    loose.object.parent?.remove(loose.object);
+    if (loose.own) disposeObject(loose.object);
+    view.looseHelmets.delete(prop);
   }
 }
 

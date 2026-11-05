@@ -1286,6 +1286,9 @@ function consumeEvents() {
     if (event.kind === 'fragment') fragmentEvent(scene, machine ? { ...event, harm: 0, plate: true } : event);
     if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : wound(scene, event));
     if (event.kind === 'bladeBlock') (event.cut > 1 ? wound : (view, at) => spawnSparks(view, at.point, 18))(scene, event);
+    // A helmet knocked off a man drawn as one of a crowd: it is baked into his body, so he is drawn again bare-headed
+    // (render.js updateProps throws a copy of it; a man drawn in full has his own lifted off).
+    if (event.kind === 'accessory' && event.helmet && state.views.find((entry) => entry.fighter.id === event.fighter)?.baked) rebuildFighterView(event.fighter);
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
       if (view) severView(scene, view, event, state.world.debris[event.debris]);
