@@ -13,7 +13,7 @@
 /** Modules left out (each one's stub, if kept code imports it, is in STUBS). */
 export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KEPT_LEVEL.includes(name)
   || /^audio\/music\/data\//.test(name)
-  || ['lastgate', 'lastgateview', 'intro', 'tutorial', 'menu', 'battlethumbs'].includes(name);
+  || ['lastgate', 'lastgateview', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
 const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];

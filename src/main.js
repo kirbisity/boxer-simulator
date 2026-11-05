@@ -34,6 +34,7 @@ import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battle
 import { judgeBattle } from './battleend.js';
 import { createGeneralMarks } from './generalmark.js';
 import { leadOf, musterLevel } from './muster.js';
+import { CUSTOM_BATTLE, customLevel } from './custombattle.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, finishOptions, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, helmChoices, helmSlotOf, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setHelmSlot, withFinish, wornCard } from './outfits.js';
 import { setCardElement } from './setcard.js';
 import { withInfo } from './infopop.js';
@@ -317,9 +318,12 @@ function placeLockRing() {
 /** The battle being fought: its level as Battle Mode plays it (scenarios.js battleOf), as set up (muster.js) if it was; null in the sandbox's ring. */
 const levelNow = () => {
   if (!state.scenario) return null;
-  const level = battleOf(state.scenario);
+  const level = battleNamed(state.scenario, state.muster);
   return state.muster ? musterLevel(level, state.muster) : level;
 };
+
+/** A battle by its key (scenarios.js battleOf); the custom battle's is made of its setup's battle (custombattle.js). */
+const battleNamed = (key, setup) => (key === CUSTOM_BATTLE.key ? customLevel(setup.battle) : battleOf(key));
 
 /** The fighter of a side the builder is editing, and replacing it. */
 // ('hero' is not a corner: the character the sandbox's level is played as, kept in state.levelPlayer.)
@@ -810,7 +814,7 @@ function audioScene() {
     boss: Boolean(stage?.level && bossFightOn(world)),
     outcome: kept?.outcome ?? (winner && me ? (me.corner === winner ? 'victory' : 'defeat') : null),
     outcomeAt: kept?.at ?? null,
-    scene: state.scenario ?? (stage ? stage.def.id ?? scene.place : scene.place),
+    scene: (state.scenario === CUSTOM_BATTLE.key ? levelNow()?.scene : state.scenario) ?? (stage ? stage.def.id ?? scene.place : scene.place),
   });
   return audioInfo;
 }
@@ -884,6 +888,8 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
 
 /** A side's name: its armies' (ARMIES labels, without a muster's year: "The French"), else Red or Blue team. */
 function sideName(corner) {
+  const own = levelNow()?.sideNames?.[corner];
+  if (own) return own;
   const armies = (state.scenario && SCENARIOS[state.scenario]?.armies?.[corner]) || [];
   const name = armies.map((key) => ARMIES[key]?.label?.replace(/, \d{3,4}$/, '')).filter(Boolean).join(' & ');
   return name || `${corner === 'red' ? 'Red' : 'Blue'} team`;
@@ -910,7 +916,7 @@ function showSummary(world, verdict) {
   const loser = winner === 'red' ? 'blue' : winner === 'blue' ? 'red' : null;
   const tally = battleTally(world);
   const names = { red: sideName('red'), blue: sideName('blue') };
-  const title = state.scenario ? SCENARIOS[state.scenario]?.title : null;
+  const title = state.scenario ? levelNow()?.title : null;
   $('#banner-eyebrow').textContent = [title, clock(world.time), verdict.how === 'time' ? 'time' : null].filter(Boolean).join(' · ');
   $('#banner-eyebrow').hidden = false;
   if (winner) $('#banner-text').replaceChildren(summaryEl('span', `summary-winner ${winner}`, names[winner]), ' hold the field');
@@ -2448,7 +2454,7 @@ function chooseLevel(key, setup = null) {
   state.muster = key && setup ? setup : null;
   state.lead = { red: 0, blue: 0, ...(state.muster?.lead ? { [state.muster.lead.corner]: state.muster.lead.index } : {}) };
   if (key) {
-    const scenario = battleOf(key);
+    const scenario = battleNamed(key, setup);
     // A level with a whole cast is made fresh each visit, at its own sizes (a set-up one is the player's, as he left it).
     if (state.muster) state.levelRosters[key] = { red: structuredClone(state.muster.cast.red), blue: structuredClone(state.muster.cast.blue) };
     else if (scenario.cast) state.levelRosters[key] = scenario.cast(Math.random);

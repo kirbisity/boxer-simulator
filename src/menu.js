@@ -16,6 +16,8 @@ import { photoFaceRegions } from './photoface.js';
 import { battleOf, SCENARIOS } from './scenarios.js';
 import { addBattleThumb } from './battlethumbs.js';
 import { musterScreen } from './musterview.js';
+import { customBattleScreen } from './custombattleview.js';
+import { CUSTOM_BATTLE } from './custombattle.js';
 import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
 import { boltedOn, breedOf, canRide, mountOf } from './horses.js';
@@ -85,13 +87,20 @@ function screen(id, title, subtitle, onBack) {
   return body;
 }
 
-/** A big choice: glyph, kicker, title, a line of text. Without `onClick`, not open yet: shown, dimmed, and saying so. */
+/**
+ * A choice: glyph, kicker and title, kept small (its line of text is its tooltip, and a battle's whole story is behind
+ * its ⓘ: `withStory`). Without `onClick`, not open yet: shown, dimmed, and saying so.
+ */
 function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
   const open = Boolean(onClick);
-  return el('button', { className: `choice ${tone}${open ? '' : ' soon'}`, type: 'button', onclick: onClick ?? null, ariaDisabled: open ? null : 'true' },
+  return el('button', { className: `choice ${tone}${open ? '' : ' soon'}`, type: 'button', title: text ?? '', onclick: onClick ?? null, ariaDisabled: open ? null : 'true' },
     el('span', { className: 'glyph', textContent: glyph, ariaHidden: 'true' }),
-    el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), el('span', { textContent: text })));
+    el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title })));
 }
+
+/** A choice with its story (`title`, `kicker`, the paragraphs of `lines`) a tap away behind its ⓘ (infopop.js). */
+const withStory = (card, { title, kicker, lines }) => withInfo(card, () => el('div', { className: 'story-info' },
+  kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), ...lines.filter(Boolean).map((line) => el('p', { textContent: line }))), `${title}: the story`);
 
 /** Each style's faction, by the character who fights in it (ring if none does): for grouping styles. */
 const STYLE_FACTION = (key) => {
@@ -102,7 +111,7 @@ const STYLE_FACTION = (key) => {
 /** Install the menus. `game` is the set of hooks main.js provides. */
 export function installMenus(game) {
   const show = (id) => {
-    for (const other of ['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
+    for (const other of ['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'custom-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
     document.body.dataset.overlay = id ?? '';
   };
   const close = () => show(null);
@@ -211,25 +220,29 @@ export function installMenus(game) {
         glyph: stage.glyph, kicker: stage.kicker, title: stage.title, text: stage.blurb, tone: stage.ready ? 'storm' : '',
         onClick: stage.ready ? () => { if (!game.onStage) return; close(); game.onStage(stage.key); } : null,
       });
-      return stage.ready ? addBattleThumb(card, stage.key) : card;
+      if (stage.ready) addBattleThumb(card, stage.key);
+      return withStory(card, { title: stage.title, kicker: stage.kicker, lines: [stage.blurb] });
     })));
     show('stages-screen');
   }
 
   // ---- Battle Mode: the levels --------------------------------------------------
-  // A battle is one tap from here as the level has it; its ⚙ opens the setup (musterview.js): the armies, their order, the man played.
+  // A battle is one tap from here as the level has it; its ⚙ opens the setup (musterview.js): the armies, their order, the man played;
+  // its ⓘ its story. The custom battle first (custombattleview.js): the player's own ground, sides and men.
   function levels() {
     const body = screen('levels-screen', 'Battle Mode', 'Tap a battle, then choose your side. ⚙ sets up the armies yourself.', home);
-    // The training yard first: every control, one at a time.
+    const custom = addBattleThumb(choice({ glyph: '⚔️', kicker: 'Your own', title: CUSTOM_BATTLE.title, text: 'Any ground, any two factions, any fighters, placed where you want them.', onClick: customBattle, tone: 'gold' }), CUSTOM_BATTLE.key);
+    // The training yard: every control, one at a time.
     const yard = choice({ glyph: '🎯', kicker: 'Start here · two minutes', title: 'Tutorial', text: 'Every control, one at a time, against a knight who stands to be struck.', onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
     const card = ([key, level]) => {
-      const play = choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', agincourt: '🏹', cerignola: '🔥', sekigahara: '🏯', pyongyang: '🐉', cajamarca: '☀️', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place, title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } });
+      const play = choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', agincourt: '🏹', cerignola: '🔥', sekigahara: '🏯', pyongyang: '🐉', cajamarca: '☀️', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: level.place.split(' · ').pop(), title: level.title, text: level.blurb, onClick: () => { close(); game.level(key); } });
       addBattleThumb(play, key);
-      // A battle of armies (a `cast`) can be set up; a duel cannot.
-      if (!level.cast) return play;
-      return el('div', { className: 'level-card' }, play, el('button', { className: 'level-setup', type: 'button', textContent: '⚙ Set up', title: `Set up the armies of ${level.title}`, onclick: () => muster(key) }));
+      const told = withStory(play, { title: level.title, kicker: level.place, lines: [level.blurb, level.roster] });
+      // (The card's kicker is the date alone, to fit one line; the ⓘ has the place too.) A battle of armies (a `cast`) can be set up; a duel cannot.
+      if (!level.cast) return told;
+      return el('div', { className: 'level-card' }, told, el('button', { className: 'level-setup', type: 'button', textContent: '⚙ Set up', title: `Set up the armies of ${level.title}`, onclick: () => muster(key) }));
     };
-    body.append(el('div', { className: 'choices levels' }, yard, ...Object.entries(SCENARIOS).map(card)));
+    body.append(el('div', { className: 'choices levels' }, custom, yard, ...Object.entries(SCENARIOS).map(card)));
     show('levels-screen');
   }
 
@@ -237,6 +250,12 @@ export function installMenus(game) {
   function muster(key) {
     show('muster-screen');
     musterScreen(document.getElementById('muster-screen'), { key, level: battleOf(key), onBack: levels, onStart: (setup) => { close(); game.level(key, setup); } });
+  }
+
+  /** The custom battle: its ground and sides, then its men placed (custombattleview.js); fought as any set-up battle is. */
+  function customBattle() {
+    show('custom-screen');
+    customBattleScreen(document.getElementById('custom-screen'), { onBack: levels, onFight: (setup) => { close(); game.level(CUSTOM_BATTLE.key, setup); } });
   }
 
   // ---- Deadliest Warrior -------------------------------------------------------
@@ -659,5 +678,5 @@ export function installMenus(game) {
 
   // Back to the menu from a fight.
   game.onMenu(home);
-  return { lastGate, home, levels, stages, versus, quickEvent, close };
+  return { lastGate, home, levels, stages, versus, quickEvent, customBattle, close };
 }

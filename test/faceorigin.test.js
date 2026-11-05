@@ -179,7 +179,7 @@ function seededRandom(seed) {
 /** The menus on a fake page, the creator opened for the arena (Blood & Sand) and set to `sex` on its first step. */
 async function creator(sex) {
   await photoFaces();
-  const page = fakeDocument(['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']);
+  const page = fakeDocument(['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'custom-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']);
   // render.js comes in with the menu's imports: a THREE that answers anything. (Put back for the photo faces after.)
   const stub = new Proxy(function stand() {}, { get: (_, key) => (key === Symbol.toPrimitive ? () => 0 : stub), apply: () => stub, construct: () => stub });
   const keptThree = globalThis.THREE;
