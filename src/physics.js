@@ -6400,11 +6400,13 @@ export function crashHarm(world, victim, key, { impulse: whole, mass, closing, e
   const tolerance = WORLD.crash.tolerance;
   if (victim.state === 'out' || closing <= tolerance) return null;
   const beyond = 1 - (tolerance / closing) ** 2;
-  const impulse = whole * Math.sqrt(beyond);
-  const energy = all * beyond;
+  // Met ready (`braced`: moving into it, facing it), it is taken on the shoulder and forearms, drawn out (WORLD.crash.ready).
+  const ready = braced ? WORLD.crash.ready : null;
+  const impulse = whole * Math.sqrt(beyond) * (ready?.share ?? 1);
+  const energy = all * beyond * (ready?.share ?? 1);
   const body = victim.body;
   const firmness = body.segments[key].fleshFirmness;
-  const peakForce = ((Math.PI / 2) * impulse) / (WORLD.crash.contactSeconds * (1 + 0.6 * (1 - firmness)));
+  const peakForce = ((Math.PI / 2) * impulse) / (WORLD.crash.contactSeconds * (1 + 0.6 * (1 - firmness)) * (ready?.stretch ?? 1));
   const harm = (1 - (protectionAt(body.gear, key).blunt ?? 0)) * hard;
   const event = { time: world.time, kind: 'crash', attacker: source?.id, defender: victim.id, target: key, speed: closing, impulse, energy, force: peakForce, headDeltaV: 0, effects: [], point: at, normal, harm };
   if (source) victim.lastHitBy = source.id;

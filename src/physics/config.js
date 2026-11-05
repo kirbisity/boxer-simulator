@@ -596,7 +596,11 @@ export const WORLD = {
   //   blow, not the brace) or already reeling, there is nothing (or less) to hold with. Against a charge the
   //   charger's feet drive him on with the same grip on his own weight (physics.js braceAgainstCharge): a
   //   heavier man's charge overpowers the brace, a lighter man's is partly held.
-  crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05, lying: 0.1, brace: { grip: 0.7, seconds: 0.1, shieldSeconds: 0.2, sideOn: 0.4 } },
+  // `ready`: a man going into the crash on his feet, moving into it and facing it (physics.js crashBraced), meets it as a man
+  // does who sees it coming: on his shoulder and forearms, his trunk's muscles set. The contact is drawn out `stretch` times
+  // longer (the arm and the set muscle give, as a guard's forearm takes a blow: the peak force falls by it), and of what reaches
+  // his trunk or head only `share` comes to the part (the rest is taken on the shoulder and the arm in front of it).
+  crash: { from: 0.8, tolerance: 1.2, fromHead: 3, restitution: 0.2, contactSeconds: 0.05, rotation: 1, cooldown: 0.6, hard: 0.5, horse: 0.05, lying: 0.1, brace: { grip: 0.7, seconds: 0.1, shieldSeconds: 0.2, sideOn: 0.4 }, ready: { stretch: 1.8, share: 0.6 } },
   // Static scenery in the physics (physics/terrain.js), only in an arena that
   // carries `terrain`; none of this is read otherwise.
   //   cell, margin: the lookup grid's cell (m), and how far past a solid's edge it is
