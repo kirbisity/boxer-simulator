@@ -12,6 +12,9 @@ import { attackLayout, directFighter, newOrders } from '../src/control.js';
 import { lowMan } from '../src/lowstrike.js';
 
 const WEAPONS = { fists: 'light', katana: 'samurai', spear: 'yari', mace: 'maceShield', naginata: 'naginata' };
+// A kneeling man is low only to a man tall enough to stand over him (lowstrike.js lowMan): to the 157 cm ashigaru he is not, so
+// the spear against him is a Ming spearman's (168 cm).
+const KNEELING = { ...WEAPONS, spear: 'mingSpear' };
 
 /** The player (`attacker`) and an unarmoured man `apart` m off put in `pose`, both still for the AI; one tap of the first pad move. */
 function tapAt(attacker, pose, { apart = 1.6, seed = 1, armed } = {}) {
@@ -51,7 +54,7 @@ function tapAt(attacker, pose, { apart = 1.6, seed = 1, armed } = {}) {
 for (const pose of ['lying', 'kneeling', 'crawling']) {
   test(`one tap at a man ${pose} lands on him, with fists, a katana, a spear, a mace and a naginata`, () => {
     const missed = [];
-    for (const [weapon, preset] of Object.entries(WEAPONS)) {
+    for (const [weapon, preset] of Object.entries(pose === 'kneeling' ? KNEELING : WEAPONS)) {
       const { landed } = tapAt(preset, pose);
       if (!landed) missed.push(weapon);
     }
