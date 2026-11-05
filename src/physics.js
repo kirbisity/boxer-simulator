@@ -20,6 +20,7 @@ import { flyNets } from './physics/net.js';
 import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/throwable.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, coiledTwist, hiltMix, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
+import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
@@ -2875,8 +2876,51 @@ function updateFeet(world, fighter, dt) {
       if (world.ear) soundStep(world, fighter, foot.index === P.lFoot ? 'l' : 'r', [foot.step.to[0], fighter.x[foot.index * 3 + 1], foot.step.to[2]], Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]));
       foot.planted = foot.step.to;
       foot.step = null;
+      footDown(world, fighter, foot);
     }
   }
+}
+
+/**
+ * A foot come down on a man on the floor (physics/footing.js, WORLD.bodyFooting): the man under it trodden on (his leg and
+ * WORLD.trod `legDrive` of his weight behind it, at the speed the foot came down), and his own footing on the body (a
+ * slip, the step met high, the body moving under him): put over past what his legs hold, stumbling near it. Looked for
+ * among the men near him (in a big fight, the contact grid's: collideCrowd).
+ */
+function footDown(world, fighter, foot) {
+  if (fighter.mount || fighter.crawling || fighter.air || fighter.jump || fighter.state !== 'up') return;
+  const fighters = world.fighters;
+  const near = fighters.length <= WORLD.tiers.full ? null : world.contactCache?.count === fighters.length ? world.contactCache.near[fighter.id] : undefined;
+  if (near === undefined || (near && !near.length)) return;
+  const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
+  const under = partUnder(fighters, near, foot.planted[0], foot.planted[2], fighter.radius[foot.index], (other) => other === fighter, legLength);
+  if (!under) return;
+  const side = foot.index === P.lFoot ? 'l' : 'r';
+  const lying = under.fighter;
+  const speed = Math.max(0, -fighter.v[foot.index * 3 + 1]);
+  const tread = treadOn(world, under, {
+    mass: fighter.body.limbKg[`${side}Leg`] + WORLD.trod.legDrive * fighter.body.massKg, speed, weight: fighter.body.massKg * WORLD.gravity,
+    source: lying.corner === fighter.corner ? null : fighter, hard: crashHardness(protectionAt(fighter.body.gear, `${side}Shank`).blunt), reason: 'knocked flat by a man treading on him',
+  });
+  const leg = vec.normalize(vec.sub(under.point, point(fighter.x, P[`${side}Hip`])));
+  const footing = footingOn(under, { leg, velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]], legLength, mass: fighter.body.massKg, flattened: tread.flattened });
+  const limit = WORLD.balance.speed * balanceFooting(fighter);
+  const effects = [];
+  if (tread.flattened) effects.push('knocked him flat');
+  if (tread.harm) effects.push(`hurts his ${under.key}`);
+  if (footing.size > limit) {
+    fighter.knock = [0, 0, 0];
+    fall(world, fighter, footing.slipped ? 'slips off a man underfoot' : 'loses his footing on a man underfoot');
+    effects.push('falls');
+  } else {
+    for (const axis of [0, 2]) fighter.knock[axis] += footing.knock[axis];
+    if (footing.size > WORLD.stagger.startAt * limit) {
+      fighter.wobble = standWobble(fighter);
+      effects.push('stumbles');
+    }
+  }
+  if (footing.slipped) effects.push('his foot slips');
+  world.events.push({ time: world.time, kind: 'trodden', attacker: fighter.id, defender: lying.id, part: under.key, height: footing.height, speed, impulse: tread.impulse, knock: footing.size, slipped: footing.slipped, flattened: tread.flattened, harmed: Boolean(tread.harm), fell: effects.includes('falls'), effects: effects.length ? effects : ['steps on a man on the floor'] });
 }
 
 /** How far (m) a foot's planted place is behind where his stance has that foot, along his facing. */
@@ -3956,7 +4000,7 @@ function leashShare(fighter) {
 }
 
 /** How well his legs hold him (checkBalance's footing): strong legs, sound joints and legs, gear made for it, no net. */
-function balanceFooting(fighter) {
+export function balanceFooting(fighter) {
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
   const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (1 - WORLD.balance.legDamageCost * Math.min(1, (fighter.legDamage.l + fighter.legDamage.r) / (2 * legCapacity())));
   return legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1) * (fighter.mired?.footing ?? 1);
@@ -6134,8 +6178,6 @@ function pushApart(world, first, second) {
 const TROD_LEGS = [['lShank', P.lKnee, P.lFoot], ['rShank', P.rKnee, P.rFoot], ['lThigh', P.lHip, P.lKnee], ['rThigh', P.rHip, P.rKnee]];
 const TROD_BODY = ['trunk', 'head'];
 
-/** A man on the floor: on his knees crawling, or lying there (come to rest on it: one still falling is no footing to trip on). */
-const lyingLow = (fighter) => (fighter.crawling && fighter.state === 'up') || lyingOnFloor(fighter, 'trunk');
 
 /**
  * A man on his feet whose leg runs into one on the floor (WORLD.trod): the leg, with `legDrive` of his weight behind it, meets
@@ -6248,7 +6290,7 @@ export function crashMass(local, whole, intoSpeed, closing, supported = false) {
  * from hips to shoulders, within `crash.lying` m of resting on it. A man still on his way down (a
  * moment after he was knocked off his feet) has nothing behind him but his own weight.
  */
-function lyingOnFloor(fighter, key) {
+export function lyingOnFloor(fighter, key) {
   if (fighter.state === 'up') return false;
   const indices = key === 'head' ? [P.head] : TRUNK_PARTICLES;
   return indices.every((index) => {

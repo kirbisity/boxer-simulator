@@ -20,6 +20,7 @@ import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact, sliceGain } from '../weapons.js';
 import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
+import { footingOn, partUnder, treadOn } from './footing.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
 
 /**
@@ -268,7 +269,7 @@ export function poseHorse(horse) {
       else {
         const s = (u - gait.duty) / (1 - gait.duty);
         along = -reach + 2 * reach * s;
-        lift = Math.sin(Math.PI * s) * Math.min(0.22, 0.05 + 0.02 * Math.abs(horse.speed)) * W;
+        lift = Math.sin(Math.PI * s) * swingLift(horse);
       }
       hoof = [root[0] + along, 0.03 * W + lift, root[2]];
     }
@@ -280,6 +281,20 @@ export function poseHorse(horse) {
     horse.legs[leg.key] = world;
     capsules.push({ key: leg.key, part: 'legs', a: world.root, b: world.hoof, radius: shape.legRadius * W * 1.4, mass: leg.mass });
   }
+}
+
+/** How high (m) a hoof is lifted at the top of its swing, at the horse's pace. */
+function swingLift(horse) {
+  return Math.min(0.22, 0.05 + 0.02 * Math.abs(horse.speed)) * horse.withers;
+}
+
+/**
+ * How fast (m/s) a hoof comes down as its swing ends (poseHorse: the lift a sine over the swing, `1 - duty` of the
+ * stride): ~1 m/s at a walk, ~3.5 at a gallop.
+ */
+export function hoofSpeed(horse, gait = mountGait(horse)) {
+  const rate = mountStrideRate(horse, gait);
+  return gait.duty < 1 && rate > 0 ? (Math.PI * swingLift(horse) * rate) / (1 - gait.duty) : 0;
 }
 
 /**
@@ -379,6 +394,15 @@ export function stepHorse(world, horse, h) {
   horse.stride = (horse.stride + mountStrideRate(horse, gait) * h) % 1;
   horse.velocity = [f[0] * horse.speed + horse.shove[0], 0, f[2] * horse.speed + horse.shove[1]];
   poseHorse(horse);
+  // The hooves that came down this substep: a leg's stance begins as its phase in the stride passes 0 (trodOn).
+  const landed = (horse.landed ??= []);
+  landed.length = 0;
+  if (horse.state === 'up' && !horse.air && gait.hz > 0) {
+    for (const leg of (horse.shape ?? HORSE_SHAPE).legs) {
+      const phase = gait.phase[leg.key];
+      if (!horse.severed?.has(leg.key) && (horse.stride + phase) % 1 < (stride + phase) % 1) landed.push(leg.key);
+    }
+  }
   if (world.ear && horse.state === 'up' && gait.hz > 0 && !horse.spec?.robot) hoofBeats(world, horse, gait, stride);
   const rider = horse.rider === null ? null : world.fighters[horse.rider];
   if (rider?.mount === horse) absorbMotion(rider, horse, h);
@@ -1654,43 +1678,43 @@ function rideDown(world, horse) {
 }
 
 /**
- * A hoof coming down on a man on the ground (a man knocked down in front of
- * a horse, or lying in its way): the horse's weight on that foot for the
- * length of a stride's stance (`hooves.stance` of its laden weight for
- * `hooves.seconds`) is an impulse on his trunk, taken as a crash with the ground behind him
- * through his armour, once a stride per hoof (`hooves.every`).
+ * The hooves that came down this substep (stepHorse `landed`) on a man on the floor of the other side (its own it
+ * steps over): physics/footing.js. The hoof brings its stance's share of the laden horse (all of it over the hooves on
+ * the ground: 1 / (legs x the gait's duty)) down at the speed its swing ends (hoofSpeed): a crawler is pressed flat
+ * under it if his limbs cannot hold it, and the part under it takes it as a crash (through his armour). The horse's
+ * footing on him: its share on that leg of the speed change a sole on a body gives (a slip off him, the step met high,
+ * at its pace), a jolt (its pace checked; enough of it, in a pile of bodies, brings it down).
  */
 function trodOn(world, horse) {
-  const spec = WORLD.mount.hooves;
-  const weight = ladenMass(world, horse) * WORLD.gravity;
-  for (const fighter of world.fighters) {
-    // (Its own side's men lying there it steps over.)
-    if (fighter.mount || fighter.state === 'up' || fighter.corner === horse.corner || (fighter.state === 'out' && fighter.outFor > 20)) continue;
-    const pelvis = point(fighter.x, P.pelvis);
-    if (Math.hypot(pelvis[0] - horse.at[0], pelvis[2] - horse.at[1]) > 1.6 * horse.withers) continue;
-    const neck = point(fighter.x, P.neck);
-    const reach = fighter.body.segments.trunk.skinRadius + HORSE_SHAPE.legRadius * horse.withers;
-    for (const leg of (horse.shape ?? HORSE_SHAPE).legs) {
-      const hoof = horse.legs[leg.key]?.hoof;
-      // Down on the ground, in the stance (a hoof in the air touches nothing).
-      if (!hoof || hoof[1] > spec.height * horse.withers) continue;
-      const closest = closestBetween(hoof, hoof, pelvis, neck);
-      if (vec.length(vec.sub(closest.onFirst, closest.onSecond)) > reach) continue;
-      fighter.hoofed ??= {};
-      const key = `${horse.id}:${leg.key}`;
-      if (world.time - (fighter.hoofed[key] ?? -Infinity) < spec.every) continue;
-      fighter.hoofed[key] = world.time;
-      const impulse = weight * spec.stance * spec.seconds;
-      // A crash with the ground behind him: the impulse on his trunk with the whole of him braced behind it.
-      const lying = fighterParty(fighter, 'trunk').whole;
-      // (Heard: a hoof on a man lying there.)
-      if (world.ear) soundHit(world, fighter, horse.rider === null ? null : world.fighters[horse.rider], 'trunk', hoof, { energy: (impulse * impulse) / (2 * lying), impulse, striker: 'blunt', deltaV: impulse / lying });
-      crashHarm(world, fighter, 'trunk', { impulse, mass: lying, closing: impulse / lying, energy: (impulse * impulse) / (2 * lying), point: hoof, normal: [0, 1, 0], source: horse.rider === null ? null : world.fighters[horse.rider] });
-      world.pendingImpulses.push({ fighter, shares: [[P.pelvis, 1], [P.neck, 1]], direction: [0, -1, 0], impulse, braced: Infinity });
-      if (!fighter.trampledAt || world.time - fighter.trampledAt > 0.5) {
-        fighter.trampledAt = world.time;
-        world.events.push({ time: world.time, kind: 'trampled', fighter: fighter.id, horse: horse.id, attacker: horse.rider ?? undefined, speed: Math.abs(horse.speed), impulse, effects: ['trodden by a hoof'] });
-      }
+  if (!horse.landed?.length) return;
+  const shape = horse.shape ?? HORSE_SHAPE;
+  const gait = mountGait(horse);
+  const laden = ladenMass(world, horse);
+  const legs = shape.legs.filter((leg) => !horse.severed?.has(leg.key)).length;
+  const share = Math.min(1, 1 / (legs * gait.duty));
+  const speed = hoofSpeed(horse, gait);
+  const sole = shape.legRadius * horse.withers;
+  const legLength = (shape.upperLeg + shape.lowerLeg) * horse.withers;
+  const rider = horse.rider === null ? null : world.fighters[horse.rider];
+  for (const key of horse.landed) {
+    const leg = horse.legs[key];
+    const under = partUnder(world.fighters, null, leg.hoof[0], leg.hoof[2], sole, (fighter) => fighter.corner === horse.corner, legLength);
+    if (!under) continue;
+    const man = under.fighter;
+    const crawling = man.crawling && man.state === 'up';
+    const tread = treadOn(world, under, { mass: share * laden, speed, weight: share * laden * WORLD.gravity, source: rider?.mount === horse ? rider : null, reason: 'knocked flat by a hoof' });
+    // (Heard: a hoof on a man lying there.)
+    if (world.ear && tread.harm) soundHit(world, man, rider, under.key === 'head' ? 'head' : 'trunk', under.point, { energy: tread.harm.energy, impulse: tread.impulse, striker: 'blunt', deltaV: tread.impulse / (WORLD.balance.massShare * man.body.massKg) });
+    const footing = footingOn(under, { leg: vec.normalize(vec.sub(under.point, leg.root)), velocity: horse.velocity ?? [0, 0, 0], legLength, mass: laden, flattened: tread.flattened });
+    const jolted = footing.size > 0 ? jolt(world, horse, vec.scale(footing.knock, share), 'falls over the bodies underfoot') : 0;
+    if (man.state === 'out' && !tread.harm) continue;
+    if (!man.trampledAt || world.time - man.trampledAt > 0.5 || tread.flattened) {
+      man.trampledAt = world.time;
+      const effects = [crawling ? 'trodden by a hoof on his knees' : 'trodden by a hoof'];
+      if (tread.flattened) effects.push('knocked flat');
+      if (tread.harm) effects.push(...tread.harm.effects);
+      if (footing.slipped) effects.push('the hoof slips off him');
+      world.events.push({ time: world.time, kind: 'trampled', fighter: man.id, horse: horse.id, attacker: rider?.id, speed: Math.abs(horse.speed), hoofSpeed: speed, part: under.key, impulse: tread.impulse, crawling, fell: tread.flattened || undefined, harmed: Boolean(tread.harm), horseJolt: jolted, effects });
     }
   }
 }

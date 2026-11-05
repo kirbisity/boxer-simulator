@@ -984,6 +984,15 @@ export const WORLD = {
   // and keeps his feet; a light man running into a heavy one goes over him.
   trod: { from: 0.8, legDrive: 0.25, restitution: 0.1, flatFrom: 0.5, tripFrom: 2 },
   crawl: { strike: 0.35, speed: 0.3, accel: 0.3, strideHz: 1.1, stride: 0.06, dip: 0.3, lean: 1.1, turnSpeed: 0.7, turnOnSpot: 0.35, turnStride: 0.6, thighApart: 2, leanThigh: 0.06, footOut: 0.008, armApart: 0.8 },
+  // Footing on a body (physics/footing.js): a foot or a hoof coming down on a man on the floor. `grip`: the friction
+  // of a sole (leather, a hoof's horn) on cloth, flesh and leather over a body, ~0.5 (leather on cloth 0.4-0.6; on
+  // wet or polished steel less, on a gambeson more): the leg's line further than atan(grip) (~27°) off the surface's
+  // normal slides off it. `least` m: a part no higher off the floor than this where the sole lands is no step (a
+  // forearm or a shin lying flat: the sole's give and the ground's own unevenness). `most`: the highest top a stepping
+  // sole comes down on, as a share of the stepper's leg (hip to sole): a leg lifted to a high step, the thigh near level
+  // (a man's ~0.68 m: a chair's seat is a step, a crawler's back at ~0.6 m a high one, a man getting up, his head at a
+  // metre, is no step at all: the leg meets his side, physics.js trodOver).
+  bodyFooting: { grip: 0.5, least: 0.03, most: 0.75 },
   // A blow at a man low before him (lowstrike.js: lying, getting up, on his knees): made at a place on his body, not at a standing
   // man's chest in the air above him. The striker bends to it: `stoop` is the share (0 to 1) of the deepest bend he takes, enough
   // that the striking part (the fist; the blade's contact point; the point) meets the place with the arm (or the leg) `fit` of
@@ -1096,10 +1105,10 @@ export const WORLD = {
   //   the blow into braced legs), and staggers (armoured) from `fell` x
   //   stagger.startAt. The harm to each, the man's trunk and the horse's chest,
   //   is the general crash rule (WORLD.crash), not this module's.
-  // - hooves: a hoof in the stance (within `height` of the withers of the ground)
-  //   on a man lying there bears `stance` of the laden horse's weight for
-  //   `seconds` (an impulse on his trunk, taken as a crash: the ground behind him), once every
-  //   `every` s a hoof.
+  // - hooves: a hoof coming down on a man on the floor (physics/mounted.js trodOn, physics/footing.js) brings
+  //   its stance's share of the laden horse (all of it over the hooves on the ground: 1 / (legs x the gait's
+  //   duty)) at the speed its swing comes down (its lift's sine at the end of the swing: ~1 m/s at a walk, ~3.5
+  //   at a gallop). No numbers of its own: WORLD.bodyFooting's.
   // - brace: a man on foot standing (slower than `still` m/s) with a thrusting
   //   weapon `length` m or longer, set against a horse's charge, has `share` of his
   //   own mass behind its point as well as his arms (his foot against the butt,
@@ -1165,7 +1174,6 @@ export const WORLD = {
     wheelAt: 9, turnSpeed: 5, edge: 6,
     horse: { manBlood: 75, heartSeconds: 10, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
-    hooves: { height: 0.08, stance: 0.5, seconds: 0.08, every: 0.35 },
     brace: { length: 1.5, still: 0.5, share: 0.5 },
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     stamina: { gallopSeconds: 60, restSeconds: 90, slows: 0.3, easy: 0.5 },
