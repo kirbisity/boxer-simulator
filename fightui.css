@@ -96,9 +96,13 @@ body:not(.playing) .fu-pick { display: none; }
   .fight-ui[data-fightui="buttons"] .lock-button { width: 56px; height: 56px; right: calc(94px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 18px); }
   .fight-ui[data-fightui="buttons"] .jump-button { width: 52px; height: 52px; right: calc(26px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 244px); }
   .fight-ui[data-fightui="buttons"] .action-button { right: calc(96px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 226px); }
+  /* The stick over the status, a little smaller and lower than in the Body controls: clear of the fan's outer buttons. */
+  .fight-ui[data-fightui="buttons"] .stick { width: 100px; height: 100px; bottom: calc(var(--controls-height, 56px) + 48px); }
   .fight-ui[data-fightui="buttons"] .swap-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 376px); }
   .fight-ui[data-fightui="buttons"] .horse-button { bottom: calc(var(--controls-height, 56px) + var(--fu-raise) + 422px); }
 }
+/* A small phone: the fan nearer the stick still; the stick smaller and lower again. */
+@media (max-width: 380px) { .fight-ui[data-fightui="buttons"] .stick { width: 92px; height: 92px; bottom: calc(var(--controls-height, 56px) + 40px); } }
 @media (max-height: 480px) {
   /* A phone on its side: no room under the cluster, so Crawl sits at the bottom to the left of it (past the lowest coloured
      buttons) and Lock left of Crawl, a little higher; Jump and the special action in a row over the cluster. */
