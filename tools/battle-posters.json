@@ -1,0 +1,153 @@
+{
+  "_": "The battle pickers' posters (tools/battle-posters.mjs): per card, over `default` (and `mapDefault` for a ground's card, `map-<place>`). size: the picture (px; drawn at twice that, then halved). quality: webp's. foot, riders: how many kinds of each side's men stand in it, on foot and on horse. apart: m between the two nearest men; step: [m further back, m further off] for each next man on foot; nearest: how near the camera (z, m) the first stands; riderAt: [x, z] of a rider (m; red's mirrored). eye, look: the camera's place and what it looks at; fov: deg. frames: frames played before the picture (the men settle into their guard). tint: the glow of either side's edge (red, blue). factions, units: the custom battle's and the grounds' men (custombattle.js unit ids). seed: another cast. mapDistance, mapPitch: a ground's camera, its battles' own (custombattle.js CUSTOM_BATTLE.maps) at that share of the distance and that pitch (rad).",
+  "default": {
+    "size": [
+      480,
+      270
+    ],
+    "quality": 80,
+    "foot": 2,
+    "riders": 1,
+    "apart": 2.6,
+    "step": [
+      1.1,
+      1.9
+    ],
+    "nearest": 1.4,
+    "riderAt": [
+      4.6,
+      -2.6
+    ],
+    "eye": [
+      0,
+      1.2,
+      6.6
+    ],
+    "look": [
+      0,
+      1.15,
+      -0.6
+    ],
+    "fov": 38,
+    "frames": 14
+  },
+  "mapDefault": {
+    "size": [
+      320,
+      180
+    ],
+    "quality": 70,
+    "apart": 8,
+    "nearest": -1,
+    "look": [
+      0,
+      1,
+      0
+    ],
+    "fov": 50,
+    "factions": {
+      "red": "knights",
+      "blue": "japanese"
+    },
+    "units": {
+      "red": [
+        "plate"
+      ],
+      "blue": [
+        "oyoroi"
+      ]
+    },
+    "tint": {
+      "red": "rgba(128, 128, 128, 0)",
+      "blue": "rgba(128, 128, 128, 0)"
+    },
+    "frames": 4,
+    "mapDistance": 0.85,
+    "mapPitch": 0.22
+  },
+  "legion": {},
+  "mobei": {},
+  "carrhae": {},
+  "catalaunian": {},
+  "rebellion": {},
+  "agincourt": {
+    "eye": [
+      0,
+      1.5,
+      4.4
+    ],
+    "look": [
+      0,
+      1.1,
+      -1
+    ],
+    "fov": 46
+  },
+  "cerignola": {},
+  "sekigahara": {},
+  "pyongyang": {},
+  "sarhu": {},
+  "cajamarca": {},
+  "zeelandia": {},
+  "rhodes": {},
+  "wokou": {},
+  "qiJiguang": {},
+  "port": {},
+  "pride": {
+    "eye": [
+      0,
+      1.5,
+      4.2
+    ],
+    "look": [
+      0,
+      1.2,
+      0
+    ],
+    "fov": 40
+  },
+  "subway": {
+    "eye": [
+      0,
+      1.5,
+      4.2
+    ],
+    "look": [
+      0,
+      1.2,
+      0
+    ],
+    "fov": 40
+  },
+  "custom": {
+    "factions": {
+      "red": "knights",
+      "blue": "japanese"
+    },
+    "units": {
+      "red": [
+        "templar",
+        "plate",
+        "plate.horse"
+      ],
+      "blue": [
+        "oyoroi",
+        "ashigaruSpear",
+        "tosei.horse"
+      ]
+    }
+  },
+  "map-field": {},
+  "map-plain": {},
+  "map-meadow": {},
+  "map-sengoku": {},
+  "map-sarhu": {},
+  "map-town": {},
+  "map-jiangnan": {},
+  "map-cajamarca": {},
+  "map-coastFort": {},
+  "map-port": {},
+  "map-mobei": {},
+  "map-catalaunian": {},
+  "map-carrhae": {}
+}

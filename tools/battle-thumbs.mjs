@@ -3,7 +3,7 @@
 // menu's cards show (src/battlethumbs.js; the bundle inlines them).
 // A Level Mode stage is shot the same way, from a `stage` entry: its player stood at `at` until its men come to him.
 // Usage: python3 tools/serve.py 8988 &   then   node tools/battle-thumbs.mjs [--port 8988] [--debug 9338] [--chrome <path>] [key...]
-// With no keys, every battle in the data file. THUMB_DEBUG=1 prints what each shot framed. It starts its own Chrome on the debug port and stops it after.
+// With no keys, every stage in the data file (the battles' cards are tools/battle-posters.mjs's). THUMB_DEBUG=1 prints what each shot framed. It starts its own Chrome on the debug port and stops it after.
 
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -20,7 +20,8 @@ const port = option('port', '8988');
 const debugPort = option('debug', '9338');
 const chromePath = option('chrome', '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome');
 const shots = JSON.parse(readFileSync('tools/battle-thumbs.json', 'utf8'));
-const keys = args.length ? args : Object.keys(shots).filter((key) => key !== '_' && key !== 'default');
+// With no keys, the stages only: the battles' cards are posters now (tools/battle-posters.mjs); a battle named here is still shot as before.
+const keys = args.length ? args : Object.keys(shots).filter((key) => shots[key]?.stage);
 // The picture: drawn at twice its size, then halved (a sharper small picture than one drawn small).
 const SIZE = { width: 480, height: 270, quality: 72 };
 

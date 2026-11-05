@@ -27,7 +27,7 @@ const stub = new Proxy(function stand() {}, { get: (_, key) => (key === Symbol.t
 
 async function withPage(run) {
   const kept = { THREE: globalThis.THREE, document: globalThis.document };
-  const page = fakeDocument(['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']);
+  const page = fakeDocument(['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'custom-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']);
   globalThis.THREE = stub;
   globalThis.document = page.document;
   try {
@@ -63,15 +63,20 @@ test('the home menu offers Battle Mode and Level Mode (no "Levels"), and Level M
   });
 });
 
-test('Battle Mode keeps the tutorial and the historical battles', async () => {
+test('Battle Mode opens on the custom battle, then the tutorial and the historical battles, each card just its title', async () => {
   await withPage((installMenus, byId) => {
     const menus = installMenus({ onMenu() {}, attract() {}, level() {}, tutorial() {} });
     menus.home();
     cardTitled(byId.home, 'Battle Mode').onclick();
     assert.equal(byId['levels-screen'].hidden, false);
     const titles = cards(byId['levels-screen']).map(titleOf);
-    assert.equal(titles[0], 'Tutorial');
+    assert.deepEqual(titles.slice(0, 2), ['Custom Battle', 'Tutorial']);
     assert.ok(titles.length > 5, titles.join());
+    // No paragraph of story on a card (it is behind the card's ⓘ): the kicker and the title only.
+    for (const card of cards(byId['levels-screen'])) {
+      const words = card.children.find((child) => child.className === 'words');
+      assert.ok(words.children.every((child) => child.tag === 'em' || child.tag === 'b'), titleOf(card));
+    }
     assert.match(byId['levels-screen'].text, /Battle Mode/);
   });
 });

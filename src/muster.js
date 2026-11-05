@@ -56,9 +56,10 @@ const musterRides = isMounted;
 /**
  * A side's units: each kind of man its armies have, one to a rank and style
  * (`id` "army.rank.style"), with a `label`, whether he rides or shoots, and
- * `make(random)`: one of them.
+ * `make(random)`: one of them. A level that brings its own (`level.units`: a custom battle's, custombattle.js) has those.
  */
 export function unitsOf(level, corner) {
+  if (level.units) return level.units[corner] ?? [];
   const units = [];
   for (const armyKey of level.armies?.[corner] ?? []) {
     for (const [rankKey, rank] of Object.entries(ARMIES[armyKey].ranks)) {
@@ -82,6 +83,10 @@ export function unitsOf(level, corner) {
 /** The unit a man is one of (his armour's kind, his style, on a horse or not), or null. */
 export function unitOf(units, inputs) {
   for (const unit of units) {
+    if (unit.matches) {
+      if (unit.matches(inputs)) return unit;
+      continue;
+    }
     const rank = ARMIES[unit.army].ranks[unit.rank];
     const style = rank.same?.[inputs.style] ?? inputs.style;
     // A rank that shares its kit with another tells its men by their designs (`designs`: Koxinga's vests and his lamellar).
@@ -99,6 +104,18 @@ export function countUnits(units, men) {
     counts[id] = (counts[id] ?? 0) + 1;
   }
   return counts;
+}
+
+/** The most men a side may have, and both together: the level's own (`level.caps`), else MUSTER.cap a side. */
+export function capsOf(level) {
+  return { side: level.caps?.side ?? MUSTER.cap, total: level.caps?.total ?? Infinity };
+}
+
+/** How many of `count` more men fit on a side (`sizes`: each side's men now) under the level's caps. */
+export function roomFor(level, sizes, corner, count) {
+  const caps = capsOf(level);
+  const left = Math.min(caps.side - sizes[corner], caps.total - sizes.red - sizes.blue);
+  return Math.max(0, Math.min(count, left));
 }
 
 /** A side's deployment zone on the floor: x from `x[0]` to `x[1]`, z from `z[0]` to `z[1]` (m). */

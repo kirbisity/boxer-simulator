@@ -221,14 +221,14 @@ body[data-overlay="wizard"] .hud, body[data-overlay="wizard"] .controls, body[da
 .choices { display: grid; gap: 12px; width: 100%; }
 .choices.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .choices.two { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 720px; }
-.choices.levels { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); max-width: 820px; }
-.choice { display: grid; grid-template-rows: auto 1fr; gap: 10px; text-align: left; padding: 18px; min-height: 170px; border: 1px solid var(--line); border-radius: 14px; background: rgba(20, 24, 36, 0.9); backdrop-filter: blur(6px); transition: transform 0.12s, border-color 0.12s; }
+.choices.levels { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); max-width: 1120px; gap: 10px; }
+.choice { display: grid; grid-template-rows: auto 1fr; gap: 8px; text-align: left; padding: 14px; min-height: 0; border: 1px solid var(--line); border-radius: 14px; background: rgba(20, 24, 36, 0.9); backdrop-filter: blur(6px); transition: transform 0.12s, border-color 0.12s; }
 .choice:hover, .choice:focus-visible { border-color: var(--gold); transform: translateY(-2px); background: rgba(28, 32, 46, 0.95); outline: none; }
 .choice.gold { border-color: rgba(255, 207, 74, 0.55); }
-.choice .glyph { font-size: 34px; line-height: 1; }
-.choice .words { display: grid; gap: 4px; align-content: start; }
-.choice em { font: 500 11px var(--mono); font-style: normal; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); }
-.choice b { font: 700 24px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
+.choice .glyph { font-size: 28px; line-height: 1; }
+.choice .words { display: grid; gap: 3px; align-content: start; min-width: 0; }
+.choice em { font: 500 11px var(--mono); font-style: normal; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.choice b { font: 700 21px/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
 .choice .words > span { color: var(--muted); font-size: 13px; line-height: 1.4; }
 
 /* Deadliest Warrior: a grid of characters each side. */
@@ -806,15 +806,6 @@ body[data-game="intro"] .hud, body[data-game="intro"] .controls, body[data-game=
   .choices.home-choices .choice:last-child { grid-column: 1 / -1; }
   .choices.home-choices .career { padding: 10px 12px; }
 }
-@media (max-width: 420px) {
-  /* The words under each choice come back, short as they now are. */
-  .choices.home-choices .choice .words > span, .choices.two .choice .words > span, .choices.levels .choice .words > span, .choices.stages .choice .words > span { display: block; }
-}
-/* A phone with five cards: the three lower ones keep to their titles unless the screen is tall, so the home needs no scrolling. */
-@media (max-width: 420px) and (max-height: 860px) {
-  .choices.home-choices .choice:nth-child(n+4) .words > span { display: none; }
-  .choices.home-choices .career .words > span { display: none; }
-}
 /* A short window (a laptop, a phone on its side): the home cards go flat, glyph beside words, so five fit with no scrolling. */
 @media (max-height: 760px) and (min-width: 761px) {
   .home .screen-head h1 { font-size: clamp(44px, 10vh, 80px); }
@@ -1093,24 +1084,48 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
 .level-card { position: relative; display: grid; min-width: 0; }
 .level-setup { position: absolute; top: 12px; right: 12px; padding: 7px 12px; border-radius: 999px; background: rgba(10, 12, 18, 0.82); border-color: rgba(255, 207, 74, 0.45); color: var(--gold); font-weight: 600; }
 .level-setup:hover, .level-setup:focus-visible { background: rgba(255, 207, 74, 0.16); }
+.level-setup::before { content: ''; position: absolute; inset: -8px; }
+/* A battle's story behind its ⓘ (menu.js withStory): in the card's bottom corner, clear of its picture and its ⚙. */
+.choices.levels .info-pick > .choice { padding-right: 14px; }
+.choices.levels .info-btn { top: auto; bottom: 10px; right: 10px; translate: none; width: 32px; height: 32px; }
+.choices.levels .info-pick .choice .words { padding-right: 34px; }
+.story-info { display: grid; gap: 8px; max-width: 52ch; }
+.story-info em { font: 500 11px var(--mono); font-style: normal; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold); }
+.story-info b { font: 700 24px/1.05 var(--display); text-transform: uppercase; }
+.story-info p { margin: 0; color: var(--muted); line-height: 1.45; }
 /* A battle's still (battlethumbs.js): a close shot of it across the card's top, in the glyph's place. */
-.choice.has-thumb { --thumb-pad: 18px; }
+.choice.has-thumb { --thumb-pad: 14px; }
 .choice.has-thumb .glyph { display: none; }
 .choice .thumb { display: block; width: calc(100% + 2 * var(--thumb-pad)); max-width: none; margin: calc(-1 * var(--thumb-pad)) calc(-1 * var(--thumb-pad)) 0; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 13px 13px 0 0; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); }
 @media (max-width: 760px) {
   .choice.has-thumb { --thumb-pad: 12px; }
   .choice .thumb { aspect-ratio: 12 / 5; }
+  /* Two battles abreast on a phone: each its picture and its title. */
+  .choices.levels { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .choices.levels .choice { padding: 10px; gap: 4px; }
+  .choices.levels .choice.has-thumb { --thumb-pad: 10px; }
+  .choices.levels .choice .thumb { aspect-ratio: 16 / 9; }
+  .choices.levels .choice b { font-size: 16px; }
+  .choices.levels .choice em { font-size: 10px; letter-spacing: 0.06em; }
+  .choices.levels .choice .glyph { font-size: 22px; }
+  .choices.levels .info-btn { bottom: 6px; right: 6px; width: 28px; height: 28px; }
+  .choices.levels .info-pick .choice .words { padding-right: 28px; }
+  .level-setup { top: 6px; right: 6px; padding: 4px 9px; font-size: 12px; }
 }
 /* The whole screen, never scrolled: the map takes what room is left. */
-.screen.muster { overflow: hidden; align-content: stretch; justify-items: stretch; grid-template-rows: auto auto minmax(0, 1fr) auto auto auto; gap: 8px; background: rgba(5, 6, 10, 0.94); }
-.screen.muster > * { width: min(980px, 100%); justify-self: center; min-width: 0; }
-.muster-head { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; }
+.screen.muster { overflow: hidden; align-content: stretch; justify-items: stretch; grid-template-rows: auto minmax(0, 1fr); gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(5, 6, 10, 0.95); }
+.screen.muster > * { min-width: 0; }
+.muster-head { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; padding-right: 52px; }
+.muster-head .back { min-height: 44px; }
 .muster-head .titles { min-width: 0; }
-.muster-head h1 { margin: 0; font: 700 clamp(20px, 4vw, 30px)/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.muster-head .lede { margin: 0; color: var(--muted); font-size: 13px; }
-.muster-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.muster-side { display: grid; gap: 1px; text-align: left; padding: 7px 12px; border-width: 2px; border-radius: 12px; background: rgba(16, 19, 29, 0.85); min-width: 0; opacity: 0.7; }
-.muster-side b { font: 700 15px var(--display); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-head h1 { margin: 0; font: 700 clamp(20px, 3.4vw, 28px)/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.muster-head .lede { margin: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The map takes most of the screen: on a wide screen beside a narrow panel, on a phone above one that folds away. */
+.muster-body { display: grid; grid-template-columns: minmax(0, 1fr) clamp(270px, 27vw, 360px); gap: 10px; min-height: 0; }
+.muster-aside { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; gap: 8px; min-height: 0; min-width: 0; }
+.muster-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.muster-side { display: grid; gap: 1px; text-align: left; padding: 6px 10px; min-height: 48px; border-width: 2px; border-radius: 12px; background: rgba(16, 19, 29, 0.85); min-width: 0; opacity: 0.7; }
+.muster-side b { font: 700 14px var(--display); text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .muster-side span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .muster-side.red { border-color: rgba(224, 53, 59, 0.5); }
 .muster-side.blue { border-color: rgba(58, 116, 236, 0.5); }
@@ -1119,39 +1134,122 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
 .muster-side.blue.on { border-color: var(--blue); background: rgba(58, 116, 236, 0.18); }
 .muster-map { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; background: #0e1118; border: 1px solid var(--line); }
 .muster-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
-.muster-hint { position: absolute; left: 8px; top: 8px; right: 8px; pointer-events: none; font-size: 12px; color: rgba(238, 240, 245, 0.85); text-shadow: 0 1px 3px #000; }
-.muster-pick { position: absolute; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: rgba(12, 14, 22, 0.92); border: 1px solid var(--line); }
+.muster-hint { position: absolute; left: 8px; top: 8px; right: 60px; pointer-events: none; font-size: 12px; color: rgba(238, 240, 245, 0.85); text-shadow: 0 1px 3px #000; }
+.muster-zoom { position: absolute; right: 8px; top: 8px; display: grid; gap: 6px; }
+.muster-zoom button { width: 44px; height: 44px; padding: 0; border-radius: 10px; background: rgba(12, 14, 22, 0.86); font: 700 18px var(--body); }
+.muster-zoom button:disabled { opacity: 0.4; }
+.muster-zoom button.on { border-color: var(--gold); color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+.muster-pick { position: absolute; left: 8px; right: 60px; bottom: 8px; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 12px; background: rgba(12, 14, 22, 0.92); border: 1px solid var(--line); }
 .muster-who { display: grid; flex: 1; min-width: 0; }
 .muster-who b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .muster-who span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.muster-pick button { white-space: nowrap; }
-.muster-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.muster-tabs button { padding: 8px 6px; font: 600 13px var(--body); }
-.muster-panel { display: grid; gap: 8px; align-content: start; height: clamp(108px, 24vh, 190px); overflow: hidden auto; }
-.muster-units { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 5px; }
-.muster-unit { display: flex; justify-content: space-between; align-items: center; gap: 6px; padding: 6px 9px; font-size: 12px; text-align: left; min-width: 0; }
+.muster-pick button { white-space: nowrap; min-height: 44px; }
+.muster-tabs { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 6px; }
+.muster-tabs button { min-height: 44px; padding: 6px; font: 600 13px var(--body); }
+.muster-tabs .muster-fold { display: none; width: 44px; }
+.muster-panel { display: grid; gap: 8px; align-content: start; min-height: 0; overflow: hidden auto; overscroll-behavior: contain; }
+.muster-units { display: grid; gap: 5px; }
+.muster-unit-row { display: grid; grid-template-columns: minmax(0, 1fr) 44px 44px 44px; gap: 4px; }
+.muster-unit-row .step { min-height: 44px; padding: 0; font-weight: 700; }
+.muster-unit { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-height: 44px; padding: 6px 10px; font-size: 13px; text-align: left; min-width: 0; }
 .muster-unit span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .muster-unit b { font-variant-numeric: tabular-nums; color: var(--gold); }
 .muster-unit.on, .muster-formation.on { color: var(--fg); border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); background: rgba(255, 207, 74, 0.12); }
-.muster-stepper { display: flex; align-items: center; gap: 6px; }
-.muster-stepper button { min-width: 40px; padding: 6px 10px; font-weight: 700; }
-.muster-stepper span { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.muster-stepper em { font: 12px var(--mono); font-style: normal; color: var(--muted); }
 .muster-formations { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
-.muster-formation { display: flex; align-items: center; gap: 8px; padding: 8px 10px; text-align: left; font-size: 13px; }
+.muster-formation { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 10px; text-align: left; font-size: 13px; }
 .muster-formation i { font-style: normal; color: var(--gold); width: 1.2em; text-align: center; }
 .muster-note { margin: 0; color: var(--muted); font-size: 13px; }
+.muster-note b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.muster-panel > button { min-height: 44px; }
 .muster-foot { display: flex; justify-content: space-between; gap: 8px; }
-.muster-foot .muster-start { padding: 10px 24px; font-size: 16px; }
-@media (max-width: 560px) {
+.muster-foot button { min-height: 44px; }
+.muster-foot .muster-start { flex: 1; padding: 10px 18px; font-size: 16px; }
+.muster-foot .muster-start:disabled { opacity: 0.5; }
+/* A phone held upright: the map above, the panel under it (the fold ▾ puts it away for a bigger map). */
+@media (max-aspect-ratio: 1/1) {
+  .muster-body { grid-template-columns: none; grid-template-rows: minmax(0, 1fr) auto; }
+  .muster-aside { grid-template-rows: auto auto auto auto; }
+  .muster-panel { max-height: 30vh; }
+  .muster-tabs .muster-fold { display: block; }
+  .muster-aside.folded .muster-panel { display: none; }
   .muster-head .lede { display: none; }
-  .muster-units { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
-  .muster-unit { padding: 5px 8px; font-size: 11px; }
   .muster-hint { font-size: 11px; }
-  .muster-panel { height: clamp(120px, 30vh, 230px); }
-  .muster-formations { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .muster-pick { flex-wrap: wrap; }
   .muster-who { flex-basis: 100%; }
+}
+/* A phone on its side: the least of a head, the panel narrow. */
+@media (max-height: 520px) and (min-aspect-ratio: 1/1) {
+  .screen.muster { gap: 6px; padding-top: calc(6px + env(safe-area-inset-top, 0px)); padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .muster-head .lede { display: none; }
+  .muster-head h1 { font-size: 18px; }
+  .muster-body { grid-template-columns: minmax(0, 1fr) 300px; gap: 6px; }
+  .muster-aside { gap: 6px; }
+  .muster-side { min-height: 44px; padding: 3px 8px; }
+  .muster-side span { font-size: 11px; }
+  .muster-zoom { gap: 4px; }
+}
+
+/* ---- Battle Mode: the custom battle's ground and sides (custombattleview.js) ---- */
+.screen.custom-battle { overflow: hidden; align-content: stretch; justify-items: stretch; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: calc(10px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px)); background: rgba(5, 6, 10, 0.95); }
+.screen.custom-battle > * { width: min(1180px, 100%); justify-self: center; min-width: 0; }
+.custom-head { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 12px; padding-right: 52px; }
+.custom-head .back { min-height: 44px; }
+.custom-head .titles { min-width: 0; }
+.custom-head h1 { margin: 0; font: 700 clamp(20px, 3.4vw, 30px)/1.05 var(--display); text-transform: uppercase; letter-spacing: 0.04em; }
+.custom-head .lede { margin: 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.custom-body { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; min-height: 0; }
+.custom-body h2 { margin: 0 0 6px; font: 700 14px var(--display); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.custom-ground, .custom-side { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.custom-side { grid-template-rows: auto minmax(0, 1fr) auto; padding: 8px 10px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(16, 19, 29, 0.7); }
+.custom-side.red { border-color: rgba(224, 53, 59, 0.6); }
+.custom-side.blue { border-color: rgba(58, 116, 236, 0.6); }
+.custom-side.red h2 { color: #ff8a8e; }
+.custom-side.blue h2 { color: #8db2ff; }
+.custom-sides { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; min-height: 0; }
+.custom-maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; overflow: hidden auto; min-height: 0; }
+.custom-map { position: relative; display: grid; align-content: end; gap: 4px; min-height: 64px; padding: 8px 10px; border-radius: 12px; text-align: left; overflow: hidden; }
+.custom-map .glyph { font-size: 22px; }
+.custom-map b { font: 700 14px/1.1 var(--display); text-transform: uppercase; letter-spacing: 0.03em; }
+.custom-map.has-thumb { padding: 0; align-content: start; gap: 0; }
+.custom-map.has-thumb .glyph { display: none; }
+.custom-map .thumb { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+.custom-map.has-thumb b { padding: 6px 8px; }
+.custom-map.on, .custom-faction.on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); background: rgba(255, 207, 74, 0.14); color: var(--fg); }
+.custom-factions { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 6px; align-content: start; overflow: hidden auto; min-height: 0; }
+.custom-faction { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 6px 10px; text-align: left; font-size: 13px; min-width: 0; }
+.custom-faction i { font-style: normal; }
+.custom-faction span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.custom-line { margin: 6px 0 0; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.custom-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.custom-foot button { min-height: 48px; padding: 10px 18px; font-size: 15px; }
+.custom-foot .custom-next { font-size: 16px; }
+/* A phone: each row of choices scrolls sideways, so the screen itself never does. */
+@media (max-width: 760px), (max-height: 560px) {
+  .custom-body { grid-template-columns: none; grid-template-rows: auto auto auto; align-content: start; gap: 10px; }
+  .custom-sides { grid-template-rows: none; }
+  .custom-maps, .custom-factions { display: flex; overflow: auto hidden; scroll-snap-type: x proximity; padding-bottom: 4px; }
+  .custom-map { flex: 0 0 132px; scroll-snap-align: start; }
+  .custom-faction { flex: 0 0 auto; }
+  .custom-head .lede { display: none; }
+  .custom-foot button { flex: 1; }
+}
+/* A phone held upright has the height: the factions in three rows (still sideways), the grounds' pictures bigger. */
+@media (max-width: 760px) and (min-height: 640px) {
+  .custom-factions { display: grid; grid-auto-flow: column; grid-template-rows: repeat(3, 44px); grid-auto-columns: max-content; }
+  .custom-map { flex-basis: 150px; }
+}
+@media (max-height: 560px) {
+  .screen.custom-battle { gap: 6px; }
+  .custom-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; gap: 6px 10px; }
+  .custom-ground { grid-column: 1 / -1; }
+  .custom-sides { grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .custom-map { flex-basis: 112px; }
+  .custom-map .thumb { aspect-ratio: 21 / 9; }
+  .custom-map.has-thumb b { padding: 3px 6px; font-size: 12px; }
+  .custom-side { padding: 4px 8px 6px; }
+  .custom-body h2 { margin-bottom: 3px; font-size: 12px; }
+  .custom-line { margin-top: 3px; }
+  .custom-foot button { min-height: 44px; padding: 6px 12px; }
 }
 
 /* ---- The Last Gate (lastgate.js, lastgateview.js) ----------------------------------------------------------------------

@@ -5,13 +5,15 @@
 // where they stand: tap the ground to put a man of the chosen kind there, drag
 // across open ground for a block of them, drag a man to move him, tap him to
 // remove him or to play as him. One side may be set up and the other left as
-// the level has it. It fits a phone's screen without scrolling: the map takes
-// what room there is, and what is chosen beneath it is in three tabs.
+// the level has it. It fits the screen without scrolling: the map takes most of
+// it (beside a narrow panel on a wide screen, above one that folds away on a
+// phone), zoomed with the wheel, a pinch or its buttons; what is chosen in the
+// panel is in three tabs.
 //
 // What it hands back (`onStart(setup)`) is muster.js musterLevel's setup:
 // each side's men, the places of a side set up by hand, and the man played.
 
-import { countUnits, drawUp, formationsOf, intoZone, inZone, MUSTER, unitOf, unitsOf, zoneOf } from './muster.js';
+import { capsOf, countUnits, drawUp, formationsOf, intoZone, inZone, MUSTER, roomFor, unitOf, unitsOf, zoneOf } from './muster.js';
 import { STYLES } from './moves.js';
 import { ARMIES } from './scenarios.js';
 
@@ -35,6 +37,10 @@ const MUSTER_VIEW = {
   // A block dragged out on open ground: men this far apart (m) when the formation has no spacing of its own.
   spacing: 1.2,
   rowSpacing: 1.5,
+  // Zoom: how far in (times the whole floor), each button's step, and the wheel's (per 100 px of scroll).
+  zoomMost: 6,
+  zoomStep: 1.5,
+  wheelStep: 1.25,
 };
 
 const musterEl = (tag, props = {}, ...children) => {
@@ -44,15 +50,20 @@ const musterEl = (tag, props = {}, ...children) => {
 };
 
 /**
- * Open the setup screen for a battle in `root`: `key` and `level` (scenarios.js battleOf),
- * `onStart(setup)` when the player starts it, `onBack()` to go back to the levels.
+ * Open the setup screen for a battle in `root`: `key` and `level` (scenarios.js battleOf, or a custom battle's:
+ * custombattle.js customLevel, with its men's `places` and `formations`), `onStart(setup)` when the player starts it,
+ * `onBack()` to go back, `onChange(sides, lead)` whenever an army changes (a custom battle keeps it), and the
+ * words of its back and reset buttons (`backLabel`, `resetLabel`).
  */
-export function musterScreen(root, { key, level, onStart, onBack }) {
+export function musterScreen(root, { key, level, onStart, onBack, onChange = null, lead = null, formations = {}, backLabel = '← Back', resetLabel = '↺ As the level' }) {
   const cast = level.cast(Math.random);
   const units = { red: unitsOf(level, 'red'), blue: unitsOf(level, 'blue') };
-  // Each side: the level's own (`custom` false: its men drawn where the level puts them), or the player's.
-  const fresh = (corner) => ({ custom: false, men: cast[corner].slice(), places: drawUp(level, corner, cast[corner], 'level'), formation: 'level' });
+  // Each side: the level's own (`custom` false: its men drawn where the level puts them), or the player's (a custom battle's men where he left them).
+  const fresh = (corner) => (level.places
+    ? { custom: true, men: cast[corner].slice(), places: level.places[corner].map((place) => place.slice()), formation: formations[corner] ?? 'hand' }
+    : { custom: false, men: cast[corner].slice(), places: drawUp(level, corner, cast[corner], 'level'), formation: 'level' });
   const sides = { red: fresh('red'), blue: fresh('blue') };
+  const caps = capsOf(level);
   const view = {
     corner: 'red',
     tab: 'units',
@@ -60,26 +71,34 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
     brush: { red: units.red[0]?.id, blue: units.blue[0]?.id },
     selected: null,
     // The man played: { corner, man } (his inputs), or null for the usual choice of side.
-    lead: null,
+    lead: lead && sides[lead.corner]?.men[lead.index] ? { corner: lead.corner, man: sides[lead.corner].men[lead.index] } : null,
     note: '',
+    // The map's zoom (1: the whole floor) and how far it is moved (px), and whether a drag moves it (✋) rather than drawing a block.
+    zoom: 1,
+    pan: [0, 0],
+    panning: false,
+    // On a phone the panel folds away under the map.
+    folded: false,
   };
 
   root.replaceChildren();
   root.className = 'screen muster';
   const head = musterEl('header', { className: 'muster-head' },
-    musterEl('button', { className: 'back', type: 'button', textContent: '← Back', onclick: onBack }),
-    musterEl('div', { className: 'titles' }, musterEl('h1', { textContent: level.title }), musterEl('p', { className: 'lede', textContent: 'Set up the armies — or start as it was.' })));
+    musterEl('button', { className: 'back', type: 'button', textContent: backLabel, onclick: onBack }),
+    musterEl('div', { className: 'titles' }, musterEl('h1', { textContent: level.title }), musterEl('p', { className: 'lede', textContent: level.places ? `${level.place} · place your armies, then fight.` : 'Set up the armies — or start as it was.' })));
   const sideTabs = musterEl('div', { className: 'muster-sides', role: 'tablist' });
   const canvas = musterEl('canvas', { className: 'muster-canvas' });
   const pick = musterEl('div', { className: 'muster-pick', hidden: true });
   const hint = musterEl('div', { className: 'muster-hint' });
-  const map = musterEl('div', { className: 'muster-map' }, canvas, pick, hint);
+  const zoomBar = musterEl('div', { className: 'muster-zoom' });
+  const map = musterEl('div', { className: 'muster-map' }, canvas, pick, hint, zoomBar);
   const tabs = musterEl('div', { className: 'muster-tabs', role: 'tablist' });
   const panel = musterEl('div', { className: 'muster-panel' });
-  const reset = musterEl('button', { type: 'button', className: 'muster-reset', textContent: '↺ As the level' });
+  const reset = musterEl('button', { type: 'button', className: 'muster-reset', textContent: resetLabel });
   const start = musterEl('button', { type: 'button', className: 'primary muster-start', textContent: '▶ Start battle' });
   const foot = musterEl('div', { className: 'muster-foot' }, reset, start);
-  root.append(head, sideTabs, map, tabs, panel, foot);
+  const aside = musterEl('aside', { className: 'muster-aside' }, sideTabs, tabs, panel, foot);
+  root.append(head, musterEl('div', { className: 'muster-body' }, map, aside));
 
   const side = () => sides[view.corner];
   const unitById = (corner, id) => units[corner].find((unit) => unit.id === id);
@@ -108,11 +127,11 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
     return intoZone(level, corner, [sign * front, 0]);
   }
 
-  /** Room for `count` more on a side under the cap: how many fit. */
+  /** Room for `count` more on a side under the caps (the level's: muster.js capsOf): how many fit. */
   function room(corner, count) {
-    const left = MUSTER.cap - sides[corner].men.length;
-    if (left < count) say(`At most ${MUSTER.cap} a side.`);
-    return Math.max(0, Math.min(count, left));
+    const fits = roomFor(level, { red: sides.red.men.length, blue: sides.blue.men.length }, corner, count);
+    if (fits < count) say(sides[corner].men.length + fits >= caps.side ? `At most ${caps.side} a side.` : `At most ${caps.total} in all.`);
+    return fits;
   }
 
   /** Add `count` men of a unit: at `at` ([x, z]) or, drawn up, by the side's formation. */
@@ -177,8 +196,23 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
     // Whichever way round shows the floor the bigger (a phone held upright: the lines across it, red at the foot).
     const fit = (w, h) => Math.min((width - 2 * MUSTER_VIEW.margin) / w, (height - 2 * MUSTER_VIEW.margin) / h);
     const portrait = fit(across, along) > fit(along, across);
-    const scale = Math.max(1, portrait ? fit(across, along) : fit(along, across));
-    return { width, height, portrait, scale, cx: width / 2, cy: height / 2 };
+    const whole = Math.max(1, portrait ? fit(across, along) : fit(along, across));
+    const scale = whole * view.zoom;
+    // Moved no further than keeps some of the floor in sight.
+    const reach = [(portrait ? across : along) * scale / 2, (portrait ? along : across) * scale / 2];
+    view.pan = view.pan.map((offset, axis) => Math.max(-reach[axis], Math.min(reach[axis], offset)));
+    return { width, height, portrait, scale, whole, cx: width / 2 + view.pan[0], cy: height / 2 + view.pan[1] };
+  }
+
+  /** Zoom by `factor` about a point on the map (px): the floor under it stays under it. */
+  function zoomAt(factor, [px, py] = [canvas.clientWidth / 2, canvas.clientHeight / 2]) {
+    const before = frame();
+    const zoom = Math.max(1, Math.min(MUSTER_VIEW.zoomMost, view.zoom * factor));
+    const ratio = zoom / view.zoom;
+    view.zoom = zoom;
+    view.pan = [px - (px - before.cx) * ratio - before.width / 2, py - (py - before.cy) * ratio - before.height / 2];
+    if (zoom === 1) view.pan = [0, 0];
+    refresh();
   }
   /** A place on the floor ([x, z], m) on the map (px), and back. */
   const toScreen = (f, [x, z]) => (f.portrait ? [f.cx + z * f.scale, f.cy - x * f.scale] : [f.cx + x * f.scale, f.cy + z * f.scale]);
@@ -303,21 +337,49 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
     return best && { corner: best.corner, index: best.index };
   }
 
-  // A press on the map: on a man (to move him, or a tap to pick him) or on open ground (a tap to put one down, a drag for a block).
+  // A press on the map: on a man (to move him, or a tap to pick him) or on open ground (a tap to put one down, a drag for a
+  // block; with ✋ on, or the right or middle button, a drag moves the map). Two fingers pinch to zoom and move it.
   let press = null;
+  const fingers = new Map();
+  let pinch = null;
+  const spread = () => {
+    const [a, b] = [...fingers.values()];
+    return { apart: Math.hypot(a[0] - b[0], a[1] - b[1]), mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+  };
   canvas.addEventListener('pointerdown', (event) => {
     canvas.setPointerCapture(event.pointerId);
-    const f = frame();
     const point = [event.offsetX, event.offsetY];
-    press = { id: event.pointerId, from: point, to: point, man: manAt(f, point), moved: false };
-    press.box = !press.man;
+    fingers.set(event.pointerId, point);
+    if (fingers.size === 2) {
+      // A second finger: no man is put down or moved; the two zoom and move the map.
+      press = null;
+      pinch = spread();
+      return;
+    }
+    if (fingers.size > 2) return;
+    const f = frame();
+    const pans = view.panning || event.button === 1 || event.button === 2;
+    press = { id: event.pointerId, from: point, to: point, last: point, man: pans ? null : manAt(f, point), moved: false, pans };
+    press.box = !press.man && !pans;
   });
+  canvas.addEventListener('contextmenu', (event) => event.preventDefault());
   canvas.addEventListener('pointermove', (event) => {
+    if (fingers.has(event.pointerId)) fingers.set(event.pointerId, [event.offsetX, event.offsetY]);
+    if (pinch && fingers.size === 2) {
+      const now = spread();
+      view.pan = [view.pan[0] + now.mid[0] - pinch.mid[0], view.pan[1] + now.mid[1] - pinch.mid[1]];
+      zoomAt(now.apart / Math.max(1, pinch.apart), now.mid);
+      pinch = now;
+      return;
+    }
     if (!press || event.pointerId !== press.id) return;
     press.to = [event.offsetX, event.offsetY];
     if (!press.moved && Math.hypot(press.to[0] - press.from[0], press.to[1] - press.from[1]) < MUSTER_VIEW.tap) return;
     press.moved = true;
-    if (press.man) {
+    if (press.pans) {
+      view.pan = [view.pan[0] + press.to[0] - press.last[0], view.pan[1] + press.to[1] - press.last[1]];
+      press.last = press.to;
+    } else if (press.man) {
       // Dragging a man: he goes where the finger is, inside his own side's zone.
       const army = own(press.man.corner);
       army.places[press.man.index] = intoZone(level, press.man.corner, toFloor(frame(), press.to));
@@ -328,11 +390,15 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
     refresh();
   });
   const release = (event) => {
+    fingers.delete(event.pointerId);
+    if (fingers.size < 2) pinch = null;
     if (!press || event.pointerId !== press.id) return;
     const done = press;
     press = null;
     const f = frame();
-    if (done.man && !done.moved) {
+    if (done.pans) {
+      // (Only the map moved.)
+    } else if (done.man && !done.moved) {
       // A tap on a man: pick him (again: let him go).
       const same = view.selected?.corner === done.man.corner && view.selected.index === done.man.index;
       view.selected = same ? null : done.man;
@@ -344,16 +410,30 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
       if (inZone(level, view.corner, at, 0.5)) add(view.corner, view.brush[view.corner], 1, at);
       else {
         const other = view.corner === 'red' ? 'blue' : 'red';
-        say(inZone(level, other, at, 0.5) ? `That is ${other}'s ground: switch to ${other} above to set it up.` : 'Put men down on the shaded ground.');
+        say(inZone(level, other, at, 0.5) ? `That is ${other}'s ground: switch to ${other} to set it up.` : 'Put men down on the shaded ground.');
       }
     } else if (!done.man && done.moved) fillBox(view.corner, toFloor(f, done.from), toFloor(f, done.to));
     refresh();
   };
   canvas.addEventListener('pointerup', release);
   canvas.addEventListener('pointercancel', (event) => {
+    fingers.delete(event.pointerId);
+    if (fingers.size < 2) pinch = null;
     if (press?.id === event.pointerId) press = null;
     refresh();
   });
+  canvas.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    zoomAt(MUSTER_VIEW.wheelStep ** (-event.deltaY / 100), [event.offsetX, event.offsetY]);
+  }, { passive: false });
+
+  function drawZoomBar() {
+    zoomBar.replaceChildren(
+      musterEl('button', { type: 'button', textContent: '+', title: 'Zoom in', ariaLabel: 'Zoom in', onclick: () => zoomAt(MUSTER_VIEW.zoomStep) }),
+      musterEl('button', { type: 'button', textContent: '−', title: 'Zoom out', ariaLabel: 'Zoom out', disabled: view.zoom <= 1, onclick: () => zoomAt(1 / MUSTER_VIEW.zoomStep) }),
+      musterEl('button', { type: 'button', textContent: '⤢', title: 'The whole field', ariaLabel: 'Show the whole field', disabled: view.zoom <= 1, onclick: () => { view.zoom = 1; view.pan = [0, 0]; refresh(); } }),
+      musterEl('button', { type: 'button', className: view.panning ? 'on' : '', textContent: '✋', title: 'Drag to move the map', ariaLabel: 'Drag to move the map', ariaPressed: String(view.panning), onclick: () => { view.panning = !view.panning; refresh(); } }));
+  }
 
   // ---- The panels -----------------------------------------------------------------------
 
@@ -365,20 +445,23 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
     sideTabs.replaceChildren(...['red', 'blue'].map((corner) => {
       const army = sides[corner];
       // A side's name: its armies' (the Spaniards & Tlaxcala).
-      const name = (level.armies?.[corner] ?? []).map((armyKey) => ARMIES[armyKey].label).join(' & ') || corner;
+      const name = level.sideNames?.[corner] ?? ((level.armies?.[corner] ?? []).map((armyKey) => ARMIES[armyKey].label).join(' & ') || corner);
       return musterEl('button', {
         type: 'button', role: 'tab', className: `muster-side ${corner}${view.corner === corner ? ' on' : ''}`, ariaSelected: String(view.corner === corner),
         onclick: () => { view.corner = corner; view.selected = null; refresh(); },
-      }, musterEl('b', { textContent: name }), musterEl('span', { textContent: `${army.men.length} men · ${army.custom ? 'yours' : 'as the level'}` }));
+      }, musterEl('b', { textContent: name }), musterEl('span', { textContent: `${army.men.length} men${level.places ? '' : ` · ${army.custom ? 'yours' : 'as the level'}`}` }));
     }));
   }
 
   function drawTabs() {
     const names = { units: 'Units', formation: 'Formation', you: 'Play as' };
     tabs.replaceChildren(...Object.entries(names).map(([tab, label]) => musterEl('button', {
-      type: 'button', role: 'tab', className: view.tab === tab ? 'on' : '', textContent: label, ariaSelected: String(view.tab === tab),
-      onclick: () => { view.tab = tab; refresh(); },
-    })));
+      type: 'button', role: 'tab', className: view.tab === tab && !view.folded ? 'on' : '', textContent: label, ariaSelected: String(view.tab === tab),
+      onclick: () => { view.tab = tab; view.folded = false; refresh(); },
+    })), musterEl('button', {
+      type: 'button', className: 'muster-fold', textContent: view.folded ? '▴' : '▾', title: view.folded ? 'Show the panel' : 'Fold the panel away: more map', ariaLabel: view.folded ? 'Show the panel' : 'Hide the panel', ariaExpanded: String(!view.folded),
+      onclick: () => { view.folded = !view.folded; refresh(); },
+    }));
   }
 
   function drawPanel() {
@@ -386,23 +469,22 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
     const army = sides[corner];
     if (view.tab === 'units') {
       const counts = countUnits(units[corner], army.men);
-      const brush = unitById(corner, view.brush[corner]);
-      const chips = musterEl('div', { className: 'muster-units' }, ...units[corner].map((unit) => musterEl('button', {
-        type: 'button', className: `muster-unit${unit.id === view.brush[corner] ? ' on' : ''}`,
-        onclick: () => { view.brush[corner] = unit.id; refresh(); },
-      }, musterEl('span', { textContent: `${unit.mounted ? '🐎 ' : ''}${unit.label}` }), musterEl('b', { textContent: String(counts[unit.id] ?? 0) }))));
-      const stepper = brush && musterEl('div', { className: 'muster-stepper' },
-        musterEl('button', { type: 'button', textContent: '−', ariaLabel: `One ${brush.label} fewer`, onclick: () => {
-          const index = army.men.findLastIndex((inputs) => unitOf(units[corner], inputs)?.id === brush.id);
-          if (index >= 0) remove(corner, index);
-          refresh();
-        } }),
-        musterEl('span', { textContent: `${brush.label}: ${counts[brush.id] ?? 0}` }),
-        musterEl('button', { type: 'button', textContent: '+', ariaLabel: `One more ${brush.label}`, onclick: () => { add(corner, brush.id, 1); refresh(); } }),
-        musterEl('button', { type: 'button', textContent: '+5', onclick: () => { add(corner, brush.id, 5); refresh(); } }),
-        musterEl('em', { textContent: `${army.men.length} / ${MUSTER.cap}` }));
-      // The stepper first: always in sight, however many kinds of men the side has below it.
-      panel.replaceChildren(stepper, chips);
+      const fewer = (unit) => {
+        const index = army.men.findLastIndex((inputs) => unitOf(units[corner], inputs)?.id === unit.id);
+        if (index >= 0) remove(corner, index);
+        refresh();
+      };
+      // A row a kind of man: tap it to put that kind down on the map; − and + take one off or add one (+5 five), drawn up in the side's order.
+      const rows = units[corner].map((unit) => musterEl('div', { className: `muster-unit-row${unit.id === view.brush[corner] ? ' on' : ''}` },
+        musterEl('button', {
+          type: 'button', className: `muster-unit${unit.id === view.brush[corner] ? ' on' : ''}`, title: `Tap the map to place ${unit.label}`,
+          onclick: () => { view.brush[corner] = unit.id; refresh(); },
+        }, musterEl('span', { textContent: `${unit.mounted ? '🐎 ' : ''}${unit.label}` }), musterEl('b', { textContent: String(counts[unit.id] ?? 0) })),
+        musterEl('button', { type: 'button', className: 'step', textContent: '−', ariaLabel: `One ${unit.label} fewer`, disabled: !counts[unit.id], onclick: () => fewer(unit) }),
+        musterEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: `One more ${unit.label}`, onclick: () => { add(corner, unit.id, 1); refresh(); } }),
+        musterEl('button', { type: 'button', className: 'step', textContent: '+5', ariaLabel: `Five more ${unit.label}`, onclick: () => { add(corner, unit.id, 5); refresh(); } })));
+      const total = Number.isFinite(caps.total) ? ` · ${sides.red.men.length + sides.blue.men.length} / ${caps.total} in all` : '';
+      panel.replaceChildren(musterEl('p', { className: 'muster-note' }, musterEl('b', { textContent: `${army.men.length} / ${caps.side}` }), ` men${total} · ★ kind: tap the map to place`), musterEl('div', { className: 'muster-units' }, ...rows));
     } else if (view.tab === 'formation') {
       const shapes = formationsOf();
       panel.replaceChildren(
@@ -437,14 +519,18 @@ export function musterScreen(root, { key, level, onStart, onBack }) {
   }
 
   function refresh() {
+    aside.classList.toggle('folded', view.folded);
+    drawZoomBar();
     drawSideTabs();
     drawTabs();
     drawPanel();
     drawPick();
-    hint.textContent = view.note || 'Tap the shaded ground to place · drag a man to move him · drag open ground for a block';
+    hint.textContent = view.note || (view.panning ? 'Drag to move the map · ✋ again to place men' : 'Tap the shaded ground to place · drag a man to move him · drag open ground for a block');
     view.note = '';
     reset.disabled = !side().custom;
+    start.disabled = !sides.red.men.length || !sides.blue.men.length;
     draw();
+    onChange?.(sides, view.lead && { corner: view.lead.corner, index: sides[view.lead.corner].men.indexOf(view.lead.man) });
   }
 
   reset.addEventListener('click', () => {
