@@ -93,7 +93,8 @@ export const FOLLOW_CAM = {
   // under `still` m/s, the whole of it from `brisk` m/s, so that standing still it settles back to none. It is eased over `seconds` and
   // changes no faster than `rate` rad/s: a swing, never a whip. The player's own drag of the view stops it at once; it comes back only
   // `pause` s after the last of his drag, from nothing. A visitor who asks for less motion (prefers-reduced-motion) gets `reduced` of it.
-  ahead: { turn: 0.45, intent: 0.35, intentFrom: 1.4, intentTo: 2.2, most: 0.4, headingSeconds: 0.2, still: 0.6, brisk: 2.5, seconds: 0.3, rate: 0.7, pause: 1, reduced: 0.4 },
+  // Its swing gathers and dies away no faster than `accel` rad/s² (a head turning, never a snap at the start or the end of a turn).
+  ahead: { turn: 0.7, intent: 0.5, intentFrom: 1.4, intentTo: 2.2, most: 0.6, headingSeconds: 0.25, still: 0.5, brisk: 2.2, seconds: 0.35, rate: 0.95, accel: 3, pause: 1, reduced: 0.4 },
   fov: 40,
 };
 
@@ -268,6 +269,7 @@ export function createFollowCam(spec = FOLLOW_CAM, { reduced = false } = {}) {
     cam.velocity = [0, 0, 0];
     cam.lead = 0;
     cam.ahead = 0;
+    cam.aheadV = 0;
     cam.heading = null;
     cam.turning = 0;
     cam.subjectY = anchor[1];
@@ -387,8 +389,10 @@ export function createFollowCam(spec = FOLLOW_CAM, { reduced = false } = {}) {
     const intent = input.intent ? Math.atan2(-input.intent[1], input.intent[0]) : null;
     const lead = looksAhead ? -aheadLead({ heading: cam.heading, turnRate: cam.turning, intent, speed }, spec) * (reduced ? look.reduced : 1) : 0;
     if (dt > 0) {
-      const step = lowPass(cam.ahead, lead, look.seconds, dt) - cam.ahead;
-      cam.ahead += Math.max(-look.rate * dt, Math.min(look.rate * dt, step));
+      // The swing it would have (closing on the lead over `seconds`, no faster than `rate`), reached by an eased swing (`accel`).
+      const wanted = Math.max(-look.rate, Math.min(look.rate, (lead - cam.ahead) / look.seconds));
+      cam.aheadV += Math.max(-look.accel * dt, Math.min(look.accel * dt, wanted - cam.aheadV));
+      cam.ahead += cam.aheadV * dt;
     }
     const shown = cam.yaw + cam.ahead;
     const goalPitch = manual ? cam.manualPitch : framed ? framed.pitch : spec.pitch;
@@ -424,6 +428,7 @@ export function createFollowCam(spec = FOLLOW_CAM, { reduced = false } = {}) {
     // (The look ahead is folded into the view he takes hold of: it stops where it was, without a jump.)
     cam.yaw += cam.ahead;
     cam.ahead = 0;
+    cam.aheadV = 0;
     if (now >= cam.manualUntil || cam.following) {
       cam.manualYaw = cam.yaw;
       cam.manualPitch = cam.pitch;
