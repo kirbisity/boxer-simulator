@@ -897,7 +897,22 @@ export const WORLD = {
   // blade not striking is tested for contact every other substep. The
   // player's fighter (world.keepFull) is always in full.
   // `proxyEvery`: a proxy's pose is worked out every this many steps (spread over them), for that span.
-  tiers: { full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12, proxyEvery: 2 },
+  // A rider goes by the same rules (his horse carries him through them: seatRider), but a horse closes on a man some
+  // five times as fast as a man on foot does, so the `engageRange` he is measured by is lengthened by `riderLead` s of his
+  // horse's pace (a gallop's 10 m/s: 3 m more, the ground it covers while a blow is wound up), and he is in the physics
+  // by the time he is on his man, not after.
+  // `horse`: in a big fight (tier 3 or 4) a horse with no enemy, man or horse, within `range` m (more `lead` s of its
+  // own pace, and of the other horse's: a charge is stepped in full before it arrives), its rider (if any) not in full,
+  // standing and on the ground, is 'coarse': it steps on a coarse man's substeps (`stride`, in step with its coarse
+  // rider), that much further. Its body is a pose on its legs, its own springs a few Hz (a turn's bank 1 Hz, the seat
+  // 1.6), stable and smooth at the 120 Hz that leaves it. A horse near the enemy, charging, falling or in the air, or
+  // under a rider in an exchange, is stepped every substep.
+  tiers: {
+    full: 6, grid: 16, coarse: 32, engageRange: 3, hitMemory: 0.6, stride: { 3: 2, 4: 4 }, proxyFollow: 12, proxyEvery: 2,
+    riderLead: 0.3,
+    // range: a lance's length past a horse's (~6 m from its centre to a foe's) and room to turn; lead: a second at its pace.
+    horse: { range: 8, lead: 1 },
+  },
   // m each side of the centre the sides start: a few steps apart, room to come on (further when someone carries a gun).
   startApart: 1.6,
   // m past the longest weapon's length (and half its grip) the pair starts apart.
