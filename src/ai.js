@@ -442,7 +442,7 @@ export const AI = {
     // `followTimid` of it at full hesitancy (a levy line follows its bold men in by ones and twos, not all at once). No
     // stall lasts past `longest` s (the press of the rear ranks pushed the front in at last).
     go: 0.3, goLeast: 0.04, push: 0.1, follow: 0.4, followTimid: 0.8, followFresh: 1.5, longest: 14, afterContact: 15,
-    // How he waits: shuffling up or back at `shuffle` of his pace to his holding distance; there, feints (a half step in and
+    // How he waits: shuffling up at `shuffle` of his pace to his holding distance; there, feints (a half step in and
     // back, `feint` of his pace, `feintRate` a second) and sways along the line (`sway` of his sideways pace).
     shuffle: 0.35, feint: 0.4, feintRate: 0.6, sway: 0.3,
   },
@@ -1729,7 +1729,8 @@ function holdShort(world, fighter, opponent, distance, range, dt) {
   const hold = near + spec.holdOff;
   const sway = Math.sin(world.time * spec.feintRate * Math.PI * 2 + fighter.id * 1.7);
   if (distance > hold + spec.slack) fighter.move = spec.shuffle;
-  else if (distance < hold - spec.slack) fighter.move = -spec.shuffle;
+  // (Come at by a bolder man, he stands and lets him come: the stall gives no ground, it only goes no further.)
+  else if (distance < hold - spec.slack) fighter.move = 0;
   else fighter.move = spec.feint * sway;
   fighter.running = false;
   fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + spec.sway * Math.cos(world.time * spec.feintRate * Math.PI + fighter.id)));
