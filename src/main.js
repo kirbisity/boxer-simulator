@@ -46,7 +46,7 @@ import { updateNets } from './arenaview.js';
 import { blastEvent, createBlastScreen, fragmentEvent, updateThrown } from './blastview.js';
 import { DETAIL_MAPS } from './detailmaps.js';
 import { setHelmStyle } from './helmstyle.js';
-import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray } from './render.js';
+import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray, warmSevered } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { placeMounted } from './physics/mounted.js';
 import { boltedOn, breedOf, canRide, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
@@ -721,7 +721,7 @@ function setWalking(on) {
 }
 
 let last = performance.now();
-// A big battle that cannot keep up is drawn with fewer pixels (adaptres.js); a duel never.
+// A battle is drawn at no more than ratio 1.5, and with fewer pixels if it cannot keep up (adaptres.js); a duel waiting on the graphics card down to 1.5, no lower.
 const resolution = createAdaptiveResolution();
 // The quality of a stage's picture (levelmode/quality.js): 'auto' (the frame times pick the rung of the ladder: pixels, then tiers), or one held: 'high', 'low'. Remembered.
 let qualityMode = readQuality(typeof localStorage === 'undefined' ? null : localStorage);
@@ -1292,6 +1292,8 @@ function drawWorld(dt, drawIt = true) {
   fightMarksClock += dt * (state.paused ? 0 : state.speed * fightPace());
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
   generalMarks.update(world);
+  // A cut-off piece's program (its man's material, unskinned) built while he is new, not on the frame of the cut (render.js warmSevered).
+  warmSevered(scene, state.views);
   if (drawIt) render(scene);
   updateIcons(state.drama, scene, world, canvas, realSeconds());
   renderHud();

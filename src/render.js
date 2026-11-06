@@ -39,7 +39,7 @@ import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
 import { buildExoFrame } from './exoview.js';
-import { disposeObject, doubleSided, outlineFor, surface } from './toon.js';
+import { disposeObject, doubleSided, outlineFor, surface, unskinnedCopy } from './toon.js';
 import { townSquare } from './props/town.js';
 import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
 import { cajamarcaTown } from './props/cajamarca.js';
@@ -470,7 +470,77 @@ function shaderWarmers() {
     object.frustumCulled = false;
     object.userData.shared = true;
   });
+  // The zero-area triangle, for the warmers added later (warmSevered).
+  group.userData.triangle = geometry;
   return group;
+}
+
+// The material settings three builds a different program for (r128's WebGLPrograms parameters, as far as the things a fight shows vary in them).
+const PROGRAM_MAPS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap', 'envMap', 'alphaMap', 'bumpMap', 'lightMap', 'specularMap', 'gradientMap'];
+const programKey = (material) => [material.type, material.vertexColors, material.side, material.transparent, material.alphaTest > 0, material.flatShading, material.fog, material.skinning, ...PROGRAM_MAPS.map((slot) => (material[slot] ? `${material[slot].encoding}:${material[slot].mapping}` : '')), JSON.stringify(material.defines ?? null), material.customProgramCacheKey?.() ?? '', String(material.onBeforeCompile)].join('|');
+
+/** A material's copy for a warmer: the same program (its shader patch and that patch's key go with it: three's clone leaves them behind), never disposed with the thing it came from. */
+function sameProgramCopy(material) {
+  const copy = material.clone();
+  if (Object.hasOwn(material, 'onBeforeCompile')) copy.onBeforeCompile = material.onBeforeCompile;
+  if (Object.hasOwn(material, 'customProgramCacheKey')) copy.customProgramCacheKey = material.customProgramCacheKey;
+  return copy;
+}
+
+/**
+ * Add a warmer (a zero-area triangle, see shaderWarmers) for each of `materials` whose program is of a kind not warmed yet in this view, `copy` making the material
+ * the thing will be drawn with; the warmers are drawn the next few frames (WARM_FRAMES) if any was added. Its copy is kept, so its program is never released.
+ */
+function warmMaterials(view, materials, copy) {
+  const group = view.warmers;
+  if (!group) return;
+  const seen = (view.warmedKinds ??= { materials: new WeakSet(), kinds: new Set() });
+  let added = false;
+  for (const material of materials) {
+    if (!material || seen.materials.has(material) || material.visible === false) continue;
+    seen.materials.add(material);
+    const warm = copy(material);
+    const kind = programKey(warm);
+    if (seen.kinds.has(kind)) continue;
+    seen.kinds.add(kind);
+    const warmer = new THREE.Mesh(group.userData.triangle, warm);
+    warmer.frustumCulled = false;
+    warmer.castShadow = true;
+    warmer.userData.shared = true;
+    group.add(warmer);
+    added = true;
+  }
+  if (added) warmShaders(view);
+}
+
+/**
+ * A piece cut off a man (weaponview.js severView) is his skin's, steel's or detail's material, unskinned (toon.js unskinnedCopy): a program
+ * no other thing in the fight uses, built on the frame of the cut, mid-fight (31 ms in a legion battle on an M1 Pro). Once a frame,
+ * cheaply (a material seen before is passed over): the unskinned copy of each new one is warmed, so the program is built while the armies
+ * muster or a skin is swapped in, not when the blow lands.
+ */
+export function warmSevered(view, fighterViews) {
+  const materials = [];
+  for (const fighterView of fighterViews) {
+    for (const mesh of [fighterView.skinMesh, fighterView.steelMesh, ...(fighterView.detailMeshes ?? [])]) {
+      if (mesh?.isSkinnedMesh && !Array.isArray(mesh.material)) materials.push(mesh.material);
+    }
+  }
+  warmMaterials(view, materials, unskinnedCopy);
+}
+
+/**
+ * What a crowd man wears is baked into his body; knocked off (a helmet, its plume, a pennant), it is drawn alone in its own materials, a program
+ * the crowd never otherwise uses (8-16 ms on its frame, mid-fight). The worn things of a template's full model are warmed as it is baked.
+ */
+function warmWorn(view, roots) {
+  const materials = [];
+  for (const root of roots) {
+    root?.traverse((object) => {
+      if (object.isMesh && !object.isSkinnedMesh && !object.isInstancedMesh) materials.push(...[].concat(object.material));
+    });
+  }
+  warmMaterials(view, materials, sameProgramCopy);
 }
 
 /**
@@ -2542,6 +2612,8 @@ function bakeCrowdTemplate(view, fighter) {
   // Head props get knocked off: each fighter wears his own, not baked; a
   // banner is drawn with the side's others (an instanced batch).
   for (const prop of full.headProps) prop.worn.parent?.remove(prop.worn);
+  // What can be knocked off him is drawn alone then: its programs built now (warmWorn).
+  warmWorn(view, [full.group, ...full.headProps.map((prop) => prop.loose)]);
   full.group.traverse((object) => {
     if (object.userData.banner) object.visible = false;
   });
