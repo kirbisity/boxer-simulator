@@ -2014,6 +2014,9 @@ export const OUTFITS = {
   gaziAlp: {
     // Trained: a frontier raider of a warrior band (`skill`: OUTFITS' tiers).
     skill: 0.7,
+    // Frenzied (gearTraits `frenzy`, ai.js AI.hesitation, AI.rage): a man of the holy war goes in without the pause at the
+    // edge of reach that holds most men, and a comrade cut down beside him can send him at the killer.
+    frenzy: true,
     // Rides (the gazi raiders rode Turkoman horses).
     horse: 'arabian',
     faction: 'ottomans',
@@ -3151,6 +3154,9 @@ export function gearTraits(inputs) {
     poise: inputs.outfit?.poise ?? spec.poise ?? 0,
     // Courage from good armour: less fear, readier to close (0 to 1); a man's own (`outfit.courage`: one who never breaks) before the kit's.
     courage: inputs.outfit?.courage ?? spec.courage ?? 0,
+    // Frenzied (a berserker, a gazi, a man charging in a rage): no hesitating short of contact, and rage beside a comrade
+    // cut down (ai.js AI.hesitation, AI.rage); a man's own (`outfit.frenzy`) before the kit's.
+    frenzy: Boolean(inputs.outfit?.frenzy ?? spec.frenzy),
     // A machine (a robot): no morale (never afraid, never runs; ai.js feelFear) and no blood (never bleeds, nothing spilt; physics.js, weaponview.js).
     machine: Boolean(spec.machine),
     // Trained to fight in ranks (formation.js): { advance, charge, testudo } — the line moves up to the enemy (closed under its shields if `testudo`; the last `charge` m at a run), or holds.

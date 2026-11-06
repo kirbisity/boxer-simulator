@@ -43,6 +43,8 @@ const ICONS = {
   staggered: { glyph: '🌀', label: 'STAGGERED', tone: 'down' },
   panic: { glyph: '😱', label: 'PANIC', tone: 'down' },
   rally: { glyph: '🔥', label: 'FIGHTS ON', tone: 'gear' },
+  // A comrade cut down and he goes for the killer (ai.js AI.rage).
+  rage: { glyph: '💢', label: 'RAGE', tone: 'gear' },
   held: { glyph: '🤼', label: 'HOLD', tone: 'down' },
   pinned: { glyph: '🤼', label: 'HELD DOWN', tone: 'ko' },
 };
@@ -53,7 +55,7 @@ export function momentFor(event) {
   if (event.kind === 'broken') return { kind: 'broken', fighter: event.fighter, particle: P[event.joint] ?? P.neck, label: event.joint };
   if (event.kind === 'severed') return { kind: 'severed', fighter: event.fighter, particle: event.joint === 'neck' ? P.neck : P[`${event.side}${{ shoulder: 'Shoulder', elbow: 'Elbow', wrist: 'Hand', hip: 'Hip', knee: 'Knee', ankle: 'Foot' }[event.joint]}`] };
   if (event.kind === 'held' || event.kind === 'pinned') return { kind: event.kind, fighter: event.fighter, particle: P.neck };
-  if (event.kind === 'panic' || event.kind === 'rally') return { kind: event.kind, fighter: event.fighter, particle: P.head };
+  if (event.kind === 'panic' || event.kind === 'rally' || event.kind === 'rage') return { kind: event.kind, fighter: event.fighter, particle: P.head };
   // (Played whoever else is about: `always`, a stage's crowd notwithstanding.)
   if (event.kind === 'rise') return { kind: 'rise', fighter: event.fighter, particle: P.head, always: true };
   // Thrown from the saddle: as a knockdown.

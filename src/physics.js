@@ -202,6 +202,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // The press of a crowd (physics/press.js): what bears on him from the bodies touching him, and his drive into them;
     // groundSlope: the floor's rise per metre under him along x and z (on terrain; set each step by moveRoot).
     press: undefined, groundSlope: undefined,
+    // Short of contact (ai.js AI.hesitation): hesitant ({ since, stalled }) while in the band before the enemy's reach;
+    // contactAt, when he was last at grips. In a rage at the man who cut down a comrade (AI.rage): rage ({ until, target }).
+    hesitant: undefined, contactAt: undefined, rage: undefined,
     // Running (physics/gait.js; everyone's run): runPose (the run's look, 0..1), runSlope (the slope under his run),
     // turn and yawWas (the heading's rate in a run), gaitBody (his body's gait, cached), gaitAlong and gaitAccel (his
     // speed along his way and its rate, for the lean). runMode is the player's sprint (control.js).

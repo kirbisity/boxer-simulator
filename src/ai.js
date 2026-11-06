@@ -416,6 +416,44 @@ export const AI = {
   // - margin: m beyond his man's reach he stands off (a step's room: the other must close a stride to strike).
   // - pace: his footwork's share backing out (a measured step back, not a run: guard up, facing him).
   breather: { below: 0.3, hot: 0.4, until: 0.7, margin: 0.4, pace: 0.8 },
+  // Hesitation before contact (holdShort): real lines of foot slowed and stalled a few paces short of the enemy and stood
+  // glaring, shuffling, feinting, until somebody went in (Thucydides on hoplites drifting right; Napoleonic and ACW
+  // accounts of lines halting at 30-50 paces to trade volleys rather than close; Goldsworthy's Roman lines pausing short of
+  // contact; Keegan, The Face of Battle). Men in front went in first, the rest followed; trained men and fanatics did not
+  // stall. A battle only (a side of rout.minSide or more), and only before he has been at grips (or `afterContact` s after).
+  hesitation: {
+    on: true,
+    // The band: from the nearer of his working range and the other's reach, out `band` m more (two paces and a bit: the
+    // gap the accounts give for lines halted face to face). He holds `holdOff` m outside reach (a long stride: he can step in or back).
+    band: 2.5, holdOff: 1.1, slack: 0.25,
+    // Quality, 0 (a levy) to 1 (an elite): his skill from `levy` (0.25: weeks of drill) to `elite` (0.7: OUTFITS' elite tier),
+    // joined with his side's discipline (either alone makes a man go in). Hesitancy goes with (1 - quality) to `power`:
+    // a regular (skill 0.5) stalls about a third as readily as a levy, an elite hardly at all.
+    quality: { levy: 0.25, elite: 0.7, power: 1.5 },
+    // How readily he stalls (0..1, the chance as he comes into the band): `base` for an untrained man at even odds (most of
+    // a levy line stops short); + `fear` × his fear; + `odds` × the log of the other man's strength over his own (strengthOf:
+    // armour, weapon, size) over `oddsSpan` (×2.7), either way (a peasant before a knight stalls; before a peasant less);
+    // − `support` for each comrade within `beside` m (up to `supportMost`: the files at his shoulders); − `formed` in his
+    // place in a drilled body; − `led` with his leader or general within `leaderWithin` m. All × (1 - his kit's courage).
+    base: 0.9, fear: 0.6, odds: 0.25, oddsSpan: 1, support: 0.06, supportMost: 3, beside: 2.5, formed: 0.15, led: 0.12, leaderWithin: 6,
+    // Stalled, he goes in at a chance a second of `go` × (1 - hesitancy) + `goLeast` (alone with his nerve: a levy at
+    // hesitancy 0.9 waits ~8 s), + `push` with his leader near him (the officer behind the line), + `follow` once a comrade
+    // within `beside` m has gone in (within `followFresh` s: men followed the first man in, they did not lead), less
+    // `followTimid` of it at full hesitancy (a levy line follows its bold men in by ones and twos, not all at once). No
+    // stall lasts past `longest` s (the press of the rear ranks pushed the front in at last).
+    go: 0.3, goLeast: 0.04, push: 0.1, follow: 0.4, followTimid: 0.8, followFresh: 1.5, longest: 14, afterContact: 15,
+    // How he waits: shuffling up or back at `shuffle` of his pace to his holding distance; there, feints (a half step in and
+    // back, `feint` of his pace, `feintRate` a second) and sways along the line (`sway` of his sideways pace).
+    shuffle: 0.35, feint: 0.4, feintRate: 0.6, sway: 0.3,
+  },
+  // Rage instead of the flinch (recoilFrom): rarely, a man who sees a comrade cut down beside him does not step back but goes
+  // for the killer, past fear, guard cut, every blow committed (the hero of the sagas and the furor of the chroniclers is
+  // the exception the accounts name because it was rare). Only an elite (skill `skillFrom` or more: OUTFITS' elite tier) or a
+  // frenzied man (gear.frenzy), only with his blood up (adrenaline `adrenalineFrom` or more: a knockdown scored or a hard
+  // blow survived), and then at a chance of `chance` × how well he saw it (AI.recoil near/within). For `seconds` s he
+  // knows no fear (knowsNoFear), goes for the killer whoever else is near, guards `guard` less, rests `tempo` as long
+  // between blows, presses `pressure` times as often, stands `closer` m closer and loads up `heavy` more.
+  rage: { skillFrom: 0.6, adrenalineFrom: 0.35, chance: 0.4, seconds: 6, guard: 0.6, tempo: 0.5, pressure: 2, closer: 0.2, heavy: 0.3 },
   shock: { blast: 0.06, blastMost: 0.15, blastNear: 4, blastFar: 16, halfLife: 5, horse: 0.1, horseNear: 3, horseFar: 10, horseSpeed: 3, horseCone: 0.7, strange: 3 },
   // An ambush (a side's `ambush`, physics.js createWorld: hidden men) is
   // sprung at its signal, when one of its men strikes, or when one of the
@@ -1624,6 +1662,80 @@ function phaseLength(random, mean) {
  * retreat follows. Sets the fighter's footwork; returns whether he may
  * start an attack now.
  */
+/** His quality as a soldier, 0 (a levy) to 1 (an elite) (AI.hesitation quality): his training, or his side's discipline. */
+export function troopQuality(world, fighter) {
+  const spec = AI.hesitation.quality;
+  const trained = Math.max(0, Math.min(1, ((fighter.body.skill ?? 0.5) - spec.levy) / (spec.elite - spec.levy)));
+  return 1 - (1 - trained) * (1 - disciplineOf(world, fighter));
+}
+
+/**
+ * How readily he stalls short of contact with `opponent`, 0..1 (AI.hesitation): his quality above all, then his fear, the
+ * other man's strength against his own, the comrades at his shoulders, his place in the ranks and his leader near him.
+ * A frenzied man (gear.frenzy) never does.
+ */
+export function hesitancy(world, fighter, opponent) {
+  const spec = AI.hesitation;
+  if (fighter.body.gear.frenzy) return 0;
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  const apart = (other) => Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[1]);
+  const beside = world.fighters.filter((other) => other !== fighter && other.corner === fighter.corner && other.state === 'up' && !other.panicked && !other.crawling && apart(other) <= spec.beside).length;
+  const formed = fighter.slot && world.formations?.[fighter.formation] ? 1 : 0;
+  const odds = Math.max(-1, Math.min(1, Math.log(Math.max(1e-6, strengthOf(opponent)) / Math.max(1e-6, strengthOf(fighter))) / spec.oddsSpan));
+  const nerve = spec.base + spec.fear * (fighter.fear ?? 0) + spec.odds * odds - spec.support * Math.min(beside, spec.supportMost) - spec.formed * formed - spec.led * (ledNear(world, fighter) ? 1 : 0);
+  return Math.max(0, Math.min(1, (1 - troopQuality(world, fighter)) ** spec.quality.power * (1 - fighter.body.gear.courage) * nerve));
+}
+
+/** His side's leader or general on his feet within AI.hesitation `leaderWithin` m of him (not himself). */
+function ledNear(world, fighter) {
+  const side = world.leaders?.[fighter.corner];
+  const leader = side?.general ?? side?.leader;
+  if (!leader || leader === fighter || leader.state !== 'up' || leader.panicked) return false;
+  return Math.hypot(leader.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], leader.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) <= AI.hesitation.leaderWithin;
+}
+
+/** A comrade within AI.hesitation `beside` m of him gone in to grips the last `followFresh` s: he follows him in. */
+function comradeWentIn(world, fighter) {
+  const spec = AI.hesitation;
+  return world.fighters.some((other) => other !== fighter && other.corner === fighter.corner && other.state === 'up' && world.time - (other.contactAt ?? -Infinity) <= spec.followFresh
+    && Math.hypot(other.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) <= spec.beside);
+}
+
+/**
+ * Hesitation before contact (AI.hesitation): coming into the band a few paces short of the enemy's reach, he may stall
+ * there (hesitancy, decided once as he comes into it), shuffling, feinting and swaying, until his nerve comes, his leader
+ * pushes him or a comrade beside him goes in; or until the other man comes to him. True while he holds short (his feet
+ * set here); false and he closes as ever.
+ */
+function holdShort(world, fighter, opponent, distance, range, dt) {
+  const spec = AI.hesitation;
+  const near = Math.max(range, reachOf(opponent) + fighter.body.lengths.headRadius);
+  const battle = (world.sides?.[fighter.corner]?.men ?? 0) >= AI.rout.minSide;
+  const exempt = !spec.on || !battle || fighter.player || opponent.state !== 'up' || knowsNoFear(world, fighter) || (fighter.body.inputs.charging ?? 1) > 1;
+  const fought = world.time - (fighter.contactAt ?? -Infinity) < spec.afterContact;
+  if (exempt || fought || distance <= range + AI.rangeSlack || distance > near + spec.band) {
+    fighter.hesitant = null;
+    return false;
+  }
+  const hesitant = hesitancy(world, fighter, opponent);
+  fighter.hesitant ??= { since: world.time, stalled: world.random() < hesitant };
+  const state = fighter.hesitant;
+  if (!state.stalled) return false;
+  const rate = spec.go * (1 - hesitant) + spec.goLeast + (ledNear(world, fighter) ? spec.push : 0) + (comradeWentIn(world, fighter) ? spec.follow * (1 - spec.followTimid * hesitant) : 0);
+  if (world.time - state.since > spec.longest || world.random() < rate * dt) {
+    state.stalled = false;
+    return false;
+  }
+  const hold = near + spec.holdOff;
+  const sway = Math.sin(world.time * spec.feintRate * Math.PI * 2 + fighter.id * 1.7);
+  if (distance > hold + spec.slack) fighter.move = spec.shuffle;
+  else if (distance < hold - spec.slack) fighter.move = -spec.shuffle;
+  else fighter.move = spec.feint * sway;
+  fighter.running = false;
+  fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + spec.sway * Math.cos(world.time * spec.feintRate * Math.PI + fighter.id)));
+  return true;
+}
+
 function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt, pressing = false }) {
   const random = world.random;
   const blade = AI.blade;
@@ -2253,13 +2365,13 @@ function keepShock(world, dt) {
     const event = events[index];
     // A man of a side cut down: a limb or the head off, or killed outright (AI.recoil).
     const share = event.kind === 'severed' ? AI.recoil.severed : event.kind === 'killed' ? AI.recoil.killed : 0;
-    if (share > 0 && world.fighters[event.fighter]) fallen.push([world.fighters[event.fighter], share]);
+    if (share > 0 && world.fighters[event.fighter]) fallen.push([world.fighters[event.fighter], share, world.fighters[event.attacker]]);
     if (event.kind !== 'shot' || !event.from || fired.has(`${event.attacker}:${event.time}`)) continue;
     fired.add(`${event.attacker}:${event.time}`);
     blasts.push([event.from[0], event.from[2], world.fighters[event.attacker]]);
   }
   world.shockCursor = events.length;
-  for (const [victim, share] of fallen) recoilFrom(world, victim, share);
+  for (const [victim, share, killer] of fallen) recoilFrom(world, victim, share, killer);
   const fade = 0.5 ** (dt / spec.halfLife);
   for (const fighter of world.fighters) {
     if (fighter.startle) fighter.startle *= fade;
@@ -2281,20 +2393,52 @@ function horseFailing(horse) {
   return Boolean(health && !health.down && (health.harm >= AI.dismount.at || (health.bleeding && health.harm >= AI.dismount.bleeding) || health.lame));
 }
 
-/** The men of his side near a man cut down (`share`: how terrible a sight, AI.recoil) flinch from it: back, guard up, a moment. */
-function recoilFrom(world, victim, share) {
+/**
+ * The men of his side near a man cut down (`share`: how terrible a sight, AI.recoil) flinch from it: back, guard up, a
+ * moment. Rarely, an elite or a frenzied man with his blood up goes for the killer instead (AI.rage).
+ */
+function recoilFrom(world, victim, share, killer = null) {
   const spec = AI.recoil;
   const at = [victim.x[P.pelvis * 3], victim.x[P.pelvis * 3 + 2]];
+  const avenged = killer && hostile(killer, victim) && killer.state === 'up' && inFight(killer) ? killer : null;
   for (const fighter of world.fighters) {
     if (fighter === victim || fighter.corner !== victim.corner || fighter.player || !inFight(fighter) || knowsNoFear(world, fighter)) continue;
     const apart = Math.hypot(fighter.x[P.pelvis * 3] - at[0], fighter.x[P.pelvis * 3 + 2] - at[1]);
     if (apart > spec.within) continue;
     const seen = apart <= spec.near ? 1 : 1 - (apart - spec.near) / (spec.within - spec.near);
+    if (avenged && fighter.state === 'up' && !fighter.panicked && !fighter.crawling && mayRage(fighter) && world.random() < AI.rage.chance * seen) {
+      enrage(world, fighter, avenged);
+      continue;
+    }
     const steady = (1 - fighter.body.gear.courage) * (1 - disciplineOf(world, fighter)) * (1 - (fighter.body.skill ?? 0.5));
     const seconds = spec.seconds * share * seen * steady;
     if (seconds < spec.least) continue;
     fighter.recoilUntil = Math.max(fighter.recoilUntil ?? 0, world.time + seconds);
   }
+}
+
+/** Whether a man may go into a rage (AI.rage): an elite or a frenzied man, his blood up. */
+export function mayRage(fighter) {
+  const spec = AI.rage;
+  return ((fighter.body.skill ?? 0.5) >= spec.skillFrom || Boolean(fighter.body.gear.frenzy)) && (fighter.adrenaline ?? 0) >= spec.adrenalineFrom;
+}
+
+/** He goes for the man who cut his comrade down: past fear, no flinch, for AI.rage `seconds`. */
+function enrage(world, fighter, killer) {
+  fighter.rage = { until: world.time + AI.rage.seconds, target: killer.id };
+  fighter.recoilUntil = Math.min(fighter.recoilUntil ?? 0, world.time);
+  fighter.hesitant = null;
+  fighter.fear = 0;
+  fighter.focus = killer.id;
+  world.events.push({ time: world.time, kind: 'rage', fighter: fighter.id, target: killer.id, effects: ['goes for the man who cut his comrade down'] });
+}
+
+/** The man he is in a rage at (AI.rage), while the rage lasts and that man is on his feet; else null. */
+export function rageTarget(world, fighter) {
+  const rage = fighter.rage;
+  if (!rage || world.time >= rage.until) return null;
+  const target = world.fighters[rage.target];
+  return target && target.state === 'up' && inFight(target) && !fighter.panicked ? target : null;
 }
 
 /**
@@ -2475,10 +2619,11 @@ export const relentless = (fighter) => Boolean(fighter.body.inputs?.relentless);
 /**
  * Whether he is past fear: a machine (no morale); a relentless man; or a man of a side on its own ground (`world.homeGround[corner]`: a
  * stage's `homeGround`, levelmode/stage.js: the garrison inside its own castle), who has nowhere to run to and no thought of it. He still
- * keeps his distance, steps back from a blow and makes room for a long weapon as his style does: he never breaks.
+ * keeps his distance, steps back from a blow and makes room for a long weapon as his style does: he never breaks. And a man
+ * in a rage (AI.rage), while it lasts.
  */
 export function knowsNoFear(world, fighter) {
-  return Boolean(fighter.body.gear.machine || relentless(fighter) || world.homeGround?.[fighter.corner]);
+  return Boolean(fighter.body.gear.machine || relentless(fighter) || world.homeGround?.[fighter.corner] || (fighter.rage && world.time < fighter.rage.until));
 }
 
 /**
@@ -3060,8 +3205,11 @@ function decide(world, fighter, dt) {
     fighter.move = 0;
     return;
   }
-  // His own choice, or the man the player's order sends him at (command.js).
-  const opponent = orderedFocus(world, fighter, chooseFocus(world, fighter));
+  // His own choice, or the man the player's order sends him at (command.js); in a rage, the man who cut his comrade down (AI.rage).
+  const chosen = orderedFocus(world, fighter, chooseFocus(world, fighter));
+  const avenging = rageTarget(world, fighter);
+  if (avenging) fighter.focus = avenging.id;
+  const opponent = avenging ?? chosen;
   if (!opponent) {
     fighter.move = 0;
     return;
@@ -3141,6 +3289,15 @@ function decide(world, fighter, dt) {
     defend: basePlan.defend * Math.exp(-bold.defend * nerve) * (shaky ? 1 - AI.rout.rally.guard : 1),
     heavy: Math.max(0, basePlan.heavy + bold.heavy * nerve),
   };
+  // In a rage (AI.rage): in on the killer, his guard forgotten, blow after blow, each one loaded.
+  if (avenging) {
+    const rage = AI.rage;
+    plan.defend *= 1 - rage.guard;
+    plan.tempo *= rage.tempo;
+    plan.pressure *= rage.pressure;
+    plan.range -= rage.closer;
+    plan.heavy += rage.heavy;
+  }
   // Pressing the fight (AI.press): a quicker pace, and a guard held up a while against him pressed.
   const pressing = AI.press.on;
   // (Gloves in a ring are a sport paced over its rounds: the pace and the spells are the sport's own; the rest presses as anywhere.)
@@ -3239,7 +3396,7 @@ function decide(world, fighter, dt) {
   const spacing = teamSpacing(world, fighter, opponent);
   fighter.strafe = spacing.strafe;
   // In a gang, wait my turn: only the nearest few take him on.
-  const waiting = waitingTurn(world, fighter, opponent);
+  const waiting = !avenging && waitingTurn(world, fighter, opponent);
   if (waiting && random() < AI.refocusRate * dt) fighter.focus = undefined;
   const kicker = (style.attacks.roundhouse ?? 0) + (style.attacks.teep ?? 0) > 0.15;
   // Spells of pressure: for a few seconds the fighter works inside.
@@ -3261,7 +3418,11 @@ function decide(world, fighter, dt) {
     cadence.move *= AI.press.move;
   }
   let mayAttack = true;
+  // At grips: in his range, in a clinch, or a blow of his out (AI.hesitation: his comrades follow him in).
+  if (fighter.clinch || fighter.punch || distance <= range + AI.rangeSlack) fighter.contactAt = world.time;
   if (fighter.clinch && style.clinchDrive) fighter.move = 1;
+  // Short of contact and stalled (AI.hesitation): his feet are holdShort's (a blow only if his man walks onto it).
+  else if (!waiting && !fighter.clinch && holdShort(world, fighter, opponent, distance, range, dt)) mayAttack = true;
   else if (waiting || fighter.clinch) {
     if (distance > range + AI.rangeSlack) fighter.move = 1;
     else if (distance < range - AI.rangeSlack * 2 && !fighter.clinch) fighter.move = -0.7;
