@@ -18,7 +18,7 @@ import { RUN_STEER, runSteer } from './runsteer.js';
 import { jogSpeed, runSpeed } from './physics/gait.js';
 import { FINISHER, finishTarget, startFinisher, updateFinisher } from './finisher.js';
 import { lowTarget, startLowStrike, updateLowStrike } from './lowstrike.js';
-import { chargeAt } from './riding.js';
+import { chargeAt, ringHeading } from './riding.js';
 import { ARTS, artBlocked, feelAdrenaline, startArt } from './weaponarts.js';
 
 export const CONTROL = {
@@ -57,7 +57,19 @@ export const CONTROL = {
   // `reins` false: the old way (the stick split round his facing as on foot: a pull back while locked on reins the horse back), to compare.
   // `canterFrom`, `gallopFrom`: the stick's throw for the horse's full canter and its gallop (the horse keeps the stick's old
   // ranges: its gaits are its own, not the man's run).
-  ride: { reins: true, slowFrom: 0.35, snap: false, snapAngle: 0.25, canterFrom: 0.8, gallopFrom: 0.88 },
+  // Locked on with no stick or keys, the horse is not ridden at his man: it slows to a stand where it is (the lock aims him,
+  // not the horse). It closes on him only under the stick or with a charge (a tap on the man: chargeOrder).
+  // `circle`: a bow or gun in his hands, locked on, the stick rides the horse archer's ring round his man (riding.js
+  // ringHeading, as the AI's horse archers ride it) rather than at him. The stick's share across the line to the man
+  // (`sideFrom` or more) picks the way round (the way it points); its share along that line tightens the ring (towards
+  // him) or widens it (away), `rate` m/s at full throw, between `least` and `most` m. The ring is taken up at the distance
+  // he is at, held between `from` (inside it, out to it) and `to` (beyond it, in to it): a horse bow's best killing range
+  // is some 15-25 m (the steppe archer's ring, near enough to hit, beyond a spear's rush). `inward` (rad at a radius off)
+  // and `approach` (radii off, beyond which he comes in on the tangent) as the AI's ring (RIDING.archer).
+  ride: {
+    reins: true, slowFrom: 0.35, snap: false, snapAngle: 0.25, canterFrom: 0.8, gallopFrom: 0.88,
+    circle: { from: 15, to: 25, least: 10, most: 35, rate: 6, sideFrom: 0.3, alongFrom: 0.3, inward: 0.6, approach: 1.6 },
+  },
   // An attack asked for while busy waits this long (s) for the hands to come back.
   bufferSeconds: 0.35,
   // He turns to face the place he strikes at for this long (s).
@@ -120,7 +132,7 @@ export const CONTROL = {
 
 /** A fresh set of orders: no one locked, nothing held, nothing asked. */
 export function newOrders() {
-  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null, spacing: false, artAskedUntil: 0 };
+  return { lock: null, stick: null, keyStick: null, guard: false, jump: false, requests: [], runBroken: false, winded: false, runSteer: { bend: 0 }, charge: null, charged: null, spacing: false, artAskedUntil: 0, circle: null };
 }
 
 /**
@@ -269,7 +281,7 @@ function steer(world, fighter, orders, opponent, dt) {
   const slow = orders.guard ? CONTROL.guardFootwork : 1;
   // On horseback the stick is the reins, locked on or not: the horse goes the way it points (rideStick).
   if (stick && fighter.mount && CONTROL.ride.reins) {
-    rideStick(world, fighter, orders, stick, opponent);
+    rideStick(world, fighter, orders, stick, opponent, dt);
     return;
   }
   if (stick) {
@@ -313,7 +325,9 @@ function steer(world, fighter, orders, opponent, dt) {
     return;
   }
   fighter.goTo = null;
-  if (!locked || opponent.state !== 'up') {
+  // (On horseback, locked or not, the horse is not ridden at his man without the stick: it slows to a stand. CONTROL.ride.)
+  if (!locked || opponent.state !== 'up' || fighter.mount) {
+    fighter.strafe = 0;
     fighter.move *= Math.exp(-dt * 6);
     // The stick idle and his man faced inside a long weapon's head: a step back (CONTROL.spacing).
     if (!locked && fighter.faceFoe && keepsRoom(fighter, orders, opponent)) fighter.move = -CONTROL.spacing.pace * slow;
@@ -331,14 +345,44 @@ function steer(world, fighter, orders, opponent, dt) {
   else fighter.move = Math.max(-1, Math.min(1, off * 2)) * slow;
 }
 
+/** Whether a rider rides the ring round his man (CONTROL.ride.circle): a bow or gun in his hands, his man up. */
+export function ridesRing(fighter, opponent) {
+  return Boolean(fighter.mount && fighter.weapon?.held && fighter.weapon.spec?.ranged && opponent?.state === 'up');
+}
+
+/**
+ * The heading of the player's ring round his man (CONTROL.ride.circle), from the stick's way `dir` ([x, z] on the floor),
+ * the horse at `me` ([x, z]) heading `yaw`, the man at `man` ([x, z]). Keeps the ring in `orders.circle` ({ target, radius,
+ * turn }): taken up at the distance he is at (held between `from` and `to`) the way the horse already goes round, the way
+ * round set by the stick's share across the line to him, the radius by its share along it. Pure but for `orders.circle`.
+ */
+export function circleStick(orders, target, me, man, dir, yaw, dt, spec = CONTROL.ride.circle) {
+  const to = [man[0] - me[0], man[1] - me[1]];
+  const apart = Math.hypot(to[0], to[1]) || 1e-6;
+  const unit = [to[0] / apart, to[1] / apart];
+  // The way round with him on the left (turn +1): a quarter turn clockwise of the way to him.
+  const round = [-unit[1], unit[0]];
+  const across = dir[0] * round[0] + dir[1] * round[1];
+  const along = dir[0] * unit[0] + dir[1] * unit[1];
+  if (!orders.circle || orders.circle.target !== target) {
+    const going = Math.cos(yaw) * round[0] - Math.sin(yaw) * round[1];
+    orders.circle = { target, radius: Math.max(spec.from, Math.min(spec.to, apart)), turn: going < 0 ? -1 : 1 };
+  }
+  const circle = orders.circle;
+  if (Math.abs(across) >= spec.sideFrom) circle.turn = Math.sign(across);
+  if (Math.abs(along) >= spec.alongFrom) circle.radius = Math.max(spec.least, Math.min(spec.most, circle.radius - along * spec.rate * dt));
+  return ringHeading(Math.atan2(-unit[1], unit[0]), apart, circle.radius, { turn: circle.turn, inward: spec.inward, approach: spec.approach });
+}
+
 /**
  * The player's horse under the stick: its heading is the stick's way on the floor, at the canter (the gallop past the run
  * threshold or with Shift), whether or not he is locked on a man (the lock aims his weapon, his shoulders and the camera, not
  * the horse). The horse turns at its own rate (physics/mounted.js: `spin`, and `lateral` / speed), and is slowed into a turn
  * the harder it is: to the speed it turns sharpest at (lateral / spin) by a right angle off its line (CONTROL.ride.slowFrom on).
  * Snap (CONTROL.ride.snap, off): locked, a way within `snapAngle` of his man goes straight at him.
+ * Locked on with a bow or gun in his hands (ridesRing), the stick rides the ring round his man instead (circleStick).
  */
-function rideStick(world, fighter, orders, stick, opponent) {
+function rideStick(world, fighter, orders, stick, opponent, dt) {
   const horse = fighter.mount;
   const spec = CONTROL.ride;
   const { deadZone, walkFrom } = CONTROL.stick;
@@ -346,7 +390,11 @@ function rideStick(world, fighter, orders, stick, opponent) {
   const gallop = stick.amount >= spec.gallopFrom && !orders.guard;
   let heading = Math.atan2(-stick.dir[1], stick.dir[0]);
   const locked = orders.lock !== null && opponent?.id === orders.lock;
-  if (spec.snap && locked) {
+  if (locked && ridesRing(fighter, opponent)) {
+    const man = opponent.mount ? opponent.mount.at : [opponent.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2]];
+    heading = circleStick(orders, opponent.id, horse.at, man, stick.dir, horse.yaw, dt);
+  } else orders.circle = null;
+  if (spec.snap && locked && !orders.circle) {
     const at = point(opponent.x, P.pelvis);
     const toward = Math.atan2(-(at[2] - horse.at[1]), at[0] - horse.at[0]);
     if (Math.abs(Math.atan2(Math.sin(toward - heading), Math.cos(toward - heading))) < spec.snapAngle) heading = toward;

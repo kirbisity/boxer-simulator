@@ -122,6 +122,19 @@ export const RIDING = {
   robot: { turretStand: 3, dodge: 0.35, dodgeReach: 0.6, leap: [0.9, 1.4] },
 };
 
+/**
+ * The heading that rides a ring of `radius` m round a man (the horse archer's circle: skirmish, the gun's ring, the
+ * player's circle with a bow locked on, control.js rideStick). `toward` is the heading to the ring's middle, `apart` the
+ * distance to it. `turn` +1 goes round with the man on the left (clockwise from above: a quarter turn clockwise of the
+ * way to him), −1 the other way. On the ring, that quarter turn, turned in or out by `inward` (rad at a radius off) to
+ * keep it; from further than `approach` radii off, in on the line that meets the ring at a tangent (Infinity: never).
+ */
+export function ringHeading(toward, apart, radius, { turn = 1, inward = RIDING.archer.inward, approach = RIDING.archer.approach } = {}) {
+  if (apart > radius * approach) return toward - turn * Math.asin(Math.min(1, radius / apart));
+  const off = Math.max(-1, Math.min(1, (apart - radius) / radius));
+  return toward - turn * (Math.PI / 2 - inward * off);
+}
+
 const aheadOf = (yaw) => yawRotate([1, 0, 0], yaw);
 const leftwardOf = (yaw) => yawRotate([0, 0, 1], yaw);
 const headingOf = (x, z) => Math.atan2(-z, x);
@@ -438,8 +451,7 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     if (!fighter.ride.plan) drawPass(world, fighter.ride, world.time);
     // On the left: the heading a quarter turn clockwise of the way to him, turned in or out to keep the ring (his own, a little different each).
     const radius = spec.gunRadius * (1 + fighter.ride.plan.aim);
-    const off = Math.max(-1, Math.min(1, (distance - radius) / radius));
-    setGoal(headingOf(along[0], along[2]) - Math.PI / 2 + spec.inward * off, horse.paces.canter);
+    setGoal(ringHeading(headingOf(along[0], along[2]), distance, radius, { inward: spec.inward, approach: Infinity }), horse.paces.canter);
     return true;
   }
   // Out of arrows, with his side's train on the field (a level's `train`: the camels with fresh sheaves): back to it for more.
@@ -710,11 +722,7 @@ function skirmish(world, fighter, opponent, gun, distance, along, setGoal) {
     const to = [body.at[0] - horse.at[0], body.at[2] - horse.at[1]];
     const apart = Math.hypot(to[0], to[1]) || 1e-6;
     const toward = headingOf(to[0], to[1]);
-    if (apart > radius * spec.approach) setGoal(toward - Math.asin(Math.min(1, radius / apart)), horse.paces.canter);
-    else {
-      const off = Math.max(-1, Math.min(1, (apart - radius) / radius));
-      setGoal(toward - Math.PI / 2 + spec.inward * off, horse.paces.canter);
-    }
+    setGoal(ringHeading(toward, apart, radius, spec), horse.paces.canter);
   }
   // The shot: any man in range within the sweep of his bow arm; his own man first, else whoever is nearest of those he can.
   fighter.aimAt = undefined;

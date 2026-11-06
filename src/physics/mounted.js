@@ -1428,6 +1428,27 @@ function severMountLeg(world, horse, key, event, attacker) {
   bringDown(world, horse, 'goes down on three legs');
 }
 
+// The horse's health as the screen shows it (touch.js: the player's own horse under his own bar, a mounted enemy's under his):
+// what is left of it before it goes down, the worst of three ways it is going there.
+// - blood: its blood lost against the share that drops it (collapseShare, as a man's);
+// - blows: blunt harm summed on its body against `trunkFatal` (WORLD.mount.horse, as harmHorse kills it);
+// - lame: a lame horse (a leg broken, a robot's leg cut off) is at least `lame` of the way gone (it goes down then anyway:
+//   the bar is empty with it down).
+// `fastBleed`: bleeding this share of its blood a second or more (as a man's great vessel, maiming.js MAIMING.fastBleed:
+// the same units, the horse's already scaled to its mass) and its bar pulses as a man's does.
+export const HORSE_HEALTH = { lame: 0.6, fastBleed: 0.002 };
+
+/** The horse's harm for the screen: `harm` 0 (sound) to 1 (down), `bleeding` fast, `lame`. */
+export function horseHealth(horse) {
+  if (!horse) return null;
+  const spec = { ...WORLD.mount.horse, ...horse.spec?.harm };
+  const blood = (horse.bloodLost ?? 0) / collapseShare();
+  const blows = (horse.trauma ?? 0) / (spec.trunkFatal * BODY.toughness);
+  const down = horse.state !== 'up';
+  const harm = down ? 1 : Math.min(1, Math.max(blood, blows, horse.lame ? HORSE_HEALTH.lame : 0));
+  return { harm, bleeding: !down && (horse.bleed ?? 0) >= HORSE_HEALTH.fastBleed, lame: Boolean(horse.lame), down };
+}
+
 /** The horse's timers each step: it bleeds, and down it goes past what it can lose. */
 export function horseTimers(world, horse, dt) {
   if (horse.bleed > 0) {

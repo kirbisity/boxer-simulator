@@ -26,6 +26,7 @@ import { paintStamina } from './overdraftview.js';
 import { ARTS, artBlocked, artLabel, artPrimed } from './weaponarts.js';
 import { throwableOf } from './physics/throwable.js';
 import { bleedingFast } from './maiming.js';
+import { horseHealth } from './physics/mounted.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -111,11 +112,11 @@ export function installFightControls(root, hooks) {
   crawl.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.crawl}</b><span class="label">Crawl</span><kbd>C</kbd>`;
   crawl.setAttribute('aria-label', 'Crawl');
   const status = root.appendChild(uiElement('div', 'player-status'));
-  status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" title="Adrenaline"><i></i></div>';
+  status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" title="Adrenaline"><i></i></div><div class="horse-row" hidden title="His horse"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>';
   // Adrenaline: a hair-thin line under stamina, a tick where his weapon's art comes within reach (weaponarts.js ARTS.ready).
   status.querySelector('.adrenaline').style.setProperty('--ready', `${ARTS.ready * 100}%`);
   const marker = root.appendChild(uiElement('div', 'target-marker'));
-  marker.innerHTML = '<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div>';
+  marker.innerHTML = '<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div><div class="horse-row" hidden title="His horse"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>';
   let incoming = null;
   const touches = new Map();
   let stickId = null;
@@ -535,6 +536,7 @@ export function installFightControls(root, hooks) {
     adrenaline.querySelector('i').style.width = `${Math.round(Math.min(1, me.adrenaline ?? 0) * 100)}%`;
     // (Lit for the art's charge, not for a grenade, which asks none.)
     adrenaline.classList.toggle('primed', artPrimed(me) && !throwableOf(me));
+    paintHorse(status, me);
     // His man: the one locked, or the one he is on; a marker over his head.
     const target = locked ?? foeFor(world, me);
     for (const event of world.events.slice(-6)) if (event.time > world.time - 0.1 && event.defender !== undefined) awake.set(event.defender, now);
@@ -550,9 +552,22 @@ export function installFightControls(root, hooks) {
     marker.querySelector('.name').textContent = firstNameOf(target);
     marker.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(target)) * 100)}%`;
     marker.querySelector('.health').classList.toggle('bleeding', bleedingFast(target));
+    paintHorse(marker, target);
     marker.classList.toggle('locked', Boolean(locked));
     const fresh = now - (awake.get(target.id) ?? -Infinity) < TOUCH.markerAwake;
     marker.style.opacity = locked || fresh ? '1' : String(TOUCH.markerIdle);
+  }
+
+  /** The horse's bar in `box` (the player's status, the marker): shown while `man` rides, its health (horseHealth). */
+  function paintHorse(box, man) {
+    const row = box.querySelector('.horse-row');
+    const health = man.mount ? horseHealth(man.mount) : null;
+    row.hidden = !health;
+    if (!health) return;
+    row.querySelector('i').style.width = `${Math.round((1 - health.harm) * 100)}%`;
+    row.querySelector('.bar').classList.toggle('bleeding', health.bleeding);
+    row.classList.toggle('down', health.down);
+    row.title = health.down ? 'His horse is down' : health.lame ? 'His horse is lame' : health.bleeding ? 'His horse is bleeding' : 'His horse';
   }
 
   function setActive(on) {
