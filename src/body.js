@@ -118,6 +118,19 @@ export const DEFAULT_INPUTS = {
   look: { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown' },
 };
 
+// Peoples: what the men of a time and place were, from the records; a preset of that people gives his height, diet and
+// training as his own difference from them (picked for size, fed better, drilled harder), so the whole people moves together.
+const PEOPLES = {
+  // Ming China, c. 1600: Ming burials of northern Han men give a stature about 164-166 cm; the soldier's ration about a
+  // sheng and a half of grain a day (about 1 kg: ~3000 kcal) with little meat, often in arrears (`calories`); a garrison man
+  // (weisuo) drilled little, his officers' tenant as much as their soldier (`exercise`).
+  ming: { heightCm: 165, calories: 2900, exercise: 0.5 },
+  // The Jianzhou Jurchen of Nurhaci (Sarhu, 1619): hunters, herders and farmers, more meat and dairy than the Ming's
+  // levies and at the bow and on horse from boyhood, but no giants: Qing bannermen and their descendants about 165-168 cm.
+  // The hunt (the banner company was the hunting band) kept them harder than a garrison man (`exercise`).
+  jurchen: { heightCm: 167, calories: 3500, exercise: 0.75 },
+};
+
 // `look` is appearance only; nothing in the simulation reads it.
 export const PRESETS = {
   heavy: {
@@ -204,58 +217,58 @@ export const PRESETS = {
   // garrison man with the dao; a brigandine man with sword and shield; a
   // brigandine gunner; Liu Ting, the general famed for his heavy blade.
   mingSpear: {
-    name: 'Wang Er', style: 'spear', sex: 'male', heightCm: 168, frame: 'medium', age: 26, exercise: 0.5, calories: 2900,
+    name: 'Wang Er', style: 'spear', sex: 'male', heightCm: PEOPLES.ming.heightCm + 2, frame: 'medium', age: 26, exercise: PEOPLES.ming.exercise, calories: PEOPLES.ming.calories,
     outfit: { kind: 'mingGarrison', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },
   mingDao: {
-    name: 'Zhang San', style: 'dao', sex: 'male', heightCm: 170, frame: 'medium', age: 29, exercise: 0.55, calories: 3000,
+    name: 'Zhang San', style: 'dao', sex: 'male', heightCm: PEOPLES.ming.heightCm + 3, frame: 'medium', age: 29, exercise: PEOPLES.ming.exercise + 0.05, calories: PEOPLES.ming.calories + 100,
     outfit: { kind: 'mingGarrison', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   swordShield: {
-    name: 'Chen Bao', style: 'swordShield', sex: 'male', heightCm: 172, frame: 'medium', age: 30, exercise: 0.65, calories: 4000,
+    name: 'Chen Bao', style: 'swordShield', sex: 'male', heightCm: PEOPLES.ming.heightCm + 5, frame: 'medium', age: 30, exercise: PEOPLES.ming.exercise + 0.12, calories: PEOPLES.ming.calories + 600,
     outfit: { kind: 'mingBrigandine', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   mingMatchlock: {
-    name: 'Zhao Liu', style: 'matchlock', sex: 'male', heightCm: 169, frame: 'medium', age: 33, exercise: 0.55, calories: 3000,
+    name: 'Zhao Liu', style: 'matchlock', sex: 'male', heightCm: PEOPLES.ming.heightCm + 2, frame: 'medium', age: 33, exercise: PEOPLES.ming.exercise + 0.05, calories: PEOPLES.ming.calories + 100,
     outfit: { kind: 'mingBrigandine', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   // A wolf-brush man of Qi Jiguang's army: a Yiwu miner, drilled, in the brigandine (the langxian went to the strongest men of a squad).
   langxian: {
-    name: 'Feng Da', style: 'langxian', sex: 'male', heightCm: 168, frame: 'medium', age: 27, exercise: 0.68, calories: 3300,
+    name: 'Feng Da', style: 'langxian', sex: 'male', heightCm: PEOPLES.ming.heightCm + 3, frame: 'medium', age: 27, exercise: PEOPLES.ming.exercise + 0.18, calories: PEOPLES.ming.calories + 400,
     outfit: { kind: 'mingBrigandine', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },
   guandao: {
-    name: 'Liu Ting', style: 'guandao', sex: 'male', heightCm: 182, frame: 'medium', age: 40, exercise: 0.6, calories: 3625,
+    name: 'Liu Ting', style: 'guandao', sex: 'male', heightCm: PEOPLES.ming.heightCm + 7, frame: 'medium', age: 40, exercise: PEOPLES.ming.exercise + 0.1, calories: PEOPLES.ming.calories + 500,
     outfit: { kind: 'mingElite', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   // The Eight Banners of the Later Jin (Sarhu, 1619): a banner archer of the Plain Yellow with the heavy Manchu bow
   // and the saber at his belt; a big man of the Bordered Red with the guandao; Yangguri, the commander of Nurhaci's
   // guard, a Bayara in the heavy coat, with the banners' heavy spear (the bow his to choose). Jurchen hunters and herders fed on meat and grain, at the bow
-  // and on horse from boyhood: big and strong for their day, taller and harder than the Ming's men (`exercise`, `calories`).
+  // and on horse from boyhood: a little taller and harder than the Ming's men, not giants (PEOPLES.jurchen; `exercise`, `calories`).
   bannerBow: {
-    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: 177, frame: 'large', age: 28, exercise: 0.92, calories: 5025,
+    name: 'Hūsun', style: 'manchuBow', sex: 'male', heightCm: PEOPLES.jurchen.heightCm + 4, frame: 'medium', age: 28, exercise: PEOPLES.jurchen.exercise + 0.05, calories: PEOPLES.jurchen.calories + 500,
     outfit: { kind: 'bannerArmour', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   bannerGuandao: {
-    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: 182, frame: 'large', age: 31, exercise: 0.92, calories: 5325,
+    name: 'Baturu', style: 'guandao', sex: 'male', heightCm: PEOPLES.jurchen.heightCm + 9, frame: 'large', age: 31, exercise: PEOPLES.jurchen.exercise + 0.07, calories: PEOPLES.jurchen.calories + 900,
     outfit: { kind: 'bannerArmour', design: 5 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
   bayara: {
-    name: 'Yangguri', style: 'bayaraLance', sex: 'male', heightCm: 179, frame: 'large', age: 40, exercise: 0.94, calories: 5225,
+    name: 'Yangguri', style: 'bayaraLance', sex: 'male', heightCm: PEOPLES.jurchen.heightCm + 6, frame: 'large', age: 40, exercise: PEOPLES.jurchen.exercise + 0.1, calories: PEOPLES.jurchen.calories + 800,
     outfit: { kind: 'bayara', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
   // A Bayara who keeps to the heavy Manchu bow (the guard's archers, the bow his before the spear: STYLES.bayaraBow).
   bayaraBow: {
-    name: 'Darhan', style: 'bayaraBow', sex: 'male', heightCm: 178, frame: 'large', age: 33, exercise: 0.94, calories: 5125,
+    name: 'Darhan', style: 'bayaraBow', sex: 'male', heightCm: PEOPLES.jurchen.heightCm + 5, frame: 'large', age: 33, exercise: PEOPLES.jurchen.exercise + 0.1, calories: PEOPLES.jurchen.calories + 700,
     outfit: { kind: 'bayara', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
@@ -321,7 +334,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'cleanShort', hairColor: '#2a1a10', facialHair: 'stubble', eyeColor: 'brown' },
   },
   mingCrossbow: {
-    name: 'Li Si', style: 'nu', sex: 'male', heightCm: 168, frame: 'medium', age: 29, exercise: 0.55, calories: 2900,
+    name: 'Li Si', style: 'nu', sex: 'male', heightCm: PEOPLES.ming.heightCm + 2, frame: 'medium', age: 29, exercise: PEOPLES.ming.exercise + 0.05, calories: PEOPLES.ming.calories,
     outfit: { kind: 'mingGarrison', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
@@ -411,7 +424,7 @@ export const PRESETS = {
   },
   // A Ming elite with the three-eyed gun.
   threeEyed: {
-    name: 'Ma Lin', style: 'threeEyed', sex: 'male', heightCm: 171, frame: 'medium', age: 35, exercise: 0.74, calories: 4075,
+    name: 'Ma Lin', style: 'threeEyed', sex: 'male', heightCm: PEOPLES.ming.heightCm + 4, frame: 'medium', age: 35, exercise: PEOPLES.ming.exercise + 0.18, calories: PEOPLES.ming.calories + 800,
     outfit: { kind: 'mingElite', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },

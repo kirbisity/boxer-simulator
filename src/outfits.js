@@ -1310,7 +1310,9 @@ export const OUTFITS = {
   mingElite: {
     // Rides (Ming elite cavalry on northern horses).
     horse: 'steppe',
-    skill: 0.6,
+    // Trained: a general's household men (jiading), picked and kept by him, the best the Ming fielded, but drilled to a
+    // regular's level more than an elite's: the Ming army of the 1610s was a byword for neglected drill (`skill`).
+    skill: 0.55,
     faction: 'chinese', bulletRating: 650, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     // The officer's helmet bright or black-lacquered, plain, with the lion face and wings, or gilt with guardians.
@@ -1348,8 +1350,8 @@ export const OUTFITS = {
   // (`courage`, above the Ming regular's and as high as their elite's), the front ranks at Sarhu in two coats.
   bannerArmour: {
     // Trained: a banner man was a soldier for life, his company's hunts its drill (`skill`: OUTFITS' tiers, the
-    // Ming regular's 0.35 and their elite's 0.6).
-    skill: 0.55,
+    // Ming regular's 0.35 and their elite's 0.55): a regular's, hardened by the hunt more than drilled to a weapon.
+    skill: 0.5,
     faction: 'manchu', bulletRating: 600, plated: true,
     label: 'Eight Banners (Later Jin) — banner armour', family: 'manchu', movement: 'good', fists: 'bare',
     // The Manchu saber at his belt (drawn as the dao: a single-edged sabre a little more curved); a knife.
@@ -1384,7 +1386,8 @@ export const OUTFITS = {
     // Rides (a Manchurian horse, the steppe's breed), the horse clad in brigandine as he is, in his coat's colours with its
     // gilt studs (horses.js BARDING.brigandine, mountOf `finish`).
     horse: 'steppe', barding: 'brigandine',
-    skill: 0.6,
+    // Trained: Nurhaci's guard, picked from the banners' best, a step above the banner man (`skill`).
+    skill: 0.55,
     faction: 'manchu', bulletRating: 650, plated: true,
     label: 'Eight Banners (Later Jin) — Bayara guard', family: 'manchu', movement: 'good', fists: 'bare',
     sidearm: 'dao',
