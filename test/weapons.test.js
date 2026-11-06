@@ -485,7 +485,9 @@ test('the whip: its thong a rope whose tip outruns the hand; a lash bleeds bare 
 
 test('plate is cut-proof: no edge finds a gap in a full harness; a point still can', () => {
   const gapsBy = { swing: 0, thrust: 0 };
-  for (let seed = 1; seed <= 8; seed += 1) {
+  // A point finds a gap in a few landed thrusts in a hundred: sixteen bouts, since the knight's plate ending them sooner
+  // (wear dulling the samurai's edge, heat) leaves eight with too few thrusts to count on one.
+  for (let seed = 1; seed <= 16; seed += 1) {
     const world = createWorld([{ inputs: structuredClone(PRESETS.samurai), corner: 'red' }, { inputs: structuredClone(PRESETS.knight), corner: 'blue' }], { seed });
     for (let second = 0; second < 60 && !boutWinner(world); second += 1) advance(world, 1, (current, dt) => thinkAll(current, dt));
     for (const event of world.events) {
