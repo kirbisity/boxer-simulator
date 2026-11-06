@@ -1082,6 +1082,14 @@ export const WORLD = {
     // The reference shaft: the war spear's ~3.6 cm of ash (radius m), the one WORLD.mount.brace.shaft is the strength of.
     // A shaft's strength goes as its radius cubed (bending modulus): a lance's 5 cm three times it, a naginata's 2.8 cm 0.5.
     shaft: 0.018,
+    // Driven along its length a shaft is a column, held at the front hand, its head on what stops it: it fails by buckling,
+    // Euler's π²EI/L², I = πr⁴/4, over its free wood L, from the front hand to where the head's socket or its langets begin.
+    // The war spear's (r 1.8 cm of ash, E ≈ 12 GPa: USDA Wood Handbook, white ash; L its 1.45 m `strikeFrom`) buckles at
+    // ~4.6 kN: the brace figure's ~4 kN, so `column` (m) is that reference length. A shaft stockier than it (shorter, or
+    // thicker for its length) is as much stronger along it as Euler says, r⁴/L²: a hasta's short 0.9 m 2.3×, a war hammer's
+    // 0.8 m of wood below its langets 3.3×. A longer, slenderer one buckles sooner but bows far before its wood snaps (a
+    // pike's whip: the bend that breaks it, MOR·S/P, grows as its buckling load falls), so it keeps its section's r³ (above).
+    column: 1.45,
     // How far a point's drive is stopped in (m): `flesh` the 0.25 m the brace's 1,000 J is over (a set shaft gives at ~4
     // kN), wherever it goes in (through mail, lamellar or cloth as through skin: it still goes in); on rigid plate that turns
     // it, or armour proof against a point to `proof` or more, it stops dead within `plate`: the 1-2 cm of padding under it

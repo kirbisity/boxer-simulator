@@ -9,7 +9,7 @@
 // These are pure sums: they say what broke and why; physics.js breaks it (breakWeapon, breakShield).
 
 import { WORLD } from './config.js';
-import { MATERIALS, buildOf } from '../weapons.js';
+import { MATERIALS, buildOf, freeShaft } from '../weapons.js';
 
 /** A uniform draw in (0, 1) from a string: the same piece of wood or steel is always as strong. */
 function pieceDraw(key) {
@@ -39,6 +39,10 @@ export function wearOf(weapon, fighter, time) {
   const shaftSize = shaft ? build.shaftRadius / rule.shaft : 0;
   const bladeScatter = blade ? pieceScatter(`${key}:blade`, blade.scatter) : 1;
   const shaftScatter = shaft ? pieceScatter(`${key}:shaft`, shaft.scatter) : 1;
+  // Along it, a column: a stockier one than the war spear's buckles only at Euler's r⁴/L², more than its section's r³ (WORLD.wear.column).
+  const free = shaft ? freeShaft(spec, build) : null;
+  const column = free ? Math.max(1, shaftSize * (rule.column / free) ** 2) : 1;
+  const shaftBend = shaft ? WORLD.mount.brace.shaft * shaft.strength * shaftSize ** 3 * shaftScatter : Infinity;
   weapon.wear = {
     build,
     // The edge's width, × fresh.
@@ -49,7 +53,9 @@ export function wearOf(weapon, fighter, time) {
     bladeCapacity: blade ? blade.capacity * bladeSize * bladeScatter : Infinity,
     // What the shaft carries along its length driving a point into flesh (J), and the edge-on work hacked into it so far, of what
     // it takes to go through.
-    shaftStrength: shaft ? WORLD.mount.brace.shaft * shaft.strength * shaftSize ** 3 * shaftScatter : Infinity,
+    shaftStrength: shaftBend * column,
+    // What its section bears bent across it, as against along it (WORLD.wear.across of this): the column's length does not help it.
+    shaftBend,
     chop: 0,
     chopCapacity: shaft ? shaft.chop * shaftSize ** 2 * shaftScatter : Infinity,
   };
@@ -130,12 +136,12 @@ export function stopIn(protection) {
 
 /**
  * A blow across a shaft (`joules` of it; `edge` J of it an edge's, hacking in): past its strength across
- * (WORLD.wear.across of what it carries along) it snaps; the edges' work, summed, hacks it through. Returns why, or null.
+ * (WORLD.wear.across of what its section carries along, `shaftBend`: no column's gain) it snaps; the edges' work, summed, hacks it through. Returns why, or null.
  */
 export function strikeShaft(weapon, fighter, time, joules, edge = 0) {
   const wear = wearOf(weapon, fighter, time);
   if (!wear.build.shaft || joules <= 0) return null;
-  if (joules >= wear.shaftStrength * WORLD.wear.across) return 'snapped';
+  if (joules >= wear.shaftBend * WORLD.wear.across) return 'snapped';
   wear.chop += edge;
   return wear.chop >= wear.chopCapacity ? 'hacked through' : null;
 }

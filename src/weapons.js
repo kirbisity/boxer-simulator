@@ -289,8 +289,11 @@ export const WEAPONS = {
   // against blows (a long spear, levered from the hands, is easiest lost).
   warhammer: {
     label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 3.4, balance: 0.85, radius: 0.04,
-    // (Its haft: ~3.5 cm of ash under the langets, not the head's 8 cm: what snaps, physics/wear.js.)
-    build: { shaftRadius: 0.018 },
+    // (Its haft: ~3.5 cm of ash under the langets, not the head's 8 cm: what snaps, physics/wear.js.) The langets: the steel
+    // straps riveted down the haft from the head (`langets`, m), ~30-50 cm on surviving 15th-c. pollaxes, bec de corbins
+    // and Lucerne hammers, there to keep an edge off the wood below the head; they also stiffen it, so a thrust bows only
+    // the ~0.8 m of bare wood from the front hand to their foot (WORLD.wear.column: Euler's ~15 kN, not a war spear's ~4).
+    build: { shaftRadius: 0.018, langets: 0.35 },
     // Its head is a hammer face with a beak behind it (the bec de corbin): a swing lands one or the other, the beak a spike
     // that goes into plate where an edge skids (pierce). The face is small and hard on a long lever: most of its blow is felt
     // through plate, which dents and passes it on rather than spreading it (`crush` 0.7; was 0.45, as a mace's flanges).
@@ -1020,9 +1023,21 @@ export function buildOf(spec, shaftFrom) {
   const edge = own.edge !== undefined ? own.edge : edged ? 'steel' : null;
   const shaft = own.shaft !== undefined ? own.shaft : hafted ? 'hardwood' : null;
   const blade = own.blade !== undefined ? own.blade : edge && !shaft ? edge : null;
-  return { edge, blade, shaft, shaftRadius: own.shaftRadius ?? spec.radius };
+  return { edge, blade, shaft, shaftRadius: own.shaftRadius ?? spec.radius, langets: own.langets ?? 0 };
 }
-const NO_BUILD = { edge: null, blade: null, shaft: null, shaftRadius: 0 };
+const NO_BUILD = { edge: null, blade: null, shaft: null, shaftRadius: 0, langets: 0 };
+
+/**
+ * How far (m) ahead of the front hand a shaft's head begins: its socket (a long head's own `head` length back from the tip,
+ * else where a point's `pointFrom` share of the striking length starts, else the striking length's start), less the steel
+ * `langets` strapped down the wood below it: the free wood that bows under a thrust (WORLD.wear.column). Null for a weapon
+ * that is all pole (a staff's or a standard's `strikeFrom` behind the hands).
+ */
+export function freeShaft(spec, build) {
+  if (spec.strikeFrom < 0) return null;
+  const headFrom = spec.head ? spec.length - spec.head : spec.strikeFrom + (spec.pointFrom ?? 0) * (spec.length - spec.strikeFrom);
+  return Math.max(0.1, headFrom - (build.langets ?? 0));
+}
 
 // Shields strapped to the off forearm: a disc of this radius held off the
 // arm, facing where the fighter faces. A strike that meets it is stopped
