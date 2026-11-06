@@ -456,6 +456,14 @@ export const AI = {
   markWithin: 60,
   pastTarget: 0.45, // m: a team-mate this close behind my man is in the line too
   kickClearance: 1.3, // m: no kicks or knees with a team-mate this close, beside or ahead
+  // The crowd (physics/press.js). `leanWithin` (m, hips to hips): a comrade this near before him on the line to his man, he
+  // closes on his back and leans in to get at the enemy, driving him on (the ranks behind bearing on the front: Agincourt, the
+  // Roman centre at Cannae), rather than circling round a man he cannot pass (a body's depth ~0.3 m and an arm's bend).
+  // `highGround`: circling his man, his circling's pace is weighted toward the higher side by this times the slope's fall
+  // across his line (sin θ): on a 20% slope a man circling uphill goes ~1.3 times his pace, one circling down ~0.7, so the
+  // pair drift round until he has the upper side. A little ground, taken when it costs nothing (the man above reaches down
+  // onto the head and is the harder to shove: physics.js groundBrace, physics/press.js slopeHold).
+  crowd: { leanWithin: 0.9, highGround: 1.5 },
   // Facing a longer reach (a sword, a baton, a spear) or a blade: keep out of
   // it, then surge. Outreached by this much (m) or facing an edge or a point
   // with nothing as long in hand, a fighter holds `margin` beyond the other's
@@ -1314,6 +1322,61 @@ function closerAtHand(world, fighter, current) {
  * Team-mates: where to sidestep (+ left) to stay apart and keep the line to
  * my man clear, and whether one stands in that line now.
  */
+/**
+ * Whether a weapon swing (a blade move made `mode: 'swing'`) cannot be made where he stands: the blade's line (the hand at the
+ * move's `from`, out along its `dir` the weapon's length; the same at its `to`) passes within WORLD.press `body` of another
+ * man on his feet (his hips; his man, whom it is aimed at, aside). The wind-up behind his head and the follow-through across
+ * him need the room a thrust, going out along his front, does not.
+ */
+export function swingFouled(world, fighter, spec, opponent) {
+  if (spec?.path !== 'blade' || spec.mode !== 'swing' || !spec.from || !spec.to) return false;
+  const weapon = (spec.limb?.[0] === 'l' && fighter.offWeapon?.held ? fighter.offWeapon : fighter.weapon);
+  if (!weapon?.held) return false;
+  const length = weapon.spec.length;
+  const height = fighter.body.heightM;
+  const clear = WORLD.press.body;
+  const reach = length + fighter.body.reach + clear;
+  const hipX = fighter.x[P.pelvis * 3];
+  const hipZ = fighter.x[P.pelvis * 3 + 2];
+  for (const other of world.fighters) {
+    if (other === fighter || other === opponent || other.state !== 'up' || other.mount || other.dormant) continue;
+    const ox = other.x[P.pelvis * 3];
+    const oz = other.x[P.pelvis * 3 + 2];
+    if (Math.abs(ox - hipX) > reach || Math.abs(oz - hipZ) > reach) continue;
+    const at = toLocal(fighter, [ox, 0, oz]);
+    for (const pose of [spec.from, spec.to]) {
+      const hx = pose.hand[0] * height;
+      const hz = pose.hand[2] * height;
+      const size = Math.hypot(...pose.dir) || 1;
+      const tx = hx + (pose.dir[0] / size) * length;
+      const tz = hz + (pose.dir[2] / size) * length;
+      if (levelGap(at[0], at[2], hx, hz, tx, tz) < clear) return true;
+    }
+  }
+  return false;
+}
+
+/** How far the level point (px, pz) is from the segment (ax, az) to (bx, bz). */
+function levelGap(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const span = dx * dx + dz * dz;
+  const t = span > 1e-12 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / span)) : 0;
+  return Math.hypot(ax + dx * t - px, az + dz * t - pz);
+}
+
+/**
+ * Circling, the way round his man toward the higher ground (AI.crowd highGround): + to his left. The fall of the slope under
+ * him across his line to his man (sin θ), toward the uphill side; 0 on the flat.
+ */
+function uphillStrafe(fighter, opponent) {
+  const slope = fighter.groundSlope;
+  if (!slope || (!slope[0] && !slope[1])) return 0;
+  const left = yawRotate([0, 0, 1], fighter.yaw);
+  const rise = slope[0] * left[0] + slope[1] * left[2];
+  return AI.crowd.highGround * (rise / Math.sqrt(1 + rise * rise));
+}
+
 function teamSpacing(world, fighter, opponent, lineOfFire = AI.lineOfFire) {
   const at = point(fighter.x, P.pelvis);
   const to = point(opponent.x, P.pelvis);
@@ -1323,6 +1386,8 @@ function teamSpacing(world, fighter, opponent, lineOfFire = AI.lineOfFire) {
   const left = [-ahead[2], 0, ahead[0]];
   let strafe = 0;
   let blocked = false;
+  // A comrade at his chest on the line to his man (AI.crowd leanWithin): he leans in behind him.
+  let leanOn = false;
   // A kick or knee sweeps wide: it needs a team-mate-free arc beside me too.
   let kickRoom = true;
   for (const mate of world.fighters) {
@@ -1335,6 +1400,7 @@ function teamSpacing(world, fighter, opponent, lineOfFire = AI.lineOfFire) {
     if (along > 0.1 && along < length + AI.pastTarget && Math.abs(across) < lineOfFire) {
       blocked = true;
       strafe += across >= 0 ? -1 : 1;
+      if (along < AI.crowd.leanWithin && mate.state === 'up') leanOn = true;
     } else if (apart < AI.mateSpacing) strafe += (across >= 0 ? -1 : 1) * (1 - apart / AI.mateSpacing);
     if (apart < AI.kickClearance && along > -0.2) kickRoom = false;
   }
@@ -1345,7 +1411,7 @@ function teamSpacing(world, fighter, opponent, lineOfFire = AI.lineOfFire) {
     if (Math.hypot(offset[0], offset[2]) < length + AI.kickClearance && vec.dot(offset, ahead) > -0.2) kickRoom = false;
   }
   // Facing turns the line: the fighter's own left is the line's left.
-  return { strafe: Math.max(-1, Math.min(1, strafe)), blocked, kickRoom };
+  return { strafe: Math.max(-1, Math.min(1, strafe)), blocked, kickRoom, leanOn };
 }
 
 /** Whether team-mates nearer my man already fill the places to take him on. */
@@ -1597,7 +1663,7 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
     if (distance < hold - blade.slack) fighter.move = wary ? -1 : -0.7;
     else if (distance > hold + blade.slack) fighter.move = (wary ? 0.6 : 1) * approach;
     else fighter.move *= Math.exp(-dt * 4);
-    fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 1 : -1) * cadence.mobility));
+    fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 1 : -1) * cadence.mobility + uphillStrafe(fighter, opponent) * cadence.mobility));
     // Pressing (AI.press): a man who walks into his range, or misses, is met at once.
     const met = pressing && AI.press.meet && (recovering || distance <= (wary ? myRange : range) + AI.rangeSlack);
     const opening = met || (recovering && random() < cadence.opening * dt * 10);
@@ -1652,7 +1718,7 @@ function holdTheRange(world, fighter, opponent, distance, cadence, dt) {
   else if (distance < hold - AI.blade.slack) fighter.move = -0.6;
   else if (distance > hold + AI.blade.slack) fighter.move = 0.8;
   else fighter.move *= Math.exp(-dt * 4);
-  fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + (fighter.id % 2 ? 1 : -1) * cadence.mobility * 0.5));
+  fighter.strafe = Math.max(-1, Math.min(1, fighter.strafe + ((fighter.id % 2 ? 1 : -1) + uphillStrafe(fighter, opponent)) * cadence.mobility * 0.5));
   // Coming in: the moment to strike, and to keep striking.
   const closing = (fighter.aiLastGap ?? distance) - distance;
   fighter.aiLastGap = distance;
@@ -3157,6 +3223,12 @@ function decide(world, fighter, dt) {
   } else if (!fighter.defence || (fighter.defence.name !== 'stepBack' && fighter.defence.name !== 'sidestep')) {
     mayAttack = cadenceStep(world, fighter, opponent, { distance, range, wary, cadence, dt, pressing: pressing && spacing.kickRoom });
   }
+  // A comrade at his chest between him and his man: he leans in on his back and drives him on (AI.crowd leanWithin; the
+  // force goes through the man before him: physics/press.js), not round him.
+  if (spacing.leanOn && !fighter.clinch) {
+    fighter.move = 1;
+    fighter.strafe = 0;
+  }
   // His man inside his long weapon's head: room first, then the point (AI.pointRoom). A relentless man makes none: he strikes from where he stands.
   const cramped = relentless(fighter) ? false : makeRoom(world, fighter, opponent);
   // Relentless: never a step back, and out from a wall at his back (AI.relentless).
@@ -3235,6 +3307,10 @@ function decide(world, fighter, dt) {
   // The rest of a combination follows as soon as the last hand is back.
   if (fighter.aiCombo?.length) {
     if (cramped && strikesWithHead(fighter.aiCombo[0])) return;
+    if (swingFouled(world, fighter, MOVES[fighter.aiCombo[0]], opponent)) {
+      fighter.aiCombo = null;
+      return;
+    }
     const next = fighter.aiCombo.shift();
     fighter.aiComboStep += 1;
     if (!throwPunch(world, fighter, next, fighter.aiComboZone)) fighter.aiCombo = null;
@@ -3290,6 +3366,8 @@ function decide(world, fighter, dt) {
     const held = blade?.held ? blade.spec : null;
     if (spec.reach === 'weapon' && !held) continue;
     if (cramped && strikesWithHead(name)) continue;
+    // A swing whose blade would pass through a man beside or behind him cannot be made where he stands (hemmed in a press).
+    if (swingFouled(world, fighter, spec, opponent)) continue;
     // (Pressing, a lunging blow is thrown from as far as its step carries him in: AI.press lunge.)
     const reach = moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius + (reachOut ? lungeReach(spec) + timed * spec.extendUntil : 0);
     // Close-range moves only when close; long ones only when there is room.
