@@ -442,7 +442,7 @@ export const AI = {
     // `followTimid` of it at full hesitancy (a levy line follows its bold men in by ones and twos, not all at once). No
     // stall lasts past `longest` s (the press of the rear ranks pushed the front in at last).
     go: 0.3, goLeast: 0.04, push: 0.1, follow: 0.4, followTimid: 0.8, followFresh: 1.5, longest: 14, afterContact: 15,
-    // Come at: the man he faces coming on at him at `metAt` m/s or more (a steady walk's half) ends it at once. The stall
+    // Come at: any enemy in his band coming on at him at `metAt` m/s or more (a steady walk's half) ends it at once. The stall
     // is two lines each waiting for the other; a man who does not wait (an elite, a fanatic) is met where he arrives,
     // stepped in to as any man steps in to a blow he cannot stand still under, not waited for at the edge of reach.
     metAt: 0.6,
@@ -1706,6 +1706,23 @@ function comradeWentIn(world, fighter) {
 }
 
 /**
+ * Whether `other` is coming at `fighter` from within `within` m (AI.hesitation metAt): an enemy on his feet who goes in,
+ * closing on him at a walk's half or more. Any man who never stalls (a charger, an elite, a fanatic: a line of them coming
+ * on is met all along it); and his own man (`opponent`) once he has made up his mind in his own band. Not another
+ * stalled man's shuffling and feints, nor a man still walking up who will stall at his own band, nor one going in at
+ * the man beside him (that one his neighbour meets; he follows, AI.hesitation follow).
+ */
+function comingAt(world, other, fighter, within, opponent) {
+  if (!foeOf(fighter, other) || other.state !== 'up' || other.panicked || other.hesitant?.stalled) return false;
+  const toMe = [fighter.x[P.pelvis * 3] - other.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2] - other.x[P.pelvis * 3 + 2]];
+  const apart = Math.hypot(toMe[0], toMe[1]);
+  if (apart > within) return false;
+  const his = other.rootVelocity ?? [0, 0];
+  if ((his[0] * toMe[0] + his[1] * toMe[1]) / Math.max(1e-6, apart) < AI.hesitation.metAt) return false;
+  return (other === opponent && Boolean(other.hesitant)) || (other.body.inputs.charging ?? 1) > 1 || hesitancy(world, other, fighter) === 0;
+}
+
+/**
  * Hesitation before contact (AI.hesitation): coming into the band a few paces short of the enemy's reach, he may stall
  * there (hesitancy, decided once as he comes into it), shuffling, feinting and swaying, until his nerve comes, his leader
  * pushes him or a comrade beside him goes in; or until the other man comes to him. True while he holds short (his feet
@@ -1722,16 +1739,11 @@ function holdShort(world, fighter, opponent, distance, range, dt) {
     return false;
   }
   const hesitant = hesitancy(world, fighter, opponent);
-  fighter.hesitant ??= { since: world.time, stalled: world.random() < hesitant };
+  fighter.hesitant ??= { since: world.time, stalled: hesitant > 0 && world.random() < hesitant };
   const state = fighter.hesitant;
   if (!state.stalled) return false;
   const rate = spec.go * (1 - hesitant) + spec.goLeast + (ledNear(world, fighter) ? spec.push : 0) + (comradeWentIn(world, fighter) ? spec.follow * (1 - spec.followTimid * hesitant) : 0);
-  const toMe = [fighter.x[P.pelvis * 3] - opponent.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2] - opponent.x[P.pelvis * 3 + 2]];
-  const his = opponent.rootVelocity ?? [0, 0];
-  // (By a man who has made up his mind to go in, or a charger: not by another stalled man's shuffling and feints, nor by
-  // one still walking up who has yet to come to his own band.)
-  const goingIn = (opponent.hesitant && !opponent.hesitant.stalled) || (opponent.body.inputs.charging ?? 1) > 1;
-  const comeAt = goingIn && (his[0] * toMe[0] + his[1] * toMe[1]) / Math.max(1e-6, distance) >= spec.metAt;
+  const comeAt = world.fighters.some((other) => comingAt(world, other, fighter, near + spec.band, opponent));
   if (comeAt || world.time - state.since > spec.longest || world.random() < rate * dt) {
     state.stalled = false;
     return false;
