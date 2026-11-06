@@ -167,3 +167,22 @@ test('locked on, the stick idle, a tap on his man: the charge rides at him as be
   assert.ok(charge?.reins, 'a charge with the reins');
   assert.ok(nearest < 3, `rode at him: within ${nearest.toFixed(1)} m`);
 });
+
+test('an AI rider whose horse is failing reins in and gets down before it falls with him', async () => {
+  const { PRESETS, normaliseInputs } = await import('../src/body.js');
+  const { createWorld, placeFighter, advance } = await import('../src/physics.js');
+  const { thinkAll } = await import('../src/ai.js');
+  const world = createWorld([{ inputs: normaliseInputs({ ...structuredClone(PRESETS.knight), mounted: true }), corner: 'red' }, { inputs: normaliseInputs(structuredClone(PRESETS.yari)), corner: 'blue' }], { seed: 1, arena: { halfX: 30, halfZ: 30 } });
+  const [rider, man] = world.fighters;
+  placeFighter(rider, -12, 0);
+  placeFighter(man, 12, 0);
+  advance(world, 0.5);
+  const horse = rider.mount;
+  // Bled most of the way to collapse, and still bleeding.
+  horse.bloodLost = 0.17;
+  horse.bleed = 0.003;
+  for (let t = 0; t < 8 && rider.mount; t += 0.1) advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+  assert.equal(rider.mount, null, 'he got down');
+  assert.equal(rider.state, 'up', 'on his feet, not thrown');
+  assert.ok(world.events.some((event) => event.kind === 'unhorsed' && event.fighter === rider.id && event.effects[0] === 'gets down from his horse'));
+});

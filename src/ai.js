@@ -20,7 +20,7 @@ import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
 import { ammoLeft, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
 import { rayBlocked } from './physics/terrain.js';
-import { turretLaid } from './physics/mounted.js';
+import { dismount, dismountReady, horseHealth, turretLaid } from './physics/mounted.js';
 
 export const AI = {
   // Against a gun: close in (to `within` m, then fight), weaving (rad/s),
@@ -393,6 +393,9 @@ export const AI = {
   //   (near a third of the way to breaking alone) and leaves it a flinch to
   //   others; relative strength (AI.standing) already counts the horse's and
   //   the steel's real advantage, for everyone alike.
+  // A rider's horse failing under him (mounted.js horseHealth): past `at` of the way down (or past `bleeding` while it bleeds fast)
+  // he reins it in and gets down onto his feet before it falls with him; a lame horse is no less. Thrown off by a blow, as ever.
+  dismount: { at: 0.7, bleeding: 0.5 },
   // The flinch at a comrade cut down beside him (keepShock, think): a man who sees one of his own, within `within` m (in full
   // within `near`), lose a limb or his head (`severed`) or be killed outright (`killed`, of that), steps back with his guard up
   // and holds his blows for up to `seconds` s, then fights on: the startle of combat, not flight (the fear model and the rout
@@ -2159,6 +2162,13 @@ function keepShock(world, dt) {
   }
 }
 
+/** Whether a horse is too far gone to stay on (AI.dismount): badly hurt, or bleeding fast and half way, or lame. A machine never. */
+function horseFailing(horse) {
+  if (horse.spec?.machine) return false;
+  const health = horseHealth(horse);
+  return Boolean(health && !health.down && (health.harm >= AI.dismount.at || (health.bleeding && health.harm >= AI.dismount.bleeding) || health.lame));
+}
+
 /** The men of his side near a man cut down (`share`: how terrible a sight, AI.recoil) flinch from it: back, guard up, a moment. */
 function recoilFrom(world, victim, share) {
   const spec = AI.recoil;
@@ -2946,6 +2956,13 @@ function decide(world, fighter, dt) {
   }
   // On horseback: the charge (riding.js).
   if (fighter.mount) {
+    // His horse failing: reined in and got down from, before it falls with him (AI.dismount).
+    if (horseFailing(fighter.mount)) {
+      fighter.mount.goal = { heading: fighter.mount.yaw, speed: 0 };
+      fighter.mount.goalAt = world.time;
+      if (dismountReady(fighter)) dismount(world, fighter);
+      return;
+    }
     // A wing of horse stands on the flank until it is released (formation.js moveWings).
     if (fighter.wing?.held) holdWing(fighter, world.time);
     else ride(world, fighter, opponent, STYLES[fighter.style] ?? STYLES.mix, dt, { gunfight });
