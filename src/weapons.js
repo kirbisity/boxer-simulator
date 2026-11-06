@@ -1345,9 +1345,26 @@ export const BLADES = {
   bite: 0.82,
   sever: {
     // joint: [J for a typical limb, the segment whose thickness scales it, typical radius m]
-    wrist: [34, 'Forearm', 0.035], elbow: [60, 'Forearm', 0.04], shoulder: [105, 'UpperArm', 0.05],
-    ankle: [55, 'Shank', 0.045], knee: [94, 'Shank', 0.055], hip: [195, 'Thigh', 0.08], neck: [120, null, 0],
+    // The limbs' are an eighth below what they were (wrist 34, elbow 60, shoulder 105, ankle 55, knee 94, hip 195): an
+    // edge does not shear a long bone through its whole section, it is a wedge, and cortical bone (brittle across the
+    // grain: fracture toughness ~2-5 MPa·√m against a shear strength of ~50-70 MPa) splits ahead of it once it is in, so
+    // the last of the section parts for less than its shear work. (The neck is not a limb: as it was.)
+    wrist: [30, 'Forearm', 0.035], elbow: [53, 'Forearm', 0.04], shoulder: [92, 'UpperArm', 0.05],
+    ankle: [48, 'Shank', 0.045], knee: [83, 'Shank', 0.055], hip: [172, 'Thigh', 0.08], neck: [120, null, 0],
   },
+  // What is left of a limb to cut through (physics.js limbResistance): the energy to go through it (`sever`) is the
+  // flesh's (skin, muscle, tendon: 1 - `bone` of it) and the bone's (`bone`: the bone takes most of the work, as a
+  // butcher's cleaver finds; the soft tissue parts under an edge for little). An edge that stops in the limb leaves it
+  // so: of the flesh it parted, `reopen` lies where the next blow at that place cuts (a blow put to a place lands within
+  // a hand's breadth of the last; a wound gapes, and what is cut does not resist again); of the bone, what it notched.
+  // An edge that goes into the bone `splits` of the way (by energy: what is past the flesh, and as much of it as came
+  // square across the limb, BLADES.bone `grazeShare` for a graze) breaks it: a notched long bone fails across the notch
+  // under the limb's own load (a notch a third or more into a cortical tube takes most of its bending strength). A
+  // broken bone carries `fractured` of its share: the ends move apart under the next edge, only the splinters and the
+  // periosteum to part, and the flesh is all that holds the limb on. So a heavy cut short of the bone's work cuts, past
+  // it breaks, past the whole limb takes it off; and a broken or cut-into limb comes off to a blow that would only
+  // have cut a whole one — what is left of the limb resists, not a rule for a second blow.
+  limbCut: { bone: 0.6, splits: 0.45, fractured: 0.2, reopen: 0.5 },
   // A cut or a stab in a limb breaks the bone only if it reaches it: the
   // flesh takes the first `fleshJ` of it, all past `fullJ` gets to the bone;
   // and a blow that only grazes the side of the limb (its line passing far

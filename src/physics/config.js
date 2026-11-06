@@ -916,6 +916,16 @@ export const WORLD = {
   // seriously hurt and shows fully red: a face about a dozen hard shots,
   // a trunk two dozen body shots, a forearm a lot of blocking.
   damageCapacity: { head: 26, trunk: 16, Forearm: 30, UpperArm: 30, Thigh: 12, Shank: 12 },
+  // The tissue under a blunt blow is hurt by the stress of the contact, not only by the part's speed change: by how deep
+  // it is pressed in (the compression the chest's injury follows, Viano and Lau's viscous criterion; a bruise, a crushed
+  // muscle, a cracked bone all go by it). For one impulse a striking face of radius a presses in as 1/√a: on a soft body
+  // a flat face's stiffness is ∝ a (Boussinesq), so its peak force is ∝ √a and the depth, force over stiffness, ∝ 1/√a.
+  // The capacities above were set by gloved blows and kicks, so a striking face narrower than the glove's (`radius`, m:
+  // WORLD.fists.gloved) hurts the part √(radius / a) times its speed change (a bare fist 0.042 m: ~1.24; a mace's head
+  // 0.036: ~1.34), to `most` (narrower still, the flesh wraps round it and the patch is the flesh's, not the striker's).
+  // A broader face than the glove's is as the glove. The brain's strain (the head's speed change) is not the tissue's:
+  // it is left as it is (applyHeadDamage). (A bare fist hurt as a glove did before, and a club's shaft as a cushion.)
+  contactStress: { radius: 0.065, most: 1.5 },
   blockedDamageShare: 0.35,
   downSecondsMin: 3,
   downSecondsRange: 4,

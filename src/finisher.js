@@ -48,8 +48,13 @@ export const FINISHER = {
   short: 0.65,
   belt: 'knife',
   // What the thrust gains over an ordinary stab: the share of his own body mass behind the point (`body`; a stab is 0.02), the
-  // point's harm and the blunt harm it carries as multiples, and how often it finds the gap in plate it is aimed at (`gap`).
-  profile: { body: 0.15, pierce: 2, blunt: 0.3, gap: 0.95, drive: 4 },
+  // blunt harm it carries as a multiple (a dagger driven in: all point), and how often it finds the gap in plate it is aimed
+  // at (`gap`). And the point is leaned on all the way in (physics.js finisherPress): bowed over him, `lean` of his weight on
+  // the hilt (his trunk, head and arms over his hands, ~0.6 of him, more than half of it borne by them) and his arm's push,
+  // over `depth` m (a dagger's length into the throat, the armpit or the groin, to the vessels or the brain): ~550 N over
+  // 0.12 m, ~65 J more than the blow brings, and more again for a heavier man or one in armour. (It was the blow's point
+  // harm doubled: a rule, and through the mail under a gap in plate it still often left him alive.)
+  profile: { body: 0.15, lean: 0.35, depth: 0.12, blunt: 0.3, gap: 0.95, drive: 4 },
 };
 
 // The places on a man that a point is put to, in order of preference when they are alike. `key` is the part of him struck first,
