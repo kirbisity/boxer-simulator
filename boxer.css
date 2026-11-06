@@ -590,6 +590,21 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .target-marker .bar { width: 100%; height: 5px; }
 .target-marker.locked .name { color: var(--lock); }
 .target-marker.locked .name::before { content: '◎ '; }
+/* His horse (physics/mounted.js horseHealth: its blood lost, the blows on its body, lame): a thin bar under the man's, a horse
+   glyph before it; there only while he rides. Under the player's stamina and adrenaline, and under a mounted man's marker bar. */
+.horse-row { display: flex; align-items: center; gap: 5px; height: 9px; }
+.horse-row[hidden] { display: none; }
+.horse-row .glyph { font-size: 12px; line-height: 9px; }
+.horse-row .bar { flex: 1; position: relative; }
+.player-status .horse-row .bar { height: 5px; }
+.target-marker .horse-row { width: 100%; gap: 3px; height: 7px; }
+.target-marker .horse-row .glyph { font-size: 10px; line-height: 7px; }
+.target-marker .horse-row .bar { height: 3px; }
+.bar.horse-bar i { background: linear-gradient(90deg, #e0353b, #ffcf4a 45%, #c8a06a); }
+.horse-row.down .glyph { opacity: 0.45; }
+.bar.horse-bar.bleeding { animation: bleed-pulse 0.9s ease-in-out infinite; }
+.bar.horse-bar.bleeding i { background: repeating-linear-gradient(90deg, #b3121e 0 10px, #e0353b 10px 20px); background-size: 40px 100%; animation: bleed-drain 0.6s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .bar.horse-bar.bleeding, .bar.horse-bar.bleeding i { animation: none; } }
 @media (max-width: 560px), (max-height: 480px) {
   /* A phone: the column smaller (centred 56px in): Crawl, Guard, Jump, the special action; Lock left of Crawl and Guard. */
   .crawl-button { right: calc(30px + env(safe-area-inset-right, 0px)); bottom: calc(var(--controls-height, 56px) + 4px); width: 52px; height: 52px; }
@@ -607,6 +622,8 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
   .stick .knob { width: 46px; height: 46px; margin: -23px 0 0 -23px; }
   .stick .move { bottom: 9px; }
   .player-status { left: calc(16px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 6px); }
+  /* Riding, the horse's bar makes the status a line taller: the stick up by as much, clear of his name. */
+  *:has(> .player-status .horse-row:not([hidden])) > .stick { bottom: calc(var(--controls-height, 56px) + 70px); }
   .art-button { left: calc(16px + env(safe-area-inset-left, 0px)); width: 64px; height: 64px; bottom: calc(var(--controls-height, 56px) + 192px); }
   .art-button b { font-size: 20px; }
   .swap-button, .horse-button { right: calc(36px + env(safe-area-inset-right, 0px)); }
