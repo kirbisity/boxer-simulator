@@ -51,7 +51,7 @@ test('the bleeding is by the vessel: the thigh fastest, then the arm at the shou
   const shoulder = secondsTo('shoulder', collapse);
   const elbow = secondsTo('elbow', collapse);
   const wrist = secondsTo('wrist', collapse);
-  assert.ok(hip >= 20 && hip <= 45, `the femoral: collapse in ${hip} s`);
+  assert.ok(hip >= 12 && hip <= 45, `the femoral: collapse in ${hip} s`);
   assert.ok(hip < shoulder && shoulder < elbow && shoulder < knee + 30, `hip ${hip} < shoulder ${shoulder} < elbow ${elbow}`);
   assert.ok(elbow <= 120, `the forearm off: ${elbow} s`);
   assert.ok(wrist > elbow, `the hand: ${wrist} s`);

@@ -35,20 +35,20 @@ export const MAIMING = {
   // brachial at the shoulder over a minute; a forearm's or a hand's arteries (2-3 mm) far less, and they clamp more
   // often than not (Ditkoff and Weiss; the 'paradox' of complete transection: a severed artery retracts, a lacerated
   // one cannot). So the leg off at the thigh is the quickest to drop him, the hand the slowest, and often never.
-  // (Raised a quarter across the board on the user's call, 2026-11-05: a cut limb bleeds a little faster than the first tuning.)
+  // (Raised a quarter across the board on the user's call, 2026-11-05, and two-fifths more after: a cut limb bleeds fast.)
   vessels: {
     // A hand off: the radial and ulnar arteries at the wrist.
-    wrist: { flow: 12.5, clamp: 0.55, clot: 90 },
+    wrist: { flow: 17.5, clamp: 0.55, clot: 90 },
     // The forearm off: the brachial at the elbow (~4 mm), where it divides.
-    elbow: { flow: 22.5, clamp: 0.4, clot: 140 },
+    elbow: { flow: 31.5, clamp: 0.4, clot: 140 },
     // The arm off at the shoulder: the axillary and the top of the brachial (~6 mm).
-    shoulder: { flow: 30, clamp: 0.2, clot: 200 },
+    shoulder: { flow: 42, clamp: 0.2, clot: 200 },
     // A foot off: the tibial arteries at the ankle.
-    ankle: { flow: 11.25, clamp: 0.5, clot: 90 },
+    ankle: { flow: 15.75, clamp: 0.5, clot: 90 },
     // The leg off at the knee: the popliteal (~6 mm).
-    knee: { flow: 27.5, clamp: 0.3, clot: 160 },
+    knee: { flow: 38.5, clamp: 0.3, clot: 160 },
     // The leg off at the hip: the femoral (~8-10 mm), the worst there is short of the neck.
-    hip: { flow: 47.5, clamp: 0.1, clot: 240 },
+    hip: { flow: 66.5, clamp: 0.1, clot: 240 },
   },
   // A clamped artery: this share of the flow, closing in this share of the time.
   clamped: { flow: 0.3, clot: 0.4 },

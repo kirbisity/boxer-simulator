@@ -8271,6 +8271,19 @@ export function partHealth(fighter, key) {
   return Math.max(0, 1 - (fighter.trauma?.[key] ?? 0) / injuryMark(key));
 }
 
+/** One limb's weight on his health: cut off, the share of him that went with it (WORLD.injury.severed); else its worst part's hurt × limbWeight. */
+function limbLoss(fighter, segments) {
+  const side = segments[0][0];
+  const joints = segments[0].endsWith('Arm') ? ARM_CUT_JOINTS : LEG_CUT_JOINTS;
+  const spec = WORLD.injury.severed;
+  let lost = 0;
+  for (const cut of fighter.severed ?? []) if (cut.side === side && joints.includes(cut.joint)) lost = Math.max(lost, spec.share[cut.joint]);
+  if (lost > 0) return spec.base + spec.perMass * lost;
+  return WORLD.injury.limbWeight * (1 - Math.min(...segments.map((key) => partHealth(fighter, key))));
+}
+const ARM_CUT_JOINTS = ['wrist', 'elbow', 'shoulder'];
+const LEG_CUT_JOINTS = ['ankle', 'knee', 'hip'];
+
 /**
  * How hurt the body is, 0 (fresh) to 1 (spent) — what the health bar shows: the
  * injury to the head and the trunk above all (either at its mark, he is dead),
@@ -8280,7 +8293,8 @@ export function partHealth(fighter, key) {
  */
 export function bodyHarm(fighter) {
   const vital = partHealth(fighter, 'head') * partHealth(fighter, 'trunk');
-  const limbs = WORLD.injury.limbWeight * LIMBS.reduce((sum, segments) => sum + 1 - Math.min(...segments.map((key) => partHealth(fighter, key))), 0);
+  // A limb hurt or broken weighs `limbWeight`; one cut off, by the share of him that went with it (WORLD.injury.severed).
+  const limbs = LIMBS.reduce((sum, segments) => sum + limbLoss(fighter, segments), 0);
   const blood = Math.min(1, (fighter.bloodLost ?? 0) / collapseAt());
   const injured = 1 - vital * (1 - Math.min(1, limbs)) * (1 - blood) * (1 - Math.min(1, fighter.gunshot ?? 0));
   return Math.min(1, Math.max(fighter.concussion / concussionCapacity(fighter), injured));

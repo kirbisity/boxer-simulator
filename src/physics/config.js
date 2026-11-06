@@ -867,7 +867,12 @@ export const WORLD = {
   // above all the head's and the trunk's: a limb gone or broken costs
   // `limbWeight` of it (he lives without it), and the blood lost its share of
   // what collapses him. Injury, not bleeding, ends most fights with blades.
-  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, shockStrength: 0.6, limbWeight: 0.12 },
+  // `severed`: a limb cut off is not a limb hurt: the loss of it (the shock, the blood vessels, a part of him gone) weighs on him
+  // `base` plus `perMass` times the share of his body's mass that went with it, by the joint it came off at (`share`: Dempster's
+  // segment masses: a hand 0.6%, forearm and hand 2.2%, the whole arm 5%; a foot 1.45%, shank and foot 6.1%, the whole leg 16.1%):
+  // a hand ~0.27, a forearm ~0.31, an arm ~0.38, a foot ~0.29, a shank ~0.4, a leg ~0.65; the blood it loses on top.
+  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, shockStrength: 0.6, limbWeight: 0.12,
+    severed: { base: 0.25, perMass: 2.5, share: { wrist: 0.006, elbow: 0.022, shoulder: 0.05, ankle: 0.0145, knee: 0.061, hip: 0.161 } } },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).
   // Against the gun hand's strength (N; `reference` an average man's) the
