@@ -101,6 +101,8 @@ export function createHorse(fighter, id, random) {
     goal: { heading: fighter.yaw, speed: 0 }, goalAt: -Infinity,
     // Its comrades' horses swerved from (friendlyAvoid): { at, turn, speed }, looked again every WORLD.mount.avoid `every` s.
     avoid: null,
+    // Its detail this step (physics.js chooseDetail, chooseHorseDetail: 'full' or 'coarse'), and whether it moved this substep.
+    detail: 'full', stepped: true,
     stride: 0, state: 'up', fall: 0, roll: 0, bleed: 0, bloodLost: 0, trauma: 0, wounds: {},
     capsules: [], legs: {},
     // Its shape and gaits (a robot dog's are its own: robotdogs.js).
@@ -1599,16 +1601,45 @@ function packedWith(world, men) {
 export function collideHorses(world, h) {
   const horses = world.horses;
   if (!horses?.length) return;
+  // (A coarse horse is tested on the substeps it moves on: chooseHorseDetail.)
   for (const horse of horses) {
-    if (horse.state === 'down') continue;
+    if (horse.state === 'down' || !horse.stepped) continue;
     rideDown(world, horse);
     trodOn(world, horse);
   }
   for (let a = 0; a < horses.length; a += 1) {
     for (let b = a + 1; b < horses.length; b += 1) {
-      if (horses[a].state !== 'down' && horses[b].state !== 'down') horsesMeet(world, horses[a], horses[b]);
+      if (horses[a].state !== 'down' && horses[b].state !== 'down' && (horses[a].stepped || horses[b].stepped)) horsesMeet(world, horses[a], horses[b]);
     }
   }
+}
+
+/**
+ * Each horse's detail this step (WORLD.tiers `horse`): in a big fight (tier 3 up) a horse out of it — no enemy man or
+ * horse near, its rider not in full, standing on the ground — is 'coarse' and steps on a coarse man's substeps; any
+ * other is in 'full'. (Its rider's detail is chosen first: chooseDetail.)
+ */
+export function chooseHorseDetail(world, tier) {
+  for (const horse of world.horses) horse.detail = tier >= 3 && horse.state === 'up' && !horse.air && !horseEngaged(world, horse) ? 'coarse' : 'full';
+}
+
+/** Whether a horse is in the fight: its rider in full, or an enemy man (not out) or horse (not down) within reach of it soon (WORLD.tiers `horse`). */
+function horseEngaged(world, horse) {
+  const spec = WORLD.tiers.horse;
+  const rider = horse.rider === null ? null : world.fighters[horse.rider];
+  if (rider?.mount === horse && rider.detail === 'full') return true;
+  const range = spec.range + spec.lead * Math.abs(horse.speed);
+  for (const fighter of world.fighters) {
+    if (fighter.corner === horse.corner || fighter.state === 'out' || fighter.dormant || fighter.mount) continue;
+    const at = P.pelvis * 3;
+    if ((fighter.x[at] - horse.at[0]) ** 2 + (fighter.x[at + 2] - horse.at[1]) ** 2 < range * range) return true;
+  }
+  for (const other of world.horses) {
+    if (other === horse || other.corner === horse.corner || other.state === 'down') continue;
+    const reach = range + spec.lead * Math.abs(other.speed);
+    if ((other.at[0] - horse.at[0]) ** 2 + (other.at[1] - horse.at[1]) ** 2 < reach * reach) return true;
+  }
+  return false;
 }
 
 /** A man of the horse's own side in its way: eased out of it (he steps aside, the lighter further), no blow, no harm. */

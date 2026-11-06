@@ -36,7 +36,7 @@ import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
 import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
-import { collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
+import { chooseHorseDetail, collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, SEATED_PARTICLES, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
@@ -3801,8 +3801,11 @@ export function step(world, dt) {
   const stride = coarseStride(world);
   for (let substep = 0; substep < WORLD.substeps; substep += 1) {
     const time = world.time + substep * h;
-    // Horses move on their own (rigid bodies), and carry their riders.
-    for (const horse of world.horses) stepHorse(world, horse, h);
+    // Horses move on their own (rigid bodies), and carry their riders. A coarse horse (chooseHorseDetail) steps with the coarse men.
+    for (const horse of world.horses) {
+      horse.stepped = horse.detail !== 'coarse' || substep % stride === stride - 1;
+      if (horse.stepped) stepHorse(world, horse, horse.detail === 'coarse' ? stride * h : h);
+    }
     // A coarse fighter steps on one substep in `stride`, that much further; a proxy not at all.
     const stepping = (fighter) => fighter.detail === 'full' || (fighter.detail === 'coarse' && substep % stride === stride - 1);
     const span = (fighter) => (fighter.detail === 'coarse' ? stride * h : h);
@@ -3852,7 +3855,11 @@ export function step(world, dt) {
       world.crashQueued.length = 0;
     }
   }
-  for (const fighter of world.fighters) if (fighter.detail === 'proxy' && !fighter.dormant && proxyBeat(world, fighter)) poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
+  for (const fighter of world.fighters) {
+    if (fighter.detail !== 'proxy' || fighter.dormant) continue;
+    if (fighter.mount) carryProxyRider(world, fighter, dt);
+    else if (proxyBeat(world, fighter)) poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
+  }
   for (const horse of world.horses) {
     horseTimers(world, horse, dt);
     if (horse.rider === null) loseHorse(world, horse);
@@ -4410,16 +4417,20 @@ function chooseDetail(world) {
       // In an exchange now: striking, struck at, just hit, holding or held, getting up.
       const exchanging = world.keepFull?.has(fighter.id) || fighter.punch || fighter.rush || fighter.clinch || fighter.pin || fighter.pickup
         || targeted.has(fighter.id) || lastHit > world.time - WORLD.tiers.hitMemory || fighter.state === 'rising';
-      // (A rider is always in full: he is carried by his horse, which is not a pose.)
-      if (exchanging || fighter.mount) fighter.detail = 'full';
+      // (A rider whose horse is going down or is in the air is in full: he may be thrown.)
+      const unsteady = fighter.mount && (fighter.mount.state !== 'up' || fighter.mount.air);
+      if (exchanging || unsteady) fighter.detail = 'full';
       // A man standing in the ranks behind the front (formation.js) is only a pose, enemy near or not.
       else if (fighter.slot && !fighter.inFront && fighter.state === 'up' && world.formations?.[fighter.formation]) fighter.detail = 'proxy';
       else if (tier === 3 || fighter.state !== 'up') fighter.detail = 'coarse';
+      else if (fighter.mount) fighter.detail = foeWithin(world, hips, index, WORLD.tiers.engageRange + WORLD.tiers.riderLead * Math.abs(fighter.mount.speed)) ? 'coarse' : 'proxy';
       else fighter.detail = grid.near(index).some((other) => world.fighters[other].corner !== fighter.corner && world.fighters[other].state !== 'out') ? 'coarse' : 'proxy';
     });
   }
   // A dormant man is a pose that is never worked out: out of the contacts like any proxy, and not drawn.
   if (world.awake !== undefined) for (const fighter of world.fighters) if (fighter.dormant) fighter.detail = 'proxy';
+  // (The horses after their riders: a horse goes by its rider's detail, and by the enemy near it.)
+  if (world.horses.length) chooseHorseDetail(world, tier);
   // Back into the physics from a pose: moving as the pose was. (A pose touches no one: a man may have walked into it. This
   // step that overlap is put right as a placement, not a speed: pushApart.)
   world.fighters.forEach((fighter, index) => {
@@ -4429,6 +4440,43 @@ function chooseDetail(world) {
       fighter.unposedAt = world.steps;
     }
   });
+}
+
+/** Whether a man not of his side and not out is within `range` m of fighter `index` (his hips, `hips[index]`, on the floor). */
+function foeWithin(world, hips, index, range) {
+  const fighter = world.fighters[index];
+  const [x, z] = hips[index];
+  return world.fighters.some((other, at) => other.corner !== fighter.corner && other.state !== 'out' && (hips[at][0] - x) ** 2 + (hips[at][1] - z) ** 2 < range * range);
+}
+
+/**
+ * A rider who is a pose (a proxy), once a step: carried by his horse. His seat goes where the saddle is
+ * (seatRider), the rest of him and his weapons with it as one piece; on his beat his pose is worked out
+ * there (poseProxy) and he is set back in the saddle. All of him moves at the saddle's speed, so that
+ * back in the physics (chooseDetail sets each part's previous place from it) he goes on with the horse.
+ */
+function carryProxyRider(world, fighter, dt) {
+  const pelvis = P.pelvis * 3;
+  const before = [fighter.x[pelvis], fighter.x[pelvis + 1], fighter.x[pelvis + 2]];
+  seatRider(fighter, dt);
+  const shift = [fighter.x[pelvis] - before[0], fighter.x[pelvis + 1] - before[1], fighter.x[pelvis + 2] - before[2]];
+  for (let index = 0; index < PARTICLES.length; index += 1) {
+    if (SEATED_PARTICLES.has(index)) continue;
+    for (let axis = 0; axis < 3; axis += 1) fighter.x[index * 3 + axis] += shift[axis];
+  }
+  for (const weapon of [fighter.weapon, fighter.offWeapon]) if (weapon?.held && weapon.tip) weapon.tip = vec.add(weapon.tip, shift);
+  if (proxyBeat(world, fighter)) {
+    poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
+    seatRider(fighter, dt);
+  }
+  const carrier = fighter.carrier;
+  for (let index = 0; index < PARTICLES.length; index += 1) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      fighter.v[index * 3 + axis] = carrier[axis];
+      fighter.prev[index * 3 + axis] = fighter.x[index * 3 + axis] - carrier[axis] * dt;
+    }
+  }
+  for (const weapon of [fighter.weapon, fighter.offWeapon]) if (weapon?.held) weapon.tipVelocity = carrier;
 }
 
 /** Whether this step is a proxy's beat (each on his own, spread by his id). */

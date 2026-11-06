@@ -609,7 +609,9 @@ export function thinkAll(world, dt, playerIds = new Set()) {
     if (fighter.dormant || fighter.corner === 'grey' || fighter.driven) continue;
     // A man lying in ambush waits where he is, unseen, for the signal (springAmbush).
     if (fighter.hidden) continue;
-    if (!staggered || fighter.detail === 'full' || fighter.detail === undefined) {
+    // (A rider thinks every step, whatever his detail: a step his AI sets no goal for his horse, it goes by his footwork,
+    // physics/mounted.js goalFromFootwork.)
+    if (!staggered || fighter.detail === 'full' || fighter.detail === undefined || fighter.mount) {
       // Cleared, so that once he is staggered he takes up his own beat.
       fighter.aiOwed = undefined;
       think(world, fighter, dt);
