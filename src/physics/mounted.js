@@ -1307,7 +1307,8 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const struckMass = horse.mass * capsule.mass;
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
   const impulse = reducedMass * closing * (1 + WORLD.restitution);
-  const energy = 0.5 * reducedMass * closing * closing;
+  // (A set point into a charging horse: no more than its shaft carries before it gives, brace `shaft`.)
+  const energy = Math.min(0.5 * reducedMass * closing * closing, set ? brace.shaft : Infinity);
   const mix = harmMix(wspec, spec.mode, along, closest.s);
   const drawn = 1 + WORLD.skill.draw * 2 * ((attacker.body.skill ?? 0.5) - 0.5);
   mix.cut *= drawn;
@@ -1377,7 +1378,9 @@ export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, 
   if (attacker) horse.lastHitBy = attacker.id;
   if (cut > 1) event.effects.push(cut > 60 ? 'a deep cut' : 'cut');
   if (pierce > 1) event.effects.push(pierce > 40 ? 'run through' : 'stabbed');
-  if (!horse.spec?.machine && (capsule.part === 'chest' || capsule.part === 'neck') && pierce > BLADES.lethalPierce * BODY.toughness * spec.heartDepth) {
+  // Deep enough, and over the heart or a great vessel (`vital`: their share of the part's flank where the point lands).
+  const vital = spec.vital?.[capsule.part] ?? 0;
+  if (!horse.spec?.machine && vital > 0 && pierce > BLADES.lethalPierce * BODY.toughness * spec.heartDepth && world.random() < vital) {
     horse.bleed += bleedToLose(collapseShare() - horse.bloodLost, spec.heartSeconds);
     event.effects.push('through the heart');
   }

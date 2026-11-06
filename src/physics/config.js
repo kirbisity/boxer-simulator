@@ -1221,9 +1221,14 @@ export const WORLD = {
     // `bleedShare`: a horse's wounds bleed this share of what the same wound costs a man for its blood (set slower for play, the
     // user's call 2026-11-06: a horse's thick hide and the muscle over its vessels close a wound's mouth; horses ran on with many
     // wounds), and a heart or great vessel opened drops it in `heartSeconds`.
-    horse: { manBlood: 75, bleedShare: 0.3, heartSeconds: 30, heartDepth: 4, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
+    // `vital`: of a point deep enough to reach them, the share that lands over the heart and great vessels (their part of the
+    // chest's and the neck's flank, seen as the point meets it): the rest goes into muscle and bleeds as any wound.
+    horse: { manBlood: 75, bleedShare: 0.3, heartSeconds: 45, heartDepth: 4, vital: { chest: 0.15, neck: 0.1 }, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
-    brace: { length: 1.5, still: 0.5, share: 0.5 },
+    // `shaft`: what a set point can drive into a horse before its shaft gives (J): an ash shaft bends or snaps past a few kN
+    // (~4 kN) over the ~0.25 m the point goes in: past that the energy goes into the shaft breaking and the man thrown back,
+    // not into the horse.
+    brace: { length: 1.5, still: 0.5, share: 0.5, shaft: 1000 },
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     // A horse will not run into another horse if it can help it (a herd animal, and a rider rides his line knee to knee, not
     // into his comrade): each horse looks `ahead` s along its way (at least `nearest` m) at the horses of its own side and, where
