@@ -94,7 +94,7 @@ export const FOLLOW_CAM = {
   // changes no faster than `rate` rad/s: a swing, never a whip. The player's own drag of the view stops it at once; it comes back only
   // `pause` s after the last of his drag, from nothing. A visitor who asks for less motion (prefers-reduced-motion) gets `reduced` of it.
   // Its swing gathers and dies away no faster than `accel` rad/s² (a head turning, never a snap at the start or the end of a turn).
-  ahead: { turn: 0.7, intent: 0.5, intentFrom: 1.4, intentTo: 2.2, most: 0.6, headingSeconds: 0.25, still: 0.5, brisk: 2.2, seconds: 0.35, rate: 0.95, accel: 3, pause: 1, reduced: 0.4 },
+  ahead: { turn: 0.55, intent: 0.4, intentFrom: 1.4, intentTo: 2.2, most: 0.5, headingSeconds: 0.25, still: 0.5, brisk: 2.2, seconds: 0.45, rate: 0.7, accel: 2, pause: 1, reduced: 0.4 },
   fov: 40,
 };
 
