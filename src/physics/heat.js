@@ -103,15 +103,21 @@ export function stepHeat(world, fighter, dt) {
   const spec = WORLD.heat;
   const kit = kitHeat(fighter);
   const aerobic = Math.max(1e-6, fighter.body.aerobic);
-  const load = loadWatts(fighter);
-  if (load > 0) fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - (load * dt) / (aerobic * spec.staminaJoules));
-  // What he drew since the last step, less the wind knocked out of him (owed back, not spent).
-  const knocked = Math.max(0, (fighter.windDebt ?? 0) - heat.debt);
-  const drawn = Math.max(0, heat.last - fighter.stamina - knocked);
   const bodyKg = fighter.body.bodyMassKg;
-  // His own body's walk or run (the player's sprint draws for it: its heat is in `drawn`).
-  const moving = fighter.runMode ? 0 : movingWattsPerKg(groundSpeed(fighter)) * bodyKg;
-  const metabolic = (drawn * aerobic * spec.staminaJoules) / dt + moving;
+  const speed = groundSpeed(fighter);
+  // What he drew since the last step, less the wind knocked out of him (owed back, not spent). While he sprints (the player's
+  // run mode) what he draws is the run's, and its heat is reckoned below from his speed.
+  const knocked = Math.max(0, (fighter.windDebt ?? 0) - heat.debt);
+  const drawn = fighter.runMode ? 0 : Math.max(0, heat.last - fighter.stamina - knocked);
+  // The armour's cost to move, on the game's scale for moving a body (WORLD.heat.loadDraw). Not in the player's sprint: its
+  // cost (control.js CONTROL.run) was set for a man in plate as well as out of it, and is paid there.
+  const loadKg = kit.armourKg * spec.armourPerKg + kit.carriedKg * spec.carriedPerKg;
+  if (loadKg > 0 && speed >= spec.still && !fighter.runMode) {
+    const draw = (spec.loadDraw * (loadKg / bodyKg) * Math.min(1, speed / spec.sprint) * dt) / aerobic;
+    fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - draw);
+  }
+  // Moving his body and his load, in watts (the load's heat whatever its stamina).
+  const metabolic = (drawn * aerobic * spec.staminaJoules) / dt + movingWattsPerKg(speed) * bodyKg + loadWatts(fighter);
   const made = spec.restWatts * bodyKg + metabolic * (1 - spec.efficiency);
   const climate = world.climate ?? climateOf(null);
   const dry = kit.conductance * (spec.skin - climate.air);

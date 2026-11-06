@@ -312,8 +312,13 @@ export const WORLD = {
   //   in kg of body: plate is strapped to the limbs, which must be swung every stride, and Askew et al. 2012 (Proc. R. Soc. B,
   //   fifteenth-century harnesses on a treadmill) measured it 1.9× (walking) to 1.7× (running) a back-carried load of the same
   //   mass, and 2.1-2.3× the cost of moving unloaded. `carriedPerKg`: a load on the back or in a pack, at the plain rate
-  //   (a flamethrower's tanks are not counted here: they already lower his aerobic, body.js `packed`). This extra cost, unlike
-  //   his own body's, is drawn from his stamina as he moves.
+  //   (a flamethrower's tanks are not counted here: they already lower his aerobic, body.js `packed`). Its heat is reckoned in
+  //   watts as above; its stamina on the game's own scale for moving a body, so a load costs what the same mass of body would:
+  // - loadDraw: stamina a second (before his aerobic) for moving his own body's worth of load at `sprint` m/s, in proportion
+  //   to his speed: the run's own cost (control.js CONTROL.run.staminaPerSecond, a sprint's), so 23 kg of plate (~44 kg of
+  //   load at 1.9×) on an 85 kg man costs half as much again as the run itself, and a walk a few hundredths of that. Drawn
+  //   at any pace, walk or (an AI's) run: his own body's walk costs nothing, the armour's does. Not in the player's sprint
+  //   (run mode): CONTROL.run's cost was set against a man in plate already (winded in a little over a minute), and is not counted twice.
   // - area: body surface (m²) by the DuBois formula from his height and body mass; airInsulation (m²K/W): the still layer of
   //   air on the skin (~0.1, moving a little); clo (m²K/W per clo: 0.155). skin: his skin's temperature working hard (~35 °C).
   // - clothes: clo of ordinary clothes (shirt and trousers, a tunic: ~0.6); armour: clo over that from armour that covers
@@ -337,7 +342,7 @@ export const WORLD = {
   //   not named (a ring, a hall, a town in spring).
   heat: {
     core: 37, heatCapacity: 3470, restWatts: 1.2, staminaJoules: 18600, efficiency: 0.2,
-    walk: 2, run: 4, runFrom: 2.2, still: 0.2, armourPerKg: 1.9, carriedPerKg: 1,
+    walk: 2, run: 4, runFrom: 2.2, still: 0.2, armourPerKg: 1.9, carriedPerKg: 1, loadDraw: 0.02, sprint: 8,
     airInsulation: 0.1, clo: 0.155, skin: 35, clothes: 0.6, armour: 1.6,
     skinShare: { head: 0.09, trunk: 0.36, limb: 0.55 },
     sweatFrom: 36.8, sweatPerDegree: 550, sweatMost: 1000, evapBlocked: 0.65,
