@@ -25,6 +25,7 @@ import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportL
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
+import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
@@ -173,7 +174,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // A hand grenade carried (physics/throwable.js: { kind, left }, from his kit) and the throw under way ({ kind, hand, t, mark, lit, released }).
     throwable: undefined, throwing: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
-    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null, aiGuardSeen: undefined, aiPunished: undefined,
+    aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiBreather: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null, aiGuardSeen: undefined, aiPunished: undefined,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
     // What he has left to shoot (physics/ranged.js ammoLeft: arrows, or bolts and charges), and since when he has held a shot his own men foul (ai.js).
     arrows: undefined, rounds: undefined, holdingShot: undefined,
@@ -207,6 +208,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     guardHeld: undefined, guardUntil: undefined, guardLinger: undefined, blowRead: undefined,
     // windDebt: the wind blows knocked out of him, coming back (WORLD.wind.returnSeconds).
     windDebt: 0,
+    // His body heat (physics/heat.js, WORLD.heat): core (°C), what the bar was as it left the last step (last, debt), his kit's
+    // heat traits worked out once (kit).
+    heat: freshHeat(),
     // limbCache: limbShares worked out this step.
     limbCache: undefined,
   };
@@ -1582,6 +1586,8 @@ export function reclothe(world, fighter, inputs) {
   }
   fighter.capsuleCache = undefined;
   fighter.damageVersion += 1;
+  // (Other clothes keep heat in, and cost breath to move in, as they do: worked out again.)
+  fighter.heat.kit = null;
   refreshProps(world, fighter);
 }
 
@@ -1628,7 +1634,7 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
-export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {} } = {}) {
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
@@ -1721,7 +1727,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // Each rider's horse under him (physics/mounted.js).
   const horses = [];
   if (mounted) for (const fighter of fighters) if (riding(fighter.body.inputs)) horses.push(createHorse(fighter, horses.length, random));
-  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses };
+  // The air of the place (`place`: its scene's key; WORLD.heat.climates): how fast a man sheds the heat of the fight there.
+  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses, climate: climateOf(place) };
   // A fight with weapons in it: someone came armed (a weapon in hand or a sidearm in his kit). A bout of bare hands (the ring, the
   // cage, a brawl) is not one, and no one in it draws a knife on a man who is down (finisher.js).
   world.armed = fighters.some((fighter) => fighter.weapon || fighter.body.gear.sidearm);
@@ -4454,13 +4461,16 @@ function updateTimers(world, fighter, dt) {
   updatePickup(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
   if (fighter.player) overdraftStep(world, fighter, dt);
+  // His heat: what he has drawn warms him, his armour costs breath to move in (physics/heat.js).
+  stepHeat(world, fighter, dt);
   // A machine (gear.machine: a robot) does not tire: what an attack or a run costs a man costs it nothing.
   if (fighter.body.gear.machine) fighter.stamina = 1;
   else {
     // His guard held up: a steady draw (WORLD.guardHeld), never past empty.
     if (fighter.guardHeld) fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - WORLD.guardHeld.staminaPerSecond * dt / fighter.body.aerobic);
     // He breathes through a blow of his own too, only less (WORLD.strikeRecovery).
-    fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * (fighter.punch ? WORLD.strikeRecovery : 1) * (fighter.runMode ? WORLD.runMode.recovery : 1) * (fighter.guardHeld ? WORLD.guardHeld.recovery : 1) * recoveryShare(fighter.stamina) * dt);
+    // Hot, or breathing behind a breastplate or a visor, he gets it back slower (WORLD.heat strainFrom, breath).
+    fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * winded * heatRecovery(fighter) * (fighter.punch ? WORLD.strikeRecovery : 1) * (fighter.runMode ? WORLD.runMode.recovery : 1) * (fighter.guardHeld ? WORLD.guardHeld.recovery : 1) * recoveryShare(fighter.stamina) * dt);
     // The wind a blow knocked out of him comes back on its own in a few seconds (WORLD.wind.returnSeconds).
     if (fighter.windDebt > 0) {
       const back = fighter.windDebt * (1 - Math.exp(-dt / WORLD.wind.returnSeconds));
@@ -4468,6 +4478,7 @@ function updateTimers(world, fighter, dt) {
       fighter.stamina = Math.min(1, fighter.stamina + back);
     }
   }
+  heatMark(fighter);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;
@@ -4656,7 +4667,8 @@ const want = [0, 0, 0];
 const accelerations = new Float64Array(PARTICLES.length * 3);
 
 function integrate(fighter, h, time) {
-  const fatigue = fatigueScale(fighter.stamina);
+  // (Past WORLD.heat.weakFrom the heat weakens him too: heatStrength.)
+  const fatigue = fatigueScale(fighter.stamina) * heatStrength(fighter);
   const alive = fighter.state === 'up' || fighter.state === 'rising';
   const rising = fighter.state === 'rising';
   const damping = Math.exp(-h * (fighter.air ? WORLD.terrain.airDamping : alive ? WORLD.damping.up : WORLD.damping.down));
@@ -4765,7 +4777,7 @@ export function limbShares(fighter) {
   // (Asked several times a step by the run and the rise: worked out once a step, and again if his stamina, legs or limp limbs change.)
   const cache = fighter.limbCache;
   if (cache && cache.stamp === stepStamp && cache.stamina === fighter.stamina && cache.left === fighter.legDamage.l && cache.right === fighter.legDamage.r && cache.limp === fighter.limp.size) return cache.shares;
-  const fatigue = fatigueScale(fighter.stamina);
+  const fatigue = fatigueScale(fighter.stamina) * heatStrength(fighter);
   const legFatigue = 1 - WORLD.rise.legFatigue * (1 - fatigue);
   const capacity = legCapacity();
   const shares = {

@@ -1513,5 +1513,5 @@ export function scenarioWorld(key, seed = 1) {
   const scenario = battleOf(key);
   // A battle's armies are drawn from its cast, at the same seed.
   const fighters = scenario.cast ? Object.entries(scenario.cast(seededRandom(seed))).flatMap(([corner, side]) => side.map((inputs) => ({ inputs, corner }))) : scenarioFighters(scenario);
-  return createWorld(fighters, { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation });
+  return createWorld(fighters, { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation, place: scenario.scene });
 }

@@ -18,6 +18,7 @@ import { expectedGap, gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
+import { heatStrain } from './physics/heat.js';
 import { ammoLeft, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
 import { rayBlocked } from './physics/terrain.js';
 import { dismount, dismountReady, horseHealth, turretLaid } from './physics/mounted.js';
@@ -402,6 +403,19 @@ export const AI = {
   // see to that). How long by how steady he is: × (1 - his kit's courage) × (1 - his side's discipline) × (1 - his skill); a
   // spell shorter than `least` s is none. A machine or a relentless man does not flinch, and nor does the man played.
   recoil: { within: 4, near: 2, seconds: 2, severed: 1, killed: 0.8, least: 0.3, backOff: 0.7 },
+  // Getting his wind (catchBreath): a man blown, with no blow coming at him and not held, steps back out of his man's reach and
+  // stands off, guard up, until he has it back: no timer, his own stamina and heat say when. Two men both blown stand off from
+  // each other and the fight pauses (the lulls of a real fight: a few to tens of seconds of circling apart, then at it again);
+  // a fresh man goes after a blown one, and is met if he comes into reach. In a battle's ranks the spent are relieved by the
+  // man behind them instead (formation.js DRILL.spentBelow).
+  // - below: stamina under this, he is spent (a quarter-to-a-third of the bar: the point where a man is breathing too hard to
+  //   go on trading and his arms are already down to ~70% of their force: fatigueScale).
+  // - hot: × his heat strain (physics/heat.js heatStrain, 0..1) added to `below`: a man hot past ~38.5 °C feels spent sooner
+  //   (perceived exertion climbs with core temperature at the same work: Nybo & Nielsen 2001).
+  // - until: he goes back in once his stamina is back to this (most of the bar: a man rests until he can go again, not just off empty).
+  // - margin: m beyond his man's reach he stands off (a step's room: the other must close a stride to strike).
+  // - pace: his footwork's share backing out (a measured step back, not a run: guard up, facing him).
+  breather: { below: 0.3, hot: 0.4, until: 0.7, margin: 0.4, pace: 0.8 },
   shock: { blast: 0.06, blastMost: 0.15, blastNear: 4, blastFar: 16, halfLife: 5, horse: 0.1, horseNear: 3, horseFar: 10, horseSpeed: 3, horseCone: 0.7, strange: 3 },
   // An ambush (a side's `ambush`, physics.js createWorld: hidden men) is
   // sprung at its signal, when one of its men strikes, or when one of the
@@ -1566,6 +1580,8 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
     }
     return true;
   }
+  // Blown, and safe to: out of his reach to get his wind back (AI.breather). He strikes only at a man who comes into his reach.
+  if (catchBreath(world, fighter, opponent, distance, dt)) return distance <= myRange + AI.rangeSlack;
   // The longer weapon: hold at the edge of his reach, inside mine; answer
   // whoever steps in with a burst; step back when pressed.
   const outreaching = !wary && !relentless(fighter) && fighter.weapon?.held && reachOf(fighter) - reachOf(opponent) > blade.outreachedBy;
@@ -1632,6 +1648,36 @@ function cadenceStep(world, fighter, opponent, { distance, range, wary, cadence,
   if (pressing && giving && distance > workRange + AI.rangeSlack && distance < workRange + AI.press.chaseWithin) fighter.move = Math.max(fighter.move, AI.press.chase * approach);
   if (fighter.stamina < 0.25 && distance < range + 0.4 && !relentless(fighter)) fighter.move = -0.6;
   if (phase.t > phase.length && !fighter.punch && !fighter.aiCombo?.length) start('move', phaseLength(random, cadence.move));
+  return true;
+}
+
+/**
+ * Getting his wind (AI.breather): blown (his stamina under `below`, the sooner the hotter he is), with no blow of his man's coming
+ * at him and not held in a clinch, he steps back out of his man's reach and stands off there, facing him, until his stamina is
+ * back to `until`. Returns whether he is getting it now (his footwork set). A machine never tires; a relentless man never steps
+ * back; the player decides for himself.
+ */
+function catchBreath(world, fighter, opponent, distance, dt) {
+  if (fighter.body.gear.machine || relentless(fighter) || fighter.player) return false;
+  const spec = AI.breather;
+  if (fighter.aiBreather && fighter.stamina >= spec.until) {
+    fighter.aiBreather = null;
+    // Back in: a spell of work begins from here.
+    fighter.aiCadence = null;
+    return false;
+  }
+  if (!fighter.aiBreather) {
+    const spent = fighter.stamina < spec.below + spec.hot * heatStrain(fighter);
+    const danger = opponent.punch?.target === fighter.id || fighter.clinch || opponent.clinch?.target === fighter.id;
+    if (!spent || danger) return false;
+    fighter.aiBreather = { since: world.time };
+  }
+  const safe = reachOf(opponent) + fighter.body.lengths.headRadius + spec.margin;
+  if (distance < safe - AI.blade.slack) fighter.move = -spec.pace;
+  else if (distance > safe + AI.blade.slack) fighter.move = 0.3;
+  else fighter.move *= Math.exp(-dt * 4);
+  fighter.strafe = 0;
+  fighter.running = false;
   return true;
 }
 

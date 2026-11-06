@@ -22,6 +22,7 @@
 
 import { P } from './body.js';
 import { walkingDistance } from './physics/fieldworks.js';
+import { heatStrain } from './physics/heat.js';
 
 export const DRILL = {
   // Drilled men on a side before it forms up.
@@ -117,6 +118,14 @@ export const DRILL = {
   woundedAt: 0.3,
   freshBelow: 0.15,
   relief: 2.5,
+  // The spent, in any drill: a man of the front rank blown (his stamina under `spentBelow`, + `spentHot` × his heat strain,
+  // physics/heat.js: as ai.js AI.breather's) changes places with the first man behind him in his file with his wind (stamina
+  // at least `freshAbove`) and not hurt past `woundedAt`, and drifts back to his new place as the wounded do (`relief`). The
+  // ranks behind a front were there to feed it fresh men: the Roman line relieved by the files behind it, a medieval press's
+  // front rank changing as men tired. A man with no one fresh behind him gets his wind where he stands (ai.js catchBreath).
+  spentBelow: 0.3,
+  spentHot: 0.4,
+  freshAbove: 0.7,
 };
 
 /**
@@ -266,6 +275,7 @@ export function moveFormations(world, dt, hurt = () => 0) {
     if (formation.drill.squad) retireShooters(members, formation);
     relieveShooters(world, members, formation);
     if (formation.drill.squad) relieveWounded(world, members, hurt);
+    relieveSpent(world, members, hurt);
   }
 }
 
@@ -372,6 +382,18 @@ function relieveWounded(world, members, hurt) {
   for (const fighter of members) {
     if (!fighter.inFront || !fighting(fighter) || fighter.panicked || hurt(fighter) < DRILL.woundedAt) continue;
     const fresh = behindInFile(members, fighter.slot, (other) => fighting(other) && !other.panicked && other.weapon?.held && !shoots(other) && hurt(other) < DRILL.freshBelow);
+    if (!fresh) continue;
+    swapSlots(fighter, fresh);
+    fighter.relievedAt = world.time;
+  }
+}
+
+/** A blown front-rank man changes places with a fresh one behind him in his file (DRILL.spentBelow). Never the player. */
+function relieveSpent(world, members, hurt) {
+  for (const fighter of members) {
+    if (!fighter.inFront || fighter.player || !fighting(fighter) || fighter.panicked || shoots(fighter) || fighter.body.gear.machine) continue;
+    if (fighter.stamina >= DRILL.spentBelow + DRILL.spentHot * heatStrain(fighter)) continue;
+    const fresh = behindInFile(members, fighter.slot, (other) => fighting(other) && !other.player && !other.panicked && other.weapon?.held && !shoots(other) && other.stamina >= DRILL.freshAbove && hurt(other) < DRILL.woundedAt);
     if (!fresh) continue;
     swapSlots(fighter, fresh);
     fighter.relievedAt = world.time;

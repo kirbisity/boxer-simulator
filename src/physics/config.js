@@ -295,6 +295,75 @@ export const WORLD = {
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
   staminaRecovery: 0.07,
+  // Body heat (physics/heat.js; fighter.heat.core, °C). Work warms him and his kit and the air decide how fast it goes:
+  // - core: where a man starts and where he is held at rest (37 °C; the body sheds or keeps heat to stay there, so he never
+  //   cools below it here).
+  // - heatCapacity: J per kg of body per °C, the body's mean (3.47 kJ/kg/K, the figure used in every heat-balance model):
+  //   an 80 kg man takes ~280 kJ to warm one degree.
+  // - restWatts: his resting metabolism per kg of body (~1.2 W/kg: ~95 W for 80 kg); all of it heat.
+  // - staminaJoules: the metabolic energy a whole bar of stamina is, at aerobic 1: his recovery (staminaRecovery 0.07/s) taken as
+  //   a trained man's oxygen ceiling (~4 L/min of O2, ~1.4 kW) less his resting ~0.1 kW: 1.3 kW / 0.07 per s. What he draws
+  //   costs this × his aerobic (costs are divided by it: a fitter man draws less of his bar for the same work, not less energy).
+  // - efficiency: the share of metabolic energy that becomes work, the rest heat (~20-25%: metabolic heat ~4× the mechanical work).
+  // - walk, run: the metabolic cost of moving his own body, J per kg per m (net cost of transport: ~2 walking, ~4 running,
+  //   Margaria's 1 kcal/kg/km), the run from `runFrom` m/s; nothing below `still` m/s (shuffling on the spot is in the rest).
+  //   Heat only: an unloaded man's walk costs no stamina (it is far under his aerobic ceiling); the player's sprint draws its own.
+  // - armourPerKg: what each kg of armour (the kit's mass less any load carried on the back or in a pack) costs to move,
+  //   in kg of body: plate is strapped to the limbs, which must be swung every stride, and Askew et al. 2012 (Proc. R. Soc. B,
+  //   fifteenth-century harnesses on a treadmill) measured it 1.9× (walking) to 1.7× (running) a back-carried load of the same
+  //   mass, and 2.1-2.3× the cost of moving unloaded. `carriedPerKg`: a load on the back or in a pack, at the plain rate
+  //   (a flamethrower's tanks are not counted here: they already lower his aerobic, body.js `packed`). This extra cost, unlike
+  //   his own body's, is drawn from his stamina as he moves.
+  // - area: body surface (m²) by the DuBois formula from his height and body mass; airInsulation (m²K/W): the still layer of
+  //   air on the skin (~0.1, moving a little); clo (m²K/W per clo: 0.155). skin: his skin's temperature working hard (~35 °C).
+  // - clothes: clo of ordinary clothes (shirt and trousers, a tunic: ~0.6); armour: clo over that from armour that covers
+  //   (a full harness over its arming doublet ~2 clo in all; a quilted gambeson alone ~1.5 clo); a region counts as covered by
+  //   the armour's own protection there (its blunt or cut, whichever more, 0..1: padding and plate both keep heat in), weighted by
+  //   the region's share of the skin (`skin`: head ~9%, trunk ~36%, limbs the rest, the rule of nines).
+  // - sweatFrom: core °C where sweating starts; sweatPerDegree: W of sweat evaporated per °C above it (~500-600 W/K, Nadel);
+  //   sweatMost: the most a trained man sweats, as W of evaporation (~1.5 L/h × 2.43 kJ/g ≈ 1 kW).
+  // - evapBlocked: the share of his sweat that covered skin cannot evaporate (plate is impermeable and the padding under it
+  //   soaks; the harness is open at the joints and pumps some air: roughly two thirds is lost, as in heavy protective suits).
+  // - The air: the vapour pressure gap between wet skin (at `skin`) and the air drives evaporation (Magnus formula for
+  //   saturation). Evaporation runs at its full share in temperate air (`reference`: 20 °C, 50% humidity) and less in damp
+  //   heat (a Jiangnan summer), more in dry air. Dry heat goes from skin to air, or the other way in air hotter than skin.
+  // - strainFrom/limit: hyperthermia: from `strainFrom` °C (~38.5: heart rate drifts up, the oxygen ceiling falls) his
+  //   recovery falls linearly to `recoveryAtLimit` of itself at `limit` (~40 °C, where men stop from heat exhaustion: González-
+  //   Alonso et al. 1999); from `weakFrom` (39 °C) his muscles' drive falls to `strengthAtLimit` at the limit (central fatigue:
+  //   voluntary force down ~10-20% at 40 °C, Nybo & Nielsen 2001), and no further past it.
+  // - breath: armour that hampers breathing (Askew 2012 found the breastplate forced shallow, quick breaths): his recovery ×
+  //   `breastplate` in a curved breastplate, × `closedHelm` behind a closed visor (air drawn through the sights and breaths).
+  // - climates: each place's air ({ air °C, humidity 0..1 }) for the season its battle was fought in; `temperate` for anywhere
+  //   not named (a ring, a hall, a town in spring).
+  heat: {
+    core: 37, heatCapacity: 3470, restWatts: 1.2, staminaJoules: 18600, efficiency: 0.2,
+    walk: 2, run: 4, runFrom: 2.2, still: 0.2, armourPerKg: 1.9, carriedPerKg: 1,
+    airInsulation: 0.1, clo: 0.155, skin: 35, clothes: 0.6, armour: 1.6,
+    skinShare: { head: 0.09, trunk: 0.36, limb: 0.55 },
+    sweatFrom: 36.8, sweatPerDegree: 550, sweatMost: 1000, evapBlocked: 0.65,
+    reference: { air: 20, humidity: 0.5 },
+    strainFrom: 38.5, weakFrom: 39, limit: 40, recoveryAtLimit: 0.4, strengthAtLimit: 0.8,
+    breath: { breastplate: 0.95, closedHelm: 0.93 },
+    climates: {
+      temperate: { air: 18, humidity: 0.6 },
+      // Harran, June 53 BC: the Mesopotamian summer, ~40 °C in the shade, dry.
+      carrhae: { air: 40, humidity: 0.2 },
+      // The Gobi in early summer (119 BC): hot days, dry air.
+      mobei: { air: 30, humidity: 0.25 },
+      // A water town of the lower Yangzi in summer: ~32 °C and close to saturated.
+      jiangnan: { air: 32, humidity: 0.8 },
+      // Cajamarca, November 1532: 2,750 m up in the Andes, mild.
+      cajamarca: { air: 17, humidity: 0.55 },
+      // Agincourt, 25 October 1415: cold rain on a ploughed field.
+      agincourt: { air: 8, humidity: 0.95 },
+      // Cerignola, Apulia, 28 April 1503; the Catalaunian plains, 20 June 451; Sarhu, Liaodong, April 1619.
+      cerignola: { air: 22, humidity: 0.6 },
+      catalaunian: { air: 25, humidity: 0.6 },
+      sarhu: { air: 8, humidity: 0.5 },
+      // The arena in a Roman summer, sand under the sun.
+      colosseum: { air: 30, humidity: 0.5 },
+    },
+  },
   // The share of that he still gets in the middle of a blow of his own: he does not stop breathing to swing (at 0, as it was,
   // a man swinging at three about him got next to nothing back, and wore out in seconds).
   strikeRecovery: 0.6,

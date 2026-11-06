@@ -421,7 +421,7 @@ function newBout() {
   const cramped = mounted && state.game !== 'sandbox' && (PLACE_ARENAS[state.place]?.halfX ?? 0) < PLACE_ARENAS.field.halfX * 0.6;
   const place = scenario?.scene ?? (cramped ? 'field' : state.place);
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
-  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation });
+  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation, place });
   clearGore(scene);
   setPlace(scene, place, arena, scenario?.weather);
   fightMarks.reset();
@@ -3471,7 +3471,7 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
   const entries = [...red.map((inputs) => ({ inputs: build(inputs), corner: 'red' })), ...blue.map((inputs) => ({ inputs: build(inputs), corner: 'blue' }))];
   document.body.classList.remove('sheet');
   document.querySelector('#sheet-labels')?.replaceChildren();
-  state.world = createWorld(entries, { seed, arena: PLACE_ARENAS[place] });
+  state.world = createWorld(entries, { seed, arena: PLACE_ARENAS[place], place });
   clearGore(scene);
   setPlace(scene, place, PLACE_ARENAS[place]);
   if (distance && state.world.fighters.length === 2) {
