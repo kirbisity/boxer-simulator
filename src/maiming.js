@@ -35,19 +35,20 @@ export const MAIMING = {
   // brachial at the shoulder over a minute; a forearm's or a hand's arteries (2-3 mm) far less, and they clamp more
   // often than not (Ditkoff and Weiss; the 'paradox' of complete transection: a severed artery retracts, a lacerated
   // one cannot). So the leg off at the thigh is the quickest to drop him, the hand the slowest, and often never.
+  // (Raised a quarter across the board on the user's call, 2026-11-05: a cut limb bleeds a little faster than the first tuning.)
   vessels: {
     // A hand off: the radial and ulnar arteries at the wrist.
-    wrist: { flow: 10, clamp: 0.55, clot: 90 },
+    wrist: { flow: 12.5, clamp: 0.55, clot: 90 },
     // The forearm off: the brachial at the elbow (~4 mm), where it divides.
-    elbow: { flow: 18, clamp: 0.4, clot: 140 },
+    elbow: { flow: 22.5, clamp: 0.4, clot: 140 },
     // The arm off at the shoulder: the axillary and the top of the brachial (~6 mm).
-    shoulder: { flow: 24, clamp: 0.2, clot: 200 },
+    shoulder: { flow: 30, clamp: 0.2, clot: 200 },
     // A foot off: the tibial arteries at the ankle.
-    ankle: { flow: 9, clamp: 0.5, clot: 90 },
+    ankle: { flow: 11.25, clamp: 0.5, clot: 90 },
     // The leg off at the knee: the popliteal (~6 mm).
-    knee: { flow: 22, clamp: 0.3, clot: 160 },
+    knee: { flow: 27.5, clamp: 0.3, clot: 160 },
     // The leg off at the hip: the femoral (~8-10 mm), the worst there is short of the neck.
-    hip: { flow: 38, clamp: 0.1, clot: 240 },
+    hip: { flow: 47.5, clamp: 0.1, clot: 240 },
   },
   // A clamped artery: this share of the flow, closing in this share of the time.
   clamped: { flow: 0.3, clot: 0.4 },
@@ -63,7 +64,8 @@ export const MAIMING = {
   // lost leaves the weapon in his hand but him on the ground among standing men, which it does not see (it weighs a
   // man, not his height): the leg's shock carries that. More of him gone, more shock. (Calibrated, tools/maiming.js:
   // about half of a middling unit's men break at once, more of a levy's, fewer of an elite's.)
-  shock: { wrist: 0.4, elbow: 0.45, shoulder: 0.5, ankle: 0.7, knee: 0.85, hip: 1.0 },
+  // (A fifth more across the board, 2026-11-05: a little more likely to break and crawl off than the first tuning.)
+  shock: { wrist: 0.48, elbow: 0.54, shoulder: 0.6, ankle: 0.84, knee: 1.02, hip: 1.2 },
   shockHalfLife: 25,
   // Of the shock, the share his training takes off at full skill (a veteran has seen it; his kit's courage and his side's
   // discipline already steady him in the fear model, so this is the smaller part).
