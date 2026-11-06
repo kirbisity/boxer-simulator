@@ -1145,6 +1145,22 @@ export const WORLD = {
   // and checks the runner by that impulse over his own mass (WORLD.balance.massShare of him): a light man kicking into a heavy
   // armoured body is checked the most, and trips only past what his legs hold.
   bodyFooting: { grip: 0.5, least: 0.03, most: 0.75, stepOver: { below: 2.2, height: 0.45 }, kick: { swing: 2 } },
+  // The press of a crowd (physics/press.js): bodies in contact (pushApart's trunk and shoulder touches) carry force man to man.
+  // Each man's feet hold what bears on him up to the ground's grip on his weight (WORLD.crash.brace `grip`, ~0.7, less on a slope
+  // the push runs down: μ cos θ − sin θ); a man stepping into the man before him drives instead, `push` of his weight along his
+  // way (a man leaning a shoulder into another sustains ~300-500 N, 0.4-0.7 of his weight; set at the middle). What a man neither
+  // holds nor passes on to the man before him (the front of the pack, or one pushed with nobody beyond him) drives him as a knock
+  // (WORLD.balance: speed beyond `speed` puts him over, as any shove): one man's push is held by a man standing, two lean him
+  // back, four or five ranks' worth carries the front man off his feet (Agincourt's front, borne down by those behind).
+  // A slope adds his own weight along it (m g sin θ) to what bears on him and passes on, as a crowd on a hill bears down on its foot.
+  // - sweeps: the passes a step makes through the pack (Gauss-Seidel: each pass carries a push about one rank on; a deeper pack
+  //   takes it the next step, ~0.017 s later, as quick as flesh passes a shove).
+  // - blindFrom: a man with this share of his hold already bearing on him is carried, not walking: he cannot pick where his feet
+  //   go, and treads on a man lying there (bodyFooting `stepOver` is for a man choosing his steps).
+  // - body: m, the half-breadth of a man standing, at the arms (shoulder half-span ~0.2 m and the deltoid over it): what a blade's
+  //   sweep meets beside or behind him. A swing (a move's `from` and `to`: the hand, and the blade along `dir`) whose path passes
+  //   nearer than this to another man's middle cannot be made where he stands (ai.js swingFouled); a thrust goes out in front.
+  press: { push: 0.5, sweeps: 3, blindFrom: 0.5, body: 0.25 },
   // A blow at a man low before him (lowstrike.js: lying, getting up, on his knees): made at a place on his body, not at a standing
   // man's chest in the air above him. The striker bends to it: `stoop` is the share (0 to 1) of the deepest bend he takes, enough
   // that the striking part (the fist; the blade's contact point; the point) meets the place with the arm (or the leg) `fit` of

@@ -22,6 +22,7 @@ import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tan
 import { artTurn, beakMix, coiledTwist, hiltCrush, hiltKnob, hiltMix, hookPull, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
 import { armourHardness, bluntEdge, driveShaft, dullEdge, hackShield, partHardness, shieldHardness, stopIn, strainBlade, strikeShaft } from './physics/wear.js';
+import { blockStep, carried, recordContact, setDrive, slopeFall, slopeHold, solvePress } from './physics/press.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
@@ -198,6 +199,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     helmetOff: undefined,
     // Flinching from a comrade cut down beside him until this time (ai.js AI.recoil).
     recoilUntil: undefined,
+    // The press of a crowd (physics/press.js): what bears on him from the bodies touching him, and his drive into them;
+    // groundSlope: the floor's rise per metre under him along x and z (on terrain; set each step by moveRoot).
+    press: undefined, groundSlope: undefined,
     // Running (physics/gait.js; everyone's run): runPose (the run's look, 0..1), runSlope (the slope under his run),
     // turn and yawWas (the heading's rate in a run), gaitBody (his body's gait, cached), gaitAlong and gaitAccel (his
     // speed along his way and its rate, for the lean). runMode is the player's sprint (control.js).
@@ -3092,12 +3096,15 @@ function footDown(world, fighter, foot) {
   if (!under) return;
   // Not hurrying, nor broken: he sees a man lying low where he goes and steps over him (WORLD.bodyFooting.stepOver; a crawler,
   // moving under him, is met as before).
+  // Carried in a press (physics/press.js carried), he does not choose where his feet go: he treads on him.
   const over = WORLD.bodyFooting.stepOver;
-  if (!fighter.panicked && !under.fighter.crawling && Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) < over.below && under.height <= over.height * legLength) return;
+  const pressed = carried(fighter);
+  const pace = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  if (!pressed && !fighter.panicked && !under.fighter.crawling && pace < over.below && under.height <= over.height * legLength) return;
   const side = foot.index === P.lFoot ? 'l' : 'r';
   const lying = under.fighter;
   // Going too fast to step over a man lying on the floor (or broken and fleeing): his stride kicks into him (kickLying).
-  if (!lying.crawling) {
+  if (!lying.crawling && !(pressed && pace < over.below)) {
     kickLying(world, fighter, under, side);
     return;
   }
@@ -3763,6 +3770,8 @@ export function step(world, dt) {
   stepStamp += 1;
   measureNearestFoes(world);
   world.steps = (world.steps ?? 0) + 1;
+  // The press of the bodies that touched last step (physics/press.js): what bears on each man, and the knock where it is not held.
+  solvePress(world, dt, balanceFooting);
   // Fieldworks and soft ground (an arena's `works`: physics/fieldworks.js): how deep each man stands, how the mud holds his legs, who is smothering.
   if (world.arena.works) mireStep(world, dt);
   for (const fighter of world.fighters) {
@@ -3926,7 +3935,9 @@ function checkBalance(world, fighter) {
   } else stagger(world, fighter, pushed, null);
   if (knock > WORLD.balance.speed * footing || outside > WORLD.balance.reach * legLength * footing) {
     fighter.knock = [0, 0, 0];
-    fall(world, fighter, knock > WORLD.balance.speed * footing ? 'knocked off balance' : 'overreached', !planted);
+    // (Driven by the press this step, physics/press.js: borne down by the men pushing.)
+    const reason = knock > WORLD.balance.speed * footing ? (fighter.press?.knock > 0 ? 'borne down by the press' : 'knocked off balance') : 'overreached';
+    fall(world, fighter, reason, !planted);
   }
 }
 
@@ -4087,9 +4098,27 @@ function moveRoot(world, fighter, dt) {
   const wanted = runPace === null
     ? [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot]
     : [forward[0] * runPace + left[0] * side * footwork, forward[2] * runPace + left[2] * side * footwork];
+  // Flat out (a charge, a run), the slope's pull adds to his legs' drive down it and takes from it up it (downhillPull).
+  // (Its accelerations: the charge's, as below; the run's at a standstill, gait.js runChange.) Up it, that and the climb's
+  // own limit (climbShare: the rate his legs lift him) are one limit, the work of lifting him: the lesser holds, not both;
+  // and up a grade steeper than a run takes (WORLD.runMode.stairs `slope`: he steps it, as a stair) the climb's alone.
+  let downhill = 0;
+  let uphill = 1;
+  if (world.arena.terrain) {
+    fighter.groundSlope = slopeUnder(fighter, fighter.groundSlope);
+    if (fighter.rush || runPace !== null) {
+      const accel = fighter.rush ? WORLD.footAcceleration * legs * gear.accel * 1.6 : runChange(fighter, 0, 1, 1);
+      downhill = downhillPull(fighter, wanted);
+      const share = Math.max(WORLD.gait.least, 1 + downhill / accel);
+      if (share >= 1) {
+        wanted[0] *= share;
+        wanted[1] *= share;
+      } else uphill = share;
+    }
+  }
   // On a stair or a steep slope he goes only as fast as his feet can climb (up or down) it.
   if (world.arena.terrain) {
-    const slowed = Math.min(climbShare(fighter, wanted), leashShare(fighter));
+    const slowed = Math.min(climbShare(fighter, wanted), uphill, leashShare(fighter));
     wanted[0] *= slowed;
     wanted[1] *= slowed;
   }
@@ -4100,6 +4129,9 @@ function moveRoot(world, fighter, dt) {
   if (works) [wanted[0], wanted[1]] = stepOnWorks(works, fighter, wanted);
   // His blade caught in a wolf-brush: its branches in his face, he does not get in on its bearer (physics/brush.js).
   if (fighter.caught) [wanted[0], wanted[1]] = brushKeepsOff(world, fighter, wanted);
+  // In a press (physics/press.js): the way he wants to go is his drive into the bodies before him, and he cannot step back into one bearing on him.
+  setDrive(fighter, wanted, footwork);
+  blockStep(fighter, wanted, forward);
   const change = [wanted[0] - fighter.rootVelocity[0], wanted[1] - fighter.rootVelocity[1]];
   const size = Math.hypot(change[0], change[1]);
   const speedNow = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
@@ -4109,6 +4141,14 @@ function moveRoot(world, fighter, dt) {
     // Running, or carried on from a run: he gathers speed and brakes as his body can (gait.js runChange), and turns no
     // sharper than his brake allows across his way.
     runTowards(fighter, wanted, speedNow, dt);
+    // (The run's own gathering eases off near his top, gait.js runChange: the slope's pull goes on, to the top it lets him reach.)
+    if (downhill && speedNow > 0.1 && !fighter.air) {
+      fighter.rootVelocity[0] += (fighter.rootVelocity[0] / speedNow) * downhill * dt;
+      fighter.rootVelocity[1] += (fighter.rootVelocity[1] / speedNow) * downhill * dt;
+      const now = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+      const most = Math.hypot(wanted[0], wanted[1]);
+      if (now > most && now > 1e-6) for (const axis of [0, 1]) fighter.rootVelocity[axis] *= most / now;
+    }
   } else {
     const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
     // (Off the ground, the legs push on nothing.)
@@ -4205,6 +4245,41 @@ function leashShare(fighter) {
   const leash = WORLD.terrain.leash;
   const used = outside / reach;
   return used <= leash.from ? 1 : Math.max(0, 1 - (used - leash.from) / (leash.to - leash.from));
+}
+
+/**
+ * The floor's slope under his stance (rise per metre along x and z), over WORLD.terrain.slopeSpan each side; a face higher than
+ * slopeMost there (a ledge, a tread's riser) is no slope. Written into `into` (made if missing).
+ */
+function slopeUnder(fighter, into = [0, 0]) {
+  const terrain = fighter.arena.terrain;
+  const spec = WORLD.terrain;
+  const y = (fighter.lift ?? 0) + spec.stepUp + spec.slopeHeadroom;
+  const [x, z] = fighter.root;
+  const span = spec.slopeSpan;
+  const grade = (ax, az, bx, bz) => {
+    const a = floorAt(terrain, ax, az, y);
+    const b = floorAt(terrain, bx, bz, y);
+    return Math.abs(a - b) <= spec.slopeMost ? (a - b) / (2 * span) : 0;
+  };
+  into[0] = grade(x + span, z, x - span, z);
+  into[1] = grade(x, z + span, x, z - span);
+  return into;
+}
+
+/**
+ * The slope's pull along the way he wants to go (`wanted`, level m/s): g sin θ of the grade that way (m/s², + down it). Flat
+ * out, a man's legs gather speed at A (1 - v / top) (gait.js runChange) and the pull adds to it, so his top goes to
+ * top × (1 + pull / A): a run down a 5% grade ~6% faster, up it ~6% slower (downhill sprinting's +5-7% at -5%), a charge
+ * down a 20% hill ~15% faster. A man walking at his chosen pace keeps it (his legs brake or push the difference).
+ */
+function downhillPull(fighter, wanted) {
+  const speed = Math.hypot(wanted[0], wanted[1]);
+  const slope = fighter.groundSlope;
+  if (speed < 1e-6 || !slope) return 0;
+  // (Up a grade a run is stepped at, no more of it than that grade's: the climb past it is climbShare's.)
+  const grade = Math.max(-WORLD.runMode.stairs.slope, -(slope[0] * wanted[0] + slope[1] * wanted[1]) / speed);
+  return (WORLD.gravity * grade) / Math.sqrt(1 + grade * grade);
 }
 
 /** How well his legs hold him (checkBalance's footing): strong legs, sound joints and legs, gear made for it, no net. */
@@ -6498,7 +6573,11 @@ function pushApart(world, first, second) {
       }
     }
   }
-  if (body) crashBodies(world, first, second, 'trunk', 'trunk', body.normal);
+  if (body) {
+    crashBodies(world, first, second, 'trunk', 'trunk', body.normal);
+    // (Kept for the step's press: physics/press.js.)
+    recordContact(world, first, second, body.normal, body.depth);
+  }
   // A shield held in front is what a body running into the man meets first.
   crashIntoShield(world, first, second);
   crashIntoShield(world, second, first);
@@ -6735,7 +6814,10 @@ export function groundBrace(fighter, direction, set = false) {
   const front = Math.max(0, -(facing[0] * direction[0] + facing[2] * direction[2]));
   const lean = spec.sideOn + (1 - spec.sideOn) * front;
   const spent = Math.max(0, 1 - Math.hypot(fighter.knock[0], fighter.knock[2]) / WORLD.balance.speed);
-  return spec.grip * (fighter.mired?.footing ?? 1) * WORLD.gravity * (set ? spec.shieldSeconds : spec.seconds) * lean * spent;
+  // On a slope his grip holds his own weight's pull along it too: a shove down the hill is held the less (physics/press.js slopeHold).
+  const level = Math.hypot(direction[0], direction[2]);
+  const slope = level > 1e-6 ? slopeHold(fighter, direction[0] / level, direction[2] / level) : 1;
+  return spec.grip * (fighter.mired?.footing ?? 1) * WORLD.gravity * (set ? spec.shieldSeconds : spec.seconds) * lean * spent * slope;
 }
 
 /**
@@ -6746,7 +6828,10 @@ export function groundBrace(fighter, direction, set = false) {
  */
 function braceAgainstCharge(fighter, direction, charger) {
   const spec = WORLD.crash.brace;
-  const drive = spec.grip * (charger.mired?.footing ?? 1) * WORLD.gravity * spec.seconds * (charger.body.massKg / fighter.body.massKg);
+  // (Down a slope his weight's pull along it drives him on with his feet, sin θ of it: up one, it holds him back.)
+  const level = Math.hypot(direction[0], direction[2]);
+  const fallen = level > 1e-6 ? slopeFall(charger, direction[0] / level, direction[2] / level) : 0;
+  const drive = (spec.grip * (charger.mired?.footing ?? 1) + fallen) * WORLD.gravity * spec.seconds * (charger.body.massKg / fighter.body.massKg);
   return Math.max(0, groundBrace(fighter, direction) - drive);
 }
 
