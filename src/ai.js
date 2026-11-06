@@ -393,6 +393,12 @@ export const AI = {
   //   (near a third of the way to breaking alone) and leaves it a flinch to
   //   others; relative strength (AI.standing) already counts the horse's and
   //   the steel's real advantage, for everyone alike.
+  // The flinch at a comrade cut down beside him (keepShock, think): a man who sees one of his own, within `within` m (in full
+  // within `near`), lose a limb or his head (`severed`) or be killed outright (`killed`, of that), steps back with his guard up
+  // and holds his blows for up to `seconds` s, then fights on: the startle of combat, not flight (the fear model and the rout
+  // see to that). How long by how steady he is: × (1 - his kit's courage) × (1 - his side's discipline) × (1 - his skill); a
+  // spell shorter than `least` s is none. A machine or a relentless man does not flinch, and nor does the man played.
+  recoil: { within: 4, near: 2, seconds: 2, severed: 1, killed: 0.8, least: 0.3, backOff: 0.7 },
   shock: { blast: 0.06, blastMost: 0.15, blastNear: 4, blastFar: 16, halfLife: 5, horse: 0.1, horseNear: 3, horseFar: 10, horseSpeed: 3, horseCone: 0.7, strange: 3 },
   // An ambush (a side's `ambush`, physics.js createWorld: hidden men) is
   // sprung at its signal, when one of its men strikes, or when one of the
@@ -2127,13 +2133,18 @@ function keepShock(world, dt) {
   if ((world.shockCursor ?? 0) > events.length) world.shockCursor = events.length;
   const blasts = [];
   const fired = new Set();
+  const fallen = [];
   for (let index = world.shockCursor ?? 0; index < events.length; index += 1) {
     const event = events[index];
+    // A man of a side cut down: a limb or the head off, or killed outright (AI.recoil).
+    const share = event.kind === 'severed' ? AI.recoil.severed : event.kind === 'killed' ? AI.recoil.killed : 0;
+    if (share > 0 && world.fighters[event.fighter]) fallen.push([world.fighters[event.fighter], share]);
     if (event.kind !== 'shot' || !event.from || fired.has(`${event.attacker}:${event.time}`)) continue;
     fired.add(`${event.attacker}:${event.time}`);
     blasts.push([event.from[0], event.from[2], world.fighters[event.attacker]]);
   }
   world.shockCursor = events.length;
+  for (const [victim, share] of fallen) recoilFrom(world, victim, share);
   const fade = 0.5 ** (dt / spec.halfLife);
   for (const fighter of world.fighters) {
     if (fighter.startle) fighter.startle *= fade;
@@ -2145,6 +2156,22 @@ function keepShock(world, dt) {
       const heard = Math.max(0, Math.min(1, 1 - (Math.hypot(x - at[0], z - at[1]) - spec.blastNear) / (spec.blastFar - spec.blastNear)));
       if (heard > 0) fighter.startle = (fighter.startle ?? 0) + spec.blast * heard * strangeness(fighter, 'gun');
     }
+  }
+}
+
+/** The men of his side near a man cut down (`share`: how terrible a sight, AI.recoil) flinch from it: back, guard up, a moment. */
+function recoilFrom(world, victim, share) {
+  const spec = AI.recoil;
+  const at = [victim.x[P.pelvis * 3], victim.x[P.pelvis * 3 + 2]];
+  for (const fighter of world.fighters) {
+    if (fighter === victim || fighter.corner !== victim.corner || fighter.player || !inFight(fighter) || knowsNoFear(world, fighter)) continue;
+    const apart = Math.hypot(fighter.x[P.pelvis * 3] - at[0], fighter.x[P.pelvis * 3 + 2] - at[1]);
+    if (apart > spec.within) continue;
+    const seen = apart <= spec.near ? 1 : 1 - (apart - spec.near) / (spec.within - spec.near);
+    const steady = (1 - fighter.body.gear.courage) * (1 - disciplineOf(world, fighter)) * (1 - (fighter.body.skill ?? 0.5));
+    const seconds = spec.seconds * share * seen * steady;
+    if (seconds < spec.least) continue;
+    fighter.recoilUntil = Math.max(fighter.recoilUntil ?? 0, world.time + seconds);
   }
 }
 
@@ -3008,6 +3035,15 @@ function decide(world, fighter, dt) {
   // A couched charge (style.couchedCharge): run at him and drive it home in stride; when that blow is done, hit or
   // miss, the lance is kept and fought with at the point (it breaks only on heavy armour: then the sidearm).
   if (style.couchedCharge && couchedCharge(world, fighter, opponent, style, distance)) return;
+  // A comrade cut down beside him (AI.recoil): he flinches back, guard up, his blows held, for a moment.
+  if (world.time < (fighter.recoilUntil ?? 0)) {
+    if (!fighter.defence && !fighter.punch) perform(world, fighter, 'guard');
+    fighter.move = -AI.recoil.backOff;
+    fighter.running = false;
+    fighter.strafe = 0;
+    fighter.cooldown = Math.max(fighter.cooldown, 0.1);
+    return;
+  }
   if (style.couchedCharge) style = STYLES[fighter.style] ?? STYLES.mix;
   // Forearm weapons (`switches`): the one the distance, or the blows thrown with this one, call for.
   if (switchArms(world, fighter, style, distance)) style = STYLES[fighter.style];

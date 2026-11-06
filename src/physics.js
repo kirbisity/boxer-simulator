@@ -194,6 +194,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     riseTries: undefined, floored: undefined, crawlWeak: undefined, crawlRetryAt: undefined, wobble: undefined,
     // His helmet knocked off (helmetSlip): { time, hold, name }; bare-headed for the rest of the fight.
     helmetOff: undefined,
+    // Flinching from a comrade cut down beside him until this time (ai.js AI.recoil).
+    recoilUntil: undefined,
     // Running (physics/gait.js; everyone's run): runPose (the run's look, 0..1), runSlope (the slope under his run),
     // turn and yawWas (the heading's rate in a run), gaitBody (his body's gait, cached), gaitAlong and gaitAccel (his
     // speed along his way and its rate, for the lean). runMode is the player's sprint (control.js).
