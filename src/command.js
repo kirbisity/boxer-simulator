@@ -15,6 +15,10 @@
 //     spot where the order found him; each fights only a man within reach.
 //   As you were (`free`): the order taken back, the side's own way again
 //     (its formation, its standard). Every battle begins so.
+//   Formation (`form`), where the side has places of its own to keep
+//     (`world.formPlaces[corner]`: Last Stand Squad's, placed before the
+//     run): every man back to his place, at a run from afar, and held
+//     there, fighting only a man who comes within reach of him.
 // A man broken (panicked), crawling away, fled, on horseback or down hears
 // nothing; once up he obeys whatever order stands. The giver out of the
 // fight, his order lapses.
@@ -49,7 +53,14 @@ export const COMMAND_ORDERS = [
   { kind: 'charge', label: 'Charge', key: '8' },
   { kind: 'hold', label: 'Hold', key: '9' },
   { kind: 'free', label: 'Free', key: '0' },
+  // Back to the places set before the fight: only where the side has them (formPlaces).
+  { kind: 'form', label: 'Formation', key: '-', places: true },
 ];
+
+/** The orders this side may be given: all but Formation where it has no places of its own. */
+export function ordersFor(world, corner) {
+  return COMMAND_ORDERS.filter((entry) => !entry.places || Boolean(world?.formPlaces?.[corner]));
+}
 
 const commandAt = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
 const commandApart = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
@@ -57,7 +68,9 @@ const commandApart = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 /** Whether this man can command his side: in a fight his side has enough men for it, and not out of it himself. */
 export function canCommand(world, fighter) {
   if (!world || !fighter || fighter.state === 'out') return false;
-  return world.fighters.filter((other) => other.corner === fighter.corner).length >= COMMAND.minSide;
+  // (A squad with places of its own takes orders however small: two men are enough to be told back to them.)
+  const least = world.formPlaces?.[fighter.corner] ? 2 : COMMAND.minSide;
+  return world.fighters.filter((other) => other.corner === fighter.corner).length >= least;
 }
 
 /** The order his side is under ('rally', 'charge', 'hold'), or 'free'. */
@@ -71,6 +84,7 @@ export function standingOrder(world, corner) {
  */
 export function giveOrder(world, by, kind, { dir = null } = {}) {
   world.commands ??= {};
+  if (kind === 'form' && !world.formPlaces?.[by.corner]) return null;
   if (kind === 'free') {
     delete world.commands[by.corner];
     return null;
@@ -84,6 +98,8 @@ export function giveOrder(world, by, kind, { dir = null } = {}) {
   const formation = world.formations?.[by.corner];
   if (kind === 'hold' && formation) command.anchor = [...formation.anchor];
   if (kind === 'rally') command.places = rallyPlaces(world, by);
+  // Formation: each man's own place, fixed in the world ([x, z] by his id).
+  if (kind === 'form') command.places = structuredClone(world.formPlaces[by.corner]);
   world.commands[by.corner] = command;
   return command;
 }
@@ -264,8 +280,9 @@ export function orderKeepsPlace(world, fighter) {
   return Boolean(command) && !(command.kind === 'hold' && fighter.order.ranks);
 }
 
-/** His place under the order ([x, z]): his ring's place round the giver, or his own ground. */
+/** His place under the order ([x, z]): his ring's place round the giver, his place in the formation, or his own ground. */
 function placeFor(world, command, fighter) {
+  if (command.kind === 'form') return command.places[fighter.id] ?? null;
   if (command.kind === 'rally') {
     const offset = command.places[fighter.id];
     if (!offset) return null;

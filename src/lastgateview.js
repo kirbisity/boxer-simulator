@@ -1,9 +1,14 @@
-// The Last Gate on the page (lastgate.js is the run): the strip at the top (the gate's breaches as pips, the time held, the
-// hero's kills, the wave), a word in the middle when a wave comes or a foe gets through, and at the end a poster of the run:
-// the hero drawn large before the gate in the mist, how long it held and how many fell to him, to share as an image; Play
-// again, Menu, and this browser's best runs one tap away. DOM and 2D canvas only (the hero's figure is drawn by main.js).
+// Last Stand Squad on the page (lastgate.js is the run, squad.js the squad's reckoning): before a run, the squad builder (the
+// hero, and the men bought out of the budget, − / + a kind, each with his stars and his price) whose squad musterview.js
+// then places before the gate; in the run, the strip at the top (the wave, the time lasted, the hero's kills and the
+// squad's, the men still up, the level's best) and a word in the middle when a wave comes or is cleared; at the end a
+// poster of the run (the hero drawn large before the gate in the mist, how long the squad lasted and how many fell to it, to
+// share as an image), the score under it (a new best called), Play again, the squad, Menu, and this browser's best runs one
+// tap away. DOM and 2D canvas only (the hero's figure is drawn by main.js).
 
 import { LAST_GATE, LAST_GATE_MODES, lastGateClock, lastGatePosterWords, lastGateShareText } from './lastgate.js';
+import { FACTIONS } from './outfits.js';
+import { readSquad, SQUAD, squadCanAdd, squadSpent, squadStep, squadUnits, writeSquad } from './squad.js';
 
 const lgEl = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
@@ -14,22 +19,30 @@ const lgEl = (tag, props = {}, ...children) => {
 // How long (ms) a word in the middle stays.
 const LAST_GATE_TOAST_MS = 1800;
 
+/** A rating's stars as text: ★ for each, ☆ to five. */
+const lgStars = (count) => `${'★'.repeat(count)}${'☆'.repeat(Math.max(0, 5 - count))}`;
+
 /** Put the run's strip, its words and its end poster on the page (under `root`); returns its controls. */
 export function createLastGateView(root) {
-  const pips = lgEl('span', { className: 'lg-pips' });
+  const wave = lgEl('b', { className: 'lg-wave', textContent: '1' });
   const time = lgEl('b', { className: 'lg-time', textContent: '0:00' });
   const kills = lgEl('b', { className: 'lg-kills', textContent: '0' });
-  const wave = lgEl('b', { className: 'lg-wave', textContent: '1' });
+  const squadKills = lgEl('b', { className: 'lg-squad-kills', textContent: '0' });
+  const men = lgEl('b', { className: 'lg-men', textContent: '0' });
+  const best = lgEl('b', { className: 'lg-best', textContent: '–' });
+  const stat = (label, value, title, className = '') => lgEl('span', { className: `lg-stat ${className}`, title }, lgEl('em', { textContent: label }), value);
   const hud = lgEl('div', { className: 'lg-hud', hidden: true, ariaLive: 'off' },
-    lgEl('span', { className: 'lg-gate', title: 'The gate: each one through is a breach' }, lgEl('em', { textContent: 'Gate' }), pips),
-    lgEl('span', { className: 'lg-stat' }, lgEl('em', { textContent: 'Held' }), time),
-    lgEl('span', { className: 'lg-stat' }, lgEl('em', { textContent: 'Kills' }), kills),
-    lgEl('span', { className: 'lg-stat' }, lgEl('em', { textContent: 'Wave' }), wave));
+    stat('Wave', wave, 'The wave now'),
+    stat('Time', time, 'How long the squad has lasted'),
+    stat('You', kills, 'Your kills'),
+    stat('Squad', squadKills, 'Your men\'s kills'),
+    stat('Men', men, 'Your men still on their feet'),
+    stat('Best', best, 'This level\'s best: kills', 'lg-best-stat'));
   const toast = lgEl('div', { className: 'lg-toast', hidden: true, ariaLive: 'polite' });
   const card = lgEl('div', { className: 'lg-end', hidden: true, role: 'dialog', ariaModal: 'true' });
   root.append(hud, toast, card);
   let toastTimer = null;
-  let shown = { breaches: -1, seconds: -1, kills: -1, wave: -1 };
+  let shown = {};
   // A run begun again before its poster was made: that poster is not shown.
   let serial = 0;
 
@@ -40,6 +53,11 @@ export function createLastGateView(root) {
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { toast.hidden = true; }, LAST_GATE_TOAST_MS);
   };
+  const put = (node, key, value) => {
+    if (shown[key] === value) return;
+    shown[key] = value;
+    node.textContent = value;
+  };
 
   return {
     /** A new run: the strip shown and cleared, the poster put away. */
@@ -48,32 +66,31 @@ export function createLastGateView(root) {
       hud.hidden = false;
       card.hidden = true;
       toast.hidden = true;
-      shown = { breaches: -1, seconds: -1, kills: -1, wave: -1 };
-      say('Hold the gate', 'lg-hint');
+      shown = {};
+      say('Hold the line', 'lg-hint');
     },
-    /** Each frame: the strip as the run stands (written only when a figure changes). */
-    update(run) {
+    /** Each frame: the strip as the run stands (`up`/`all`: the squad's men on their feet, and in all; `best`: the level's best run or null). */
+    update(run, { up = 0, all = 0, best: record = null } = {}) {
       if (!run) return;
-      const seconds = Math.floor(run.over?.time ?? run.time);
-      if (run.breaches !== shown.breaches) {
-        pips.replaceChildren(...Array.from({ length: LAST_GATE.breachesToFall }, (_, index) => lgEl('i', { className: index < run.breaches ? 'lost' : '' })));
-        shown.breaches = run.breaches;
-      }
-      if (seconds !== shown.seconds) time.textContent = lastGateClock((shown.seconds = seconds));
-      if (run.kills.hero !== shown.kills) kills.textContent = String((shown.kills = run.kills.hero));
-      if (run.wave !== shown.wave) wave.textContent = String((shown.wave = run.wave));
+      put(wave, 'wave', String(run.wave));
+      put(time, 'time', lastGateClock(Math.floor(run.over?.time ?? run.time)));
+      put(kills, 'kills', String(run.kills.hero));
+      put(squadKills, 'squad', String(run.kills.squad));
+      put(men, 'men', `${up}/${all}`);
+      put(best, 'best', record ? String(record.kills) : '–');
     },
-    /** The run's news: a wave come, a breach. */
+    /** The run's news: a wave come, a wave cleared. */
     news(item) {
       if (item.kind === 'wave') say(`Wave ${item.wave}`, 'lg-wave-word');
-      else if (item.kind === 'breach') say(item.breaches >= LAST_GATE.breachesToFall ? 'The gate has fallen' : `Breach! ${item.breaches} / ${LAST_GATE.breachesToFall}`, 'lg-breach');
+      else if (item.kind === 'cleared') say(`Wave ${item.wave} cleared`, 'lg-cleared');
     },
     /**
      * The end: the run's poster (`result`: lastgate.js lastGateResult; `hero`: his fighter drawn alone, a canvas clear round
-     * him, or null; `name` his name), Play again, Share (the poster as an image where the device shares files: lastGateShare),
-     * Menu, and the best runs (`ranked`: the board with this run in it) one tap away under it.
+     * him, or null; `name` his name), the score under it, Play again, Share (the poster as an image where the device shares
+     * files: lastGateShare), the squad (`squad`, to change it), Menu, and the best runs (`ranked`: the board with this run in
+     * it) one tap away under it.
      */
-    async end(result, ranked, { again, menu, hero = null, name = null }) {
+    async end(result, ranked, { again, menu, squad = null, hero = null, name = null }) {
       const mine = serial;
       const poster = await lastGatePoster(lastGatePosterWords(result, name), hero);
       if (mine !== serial) return;
@@ -84,14 +101,10 @@ export function createLastGateView(root) {
       const share = async () => {
         const blob = await new Promise((done) => (poster.toBlob ? poster.toBlob(done, 'image/png') : done(null)));
         const how = await lastGateShare({ blob, text: line, title: LAST_GATE.title, save: lastGateSave });
-        const said = { download: 'Poster saved — and the line is copied.', copied: 'Copied — paste it anywhere.', select: 'Copy this:' }[how];
-        note.textContent = said ?? '';
-        note.hidden = !said;
+        note.hidden = !['download', 'copied', 'select', 'text'].includes(how);
+        note.textContent = { download: 'Poster saved; the line is copied.', copied: 'Copied: paste it anywhere.', select: 'Copy the line below.', text: 'Shared.' }[how] ?? '';
         fallback.hidden = how !== 'select';
-        if (how === 'select') {
-          fallback.focus();
-          fallback.select();
-        }
+        if (how === 'select') fallback.select();
       };
       const board = lgEl('div', { className: 'lg-end-board', hidden: true },
         ranked?.rank ? lgEl('p', { className: 'lg-rank', textContent: ranked.rank === 1 ? 'Your best run yet' : `Your #${ranked.rank} run` }) : null,
@@ -100,13 +113,22 @@ export function createLastGateView(root) {
         board.hidden = !board.hidden;
         boardButton.textContent = board.hidden ? '🏆 Best runs' : '✕ Close';
       } });
+      const figure = (value, label) => lgEl('span', { className: 'lg-score-figure' }, lgEl('b', { textContent: value }), lgEl('span', { textContent: label }));
+      const score = lgEl('div', { className: 'lg-score' },
+        figure(String(result.heroKills), 'yours'),
+        figure(String(result.squadKills), 'squad'),
+        figure(String(result.waves), result.waves === 1 ? 'wave' : 'waves'),
+        figure(lastGateClock(result.seconds), 'lasted'),
+        ranked?.rank === 1 ? lgEl('em', { className: 'lg-new-best', textContent: '★ New best' }) : null);
       card.replaceChildren(lgEl('div', { className: 'lg-end-stack' },
         lgEl('div', { className: 'lg-poster-frame' }, poster, board),
+        score,
         note, fallback,
         lgEl('div', { className: 'lg-actions' },
           lgEl('button', { type: 'button', textContent: '☰', title: 'Menu', ariaLabel: 'Menu', onclick: menu }),
+          squad ? lgEl('button', { type: 'button', className: 'lg-squad', textContent: '⚔ Squad', title: 'Change the squad', onclick: squad }) : null,
           lgEl('button', { type: 'button', className: 'lg-share', textContent: '↗ Share', onclick: share }),
-          lgEl('button', { type: 'button', className: 'primary', textContent: '↻ Play again', onclick: again })),
+          lgEl('button', { type: 'button', className: 'primary', textContent: '↻ Again', onclick: again })),
         boardButton));
       card.hidden = false;
     },
@@ -123,17 +145,84 @@ export function createLastGateView(root) {
 
 /** The best runs, as a short ranked list (`mark`: this run's place, lit). Also the menu's. */
 export function lastGateBoardList(runs, mark = null) {
-  if (!runs.length) return lgEl('p', { className: 'lg-board-empty', textContent: 'No runs yet. How long can you hold?' });
+  if (!runs.length) return lgEl('p', { className: 'lg-board-empty', textContent: 'No runs yet. How long can your squad last?' });
   const day = (date) => {
     const at = new Date(date);
     return Number.isNaN(at.getTime()) ? '' : at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
   };
   return lgEl('ol', { className: 'lg-board' }, ...runs.map((run, index) => lgEl('li', { className: index + 1 === mark ? 'mine' : '' },
     lgEl('span', { className: 'lg-board-rank', textContent: String(index + 1) }),
-    lgEl('span', { className: 'lg-board-hero', textContent: `${LAST_GATE_MODES[run.hero]?.glyph ?? ''} ${LAST_GATE_MODES[run.hero]?.label ?? run.hero}` }),
     lgEl('b', { textContent: `${run.kills} kill${run.kills === 1 ? '' : 's'}` }),
+    lgEl('span', { className: 'lg-board-waves', textContent: `${run.waves ?? 0} wave${run.waves === 1 ? '' : 's'}` }),
     lgEl('span', { textContent: lastGateClock(run.seconds) }),
     lgEl('span', { className: 'lg-board-date', textContent: day(run.date) }))));
+}
+
+// ---- The squad builder ----------------------------------------------------------------------------------------------------
+// One screen that fits without scrolling the page (the list scrolls inside it): the hero (free, always there), the points
+// left and the men, the level's own people first (a row a kind: his name, stars, kit, price, − count +), the rest of the
+// roster behind "Mercenaries"; then on to placing them (musterview.js, locked).
+
+/**
+ * Open the squad builder for a level in `root` (a menu screen): `mode` (lastgate.js LAST_GATE_MODES' key), `hero` his
+ * name and look (`portrait`: a promise of a picture's url, or null), `onBack()`, `onNext(men, picks)` with the squad's men
+ * (squad.js squadMen) when the player goes on to place them; the squad bought is kept in `storage` for the next visit.
+ */
+export function lastStandBuilder(root, { mode, onBack, onNext, portrait = null, storage = globalThis.localStorage }) {
+  const spec = LAST_GATE_MODES[mode] ?? LAST_GATE_MODES.samurai;
+  const units = squadUnits(spec.factions);
+  let picks = readSquad(mode, units, { storage, prefer: spec.soldier });
+  let others = units.some((unit) => !unit.own && picks[unit.key]);
+  root.replaceChildren();
+  root.className = 'screen ls-builder';
+  const head = lgEl('header', { className: 'screen-head' },
+    lgEl('button', { className: 'back', type: 'button', textContent: '← Back', onclick: onBack }),
+    lgEl('div', { className: 'titles' },
+      lgEl('h1', { textContent: `${spec.glyph} ${spec.title}` }),
+      lgEl('p', { className: 'lede', textContent: `Level ${spec.level} · ${spec.region}. Pick your squad: ${SQUAD.budget} points, up to ${SQUAD.most} men beside you.` })));
+  const look = lgEl('img', { alt: '', draggable: false });
+  portrait?.then((url) => { look.src = url; });
+  const heroRow = lgEl('div', { className: 'ls-hero' },
+    lgEl('span', { className: 'ls-hero-look' }, look),
+    lgEl('span', { className: 'ls-hero-words' }, lgEl('em', { textContent: 'You · free' }), lgEl('b', { textContent: `${spec.label} · ${spec.weapon}` }), lgEl('span', { textContent: spec.strength })));
+  const purse = lgEl('div', { className: 'ls-purse' });
+  const list = lgEl('div', { className: 'ls-units' });
+  const next = lgEl('button', { type: 'button', className: 'primary ls-next', textContent: 'Place the squad →' });
+  root.append(head, lgEl('div', { className: 'ls-body' }, heroRow, purse, list, lgEl('div', { className: 'ls-foot' }, next)));
+
+  function draw() {
+    const { points, men } = squadSpent(units, picks);
+    purse.replaceChildren(
+      lgEl('span', { className: 'ls-points' }, lgEl('b', { textContent: String(SQUAD.budget - points) }), ' points left'),
+      lgEl('span', { className: 'ls-bar', ariaHidden: 'true' }, lgEl('i', { style: `width: ${Math.min(100, (100 * points) / SQUAD.budget)}%` })),
+      lgEl('span', { className: 'ls-men' }, lgEl('b', { textContent: String(men + 1) }), ` men · ${SQUAD.most + 1} at most`),
+      lgEl('button', { type: 'button', className: 'ls-clear', textContent: 'Clear', disabled: !men, onclick: () => { picks = {}; changed(); } }));
+    const row = (unit) => {
+      const count = picks[unit.key] ?? 0;
+      return lgEl('div', { className: `ls-unit${count ? ' on' : ''}` },
+        lgEl('span', { className: 'ls-unit-words' },
+          lgEl('b', { textContent: `${unit.label}${unit.shoots ? ' 🏹' : ''}` }),
+          lgEl('span', { className: 'ls-stars', title: `${unit.stars} of 5 stars (its rating)`, textContent: lgStars(unit.stars) }),
+          lgEl('small', { textContent: unit.line })),
+        lgEl('span', { className: 'ls-cost', title: 'Its price in points' }, lgEl('b', { textContent: String(unit.cost) }), ' pts'),
+        lgEl('button', { type: 'button', className: 'step', textContent: '−', ariaLabel: `One ${unit.label} fewer`, disabled: !count, onclick: () => { picks = squadStep(units, picks, unit.key, -1); changed(); } }),
+        lgEl('b', { className: 'ls-count', textContent: String(count) }),
+        lgEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: `One more ${unit.label}`, disabled: !squadCanAdd(units, picks, unit.key), onclick: () => { picks = squadStep(units, picks, unit.key, 1); changed(); } }));
+    };
+    const group = (label, members) => (members.length ? [lgEl('h3', { className: 'ls-group', textContent: label }), ...members.map(row)] : []);
+    const own = spec.factions.flatMap((faction) => group(`${FACTIONS[faction]?.glyph ?? ''} ${FACTIONS[faction]?.label ?? faction}`, units.filter((unit) => unit.faction === faction)));
+    const toggle = lgEl('button', { type: 'button', className: 'ls-others', textContent: others ? '▾ Mercenaries: every other fighter' : '▸ Mercenaries: every other fighter', ariaExpanded: String(others), onclick: () => { others = !others; draw(); } });
+    const rest = others ? Object.keys(FACTIONS).filter((faction) => !spec.factions.includes(faction)).flatMap((faction) => group(`${FACTIONS[faction].glyph ?? ''} ${FACTIONS[faction].label}`, units.filter((unit) => unit.faction === faction))) : [];
+    const scroll = list.scrollTop;
+    list.replaceChildren(...own, toggle, ...rest);
+    list.scrollTop = scroll;
+  }
+  function changed() {
+    writeSquad(mode, picks, storage);
+    draw();
+  }
+  next.addEventListener('click', () => onNext(units.flatMap((unit) => Array.from({ length: picks[unit.key] ?? 0 }, () => unit.make())), picks));
+  draw();
 }
 
 // ---- The poster -------------------------------------------------------------------------------------------------------------

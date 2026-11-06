@@ -399,7 +399,7 @@ function shuffleColors(inputs) {
 function newBout() {
   leaveStage();
   state.seed += 1;
-  // The Last Gate: a run of its own (lastgate.js), the hero picked on its screen.
+  // Last Stand Squad: a run of its own (lastgate.js), the level and the squad picked on its screens.
   if (state.game === 'lastgate') return newLastGateRun();
   // A scenario is the same world on its own floor, with its own people.
   const scenario = levelNow();
@@ -498,16 +498,21 @@ function buildQueuedViews() {
   showMustering();
 }
 
-// ---- The Last Gate (lastgate.js the run, lastgateview.js its strip and end card) ---------------------------------------
+// ---- Last Stand Squad (lastgate.js the run, lastgateview.js its strip and end card) ---------------------------------------
 
 const lastGateView = createLastGateView($('.arena'));
 // The best runs, kept in this browser (behind list/add, so a server's board can take its place).
 const lastGateBoard = createLastGateBoard(browserStorage());
 
-/** Into The Last Gate in this mode, as its hero (lastgate.js LAST_GATE_MODES): straight into the run, played. */
-function enterLastGate(heroKey) {
+/**
+ * Into Last Stand Squad at this level, as its hero (lastgate.js LAST_GATE_MODES), with the squad set up on its screens
+ * (`setup`: the men and where each stands, the hero's place first; none: the level's own five at their posts): straight
+ * into the run, played.
+ */
+function enterLastGate(heroKey, setup = null) {
   setGame('lastgate', { text: 'Play again', retry: true, run: () => newBout() });
   state.lastGateHero = heroKey;
+  state.lastGateSetup = setup;
   state.scenario = null;
   state.muster = null;
   state.lead = { red: 0, blue: 0 };
@@ -518,7 +523,8 @@ function enterLastGate(heroKey) {
 
 /** A new run: the world as lastgate.js makes it, drawn in its misty place, the hero's men at their posts. */
 function newLastGateRun() {
-  state.world = createLastGate(state.lastGateHero, { seed: state.seed });
+  const setup = state.lastGateSetup;
+  state.world = createLastGate(state.lastGateHero, { seed: state.seed, ...(setup ? { men: setup.men, places: setup.places } : {}) });
   const arena = state.world.arena;
   const place = LAST_GATE.place;
   clearGore(scene);
@@ -553,7 +559,8 @@ function lastGateFrame(world) {
   const { rebuilds, news } = drainLastGate(world);
   for (const id of rebuilds) rebuildFighterView(id);
   for (const item of news) lastGateView.news(item);
-  lastGateView.update(world.lastGate);
+  const squad = world.fighters.filter((fighter) => fighter.corner === 'red');
+  lastGateView.update(world.lastGate, { up: squad.filter((fighter) => fighter.state !== 'out' && !fighter.fled).length, all: squad.length, best: lastGateBoard.best(world.lastGate.mode) });
   if (!world.lastGate.over || state.finishedAt !== null) return;
   state.finishedAt = world.time;
   const result = lastGateResult(world);
@@ -568,9 +575,9 @@ function lastGateFrame(world) {
     try {
       hero = drawHeroFigure(inputs);
     } catch (error) {
-      console.warn('The Last Gate: the hero could not be drawn for the poster', error);
+      console.warn('Last Stand Squad: the hero could not be drawn for the poster', error);
     }
-    lastGateView.end(result, ranked, { again: () => newBout(), menu: () => goHome(), hero, name: inputs.name });
+    lastGateView.end(result, ranked, { again: () => newBout(), menu: () => goHome(), squad: () => { lastGateView.hide(); menus.lastGate(world.lastGate.mode); }, hero, name: inputs.name });
   }, 1400);
 }
 
@@ -623,7 +630,7 @@ function thinkForBout(world, dt) {
       yardStep(world, partner);
     }
   }
-  // The Last Gate: the rebels walked at the gate, the hero's men kept near their posts, the waves (lastgate.js).
+  // Last Stand Squad: the foes walked at the squad, the squad kept at its places, the waves (lastgate.js).
   if (world.lastGate) stepLastGate(world, dt, { playerId: players.size ? [...players][0] : null });
   thinkAll(world, dt, still);
   if (!players.size) return;
@@ -848,7 +855,7 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   }
   consumeEvents();
   if (state.world.stage?.level) drainLevel();
-  // The Last Gate ends when the gate falls or its defenders are down (lastgate.js), not as a battle does.
+  // Last Stand Squad ends when the hero falls or the squad is down (lastgate.js), not as a battle does.
   if (state.world.lastGate) return lastGateFrame(state.world);
   // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
   if (state.game === 'intro' || state.game === 'tutorial') return;
@@ -3298,7 +3305,7 @@ const menus = installMenus({
   intro: (then) => playIntro(introStage, then), attract, match, sandbox: enterSandbox, level: enterLevel, tutorial: enterTutorial, preview, portrait, setPortrait: (kind, key) => portrait(`set:${kind}/${key}`, setModel(kind, key)),
   // Level Mode: a stage from its card (levelmode/stages.js): its men built at once, the title card over the storm, the world held still behind it.
   onStage: (key) => { enterStage(key, { opening: true }); boxer.finishBuilding(); },
-  // The Last Gate: the hero picked, straight into the run; its board for the menu.
+  // Last Stand Squad: the level and the squad picked, straight into the run; its board for the menu.
   lastGate: enterLastGate,
   lastGateBoard,
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
@@ -3528,10 +3535,11 @@ installLooksBench({
 const boxer = window.boxer = {
   state,
   scene,
-  // The Last Gate in this mode ('samurai', 'knight', 'mongol', 'police': lastgate.js LAST_GATE_MODES), from anywhere (tests, shots).
-  lastGate: (hero = 'samurai') => {
+  // Last Stand Squad at this level ('samurai', 'knight', 'mongol', 'police': lastgate.js LAST_GATE_MODES), from anywhere
+  // (tests, shots); `setup` its squad ({ men, places }), else the level's own five at their posts.
+  lastGate: (hero = 'samurai', setup = null) => {
     menus.close();
-    enterLastGate(hero);
+    enterLastGate(hero, setup);
   },
   // The intro: end it now (true if it was playing), as Skip does; or play it again.
   skipIntro,

@@ -118,8 +118,9 @@ export function roomFor(level, sizes, corner, count) {
   return Math.max(0, Math.min(count, left));
 }
 
-/** A side's deployment zone on the floor: x from `x[0]` to `x[1]`, z from `z[0]` to `z[1]` (m). */
+/** A side's deployment zone on the floor: x from `x[0]` to `x[1]`, z from `z[0]` to `z[1]` (m); a level's own (`level.zones`: Last Stand Squad's ground before the gate) if it has one. */
 export function zoneOf(level, corner) {
+  if (level.zones?.[corner]) return level.zones[corner];
   const sign = MUSTER_SIGN[corner];
   const far = level.arena.halfX - MUSTER.edge;
   const near = Math.min(MUSTER.neutral, far);
