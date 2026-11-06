@@ -1,19 +1,19 @@
 // The custom build (`node tools/bundle.js --custom` → dist/gladiator-custom.html): a test bed that is only the sandbox (custom
 // mode: the fighter builder and its fights), opened at once, in one file under 15 MB. The fights are the same code as the full
 // game's (physics, AI, weapons, outfits, fire, sound effects, the builder's roster and presets); what custom mode never reaches is
-// left out: level mode (the Dunnottar stages, their kit, the storm and its sky photographs, the story, cutscenes and HUD), The
-// Last Gate, the intro, the tutorial, the home screen and its other modes, and the music (its cues gone, the engine plays its
-// stings instead, as with a cue that is missing).
+// left out: level mode (the Dunnottar stages, their kit, the storm and its sky photographs, the story, cutscenes and HUD), Last
+// Stand Squad (and its squad builder), the intro, the tutorial, the home screen and its other modes, and the music (its cues
+// gone, the engine plays its stings instead, as with a cue that is missing).
 //
 // An excluded module that kept code imports is replaced by a stub here declaring just what is imported: inert where the kept
-// code calls it on every path (always behind a level, Last Gate or intro test, so a fight never sees a difference), throwing
+// code calls it on every path (always behind a level, Last Stand Squad or intro test, so a fight never sees a difference), throwing
 // where it would open a part of the game that is not here. tools/bundle.js refuses a build in which a kept module imports a
 // name an excluded module's stub does not declare.
 
 /** Modules left out (each one's stub, if kept code imports it, is in STUBS). */
 export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KEPT_LEVEL.includes(name)
   || /^audio\/music\/data\//.test(name)
-  || ['lastgate', 'lastgateview', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
+  || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
 const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];
@@ -79,9 +79,9 @@ export function installTutorial() {
 }
 `,
   lastgate: `
-export const LAST_GATE = { title: 'The Last Gate', place: 'lastgate', arena: { halfX: 18, halfZ: 10.5 }, gate: { x: 0 }, puddles: [] };
-export const createLastGate = ${missing('The Last Gate')};
-export const createLastGateBoard = () => ({ add: () => null, list: () => [] });
+export const LAST_GATE = { title: 'Last Stand Squad', place: 'lastgate', arena: { halfX: 18, halfZ: 10.5 }, gate: { x: 0 }, puddles: [] };
+export const createLastGate = ${missing('Last Stand Squad')};
+export const createLastGateBoard = () => ({ add: () => null, list: () => [], best: () => null });
 export const drainLastGate = () => ({ rebuilds: [], news: [] });
 export const lastGateResult = () => null;
 export const stepLastGate = () => {};

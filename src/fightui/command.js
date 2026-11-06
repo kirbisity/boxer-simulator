@@ -1,19 +1,20 @@
 // The player's orders to his side on screen (command.js): a small column of
 // pills at the top left, out of the fight's way (the status is low on the
 // left, the Guard, Lock and special buttons down the right), each an icon
-// and a word: To me, Charge, Hold, Free. The order standing is lit gold, as
+// and a word: To me, Charge, Hold, Free; and Formation (back to the places
+// set before the fight) where the side has them (Last Stand Squad). The order standing is lit gold, as
 // a choice is in the footer. Shown only in a fight his side is big enough
 // for orders. A new order is called for a moment under the column, however
 // it was given (a tap, or keys 7–0).
 
-import { canCommand, COMMAND_ORDERS, standingOrder } from '../command.js';
+import { canCommand, COMMAND_ORDERS, ordersFor, standingOrder } from '../command.js';
 import { fightUiElement } from './kit.js';
 
 export const FIGHT_UI_COMMAND = {
   // The call of a new order stays this long (s).
   callSeconds: 1.6,
   // What each order calls out.
-  calls: { rally: 'To me!', charge: 'Charge!', hold: 'Hold!', free: 'As you were' },
+  calls: { rally: 'To me!', charge: 'Charge!', hold: 'Hold!', free: 'As you were', form: 'Back to formation!' },
 };
 
 // Each order's icon: plain strokes in the pill's colour (16 px).
@@ -26,6 +27,8 @@ const FIGHT_UI_COMMAND_ICONS = {
   hold: '<path d="M8 2l5 2v4c0 3-2.5 5-5 6-2.5-1-5-3-5-6V4z"/>',
   // Out, each his own way.
   free: '<path d="M7 7L3 3m0 3V3h3M9 7l4-4m0 3V3h-3M8 9.5V14m-2-2l2 2 2-2"/>',
+  // Men in their places: two ranks of dots, an arrow back to them.
+  form: '<circle cx="4" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="6" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="10" cy="8" r="1.2" fill="currentColor" stroke="none"/><path d="M8 15v-4m-2 2l2-2 2 2"/>',
 };
 
 /**
@@ -69,6 +72,10 @@ export function fightUiCommandBar(root, hooks) {
       said.hidden = true;
       return;
     }
+    // Formation only where the side has places of its own; the call under the column moved down a pill for it.
+    const offered = new Set(ordersFor(world, me.corner).map((entry) => entry.kind));
+    for (const button of buttons) button.hidden = !offered.has(button.dataset.order);
+    bar.classList.toggle('fu-orders-five', offered.size > 4);
     const kind = standingOrder(world, me.corner);
     if (kind !== shown) {
       shown = kind;

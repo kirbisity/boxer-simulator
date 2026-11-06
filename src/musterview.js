@@ -12,6 +12,11 @@
 //
 // What it hands back (`onStart(setup)`) is muster.js musterLevel's setup:
 // each side's men, the places of a side set up by hand, and the man played.
+//
+// Locked (`locked`: Last Stand Squad's placing, its men already chosen), only
+// the sides in `corners` are shown, and nobody is added or taken out: the
+// men are dragged to their places, or a man tapped and then the ground, or
+// all drawn up again in a formation.
 
 import { capsOf, countUnits, drawUp, formationsOf, intoZone, inZone, MUSTER, roomFor, unitOf, unitsOf, zoneOf } from './muster.js';
 import { STYLES } from './moves.js';
@@ -19,7 +24,7 @@ import { ARMIES } from './scenarios.js';
 
 // The map's look: the floor's colour by its place (the ground it is drawn on), the sides' colours, sizes.
 const MUSTER_VIEW = {
-  ground: { plain: '#6c6a40', sengoku: '#66753f', town: '#6a645a', jiangnan: '#5a6058', cajamarca: '#8c7556', coastFort: '#a08e64', port: '#3c3e44', mobei: '#857a5e', catalaunian: '#7c8a44', carrhae: '#c2ac84', sarhu: '#8a7e52' },
+  ground: { lastgate: '#5a5a4c', plain: '#6c6a40', sengoku: '#66753f', town: '#6a645a', jiangnan: '#5a6058', cajamarca: '#8c7556', coastFort: '#a08e64', port: '#3c3e44', mobei: '#857a5e', catalaunian: '#7c8a44', carrhae: '#c2ac84', sarhu: '#8a7e52' },
   side: { red: '#e0353b', blue: '#3a74ec' },
   gold: '#ffcf4a',
   // A man's dot (m of radius, and at least this many px); a rider's the size of his horse.
@@ -55,7 +60,7 @@ const musterEl = (tag, props = {}, ...children) => {
  * `onBack()` to go back, `onChange(sides, lead)` whenever an army changes (a custom battle keeps it), and the
  * words of its back and reset buttons (`backLabel`, `resetLabel`).
  */
-export function musterScreen(root, { key, level, onStart, onBack, onChange = null, lead = null, formations = {}, backLabel = '← Back', resetLabel = '↺ As the level' }) {
+export function musterScreen(root, { key, level, onStart, onBack, onChange = null, lead = null, formations = {}, backLabel = '← Back', resetLabel = '↺ As the level', locked = false, corners = ['red', 'blue'], startLabel = '▶ Start battle', lede = null }) {
   const cast = level.cast(Math.random);
   const units = { red: unitsOf(level, 'red'), blue: unitsOf(level, 'blue') };
   // Each side: the level's own (`custom` false: its men drawn where the level puts them), or the player's (a custom battle's men where he left them).
@@ -65,8 +70,8 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   const sides = { red: fresh('red'), blue: fresh('blue') };
   const caps = capsOf(level);
   const view = {
-    corner: 'red',
-    tab: 'units',
+    corner: corners[0],
+    tab: locked ? 'formation' : 'units',
     // The kind of man a tap puts down, per side: the side's first.
     brush: { red: units.red[0]?.id, blue: units.blue[0]?.id },
     selected: null,
@@ -85,7 +90,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   root.className = 'screen muster';
   const head = musterEl('header', { className: 'muster-head' },
     musterEl('button', { className: 'back', type: 'button', textContent: backLabel, onclick: onBack }),
-    musterEl('div', { className: 'titles' }, musterEl('h1', { textContent: level.title }), musterEl('p', { className: 'lede', textContent: level.places ? `${level.place} · place your armies, then fight.` : 'Set up the armies — or start as it was.' })));
+    musterEl('div', { className: 'titles' }, musterEl('h1', { textContent: level.title }), musterEl('p', { className: 'lede', textContent: lede ?? (level.places ? `${level.place} · place your armies, then fight.` : 'Set up the armies — or start as it was.') })));
   const sideTabs = musterEl('div', { className: 'muster-sides', role: 'tablist' });
   const canvas = musterEl('canvas', { className: 'muster-canvas' });
   const pick = musterEl('div', { className: 'muster-pick', hidden: true });
@@ -95,7 +100,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   const tabs = musterEl('div', { className: 'muster-tabs', role: 'tablist' });
   const panel = musterEl('div', { className: 'muster-panel' });
   const reset = musterEl('button', { type: 'button', className: 'muster-reset', textContent: resetLabel });
-  const start = musterEl('button', { type: 'button', className: 'primary muster-start', textContent: '▶ Start battle' });
+  const start = musterEl('button', { type: 'button', className: 'primary muster-start', textContent: startLabel });
   const foot = musterEl('div', { className: 'muster-foot' }, reset, start);
   const aside = musterEl('aside', { className: 'muster-aside' }, sideTabs, tabs, panel, foot);
   root.append(head, musterEl('div', { className: 'muster-body' }, map, aside));
@@ -251,9 +256,20 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
       g.lineTo(...b);
     }
     g.stroke();
-    // No man's land between the zones, darker.
-    g.fillStyle = 'rgba(0,0,0,0.25)';
-    g.fillRect(...rect(-MUSTER.neutral, -halfZ, MUSTER.neutral, halfZ));
+    // No man's land between the zones, darker (a level with zones of its own has none).
+    if (!level.zones) {
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      g.fillRect(...rect(-MUSTER.neutral, -halfZ, MUSTER.neutral, halfZ));
+    }
+    // The level's marks on the ground (`level.marks`: Last Stand Squad's wall and gateway), lines from [x, z] to [x, z].
+    for (const mark of level.marks ?? []) {
+      g.strokeStyle = mark.colour ?? 'rgba(255,255,255,0.6)';
+      g.lineWidth = Math.max(2, (mark.width ?? 0.4) * f.scale);
+      g.beginPath();
+      g.moveTo(...toScreen(f, mark.from));
+      g.lineTo(...toScreen(f, mark.to));
+      g.stroke();
+    }
     // Each side's zone: tinted, the side being set up the more, edged in its colour.
     for (const corner of ['red', 'blue']) {
       const zone = zoneOf(level, corner);
@@ -358,8 +374,10 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     }
     if (fingers.size > 2) return;
     const f = frame();
-    const pans = view.panning || event.button === 1 || event.button === 2;
-    press = { id: event.pointerId, from: point, to: point, last: point, man: pans ? null : manAt(f, point), moved: false, pans };
+    const man = manAt(f, point);
+    // (Locked, open ground is never a block to fill: a drag on it moves the map.)
+    const pans = view.panning || event.button === 1 || event.button === 2 || (locked && !man);
+    press = { id: event.pointerId, from: point, to: point, last: point, man: pans ? null : man, moved: false, pans };
     press.box = !press.man && !pans;
   });
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
@@ -397,7 +415,15 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     press = null;
     const f = frame();
     if (done.pans) {
-      // (Only the map moved.)
+      // (Only the map moved; locked, a tap on open ground puts the man picked there.)
+      if (locked && !done.moved) {
+        const at = toFloor(f, done.from);
+        const chosen = view.selected;
+        if (chosen && inZone(level, chosen.corner, at, 0.5)) {
+          own(chosen.corner).places[chosen.index] = intoZone(level, chosen.corner, at);
+          sides[chosen.corner].formation = 'hand';
+        } else say(chosen ? 'Put him on the shaded ground.' : 'Tap a man, then where he should stand — or drag him.');
+      }
     } else if (done.man && !done.moved) {
       // A tap on a man: pick him (again: let him go).
       const same = view.selected?.corner === done.man.corner && view.selected.index === done.man.index;
@@ -442,7 +468,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   }
 
   function drawSideTabs() {
-    sideTabs.replaceChildren(...['red', 'blue'].map((corner) => {
+    sideTabs.replaceChildren(...corners.map((corner) => {
       const army = sides[corner];
       // A side's name: its armies' (the Spaniards & Tlaxcala).
       const name = level.sideNames?.[corner] ?? ((level.armies?.[corner] ?? []).map((armyKey) => ARMIES[armyKey].label).join(' & ') || corner);
@@ -454,7 +480,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   }
 
   function drawTabs() {
-    const names = { units: 'Units', formation: 'Formation', you: 'Play as' };
+    const names = locked ? { formation: 'Formation' } : { units: 'Units', formation: 'Formation', you: 'Play as' };
     tabs.replaceChildren(...Object.entries(names).map(([tab, label]) => musterEl('button', {
       type: 'button', role: 'tab', className: view.tab === tab && !view.folded ? 'on' : '', textContent: label, ariaSelected: String(view.tab === tab),
       onclick: () => { view.tab = tab; view.folded = false; refresh(); },
@@ -496,8 +522,8 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
             mine.places = drawUp(level, corner, mine.men, shape.key);
             refresh();
           },
-        }, musterEl('i', { textContent: shape.glyph, ariaHidden: 'true' }), musterEl('span', { textContent: shape.label })))),
-        musterEl('p', { className: 'muster-note', textContent: army.formation === 'hand' ? 'Placed by hand. Pick a formation to draw them all up again.' : 'Bows and guns go in front of a line or a skirmish screen, behind a block or a wedge; riders wait on the flanks.' }));
+        }, musterEl('i', { textContent: shape.glyph, ariaHidden: 'true' }), musterEl('span', { textContent: shape.key === 'level' ? level.formationLabel ?? shape.label : shape.label })))),
+        musterEl('p', { className: 'muster-note', textContent: army.formation === 'hand' ? `Placed by hand. Pick a formation to draw them all up again.${locked ? ' In the fight, Formation (−) sends them back to these places.' : ''}` : 'Bows and guns go in front of a line or a skirmish screen, behind a block or a wedge; riders wait on the flanks.' }));
     } else {
       const lead = view.lead;
       panel.replaceChildren(
@@ -512,6 +538,10 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     if (!chosen) return;
     const inputs = sides[chosen.corner].men[chosen.index];
     const played = view.lead?.man === inputs;
+    if (locked) {
+      pick.replaceChildren(musterEl('div', { className: 'muster-who' }, musterEl('b', { textContent: `${played ? '★ ' : ''}${inputs.name}` }), musterEl('span', { textContent: `${kindOf(chosen.corner, inputs)} · tap the ground to move him` })));
+      return;
+    }
     pick.replaceChildren(
       musterEl('div', { className: 'muster-who' }, musterEl('b', { textContent: inputs.name }), musterEl('span', { textContent: kindOf(chosen.corner, inputs) })),
       musterEl('button', { type: 'button', className: played ? 'on' : 'primary', textContent: played ? '★ Playing' : '▶ Play as him', onclick: () => { view.lead = played ? null : { corner: chosen.corner, man: inputs }; refresh(); } }),
@@ -525,10 +555,10 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     drawTabs();
     drawPanel();
     drawPick();
-    hint.textContent = view.note || (view.panning ? 'Drag to move the map · ✋ again to place men' : 'Tap the shaded ground to place · drag a man to move him · drag open ground for a block');
+    hint.textContent = view.note || (locked ? 'Drag a man to his place · or tap him, then the ground' : view.panning ? 'Drag to move the map · ✋ again to place men' : 'Tap the shaded ground to place · drag a man to move him · drag open ground for a block');
     view.note = '';
     reset.disabled = !side().custom;
-    start.disabled = !sides.red.men.length || !sides.blue.men.length;
+    start.disabled = corners.some((corner) => !sides[corner].men.length);
     draw();
     onChange?.(sides, view.lead && { corner: view.lead.corner, index: sides[view.lead.corner].men.indexOf(view.lead.man) });
   }

@@ -360,6 +360,18 @@ export function roninWarrior(random = Math.random, style = 'ronin') {
   return style === 'ronin' && random() < RONIN_TWO_SWORDS ? { ...built, style: 'nito' } : built;
 }
 
+/**
+ * A sōhei: an armed monk of the great temples (Enryaku-ji, Kōfuku-ji, the Ikkō-ikki's Honganji), in his kesa and the
+ * hood over a dō, with the naginata; built as a fed, hard-worked man of the period (PERIOD_BUILD.japanese.sohei), drilled
+ * past an ashigaru but short of a samurai's lifetime (Benkei, PRESETS.sohei, is the legend; these are his brothers).
+ */
+export function soheiMonk(random = Math.random) {
+  const base = varyCharacter(PRESETS.sohei, random, { sex: 'male' });
+  const name = `${pickOne(['Jōmyō', 'Raigō', 'Kakuban', 'Ichirai', 'Shinsai', 'Ryōen', 'Gyōnen', 'Kenshin', 'Dōkyō', 'Shūen'], random)} ${pickOne(['Hōshi', 'Ajari', 'Bō', 'Hōin', 'Risshi'], random)}`;
+  const monk = { ...base, sex: 'male', name, style: 'naginata', outfit: { kind: 'sohei', design: randomDesign('sohei', random) }, accessories: [], look: { ...base.look, hairStyle: 'bald', facialHair: 'none' } };
+  return builtLike(monk, PERIOD_BUILD.japanese.sohei, random);
+}
+
 // What a sea raider has on (shares, summing to 1): many nothing but a robe
 // or a loincloth; many a piece of armour taken in earlier raids; some the
 // whole of it (the big bands of the 1550s were well equipped from plunder).
@@ -443,7 +455,7 @@ const PERIOD_BUILD = {
     },
     brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 },
   },
-  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 60, exercise: 0.92 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 } },
+  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 60, exercise: 0.92 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 }, sohei: { heightCm: 160, weightKg: 62, exercise: 0.8, skill: 0.6 } },
   // Castilian men of the early 1500s about 165 cm; the Mexica a few
   // centimetres shorter, lean, trained for war from youth in the telpochcalli.
   // The men who crossed to the Indies were picked and hardened (veterans of
