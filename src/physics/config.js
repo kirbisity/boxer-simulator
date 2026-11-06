@@ -1014,7 +1014,13 @@ export const WORLD = {
   // `stepOver`: a man not hurrying (slower than `below` m/s: a walk, a jog, not a run) and not broken watches where he puts his
   // feet and steps over a body lying low, no higher than `height` of his leg (a man lying flat, ~0.25-0.3 m: a long step over
   // him); a crawler (moving under him, his back ~0.6 m) is not stepped over, and a man running or fleeing comes down where his stride lands.
-  bodyFooting: { grip: 0.5, least: 0.03, most: 0.75, stepOver: { below: 2.2, height: 0.45 } },
+  // `kick`: a man going fast (running, fleeing) whose stride meets a man lying on the floor does not step up onto him: his swinging
+  // foot runs into him. The swing foot moves `swing` times his own pace; what meets the body is the leg (its mass, swung from the
+  // hip) against the part it strikes (its standing mass, physics.js struckMassOf: the floor behind a lying man takes the rest);
+  // the impulse (their reduced mass times the closing speed) is a blunt kick to that part (crashHarm) and shoves the man along,
+  // and checks the runner by that impulse over his own mass (WORLD.balance.massShare of him): a light man kicking into a heavy
+  // armoured body is checked the most, and trips only past what his legs hold.
+  bodyFooting: { grip: 0.5, least: 0.03, most: 0.75, stepOver: { below: 2.2, height: 0.45 }, kick: { swing: 2 } },
   // A blow at a man low before him (lowstrike.js: lying, getting up, on his knees): made at a place on his body, not at a standing
   // man's chest in the air above him. The striker bends to it: `stoop` is the share (0 to 1) of the deepest bend he takes, enough
   // that the striking part (the fist; the blade's contact point; the point) meets the place with the arm (or the leg) `fit` of

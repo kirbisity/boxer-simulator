@@ -2958,6 +2958,43 @@ function updateFeet(world, fighter, dt) {
 }
 
 /**
+ * A running man's stride meeting a man lying on the floor (WORLD.bodyFooting.kick): his swinging foot, at `swing` times his
+ * pace, runs into the part under it. The leg (its mass) against that part (its standing mass): their reduced mass times the
+ * closing speed is a blunt kick to it (crashHarm, through his armour), shoves him along, and checks the runner by that impulse
+ * over his own mass: stumbling or over only past what his legs hold (WORLD.balance.speed, as any knock).
+ */
+function kickLying(world, fighter, under, side) {
+  const lying = under.fighter;
+  const pace = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
+  if (pace < 1e-3) return;
+  const way = [fighter.rootVelocity[0] / pace, 0, fighter.rootVelocity[1] / pace];
+  const closing = pace * WORLD.bodyFooting.kick.swing;
+  const leg = fighter.body.limbKg[`${side}Leg`];
+  const part = struckMassOf(lying, { key: under.key });
+  const crash = crashOf(leg, part, closing);
+  const harm = crashHarm(world, lying, under.key, { impulse: crash.impulse, mass: part, closing, energy: crash.energy, point: under.point, normal: vec.scale(way, -1), source: lying.corner === fighter.corner ? null : fighter, hard: crashHardness(protectionAt(fighter.body.gear, `${side}Shank`).blunt) });
+  const shares = under.key === 'head' ? [[P.head, 1]] : TRUNK_PARTICLES.map((index) => [index, 1]);
+  pushCrash(world, { fighter: lying, shares, direction: way, impulse: crash.impulse, braced: 0 });
+  // The runner checked by the kick: his speed change against what his legs hold.
+  const check = crash.impulse / (WORLD.balance.massShare * fighter.body.massKg);
+  const limit = WORLD.balance.speed * balanceFooting(fighter);
+  const effects = ['kicks him in passing'];
+  if (harm) effects.push(`hurts his ${under.key}`);
+  if (check > limit) {
+    fighter.knock = [0, 0, 0];
+    fall(world, fighter, 'trips over a man underfoot');
+    effects.push('falls');
+  } else {
+    for (const axis of [0, 2]) fighter.knock[axis] -= way[axis] * check;
+    if (check > WORLD.stagger.startAt * limit) {
+      fighter.wobble = standWobble(fighter);
+      effects.push('stumbles');
+    }
+  }
+  world.events.push({ time: world.time, kind: 'trodden', attacker: fighter.id, defender: lying.id, part: under.key, impulse: crash.impulse, kicked: true, harmed: Boolean(harm), fell: effects.includes('falls'), effects });
+}
+
+/**
  * A foot come down on a man on the floor (physics/footing.js, WORLD.bodyFooting): the man under it trodden on (his leg and
  * WORLD.trod `legDrive` of his weight behind it, at the speed the foot came down), and his own footing on the body (a
  * slip, the step met high, the body moving under him): put over past what his legs hold, stumbling near it. Looked for
@@ -2977,6 +3014,11 @@ function footDown(world, fighter, foot) {
   if (!fighter.panicked && !under.fighter.crawling && Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) < over.below && under.height <= over.height * legLength) return;
   const side = foot.index === P.lFoot ? 'l' : 'r';
   const lying = under.fighter;
+  // Going too fast to step over a man lying on the floor (or broken and fleeing): his stride kicks into him (kickLying).
+  if (!lying.crawling) {
+    kickLying(world, fighter, under, side);
+    return;
+  }
   const speed = Math.max(0, -fighter.v[foot.index * 3 + 1]);
   const tread = treadOn(world, under, {
     mass: fighter.body.limbKg[`${side}Leg`] + WORLD.trod.legDrive * fighter.body.massKg, speed, weight: fighter.body.massKg * WORLD.gravity,
