@@ -5,13 +5,13 @@
 //   collision or more), the share that end in nothing / a cut / the limb broken (the bone cut into or broken) / the limb off;
 // - second: the same blows on the same man with that limb's bone already broken (counterfactual: the same seed, the same
 //   blow), and two blows in a row at one place (the second's outcome by what the first did);
-// - blunt: a fist, a mace and a club at the head, the body and a limb: the injury per blow (the part's health it takes, % of
+// - blunt: a fist, a mace, a club, a kanabo, a war hammer and a bat at the head, the body and a limb: the injury per blow (the part's health it takes, % of
 //   what kills (the head, the trunk) or breaks it (a limb)), the head's speed change;
 // - finisher: the ground finisher (finisher.js) by a bare-handed man (the belt knife) and a knight (his dagger) on a man down
 //   in no armour, in mail (a Templar's hauberk) and in plate (a knight's harness): the share killed, incapacitated (out, or
 //   bleeding to collapse), the seconds to death, the health left, the point's energy;
 // - battle: a couple of battles (AI on both sides), 2 seeds: the dead, the severings, the broken limbs, the length.
-// Usage: node tools/wounds.js [sections=limbs,second,blunt,finisher,battle] [seeds=3]
+// Usage: node tools/wounds.js [sections=limbs,second,blunt,finisher,battle] [seeds=3] [battles=wokou,catalaunian]
 
 import { P, PRESETS } from '../src/body.js';
 import { MOVES, STYLES } from '../src/moves.js';
@@ -33,6 +33,8 @@ export const FAMILIES = {
 };
 // J of collision energy from which a blow on a limb counts as heavy.
 export const HEAVY = 60;
+// The weapons that strike with a blunt head (battle: the blows they land).
+const BLUNT_HEADS = new Set(['warhammer', 'kanabo', 'langya', 'flangedMace', 'champi', 'bat', 'clava', 'baton', 'staff', 'threeEyed', 'armShotgun']);
 
 const lerp = (a, b, t) => a.map((value, index) => value + (b[index] - value) * t);
 const at = (fighter, index) => [fighter.x[index * 3], fighter.x[index * 3 + 1], fighter.x[index * 3 + 2]];
@@ -57,7 +59,7 @@ function movesOf(style) {
 }
 
 /** A man of `style` and a man standing in his guard (no AI either side), `distance` m apart, settled. */
-function pair(style, distance, seed, defender = {}, attacker = 'veteran') {
+export function pair(style, distance, seed, defender = {}, attacker = 'veteran') {
   const inputs = { ...structuredClone(PRESETS[attacker]), style };
   const world = createWorld([inputs, { ...structuredClone(PRESETS.amateur), style: 'boxing', ...defender }], { seed });
   const [me, him] = world.fighters;
@@ -69,7 +71,7 @@ function pair(style, distance, seed, defender = {}, attacker = 'veteran') {
 }
 
 /** One blow `move` at `point(him)`; what it did: the hit on a limb (or null), and whether he lost or broke a limb. */
-function blowAt(world, me, him, move, point) {
+export function blowAt(world, me, him, move, point) {
   const from = world.events.length;
   if (!throwPunch(world, me, move, null, { at: point(him) })) return null;
   advance(world, MOVES[move].duration + 0.25);
@@ -154,26 +156,35 @@ function secondSection(seeds) {
   }
 }
 
-/** One blow at the head, the body or a limb: the injury it did (each part's trauma, as a share of its mark) and the head's speed change. */
+/**
+ * One blow at the head, the body or a limb: the injury it did (each part's trauma, as a share of its mark) and the head's speed
+ * change, by the part it landed on (whatever it was aimed at), the weapon's head only (a blow that met him with the haft first
+ * is left out: it is round wood, not the head, WORLD.haft).
+ */
 function bluntSection(seeds) {
-  console.log('\nBLUNT: injury per landed blow, % of the part\'s mark (the head\'s and the trunk\'s fatal, a limb\'s break); head Δv m/s');
+  console.log('\nBLUNT: injury per landed blow of the weapon\'s head, % of the part\'s mark (the head\'s and the trunk\'s fatal, a limb\'s break); head Δv m/s; (n)');
   const marks = { head: WORLD.injury.headFatal, trunk: WORLD.injury.trunkFatal, limb: WORLD.injury.limbBreak };
-  console.log(`${'style'.padEnd(9)} ${'head'.padStart(14)} ${'Δv'.padStart(5)} ${'trunk'.padStart(14)} ${'limb'.padStart(14)}`);
-  // (boxing: the veteran in his gloves; street: a brawler bare-handed, in his street clothes.)
-  for (const [style, attacker] of [['boxing', 'veteran'], ['street', 'street'], ['mace', 'veteran'], ['kanabo', 'veteran']]) {
+  console.log(`${'style'.padEnd(9)} ${'head'.padStart(14)} ${'Δv'.padStart(5)} ${'trunk'.padStart(14)} ${'limb'.padStart(14)}  haft first`);
+  // (boxing: the veteran in his gloves; street: a brawler bare-handed, in his street clothes; then the blunt heads: the flanged
+  // mace, Commodus's club, the kanabo, the war hammer, the bat.)
+  for (const [style, attacker] of [['boxing', 'veteran'], ['street', 'street'], ['mace', 'veteran'], ['commodus', 'veteran'], ['kanabo', 'veteran'], ['warhammer', 'veteran'], ['bat', 'veteran']]) {
     const rows = { head: [], trunk: [], limb: [], dv: [] };
+    let hafts = 0;
     for (const move of movesOf(style)) {
-      for (const [zone, aim] of [['head', (man) => at(man, P.head)], ['trunk', (man) => lerp(at(man, P.pelvis), at(man, P.neck), 0.55)], ['limb', (man) => lerp(at(man, P.lHip), at(man, P.lKnee), 0.5)], ['limb', SPOTS.upperArm.at && ((man) => SPOTS.upperArm.at(man, 'l'))]]) {
-        for (const share of [0.8, 0.92]) {
+      for (const aim of [(man) => at(man, P.head), (man) => lerp(at(man, P.pelvis), at(man, P.neck), 0.55), (man) => lerp(at(man, P.lHip), at(man, P.lKnee), 0.5), (man) => SPOTS.upperArm.at(man, 'l')]) {
+        for (const share of [0.8, 0.92, 1]) {
           for (let seed = 1; seed <= seeds; seed += 1) {
             const probe = pair(style, 1, seed, {}, attacker);
             const { world, me, him } = pair(style, reachOf(probe.me) * share, seed, {}, attacker);
             const before = structuredClone(him.trauma ?? {});
             const done = blowAt(world, me, him, move, aim);
             if (!done?.hit || done.hit.kind !== 'landed') continue;
+            if (done.hit.haft) {
+              hafts += 1;
+              continue;
+            }
             const key = done.hit.target;
             const kind = key === 'head' ? 'head' : key === 'trunk' ? 'trunk' : 'limb';
-            if (kind !== zone) continue;
             rows[kind].push(((him.trauma?.[key] ?? 0) - (before[key] ?? 0)) / marks[kind]);
             if (kind === 'head') rows.dv.push(done.hit.headDeltaV ?? 0);
           }
@@ -182,7 +193,7 @@ function bluntSection(seeds) {
     }
     const mean = (values) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0);
     const cell = (values) => `${(100 * mean(values)).toFixed(1)}% (${values.length})`.padStart(14);
-    console.log(`${style.padEnd(9)} ${cell(rows.head)} ${mean(rows.dv).toFixed(1).padStart(5)} ${cell(rows.trunk)} ${cell(rows.limb)}`);
+    console.log(`${style.padEnd(9)} ${cell(rows.head)} ${mean(rows.dv).toFixed(1).padStart(5)} ${cell(rows.trunk)} ${cell(rows.limb)}  ${hafts}`);
   }
 }
 
@@ -209,12 +220,17 @@ export function finish(attacker, armour, seed, watch = 10) {
   step(0.8);
   const t0 = world.time;
   const started = startFinisher(world, me, him);
-  const region = me.finisher?.entry.region;
-  // Watched until he dies or `watch` s.
-  for (let t = 0; t < watch && him.diedAt === undefined; t += 0.1) step(0.1);
+  // Watched until he dies or `watch` s; the place he put the point to as it went (he looks again as he kneels), and what he expected it to meet.
+  let region = me.finisher?.entry.region;
+  let key = me.finisher?.entry.key;
+  let plan = me.finisher?.plan;
+  for (let t = 0; t < watch && him.diedAt === undefined; t += 0.1) {
+    if (me.finisher) ({ entry: { region, key }, plan } = me.finisher);
+    step(0.1);
+  }
   const blow = world.events.find((event) => event.kind === 'landed' && event.attacker === me.id && event.defender === him.id && event.time >= t0);
   const killed = him.diedAt !== undefined;
-  return { started, region, blow, killed, out: him.state === 'out', bleeding: (him.bleed ?? 0) > 0.01, toDeath: killed ? him.diedAt - t0 : null, health: 1 - bodyHarm(him) };
+  return { started, region, key, plan, blow, killed, out: him.state === 'out', bleeding: (him.bleed ?? 0) > 0.01, toDeath: killed ? him.diedAt - t0 : null, health: 1 - bodyHarm(him) };
 }
 
 function finisherSection(seeds) {
@@ -225,8 +241,10 @@ function finisherSection(seeds) {
       const n = runs.length;
       const deaths = runs.filter((run) => run.killed).map((run) => run.toDeath).sort((a, b) => a - b);
       const mean = (pick) => runs.reduce((sum, run) => sum + pick(run), 0) / n;
+      // (Off: the point met another part of him than the one it was put to — his own arm or leg lying across it.)
+      const off = runs.filter((run) => run.blow && run.key && run.blow.target !== (run.plan?.key ?? run.key)).length;
       const regions = [...new Set(runs.map((run) => `${run.region}:${run.blow?.target ?? 'miss'}${run.blow?.gapZone ? '(gap)' : ''}`))].join(' ');
-      console.log(`${attacker.padEnd(7)} ${armour.padEnd(6)} killed ${percent(deaths.length, n)} incap ${percent(runs.filter((run) => run.out || run.bleeding).length, n)}  to death ${deaths.length ? deaths[Math.floor(deaths.length / 2)].toFixed(2) : '—'} s  health ${mean((run) => run.health).toFixed(2)}  pierce ${mean((run) => run.blow?.pierce ?? 0).toFixed(0).padStart(4)} J  E ${mean((run) => run.blow?.energy ?? 0).toFixed(0).padStart(4)} J  ${regions}`);
+      console.log(`${attacker.padEnd(7)} ${armour.padEnd(6)} killed ${percent(deaths.length, n)} incap ${percent(runs.filter((run) => run.out || run.bleeding).length, n)}  to death ${deaths.length ? deaths[Math.floor(deaths.length / 2)].toFixed(2) : '—'} s  health ${mean((run) => run.health).toFixed(2)}  pierce ${mean((run) => run.blow?.pierce ?? 0).toFixed(0).padStart(4)} J  E ${mean((run) => run.blow?.energy ?? 0).toFixed(0).padStart(4)} J  off ${off}/${n}  ${regions}`);
     }
   }
 }
@@ -244,15 +262,17 @@ function battle(key, seed, seconds = 180) {
   }
   const tally = battleTally(world);
   const count = (kind, test = () => true) => world.events.filter((event) => event.kind === kind && test(event)).length;
-  return { men: entries.length, seconds: elapsed, killed: tally.red.killed + tally.blue.killed, down: tally.red.down + tally.blue.down, severed: count('severed'), heads: count('severed', (event) => event.joint === 'neck'), broken: count('broken'), winner: judgeBattle(world)?.winner ?? '-' };
+  // (The blows the blunt heads landed: a mace's, a club's, a hammer's, a kanabo's, a champi's, a bat's.)
+  const blunt = world.events.filter((event) => event.kind === 'landed' && !event.haft && BLUNT_HEADS.has(event.weapon)).length;
+  return { blunt, men: entries.length, seconds: elapsed, killed: tally.red.killed + tally.blue.killed, down: tally.red.down + tally.blue.down, severed: count('severed'), heads: count('severed', (event) => event.joint === 'neck'), broken: count('broken'), winner: judgeBattle(world)?.winner ?? '-' };
 }
 
 function battleSection(keys = ['wokou', 'catalaunian']) {
-  console.log('\nBATTLES (2 seeds): men, seconds, killed, down, severed (heads), broken limbs, winner');
+  console.log('\nBATTLES (2 seeds): men, seconds, killed, down, severed (heads), broken limbs, blows landed by blunt heads, winner');
   for (const key of keys) {
     for (const seed of [1, 2]) {
       const row = battle(key, seed);
-      console.log(`${key.padEnd(12)} seed ${seed}: ${row.men} men ${row.seconds.toFixed(0).padStart(4)} s  killed ${row.killed} down ${row.down} severed ${row.severed} (${row.heads}) broken ${row.broken} won ${row.winner}`);
+      console.log(`${key.padEnd(12)} seed ${seed}: ${row.men} men ${row.seconds.toFixed(0).padStart(4)} s  killed ${row.killed} down ${row.down} severed ${row.severed} (${row.heads}) broken ${row.broken} blunt ${row.blunt} won ${row.winner}`);
     }
   }
 }
@@ -264,5 +284,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   if (sections.includes('second')) secondSection(seeds);
   if (sections.includes('blunt')) bluntSection(seeds);
   if (sections.includes('finisher')) finisherSection(seeds);
-  if (sections.includes('battle')) battleSection();
+  // (The battles: `keys` comma-separated, the 4th argument; the blunt heads' are cajamarca (champi) and rhodes (maces, hammers).)
+  if (sections.includes('battle')) battleSection(process.argv[4] ? process.argv[4].split(',') : undefined);
 }

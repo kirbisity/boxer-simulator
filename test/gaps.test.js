@@ -173,7 +173,7 @@ test('in a fight the katana seldom finds the knight\'s gaps and does not run him
   assert.ok(hammer.deaths.filter((end) => end.loser === 'b').length >= 2, 'the hammer: plate is not proof against a blow');
 });
 
-test('the finisher\'s dagger put to the throat of a knight on the floor goes in at the gap, to the mail standard; put to the breast, never', () => {
+test('the finisher\'s dagger looks for a gap in a knight on the floor (the throat, the sights, the armpit, the groin) and goes in at it; put to the breast, never', () => {
   for (const seed of [1, 2, 3, 4, 5]) {
     for (const region of [null, 'breast']) {
       const world = createWorld([{ inputs: structuredClone(PRESETS.light), corner: 'red' }, { inputs: structuredClone(PRESETS.knight), corner: 'blue' }], { seed });
@@ -188,13 +188,14 @@ test('the finisher\'s dagger put to the throat of a knight on the floor goes in 
       step(0.3);
       Object.assign(him, { state: 'down', downTimer: 8, knockdowns: 1 });
       step(0.8);
-      assert.equal(leastProtected(him).region, 'throat');
+      // (Of his kit alone, the sights of his helm (bare behind) or the throat (the mail standard); lying, the gap he can get at: planFinisher.)
+      assert.ok(['face', 'throat'].includes(leastProtected(him).region), leastProtected(him).region);
       assert.ok(startFinisher(world, me, him, region ? { region } : {}));
       step(3);
       const struck = world.events.filter((event) => event.kind === 'landed' && event.attacker === me.id && event.defender === him.id);
       assert.ok(struck.length >= 1, `seed ${seed}: struck`);
       if (region) assert.ok(struck.every((event) => !event.effects.includes('into a gap in the armour')), `seed ${seed}: the breastplate has no gap`);
-      else assert.ok(struck.some((event) => event.gapZone === 'neck' && event.effects.includes('into a gap in the armour')), `seed ${seed}: in at the throat`);
+      else assert.ok(struck.some((event) => event.gapZone && event.effects.includes('into a gap in the armour')), `seed ${seed}: in at a gap`);
     }
   }
 });

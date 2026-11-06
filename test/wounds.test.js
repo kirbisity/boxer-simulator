@@ -1,15 +1,17 @@
 // Wounds (physics.js): what is left of a limb to cut through (limbResistance), an edge that goes into the bone breaking it
 // (cutIntoLimb), a broken or cut-into limb coming off more easily, the stress of a narrow striking face (contactStress), a man
-// lying on the floor with the floor behind him (backedMass), and the finisher (finisher.js) killing a man down, armoured or not.
+// lying on the floor with the floor behind him (backedMass), and the finisher (finisher.js) killing a man down, armoured or not,
+// through a gap he can get at (planFinisher: the line to it clear of the man's own limbs).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESETS } from '../src/body.js';
+import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { BLADES } from '../src/weapons.js';
-import { advance, backedMass, bodyHarm, breakJoint, contactStress, createWorld, cutIntoLimb, limbResistance, placeFighter, WORLD } from '../src/physics.js';
+import { BLADES, WEAPONS } from '../src/weapons.js';
+import { advance, backedMass, bodyHarm, breakJoint, contactStress, createWorld, cutIntoLimb, limbResistance, placeFighter, reachOf, WORLD } from '../src/physics.js';
 import { directFighter, newOrders } from '../src/control.js';
-import { startFinisher } from '../src/finisher.js';
+import { firstMet, startFinisher } from '../src/finisher.js';
+import { blowAt, finish, pair } from '../tools/wounds.js';
 
 function man(preset = 'amateur') {
   const world = createWorld([{ ...structuredClone(PRESETS[preset]), style: 'boxing' }, { ...structuredClone(PRESETS.veteran), style: 'boxing' }], { seed: 1 });
@@ -73,6 +75,30 @@ test('a narrower striking face than a glove hurts the tissue more, to a limit; a
   assert.equal(contactStress(0.2), 1);
 });
 
+test('a blunt head crushes by how its face presses in against the 15 cm pendulum the crush was set by, to the same limit', () => {
+  assert.equal(contactStress(BLADES.crushFace, BLADES.crushFace), 1, 'Kroell\'s face: as calibrated');
+  assert.equal(contactStress(0.2, BLADES.crushFace), 1, 'broader: as the pendulum');
+  assert.ok(Math.abs(contactStress(WEAPONS.kanabo.radius, BLADES.crushFace) - Math.sqrt(0.075 / 0.05)) < 1e-9, 'a kanabo ~1.22');
+  assert.equal(contactStress(WEAPONS.flangedMace.face, BLADES.crushFace), WORLD.contactStress.most, 'a flange\'s edge: the limit');
+  // The same mace blow at the body (the same seed, the same swing), with its flange's face and with a 15 cm one in its place.
+  const trunkHarm = (face) => {
+    const saved = WEAPONS.flangedMace.face;
+    WEAPONS.flangedMace.face = face;
+    try {
+      const probe = pair('mace', 1, 1);
+      const { world, me, him } = pair('mace', reachOf(probe.me) * 1.05, 1);
+      const done = blowAt(world, me, him, 'maceSide', (man) => [man.x[P.neck * 3], man.x[P.neck * 3 + 1] - 0.3, man.x[P.neck * 3 + 2]]);
+      assert.ok(done?.hit?.kind === 'landed' && done.hit.target === 'trunk' && !done.hit.haft, `the head landed on the body: ${done?.hit?.target}`);
+      return him.trauma.trunk;
+    } finally {
+      WEAPONS.flangedMace.face = saved;
+    }
+  };
+  const ratio = trunkHarm(WEAPONS.flangedMace.face) / trunkHarm(BLADES.crushFace);
+  // (1.5 by the blow itself; a little more with what follows from it, the man knocked about the harder.)
+  assert.ok(ratio > 1.4 && ratio < 1.75, `the flange crushes ${ratio.toFixed(2)}x the pendulum's face`);
+});
+
 test('a man lying on the floor meets a blow coming down on him with the floor behind him; standing, with his own mass', () => {
   const { fighter } = man();
   const local = 5;
@@ -115,4 +141,31 @@ test('the finisher kills a man down in plate through the gap at his throat, and 
   const bare = finished('light', 'light', 1);
   assert.ok(bare.dead);
   assert.ok(bare.health < 0.01, `health ${bare.health}`);
+});
+
+test('the finisher looks for a gap he can get at: on a man in mail, the point meets his head or body, not his own leg lying across it', () => {
+  // (Before, 2-3 in 20 of these met the man's shank folded over the armpit the dagger was put to, and left him alive.)
+  const runs = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => finish('knight', 'mail', seed));
+  for (const run of runs) assert.ok(['head', 'trunk'].includes(run.blow?.target), `the point met his ${run.blow?.target}`);
+  assert.ok(runs.filter((run) => run.killed).length >= 7, `killed ${runs.filter((run) => run.killed).length} of 8`);
+});
+
+test('the line a point is put along meets the first part of him in its way: a leg over the body before the body', () => {
+  const { fighter } = man();
+  const at = (name) => [fighter.x[P[name] * 3], fighter.x[P[name] * 3 + 1], fighter.x[P[name] * 3 + 2]];
+  // From in front of him to the middle of his chest: the trunk.
+  const chest = [0, 1, 2].map((i) => (at('pelvis')[i] + at('neck')[i]) / 2);
+  const front = (x) => [x[0] + 1, x[1], x[2]];
+  const met = firstMet(fighter, front(chest), chest);
+  assert.ok(met && ['trunk', 'lForearm', 'rForearm', 'lUpperArm', 'rUpperArm'].includes(met.key), `met ${met?.key}`);
+  // His left shin laid across that line, between: it is met first.
+  const knee = P.lKnee * 3;
+  const foot = P.lFoot * 3;
+  const across = [chest[0] + 0.25, chest[1], chest[2]];
+  for (const [index, offset] of [[knee, -0.2], [foot, 0.2]]) {
+    fighter.x[index] = across[0];
+    fighter.x[index + 1] = across[1];
+    fighter.x[index + 2] = across[2] + offset;
+  }
+  assert.equal(firstMet(fighter, front(chest), chest).key, 'lShank');
 });

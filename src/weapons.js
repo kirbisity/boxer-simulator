@@ -295,6 +295,8 @@ export const WEAPONS = {
     // dagger's does (`pierce` 0.8, the dagger's; was 0.35), the heavy head behind it (`blunt` 1).
     harm: { swing: { blunt: 1.6, pierce: 0.4 }, thrust: { blunt: 1, pierce: 0.8 } },
     contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, art: 'artCrush', crush: 0.7,
+    // (Its striking `face`, m: the hammer's face, some 4 cm square, not the head's whole 8 cm; physics.js contactStress.)
+    face: 0.02,
   },
   naginata: {
     label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 2.35, balance: 0.55, radius: 0.014,
@@ -617,6 +619,8 @@ export const WEAPONS = {
     label: 'Flanged mace', hands: 'one', length: 0.66, strikeFrom: 0.5, handle: 0.12, mass: 1.6, balance: 0.72, radius: 0.036,
     harm: { swing: { blunt: 1.5 }, thrust: { blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.9, art: 'artCrushOne', crush: 0.55,
+    // (Its striking `face`, m: a flange's edge, ~5 cm deep and a few mm thick, lands first, not the round of the head.)
+    face: 0.02,
   },
   // The Inca champi (the Spaniards' porra): a star-shaped head of cast bronze
   // (or ground stone), five or six points round a hole, on a wooden haft of
@@ -1397,6 +1401,13 @@ export const BLADES = {
   // Calibrated on the chest: Kroell's pendulum (23.4 kg, a flat 15 cm face, at 6.7 m/s: ~285 J of collision on a 28 kg
   // trunk) breaks several ribs (AIS 3), what WORLD.damageCapacity calls seriously hurt (8.8 m/s): 0.03 × 285 ≈ 8.6.
   crushTrauma: 0.03,
+  // The face of that pendulum (m, its radius: Kroell's flat 15 cm disc). The crush is the tissue's injury under the head,
+  // and goes by how deep the face presses in, as the speed change does (WORLD.contactStress, physics.js contactStress):
+  // a weapon's striking face of radius a (its `face`, else its `radius`: the head's, the club's thickness) crushes
+  // √(crushFace / a) times what the pendulum's would for the same energy, to the same `most` (a club 1.37, a wolf-tooth
+  // mace 1.34, a kanabo or a champi 1.22; a flange's edge, a hammer's face, a bat, a baton at the limit, 1.5). Only a blunt
+  // weapon's head (physics.js bluntHeaded); a blade's flat and a spear's shaft as the pendulum. It crushed as a 15 cm disc before.
+  crushFace: 0.075,
   // Edge alignment: a cut needs the edge moving across the blade, not along it.
   cutAlignmentPower: 2,
   // The draw of a curved edge (sliceGain; a blade's `curve`). An edge parts flesh with less push the faster it slides
