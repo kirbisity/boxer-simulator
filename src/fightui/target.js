@@ -1,8 +1,10 @@
 // Body (C, the default): tap his man himself, in the fight, where you want
 // to hit (head, body or legs, on the left or right of him as the screen
-// shows him). The game picks the move of his style that reaches there best;
-// a quick second tap on the same place takes the next best (a jab, then a
-// hook). No panel covers the fight: the only sign is a faint ring on his
+// shows him, or his middle). The game picks the move of his style that
+// answers it best (fightui/logic.js fightUiTarget): from the left of him a
+// blow that comes in from the left, from the right one from the right, on
+// top of his head one from above, the middle of his body a thrust, his legs
+// a low blow; a quick second tap on the same place takes the next best. No panel covers the fight: the only sign is a faint ring on his
 // chest, which lights in the colour of the move chosen, flashes how it
 // went, greys while he has not the wind, and pulses when a tap misses him.
 
@@ -20,6 +22,10 @@ export const FIGHT_UI_TAP = {
   above: 0.14,
   below: 0.06,
   aside: 0.4,
+  // The middle of him (shares of his height either side of his head's or his hips' line): a tap here is on neither side.
+  // On his head, the top of it (above the head's middle by `crown`) is the middle too: a blow from above.
+  middle: { head: 0.035, body: 0.05, legs: 0.04 },
+  crown: 0.015,
   // Under this height (px) on screen (far off, in a crowd) he is taken as this tall, so he can still be hit.
   leastTall: 70,
   // The ring: its width as a share of his height on screen, within these px.
@@ -30,15 +36,16 @@ export const FIGHT_UI_TAP = {
   litFor: 0.9,
 };
 
-/** Where on his figure a tap at [x, y] (px) lands, from his head, neck, hips and feet on screen: { zone, side } or null if off him. */
+/** Where on his figure a tap at [x, y] (px) lands, from his head, neck, hips and feet on screen: { zone, side } (−1 left, 1 right, 0 the middle) or null if off him. */
 export function fightUiPlaceOnHim(at, head, neck, hips, feet, spec = FIGHT_UI_TAP) {
   const foot = Math.max(feet[0][1], feet[1][1]);
   const tall = Math.max(spec.leastTall, foot - head[1]);
   const [x, y] = at;
   if (y < head[1] - tall * spec.above || y > foot + tall * spec.below || Math.abs(x - hips[0]) > tall * spec.aside) return null;
   const zone = y < neck[1] + tall * 0.02 ? 'head' : y < hips[1] + tall * 0.04 ? 'body' : 'legs';
-  const side = x < (zone === 'head' ? head[0] : hips[0]) ? -1 : 1;
-  return { zone, side };
+  const across = x - (zone === 'head' ? head[0] : hips[0]);
+  const middle = Math.abs(across) < tall * (spec.middle?.[zone] ?? 0) || (zone === 'head' && y < head[1] - tall * (spec.crown ?? 0));
+  return { zone, side: middle ? 0 : Math.sign(across) || 1 };
 }
 
 /**
@@ -83,11 +90,12 @@ export function fightUiTargetBody(root, kit, hooks) {
 
   const onScreen = (target, index) => hooks.project([target.x[index * 3], target.x[index * 3 + 1], target.x[index * 3 + 2]]);
 
-  /** A tap on a place on him (or on the man `id`, tapped to charge): its best move (the next on a quick second tap). */
+  /** A tap on a place on him (`side` of the screen; or on the man `id`, tapped to charge): its best move (the next on a quick second tap). */
   function strikeAt(zone, side, id = null) {
     const now = hooks.now();
     const again = last && last.zone === zone && last.side === side && now - last.at < FIGHT_UI.againWithin ? last.again + 1 : 0;
-    const pick = fightUiTarget(kit.moves(), zone, side, again);
+    // (The moves' sides are his own: the screen's right is his +z from behind him, his −z from in front.)
+    const pick = fightUiTarget(kit.moves(), zone, side * kit.viewSign(), again);
     if (!pick) return;
     last = { zone, side, at: now, again };
     kit.throwMove(pick.entry, pick.zone, side, ring, { again: again > 0, target: id });
@@ -156,7 +164,7 @@ export function fightUiTargetBody(root, kit, hooks) {
     // Ready or not by his body blow, the one a tap on the middle of him throws.
     if (me.style !== readyStyle) {
       readyStyle = me.style;
-      readyMove = fightUiTarget(kit.moves(), 'body', 1, 0)?.move ?? null;
+      readyMove = fightUiTarget(kit.moves(), 'body', 0, 0, () => 1)?.move ?? null;
     }
     if (readyMove) fightUiPaintReady(ring, fightUiReady(me, readyMove));
   }

@@ -76,14 +76,14 @@ export function rangeDrive(punch) {
 }
 
 /**
- * The share of a stroke's `twist` the trunk takes at time `t` of a coiled art: from 0 to −`coil` through the wind-up, then
+ * The share of a stroke's `twist` the trunk takes at time `t` of a coiled art (or a stroke given its `coil`): from 0 to −`coil` through the wind-up, then
  * round to 1 by `lead` of the drive, held to the extension and eased back after it, as an ordinary stroke's is.
  */
-export function coiledTwist(spec, t) {
-  if (t < spec.windup) return -spec.coil * Math.sin((t / Math.max(1e-3, spec.windup)) * Math.PI * 0.5);
+export function coiledTwist(spec, t, coil = spec.coil) {
+  if (t < spec.windup) return -coil * Math.sin((t / Math.max(1e-3, spec.windup)) * Math.PI * 0.5);
   if (t < spec.extendUntil) {
     const drive = Math.min(1, (t - spec.windup) / Math.max(1e-3, (spec.extendUntil - spec.windup) * ART_MECHANICS.lead));
-    return -spec.coil + (1 + spec.coil) * Math.sin(drive * Math.PI * 0.5);
+    return -coil + (1 + coil) * Math.sin(drive * Math.PI * 0.5);
   }
   return Math.max(0, 1 - (t - spec.extendUntil) / Math.max(1e-3, spec.duration - spec.extendUntil));
 }

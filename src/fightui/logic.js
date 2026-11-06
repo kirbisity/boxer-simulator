@@ -8,7 +8,7 @@
 // is seen to come from by a man behind the fighter.
 
 import { attackLayout, moveName } from '../control.js';
-import { MOVES, STYLES } from '../moves.js';
+import { blowSide, MOVES, STYLES } from '../moves.js';
 import { WORLD } from '../physics/config.js';
 import { handling } from '../handling.js';
 
@@ -28,6 +28,23 @@ export const FIGHT_UI = {
   // Target on the body: where each zone of him lies on the pad.
   zoneHeight: { head: 0.55, body: 0, legs: -0.75 },
   zoneSide: 0.55,
+  // What a tap on a part of him asks for, and how badly each kind of blow answers it (0 the kind asked): on top of his head
+  // (or its middle) a blow from above; on a side of his head a cut from that side; the middle of his body a thrust (a
+  // straight, a jab with the weapon); a side of it a swing from that side; his legs a low blow.
+  want: {
+    head: { middle: { down: 0, straight: 0.7, side: 1, rising: 1.4, push: 2, low: 2.5 }, side: { down: 0, side: 0.15, rising: 0.9, straight: 1.4, push: 2.5, low: 2.5 } },
+    body: { middle: { straight: 0, push: 0.9, rising: 1.1, side: 1.2, down: 1.2, low: 2 }, side: { side: 0, down: 0.35, rising: 0.6, low: 1.4, straight: 1.8, push: 2.5 } },
+    legs: { middle: { low: 0, straight: 0.6, side: 0.8, rising: 1, down: 1.5, push: 1.5 }, side: { low: 0, side: 0.3, rising: 1, straight: 1.4, down: 1.5, push: 1.5 } },
+  },
+  // A blow from the other side than the one tapped; one from a side for a tap on his middle (or the middle's for a side's).
+  wrongSide: 3,
+  offMiddle: 0.6,
+  middleForSide: 1.6,
+  // One that cannot reach the part tapped at all.
+  noReach: 5,
+  // Mostly the best blow; now and then (this share) the next best from the same side, if it is nearly as good.
+  variety: 0.2,
+  varietyWithin: 0.7,
   // A second tap on the same zone within this (s) takes the next move that reaches it.
   againWithin: 0.7,
 };
@@ -54,11 +71,13 @@ export function fightUiLimb(spec) {
 export function fightUiTravel(spec, place) {
   if (spec.kind === 'rush' || spec.path === 'straight' || spec.path === 'aim' || spec.path === 'teep' || spec.path === 'pushBoth') return null;
   if (spec.path === 'blade') {
+    // (A thrust angled in from a side comes in from it, a little.)
+    if (spec.angled) return fightUiUnit(-spec.angled, -0.15);
     if (spec.mode === 'thrust' || !spec.from || !spec.to) return null;
-    // Local z is to his left: the right of the screen is −z.
-    return fightUiUnit(spec.to.hand[2] * -1 - spec.from.hand[2] * -1, spec.to.hand[1] - spec.from.hand[1]);
+    // Seen from behind him (control.js ATTACK_PAD), +z is the screen's right.
+    return fightUiUnit(spec.to.hand[2] - spec.from.hand[2], spec.to.hand[1] - spec.from.hand[1]);
   }
-  const side = place.x < 0 ? -1 : 1;
+  const side = blowSide(spec) || (place.x < 0 ? -1 : 1);
   const legsOnly = spec.zones?.length === 1 && spec.zones[0] === 'legs';
   const ways = {
     hook: [-side, 0], swipe: [-side, -0.15], upper: [-0.3 * side, 1], elbow: [-side, -0.3], upElbow: [0, 1], knee: [0, 1],
@@ -71,6 +90,7 @@ export function fightUiTravel(spec, place) {
 export function fightUiGroup(spec, travel) {
   if (spec.kind === 'rush' || spec.push || spec.bash) return 'push';
   if (spec.zones?.length === 1 && spec.zones[0] === 'legs') return 'low';
+  if (spec.mode === 'thrust') return 'straight';
   if (spec.path === 'roundhouse' || spec.path === 'knee') return 'low';
   if (!travel) return 'straight';
   if (travel[1] > FIGHT_UI.steep) return 'rising';
@@ -91,7 +111,8 @@ export function fightUiMoves(styleKey) {
     return {
       move: place.move, name, gloss, place: { x: place.x, y: place.y },
       travel, straight: !travel, limb: fightUiLimb(spec), group: fightUiGroup(spec, travel),
-      zones: spec.zones ?? [], side: place.x < -0.2 ? -1 : place.x > 0.2 ? 1 : 0,
+      // The side of the screen it comes from (seen from behind him): its own way, not where the pad spreads it.
+      zones: spec.zones ?? [], side: blowSide(spec),
     };
   });
 }
@@ -117,26 +138,43 @@ export const fightUiZoneOf = (entry) => fightUiZone(entry.move, entry.place.y > 
 // ---- Target on the body -----------------------------------------------------
 
 /**
- * The moves that reach a zone of him (head, body, legs) on a side of the
- * screen (−1 left, 1 right, 0 the middle), best first: those that can go
- * there, nearest the place where it lies.
+ * The moves that answer a tap on a zone of him (head, body, legs) on a side of the screen (−1 left, 1 right, 0 his middle,
+ * or the top of his head), best first: a blow from the side tapped, of the kind the place asks for (FIGHT_UI.want), that
+ * reaches it; then the rest, worse the further they are from that.
  */
 export function fightUiReaching(moves, zone, side) {
-  const strikes = moves.filter((entry) => MOVES[entry.move]?.kind === 'strike');
-  const can = strikes.filter((entry) => entry.zones.includes(zone));
-  const pool = can.length ? can : strikes;
-  const x = side * FIGHT_UI.zoneSide;
-  const y = FIGHT_UI.zoneHeight[zone] ?? 0;
-  // A move from the far side is a worse fit than its height alone says.
-  const fit = (entry) => Math.hypot(entry.place.x - x, entry.place.y - y) + (side && entry.side === -side ? 0.6 : 0);
-  return pool.slice().sort((a, b) => fit(a) - fit(b));
+  return fightUiRanked(moves, zone, side).map(({ entry }) => entry);
 }
 
-/** The move a tap on a zone throws: the best that reaches it (the next one on a quick second tap): { move, zone, entry } or null. */
-export function fightUiTarget(moves, zone, side, again = 0) {
-  const reaching = fightUiReaching(moves, zone, side);
-  if (!reaching.length) return null;
-  const entry = reaching[again % Math.min(reaching.length, 3)];
+/** fightUiReaching's moves with how well each answers the tap ({ entry, fit }: the lower the better). */
+function fightUiRanked(moves, zone, side) {
+  const strikes = moves.filter((entry) => MOVES[entry.move]?.kind === 'strike');
+  const want = FIGHT_UI.want[zone] ?? FIGHT_UI.want.body;
+  const kinds = side ? want.side : want.middle;
+  const y = FIGHT_UI.zoneHeight[zone] ?? 0;
+  const fit = (entry) => {
+    const from = entry.side ?? 0;
+    const sideCost = side ? (from === side ? 0 : from === 0 ? FIGHT_UI.middleForSide : FIGHT_UI.wrongSide) : (from === 0 ? 0 : FIGHT_UI.offMiddle);
+    // (Among equals, the one whose place on the pad is nearest the place tapped.)
+    const near = Math.hypot(entry.place.x - side * FIGHT_UI.zoneSide, entry.place.y - y) * 0.05;
+    return (entry.zones.includes(zone) ? 0 : FIGHT_UI.noReach) + sideCost + (kinds[entry.group] ?? 2) + near;
+  };
+  return strikes.map((entry) => ({ entry, fit: fit(entry) })).sort((a, b) => a.fit - b.fit);
+}
+
+/**
+ * The move a tap on a zone throws: { move, zone, entry, reaches } or null. The best that answers it, now and then
+ * (FIGHT_UI.variety, `random` 0..1) the next best from the same side if it is nearly as good; on a quick second tap the
+ * next one.
+ */
+export function fightUiTarget(moves, zone, side, again = 0, random = Math.random) {
+  const ranked = fightUiRanked(moves, zone, side);
+  if (!ranked.length) return null;
+  const best = ranked[0];
+  const fellows = ranked.filter(({ entry, fit }) => entry.side === best.entry.side && fit - best.fit <= FIGHT_UI.varietyWithin);
+  const pool = fellows.length > 1 ? fellows : ranked;
+  const pick = again ? again : fellows.length > 1 && random() < FIGHT_UI.variety ? 1 : 0;
+  const { entry } = pool[pick % Math.min(pool.length, 3)];
   return { move: entry.move, zone: fightUiZone(entry.move, zone), entry, reaches: entry.zones.includes(zone) };
 }
 

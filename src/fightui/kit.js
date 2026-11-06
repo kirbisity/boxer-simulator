@@ -17,6 +17,8 @@ export const FIGHT_UI_KIT = {
   afterOutcome: 0.6,
   // A blow begun this soon (s) after it was asked for is that ask's.
   askedWithin: 1,
+  // Half a metre to his side shows less than this (px) across the screen: the view is side-on, no telling his left from right.
+  sideOnPx: 3,
   // The pulse at the edge when he is hit: this long (s); a blow under this harm share is too light for it.
   dangerSeconds: 0.5,
   // The legend of the colours shows this long (s) in his first this many fights, then only when asked.
@@ -135,15 +137,36 @@ export function fightUiKit(root, hooks) {
     return (orders.lock !== null ? fightWorld.fighters[orders.lock] : null) ?? attackMark(fightWorld, fighter, orders, opponentFor(fightWorld, fighter));
   }
 
-  /** Mark a blow on his man (or the man `id`, tapped to charge): where it goes, its way, its colour. */
+  /**
+   * Which way the screen shows him: 1 if his +z side is on the screen's right (the follow camera behind him, as the moves'
+   * places and ways are laid out: control.js ATTACK_PAD), −1 if on its left (the view turned round to his front). Side-on
+   * (no telling), 1.
+   */
+  function viewSign() {
+    const fighter = me();
+    if (!fighter || !hooks.project) return 1;
+    const hips = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 1], fighter.x[P.pelvis * 3 + 2]];
+    // (His +z, in the world: physics.js toWorld of [0, 0, 1].)
+    const side = [hips[0] + Math.sin(fighter.yaw) * 0.5, hips[1], hips[2] + Math.cos(fighter.yaw) * 0.5];
+    const [at, out] = [hooks.project(hips), hooks.project(side)];
+    if (!at?.[2] || !out?.[2] || Math.abs(out[0] - at[0]) < FIGHT_UI_KIT.sideOnPx) return 1;
+    return Math.sign(out[0] - at[0]);
+  }
+
+  /** A side of him (his frame: +1 his +z) as the screen shows it (−1 left, 1 right). */
+  const screenSide = (side) => side * viewSign();
+
+  /** Mark a blow on his man (or the man `id`, tapped to charge): where it goes (`side`: of the screen), its way, its colour. */
   function markAim(entry, zone, side, id = null) {
     const target = id !== null ? world()?.fighters[id] : targetMan();
     if (!target || !entry) return;
-    marks()?.aim({ target: target.id, from: me().id, zone, side, group: entry.group, travel: entry.travel });
+    // (Its way as the screen shows him: across the other way if the view is from his front.)
+    const travel = entry.travel && [entry.travel[0] * viewSign(), entry.travel[1]];
+    marks()?.aim({ target: target.id, from: me().id, zone, side, group: entry.group, travel });
   }
 
   /**
-   * Ask for a move (an entry of moves()) at a zone, on a side of him: thrown
+   * Ask for a move (an entry of moves()) at a zone, on a side of him (of the screen): thrown
    * at once (or as soon as the hands are back), and marked on him. `source`
    * (the button or place pressed) is told when it begins; `again`: a quick
    * second press (the next blow of a combination); `target`: the man it is at, if not his man (a rider's tap on a man
@@ -180,7 +203,7 @@ export function fightUiKit(root, hooks) {
       strike = { punch, move: punch.type, entry, source: mine?.source ?? null, since: fightWorld.time - (punch.age ?? 0) - 1 / 60, start: now, outcome: null, outcomeAt: null };
       // A blow not asked for here (a key): marked as it begins.
       // (At the man it is made at: a rider's blow in passing, seconds after his charge tap marked that man, is marked on him again.)
-      if (!mine && entry) markAim(entry, punch.zone ?? fightUiZoneOf(entry), entry.side, punch.target ?? null);
+      if (!mine && entry) markAim(entry, punch.zone ?? fightUiZoneOf(entry), screenSide(entry.side), punch.target ?? null);
       asked = null;
       const colour = entry ? fightUiColour(entry.group) : '#ffffff';
       toast.style.setProperty('--fu-col', colour);
@@ -307,7 +330,7 @@ export function fightUiKit(root, hooks) {
     legend.remove();
   }
 
-  return { me, world, moves, targetMan, throwMove, update, reset, destroy, listen: (listener) => listeners.push(listener), toast };
+  return { me, world, moves, targetMan, throwMove, viewSign, screenSide, update, reset, destroy, listen: (listener) => listeners.push(listener), toast };
 }
 
 /** Show a control's readiness: greyed when it cannot (tired, down), a sweep while a blow is in flight. */

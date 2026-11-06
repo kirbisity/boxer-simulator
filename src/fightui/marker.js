@@ -52,6 +52,8 @@ export const FIGHT_UI_MARKS = {
   // s: the arrow, once it has flown in and held this long, dims to `arrowRest` of itself (the way is read by then).
   arrowHold: 0.22,
   arrowRest: 0.6,
+  // A blow whose way on the screen goes across by more than this share (of its length) is shown with the sweep.
+  sweepAcross: 0.45,
 };
 
 const fightUiMuted = new Map();
@@ -268,7 +270,9 @@ export function createFightUiMarks(view) {
 
   function aimAt(spec) {
     aim = { ...spec, start: null, landAt: null, outcome: null, way: spec.travel, colour: fightUiMarkColour(FIGHT_UI.colours[spec.group] ?? '#ffffff'), sweptBy: 0 };
-    aim.arrow = spec.group === 'side' || spec.group === 'low' ? 'sweep' : spec.group === 'straight' ? 'straight' : 'chevrons';
+    // (A cut from a side that falls or climbs as it crosses is drawn as a sweep too: the side it comes from is the thing to see.)
+    const across = Math.abs(spec.travel?.[0] ?? 0) > FIGHT_UI_MARKS.sweepAcross;
+    aim.arrow = spec.group === 'straight' ? 'straight' : spec.group === 'side' || spec.group === 'low' || across ? 'sweep' : 'chevrons';
   }
 
   function land(outcome, point) {

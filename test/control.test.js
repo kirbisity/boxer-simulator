@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
-import { MOVES, STYLES } from '../src/moves.js';
+import { MOVES, STYLES, TAP_MOVES } from '../src/moves.js';
 import { advance, createWorld, dropWeapon, point } from '../src/physics.js';
 import { attackAt, attackLayout, chooseAttack, contextAction, CONTROL, directFighter, doAction, holdDistance, newOrders, stickPace } from '../src/control.js';
 import { createRecognizer, GESTURE } from '../src/gesture.js';
@@ -198,13 +198,16 @@ test('the special button: reload an empty gun, fire a loaded one, pick up a weap
 test('the attack pad: every attack of every style has its own place on the screen, where a tap throws it', () => {
   for (const [key, style] of Object.entries(STYLES)) {
     const pad = attackLayout(key);
-    const wanted = Object.keys(style.attacks ?? {}).filter((name) => MOVES[name] && MOVES[name].kind !== 'clinch');
+    // (With the blows from the other side made for the player: moves.js TAP_MOVES.)
+    const wanted = [...Object.keys(style.attacks ?? {}), ...(TAP_MOVES[key] ?? [])].filter((name) => MOVES[name] && MOVES[name].kind !== 'clinch');
     assert.deepEqual(pad.map((place) => place.move).sort(), wanted.sort(), `${key}: every attack but the clinch is on the pad`);
     for (const place of pad) assert.equal(attackAt(key, place.x, place.y).move, place.move, `${key}: a tap on ${place.move}'s place throws it`);
   }
-  // Seen from behind: the jab on the left, the cross on the right, the hook out wide, the uppercut low; a katana's overhead cut on top.
+  // Seen from behind (his +z on the screen's right): the lead (+z) hand's jab on the right, the cross on the left, the hook
+  // out wide, the uppercut low; a katana's overhead cut on top, its forehand cut (from his −z shoulder) from the left.
   const boxing = Object.fromEntries(attackLayout('boxing').map((place) => [place.move, place]));
-  assert.ok(boxing.jab.x < 0 && boxing.cross.x > 0 && Math.abs(boxing.hook.x) > Math.abs(boxing.jab.x) && boxing.uppercut.y < boxing.cross.y);
+  assert.ok(boxing.jab.x > 0 && boxing.cross.x < 0 && Math.abs(boxing.hook.x) > Math.abs(boxing.jab.x) && boxing.uppercut.y < boxing.cross.y);
+  assert.ok(attackLayout('katana').find((place) => place.move === 'kesagiri').x < 0);
   const katana = Object.fromEntries(attackLayout('katana').map((place) => [place.move, place]));
   assert.ok(katana.shomen.y > 0.7 && Math.abs(katana.shomen.x) < 0.2 && katana.kiriage.y < 0);
   // The height of the tap picks the zone: a cross high is at the head, lower at the body.
