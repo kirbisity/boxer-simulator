@@ -442,6 +442,10 @@ export const AI = {
     // `followTimid` of it at full hesitancy (a levy line follows its bold men in by ones and twos, not all at once). No
     // stall lasts past `longest` s (the press of the rear ranks pushed the front in at last).
     go: 0.3, goLeast: 0.04, push: 0.1, follow: 0.4, followTimid: 0.8, followFresh: 1.5, longest: 14, afterContact: 15,
+    // Come at: the man he faces coming on at him at `metAt` m/s or more (a steady walk's half) ends it at once. The stall
+    // is two lines each waiting for the other; a man who does not wait (an elite, a fanatic) is met where he arrives,
+    // stepped in to as any man steps in to a blow he cannot stand still under, not waited for at the edge of reach.
+    metAt: 0.6,
     // How he waits: shuffling up at `shuffle` of his pace to his holding distance; there, feints (a half step in and
     // back, `feint` of his pace, `feintRate` a second) and sways along the line (`sway` of his sideways pace).
     shuffle: 0.35, feint: 0.4, feintRate: 0.6, sway: 0.3,
@@ -1722,7 +1726,13 @@ function holdShort(world, fighter, opponent, distance, range, dt) {
   const state = fighter.hesitant;
   if (!state.stalled) return false;
   const rate = spec.go * (1 - hesitant) + spec.goLeast + (ledNear(world, fighter) ? spec.push : 0) + (comradeWentIn(world, fighter) ? spec.follow * (1 - spec.followTimid * hesitant) : 0);
-  if (world.time - state.since > spec.longest || world.random() < rate * dt) {
+  const toMe = [fighter.x[P.pelvis * 3] - opponent.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2] - opponent.x[P.pelvis * 3 + 2]];
+  const his = opponent.rootVelocity ?? [0, 0];
+  // (By a man who has made up his mind to go in, or a charger: not by another stalled man's shuffling and feints, nor by
+  // one still walking up who has yet to come to his own band.)
+  const goingIn = (opponent.hesitant && !opponent.hesitant.stalled) || (opponent.body.inputs.charging ?? 1) > 1;
+  const comeAt = goingIn && (his[0] * toMe[0] + his[1] * toMe[1]) / Math.max(1e-6, distance) >= spec.metAt;
+  if (comeAt || world.time - state.since > spec.longest || world.random() < rate * dt) {
     state.stalled = false;
     return false;
   }
@@ -3262,6 +3272,7 @@ function decide(world, fighter, dt) {
   }
   if (fighter.panicked && rout(world, fighter, opponent)) return;
   if (style.passive || fighter.panicked) {
+    fighter.hesitant = null;
     keepAway(world, fighter, opponent, dt);
     return;
   }

@@ -73,6 +73,14 @@ test('two levy lines that never find their nerve stand off short of reach; elite
   });
 });
 
+test('levies who would never go in still meet samurai who come at them: the elite closes as soon as without the stall', () => {
+  const never = { go: 0, goLeast: 0, push: 0, follow: 0, longest: Infinity, base: 5 };
+  const stalled = withHesitation(never, () => firstBlow(lines('spear', 'samurai'), 20));
+  const free = withHesitation({ on: false }, () => firstBlow(lines('spear', 'samurai'), 20));
+  assert.ok(stalled !== null && free !== null, 'they meet');
+  assert.ok(stalled <= free + 1, `met at ${stalled.toFixed(1)} s against ${free.toFixed(1)} s with no hesitation`);
+});
+
 test('no stall lasts past `longest`: the levies go in at last', () => {
   withHesitation({ go: 0, goLeast: 0, push: 0, follow: 0, longest: 3, base: 5 }, () => {
     const met = firstBlow(lines('spear', 'spear'), 20);
