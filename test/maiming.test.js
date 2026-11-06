@@ -44,22 +44,21 @@ test('a limb off is not death: he is still up; the head off is', () => {
   assert.equal(battleTally(other.world).red.killed, 1);
 });
 
-test('the bleeding is by the vessel: the thigh fastest, then the arm at the shoulder, the forearm; the hand slowest, often never', () => {
+test('the bleeding is by the vessel and fast (set for play): an arm off empties a 75 kg man in ~7.5 s, the thigh sooner, the hand later', () => {
   const collapse = collapseAt();
   const hip = secondsTo('hip', collapse);
   const knee = secondsTo('knee', collapse);
   const shoulder = secondsTo('shoulder', collapse);
   const elbow = secondsTo('elbow', collapse);
   const wrist = secondsTo('wrist', collapse);
-  assert.ok(hip >= 12 && hip <= 45, `the femoral: collapse in ${hip} s`);
-  assert.ok(hip < shoulder && shoulder < elbow && shoulder < knee + 30, `hip ${hip} < shoulder ${shoulder} < elbow ${elbow}`);
-  assert.ok(elbow <= 120, `the forearm off: ${elbow} s`);
-  assert.ok(wrist > elbow, `the hand: ${wrist} s`);
-  // Clamped (the cut artery drawn back in spasm), it bleeds far less: the arm at the shoulder does not collapse him.
-  assert.ok(secondsTo('shoulder', collapse, { clamped: true }) === Infinity);
-  // Death comes later than collapse, and only from the great vessels.
-  assert.ok(secondsTo('hip', deathAt()) > hip + 5);
-  assert.equal(secondsTo('wrist', deathAt()), Infinity, 'a hand off, untreated, does not bleed a man of 75 kg to death by itself');
+  assert.ok(shoulder >= 6.5 && shoulder <= 8.5, `the arm at the shoulder: collapse in ${shoulder} s`);
+  assert.ok(elbow >= 7 && elbow <= 9, `the forearm off: ${elbow} s`);
+  assert.ok(hip < knee && knee < shoulder && shoulder < elbow && elbow < wrist, `hip ${hip} < knee ${knee} < shoulder ${shoulder} < elbow ${elbow} < hand ${wrist}`);
+  assert.ok(wrist <= 12, `the hand: ${wrist} s`);
+  // Clamped (the cut artery drawn back in spasm), it bleeds far less.
+  assert.ok(secondsTo('shoulder', collapse, { clamped: true }) > 2 * shoulder);
+  // Death comes later than collapse.
+  assert.ok(secondsTo('hip', deathAt()) > hip + 3);
   // A lighter man has less blood to lose.
   assert.ok(bloodMl({ body: { bodyMassKg: 55 } }) < bloodMl({ body: { bodyMassKg: 80 } }));
 });
@@ -68,13 +67,13 @@ test('the bleeding runs on: collapse (bledOut) at what puts any man down, death 
   const { world, man, foe } = pair();
   cutOff(world, man, { joint: 'hip', side: 'r' }, foe);
   man.vessels[0] = { ...man.vessels[0], rate: MAIMING.vessels.hip.flow / bloodMl(man), clot: MAIMING.vessels.hip.clot, clamped: false };
-  advance(world, 15);
-  assert.notEqual(man.state, 'out', 'not in seconds');
+  advance(world, 2);
+  assert.notEqual(man.state, 'out', 'not at once');
   assert.ok(bleedingFast(man), 'bleeding fast: the bar shows it');
-  advance(world, 40);
-  assert.equal(man.state, 'out', 'collapsed within the minute');
+  advance(world, 10);
+  assert.equal(man.state, 'out', 'collapsed within seconds (a thigh off: ~6 s)');
   assert.ok(world.events.some((event) => event.kind === 'bledOut' && event.fighter === man.id));
-  advance(world, 60);
+  advance(world, 30);
   assert.ok(world.events.some((event) => event.kind === 'died' && event.fighter === man.id), 'and died of it');
   assert.equal(battleTally(world).red.killed, 1);
 });
@@ -107,6 +106,8 @@ test('a leg off drops him; on his knees he fights on from the ground (in the fig
   cutOff(world, man, { joint: 'knee', side: 'l' }, foe);
   assert.ok(legBroken(man));
   assert.equal(man.state, 'down');
+  // (The stump stanched, so he lives long enough for the fight on his knees to be seen: a cut limb now empties him in seconds.)
+  man.vessels = [];
   // Steady (no fear: as a relentless man is), he kneels and fights on.
   man.body.inputs.relentless = true;
   for (let t = 0; t < 8 && !man.crawling; t += 0.25) advance(world, 0.25, (current, dt) => thinkAll(current, dt));
