@@ -246,7 +246,8 @@ export const TURRET_RIFLE = {
 // `art`: the weapon art (moves.js, weaponarts.js) its family is made for, the move the player can make with it once his
 // blood is up: the katana's and ōdachi's draw-cut (iai), the long sword's pommel strike, the jian's, dao's and kilij's drawing cut,
 // the polearm's wheel, the hammer's and kanabo's charged blow (a mace's, one-handed), the two-handed spear's step back and lunge (a spear in one hand, a shield on the other arm, cannot make it). No
-// gun or bow has one.
+// gun or bow has one. It names the family too: the family's other arts, made when the situation asks for them, are
+// weaponarts.js ARTS.choices'.
 export const WEAPONS = {
   // A side-handle-less straight police baton: hard, heavy at the tip.
   baton: {
@@ -297,6 +298,9 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 1.2, wrist: { omega: 11, zeta: 0.8 }, threat: 4, art: 'artCrush', crush: 0.7,
     // (Its striking `face`, m: the hammer's face, some 4 cm square, not the head's whole 8 cm; physics.js contactStress.)
     face: 0.02,
+    // Swung beak first (a weapon art's, moves.js artBeak): the curved spike behind the face leads, a point square to the haft
+    // with the whole head behind it — it goes into plate where it meets it near square (BLADES.bite), as a thrust's point does.
+    beak: { pierce: 1, blunt: 0.5 },
   },
   naginata: {
     label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 2.35, balance: 0.55, radius: 0.014,
@@ -1828,7 +1832,9 @@ export function bladeTargets(move, t, aim, body, spec, reachShare = 1) {
   if (t < move.windup) return from;
   const u = Math.min(1, (t - move.windup) / (move.extendUntil - move.windup));
   const middleDir = move.mid ? vec.normalize(move.mid) : slerpDir(from.dir, to.dir, 0.5);
-  const middle = vec.sub(aim, vec.scale(middleDir, spec.length * contactShare(move, spec)));
+  // (Swung hilt first, `hilt`: the mordhau, the sword held reversed, its hilt end the hammer's head: laid on the mark by the
+  // middle of the pommel's span behind the hand, physics/arts.js ART_MECHANICS.hilt: −(handle + knob 0.03) to −(handle − grip 0.07).)
+  const middle = vec.sub(aim, vec.scale(middleDir, move.hilt ? -(spec.handle - 0.02) : spec.length * contactShare(move, spec)));
   // A quadratic curve through `middle` at u = `meet` (½ unless the move says: a weapon art meets its mark later in the
   // stroke, where the weapon, lagging the hands that drive it, has come up to its full speed).
   const meet = move.meet ?? 0.5;

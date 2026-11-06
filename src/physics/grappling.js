@@ -3,8 +3,8 @@
 
 import { soundVoice } from '../audio/log.js';
 import { P } from '../body.js';
-import { STYLES } from '../moves.js';
-import { addDamage, boneShare, dropWeapon, fall, opponentFor, point, protectionAt, TRUNK_PARTICLES, wound } from '../physics.js';
+import { MOVES, STYLES } from '../moves.js';
+import { addDamage, boneShare, dropWeapon, fall, opponentFor, point, protectionAt, throwPunch, TRUNK_PARTICLES, wound } from '../physics.js';
 import { riseForces } from './rising.js';
 import { vec, yawRotate } from '../pose.js';
 import { WORLD } from './config.js';
@@ -17,6 +17,18 @@ import { WORLD } from './config.js';
 export function holdClinch(world, fighter) {
   const target = world.fighters[fighter.clinch.target];
   const style = STYLES[fighter.style];
+  // A weapon art taken from the hold (`clinch.art`, weaponarts.js): once his hands have hold of him, the throw it was taken for
+  // (judo's over the shoulder, else over the hip) or the blow (`then`: the dagger's point put in while the free hand holds him).
+  const art = fighter.clinch.art;
+  if (art && target.state === 'up' && (fighter.clinch.hands ?? ['l', 'r']).every((side) => fighter.clinch.locked?.[side])) {
+    fighter.clinch.art = null;
+    if (art.throw) {
+      if (style?.shoulderThrow) shoulderThrow(world, fighter, target);
+      else throwFromHold(world, fighter, target);
+      return;
+    }
+    if (art.then) throwPunch(world, fighter, art.then, art.zone ?? MOVES[art.then].zones[0]);
+  }
   // Holding him, an ape bites (`bite`).
   if (style?.bite && Object.values(fighter.clinch.locked ?? {}).some(Boolean)) {
     fighter.clinch.biteAt ??= world.time + style.bite.first;

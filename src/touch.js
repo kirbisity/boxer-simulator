@@ -485,7 +485,7 @@ export function installFightControls(root, hooks) {
     const charged = artPrimed(me);
     if (art.hidden === charged) art.hidden = !charged;
     if (charged) {
-      const label = artLabel(me);
+      const label = artLabel(me, world);
       if (art.querySelector('.label').textContent !== label) art.querySelector('.label').textContent = label;
       const winded = artBlocked(me) === 'winded';
       // (A grenade carried has the button first: its own mark, no adrenaline asked: physics/throwable.js.)

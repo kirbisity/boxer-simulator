@@ -19,7 +19,7 @@ import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pi
 import { flyNets } from './physics/net.js';
 import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/throwable.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
-import { artTurn, coiledTwist, hiltMix, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
+import { artTurn, beakMix, coiledTwist, hiltCrush, hiltKnob, hiltMix, hookPull, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
@@ -1928,6 +1928,19 @@ export function aimPoint(target, zone, spec = null) {
     return vec.add(point(target.x, P[`${target.weapon.main}Hand`]), vec.scale(target.weapon.dir, target.weapon.spec.length * 0.5));
   }
   if (zone === 'legs') return vec.lerp(point(target.x, P.lHip), point(target.x, P.lKnee), 0.55);
+  // The places a weapon art is laid on (weaponarts.js chooseArt): his throat (under the chin, between the neck and the head); his
+  // weapon hand (else his right); his left armpit (high on his side under the arm, at the edge of his chest, where the plates
+  // part: physics/gaps.js); his shield's face (else his legs); his shins (a sweep at the feet).
+  if (zone === 'throat') return vec.lerp(point(target.x, P.neck), point(target.x, P.head), 0.35);
+  if (zone === 'hand') return point(target.x, P[`${target.weapon?.held ? target.weapon.main : 'r'}Hand`]);
+  if (zone === 'armpit') {
+    const side = vec.sub(point(target.x, P.lShoulder), point(target.x, P.rShoulder));
+    const width = vec.length(side);
+    const chest = vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), 0.8);
+    return width > 1e-6 ? vec.add(chest, vec.scale(side, (target.body.segments.trunk.skinRadius * 0.85) / width)) : chest;
+  }
+  if (zone === 'shield') return target.shield ? shieldDisc(target).centre : aimPoint(target, 'legs');
+  if (zone === 'shins') return vec.lerp(point(target.x, P.lKnee), point(target.x, P.lFoot), 0.45);
   // (The body: the chest, `bodyAt` of the way from his hips to his neck, unless the move cuts lower: a wheel's flat arc at his waist.)
   return vec.lerp(point(target.x, P.pelvis), point(target.x, P.neck), spec?.bodyAt ?? 0.6);
 }
@@ -2210,7 +2223,8 @@ export function perform(world, fighter, name, { side = world.random() < 0.5 ? 1 
     fighter.clinch = { target: target.id, t: 0, duration: spec.duration * (0.5 + share), hands: spec.hands ?? ['l', 'r'] };
     world.events.push({ time: world.time, kind: 'clinch', attacker: fighter.id, defender: target.id, effects: [] });
   } else return false;
-  drawStamina(fighter, spec.cost / fighter.body.aerobic);
+  // (A weapon art draws none: the surge it spends pays for it, weaponarts.js.)
+  if (!spec.art) drawStamina(fighter, spec.cost / fighter.body.aerobic);
   return true;
 }
 
@@ -2423,7 +2437,13 @@ function updateIntent(world, fighter, dt) {
       const local = toLocal(fighter, point(fighter.x, P[`${s}Foot`]));
       intent[`${s}Foot`] = vec.lerp(local, [0.05 * H * (s === 'l' ? 1 : -1), fighter.body.lengths.ankle, 0.06 * H * (s === 'l' ? 1 : -1)], Math.min(1, (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil)));
     }
-    if (punch.t >= spec.duration) {
+    // A weapon art made of two blows (`then`: the shield's boss, then the blade): the second begun as the first is done (`thenAt`).
+    if (spec.then && punch.t >= (spec.thenAt ?? spec.duration)) {
+      fighter.punch = null;
+      const next = MOVES[spec.then];
+      const man = punch.target === null ? null : world.fighters[punch.target];
+      throwPunch(world, fighter, spec.then, next.zones[0], man?.state === 'up' ? {} : { at: punch.at ?? toWorld(fighter, punch.aim) });
+    } else if (punch.t >= spec.duration) {
       if (punch.heavy) fighter.committed = WORLD.heavy.committedSeconds;
       fighter.punch = null;
     }
@@ -5956,7 +5976,8 @@ function strikers(fighter) {
     const span = strikeSpan(weapon, strokeOf(fighter, weapon));
     const head = vec.add(grip, vec.scale(weapon.dir, span[0]));
     const end = span[1] === weapon.spec.length ? weapon.tip : vec.add(grip, vec.scale(weapon.dir, span[1]));
-    list.push(strikerOf(key, hand, hand, weapon.spec.radius, weapon.main, { weapon, pa: head, pb: end, span }));
+    // (The pommel is a knob of its own size, not the blade's: ART_MECHANICS.hilt.knob.)
+    list.push(strikerOf(key, hand, hand, span[0] < 0 ? Math.max(weapon.spec.radius, hiltKnob()) : weapon.spec.radius, weapon.main, { weapon, pa: head, pb: end, span }));
     // Its haft, short of the head (WORLD.haft): a man inside the head meets the wood (not when the pommel is what strikes).
     if (hasHaft(weapon.spec) && span[0] > WORLD.haft.from) list.push(strikerOf(`${key}Haft`, hand, hand, Math.min(WORLD.haft.radius, weapon.spec.radius), weapon.main, { weapon, haft: true, pa: vec.add(grip, vec.scale(weapon.dir, WORLD.haft.from)), pb: head }));
   }
@@ -7452,7 +7473,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * goingIn * goingIn;
   // The haft: round wood, no edge and no point; the pommel: all blunt.
-  const mix = haft ? { blunt: WORLD.haft.blunt, cut: 0, pierce: 0 } : spec.hilt ? hiltMix() : harmMix(wspec, spec.mode, along, closest.s);
+  // (A war hammer swung beak first, `beak`: its spike behind the head leads, the weapon's `beak` mix, physics/arts.js beakMix.)
+  const beak = !haft && spec.beak && wspec.beak ? beakMix(wspec) : null;
+  const mix = haft ? { blunt: WORLD.haft.blunt, cut: 0, pierce: 0 } : spec.hilt ? hiltMix() : beak ?? harmMix(wspec, spec.mode, along, closest.s);
   const contactSeconds = haft ? WORLD.haft.contactSeconds : wspec.contactSeconds;
   // A dagger driven into a man lying helpless: all point, little blunt (finisher.js).
   if (punch.finisher) mix.blunt *= punch.finisher.blunt;
@@ -7478,22 +7501,27 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const placed = BLADES.gaps.size / (BLADES.gaps.size + (punch.wander ?? 0));
   // (A finisher's point is placed, not thrown in a fight: put where the plates part, the visor, the armpit, the throat, it finds
   // the gap `finisher.gap` of the time; put to the middle of the breast, where plate is plate, never.)
-  const gapFound = gapZone ? (punch.finisher ? punch.finisher.gap : gapChance(body.gear, gapZone, spec.mode)) * placed : 0;
+  // (A point laid in by a hand on the blade or on the man, `placed`: a weapon art's half-sword or its stab from the hold, as a
+  // finisher's is: so often, where a gap is.)
+  const gapFound = gapZone ? (punch.finisher ? punch.finisher.gap : spec.placed ?? gapChance(body.gear, gapZone, spec.mode)) * placed : 0;
   const intoGap = gapFound > 0 && world.random() < gapFound * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gapUnder(body.gear, gapZone, covered), deflects: false } : covered;
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
   const blocked = BLOCKING.has(capsule.key);
   // A heavy hard head drives part of its blow through armour (`crush`).
-  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : wspec.crush ?? 0)));
+  // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)
+  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
   // A brittle edge (obsidian) cuts only as well as it is still sharp.
   const sharp = weapon.edge ?? 1;
   // A point on plate bites only if it meets it near square (BLADES.bite: the cosine of the steepest
   // slant it holds at); slanting, it skids off the curve of the plate (a rounded breastplate, its
   // ridge) and goes in nowhere: it is a shove.
-  const facing = Math.abs(vec.dot(weapon.dir, normal));
+  // (A beak swung into him leads square to the haft: it meets the plate along its own swing, not the weapon's line.)
+  const pointLed = spec.mode === 'thrust' || Boolean(beak);
+  const facing = beak ? Math.abs(vec.dot(vec.normalize(relative), normal)) : Math.abs(vec.dot(weapon.dir, normal));
   // (A finisher's point is driven square down onto him: it does not skid.)
-  const skids = Boolean(protection.deflects) && spec.mode === 'thrust' && mix.pierce > 0 && facing < BLADES.bite && !punch.finisher;
+  const skids = Boolean(protection.deflects) && pointLed && mix.pierce > 0 && facing < BLADES.bite && !punch.finisher;
   if (skids) {
     // (The impulse is already only what the point brings square to the plate.)
     mix.cut = 0;
@@ -7505,7 +7533,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // A finisher's point is leaned on as it goes in (finisherPress): the work of that push, as well as the blow's.
   const pierce = (energy * mix.pierce + (punch.finisher && mix.pierce > 0 ? finisherPress(attacker, weapon, punch.finisher) : 0)) * (1 - (protection.pierce ?? 0)) * sharp;
   // (An edge always glances off plate; a point that bites square does not.)
-  const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(spec.mode === 'thrust' && mix.pierce > 0)));
+  const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(pointLed && mix.pierce > 0)));
   // Glass on steel or hard armour chips.
   if (wspec.brittle && (protection.cut ?? 0) >= BLADES.chipsOn && mix.cut + mix.pierce > 0.2) chip(world, attacker);
   const event = {
@@ -7606,6 +7634,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   if (weapon.twoHanded) recoil.push([P[`${weapon.off}Hand`], 0.8]);
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, bluntShare, blocked, spec, recoil, time, event, through ? 0.4 : 1);
+  // A weapon art's hook or reap (`hook`) caught on his leg: drawn on with the arms (physics/arts.js hookPull).
+  if (spec.hook && (!haft || spec.hook === 'reap') && /Thigh|Shank/.test(capsule.key)) hookLeg(world, attacker, defender, capsule.key[0], spec.hook === 'reap' ? relative : null, event);
   world.events.push(event);
   if (shattered) dropWeapon(world, attacker, 'shattered');
   if (world.ear) {
@@ -7735,7 +7765,9 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   // Held in line, the shield stops the blow and the stroke ends there (no
   // more driving into it; the arm comes back). If the shield arm gives, the
   // blow drives it aside and goes on, thrown back only by what the arm held.
-  const gives = shieldArmGives(world, defender, hit.point, vec.scale(away, -1), impulse, event);
+  let gives = shieldArmGives(world, defender, hit.point, vec.scale(away, -1), impulse, event);
+  // A weapon art's hook (`hook`) caught on the rim: the shield drawn aside to him with his arms (physics/arts.js hookPull).
+  if (weaponStrike && spec.hook === 'pull') gives = Math.max(gives, hookShield(world, attacker, defender, hit.point, event));
   // A couched point met square on the board does not go through it: if the arm gives, the point goes aside with the shield.
   if (gives === 0 || (weaponStrike && spec.couched)) {
     punch.landed = true;
@@ -7791,6 +7823,32 @@ export function shieldArmGives(world, defender, at, direction, impulse, event) {
   world.pendingImpulses.push({ fighter: defender, shares: [[P.lHand, 1], [P.lElbow, 0.5]], direction, impulse: impulse * gives });
   defender.shieldOpen = world.time + WORLD.shield.open * Math.min(1, 2 * gives);
   event.effects.push('shield knocked aside');
+  return gives;
+}
+
+/** The way (flat, unit) from a man to another's hips: toward the one who pulls. */
+function towardHips(from, to) {
+  const flat = [to.x[P.pelvis * 3] - from.x[P.pelvis * 3], 0, to.x[P.pelvis * 3 + 2] - from.x[P.pelvis * 3 + 2]];
+  return vec.length(flat) > 1e-6 ? vec.normalize(flat) : yawRotate([-1, 0, 0], from.yaw);
+}
+
+/**
+ * A weapon art's hook on his leg (`hook`): the head caught behind his knee or ankle and the arms' pull (hookPull) on it, back
+ * to the puller's hips ('pull'), or on along the sweep (`along`: the striking part's motion, a spear shaft reaping the feet): the
+ * foot taken from under him. Whether he goes down is his balance's to decide.
+ */
+function hookLeg(world, attacker, defender, side, along, event) {
+  const pull = hookPull(attacker);
+  const flat = along ? [along[0], 0, along[2]] : null;
+  const direction = flat && vec.length(flat) > 1e-6 ? vec.normalize(flat) : towardHips(defender, attacker);
+  world.pendingImpulses.push({ fighter: defender, shares: [[P[`${side}Foot`], 1], [P[`${side}Knee`], 0.6]], direction, impulse: pull, massShare: WORLD.balance.massShare });
+  event.effects.push(along ? 'legs swept' : 'leg hooked');
+}
+
+/** A weapon art's hook on his shield's rim: the arms' pull (hookPull) drawing it to the puller; what the arm could not hold (shieldArmGives). */
+function hookShield(world, attacker, defender, at, event) {
+  const gives = shieldArmGives(world, defender, at, towardHips(defender, attacker), hookPull(attacker), event);
+  event.effects.push('shield hooked');
   return gives;
 }
 
