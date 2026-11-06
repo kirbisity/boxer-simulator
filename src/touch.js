@@ -25,6 +25,7 @@ import { fightUiCommandBar } from './fightui/command.js';
 import { paintStamina } from './overdraftview.js';
 import { ARTS, artBlocked, artLabel, artPrimed } from './weaponarts.js';
 import { throwableOf } from './physics/throwable.js';
+import { bleedingFast } from './maiming.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -524,8 +525,11 @@ export function installFightControls(root, hooks) {
     jump.classList.toggle('on', Boolean(me.jump || me.mount?.air));
     // The player's own status, compact, low down.
     status.querySelector('.name').textContent = firstNameOf(me);
-    status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : '';
+    // (A great vessel open, a limb lost: maiming.js. The bar drains and pulses; BLEEDING when nothing else is to say.)
+    const bleeding = bleedingFast(me);
+    status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : bleeding ? 'BLEEDING' : '';
     status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
+    status.querySelector('.health').classList.toggle('bleeding', bleeding);
     paintStamina(status.querySelector('.stamina'), me.stamina);
     const adrenaline = status.querySelector('.adrenaline');
     adrenaline.querySelector('i').style.width = `${Math.round(Math.min(1, me.adrenaline ?? 0) * 100)}%`;
@@ -545,6 +549,7 @@ export function installFightControls(root, hooks) {
     callIncoming(target, now);
     marker.querySelector('.name').textContent = firstNameOf(target);
     marker.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(target)) * 100)}%`;
+    marker.querySelector('.health').classList.toggle('bleeding', bleedingFast(target));
     marker.classList.toggle('locked', Boolean(locked));
     const fresh = now - (awake.get(target.id) ?? -Infinity) < TOUCH.markerAwake;
     marker.style.opacity = locked || fresh ? '1' : String(TOUCH.markerIdle);

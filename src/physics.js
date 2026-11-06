@@ -28,6 +28,7 @@ import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } fr
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
+import { ARM_CUTS, brokenLevel, feelShock, LEG_CUTS, MAIMING, openArtery, playerStun, shockOf, stepVessels } from './maiming.js';
 import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
@@ -161,8 +162,11 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // stowed: his bow (or crossbow, or gun) slung for his sidearm (swapSidearm), with the style he shot it in.
     stowed: null,
     sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
+    // A limb lost (maiming.js): the great vessels opened, the shock of it and when, the parts an edge has cut (a limb they
+    // ruin bleeds as torn open), whether he fights on from the ground with a leg gone, and when he died of the blood lost.
+    vessels: undefined, maimShock: undefined, maimShockAt: undefined, maimFeltAt: undefined, cutParts: undefined, groundFight: undefined, diedAt: undefined,
     mixFor: undefined, slipSide: undefined, crawling: undefined, crawlPhase: undefined, crawlTurn: undefined, wornStandard: undefined,
-    panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined, caught: undefined, holding: undefined, fellIn: undefined,
+    panicked: undefined, panics: undefined, goneAt: undefined, calmFor: undefined, shakyUntil: undefined, steadyUntil: undefined, paired: undefined, couched: undefined, net: undefined, netted: undefined, caught: undefined, holding: undefined, fellIn: undefined,
     aiOwed: undefined, aiEventCursor: undefined, aiPickupFor: undefined, aiConfidence: undefined, adrenaline: undefined, fear: undefined, artEventCursor: undefined,
     // The player's weapon art banked (weaponarts.js: charged at his blood's height, kept till he makes it).
     artCharged: undefined,
@@ -236,7 +240,8 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   const style = STYLES[styleKey] ?? STYLES.boxing;
   fighter.style = STYLES[styleKey] ? styleKey : 'boxing';
   if (style.weapon) fighter.mixed = null;
-  if (shield && style.shield && !fighter.shield) {
+  // (Not onto an arm he has lost.)
+  if (shield && style.shield && !fighter.shield && !armGone(fighter, 'l')) {
     const spec = SHIELDS[style.shield];
     fighter.shield = { kind: style.shield, spec, strain: undefined };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
@@ -256,6 +261,8 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
     if (instead && instead !== styleKey) armFighter(fighter, instead, { random, shield: false });
     return;
   }
+  // Not into a hand he has lost (maiming.js): the hand it is held in gone, nothing is taken up.
+  if (armGone(fighter, spec.hand === 'l' ? 'l' : 'r')) return;
   const weapon = createWeapon(style.weapon);
   weapon.spec = spec;
   weapon.twoHanded = spec.hands !== 'one';
@@ -390,6 +397,38 @@ function regrip(fighter, styleKey) {
 }
 
 /**
+ * What is in his hands, fitted to the hands he has left (a hand or an arm cut off, an elbow broken: maiming.js). The
+ * weapon of a hand gone falls (the next drawn only into a hand he still has: rearm); the off hand's blade of a hand gone,
+ * and the shield of an arm gone, too. A weapon of both hands with one gone he holds in the other alone if that hand can
+ * hold it (handling.js: a katana, a short spear; not a pike or a great axe), and poorly: the other arm's mass no longer
+ * behind its blows, its handling a one-handed weapon's of its weight. Else it falls.
+ */
+export function fitToHands(world, fighter) {
+  if (fighter.shield && armGone(fighter, 'l')) dropShield(world, fighter, 'dropped');
+  if (fighter.offWeapon?.held && armGone(fighter, fighter.offWeapon.main)) dropOffWeapon(world, fighter, 'dropped');
+  const weapon = fighter.weapon;
+  if (!weapon?.held || weapon.spec.mounted) return;
+  if (armGone(fighter, weapon.main)) {
+    dropWeapon(world, fighter, 'dropped');
+    return;
+  }
+  if (!weapon.twoHanded || !armGone(fighter, weapon.off)) return;
+  const spec = { ...weapon.spec, hands: 'one' };
+  const handled = handling(fighter.body, spec);
+  if (!handled.canHold) {
+    dropWeapon(world, fighter, 'dropped');
+    return;
+  }
+  const before = handShares(weapon.spec);
+  addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * (1 - before.main));
+  addParticleMass(fighter, P[`${weapon.off}Hand`], -weapon.spec.mass * before.off);
+  weapon.spec = spec;
+  weapon.twoHanded = false;
+  weapon.handling = handled;
+  world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: weapon.kind, effects: [`holds the ${spec.label.toLowerCase()} in one hand`] });
+}
+
+/**
  * The long blade lost with the short one still in his off hand: he takes it
  * into his sword hand (its weight goes with it) and fights in its style.
  */
@@ -454,7 +493,8 @@ function rearm(world, fighter, weapon) {
   // A kit names its sidearm by style; a bare weapon kind is fought in that weapon's style.
   const sidearm = sidearmKind && !STYLES[sidearmKind] ? styleForWeapon(sidearmKind) ?? null : sidearmKind;
   const fallback = STYLES[fighter.style]?.fallback;
-  const next = fallback && fallback !== 'mix' ? fallback : sidearm ?? fallback ?? 'mix';
+  // His sword hand gone (maiming.js): nothing to draw into it; he fights with what he has left.
+  const next = armGone(fighter, 'r') ? 'mix' : fallback && fallback !== 'mix' ? fallback : sidearm ?? fallback ?? 'mix';
   if (next === sidearm) fighter.sidearmDrawn = true;
   fighter.weapon = null;
   if (fighter.state === 'down') {
@@ -683,7 +723,9 @@ function updatePickup(world, fighter, dt) {
   }
   if (fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
   armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
-  if (debris.colour) fighter.weapon.colour = debris.colour;
+  // (A hand lost: a weapon of both hands taken up in the one he has, if he can: fitToHands.)
+  fitToHands(world, fighter);
+  if (debris.colour && fighter.weapon) fighter.weapon.colour = debris.colour;
   // A gun picked up is as it was dropped: its rounds left, and fired out, empty.
   if (fighter.weapon?.spec.shot && debris.charges !== undefined) fighter.weapon.charges = debris.charges;
   if (fighter.weapon?.spec.shot && debris.loaded === false) {
@@ -1937,8 +1979,11 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     return false;
   }
   const drain = cost / fighter.body.aerobic;
-  // On his knees by his own choice (the player's crawl), a blow of the hand is still his: low and weak (WORLD.crawl.strike).
-  const fromKnees = fighter.crawling && fighter.player && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
+  // On his knees by his own choice (the player's crawl), or fighting on from the ground with a leg gone (fightFromGround), a
+  // blow of the hand is still his: low and weak (WORLD.crawl.strike).
+  const fromKnees = fighter.crawling && (fighter.player || fighter.groundFight) && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
+  // Nothing with a limb he has lost (a hand or an arm cut off or broken, a leg gone: maiming.js).
+  if (spec?.kind === 'strike' && limbGone(fighter, spec.limb)) return false;
   if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
   // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
   if (blade && fighter.caught && blade === caughtBlade(fighter)) return false;
@@ -2719,9 +2764,27 @@ export function hostile(first, second) {
   return first.corner !== second.corner && first.corner !== 'grey' && second.corner !== 'grey';
 }
 
-/** A leg that will not bear him: a knee or hip broken. */
+/** A leg that will not bear him: a knee or hip broken, or the leg (or the foot) cut off. */
 export function legBroken(fighter) {
-  return ['lKnee', 'rKnee', 'lHip', 'rHip'].some((joint) => fighter.broken.has(joint));
+  return ['lKnee', 'rKnee', 'lHip', 'rHip'].some((joint) => fighter.broken.has(joint)) || Boolean(fighter.severed?.some((cut) => LEG_CUTS.has(cut.joint)));
+}
+
+/** An arm he cannot use (`side` 'l' or 'r'): the hand, the forearm or the arm cut off, or the elbow broken. */
+export function armGone(fighter, side) {
+  return Boolean(fighter.broken?.has(`${side}Elbow`)) || Boolean(fighter.severed?.some((cut) => cut.side === side && ARM_CUTS.has(cut.joint)));
+}
+
+/** A leg gone (`side`): broken at the knee or hip, or cut off. */
+export function legGone(fighter, side) {
+  return fighter.broken.has(`${side}Knee`) || fighter.broken.has(`${side}Hip`) || Boolean(fighter.severed?.some((cut) => cut.side === side && LEG_CUTS.has(cut.joint)));
+}
+
+/** Whether the limb a move is made with (a move's `limb`: rHand, lFoot, rKnee, ...) is gone. */
+export function limbGone(fighter, limb) {
+  if (!limb || (limb[0] !== 'l' && limb[0] !== 'r')) return false;
+  if (/Hand|Elbow|Shoulder/.test(limb)) return armGone(fighter, limb[0]);
+  if (/Foot|Knee|Hip/.test(limb)) return legGone(fighter, limb[0]);
+  return false;
 }
 
 /**
@@ -3580,7 +3643,11 @@ export function step(world, dt) {
   if (world.arena.works) mireStep(world, dt);
   for (const fighter of world.fighters) {
     if (fighter.state === 'out') fighter.outFor = (fighter.outFor ?? 0) + dt;
-    if (gone(fighter)) continue;
+    if (gone(fighter)) {
+      // (Left lying, he bleeds on.)
+      if (!fighter.dormant) bleedOn(world, fighter, dt);
+      continue;
+    }
     if (fighter.mount) goalFromFootwork(world, fighter, dt);
     moveRoot(world, fighter, dt);
     updateTimers(world, fighter, dt);
@@ -4260,6 +4327,29 @@ export function spatialGrid(points, cell) {
   };
 }
 
+/**
+ * Blood lost over `dt`: wounds bleed, easing as they clot, and a great vessel opened by a limb lost (maiming.js) bleeds
+ * as it closes. Lose enough and you go down (bledOut: in a battle, finished there, battletally.js); lose more and you
+ * die of it (died), down or not: a body left lying unsimulated (gone) still bleeds.
+ */
+function bleedOn(world, fighter, dt) {
+  // A machine (gear.machine: a robot) has no blood: what would open a wound in a man opens nothing that
+  // bleeds, and it is never weakened or dropped by blood loss; only broken (its injuries, below) or knocked out.
+  if (fighter.body.gear.machine) fighter.bleed = 0;
+  if (fighter.bleed > 0 || fighter.vessels) {
+    fighter.bloodLost = (fighter.bloodLost ?? 0) + Math.max(0, fighter.bleed ?? 0) * dt + stepVessels(fighter, dt);
+    if (fighter.bleed > 0) fighter.bleed *= Math.exp(-dt / BLADES.clotSeconds);
+    if (fighter.state !== 'out' && fighter.bloodLost >= collapseAt()) {
+      const event = { time: world.time, kind: 'bled', attacker: fighter.lastWoundedBy ?? fighter.id, effects: [] };
+      knockOut(world, fighter, event, 'collapsed from blood loss', 'bledOut');
+    }
+    if (fighter.diedAt === undefined && fighter.bloodLost >= deathAt()) {
+      fighter.diedAt = world.time;
+      world.events.push({ time: world.time, kind: 'died', fighter: fighter.id, attacker: fighter.lastWoundedBy ?? fighter.id, effects: ['dies of blood loss'] });
+    }
+  }
+}
+
 function updateTimers(world, fighter, dt) {
   if (fighter.landBruise) healLandBruise(fighter, dt);
   if (fighter.weapon?.held) fighter.weapon.strain = Math.max(0, fighter.weapon.strain - BLADES.gripLeak * dt);
@@ -4273,18 +4363,7 @@ function updateTimers(world, fighter, dt) {
   reload(world, fighter, dt);
   // A grenade on its way out of his hand (physics/throwable.js).
   if (fighter.throwing) stepThrow(world, fighter, dt);
-  // A machine (gear.machine: a robot) has no blood: what would open a wound in a man opens nothing that
-  // bleeds, and it is never weakened or dropped by blood loss; only broken (its injuries, below) or knocked out.
-  if (fighter.body.gear.machine) fighter.bleed = 0;
-  if (fighter.bleed > 0) {
-    // Wounds bleed, easing as they clot; lose enough blood and you go down.
-    fighter.bloodLost = (fighter.bloodLost ?? 0) + fighter.bleed * dt;
-    fighter.bleed *= Math.exp(-dt / BLADES.clotSeconds);
-    if (fighter.state !== 'out' && fighter.bloodLost >= collapseAt()) {
-      const event = { time: world.time, kind: 'bled', attacker: fighter.lastWoundedBy ?? fighter.id, effects: [] };
-      knockOut(world, fighter, event, 'collapsed from blood loss', 'bledOut');
-    }
-  }
+  bleedOn(world, fighter, dt);
   if (fighter.trauma && fighter.state !== 'out') sufferInjuries(world, fighter);
   overTheEdge(world, fighter);
   fighter.cooldown = Math.max(0, fighter.cooldown - dt);
@@ -4329,8 +4408,12 @@ function updateTimers(world, fighter, dt) {
     fighter.downTimer -= dt;
     // Up only once he has come to rest: a man still tumbling does not try.
     if (fighter.downTimer <= 0 && restedToRise(fighter, dt)) {
-      // A broken leg will not stand him up, but a man still conscious drags himself off on his knees.
-      if (legBroken(fighter) && !fighter.broken.has('neck') && !fighter.crawling) startCrawl(world, fighter, 'drags himself away on his knees');
+      // A leg broken or cut off will not stand him up. A man still conscious and not broken (ai.js panic) fights on from
+      // the ground with what is in his hands; a broken one drags himself off on his knees.
+      if (legBroken(fighter) && !fighter.broken.has('neck') && !fighter.crawling) {
+        if (fighter.panicked) startCrawl(world, fighter, 'drags himself away on his knees');
+        else fightFromGround(world, fighter);
+      }
       if (fighter.knockdowns >= WORLD.knockdownsToStop && !fighter.crawling) {
         fighter.state = 'out';
         world.events.push({ time: world.time, kind: 'stopped', fighter: fighter.id });
@@ -4340,6 +4423,7 @@ function updateTimers(world, fighter, dt) {
         // Crawling, his hands are on the floor: nothing drawn.
         if (fighter.pendingArm && !fighter.crawling) {
           armFighter(fighter, fighter.pendingArm, { random: world.random });
+          fitToHands(world, fighter);
           if (fighter.weapon) world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`draws the ${fighter.weapon.spec.label.toLowerCase()}`] });
           fighter.pendingArm = null;
         }
@@ -5097,15 +5181,17 @@ const LIMP_BELOW = {
   neck: ['head'],
 };
 
-/** A joint gives: no more limit, no more muscle below it; a leg or neck ends the fight. */
+/**
+ * A joint gives: no more limit, no more muscle below it. The neck ends the fight. A limb so ruined is lost to him as
+ * one cut off is (maiming.js), but closed: the arm hangs (what it held falls: fitToHands), a leg drops him (on his knees
+ * he fights on from the ground, or drags himself off: the rise); the shock of it (less than a limb off), and, where an
+ * edge had cut into it, the vessel there torn open.
+ */
 export function breakJoint(world, fighter, joint) {
   fighter.broken.add(joint);
-  // The shield arm broken: it cannot hold it; nor the off hand's blade.
-  if (joint === 'lElbow') dropShield(world, fighter, 'dropped');
-  if (fighter.offWeapon?.held && joint === `${fighter.offWeapon.main}Elbow`) dropOffWeapon(world, fighter, 'dropped');
   for (const name of LIMP_BELOW[joint]) fighter.limp.add(P[name]);
   fighter.damage[JOINT_SEGMENTS[joint][0]] = Math.max(fighter.damage[JOINT_SEGMENTS[joint][0]] ?? 0, 1);
-  const ending = !joint.endsWith('Elbow');
+  const ending = joint === 'neck';
   const event = { time: world.time, kind: 'broken', fighter: fighter.id, joint, effects: [`${jointName(joint)} broken${ending ? ' — cannot continue' : ''}`] };
   world.events.push(event);
   if (world.ear && P[joint] !== undefined) soundWound(world, fighter, 'bone', 1, particleAt(fighter, P[joint]));
@@ -5118,7 +5204,50 @@ export function breakJoint(world, fighter, joint) {
     fighter.knockdowns = Math.max(fighter.knockdowns, WORLD.knockdownsToStop);
     fighter.downTimer = Math.min(fighter.downTimer || Infinity, WORLD.joint.brokenDownSeconds);
     dropWeapon(world, fighter, 'dropped');
-  } else if (fighter.weapon?.held && joint === `${fighter.weapon.main}Elbow`) dropWeapon(world, fighter, 'dropped');
+    return;
+  }
+  // The shield arm broken: it cannot hold it; nor the off hand's blade, nor the weapon of a hand gone.
+  fitToHands(world, fighter);
+  if (!joint.endsWith('Elbow')) fallMaimed(fighter);
+  if (fighter.state === 'out' || fighter.body.gear.machine) return;
+  const level = brokenLevel(joint);
+  // Cut into by an edge or a point there, then broken: the vessel torn.
+  if (JOINT_SEGMENTS[joint].some((key) => fighter.cutParts?.has(key))) {
+    openArtery(fighter, level, world.random, { ruin: true });
+    event.effects.push('bleeding hard');
+  }
+  maimShock(world, fighter, shockOf(fighter, level, { broken: true }));
+}
+
+/** A leg gone under him (broken, or cut off): down, the blow he was making lost; up again on his knees (the rise). */
+function fallMaimed(fighter) {
+  if (fighter.mount || (fighter.state !== 'up' && fighter.state !== 'rising')) return;
+  fighter.state = 'down';
+  fighter.punch = null;
+  fighter.rush = null;
+  fighter.clinch = null;
+  fighter.rise = null;
+  fighter.knockdowns += 1;
+  fighter.downTimer = Math.min(fighter.downTimer || Infinity, WORLD.joint.brokenDownSeconds);
+}
+
+/** The shock of a limb lost (maiming.js): fear for the fear model (ai.js fearTarget); the man played, stunned a moment. */
+function maimShock(world, fighter, amount) {
+  feelShock(fighter, amount, world.time);
+  if (fighter.player) fighter.stun = Math.max(fighter.stun ?? 0, playerStun(fighter, amount));
+}
+
+/**
+ * A leg gone and his nerve held: on his knees, in the fight (crawlChosen: inFight), what is in his hands kept; the AI
+ * turns to the nearest man and strikes low from there (ai.js groundFight; throwPunch fromKnees). If he breaks he crawls away.
+ */
+export function fightFromGround(world, fighter) {
+  fighter.crawlChosen = true;
+  fighter.groundFight = true;
+  if (!startCrawl(world, fighter, 'fights on from the ground', { keep: true })) {
+    fighter.crawlChosen = false;
+    fighter.groundFight = false;
+  }
 }
 
 export const JOINT_SEGMENTS = {
@@ -7003,9 +7132,11 @@ function openVessel(defender, seconds, attacker) {
 
 /**
  * Cut through at a joint: the part beyond comes away as a loose piece with
- * the blade's push in it, the stump bleeds as an opened artery does
- * (BLADES.bleed.artery), and the fight is over for this man (the head off,
- * he is dead: battletally.js counts him so).
+ * the blade's push in it. The head off, he is dead (battletally.js counts him
+ * so). A limb off is not death by itself (maiming.js): the stump bleeds from
+ * the vessel cut there, he loses what that hand held (fitToHands), a leg gone
+ * drops him, and the shock of it goes to the fear model, which says whether he
+ * fights on with what is left or breaks and crawls away.
  */
 function sever(world, defender, where, event, bladeVelocity) {
   const part = SEVER_PARTS[where.joint];
@@ -7035,12 +7166,38 @@ function sever(world, defender, where, event, bladeVelocity) {
     q: [0, 0, 0, 1], spin, radius, axis, half: Math.max(radius, vec.length(vec.sub(far, base)) / 2), cut: vec.sub(base, centre), origin: centre, resting: false,
   };
   world.debris.push(debris);
-  openVessel(defender, BLADES.bleed.artery.seconds, world.fighters[event.attacker] ?? defender);
+  const attacker = world.fighters[event.attacker] ?? defender;
   event.severed = where.joint;
-  world.events.push({ time: world.time, kind: 'severed', fighter: defender.id, attacker: event.attacker, joint: where.joint, side: where.side, debris: debris.id, point: base, effects: [part.label] });
+  const severed = { time: world.time, kind: 'severed', fighter: defender.id, attacker: event.attacker, joint: where.joint, side: where.side, debris: debris.id, point: base, effects: [part.label] };
+  world.events.push(severed);
   // (Heard: the worst cut there is, through the bone.)
   if (world.ear) soundWound(world, defender, 'cut', 1, base);
-  knockOut(world, defender, event, `${part.label}: cannot go on`, 'out');
+  if (where.joint === 'neck') {
+    defender.diedAt ??= world.time;
+    openVessel(defender, BLADES.bleed.artery.seconds, attacker);
+    knockOut(world, defender, event, `${part.label}: cannot go on`, 'out');
+    return;
+  }
+  fitToHands(world, defender);
+  if (LEG_CUTS.has(where.joint)) fallMaimed(defender);
+  // A machine (gear.machine) has no blood and no fear: it goes on with what is left of it.
+  if (defender.body.gear.machine || defender.state === 'out') return;
+  const vessel = openArtery(defender, where.joint, world.random);
+  defender.lastWoundedBy = attacker.id;
+  if (vessel.clamped) severed.effects.push('the artery clamps');
+  maimShock(world, defender, shockOf(defender, where.joint));
+}
+
+/**
+ * A limb (or the head) cut off by `attacker` as a blade's blow does it (sever), with the bleeding of the cut itself
+ * (wound: an edge of `joules` through the flesh): for the tools and the tests (tools/maiming.js).
+ * `where`: { joint, side } ('neck' with side '').
+ */
+export function cutOff(world, fighter, where, attacker, joules = 0) {
+  const event = { time: world.time, kind: 'landed', attacker: attacker.id, defender: fighter.id, effects: [] };
+  if (joules > 0) wound(fighter, 'cut', joules, where.joint === 'neck' ? 'head' : 'limb', attacker);
+  sever(world, fighter, where, event, [0, -1, -3]);
+  return world.events.at(-1);
 }
 
 /**
@@ -7237,6 +7394,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // An edge that cannot bite deep (`cleave`: obsidian flakes in a wooden groove) opens the flesh but takes less of the bone.
   const cleaving = cut * (wspec.cleave ?? 1);
   let bleeds = 0;
+  // (A limb an edge or a point has gone into: broken later, its vessel is torn, not cut clean: breakJoint.)
+  if (limb && (cut > 0.5 || pierce > 0.5)) (defender.cutParts ??= new Set()).add(capsule.key);
   if (cut > 0.5) {
     bleeds += wound(defender, 'cut', cut, capsule.key, attacker);
     addDamage(defender, capsule.key, cut / 6, false, toBone(cleaving));
@@ -7247,18 +7406,21 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     addDamage(defender, capsule.key, pierce * (limb ? 0.25 : BLADES.pierceTrauma), false, toBone(pierce));
     event.effects.push(pierce > 25 ? 'run through' : 'stabbed');
   }
+  let through = false;
+  const wasOut = defender.state === 'out';
+  const joint = !wasOut && cut > 0 ? jointAt(defender, capsule, closest.t, contactPoint) : null;
+  const severs = Boolean(joint && cleaving > severThreshold(defender, joint) && !defender.severed?.some((done) => done.side === joint.side && done.joint === joint.joint));
+  // (A limb cut off opens its vessel as the stump: sever, maiming.js.)
   const artery = BLADES.bleed.artery;
-  if (ARTERY_SEGMENTS.has(capsule.key.slice(1)) && Math.max(boneShare(cleaving, square), boneShare(pierce, square)) >= artery.reach) {
+  if (!severs && ARTERY_SEGMENTS.has(capsule.key.slice(1)) && Math.max(boneShare(cleaving, square), boneShare(pierce, square)) >= artery.reach) {
     openVessel(defender, artery.seconds, attacker);
     bleeds += 1;
     event.effects.push(capsule.key.endsWith('Thigh') ? 'the femoral artery opened' : 'the brachial artery opened');
   }
   // (Whether this blow opened a wound that bleeds: most do not.)
-  event.bleeds = bleeds > 0;
-  let through = false;
-  if (defender.state !== 'out') {
-    const joint = cut > 0 ? jointAt(defender, capsule, closest.t, contactPoint) : null;
-    if (joint && cleaving > severThreshold(defender, joint)) {
+  event.bleeds = bleeds > 0 || severs;
+  if (!wasOut) {
+    if (severs) {
       sever(world, defender, joint, event, bladeVelocity);
       through = true;
     } else if (pierce > BLADES.lethalPierce * BODY.toughness && vital(defender, capsule, contactPoint)) {
@@ -7947,6 +8109,11 @@ export function collapseAt() {
   return BLADES.collapseAt * BODY.toughness;
 }
 
+/** Share of blood lost that kills him (maiming.js deathOver times what collapses him). */
+export function deathAt() {
+  return collapseAt() * MAIMING.deathOver;
+}
+
 // The four limbs, each by its segments (a limb is as far gone as its worse one).
 const LIMBS = [['lUpperArm', 'lForearm'], ['rUpperArm', 'rForearm'], ['lThigh', 'lShank'], ['rThigh', 'rShank']];
 
@@ -7982,6 +8149,8 @@ export function bodyHarm(fighter) {
 export function knockOut(world, defender, event, reason, kind = 'knockout') {
   const standing = defender.state === 'up' || defender.state === 'rising';
   defender.state = 'out';
+  // (Dead of it: no later death of the blood lost to log, bleedOn.)
+  if (kind === 'killed' || kind === 'drowned') defender.diedAt ??= world.time;
   dropWeapon(world, defender, 'dropped');
   dropShield(world, defender, 'dropped');
   // Finished off where he lay, he was already counted down.

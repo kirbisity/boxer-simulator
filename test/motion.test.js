@@ -6,7 +6,7 @@ import { buildBody, P, PRESETS } from '../src/body.js';
 import { ALONE, riseAlone } from '../tools/getting-up.js';
 import { liftMargin } from '../src/physics/rising.js';
 import { thinkAll, AI } from '../src/ai.js';
-import { advance, createWorld, deliverImpulse, hitParticle, placeFighter, point, WORLD } from '../src/physics.js';
+import { advance, createWorld, deliverImpulse, hitParticle, legBroken, placeFighter, point, WORLD } from '../src/physics.js';
 import { twoBoneIK, vec } from '../src/pose.js';
 
 function alone(inputs, seed = 3) {
@@ -195,7 +195,9 @@ test('a joint forced well past its range and held there breaks: the limb goes li
   assert.ok(fighter.limp.has(P.lFoot), 'the shin hangs');
   assert.ok(world.events.some((event) => event.kind === 'broken' && event.joint === 'lKnee'));
   assert.equal(fighter.damage.lShank, 1, 'shown as fully hurt');
-  assert.ok(fighter.knockdowns >= WORLD.knockdownsToStop, 'a broken knee ends the fight');
+  // (Not the end of him: down, and on his knees after it, fighting on from the ground or crawling off: maiming.js.)
+  assert.notEqual(fighter.state, 'up', 'a broken knee puts him down');
+  assert.ok(legBroken(fighter), 'and the leg will not bear him');
 });
 
 test('a single jolt past the range, gone the next instant, does not break it', () => {
