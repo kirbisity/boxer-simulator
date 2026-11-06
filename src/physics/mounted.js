@@ -1316,11 +1316,20 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const landsAt = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const protection = bardingAt(horse.barding, capsule.part, landsAt[1] + (horse.sunk ?? 0), horse.withers);
   const sharp = weapon.edge ?? 1;
+  // A point on plate barding bites only if it meets it near square (BLADES.bite), as on a man's plate (physics.js): slanting, it
+  // skids off the curve of the peytral or the crinet and goes in nowhere: a shove. (An edge never cuts plate: its `cut` is 1.)
+  const facing = Math.abs(vec.dot(weapon.dir, normal));
+  const skids = Boolean(protection.deflects) && spec.mode === 'thrust' && mix.pierce > 0 && facing < BLADES.bite;
+  if (skids) {
+    mix.cut = 0;
+    mix.pierce = 0;
+  }
   const blunt = energy * mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
   // (A curved edge's draw, as on a man: weapons.js sliceGain.)
   const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp * (mix.cut > 0 ? sliceGain(wspec, relative, weapon.dir, distance, protection) : 1);
   const pierce = energy * mix.pierce * (1 - (protection.pierce ?? 0)) * sharp;
-  const glanced = Boolean(protection.deflects) && mix.cut + mix.pierce > 0.2;
+  // (An edge always glances off plate; a point that bites square does not.)
+  const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(spec.mode === 'thrust' && mix.pierce > 0)));
   const contactPoint = landsAt;
   const event = {
     time: world.time, kind: 'horseHit', attacker: attacker.id, horse: horse.id, rider: horse.rider ?? undefined, weapon: weapon.kind, punch: punch.type, target: capsule.key,
@@ -1368,7 +1377,7 @@ export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, 
   if (attacker) horse.lastHitBy = attacker.id;
   if (cut > 1) event.effects.push(cut > 60 ? 'a deep cut' : 'cut');
   if (pierce > 1) event.effects.push(pierce > 40 ? 'run through' : 'stabbed');
-  if (!horse.spec?.machine && (capsule.part === 'chest' || capsule.part === 'neck') && pierce > BLADES.lethalPierce * BODY.toughness * Math.sqrt(horse.mass / spec.manBlood)) {
+  if (!horse.spec?.machine && (capsule.part === 'chest' || capsule.part === 'neck') && pierce > BLADES.lethalPierce * BODY.toughness * spec.heartDepth) {
     horse.bleed += bleedToLose(collapseShare() - horse.bloodLost, spec.heartSeconds);
     event.effects.push('through the heart');
   }

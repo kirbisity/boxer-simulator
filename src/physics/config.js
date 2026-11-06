@@ -1215,7 +1215,10 @@ export const WORLD = {
     seatHeight: 0.1,
     pass: 0.6, passReach: 0.5, passMounted: 1.5, passLance: 0.7,
     wheelAt: 9, turnSpeed: 5, edge: 6,
-    horse: { manBlood: 75, heartSeconds: 10, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
+    // `heartDepth`: a horse's heart and great vessels lie under ~20 cm of chest muscle and breastbone, a man's under ~5: a point
+    // must go about this many times as deep, so needs about as many times a man's `lethalPierce` (work against the tissue grows
+    // with the depth it goes).
+    horse: { manBlood: 75, heartSeconds: 10, heartDepth: 4, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
     brace: { length: 1.5, still: 0.5, share: 0.5 },
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
