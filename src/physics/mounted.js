@@ -18,7 +18,8 @@ import { BARDING, bardingAt, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
 import { DOG_JUMP } from '../robotdogs.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, shieldContact, sliceGain } from '../weapons.js';
-import { knockOut, bladeFor, bladeStrike, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
+import { armourHardness, bluntEdge, driveShaft, dullEdge, stopIn } from './wear.js';
+import { knockOut, bladeFor, bladeStrike, breakWeapon, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { footingOn, partUnder, treadOn } from './footing.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
@@ -1307,9 +1308,9 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const struckMass = horse.mass * capsule.mass;
   const reducedMass = (strikeMass * struckMass) / (strikeMass + struckMass);
   const impulse = reducedMass * closing * (1 + WORLD.restitution);
-  // (A set point into a charging horse: no more than its shaft carries before it gives, brace `shaft`.)
-  const energy = Math.min(0.5 * reducedMass * closing * closing, set ? brace.shaft : Infinity);
-  const mix = harmMix(wspec, spec.mode, along, closest.s);
+  const blow = 0.5 * reducedMass * closing * closing;
+  // (A dull edge parts less, the rest landing as the flat: physics/wear.js bluntEdge.)
+  const mix = bluntEdge(weapon, harmMix(wspec, spec.mode, along, closest.s));
   const drawn = 1 + WORLD.skill.draw * 2 * ((attacker.body.skill ?? 0.5) - 0.5);
   mix.cut *= drawn;
   mix.pierce *= drawn;
@@ -1325,6 +1326,13 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
     mix.cut = 0;
     mix.pierce = 0;
   }
+  // A point driven home carries no more than its shaft bears before it gives (a set point into a charging horse: the brace's
+  // `shaft`, at the war spear's; physics/wear.js driveShaft): past it the shaft snaps, and the rest of the blow goes into
+  // the breaking and the man thrown back, not into the horse. (A lance's own rule is `shatters`, below.)
+  const driven = spec.mode === 'thrust' && mix.pierce > 0 && !wspec.shatters ? driveShaft(weapon, attacker, world.time, blow, stopIn(protection)) : null;
+  const energy = driven ? driven.carried : blow;
+  // The edge dulls on barding harder than hide (physics/wear.js).
+  dullEdge(weapon, attacker, world.time, energy * mix.cut / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce), armourHardness(protection));
   const blunt = energy * mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
   // (A curved edge's draw, as on a man: weapons.js sliceGain.)
   const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp * (mix.cut > 0 ? sliceGain(wspec, relative, weapon.dir, distance, protection) : 1);
@@ -1346,11 +1354,13 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   // The blade is jarred by what it met, and the arm takes the blow back; a lance (`shatters`) breaks on heavy barding, else is kept.
   const shattered = shattersOn(weapon, spec.mode, protection, energy);
   if (shattered) event.effects.push(`the ${wspec.label.toLowerCase()} shattered`);
+  else if (driven?.snapped) event.effects.push(`the ${wspec.label.toLowerCase()}'s shaft snapped`);
   else if (!wspec.shatters) strainGrip(world, attacker, impulse * (glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: normal, impulse: impulse * (1 + WORLD.weaponTransferRestitution.edge) / (1 + WORLD.restitution) });
   world.events.push(event);
   if (shattered) dropWeapon(world, attacker, 'shattered');
+  else if (driven?.snapped) breakWeapon(world, attacker, weapon, 'shaft', 'snapped', contactPoint);
   // Heard: the blow on the horse (on its barding, or its hide), and an edge or a point in it makes it scream.
   if (world.ear) {
     const striker = mix.cut + mix.pierce <= mix.blunt ? 'blunt' : mix.pierce > mix.cut ? 'point' : 'blade';

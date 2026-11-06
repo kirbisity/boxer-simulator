@@ -21,6 +21,7 @@ import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/thr
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, beakMix, coiledTwist, hiltCrush, hiltKnob, hiltMix, hookPull, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
+import { armourHardness, bluntEdge, driveShaft, dullEdge, hackShield, partHardness, shieldHardness, stopIn, strainBlade, strikeShaft } from './physics/wear.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
@@ -249,7 +250,7 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   // (Not onto an arm he has lost.)
   if (shield && style.shield && !fighter.shield && !armGone(fighter, 'l')) {
     const spec = SHIELDS[style.shield];
-    fighter.shield = { kind: style.shield, spec, strain: undefined };
+    fighter.shield = { kind: style.shield, spec, strain: undefined, wear: undefined };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
   }
@@ -473,10 +474,10 @@ function releaseWeapon(world, fighter, reason, push, weapon = fighter.weapon) {
   const spec = weapon.spec;
   const centre = vec.add(hand, vec.scale(weapon.dir, (spec.length - spec.handle) / 2));
   const random = world.random;
-  // Shattered (a lance on plate): splinters, nothing whole left to pick up.
-  if (reason !== 'shattered') world.debris.push({
+  // Shattered (a lance on plate) or broken (physics/wear.js): splinters, nothing whole left to pick up (breakWeapon throws the pieces).
+  if (reason !== 'shattered' && reason !== 'broken') world.debris.push({
     id: world.debris.length, kind: 'weapon', weapon: weapon.kind, owner: fighter.id, x: centre, loaded: weapon.loaded, charges: weapon.charges,
-    colour: weapon.colour, v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
+    colour: weapon.colour, wear: weapon.wear, v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (3 + random() * 6)), radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
   });
   // The stroke it was making ends; with two blades, only its own.
@@ -485,7 +486,7 @@ function releaseWeapon(world, fighter, reason, push, weapon = fighter.weapon) {
     if (fighter.punch.with && bladeFor(fighter, fighter.punch.with.spec) === weapon) fighter.punch.with = null;
     else if (bladeFor(fighter, fighter.punch.spec) === weapon) fighter.punch = null;
   }
-  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, off: second || undefined, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : reason === 'shattered' ? `${spec.label} shattered` : `${spec.label} dropped`] });
+  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, weapon: weapon.kind, off: second || undefined, point: hand, effects: [reason === 'disarmed' ? `${spec.label} knocked away` : reason === 'shattered' ? `${spec.label} shattered` : reason === 'broken' ? `${spec.label} broken` : `${spec.label} dropped`] });
 }
 
 /** After losing a weapon, the next: a backup, his kit's sidearm, or his bare hands. */
@@ -553,14 +554,14 @@ export function dropShield(world, fighter, reason, push = [0, 0, 0]) {
   addParticleMass(fighter, P.lHand, -spec.mass * 0.6);
   addParticleMass(fighter, P.lElbow, -spec.mass * 0.4);
   const random = world.random;
-  // Shattered (a lance on plate): splinters, nothing whole left to pick up.
-  if (reason !== 'shattered') world.debris.push({
-    id: world.debris.length, kind: 'shield', shield: fighter.shield.kind, owner: fighter.id, x: shield.centre, plate: true,
+  // Shattered (a lance on plate) or split (physics/wear.js): splinters, nothing whole left to pick up.
+  if (reason !== 'shattered' && reason !== 'split') world.debris.push({
+    id: world.debris.length, kind: 'shield', shield: fighter.shield.kind, owner: fighter.id, x: shield.centre, plate: true, wear: fighter.shield.wear,
     v: vec.add(vec.add(point(fighter.v, P.lHand), push), [0, 0.4, 0]), q: quatFromBasis(shield.across, shield.up, shield.normal),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (1 + random() * 3)), radius: shieldReach(spec), axis: [0, 0, 1], half: 0.02, resting: false,
   });
   fighter.shield = null;
-  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, point: shield.centre, effects: [`${spec.label.toLowerCase()} ${reason === 'wrenched' ? 'torn from his arm' : 'dropped'}`] });
+  world.events.push({ time: world.time, kind: 'disarmed', fighter: fighter.id, point: shield.centre, effects: [`${spec.label.toLowerCase()} ${reason === 'wrenched' ? 'torn from his arm' : reason === 'split' ? 'split apart' : 'dropped'}`] });
 }
 
 /**
@@ -720,7 +721,7 @@ function updatePickup(world, fighter, dt) {
   fighter.pickup = null;
   if (debris.kind === 'shield') {
     const spec = SHIELDS[debris.shield];
-    fighter.shield = { kind: debris.shield, spec, strain: undefined };
+    fighter.shield = { kind: debris.shield, spec, strain: undefined, wear: debris.wear };
     addParticleMass(fighter, P.lHand, spec.mass * 0.6);
     addParticleMass(fighter, P.lElbow, spec.mass * 0.4);
     world.events.push({ time: world.time, kind: 'pickup', fighter: fighter.id, effects: [`takes up the ${spec.label.toLowerCase()}`] });
@@ -732,6 +733,8 @@ function updatePickup(world, fighter, dt) {
   // (A hand lost: a weapon of both hands taken up in the one he has, if he can: fitToHands.)
   fitToHands(world, fighter);
   if (debris.colour && fighter.weapon) fighter.weapon.colour = debris.colour;
+  // Worn as it was dropped: its edge as dull, its shaft as hacked (physics/wear.js).
+  if (debris.wear && fighter.weapon?.kind === debris.weapon) fighter.weapon.wear = debris.wear;
   // A gun picked up is as it was dropped: its rounds left, and fired out, empty.
   if (fighter.weapon?.spec.shot && debris.charges !== undefined) fighter.weapon.charges = debris.charges;
   if (fighter.weapon?.spec.shot && debris.loaded === false) {
@@ -767,6 +770,52 @@ function chip(world, fighter) {
     weapon.dulled = true;
     world.events.push({ time: world.time, kind: 'chipped', fighter: fighter.id, effects: ['the obsidian edge is gone'] });
   }
+}
+
+/**
+ * A weapon breaks in his hands (physics/wear.js: a blade bent or snapped, a shaft snapped or hacked through): a
+ * `weaponBroke` event, the pieces thrown off as splinters (a shaft's: the head end and the butt; a blade's: the point end),
+ * and it is gone from his hands as a weapon knocked away is (he draws his sidearm, or fights on bare-handed, or stoops for
+ * another: rearm, the AI's pickup).
+ */
+export function breakWeapon(world, fighter, weapon, part, reason, at = weapon.tip) {
+  if (!weapon?.held) return;
+  const spec = weapon.spec;
+  const hand = point(fighter.x, P[`${weapon.main}Hand`]);
+  // Where it went: a shaft at the blow (or just behind the head, driving a point); a blade a little below the middle.
+  const along = Math.max(0.1, Math.min(spec.length - 0.05, at ? vec.dot(vec.sub(at, hand), weapon.dir) : spec.length * 0.6));
+  const wood = part === 'shaft';
+  const radius = wood ? Math.min(spec.radius, weapon.wear?.build?.shaftRadius ?? spec.radius) : Math.min(spec.radius, 0.012);
+  const tossed = point(fighter.v, P[`${weapon.main}Hand`]);
+  const random = world.random;
+  const piece = (from, to, kick) => world.debris.push({
+    id: world.debris.length, kind: 'splinter', wood, owner: fighter.id, x: vec.add(hand, vec.scale(weapon.dir, (from + to) / 2)),
+    v: vec.add(tossed, [kick[0], 1 + kick[1], kick[2]]), q: quatFromTo([0, 1, 0], weapon.dir),
+    spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (4 + random() * 6)), radius, axis: [0, 1, 0], half: Math.max(0.03, (to - from) / 2), resting: false,
+  });
+  piece(along, spec.length, [random() - 0.5, 0.5, random() - 0.5]);
+  if (wood) piece(-spec.handle, along, [(random() - 0.5) * 0.5, 0, (random() - 0.5) * 0.5]);
+  const off = weapon === fighter.offWeapon;
+  world.events.push({ time: world.time, kind: 'weaponBroke', fighter: fighter.id, weapon: weapon.kind, part, reason, off: off || undefined, point: vec.add(hand, vec.scale(weapon.dir, along)), effects: [`the ${spec.label.toLowerCase()}'s ${part} ${reason}`] });
+  if (off) dropOffWeapon(world, fighter, 'broken');
+  else dropWeapon(world, fighter, 'broken');
+}
+
+/** A shield's board splits apart on his arm (physics/wear.js): a `shieldBroke` event, its halves thrown off, the shield gone. */
+export function breakShield(world, fighter) {
+  if (!fighter.shield) return;
+  const shield = shieldDisc(fighter);
+  const spec = fighter.shield.spec;
+  const random = world.random;
+  // Each half: as tall as the shield, half as wide.
+  const half = shieldReach(spec);
+  for (const side of [-1, 1]) world.debris.push({
+    id: world.debris.length, kind: 'splinter', wood: true, board: true, owner: fighter.id, x: vec.add(shield.centre, vec.scale(shield.across, side * half * 0.5)),
+    v: vec.add(point(fighter.v, P.lHand), [side * shield.across[0] * 1.2, 0.8, side * shield.across[2] * 1.2]), q: quatFromBasis(shield.across, shield.up, shield.normal),
+    spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (2 + random() * 4)), radius: 0.02, axis: [0, 1, 0], half, resting: false, width: half,
+  });
+  world.events.push({ time: world.time, kind: 'shieldBroke', fighter: fighter.id, shield: fighter.shield.kind, reason: 'split', blows: fighter.shield.wear?.blows, point: shield.centre, effects: [`the ${spec.label.toLowerCase()} splits apart`] });
+  dropShield(world, fighter, 'split');
 }
 
 /**
@@ -1607,7 +1656,7 @@ export function reviveFighter(world, fighter, inputs, { at, yaw = fighter.yaw, s
   }
   if (shield && !fresh.shield) {
     const spec = SHIELDS[shield];
-    fresh.shield = { kind: shield, spec, strain: undefined };
+    fresh.shield = { kind: shield, spec, strain: undefined, wear: undefined };
     addParticleMass(fresh, P.lHand, spec.mass * 0.6);
     addParticleMass(fresh, P.lElbow, spec.mass * 0.4);
   }
@@ -7509,6 +7558,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     mix.pierce *= trueEdge;
     mix.blunt += lost * WORLD.skill.flatBlunt;
   }
+  // A dull edge is a wider one: it parts less of what it meets, the rest lands as the flat (physics/wear.js bluntEdge).
+  if (!haft) bluntEdge(weapon, mix);
   const covered = protectionAt(body.gear, capsule.key);
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   // Into a gap in rigid armour (BLADES.gaps): only where there is one (physics/gaps.js gapZoneAt: the armpit, the groin, the
@@ -7545,15 +7596,30 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     mix.cut = 0;
     mix.pierce = 0;
   }
+  // A point thrust home loads its shaft along its length (a beak swung in loads the haft across, not along): stopped
+  // harder than the shaft carries (in flesh over a hand's depth; on plate it cannot go into, within a few cm), the shaft
+  // snaps there and drives in only what it bore (physics/wear.js driveShaft; a lance's own rule is `shatters`, below).
+  const driven = !haft && spec.mode === 'thrust' && mix.pierce > 0 && !wspec.shatters ? driveShaft(weapon, attacker, world.time, energy, stopIn(protection)) : null;
+  const goes = driven ? driven.carried : energy;
   // A curved edge slides as it goes in and draws a longer cut through flesh and cloth (weapons.js sliceGain: none through mail or plate).
   const slice = mix.cut > 0 && !haft ? sliceGain(wspec, relative, weapon.dir, distance, protection) : 1;
-  const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp * slice;
+  const cut = goes * mix.cut * (1 - (protection.cut ?? 0)) * sharp * slice;
   // A finisher's point is leaned on as it goes in (finisherPress): the work of that push, as well as the blow's.
-  const pierce = (energy * mix.pierce + (punch.finisher && mix.pierce > 0 ? finisherPress(attacker, weapon, punch.finisher) : 0)) * (1 - (protection.pierce ?? 0)) * sharp;
+  const pierce = (goes * mix.pierce + (punch.finisher && mix.pierce > 0 ? finisherPress(attacker, weapon, punch.finisher) : 0)) * (1 - (protection.pierce ?? 0)) * sharp;
   // (An edge always glances off plate; a point that bites square does not.)
   const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(pointLed && mix.pierce > 0)));
   // Glass on steel or hard armour chips.
   if (wspec.brittle && (protection.cut ?? 0) >= BLADES.chipsOn && mix.cut + mix.pierce > 0.2) chip(world, attacker);
+  // An edge dulls on what is harder than flesh (its share of the blow, against the armour's hardness), and the blade takes
+  // the jar of a blow on armour across it (physics/wear.js).
+  let broke = driven?.snapped ? { part: 'shaft', reason: 'snapped' } : null;
+  if (!haft) {
+    const hardness = armourHardness(protection);
+    const edgeShare = mix.cut / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce);
+    dullEdge(weapon, attacker, world.time, energy * edgeShare, hardness);
+    const bent = pointLed ? null : strainBlade(weapon, attacker, world.time, energy * hardness);
+    if (bent && !broke) broke = { part: 'blade', reason: bent };
+  }
   const event = {
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id, weapon: weapon.kind, mode: spec.mode,
     off: weapon === attacker.offWeapon || undefined, riposte: attacker.punch?.riposte || undefined,
@@ -7648,14 +7714,16 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // kept otherwise; any other weapon is jarred by what it hit (least when it cut straight through).
   const shattered = !haft && !intoGap && shattersOn(weapon, spec.mode, protection, energy);
   if (shattered) event.effects.push(`the ${wspec.label.toLowerCase()} shattered`);
-  else if (!wspec.shatters) strainGrip(world, attacker, impulse * (through ? 0.05 : glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
+  else if (!wspec.shatters && !broke) strainGrip(world, attacker, impulse * (through ? 0.05 : glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   if (weapon.twoHanded) recoil.push([P[`${weapon.off}Hand`], 0.8]);
   pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, bluntShare, blocked, spec, recoil, time, event, through ? 0.4 : 1);
   // A weapon art's hook or reap (`hook`) caught on his leg: drawn on with the arms (physics/arts.js hookPull).
   if (spec.hook && (!haft || spec.hook === 'reap') && /Thigh|Shank/.test(capsule.key)) hookLeg(world, attacker, defender, capsule.key[0], spec.hook === 'reap' ? relative : null, event);
+  if (broke) event.effects.push(`the ${wspec.label.toLowerCase()}'s ${broke.part} ${broke.reason}`);
   world.events.push(event);
   if (shattered) dropWeapon(world, attacker, 'shattered');
+  else if (broke) breakWeapon(world, attacker, weapon, broke.part, broke.reason, contactPoint);
   if (world.ear) {
     soundHit(world, defender, attacker, capsule.key, contactPoint, { energy, impulse, striker: weaponStriker(mix), deltaV: blocked ? 0 : impulse / partMass });
     // (A cut through at a joint is logged by sever; a point's severity is how near it came to running him through.)
@@ -7704,7 +7772,8 @@ function registerBladeBlock(world, attacker, defender, striker, closest, away, w
   const impulse = reduced * closing * (1 + WORLD.restitution);
   const energy = 0.5 * reduced * closing * closing;
   const speed = vec.length(relative);
-  const mix = harmMix(weapon.spec, 'swing', speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0, closest.t);
+  // (A dull edge parts less: physics/wear.js bluntEdge.)
+  const mix = bluntEdge(weapon, harmMix(weapon.spec, 'swing', speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0, closest.t));
   // A padded glove takes some of an edge.
   const padded = striker.key.endsWith('Hand') && glovedFists(attacker.body.inputs) ? 0.6 : 1;
   const meets = striker.shin ? { segment: 'Shank', at: closest.s, joint: closest.s > 0.6 ? 'ankle' : 'knee' } : BLADE_MEETS[striker.key.slice(1)];
@@ -7773,12 +7842,26 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   const braced = defender.shield.spec.mass + body.segments.lForearm.mass + body.segments.lUpperArm.mass + body.massKg * 0.3;
   const reduced = (strikeMass * braced) / (strikeMass + braced);
   const impulse = reduced * closing * (1 + WORLD.restitution);
+  // (What the meeting takes up, J: what the board and the arm behind it soak.)
+  const energy = 0.5 * reduced * closing * closing;
   addDamage(defender, 'lForearm', (impulse / braced) * defender.shield.spec.armHarm, true);
   attacker.stats.blocked += 1;
   const event = {
     time: world.time, kind: 'blocked', attacker: attacker.id, defender: defender.id, punch: punch.type, target: 'shield', speed: closing, impulse, force: 0, headDeltaV: 0,
-    effects: ['taken on the shield'], point: hit.point, normal: away, weapon: striker.weapon ? striker.weapon.kind : undefined,
+    effects: ['taken on the shield'], point: hit.point, normal: away, weapon: striker.weapon ? striker.weapon.kind : undefined, energy,
   };
+  // The blow wears both (physics/wear.js): the weapon's edge dulls on the shield's face, a point driven into the board loads
+  // its shaft (stopped there in a few cm), and the board is hacked by what the blow carries, until it splits.
+  const blowMix = weaponStrike ? harmMix(striker.weapon.spec, spec.mode, Math.abs(vec.dot(vec.normalize(relative), striker.weapon.dir)), hit.along) : { blunt: 1, cut: 0, pierce: 0 };
+  let broke = null;
+  if (weaponStrike) {
+    const weapon = striker.weapon;
+    dullEdge(weapon, attacker, world.time, energy * blowMix.cut / Math.max(1e-6, blowMix.blunt + blowMix.cut + blowMix.pierce), shieldHardness(defender.shield));
+    if (spec.mode === 'thrust' && blowMix.pierce > 0 && !weapon.spec.shatters && driveShaft(weapon, attacker, world.time, energy, WORLD.wear.stop.shield).snapped) broke = { part: 'shaft', reason: 'snapped' };
+  }
+  const split = hackShield(defender.shield, defender, world.time, energy, blowMix);
+  if (broke) event.effects.push(`the ${striker.weapon.spec.label.toLowerCase()}'s shaft snapped`);
+  if (split) event.effects.push(`the ${defender.shield.spec.label.toLowerCase()} split`);
   world.pendingImpulses.push({ fighter: defender, shares: [[P.lHand, 1], [P.lElbow, 0.8], [P.lShoulder, 0.5], [P.neck, 0.3], [P.pelvis, 0.2]], direction: vec.scale(away, -1), impulse });
   // Held in line, the shield stops the blow and the stroke ends there (no
   // more driving into it; the arm comes back). If the shield arm gives, the
@@ -7797,13 +7880,19 @@ function registerShieldImpact(world, attacker, defender, striker, disc, hit, awa
   const recoil = striker.weapon ? [[P[`${striker.weapon.main}Hand`], 1], [P[`${striker.weapon.main}Elbow`], 0.6]] : (RECOIL[spec.limb.slice(1)] ?? RECOIL.Hand).map(([part, share]) => [P[`${striker.side}${part}`], share]);
   world.pendingImpulses.push({ fighter: attacker, shares: recoil, direction: away, impulse: impulse * (1 - gives) });
   // (A lance on a shield is kept: it shatters only on heavy armour, `shatters`.)
-  if (striker.weapon && !striker.weapon.spec.shatters) strainGrip(world, attacker, impulse * 0.25, [0, 0, 0], striker.weapon);
+  if (striker.weapon && !striker.weapon.spec.shatters && !broke) strainGrip(world, attacker, impulse * 0.25, [0, 0, 0], striker.weapon);
   world.events.push(event);
   if (striker.weapon) world.events.push({ time: world.time, kind: 'clash', fighter: defender.id, point: hit.point, normal: away, impulse });
+  if (broke) breakWeapon(world, attacker, striker.weapon, broke.part, broke.reason, hit.point);
   // Heard: the blow on the shield's face, braced behind it when he meant the block.
   if (world.ear) {
     const strikerKind = striker.weapon ? (spec.mode === 'thrust' && (striker.weapon.spec.harm?.thrust?.pierce ?? 0) > 0 ? 'point' : weaponPart(striker.weapon, Infinity)) : striker.bash ? 'shield' : limbStriker(spec.limb);
-    soundHit(world, defender, attacker, 'shield', hit.point, { energy: 0.5 * reduced * closing * closing, impulse, striker: strikerKind, covering: shieldCovering(defender.shield), braced: defender.defence?.name === 'shieldBlock' });
+    soundHit(world, defender, attacker, 'shield', hit.point, { energy, impulse, striker: strikerKind, covering: shieldCovering(defender.shield), braced: defender.defence?.name === 'shieldBlock' });
+  }
+  // Hacked apart, the board is gone from his arm.
+  if (split) {
+    breakShield(world, defender);
+    return;
   }
   // Each blow strains the shield's hold on his arm, the more the further
   // from the grip it lands (it twists the shield there); past it, it is torn off.
@@ -8039,8 +8128,29 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
     world.events.push({ time: world.time, kind: 'parry', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, impulse, energy, effects: [`parried with the ${blade.spec.label.toLowerCase()}`] });
   }
   chipOnSteel();
-  strainGrip(world, first, impulse, normal, a);
-  strainGrip(world, second, impulse, vec.scale(normal, -1), b);
+  // Each weapon is worn by the other (physics/wear.js): an edge dulls on what it met, as hard as that is; a metal blade takes
+  // the blow across it; a shaft is bent by it and, met on the wood by an edge, hacked.
+  const taken = 0.5 * ((massA * massB) / (massA + massB)) * Math.max(0, closing) ** 2;
+  const broken = [];
+  if (taken > 0) {
+    const sides = [[first, a, one.along, strokeA, second, b, two.along, strokeB], [second, b, two.along, strokeB, first, a, one.along, strokeA]];
+    for (const [owner, blade, along, stroke, other, against, otherAlong, otherStroke] of sides) {
+      const part = weaponPart(blade, along);
+      const otherPart = weaponPart(against, otherAlong);
+      if (part === 'blade') dullEdge(blade, owner, world.time, taken, partHardness(against, otherPart, other, world.time));
+      const bent = part === 'haft' ? null : strainBlade(blade, owner, world.time, taken);
+      // An edge's share of the other's blow (its stroke's harm, or its swing's held still) hacks into the wood.
+      const table = against.spec.harm?.[otherStroke?.spec.mode ?? 'swing'] ?? against.spec.harm?.swing ?? {};
+      const onWood = part === 'haft' || blade.spec.strikeFrom < 0;
+      const edgeOn = otherPart === 'blade' && onWood ? (table.cut ?? 0) / Math.max(1e-6, (table.cut ?? 0) + (table.blunt ?? 0) + (table.pierce ?? 0)) : 0;
+      const snapped = strikeShaft(blade, owner, world.time, taken, taken * edgeOn);
+      if (bent) broken.push([owner, blade, 'blade', bent]);
+      else if (snapped) broken.push([owner, blade, 'shaft', snapped]);
+    }
+  }
+  if (!broken.some(([owner]) => owner === first)) strainGrip(world, first, impulse, normal, a);
+  if (!broken.some(([owner]) => owner === second)) strainGrip(world, second, impulse, vec.scale(normal, -1), b);
+  for (const [owner, blade, part, reason] of broken) breakWeapon(world, owner, blade, part, reason, met);
 }
 
 /** Loose things — dropped weapons, severed parts — fall, tumble, bounce and come to rest lying flat. */

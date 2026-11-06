@@ -1046,6 +1046,41 @@ export const WORLD = {
   // how far forward a raised shield leans (of its facing).
   shield: { dropOnFall: 0.75, wrench: 60, strainLeak: 1, holdSeconds: 0.03, unbraced: 0.6, open: 0.4, glance: 0.45, turnStep: 0.5, wall: [0.36, 0.7, 0.1], roof: [0.26, 0.96, 0.03], roofTilt: 1.1 },
   weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45 },
+  // Weapons and shields wear and break from what they meet (physics/wear.js; what they are made of, weapons.js MATERIALS).
+  wear: {
+    // Of the work of a deep cut, the share that is the edge's own pressure parting the tissue (the rest is the wedge forcing
+    // it apart and the flanks' friction, which a dull edge does as well): an edge `w` times its fresh width needs
+    // (1 − press) + press·w the force, so goes in as far on 1/that of the blow, the rest landing as the flat. (Knife
+    // sharpness testing: a dull edge needs 3-5× the force to start a cut; through flesh a deep one takes ~1.5-2×.)
+    press: 0.35,
+    // The widest an edge grows (× fresh): a fully rolled and notched edge ~0.3 mm across, a fresh one ~30 µm.
+    flat: 10,
+    // What dulls an edge on armour goes as its proof against a cut squared (plate 0.9 → 0.8, mail 0.6 → 0.36, quilting
+    // 0.3 → 0.09): hard rings and plate turn an edge, cloth and flesh barely touch it. Bone under them: `bone`.
+    bone: 0.02,
+    // A head set this far (m) or more out from the hands is on a wooden haft (weapons.js buildOf): a spear's, a polearm's.
+    shaftFrom: 0.4,
+    // The reference blade a material's `blade.strength` is for: an arming sword's (radius m, the blade's section; length m).
+    // A blade's strength goes as its section cubed (the bending modulus) over its length (the lever on it): a rapier's
+    // slender blade has a quarter of it, a dagger's short one 1.6×.
+    blade: { radius: 0.012, length: 0.85 },
+    // The reference shaft: the war spear's ~3.6 cm of ash (radius m), the one WORLD.mount.brace.shaft is the strength of.
+    // A shaft's strength goes as its radius cubed (bending modulus): a lance's 5 cm three times it, a naginata's 2.8 cm 0.5.
+    shaft: 0.018,
+    // How far a point's drive is stopped in (m): `flesh` the 0.25 m the brace's 1,000 J is over (a set shaft gives at ~4
+    // kN), wherever it goes in (through mail, lamellar or cloth as through skin: it still goes in); on rigid plate that turns
+    // it, or armour proof against a point to `proof` or more, it stops dead within `plate`: the 1-2 cm of padding under it
+    // and the man knocked back give some 6 cm (a war spear's shaft then bears ~240 J square on plate: a hard two-handed
+    // thrust, 150-170 J, snaps the odd weak one); into a shield, `shield`: the point in the board and the arm and the man
+    // behind it giving ~12 cm.
+    stop: { flesh: 0.25, plate: 0.06, proof: 0.8, shield: 0.12 },
+    // A blow across a shaft breaks it at this share of what it carries along its length: a pole bends between the hands
+    // (ash's ~100 MPa over a 3.6 cm section is ~450 N·m: a kN or two at the blow, over the few cm it bows: some hundreds of J).
+    across: 0.3,
+    // Of a blow on a shield board, the share of each kind of harm that hacks it: an edge's wedge splits it along the grain,
+    // a blunt head's crush cracks it less for its joules, a point punches a hole.
+    split: { cut: 1, blunt: 0.35, pierce: 0.25 },
+  },
   // A long point: a couched lance, or a thrust with a weapon this long (m, shaft and all) or longer
   // (the 3.3 m war lance; not a 2.25 m spear). It comes on a line from far out: a man steps off that
   // line rather than back along it (AI.offLine), and a shield is put on the line to meet it.
@@ -1301,7 +1336,8 @@ export const WORLD = {
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
     // `shaft`: what a set point can drive into a horse before its shaft gives (J): an ash shaft bends or snaps past a few kN
     // (~4 kN) over the ~0.25 m the point goes in: past that the energy goes into the shaft breaking and the man thrown back,
-    // not into the horse.
+    // not into the horse. It is the war spear shaft's strength for every shaft (physics/wear.js driveShaft, at its own
+    // thickness and wood): past it the shaft snaps.
     brace: { length: 1.5, still: 0.5, share: 0.5, shaft: 1000 },
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     // A horse will not run into another horse if it can help it (a herd animal, and a rider rides his line knee to knee, not

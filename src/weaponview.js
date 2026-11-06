@@ -2168,6 +2168,20 @@ export function updateDebris(view, world) {
       mesh.quaternion.set(debris.q[0], debris.q[1], debris.q[2], debris.q[3]);
       continue;
     }
+    // A broken weapon's pieces and a split shield's halves (physics.js breakWeapon, breakShield): a stick of wood, a shard
+    // of steel, half a board.
+    if (debris.kind === 'splinter') {
+      if (!mesh) {
+        const length = debris.half * 2;
+        const geometry = debris.board ? new THREE.BoxGeometry(debris.width, length, 0.015) : new THREE.CylinderGeometry(debris.radius, debris.radius * 0.7, length, 6);
+        mesh = new THREE.Mesh(geometry, debris.wood ? surface(0x7a5530, { roughness: 0.75 }) : steelMaterial(view.steelEnv, { vertexColors: false, color: 0xd9dde4 }));
+        view.scene.add(mesh);
+        view.pieces.set(debris.id, mesh);
+      }
+      mesh.position.set(debris.x[0], debris.x[1], debris.x[2]);
+      mesh.quaternion.set(debris.q[0], debris.q[1], debris.q[2], debris.q[3]);
+      continue;
+    }
     if (debris.kind !== 'weapon') continue;
     const spec = WEAPONS[debris.weapon];
     // At rest on the floor, it is drawn with every other of its kind in one

@@ -289,6 +289,8 @@ export const WEAPONS = {
   // against blows (a long spear, levered from the hands, is easiest lost).
   warhammer: {
     label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 3.4, balance: 0.85, radius: 0.04,
+    // (Its haft: ~3.5 cm of ash under the langets, not the head's 8 cm: what snaps, physics/wear.js.)
+    build: { shaftRadius: 0.018 },
     // Its head is a hammer face with a beak behind it (the bec de corbin): a swing lands one or the other, the beak a spike
     // that goes into plate where an edge skids (pierce). The face is small and hard on a long lever: most of its blow is felt
     // through plate, which dents and passes it on rather than spreading it (`crush` 0.7; was 0.45, as a mace's flanges).
@@ -307,6 +309,8 @@ export const WEAPONS = {
     // A heavy head on a long shaft (+25% weight, +25% blunt): it knocks men about as it cuts.
     harm: { swing: { cut: 1.3, blunt: 0.625 }, thrust: { pierce: 0.75, cut: 0.15, blunt: 0.25 } },
     contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 14, zeta: 0.8 }, threat: 4.5, art: 'artWheel',
+    // Its oak haft, oval ~3.5 × 2.8 cm (a round one of ~3.2 cm), not the blade's `radius`: what snaps, physics/wear.js.
+    build: { shaftRadius: 0.016 },
   },
   // The war spear: a stout ash shaft and a long socketed iron head, ~2.3 kg;
   // its weight behind a narrow point drives the thrust deep.
@@ -365,6 +369,8 @@ export const WEAPONS = {
     // The iron head's length along the shaft (m), as drawn (weaponview.js) and struck: `strikeFrom` to the tip.
     head: 0.45,
     shatters: { pierce: 0.85, joules: 500 },
+    // Its white-wax wood shaft bends and springs back (MATERIALS.waxwood).
+    build: { shaft: 'waxwood' },
   },
   // The yari, as the ashigaru carried it: the war spear's long straight head
   // with a cross blade (jūmonji) below the point. The side blades cut and
@@ -392,6 +398,8 @@ export const WEAPONS = {
     // Where its branches are, m out from the front hand: from a little past the hands to just short of the iron head.
     // A blade that comes in among them may be caught there (physics/brush.js).
     brush: { from: 1.2, to: 3.0 },
+    // A whole bamboo some 5 cm through at the butt (not its 0.3 m brush of branches): MATERIALS.bamboo.
+    build: { shaft: 'bamboo', shaftRadius: 0.025 },
   },
   // A hay fork taken up by a rebel: two long wooden-shafted iron tines, not
   // made to fight. Blunt tines that pierce poorly and knock a man about;
@@ -618,6 +626,8 @@ export const WEAPONS = {
     label: 'Wolf-tooth mace', hands: 'one', length: 0.72, strikeFrom: 0.46, handle: 0.13, mass: 2.0, balance: 0.68, radius: 0.042,
     harm: { swing: { blunt: 1.45, pierce: 0.3 }, thrust: { blunt: 0.4, pierce: 0.15 } },
     contactSeconds: 0.004, rotation: 1.0, wrist: { omega: 12, zeta: 0.85 }, threat: 4, art: 'artCrushOne', crush: 0.45,
+    // Its short haft bound in iron: no bare wood to snap.
+    build: { shaft: null },
   },
   flangedMace: {
     label: 'Flanged mace', hands: 'one', length: 0.66, strikeFrom: 0.5, handle: 0.12, mass: 1.6, balance: 0.72, radius: 0.036,
@@ -625,6 +635,8 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.9, art: 'artCrushOne', crush: 0.55,
     // (Its striking `face`, m: a flange's edge, ~5 cm deep and a few mm thick, lands first, not the round of the head.)
     face: 0.02,
+    // An iron haft, or one bound in iron strips: no bare wood to snap.
+    build: { shaft: null },
   },
   // The Inca champi (the Spaniards' porra): a star-shaped head of cast bronze
   // (or ground stone), five or six points round a hole, on a wooden haft of
@@ -637,6 +649,8 @@ export const WEAPONS = {
     label: 'Champi', hands: 'one', length: 0.74, strikeFrom: 0.62, handle: 0.12, mass: 1.25, balance: 0.74, radius: 0.05,
     harm: { swing: { blunt: 1.3, pierce: 0.25 }, thrust: { blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.6, crush: 0.3,
+    // A wooden haft ~3 cm through under the star (its `radius` is the star's).
+    build: { shaftRadius: 0.015 },
   },
   // The steppe sabre (the Mongol's, the Ming northern horse's): a long,
   // gently curved single edge for the draw cut, its back bowed 6 cm off the
@@ -863,6 +877,8 @@ export const WEAPONS = {
     label: 'Gladius', hands: 'one', length: 0.62, strikeFrom: 0.1, handle: 0.13, mass: 0.9, balance: 0.08, radius: 0.012,
     harm: { thrust: { pierce: 0.9, cut: 0.2, blunt: 0.15 }, swing: { cut: 0.8, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.7, wrist: { omega: 26, zeta: 0.8 }, threat: 3,
+    // Roman-era bloomery iron and uneven steel, softer than a later quench-hardened blade (MATERIALS.iron).
+    build: { edge: 'iron', blade: 'iron' },
   },  // The thraex's sica: a short sword curved like a sickle (~0.42 m of blade),
   // made to reach round a shield's edge into the back and the legs.
   sica: {
@@ -870,6 +886,8 @@ export const WEAPONS = {
     label: 'Sica', hands: 'one', length: 0.46, strikeFrom: 0.08, handle: 0.12, mass: 0.7, balance: 0.14, radius: 0.012, curved: true, curve: -0.07,
     harm: { swing: { cut: 1.15, blunt: 0.3 }, thrust: { pierce: 0.7, cut: 0.25, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 26, zeta: 0.8 }, threat: 3.1,
+    // Roman-era bloomery iron and uneven steel, softer than a later quench-hardened blade (MATERIALS.iron).
+    build: { edge: 'iron', blade: 'iron' },
   },
   // The retiarius's trident (fuscina): ~1.7 m of ash with three iron prongs.
   // One hand while the other holds the net; both once it is thrown. The
@@ -891,6 +909,8 @@ export const WEAPONS = {
     label: 'Spatha', hands: 'one', length: 0.82, strikeFrom: 0.12, handle: 0.12, mass: 1.2, balance: 0.13, radius: 0.011,
     harm: { thrust: { pierce: 0.95, cut: 0.2, blunt: 0.12 }, swing: { cut: 0.95, blunt: 0.4 } },
     contactSeconds: 0.004, rotation: 0.72, wrist: { omega: 23, zeta: 0.8 }, threat: 3.4,
+    // Roman-era bloomery iron and uneven steel, softer than a later quench-hardened blade (MATERIALS.iron).
+    build: { edge: 'iron', blade: 'iron' },
   },
   // The kontos: the cataphract's lance, ~3.7 m (Plutarch's and Heliodorus's
   // 'long pike'; the Sarmatian and Parthian horse's), held in both hands across
@@ -935,6 +955,75 @@ export const WEAPONS = {
   }])),
 };
 
+/**
+ * What weapons and shields are made of, for their wear (physics/wear.js). A weapon's `build` names the material of its
+ * edge (what dulls), its blade (the metal body that bends or snaps: a sword's) and its shaft (the wood between the hands
+ * and the head that snaps or is hacked through: a spear's, a polearm's); left out, buildOf works it out from the spec.
+ * A shield's `material` names its board.
+ * - `hardness`: how hard a face it is for another's edge to meet, against good steel (1): what an edge that meets it dulls by.
+ * - `dulls`: how much wider an edge of it grows (× its fresh width) for each joule it takes on a face as hard as steel. A
+ *   fresh sword edge is ~20-40 µm across; a parry edge to edge or a cut onto plate rolls and notches it a few µm per
+ *   joule of the blow: a hard minute of it (some 2,000 J taken edge on) leaves good steel ~3× as wide, soft iron and
+ *   bronze, which turn and nick sooner, twice and more that.
+ * - `blade`: a metal blade's bending: `strength` (J), the single blow across it (at the reference blade, WORLD.wear.blade)
+ *   that bends or snaps it; `scatter`, the Weibull modulus of that strength over blades of the metal (the higher, the more
+ *   alike: quench-hardened steel is made to a standard, bloomery iron and cast bronze vary with every slag inclusion and
+ *   pore); `capacity` (J), what it takes in all before the blows that each did nothing work it to a crack (fatigue). A
+ *   good steel sword passes a proof of full flat blows on a block (~150 J) and is rarely broken in a fight; Polybius's
+ *   Gauls straightened their soft iron swords under the foot after a blow or two, and bronze swords bent; `fails`, how
+ *   (hardened steel snaps, soft iron and bronze bend: either way it is no longer a sword to fight with).
+ * - `shaft`: a wooden shaft's `strength` (× WORLD.mount.brace.shaft at the reference shaft, WORLD.wear.shaft: the energy
+ *   a set point carries before its shaft gives), its `scatter` (clear wood's strength varies ~20 %: modulus ~6), and
+ *   `chop` (J at the reference shaft), the edge-on work that hacks it through (why polearms grew iron langets).
+ * - `board`: a shield board's `perKg` (J of its weight), the hacking it takes before it splits apart: a lime or alder
+ *   board of ~4 kg goes in some 20 full axe or two-hander blows (~200 J each, edge led: reconstructions in reenactment and
+ *   test cutting split planked round shields in ten to thirty); plywood (glued cross-grain, the scutum) holds longer,
+ *   springy wicker as well for its weight (but a wicker shield is light); `scatter` as the shaft's. Steel and bronze dent
+ *   and do not split (no `board`).
+ */
+export const MATERIALS = {
+  steel: { hardness: 1, dulls: 0.001, blade: { strength: 1200, scatter: 8, capacity: 40000, fails: 'snapped' } },
+  // Bloomery iron and the uneven early steels of antiquity: softer, it turns and bends sooner.
+  iron: { hardness: 0.7, dulls: 0.0022, blade: { strength: 500, scatter: 4, capacity: 9000, fails: 'bent' } },
+  // Tin bronze: work-hardened at the edge but soft behind it; it bends.
+  bronze: { hardness: 0.6, dulls: 0.0025, blade: { strength: 600, scatter: 5, capacity: 7000, fails: 'bent' } },
+  // Hardwood (ash, oak, hickory): the shaft the brace figure is set against.
+  hardwood: { hardness: 0.1, shaft: { strength: 1, scatter: 6, chop: 600 } },
+  // White-wax wood: Chinese ash grown slow and straight, it bends far and springs back where a stiffer ash snaps.
+  waxwood: { hardness: 0.1, shaft: { strength: 1.4, scatter: 6, chop: 600 } },
+  // Bamboo: hollow, light and springy; it splits along its fibres under an edge sooner than solid wood.
+  bamboo: { hardness: 0.1, shaft: { strength: 0.8, scatter: 5, chop: 350 } },
+  // Shield boards.
+  planks: { hardness: 0.12, board: { perKg: 850, scatter: 6 } },
+  plywood: { hardness: 0.12, board: { perKg: 1200, scatter: 6 } },
+  wicker: { hardness: 0.08, board: { perKg: 900, scatter: 5 } },
+  // A riot shield's polycarbonate: it crazes and cracks only under very many heavy blows.
+  polycarbonate: { hardness: 0.15, board: { perKg: 5000, scatter: 6 } },
+  // Metal shields dent and do not split.
+  steelPlate: { hardness: 1 },
+  bronzePlate: { hardness: 0.6 },
+};
+
+/**
+ * A weapon's build: its edge's, its blade's and its shaft's materials (null: it has none that wears), and the radius of its
+ * shaft (m). Its own `build` says; else an edge of good steel if it cuts or pierces (not a brittle one: obsidian's flakes
+ * chip on their own, physics.js chip), a wooden haft if its head is set a forearm or more out from the hands
+ * (WORLD.wear.shaftFrom; or it is all pole, a staff's `strikeFrom` behind the hands), a steel blade if it has an edge and
+ * no haft. A gun, a bow, a whip and a forearm weapon do not wear here.
+ */
+export function buildOf(spec, shaftFrom) {
+  if (spec.ranged || spec.bow || spec.rope || spec.mounted || spec.tethered) return NO_BUILD;
+  const own = spec.build ?? {};
+  const harm = spec.harm ?? {};
+  const edged = !spec.brittle && Object.values(harm).some((mix) => (mix.cut ?? 0) > 0 || (mix.pierce ?? 0) > 0);
+  const hafted = spec.strikeFrom >= shaftFrom || spec.strikeFrom < 0;
+  const edge = own.edge !== undefined ? own.edge : edged ? 'steel' : null;
+  const shaft = own.shaft !== undefined ? own.shaft : hafted ? 'hardwood' : null;
+  const blade = own.blade !== undefined ? own.blade : edge && !shaft ? edge : null;
+  return { edge, blade, shaft, shaftRadius: own.shaftRadius ?? spec.radius };
+}
+const NO_BUILD = { edge: null, blade: null, shaft: null, shaftRadius: 0 };
+
 // Shields strapped to the off forearm: a disc of this radius held off the
 // arm, facing where the fighter faces. A strike that meets it is stopped
 // there; its momentum goes into the arm and the body braced behind it.
@@ -947,22 +1036,22 @@ export const WEAPONS = {
 // body; the scissor's tube is on the arm itself.
 export const SHIELDS = {
   // The parma: small, round, convex bronze — far smaller than a hoplon.
-  parma: { label: 'Parma', radius: 0.28, mass: 2.4, offset: 0.07, armHarm: 0.15, hold: 1.0 },
+  parma: { label: 'Parma', radius: 0.28, mass: 2.4, offset: 0.07, armHarm: 0.15, hold: 1.0, material: 'bronzePlate' },
   // A Ming soldier's small round shield: lacquered wood with an iron rim and a boss.
-  roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, hold: 1.1, look: 'ming' },
+  roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, hold: 1.1, look: 'ming', material: 'planks' },
   // The Spanish rodela: a round steel shield, heavy and proof against cuts and thrusts.
-  rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, hold: 1.4, look: 'steel' },
+  rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, hold: 1.4, look: 'steel', material: 'steelPlate' },
   // The Mexica chimalli: a round shield of wicker or wood faced with feathers and hide.
-  chimalli: { label: 'Chimalli', radius: 0.33, mass: 1.6, offset: 0.07, armHarm: 0.2, hold: 1.3, look: 'feather' },
+  chimalli: { label: 'Chimalli', radius: 0.33, mass: 1.6, offset: 0.07, armHarm: 0.2, hold: 1.3, look: 'feather', material: 'wicker' },
   // A small round iron parry shield, held out to meet a blow.
-  buckler: { label: 'Iron buckler', radius: 0.2, mass: 1.4, offset: 0.06, armHarm: 0.12, hold: 0.6, look: 'steel' },
+  buckler: { label: 'Iron buckler', radius: 0.2, mass: 1.4, offset: 0.06, armHarm: 0.12, hold: 0.6, look: 'steel', material: 'steelPlate' },
   // The kalkan: the Turkish and steppe round shield of wicker bound in
   // coloured thread round an iron boss; light and springy.
-  kalkan: { label: 'Kalkan', radius: 0.3, mass: 1.7, offset: 0.07, armHarm: 0.17, hold: 1.1, look: 'ming' },
+  kalkan: { label: 'Kalkan', radius: 0.3, mass: 1.7, offset: 0.07, armHarm: 0.17, hold: 1.1, look: 'ming', material: 'wicker' },
   // The Ayyubid horseman's round shield (turs): boards faced with dark
   // leather, ~0.65 m across, a rawhide rim and an iron boss; heavier than
   // the wicker kalkan of later centuries, and stiffer under a blow.
-  turs: { label: 'Turs', radius: 0.32, mass: 2.8, offset: 0.07, armHarm: 0.15, hold: 1.3, look: 'turs' },
+  turs: { label: 'Turs', radius: 0.32, mass: 2.8, offset: 0.07, armHarm: 0.15, hold: 1.3, look: 'turs', material: 'planks' },
   // Shaped shields (`shape: 'curved'`): a rectangle `width` × `height` (m)
   // bent round a vertical axis (`curve`, the bend's radius), held upright by
   // a grip at its middle. The scutum of the murmillo and the secutor: plywood
@@ -971,27 +1060,27 @@ export const SHIELDS = {
   // the body: blows go round it to the head or the forward leg.
   // A police riot shield: clear polycarbonate, ~0.6 × 1.05 m, slightly
   // curved; it stops blows, thrown things and edges, not rounds.
-  riotShield: { label: 'Riot shield', shape: 'curved', width: 0.6, height: 1.05, curve: 1.2, mass: 4, offset: 0.1, armHarm: 0.07, hold: 1.5, look: 'riot' },
+  riotShield: { label: 'Riot shield', shape: 'curved', width: 0.6, height: 1.05, curve: 1.2, mass: 4, offset: 0.1, armHarm: 0.07, hold: 1.5, look: 'riot', material: 'polycarbonate' },
   // The heater: the knight's shield of the 12th–13th century, ~0.6 × 0.8 m,
   // flat at the top and curving to a point below, a little bent round the
   // arm; wood faced with leather, painted (the Temple's white with its red cross).
-  heater: { label: 'Heater shield', shape: 'curved', width: 0.56, height: 0.8, curve: 0.75, mass: 4, offset: 0.1, armHarm: 0.08, hold: 1.6, look: 'heater' },
-  scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, hold: 1.5, look: 'scutum' },
+  heater: { label: 'Heater shield', shape: 'curved', width: 0.56, height: 0.8, curve: 0.75, mass: 4, offset: 0.1, armHarm: 0.08, hold: 1.6, look: 'heater', material: 'planks' },
+  scutum: { label: 'Scutum', shape: 'curved', width: 0.62, height: 0.95, curve: 0.5, mass: 6, offset: 0.1, armHarm: 0.07, hold: 1.5, look: 'scutum', material: 'plywood' },
   // The late Roman infantry's shield (scutum of the 4th–5th centuries, as the
   // Dura-Europos and Notitia shields show it): a broad oval of glued planks,
   // ~0.8 × 1.05 m, faced with painted leather (each unit its own device), an
   // iron boss over a horizontal grip; only gently dished, not the old
   // semicylinder. Met as a rectangle (`shape: 'curved'`) a little inside the
   // oval (0.72 × 0.98 m): the corners an oval has not are left out; ~5.5 kg.
-  oval: { label: 'Oval shield', shape: 'curved', width: 0.72, height: 0.98, curve: 1.6, mass: 5.5, offset: 0.1, armHarm: 0.08, hold: 1.3, look: 'oval' },
+  oval: { label: 'Oval shield', shape: 'curved', width: 0.72, height: 0.98, curve: 1.6, mass: 5.5, offset: 0.1, armHarm: 0.08, hold: 1.3, look: 'oval', material: 'planks' },
   // The Germanic round shield (the Visigoths', the Franks', the Huns' foot): planks of
   // lime or alder ~0.85 m across, rawhide-edged, a domed iron boss over a single grip; ~4 kg.
-  germanic: { label: 'Round shield', radius: 0.42, mass: 4, offset: 0.08, armHarm: 0.14, hold: 1.1, look: 'germanic' },
+  germanic: { label: 'Round shield', radius: 0.42, mass: 4, offset: 0.08, armHarm: 0.14, hold: 1.1, look: 'germanic', material: 'planks' },
   // The thraex's parmula: small and nearly square (~0.36 × 0.42 m), flat-ish.
-  parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, hold: 1.1, look: 'parmula' },
+  parmula: { label: 'Parmula', shape: 'curved', width: 0.36, height: 0.42, curve: 0.9, mass: 2.4, offset: 0.08, armHarm: 0.13, hold: 1.1, look: 'parmula', material: 'planks' },
   // The scissor's arm: a steel tube over the left forearm and fist, ending in
   // a crescent blade (~0.13 m round): it parries like a small shield.
-  scissores: { label: 'Scissores', radius: 0.13, mass: 2, offset: 0.12, armHarm: 0.04, hold: 4, look: 'scissores' },
+  scissores: { label: 'Scissores', radius: 0.13, mass: 2, offset: 0.12, armHarm: 0.04, hold: 4, look: 'scissores', material: 'steelPlate' },
 };
 
 /**
@@ -1661,7 +1750,7 @@ export function createWeapon(kind) {
     loaded: true, reloaded: 0,
     // What a weapon gains in the fight, named here (unset) so that every weapon has one shape.
     handling: undefined, charges: undefined, colour: undefined, edge: undefined, dulled: undefined, spent: undefined,
-    draw: undefined, facing: undefined, rope: undefined,
+    draw: undefined, facing: undefined, rope: undefined, wear: undefined,
   };
 }
 
