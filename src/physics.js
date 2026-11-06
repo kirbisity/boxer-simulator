@@ -158,6 +158,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     shieldPose: undefined, shieldOpen: undefined, strafe: undefined, running: undefined, aimAt: undefined, focus: undefined, goTo: undefined,
     nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
     weave: undefined, carry: undefined, detail: undefined, unposedAt: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined, crashDv: undefined,
+    underStyle: undefined, runsUnder: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
     bleed: undefined, bloodLost: undefined, gunshot: undefined, swappedAt: undefined, relievedAt: undefined, lean: undefined, burning: undefined, flameFright: undefined,
     loosed: undefined, reloading: undefined, pickup: undefined, pin: undefined, finisher: undefined, lowStrike: undefined, focusAny: undefined, rise: undefined, triedRise: undefined, riseBudget: undefined,
@@ -6267,12 +6268,16 @@ function collideCrowd(world, time, substep) {
     if (!list.length) continue;
     const attacker = fighters[a];
     const limbs = strikers(attacker);
+    const idleTested = substep % idleEvery === 0;
     for (let k = 0; k < list.length; k += 1) {
       const defender = fighters[list[k]];
       if (attacker.corner === defender.corner && !attacker.punch) continue;
-      for (const striker of limbs) {
-        const striking = striker.weapon ? Boolean(strokeOf(attacker, striker.weapon)) : attacker.punch?.spec.limb === striker.key;
-        if (striking || substep % idleEvery === 0) collideStriker(world, attacker, defender, striker, time);
+      // With no strike in flight nothing of his is striking: on a substep the idle ones are not tested, none is.
+      if (!idleTested && !attacker.punch) continue;
+      for (let index = 0; index < limbs.length; index += 1) {
+        const striker = limbs[index];
+        // (Whether it strikes is asked only on the substeps it decides anything.)
+        if (idleTested || strikingNow(attacker, striker)) collideStriker(world, attacker, defender, striker, time);
       }
     }
   }
@@ -6285,6 +6290,11 @@ function collideCrowd(world, time, substep) {
       if (fighters[a].corner !== fighters[b].corner) clashBlades(world, fighters[a], fighters[b]);
     }
   }
+}
+
+/** Whether a striker is the one a strike in flight is made with (a blade's own stroke, or the punch's limb). */
+function strikingNow(attacker, striker) {
+  return striker.weapon ? Boolean(strokeOf(attacker, striker.weapon)) : attacker.punch?.spec.limb === striker.key;
 }
 
 /** A striker with every field set (unset ones undefined), so all strikers share one shape. */
@@ -6745,7 +6755,15 @@ const BODY_PARTS = new Set(['trunk', 'shoulders']);
 const UNDER_LEGS = ['lThigh', 'rThigh', 'lShank', 'rShank'];
 const UNDER_LEG_PAIRS = ['trunk', 'head'].flatMap((part) => UNDER_LEGS.flatMap((leg) => [[part, leg], [leg, part]]));
 const UNDER_LEG_KEYS = new Set(UNDER_LEGS);
-const runsUnder = (fighter) => Boolean(STYLES[fighter.style]?.bite?.low);
+// Asked of every pair pushed apart, every substep: kept on the fighter, for the style it was read for (a style changes with a weapon).
+function runsUnder(fighter) {
+  if (fighter.underStyle !== fighter.style) {
+    fighter.underStyle = fighter.style;
+    fighter.runsUnder = Boolean(STYLES[fighter.style]?.bite?.low);
+  }
+  return fighter.runsUnder;
+}
+const PUSH_AND_LEG_PAIRS = [...PUSH_PAIRS, ...UNDER_LEG_PAIRS];
 const UNDER_LEG_EASE = 1.5;
 
 /** A small animal's charge that runs into a man's legs ends there: it takes hold of him (a clinch, grappling.js clinchGrip). */
@@ -6772,7 +6790,7 @@ function pushApart(world, first, second) {
   // placement (prev moved with x), not turned into a speed. Two trunks 0.2 m into each other, put apart in one substep, met
   // at 30 m/s and knocked each other cold.
   const placed = first.unposedAt === world.steps || second.unposedAt === world.steps;
-  const pairs = runsUnder(first) || runsUnder(second) ? [...PUSH_PAIRS, ...UNDER_LEG_PAIRS] : PUSH_PAIRS;
+  const pairs = runsUnder(first) || runsUnder(second) ? PUSH_AND_LEG_PAIRS : PUSH_PAIRS;
   for (const [firstKey, secondKey] of pairs) {
     const one = firstKey === 'shoulders' ? shoulderCapsule(first) : firstCapsules[firstKey];
     const two = secondKey === 'shoulders' ? shoulderCapsule(second) : secondCapsules[secondKey];
