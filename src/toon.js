@@ -50,6 +50,17 @@ export function surface(color, { skinning = false, vertexColors = false, roughne
 }
 
 /**
+ * A skinned body's material for a piece cut off it (weaponview.js liftTriangles): the same, unskinned. One function for the cut and
+ * for the warmers that build its program before the fight (render.js warmSevered), so both ask three for the very same program.
+ */
+export function unskinnedCopy(material) {
+  const copy = material.clone();
+  copy.skinning = false;
+  copy.needsUpdate = true;
+  return copy;
+}
+
+/**
  * An ink outline: the same mesh drawn again, back faces only, pushed out
  * along its normals (the "inverted hull"). Works on skinned meshes because
  * the push happens before skinning.

@@ -8,7 +8,7 @@ import { P } from './body.js';
 import { floorUnder, SEVER_PARTS, point, quatRotate, shieldDisc } from './physics.js';
 import { reloadProps } from './physics/ranged.js';
 import { BONE } from './rig.js';
-import { disposeObject, doubleSided, outlineFor, surface } from './toon.js';
+import { disposeObject, doubleSided, outlineFor, surface, unskinnedCopy } from './toon.js';
 import { ARROW, SHIELDS, WEAPONS } from './weapons.js';
 import { arrowSightScale } from './arrowsight.js';
 import { outfitOf } from './outfits.js';
@@ -2108,10 +2108,7 @@ function liftTriangles(mesh, boneIndices, origin) {
   lifted.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   if (colors) lifted.setAttribute('color', new THREE.Float32BufferAttribute(colorList, 3));
   lifted.computeVertexNormals();
-  const material = mesh.material.clone();
-  material.skinning = false;
-  material.needsUpdate = true;
-  const result = new THREE.Mesh(lifted, material);
+  const result = new THREE.Mesh(lifted, unskinnedCopy(mesh.material));
   result.castShadow = true;
   return result;
 }

@@ -9,7 +9,7 @@ const run = (state, seconds, ms, { fighters = 100, work = 8 } = {}) => {
 };
 
 test('the steps are descending, never under the floor, and a low full ratio has fewer', () => {
-  assert.deepEqual(ratioSteps(2), [2, 1.5, 1.25, 1]);
+  assert.deepEqual(ratioSteps(2, { ...CONFIG, battleRatioMost: Infinity }), [2, 1.5, 1.25, 1]);
   assert.deepEqual(ratioSteps(1.5), [1.5, 1.125, 1]);
   assert.deepEqual(ratioSteps(1), [1]);
   for (const full of [3, 2, 1.75, 1.25, 1]) {
@@ -19,11 +19,32 @@ test('the steps are descending, never under the floor, and a low full ratio has 
   }
 });
 
-test('a fight of eight or fewer is never adapted, and a battle that shrinks to it is put back at once', () => {
+test('a battle starts at no more than 1.5; a ratio-1 screen is never touched', () => {
+  assert.deepEqual(ratioSteps(2), [1.5, 1.125, 1], 'a 2x screen: the battle is drawn at 1.5 at best, its steps shares of that');
+  assert.deepEqual(ratioSteps(3), [1.5, 1.125, 1]);
+  assert.deepEqual(ratioSteps(1.25), [1.25, 1]);
+  assert.deepEqual(ratioSteps(1), [1]);
+  for (const full of [3, 2, 1.5, 1.25, 1]) assert.ok(ratioSteps(full)[0] <= CONFIG.battleRatioMost && ratioSteps(full)[0] <= full);
+});
+
+test('a duel steps down only to its floor, and a 1.5x or 1x screen not at all', () => {
+  assert.deepEqual(ratioSteps(2, CONFIG, { duel: true }), [2, 1.5]);
+  assert.deepEqual(ratioSteps(3, CONFIG, { duel: true }), [3, 2.25, 1.875, 1.5]);
+  assert.deepEqual(ratioSteps(1.5, CONFIG, { duel: true }), [1.5]);
+  assert.deepEqual(ratioSteps(1, CONFIG, { duel: true }), [1]);
+  assert.deepEqual(ratioSteps(2, { ...CONFIG, duelFloor: undefined }, { duel: true }), [2], 'no duel floor: a duel is never adapted');
+});
+
+test('a duel waiting on the graphics card adapts on its own ladder; a battle that shrinks to one starts it again from the top', () => {
   const state = newAdaptiveState();
-  assert.equal(run(state, 30, 40, { fighters: CONFIG.fewestFighters - 1 }), 0, 'slow, but a duel');
+  const duel = { fighters: CONFIG.fewestFighters - 1 };
+  assert.equal(run(state, 30, 40, { ...duel, work: 36 }), 0, 'slow, but the processor is the reason');
+  const steps = (fighters) => ratioSteps(2, CONFIG, { duel: fighters < CONFIG.fewestFighters }).length;
+  let level = 0;
+  for (let time = 0; time < 30; time += 0.04) level = stepAdaptive(state, { ms: 40, fighters: 2, levels: steps(2), work: 8 });
+  assert.equal(level, 1, 'fill-bound duel: one step, to 1.5');
   assert.equal(run(state, 30, 40), 3, 'slow in a battle: down to the last step');
-  assert.equal(stepAdaptive(state, { ms: 40, fighters: 8, levels: 4, work: 8 }), 0, 'eight men left');
+  assert.equal(stepAdaptive(state, { ms: 40, fighters: 8, levels: steps(8), work: 8 }), 0, 'eight men left: the duel ladder, from its top');
   assert.equal(state.level, 0);
 });
 

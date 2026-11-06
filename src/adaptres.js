@@ -1,8 +1,9 @@
 // Adaptive resolution: in a big battle that cannot keep up, the renderer's
-// pixel ratio steps down (2 -> 1.5 -> 1.25) and, once the frames come easily
-// again, back up. The canvas keeps its size on the page; only the pixels it is
-// drawn with change. A duel (a few men) is never touched: it is drawn as
-// ever. The choices are plain functions of the frame times, so they run in
+// pixel ratio steps down (1.5 -> 1.125 -> 1: a battle starts at most at 1.5)
+// and, once the frames come easily again, back up. The canvas keeps its size
+// on the page; only the pixels it is drawn with change. A duel (a few men)
+// that waits on the graphics card steps from 2 to 1.5 and no further; a
+// screen of ratio 1 is never drawn with fewer pixels than it has. The choices are plain functions of the frame times, so they run in
 // Node (test/adaptres.test.js); `createAdaptiveResolution` applies them to a
 // view (render.js createScene) from main.js's frame.
 
@@ -11,8 +12,14 @@
 import { rungsFor } from './levelmode/quality.js';
 
 export const ADAPTIVE_RESOLUTION = {
-  // A fight of fewer fighters than this is never adapted (and is put back to full at once if one shrinks to it): a 1v1 is drawn exactly as ever.
+  // A fight of fewer fighters than this is a duel: its own short ladder (`duelFloor`), started again at the full ratio when a battle shrinks to one.
   fewestFighters: 9,
+  // A battle is drawn at no more than this pixel ratio. 2 against 1.5 is 1.78x the pixels, and from a battle's camera (10-25 m) the difference is
+  // finer than a man's ink line; on an M1 Pro a 70-man battle at 2 paid 6.4 ms a frame more than at 1 (the duel ring, a man filling the screen, keeps 2).
+  battleRatioMost: 1.5,
+  // A duel that waits on the graphics card (a 1v1 at ratio 2 is fill-bound: 8.8 ms on an M1 Pro, most of it pixels) is drawn down to this ratio, no
+  // lower: 1.5 is still sharper than a ratio-1 screen, and the fighters fill the picture. A screen of ratio 1.5 or less is never adapted in a duel.
+  duelFloor: 1.5,
   // Each step's share of the full pixel ratio. Fill cost is the pixel count, so 0.75 of the ratio is 0.56 of the pixels, 0.625 is 0.39 and 0.5 is a quarter.
   // On a ratio-2 screen: 2, 1.5, 1.25, 1. The last is the floor, for a graphics card that is far behind.
   steps: [1, 0.75, 0.625, 0.5],
@@ -52,14 +59,23 @@ export function adaptiveSize(fighters, stage = false, config = ADAPTIVE_RESOLUTI
   return stage ? Math.max(config.fewestFighters, fighters) : fighters;
 }
 
-/** The pixel ratios the steps give from a `full` ratio: descending, none under the floor, each once. */
-export function ratioSteps(full, config = ADAPTIVE_RESOLUTION) {
-  const ratios = config.steps.map((share) => Math.max(config.floor, Math.round(full * share * 1000) / 1000)).map((ratio) => Math.min(full, ratio));
+/**
+ * The pixel ratios the steps give from a `full` ratio: descending, none under the floor, each once. A battle's start at most at `battleRatioMost`;
+ * a duel's (`duel`) from the full ratio, none under `duelFloor`.
+ */
+export function ratioSteps(full, config = ADAPTIVE_RESOLUTION, { duel = false } = {}) {
+  const top = duel ? full : Math.min(full, config.battleRatioMost ?? full);
+  const floor = duel ? Math.max(config.floor, config.duelFloor ?? Infinity) : config.floor;
+  // (The steps are shares of the top: a capped battle has its whole ladder under the cap.)
+  const ratios = config.steps.map((share) => Math.max(floor, Math.round(top * share * 1000) / 1000)).map((ratio) => Math.min(top, ratio));
   return [...new Set(ratios)].sort((a, b) => b - a);
 }
 
+/** Whether a fight of `fighters` (adaptiveSize) is a duel, with its own ladder. */
+export const isDuel = (fighters, config = ADAPTIVE_RESOLUTION) => fighters < config.fewestFighters;
+
 export function newAdaptiveState() {
-  return { level: 0, smoothed: null, work: null, slowFor: 0, severeFor: 0, fastFor: 0, sinceStep: Infinity, lastStep: 0, fastNeeded: null, settle: 0 };
+  return { level: 0, smoothed: null, work: null, slowFor: 0, severeFor: 0, fastFor: 0, sinceStep: Infinity, lastStep: 0, fastNeeded: null, settle: 0, duel: null };
 }
 
 /**
@@ -69,10 +85,9 @@ export function newAdaptiveState() {
  */
 export function stepAdaptive(state, { ms, fighters, levels, work = null }, config = ADAPTIVE_RESOLUTION) {
   state.fastNeeded ??= config.fastSeconds;
-  if (fighters < config.fewestFighters) {
-    Object.assign(state, newAdaptiveState(), { fastNeeded: config.fastSeconds });
-    return 0;
-  }
+  // A battle become a duel (or the other way): another ladder, walked from its top.
+  const duel = isDuel(fighters, config);
+  if (state.duel !== duel) Object.assign(state, newAdaptiveState(), { fastNeeded: config.fastSeconds, duel });
   state.level = Math.min(state.level, levels - 1);
   if (ms > config.stallMs) return state.level;
   const dt = ms / 1000;
@@ -133,19 +148,21 @@ export function createAdaptiveResolution(config = ADAPTIVE_RESOLUTION) {
   let tier = 'high';
   let tiered = false;
   let onTier = null;
+  let duel = false;
 
   function apply(view, ratio) {
     const renderer = view.renderer;
     if (renderer.getPixelRatio() === ratio) return;
     renderer.setPixelRatio(ratio);
-    applied = ratio;
+    // Our own ratio, not a new full one (the full one itself is nobody's change).
+    applied = ratio === full ? null : ratio;
     // A look that draws to its own targets (a composer) sizes them by the ratio.
     const size = renderer.getSize(new THREE.Vector2());
     view.look?.resize?.(view, size.x, size.y);
   }
 
   /** The rungs: pixel ratios with a tier each in a stage; ratios alone elsewhere. */
-  const ladder = () => (tiered ? rungsFor(full, config.floor) : ratioSteps(full, config).map((ratio) => ({ ratio, tier: 'high' })));
+  const ladder = () => (tiered ? rungsFor(full, config.floor) : ratioSteps(full, config, { duel }).map((ratio) => ({ ratio, tier: 'high' })));
 
   function setTier(next) {
     if (next === tier) return;
@@ -184,7 +201,6 @@ export function createAdaptiveResolution(config = ADAPTIVE_RESOLUTION) {
         const at = rung === null ? 0 : Math.min(rung, rungs.length - 1);
         apply(view, rungs[at].ratio);
         setTier(rungs[at].tier);
-        if (at === 0) applied = null;
       }
       return pinned;
     },
@@ -210,20 +226,23 @@ export function createAdaptiveResolution(config = ADAPTIVE_RESOLUTION) {
         applied = null;
         Object.assign(state, newAdaptiveState());
       }
+      duel = isDuel(fighters, config);
       const rungs = ladder();
       if (pinned !== null) {
         const at = Math.min(pinned, rungs.length - 1);
         if (rungs[at].ratio !== current) apply(view, rungs[at].ratio);
         if (tiered) setTier(rungs[at].tier);
-        if (at === 0) applied = null;
         return;
       }
-      if (!enabled) return;
+      if (!enabled) {
+        // Off: the full ratio (a battle's cap is part of adapting, and goes with it).
+        if (current !== full) apply(view, full);
+        return;
+      }
       const level = stepAdaptive(state, { ms, fighters, levels: rungs.length, work }, config);
       const rung = rungs[level];
       if (rung.ratio !== current) apply(view, rung.ratio);
       if (tiered) setTier(rung.tier);
-      if (level === 0) applied = null;
     },
   };
   return api;
