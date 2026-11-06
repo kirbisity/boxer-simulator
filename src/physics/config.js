@@ -1218,7 +1218,10 @@ export const WORLD = {
     // `heartDepth`: a horse's heart and great vessels lie under ~20 cm of chest muscle and breastbone, a man's under ~5: a point
     // must go about this many times as deep, so needs about as many times a man's `lethalPierce` (work against the tissue grows
     // with the depth it goes).
-    horse: { manBlood: 75, heartSeconds: 10, heartDepth: 4, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
+    // `bleedShare`: a horse's wounds bleed this share of what the same wound costs a man for its blood (set slower for play, the
+    // user's call 2026-11-06: a horse's thick hide and the muscle over its vessels close a wound's mouth; horses ran on with many
+    // wounds), and a heart or great vessel opened drops it in `heartSeconds`.
+    horse: { manBlood: 75, bleedShare: 0.3, heartSeconds: 30, heartDepth: 4, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
     brace: { length: 1.5, still: 0.5, share: 0.5 },
     crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },

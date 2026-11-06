@@ -1369,7 +1369,7 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
 export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, attacker = null) {
   // (A robot dog: its own limits, and no blood: robotdogs.js `harm`, `machine`.)
   const spec = { ...WORLD.mount.horse, ...horse.spec?.harm };
-  const share = horse.spec?.machine ? 0 : spec.manBlood / horse.mass;
+  const share = horse.spec?.machine ? 0 : (spec.manBlood / horse.mass) * spec.bleedShare;
   const zone = capsule.part === 'legs' ? 'limb' : capsule.part === 'head' ? 'head' : 'trunk';
   const bleed = (bleedRate('cut', cut, zone) + bleedRate('pierce', pierce, zone)) * share;
   horse.bleed += bleed;
