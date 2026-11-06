@@ -71,7 +71,8 @@ export const MAIMING = {
   // man, not his height): the leg's shock carries that. More of him gone, more shock. (Calibrated, tools/maiming.js:
   // about half of a middling unit's men break at once, more of a levy's, fewer of an elite's.)
   // (A fifth more across the board, 2026-11-05: a little more likely to break and crawl off than the first tuning.)
-  shock: { wrist: 0.48, elbow: 0.54, shoulder: 0.6, ankle: 0.84, knee: 1.02, hip: 1.2 },
+  // (The legs' a sixth less again, 2026-11-05: a leg lost frightened near every mid-tier man off once health fell with it.)
+  shock: { wrist: 0.48, elbow: 0.54, shoulder: 0.6, ankle: 0.71, knee: 0.87, hip: 1.02 },
   shockHalfLife: 25,
   // Of the shock, the share his training takes off at full skill (a veteran has seen it; his kit's courage and his side's
   // discipline already steady him in the fear model, so this is the smaller part).
