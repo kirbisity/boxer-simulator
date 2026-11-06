@@ -643,7 +643,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   }
 
   // Under a helmet: no hair, and no locks swinging through the steel; the
-  // beard too, unless the helmet leaves the face open (`beard`).
+  // beard too, unless the helmet leaves the face open (`beard`). Returns the meshes hidden.
   let hidden = null;
   function hideHair({ beard = false } = {}) {
     hidden = { meshes: [], dangles: dangles.slice(), face: [] };
@@ -655,6 +655,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     });
     dangles.length = 0;
     if (hairSwing) hairSwing.enabled = false;
+    return hidden.meshes;
   }
   // The helmet knocked off (physics.js knockHelmetOff): the hair it hid shows again, and swings.
   function showHair() {

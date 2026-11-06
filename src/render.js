@@ -34,7 +34,7 @@ import { HELM_HEAD_BREADTH, HELM_SPAN } from './helmforms.js';
 import { photoFaceFor } from './photoface.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
-import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, simplifyTemplate, stretchedInverses } from './crowdview.js';
+import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, HEAD_VARIANT, onlyVariant, simplifyTemplate, stretchedInverses, withoutVariant } from './crowdview.js';
 import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
@@ -2077,7 +2077,15 @@ function detailedView(view, fighter, simple) {
     const widen = headgear.fitted && headView.breadth > HELM_HEAD_BREADTH ? headView.breadth / HELM_HEAD_BREADTH : 1;
     headgear.group.scale.set(spanX, spanY, spanZ * widen);
     headView.group.add(headgear.group);
-    if (headgear.hidesHair) headView.hideHair({ beard: headgear.showsBeard });
+    const hidden = headgear.hidesHair ? headView.hideHair({ beard: headgear.showsBeard }) : [];
+    // A crowd template is baked with both heads (crowdview.js HEAD_VARIANT): the helmet, and the hair it hides, each marked.
+    if (simple) {
+      headVariant(headgear.group, 'helmed');
+      for (const mesh of hidden) {
+        mesh.visible = true;
+        mesh.userData.crowdVariant = 'bare';
+      }
+    }
   }
   const dangles = [];
   // Headgear: worn on the head, and a loose copy for when it is knocked off.
@@ -2101,7 +2109,9 @@ function detailedView(view, fighter, simple) {
   dangles.push(...buildSwinging(body, dress, collar, hips, corner));
   // Long hair down the back hangs from the upper back (unless a helmet hides the hair).
   // Soft (chains of links) for a fighter drawn in full; one rigid sheet for a crowd.
+  // (A crowd template hangs it under a helmet too, to be drawn once the helmet is knocked off.)
   if (!headgear?.hidesHair) for (const curtain of headView.curtains ?? []) dangles.push(...(simple ? [hairCurtain(collar, headView.hairMaterial, body.lengths.headRadius, curtain)] : hairCurtainSoft(collar, headView.hairMaterial, body.lengths.headRadius, curtain)));
+  else if (simple) for (const curtain of headView.curtains ?? []) headVariant(hairCurtain(collar, headView.hairMaterial, body.lengths.headRadius, curtain).group, 'bare');
   if (dress.armor?.backPrint) collar.add(buildBackPrint(body, dress.armor.backPrint));
   if (dress.armor?.backBox) collar.add(buildBackBox(body, garmentColors));
   // A breathing set on the back (a design's `airPack`: wardrobe.js buildAirPack), under a fire-entry suit its hump.
@@ -2173,6 +2183,13 @@ function detailedView(view, fighter, simple) {
   };
   if (later) queueSkin(fighterView, wanted);
   return fighterView;
+}
+
+/** Every mesh under `root` marked as drawn with one head of a crowd template's two (crowdview.js HEAD_VARIANT). */
+function headVariant(root, variant) {
+  root.traverse((object) => {
+    if (object.isMesh) object.userData.crowdVariant = variant;
+  });
 }
 
 // ---- The skin, built in slices -------------------------------------------------------------------
@@ -2652,14 +2669,33 @@ function bakeCrowdTemplate(view, fighter) {
     bodyOutlineIndex: join(Uint32Array, full.skinMesh.geometry.index.array, after(baked.outlined.body)),
     steelOutlineIndex: join(Uint32Array, full.steelMesh?.geometry.index.array ?? [], after(baked.outlined.steel)),
     vertexSegment: [...full.vertexSegment, ...new Array(added).fill(null)],
+    variant: join(Uint8Array, new Uint8Array(own), baked.variant),
     frames,
     headRadius: fighter.body.lengths.headRadius,
     lacquer: full.lacquer,
     vertices: own + added,
   };
   template.far = farTemplate(template);
+  splitHeads(template);
+  splitHeads(template.far);
   disposeFighterView(view, full);
   return template;
+}
+
+const TEMPLATE_INDICES = ['bodyIndex', 'steelIndex', 'bodyOutlineIndex', 'steelOutlineIndex'];
+
+/**
+ * A template baked with both heads (HEAD_VARIANT): its indices drawn helmed, and apart (`bare`) the triangles a man shows
+ * once his helmet is knocked off (bareCrowdHead). A template with no helmet has none.
+ */
+function splitHeads(template) {
+  template.bare = null;
+  if (!template.variant?.some((variant) => variant !== HEAD_VARIANT.always)) return;
+  template.bare = {};
+  for (const name of TEMPLATE_INDICES) {
+    template.bare[name] = onlyVariant(template[name], template.variant, HEAD_VARIANT.bare);
+    template[name] = withoutVariant(template[name], template.variant, HEAD_VARIANT.bare);
+  }
 }
 
 /** The template's far body (see simplifyTemplate), as GPU attributes shared by every man who uses it. */
@@ -2667,7 +2703,12 @@ function farTemplate(template) {
   const { position, normal, skinIndex, skinWeight, ...rest } = simplifyTemplate(template);
   // Far, the steel can be drawn as part of the skin's mesh (one draw call fewer a man), dull in place of shining.
   if (!CROWD_VIEW.farSteelApart) {
-    const joined = (a, b) => Uint32Array.from([...a, ...b]);
+    const joined = (a, b) => {
+      const both = new Uint32Array(a.length + b.length);
+      both.set(a);
+      both.set(b, a.length);
+      return both;
+    };
     rest.bodyIndex = joined(rest.bodyIndex, rest.steelIndex);
     rest.bodyOutlineIndex = joined(rest.bodyOutlineIndex, rest.steelOutlineIndex);
     rest.steelIndex = new Uint32Array(0);
@@ -2742,7 +2783,7 @@ function crowdView(view, fighter, template) {
       steelOutline = inked(steelGeometry, source.steelOutlineIndex);
       steel.userData.ink = steelOutline;
     }
-    return { mesh, outline, steel, steelOutline, baseColors: source.colors, vertexSegment: source.vertexSegment };
+    return { mesh, outline, steel, steelOutline, baseColors: source.colors, vertexSegment: source.vertexSegment, source };
   };
   const near = bodyOf(template);
   const { mesh: skinMesh, outline: skinOutline, steel: steelMesh } = near;
@@ -2802,7 +2843,42 @@ function crowdView(view, fighter, template) {
     fighter, group, layers, bones, built: { bindFrames: template.frames }, skinMesh, skinOutline, muscle: null, skeleton: boneGroups, attachments, shells: [], near, far,
     baseColors: template.colors, vertexSegment: template.vertexSegment, damageVersion: -1, headProps, dangles: [], steelMesh,
     head: { group: headGroup, shell: { dent() {} }, update() {}, hideHair() {} }, layer: 'skin', frames, baked: true, banner,
+    // Drawn bare-headed (bareCrowdHead): his helmet knocked off.
+    bareHead: false,
   };
+}
+
+/**
+ * A crowd man's helmet knocked off: his own indices (near and far) lose the helmet's triangles and gain the hair, beard
+ * and long hair it hid, both baked into his template (splitHeads); nothing baked or built on the frame. False if his
+ * template has no second head (drawn again in full then: main.js).
+ */
+export function bareCrowdHead(fighterView) {
+  if (!fighterView.baked) return false;
+  if (fighterView.bareHead) return true;
+  const bodies = [fighterView.near, fighterView.far].filter(Boolean);
+  if (!bodies.length || !bodies.every((body) => body.source.bare)) return false;
+  // (A head cut off took its helmet with it: nothing to show in its place.)
+  const headOn = !fighterView.headDetached;
+  for (const { mesh, steel, source } of bodies) {
+    for (const [part, own, ink] of [[mesh, 'bodyIndex', 'bodyOutlineIndex'], [steel, 'steelIndex', 'steelOutlineIndex']]) {
+      if (!part) continue;
+      bareIndex(part.geometry, source, headOn ? source.bare[own] : []);
+      const inked = part.userData.ink?.geometry;
+      if (inked && inked !== part.geometry) bareIndex(inked, source, headOn ? source.bare[ink] : []);
+    }
+  }
+  fighterView.bareHead = true;
+  return true;
+}
+
+/** A geometry's index (as he is drawn now: a part cut off stays off) without the helmet, with `bare` added. */
+function bareIndex(geometry, source, bare) {
+  const kept = withoutVariant(geometry.index.array, source.variant, HEAD_VARIANT.helmed);
+  const index = new Uint32Array(kept.length + bare.length);
+  index.set(kept);
+  index.set(bare, kept.length);
+  geometry.setIndex(new THREE.BufferAttribute(index, 1));
 }
 
 // A simple character (a crowd of them) draws its ink outline only round the

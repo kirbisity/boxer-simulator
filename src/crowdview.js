@@ -75,13 +75,45 @@ export function crowdKey(fighter) {
 }
 
 /**
+ * A crowd man's head is baked both ways: his helmet, and the hair (and beard, and long hair down the back) it hides. A man
+ * shows one or the other by his own index (render.js crowdView, bareCrowdHead), so a helmet knocked off mid-fight is a new
+ * index, not a new template baked (9-26 ms on the frame it fell in).
+ */
+export const HEAD_VARIANT = { always: 0, helmed: 1, bare: 2 };
+
+/** The triangles of `indices` (a flat index) whose vertices are not of `variant` (`vertexVariant`: each vertex's HEAD_VARIANT). */
+export function withoutVariant(indices, vertexVariant, variant) {
+  return keepTriangles(indices, (vertex) => vertexVariant[vertex] !== variant);
+}
+
+/** The triangles of `indices` drawn only with `variant`. */
+export function onlyVariant(indices, vertexVariant, variant) {
+  return keepTriangles(indices, (vertex) => vertexVariant[vertex] === variant);
+}
+
+/** (A triangle's vertices all come from one mesh, so one has the variant of all three.) */
+function keepTriangles(indices, keep) {
+  const kept = new Uint32Array(indices.length);
+  let length = 0;
+  for (let corner = 0; corner + 2 < indices.length; corner += 3) {
+    if (!keep(indices[corner])) continue;
+    kept[length] = indices[corner];
+    kept[length + 1] = indices[corner + 1];
+    kept[length + 2] = indices[corner + 2];
+    length += 3;
+  }
+  return kept.slice(0, length);
+}
+
+/**
  * Bake visible meshes into skinned vertices. `pieces` are {root, bone}: each
  * root already placed at the bind pose. Ink outlines, skinned meshes,
  * textured and see-through pieces are left alone (returned as `kept`).
- * @returns {{ positions, normals, colors, skinIndex, body: number[], steel: number[], outlined: { body, steel }, baked: Mesh[] }}
+ * Each vertex keeps its mesh's head variant (`userData.crowdVariant`, see HEAD_VARIANT): drawn only helmed, only bare, or always.
+ * @returns {{ positions, normals, colors, skinIndex, variant: number[], body: number[], steel: number[], outlined: { body, steel }, baked: Mesh[] }}
  */
 export function bakePieces(pieces) {
-  const out = { positions: [], normals: [], colors: [], skinIndex: [], body: [], steel: [], outlined: { body: [], steel: [] }, baked: [] };
+  const out = { positions: [], normals: [], colors: [], skinIndex: [], variant: [], body: [], steel: [], outlined: { body: [], steel: [] }, baked: [] };
   const vertex = new THREE.Vector3();
   const normal = new THREE.Vector3();
   const normalMatrix = new THREE.Matrix3();
@@ -106,6 +138,7 @@ export function bakePieces(pieces) {
       if (inked) targets.push(steel ? out.outlined.steel : out.outlined.body);
       // A cloth seen from both sides is baked twice, the back facing out.
       const sides = material.side === THREE.DoubleSide ? [1, -1] : [1];
+      const variant = HEAD_VARIANT[mesh.userData.crowdVariant] ?? HEAD_VARIANT.always;
       for (const facing of sides) {
         const base = out.positions.length / 3;
         for (let index = 0; index < positions.count; index += 1) {
@@ -118,6 +151,7 @@ export function bakePieces(pieces) {
           out.normals.push(normal.x, normal.y, normal.z);
           out.colors.push(color.r, color.g, color.b);
           out.skinIndex.push(bone);
+          out.variant.push(variant);
         }
         const flip = mirrored !== (facing < 0);
         for (let corner = 0; corner + 2 < indices.length; corner += 3) {
@@ -146,6 +180,7 @@ export function simplifyTemplate(template, { cell = CROWD_VIEW.farCell, colorSte
   const skinIndex = template.attributes.skinIndex.array;
   const skinWeight = template.attributes.skinWeight.array;
   const colors = template.colors;
+  const variant = template.variant ?? null;
   const count = position.length / 3;
   const clusterOf = new Uint32Array(count);
   const keys = new Map();
@@ -165,6 +200,8 @@ export function simplifyTemplate(template, { cell = CROWD_VIEW.farCell, colorSte
     key = key * 32 + skinIndex[vertex * 4];
     for (let axis = 0; axis < 3; axis += 1) key = key * colorLevels + Math.min(colorLevels - 1, Math.floor(colors[vertex * 3 + axis] / colorStep));
     key = key * 8 + facing;
+    // A helmet's vertex and the hair under it never merge: each must go with its own head.
+    key = key * 3 + (variant ? variant[vertex] : 0);
     let cluster = keys.get(key);
     if (cluster === undefined) {
       cluster = first.length;
@@ -241,6 +278,7 @@ export function simplifyTemplate(template, { cell = CROWD_VIEW.farCell, colorSte
     bodyOutlineIndex: remap(template.bodyOutlineIndex),
     steelOutlineIndex: remap(template.steelOutlineIndex),
     vertexSegment: out.vertexSegment,
+    variant: variant ? Uint8Array.from(first, (vertex) => variant[vertex]) : null,
     vertices: total,
   };
 }

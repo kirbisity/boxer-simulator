@@ -46,7 +46,7 @@ import { updateNets } from './arenaview.js';
 import { blastEvent, createBlastScreen, fragmentEvent, updateThrown } from './blastview.js';
 import { DETAIL_MAPS } from './detailmaps.js';
 import { setHelmStyle } from './helmstyle.js';
-import { BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray, warmSevered } from './render.js';
+import { bareCrowdHead, BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray, warmSevered } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { placeMounted } from './physics/mounted.js';
 import { boltedOn, breedOf, canRide, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
@@ -1331,9 +1331,13 @@ function consumeEvents() {
     if (event.kind === 'fragment') fragmentEvent(scene, machine ? { ...event, harm: 0, plate: true } : event);
     if (event.kind === 'arrow') (event.bounced ? spawnSparks(scene, event.point, 7) : wound(scene, event));
     if (event.kind === 'bladeBlock') (event.cut > 1 ? wound : (view, at) => spawnSparks(view, at.point, 18))(scene, event);
-    // A helmet knocked off a man drawn as one of a crowd: it is baked into his body, so he is drawn again bare-headed
-    // (render.js updateProps throws a copy of it; a man drawn in full has his own lifted off).
-    if (event.kind === 'accessory' && event.helmet && state.views.find((entry) => entry.fighter.id === event.fighter)?.baked) rebuildFighterView(event.fighter);
+    // A helmet knocked off a man drawn as one of a crowd: it is baked into his body, beside the hair it hid, so his own index
+    // swaps one for the other (render.js bareCrowdHead: no template baked mid-fight). updateProps throws a copy of it; a man
+    // drawn in full has his own lifted off. (Built again only if his template has no second head.)
+    if (event.kind === 'accessory' && event.helmet) {
+      const view = state.views.find((entry) => entry.fighter.id === event.fighter);
+      if (view?.baked && !bareCrowdHead(view)) rebuildFighterView(event.fighter);
+    }
     if (event.kind === 'severed') {
       const view = state.views.find((entry) => entry.fighter.id === event.fighter);
       if (view) severView(scene, view, event, state.world.debris[event.debris]);
