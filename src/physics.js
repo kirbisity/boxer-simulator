@@ -7079,11 +7079,26 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
   }
 }
 
-/** How much a striking face of radius `face` (m) hurts the tissue under it over its speed change (WORLD.contactStress): 1 for none given. */
-export function contactStress(face) {
-  const spec = WORLD.contactStress;
+/**
+ * Whether a weapon strikes with a blunt head (a mace, a club, a hammer, a bat, a baton, a staff): every stroke of it more blunt than
+ * edge and point (a spear swung is its shaft, and it is a point; a sword's flat is a blade's), and made to strike so: not a gun or
+ * a bow swung for want of better, nor a standard's pole or a whip's lash, unless it has an iron head on it to crush with (`crush`:
+ * the three-eyed gun's barrels, the arm shotgun's mace).
+ */
+export function bluntHeaded(wspec) {
+  const strokes = Object.values(wspec.harm ?? {});
+  if (!strokes.length || !strokes.every((mix) => (mix.blunt ?? 0) > (mix.cut ?? 0) + (mix.pierce ?? 0))) return false;
+  return wspec.crush !== undefined || !(wspec.ranged || wspec.flag || wspec.rope);
+}
+
+/**
+ * How much a striking face of radius `face` (m) hurts the tissue under it (WORLD.contactStress), over what a face of radius
+ * `reference` did where the measure was set: the glove's for the speed change, the pendulum's for a head's crush
+ * (BLADES.crushFace). 1 for none given or a broader face; at most `most`.
+ */
+export function contactStress(face, reference = WORLD.contactStress.radius) {
   if (!(face > 0)) return 1;
-  return Math.min(spec.most, Math.max(1, Math.sqrt(spec.radius / face)));
+  return Math.min(WORLD.contactStress.most, Math.max(1, Math.sqrt(reference / face)));
 }
 
 /**
@@ -7505,8 +7520,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   if (capsule.key === 'head') cutOffHeadgear(world, defender, event, energy * mix.cut, contactPoint);
   const concentration = Math.sqrt(WORLD.contactSeconds / contactSeconds);
   // (A blunt head's face: a club's, a mace's; an edge's flat or a haft is no striking face of its own.)
-  const face = !haft && mix.blunt >= mix.cut + mix.pierce ? wspec.radius : null;
-  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass: partMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration, crushing: energy * bluntShare * BLADES.crushTrauma, face });
+  const face = !haft && mix.blunt >= mix.cut + mix.pierce ? wspec.face ?? wspec.radius : null;
+  // What its head crushes under it (BLADES.crushTrauma), by how its face presses in against the pendulum's (BLADES.crushFace):
+  // a blunt weapon's head (bluntHeaded: a mace, a club, a hammer, a bat); a blade's flat or a spear's shaft crushes as before.
+  const crushing = energy * bluntShare * BLADES.crushTrauma * (bluntHeaded(wspec) ? contactStress(face, BLADES.crushFace) : 1);
+  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass: partMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration, crushing, face });
   if (glanced) {
     // Off the plate: the blade is turned along it.
     const across = vec.sub(relative, vec.scale(normal, vec.dot(relative, normal)));
