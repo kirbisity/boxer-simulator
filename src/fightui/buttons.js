@@ -54,7 +54,7 @@ export function fightUiActionButtons(root, kit, hooks) {
     const now = hooks.now();
     const again = now - button.pressedAt < FIGHT_UI.againWithin;
     button.pressedAt = now;
-    kit.throwMove(entry, fightUiZoneOf(entry), entry.side, button.element, { again });
+    kit.throwMove(entry, fightUiZoneOf(entry), kit.screenSide(entry.side), button.element, { again });
     fightUiFlash(button.element, 'asked', fightUiColour(entry.group));
     button.next = (button.next + 1) % button.group.moves.length;
     show(button);

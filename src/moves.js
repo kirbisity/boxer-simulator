@@ -2155,3 +2155,120 @@ export function moveRange(move, body, weapon = null) {
   if (move.reach === 'close') return body.reach * 0.95;
   return body.reach * 1.3;
 }
+
+// ---- The player's blows from either side (the tap on his man: fightui/logic.js) ----
+//
+// A tap on the left or the right of his man is a blow from that side, whatever the weapon. A style's swings mostly come
+// from one side (a right-hander's forehand); the other side's are made here as data, each the mirror of one he has: the
+// hand's path and the blade's line turned over across his middle (local z), and the trunk's turn the other way (`twist`).
+// The same hand makes it (a backhand: the sword arm comes across), the empty hands the other's (a right hook for the left).
+// A style that only thrusts (a pike, a dagger, a trident) gets the thrust made from out on either side, angled in at him.
+// These are the player's only: the AI keeps its own (`attacks`), so its fights are as they were.
+
+export const TAP_SIDES = {
+  // A swing whose hand crosses less than this (share of height) is straight down the middle (an overhead cut).
+  lateral: 0.12,
+  // A thrust angled in from a side: its hand that far out (share of height), its point turned in by this much.
+  angledHand: 0.2,
+  angledIn: 0.45,
+  // A backhand brings the weapon arm across the body before it can swing: its wind-up is this much (s) longer.
+  backhandWindup: 0.1,
+  // The empty-handed paths that come round from the striking limb's side; those that go straight in or up are the middle's.
+  limbPaths: new Set(['hook', 'swipe', 'elbow', 'roundhouse', 'club']),
+  // A weapon that only swings (a mace, a club, a war hammer's head): a short jab straight in with its head, for a tap on
+  // the middle of him. A whip has none (its thong cannot be driven).
+  jab: { kind: 'strike', path: 'blade', mode: 'thrust', tapName: ['Jab', 'with the head'], from: { hand: [0.1, 0.62, 0.1], dir: [1, 0.1, 0] }, windup: 0.1, extendUntil: 0.32, duration: 0.6, twist: 0.45, lean: 0.14, shift: 0.08, depth: 0.15, step: 1.2, cost: 0.022, extendShare: 0.7, mass: { arm: 0.6, body: 0.04 }, rotation: 0.6, zones: ['body', 'head'], reach: 'weapon' },
+  noJab: new Set(['whip']),
+};
+
+/**
+ * The side a blow comes from, in his frame: +1 his +z side, −1 his −z, 0 down the middle. (Seen from behind him, as the
+ * follow camera sees him, +z is the screen's right.) A swing comes from where it starts, across to where it ends; a
+ * hook or a kick round from the limb's own side; a thrust (but an angled one), a straight blow, an uppercut down the middle.
+ */
+export function blowSide(spec) {
+  if (!spec || spec.kind !== 'strike') return 0;
+  if (spec.path === 'blade') {
+    if (spec.mode === 'thrust' || !spec.to) return spec.angled ?? 0;
+    const across = spec.from.hand[2] - spec.to.hand[2];
+    return Math.abs(across) < TAP_SIDES.lateral ? 0 : Math.sign(across);
+  }
+  if (TAP_SIDES.limbPaths.has(spec.path)) return spec.limb?.[0] === 'l' ? 1 : -1;
+  return 0;
+}
+
+const tapFlip = (v) => v && [v[0], v[1], -v[2]];
+
+/** A blow turned over across his middle: a weapon's in the same hand (its path and line mirrored), an empty hand's in the other. */
+function tapMirror(name, spec) {
+  const change = { mirrorOf: name, twist: -(spec.twist ?? 0) };
+  if (spec.turn !== undefined) change.turn = -spec.turn;
+  if (spec.path !== 'blade') return { ...spec, ...change, limb: spec.limb.replace(/^[lr]/, (side) => (side === 'l' ? 'r' : 'l')) };
+  const place = (at) => at && { ...at, hand: tapFlip(at.hand), dir: tapFlip(at.dir) };
+  const mirror = { ...spec, ...change, from: place(spec.from), to: place(spec.to), mid: tapFlip(spec.mid), counterArm: tapFlip(spec.counterArm) };
+  // (Across from the hand's own side: a backhand, the arm brought over first.)
+  if (blowSide(mirror) === (spec.limb[0] === 'l' ? -1 : 1)) {
+    const more = TAP_SIDES.backhandWindup;
+    Object.assign(mirror, { windup: spec.windup + more, extendUntil: spec.extendUntil + more, duration: spec.duration + more });
+  }
+  return mirror;
+}
+
+/** A thrust made from out on one side (`side`, his frame) and angled in at him. */
+function tapAngled(name, spec, side) {
+  const [x, y] = spec.from.hand;
+  const [dx, dy] = spec.from.dir;
+  const dir = [dx, dy, -side * TAP_SIDES.angledIn * Math.hypot(dx, dy)];
+  return { ...spec, mirrorOf: name, angled: side, from: { ...spec.from, hand: [x, y, side * TAP_SIDES.angledHand], dir } };
+}
+
+/** Whether a style's blow `a` already has its fellow from the other side in `b` (the same path, about the same heights). */
+function tapFellows(a, b) {
+  if (a.path !== b.path || blowSide(b) !== -blowSide(a)) return false;
+  if (a.path !== 'blade') return a.zones.join() === b.zones.join() && (a.limb.endsWith('Hand') === b.limb.endsWith('Hand'));
+  // (Two blades: the other hand's cut from the other side is its fellow, as the wakizashi's is the katana's.)
+  return a.mode === b.mode && Math.abs(a.from.hand[1] - b.from.hand[1]) < 0.12 && Math.abs(a.to.hand[1] - b.to.hand[1]) < 0.15;
+}
+
+/** The player's extra blows for each style (names in MOVES), made once. */
+export const TAP_MOVES = {};
+for (const [key, style] of Object.entries(STYLES)) {
+  const own = Object.keys(style.attacks ?? {}).filter((name) => MOVES[name]?.kind === 'strike' && !MOVES[name].art && !MOVES[name].with && !MOVES[name].bash && !MOVES[name].push);
+  const added = [];
+  const has = () => [...own, ...added].map((name) => MOVES[name]);
+  for (const name of own) {
+    const spec = MOVES[name];
+    if (!blowSide(spec) || has().some((other) => tapFellows(spec, other))) continue;
+    // An empty hand's fellow may be a move already made (a rear hook for the hook, a left club for the right).
+    const made = Object.keys(MOVES).find((other) => !MOVES[other].art && MOVES[other].kind === 'strike' && !MOVES[other].mirrorOf && tapFellows(spec, MOVES[other]) && spec.path !== 'blade');
+    const mirror = made ?? `${name}Mirror`;
+    if (!made) MOVES[mirror] ??= tapMirror(name, spec);
+    added.push(mirror);
+  }
+  // Nothing from the sides at his body, or at his head: the thrust he has (that reaches there), angled in from each.
+  const bare = (zone) => !has().some((spec) => blowSide(spec) && spec.zones.includes(zone));
+  const thrusts = own.filter((name) => MOVES[name].path === 'blade' && MOVES[name].mode === 'thrust' && !MOVES[name].couched && !MOVES[name].hilt);
+  const angledFor = new Set(['body', 'head'].filter(bare).map((zone) => thrusts.find((name) => MOVES[name].zones.includes(zone))).filter(Boolean));
+  for (const thrust of angledFor) {
+    for (const side of [1, -1]) {
+      const angled = `${thrust}${side > 0 ? 'Plus' : 'Minus'}`;
+      MOVES[angled] ??= tapAngled(thrust, MOVES[thrust], side);
+      added.push(angled);
+    }
+  }
+  // Only swings, nothing straight in at his body: a jab with the weapon's head, in the hand that swings it.
+  const swing = own.find((name) => MOVES[name].path === 'blade' && MOVES[name].mode === 'swing');
+  const straight = has().some((spec) => !blowSide(spec) && spec.zones.includes('body') && (spec.mode === 'thrust' || ['straight', 'pushBoth', 'teep'].includes(spec.path)));
+  if (swing && !straight && !TAP_SIDES.noJab.has(style.weapon)) {
+    const { limb, grip } = MOVES[swing];
+    const jab = `tapJab${limb[0] === 'l' ? 'Left' : ''}${grip === 'two' ? 'Two' : ''}`;
+    const made = { ...TAP_SIDES.jab, limb, grip };
+    if (limb[0] === 'r') Object.assign(made, { twist: -made.twist, from: { ...made.from, hand: tapFlip(made.from.hand) } });
+    MOVES[jab] ??= made;
+    added.push(jab);
+  }
+  if (added.length) TAP_MOVES[key] = added;
+}
+
+/** Every blow the player can tap with a style: its own attacks and the ones from the other side made for him. */
+export const tapAttacks = (styleKey) => [...Object.keys(STYLES[styleKey]?.attacks ?? {}), ...(TAP_MOVES[styleKey] ?? [])];

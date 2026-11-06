@@ -6,7 +6,7 @@
 
 import { P } from './body.js';
 import { AI, chooseDefence } from './ai.js';
-import { DEFENCES, MOVES, pointRoomOf, STYLES, moveRange } from './moves.js';
+import { blowSide, DEFENCES, MOVES, pointRoomOf, STYLES, moveRange, tapAttacks } from './moves.js';
 import { aimPoint, BLOCKS, dropWeapon, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
 import { dismount, dismountReady, horseToMount, mountHorse } from './physics/mounted.js';
 import { throwFromHold } from './physics/grappling.js';
@@ -88,6 +88,9 @@ export const CONTROL = {
   // A pad attack goes at his man within its reach (m more for each unit of a lunge's step, and this slack), else at the air.
   padStepReach: 0.5,
   padSlack: 0.3,
+  // A pad blow from a side (moves.js blowSide): the trunk wound this share of its turn back into that side first (the wind-up
+  // turns him to where the blow comes from, so it is seen; physics/arts.js coiledTwist), then turned through.
+  padCoil: 0.5,
   // An aimed attack: a man this far (m) past his reach is lunged at; a point this high on his own
   // body (share of the shoulder's height) or higher is high, below this share of the hip's, low.
   lungeBeyond: 0.35,
@@ -416,11 +419,14 @@ function rideStick(world, fighter, orders, stick, opponent, dt) {
 // ---- The attack pad ----------------------------------------------------------
 //
 // Every attack of a style has its own place on the screen, where it would be
-// seen to come from by a man behind the fighter: a jab on the left, a cross
-// on the right, a hook out wide, an uppercut from below, kicks low on their
-// side, a cut from wherever its swing starts, a thrust down the middle. A tap
-// throws the move whose place is nearest (screen x right and y up, −1 to 1
-// from the centre), so every move a style has can be thrown.
+// seen to come from by a man behind the fighter: a straight on its hand's
+// side, a hook out wide, an uppercut from below, kicks low on their side, a
+// cut from wherever its swing starts, a thrust down the middle. A tap throws
+// the move whose place is nearest (screen x right and y up, −1 to 1 from the
+// centre), so every move a style has can be thrown. (Seen from behind him, as
+// the follow camera stands, his +z side is the screen's right: the camera's
+// right is +z when it looks down +x. So his lead (left-named, +z) hand's jab
+// is on the right, the sword hand's forehand cut comes from the left.)
 
 export const ATTACK_PAD = {
   // Places by the way a move travels: [x for the right side (mirrored for the left), y].
@@ -433,6 +439,7 @@ export const ATTACK_PAD = {
   swingHeight: 3,
   swingMiddle: 0.65,
   thrust: [0, 0.05],
+  angled: 0.55,
   rush: [0, -0.92],
   // Places nearer than this are spread apart so that each keeps a patch of its own.
   apart: 0.32,
@@ -447,11 +454,12 @@ const clampPad = (value) => Math.max(-0.95, Math.min(0.95, value));
 function padPlace(spec) {
   if (spec.kind === 'rush') return [...ATTACK_PAD.rush];
   if (spec.kind !== 'strike') return null;
-  const side = spec.limb?.[0] === 'l' ? -1 : 1;
+  const side = spec.limb?.[0] === 'l' ? 1 : -1;
   if (spec.path === 'blade') {
-    if (spec.mode === 'thrust' || !spec.from) return [...ATTACK_PAD.thrust];
-    // Local z is to his left: the right of the screen is −z.
-    return [clampPad(-spec.from.hand[2] * ATTACK_PAD.swingSide), clampPad((spec.from.hand[1] - ATTACK_PAD.swingMiddle) * ATTACK_PAD.swingHeight)];
+    // (A thrust angled in from a side, moves.js tapAngled: on that side of the middle.)
+    if (spec.mode === 'thrust' || !spec.from) return [ATTACK_PAD.thrust[0] + (spec.angled ?? 0) * ATTACK_PAD.angled, ATTACK_PAD.thrust[1]];
+    // Seen from behind him, +z is the screen's right.
+    return [clampPad(spec.from.hand[2] * ATTACK_PAD.swingSide), clampPad((spec.from.hand[1] - ATTACK_PAD.swingMiddle) * ATTACK_PAD.swingHeight)];
   }
   if (spec.path === 'roundhouse') {
     const [x, y] = spec.zones.length === 1 && spec.zones[0] === 'legs' ? ATTACK_PAD.lowKick : ATTACK_PAD.kick;
@@ -465,7 +473,9 @@ function padPlace(spec) {
 export function attackLayout(styleKey) {
   const style = STYLES[styleKey];
   const pad = [];
-  for (const name of Object.keys(style?.attacks ?? {})) {
+  if (!style) return pad;
+  // (With the blows from the other side made for the player: moves.js tapAttacks.)
+  for (const name of tapAttacks(styleKey)) {
     const spec = MOVES[name];
     const place = spec ? padPlace(spec) : null;
     if (!place) continue;
@@ -536,8 +546,30 @@ export const MOVE_NAMES = {
 export function moveName(key) {
   const named = MOVE_NAMES[key];
   if (named) return { name: named[0], gloss: named[1] ?? '' };
+  // A blow made for the player from the other side (moves.js): its own's name, and which way it comes.
+  const spec = MOVES[key];
+  if (spec?.tapName) return { name: spec.tapName[0], gloss: spec.tapName[1] ?? '' };
+  if (spec?.mirrorOf) return { name: mirrorName(spec, moveName(spec.mirrorOf).name), gloss: mirrorGloss(spec) };
   const words = String(key).replace(/([A-Z])/g, ' $1').toLowerCase();
   return { name: words[0].toUpperCase() + words.slice(1), gloss: '' };
+}
+
+/**
+ * The name of a blow made from the other side, as the word beside the man shows it: an angled thrust keeps its own; a
+ * swing from the other side is the reverse of its own (a forehand's is the backhand); an empty hand's or foot's the switch.
+ */
+function mirrorName(spec, own) {
+  if (spec.angled) return own;
+  if (spec.path !== 'blade') return `Switch ${own.toLowerCase()}`;
+  return own === 'Forehand' ? 'Backhand' : `Reverse ${own.toLowerCase()}`;
+}
+
+/** How a blow made from the other side is called: an angled thrust, a backhand (the hand comes across), or from the other side. */
+function mirrorGloss(spec) {
+  if (spec.angled) return 'angled in';
+  if (spec.path !== 'blade') return 'other side';
+  const own = spec.limb?.[0] === 'l' ? 1 : -1;
+  return blowSide(spec) === -own ? 'backhand' : 'other side';
 }
 
 /** Where an attack goes, in words: its height (by zone) and its side on the pad (x −1 to 1): { height, side, arrow }. */
@@ -860,7 +892,9 @@ function padAttack(world, fighter, request, opponent) {
   if (opponent && !hostile(opponent, fighter)) fighter.faceAt = { at: point(opponent.x, P.pelvis), until: world.time + CONTROL.faceSeconds };
   // (He is thrown at as the place he is: throwPunch's own man is an enemy.)
   if (!at && spec.kind === 'strike' && opponent && !hostile(opponent, fighter)) at = aimPoint(opponent, request.zone);
-  const thrown = spec.kind === 'strike' ? throwPunch(world, fighter, request.move, request.zone, { at }) : throwPunch(world, fighter, request.move);
+  // A blow from a side is wound up into that side first (CONTROL.padCoil), so that the player sees where it comes from.
+  const coil = blowSide(spec) && !spec.coil ? CONTROL.padCoil : 0;
+  const thrown = spec.kind === 'strike' ? throwPunch(world, fighter, request.move, request.zone, { at, coil }) : throwPunch(world, fighter, request.move);
   if (thrown) {
     fighter.orderCombo = combo;
     fighter.orderComboZone = request.zone;

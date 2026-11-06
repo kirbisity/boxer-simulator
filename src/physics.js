@@ -1961,7 +1961,7 @@ function couchedNear(world, fighter, punch) {
  * Throw a strike (any attack in MOVES) at the opponent. The zone defaults to
  * the move's first. Returns false if the fighter cannot throw it now.
  */
-export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null, riposte = false } = {}) {
+export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null, riposte = false, coil = 0 } = {}) {
   const spec = MOVES[type];
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
   // Thrown at a place (`at`, the player's aim): at whoever stands there, or at the empty air.
@@ -2017,6 +2017,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     weak: undefined,
     // Beaten through a lighter blade's parry (beatenThrough): the share of its speed it kept, the mass behind it so much less.
     beaten: undefined,
+    // The share of its turn the trunk is wound back first (`coil`: a weapon art's, or the player's blow from a side, control.js).
+    coil: coil || spec.coil || undefined,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
   if (riposte) fighter.punch.riposte = true;
@@ -2401,7 +2403,9 @@ function updateIntent(world, fighter, dt) {
     const phase = spec.couched ? Math.max(0, Math.min(1, (punch.t - spec.windup) / (spec.extendUntil - spec.windup))) : Math.min(1, punch.t / (spec.extendUntil * WORLD.rotationLead));
     const shape = punch.t < spec.extendUntil ? Math.sin(phase * Math.PI * 0.5) : Math.max(0, 1 - (punch.t - spec.extendUntil) / (spec.duration - spec.extendUntil));
     // (A weapon art's coil: the hips wound the other way first, then turned through: physics/arts.js.)
-    intent.twist += spec.twist * (spec.coil ? coiledTwist(spec, punch.t) : shape);
+    // (A stroke not begun by throwPunch has no `coil` of its own: its move's.)
+    const coil = punch.coil ?? spec.coil;
+    intent.twist += spec.twist * (coil ? coiledTwist(spec, punch.t, coil) : shape);
     intent.dip += (spec.dip ?? 0) * shape;
     intent.lean += (spec.lean ?? 0.12) * shape;
     intent.shift += (spec.shift ?? 0) * shape;
