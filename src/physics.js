@@ -1944,6 +1944,12 @@ export function shedStandard(world, fighter) {
 export function point(array, index) {
   return [array[index * 3], array[index * 3 + 1], array[index * 3 + 2]];
 }
+/** point, written into `into`. */
+function pointInto(into, array, index) {
+  into[0] = array[index * 3];
+  into[1] = array[index * 3 + 1];
+  into[2] = array[index * 3 + 2];
+}
 function setPoint(array, index, value) {
   array[index * 3] = value[0];
   array[index * 3 + 1] = value[1];
@@ -3811,19 +3817,16 @@ export function step(world, dt) {
       horse.stepped = horse.detail !== 'coarse' || substep % stride === stride - 1;
       if (horse.stepped) stepHorse(world, horse, horse.detail === 'coarse' ? stride * h : h);
     }
-    // A coarse fighter steps on one substep in `stride`, that much further; a proxy not at all.
-    const stepping = (fighter) => fighter.detail === 'full' || (fighter.detail === 'coarse' && substep % stride === stride - 1);
-    const span = (fighter) => (fighter.detail === 'coarse' ? stride * h : h);
     moving.length = 0;
-    for (const fighter of world.fighters) if (!asleep(fighter) && stepping(fighter)) moving.push(fighter);
+    for (const fighter of world.fighters) if (!asleep(fighter) && steppingNow(fighter, substep, stride)) moving.push(fighter);
     for (const fighter of moving) {
-      const own = span(fighter);
+      const own = spanOf(fighter, h, stride);
       if (isLimp(fighter)) relaxedTone(fighter, own);
       integrate(fighter, own, time);
       if (fighter.mount) seatRider(fighter, own);
     }
     for (const fighter of moving) {
-      const own = span(fighter);
+      const own = spanOf(fighter, h, stride);
       solveConstraints(fighter, own);
       solveJointLimits(world, fighter, own);
       if (fighter.weapon?.held) updateWeapon(fighter, own);
@@ -3844,8 +3847,8 @@ export function step(world, dt) {
         fighter.v.fill(0);
         continue;
       }
-      if (!stepping(fighter)) continue;
-      const own = span(fighter);
+      if (!steppingNow(fighter, substep, stride)) continue;
+      const own = spanOf(fighter, h, stride);
       collideGround(world, fighter, own, world.arena);
       for (let index = 0; index < fighter.v.length; index += 1) fighter.v[index] = (fighter.x[index] - fighter.prev[index]) / own;
       stopAtLimits(fighter);
@@ -3892,6 +3895,16 @@ export function step(world, dt) {
   payForBlocks(world);
   world.time += dt;
   world.lastDt = dt;
+}
+
+/** A coarse fighter steps on one substep in `stride`, that much further; a proxy not at all. */
+function steppingNow(fighter, substep, stride) {
+  return fighter.detail === 'full' || (fighter.detail === 'coarse' && substep % stride === stride - 1);
+}
+
+/** The time a fighter's substep spans: `stride` of them for a coarse one. */
+function spanOf(fighter, h, stride) {
+  return fighter.detail === 'coarse' ? stride * h : h;
 }
 
 /**
@@ -4402,20 +4415,30 @@ export function fightTier(world) {
  * pose, no physics), as is a man standing in the ranks behind the front
  * (in tier 3 too). Everyone else is in 'full'.
  */
+// What chooseDetail works with, kept from step to step rather than made anew: each one's detail as the step began, the
+// grid of hips it looks for enemies in, and who is struck at.
+const detailBefore = [];
+const detailGrid = floorGrid();
+const targetedIds = new Set();
+
 function chooseDetail(world) {
   const tier = fightTier(world);
-  const previous = world.fighters.map((fighter) => fighter.detail);
+  const previous = detailBefore;
+  previous.length = 0;
+  for (const fighter of world.fighters) previous.push(fighter.detail);
   if (tier < 3) {
     for (const fighter of world.fighters) fighter.detail = 'full';
   } else {
-    const hips = world.fighters.map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
-    const grid = spatialGrid(hips, WORLD.tiers.engageRange);
-    const targeted = new Set(world.fighters.filter((fighter) => fighter.punch).map((fighter) => fighter.punch.target));
-    world.fighters.forEach((fighter, index) => {
-      if (fighter.dormant) return;
+    const grid = fillGrid(detailGrid, world.fighters, WORLD.tiers.engageRange);
+    const targeted = targetedIds;
+    targeted.clear();
+    for (const fighter of world.fighters) if (fighter.punch) targeted.add(fighter.punch.target);
+    for (let index = 0; index < world.fighters.length; index += 1) {
+      const fighter = world.fighters[index];
+      if (fighter.dormant) continue;
       if (gone(fighter)) {
         fighter.detail = 'coarse';
-        return;
+        continue;
       }
       let lastHit = -Infinity;
       for (const at of fighter.hitAt) lastHit = Math.max(lastHit, at);
@@ -4428,9 +4451,9 @@ function chooseDetail(world) {
       // A man standing in the ranks behind the front (formation.js) is only a pose, enemy near or not.
       else if (fighter.slot && !fighter.inFront && fighter.state === 'up' && world.formations?.[fighter.formation]) fighter.detail = 'proxy';
       else if (tier === 3 || fighter.state !== 'up') fighter.detail = 'coarse';
-      else if (fighter.mount) fighter.detail = foeWithin(world, hips, index, WORLD.tiers.engageRange + WORLD.tiers.riderLead * Math.abs(fighter.mount.speed)) ? 'coarse' : 'proxy';
-      else fighter.detail = grid.near(index).some((other) => world.fighters[other].corner !== fighter.corner && world.fighters[other].state !== 'out') ? 'coarse' : 'proxy';
-    });
+      else if (fighter.mount) fighter.detail = foeWithin(world, grid, index, WORLD.tiers.engageRange + WORLD.tiers.riderLead * Math.abs(fighter.mount.speed)) ? 'coarse' : 'proxy';
+      else fighter.detail = enemyNear(world, gridNear(grid, index), fighter) ? 'coarse' : 'proxy';
+    }
   }
   // A dormant man is a pose that is never worked out: out of the contacts like any proxy, and not drawn.
   if (world.awake !== undefined) for (const fighter of world.fighters) if (fighter.dormant) fighter.detail = 'proxy';
@@ -4438,20 +4461,35 @@ function chooseDetail(world) {
   if (world.horses.length) chooseHorseDetail(world, tier);
   // Back into the physics from a pose: moving as the pose was. (A pose touches no one: a man may have walked into it. This
   // step that overlap is put right as a placement, not a speed: pushApart.)
-  world.fighters.forEach((fighter, index) => {
+  for (let index = 0; index < world.fighters.length; index += 1) {
+    const fighter = world.fighters[index];
     if (previous[index] === 'proxy' && fighter.detail !== 'proxy') {
       const h = (world.lastDt ?? 1 / 60) / WORLD.substeps;
       for (let at = 0; at < fighter.x.length; at += 1) fighter.prev[at] = fighter.x[at] - fighter.v[at] * h;
       fighter.unposedAt = world.steps;
     }
-  });
+  }
 }
 
-/** Whether a man not of his side and not out is within `range` m of fighter `index` (his hips, `hips[index]`, on the floor). */
-function foeWithin(world, hips, index, range) {
+/** Whether any of `near` (indices) is an enemy of the fighter's corner still in it. */
+function enemyNear(world, near, fighter) {
+  for (let k = 0; k < near.length; k += 1) {
+    const other = world.fighters[near[k]];
+    if (other.corner !== fighter.corner && other.state !== 'out') return true;
+  }
+  return false;
+}
+
+/** Whether a man not of his side and not out is within `range` m of fighter `index` (his hips as the floorGrid holds them). */
+function foeWithin(world, grid, index, range) {
   const fighter = world.fighters[index];
-  const [x, z] = hips[index];
-  return world.fighters.some((other, at) => other.corner !== fighter.corner && other.state !== 'out' && (hips[at][0] - x) ** 2 + (hips[at][1] - z) ** 2 < range * range);
+  const x = grid.x[index];
+  const z = grid.z[index];
+  for (let at = 0; at < world.fighters.length; at += 1) {
+    const other = world.fighters[at];
+    if (other.corner !== fighter.corner && other.state !== 'out' && (grid.x[at] - x) ** 2 + (grid.z[at] - z) ** 2 < range * range) return true;
+  }
+  return false;
 }
 
 /**
@@ -4498,8 +4536,9 @@ function poseProxy(fighter, dt) {
   // physics left him.
   const follow = Math.min(1, dt * WORLD.tiers.proxyFollow);
   for (let index = 0; index < PARTICLES.length; index += 1) {
-    const { target } = motorTarget(fighter, index);
-    fighter.targets[index] = target;
+    motorTarget(fighter, index);
+    const target = fighter.targets[index];
+    copy3(target, motorAim);
     for (let axis = 0; axis < 3; axis += 1) {
       const at = index * 3 + axis;
       fighter.prev[at] = fighter.x[at];
@@ -4532,22 +4571,26 @@ function measureNearestFoes(world) {
     }
     return;
   }
-  const grid = spatialGrid(fighters.map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]), reach);
-  fighters.forEach((fighter, index) => {
+  const grid = fillGrid(foeGrid, fighters, reach);
+  for (let index = 0; index < fighters.length; index += 1) {
+    const fighter = fighters[index];
     let nearest = Infinity;
     // Only a running man's arms ask (see runCarry).
-    if (!fighter.running && Math.hypot(...(fighter.rootVelocity ?? [0, 0])) <= WORLD.runCarry.runningSpeed) {
+    const rootVelocity = fighter.rootVelocity;
+    if (!fighter.running && (rootVelocity ? Math.hypot(rootVelocity[0], rootVelocity[1]) : 0) <= WORLD.runCarry.runningSpeed) {
       fighter.nearestFoe = Infinity;
-      return;
+      continue;
     }
-    for (const other of grid.near(index)) {
-      const foe = fighters[other];
+    const near = gridNear(grid, index);
+    for (let k = 0; k < near.length; k += 1) {
+      const foe = fighters[near[k]];
       if (!hostile(foe, fighter) || foe.state === 'out' || foe.dormant) continue;
       nearest = Math.min(nearest, Math.hypot(foe.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], foe.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]));
     }
     fighter.nearestFoe = nearest;
-  });
+  }
 }
+const foeGrid = floorGrid();
 
 /**
  * Points on the floor binned into square cells of `cell` m: `near(index)`
@@ -4577,6 +4620,60 @@ export function spatialGrid(points, cell) {
       return found.sort((a, b) => a - b);
     },
   };
+}
+
+/**
+ * spatialGrid over fighters' hips, kept and refilled each step rather than made anew (a big fight's step made three):
+ * the same cells, and `gridNear` gives the same indices in the same order, into a list it reuses (read it before asking again).
+ */
+export function floorGrid() {
+  return { cell: 1, count: 0, x: new Float64Array(0), z: new Float64Array(0), cells: new Map(), found: [] };
+}
+
+/** Fill a floorGrid with the fighters' hips (x, z), in cells of `cell` m. */
+export function fillGrid(grid, fighters, cell) {
+  const count = fighters.length;
+  if (grid.x.length < count) {
+    grid.x = new Float64Array(count * 2);
+    grid.z = new Float64Array(count * 2);
+  }
+  grid.cell = cell;
+  grid.count = count;
+  for (const list of grid.cells.values()) list.length = 0;
+  for (let index = 0; index < count; index += 1) {
+    const x = fighters[index].x[P.pelvis * 3];
+    const z = fighters[index].x[P.pelvis * 3 + 2];
+    grid.x[index] = x;
+    grid.z[index] = z;
+    const key = Math.floor(x / cell) * 4096 + Math.floor(z / cell);
+    let list = grid.cells.get(key);
+    if (!list) grid.cells.set(key, (list = []));
+    list.push(index);
+  }
+  return grid;
+}
+
+const byIndex = (a, b) => a - b;
+
+/** Every other fighter within the grid's cell of fighter `index`, in index order (the grid's own list: copy it to keep it). */
+export function gridNear(grid, index, found = grid.found) {
+  const cell = grid.cell;
+  const x = grid.x[index];
+  const z = grid.z[index];
+  const cx = Math.floor(x / cell);
+  const cz = Math.floor(z / cell);
+  found.length = 0;
+  for (let dx = -1; dx <= 1; dx += 1) {
+    for (let dz = -1; dz <= 1; dz += 1) {
+      const list = grid.cells.get((cx + dx) * 4096 + (cz + dz));
+      if (!list) continue;
+      for (let k = 0; k < list.length; k += 1) {
+        const other = list[k];
+        if (other !== index && (grid.x[other] - x) ** 2 + (grid.z[other] - z) ** 2 < cell * cell) found.push(other);
+      }
+    }
+  }
+  return found.sort(byIndex);
 }
 
 /**
@@ -4796,22 +4893,72 @@ function reflexShare(fighter, elapsed) {
   return 1;
 }
 
-/** Getting up, the parts go where its stage puts them (physics/rising.js); otherwise where he stands. */
+// A part's muscle target and the velocity it is driven at, as motorTarget writes them for the one particle being driven
+// (read before the next is asked for: the hot path allocates nothing).
+const motorAim = [0, 0, 0];
+const motorVelocity = [0, 0, 0];
+
+/** Getting up, the parts go where its stage puts them (physics/rising.js); otherwise where he stands. Into motorAim and motorVelocity. */
 function motorTarget(fighter, index) {
-  if (fighter.state === 'rising' && fighter.rise) return riseTarget(fighter, index);
-  return standingTarget(fighter, index);
+  if (fighter.state === 'rising' && fighter.rise) {
+    const { target, velocity } = riseTarget(fighter, index);
+    copy3(motorAim, target);
+    copy3(motorVelocity, velocity);
+    return;
+  }
+  standingTargetInto(fighter, index, motorAim, motorVelocity);
 }
 
+function copy3(into, from) {
+  into[0] = from[0];
+  into[1] = from[1];
+  into[2] = from[2];
+}
+
+function set3(into, x, y, z) {
+  into[0] = x;
+  into[1] = y;
+  into[2] = z;
+}
+
+/** toWorld, written into `into` (the same sums, in the same order). */
+function toWorldInto(fighter, local, into) {
+  const cos = yawCos(fighter.yaw);
+  const sin = yawSin(fighter.yaw);
+  set3(into, fighter.root[0] + (local[0] * cos + local[2] * sin), local[1] + (fighter.lift ?? 0), fighter.root[1] + (-local[0] * sin + local[2] * cos));
+}
+
+/** A standing part's muscle target: { target, velocity }. */
 export function standingTarget(fighter, index) {
+  const target = [0, 0, 0];
+  const velocity = [0, 0, 0];
+  standingTargetInto(fighter, index, target, velocity);
+  return { target, velocity };
+}
+
+function standingTargetInto(fighter, index, target, velocity) {
   const info = PARTICLE_INFO[index];
   const desired = fighter.desired[index];
   // Kneeling to hold a man down, the legs go where the kneel puts them.
-  if ((fighter.pin || fighter.crawling || onKnees(fighter)) && info.leg) return { target: toWorld(fighter, desired), velocity: [0, 0, 0] };
+  if ((fighter.pin || fighter.crawling || onKnees(fighter)) && info.leg) {
+    toWorldInto(fighter, desired, target);
+    set3(velocity, 0, 0, 0);
+    return;
+  }
   // (In a jump's flight the feet go with the hips, under them.)
-  if (info.foot) return { target: footTarget(fighter, fighter.feet[info.side]), velocity: fighter.jump?.phase === 'air' ? point(fighter.v, P.pelvis) : swingVelocity(fighter, fighter.feet[info.side]) };
+  if (info.foot) {
+    copy3(target, footTarget(fighter, fighter.feet[info.side]));
+    if (fighter.jump?.phase === 'air') pointInto(velocity, fighter.v, P.pelvis);
+    else copy3(velocity, swingVelocity(fighter, fighter.feet[info.side]));
+    return;
+  }
   if (info.knee) {
     const side = info.side;
-    if (fighter.feet[side].lifted) return { target: toWorld(fighter, desired), velocity: point(fighter.v, info.hip) };
+    if (fighter.feet[side].lifted) {
+      toWorldInto(fighter, desired, target);
+      pointInto(velocity, fighter.v, info.hip);
+      return;
+    }
     const hip = point(fighter.x, info.hip);
     const foot = footTarget(fighter, fighter.feet[side]);
     const out = fighter.runPose > 0 ? POSE.kneeOut + (WORLD.runMode.kneeOut - POSE.kneeOut) * fighter.runPose : POSE.kneeOut;
@@ -4820,9 +4967,15 @@ export function standingTarget(fighter, index) {
     const knee = twoBoneIK(hip, foot, L.thigh, L.shank, pole);
     // Where the hips have turned the knee further than they can, it comes round.
     const axes = trunkAxes(point(fighter.x, P.pelvis), point(fighter.x, P.neck), point(fighter.x, P.lHip), point(fighter.x, P.rHip));
-    return { target: swivelIntoRange(axes, 'leg', side, hip, knee, foot, { margin: WORLD.limbTwist.softBand }), velocity: point(fighter.v, info.hip) };
+    copy3(target, swivelIntoRange(axes, 'leg', side, hip, knee, foot, { margin: WORLD.limbTwist.softBand }));
+    pointInto(velocity, fighter.v, info.hip);
+    return;
   }
-  if (info.anchor === null) return { target: toWorld(fighter, desired), velocity: [fighter.rootVelocity[0], 0, fighter.rootVelocity[1]] };
+  if (info.anchor === null) {
+    toWorldInto(fighter, desired, target);
+    set3(velocity, fighter.rootVelocity[0], 0, fighter.rootVelocity[1]);
+    return;
+  }
   // Most parts: where the pose puts it from its anchor, turned to the way he faces, from where the anchor is.
   const anchor = info.anchor;
   const from = fighter.desired[anchor];
@@ -4832,10 +4985,8 @@ export function standingTarget(fighter, index) {
   const at = anchor * 3;
   const dx = desired[0] - from[0];
   const dz = desired[2] - from[2];
-  return {
-    target: [x[at] + (dx * cos + dz * sin), x[at + 1] + (desired[1] - from[1]), x[at + 2] + (-dx * sin + dz * cos)],
-    velocity: point(fighter.v, anchor),
-  };
+  set3(target, x[at] + (dx * cos + dz * sin), x[at + 1] + (desired[1] - from[1]), x[at + 2] + (-dx * sin + dz * cos));
+  pointInto(velocity, fighter.v, anchor);
 }
 
 // Scratch for the integrator's muscle drive (one particle at a time), and
@@ -4850,7 +5001,8 @@ function integrate(fighter, h, time) {
   const rising = fighter.state === 'rising';
   const damping = Math.exp(-h * (fighter.air ? WORLD.terrain.airDamping : alive ? WORLD.damping.up : WORLD.damping.down));
   // A hand's health is the same for both its particles: once per side.
-  const hands = { l: fatigue * handHealth(fighter, 'l'), r: fatigue * handHealth(fighter, 'r') };
+  const leftHand = fatigue * handHealth(fighter, 'l');
+  const rightHand = fatigue * handHealth(fighter, 'r');
   // The muscles hold each part up against gravity, except in the air (terrain): a man off a ledge falls.
   const holding = fighter.air ? 0 : WORLD.gravity;
   const ballistic = fighter.jump?.phase === 'air';
@@ -4859,12 +5011,16 @@ function integrate(fighter, h, time) {
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const info = PARTICLE_INFO[index];
     const base = index * 3;
-    const { target, velocity } = motorTarget(fighter, index);
-    fighter.targets[index] = target;
+    motorTarget(fighter, index);
+    const target = fighter.targets[index];
+    copy3(target, motorAim);
+    const velocity = motorVelocity;
     // In the air the muscles keep the pose but do not brake the fall.
     if (fighter.air) velocity[1] = fighter.v[base + 1];
-    let acceleration = [0, -WORLD.gravity, 0];
-    const scale = fighter.motorScale * (info.arm ? hands[info.side] : 1) * reflexShare(fighter, time - fighter.hitAt[index]);
+    let ax = 0;
+    let ay = -WORLD.gravity;
+    let az = 0;
+    const scale = fighter.motorScale * (info.arm ? (info.side === 'l' ? leftHand : rightHand) : 1) * reflexShare(fighter, time - fighter.hitAt[index]);
     if (scale > 0.01) {
       const { omega, zeta } = WORLD.motor[info.motorGroup];
       for (let axis = 0; axis < 3; axis += 1) {
@@ -4885,9 +5041,13 @@ function integrate(fighter, h, time) {
         if (along > 0) cap *= Math.max(0.02, (1 - along / top) / (1 + along / (BODY.hillCurvature * top)));
       }
       const limit = size > cap ? cap / size : 1;
-      acceleration = vec.add(acceleration, vec.scale(want, limit));
+      ax += want[0] * limit;
+      ay += want[1] * limit;
+      az += want[2] * limit;
     }
-    for (let axis = 0; axis < 3; axis += 1) accelerations[base + axis] = acceleration[axis];
+    accelerations[base] = ax;
+    accelerations[base + 1] = ay;
+    accelerations[base + 2] = az;
     // Each part moves as soon as it is driven (the next one's target reads
     // it); getting up, all wait for what the floor allows them together.
     if (!rising) moveParticle(fighter, index, h, damping);
@@ -4966,20 +5126,26 @@ export function limbShares(fighter) {
 }
 
 function solveConstraints(fighter, h, reposition = false) {
-  for (const constraint of fighter.constraints) {
-    const { i, j, rest, compliance } = constraint;
-    const offset = vec.sub(point(fighter.x, i), point(fighter.x, j));
-    const distance = vec.length(offset) || 1e-9;
+  const x = fighter.x;
+  const constraints = fighter.constraints;
+  for (let k = 0; k < constraints.length; k += 1) {
+    const { i, j, rest, compliance } = constraints[k];
+    // (In numbers, not vectors: every constraint, every substep, for every man.)
+    const ox = x[i * 3] - x[j * 3];
+    const oy = x[i * 3 + 1] - x[j * 3 + 1];
+    const oz = x[i * 3 + 2] - x[j * 3 + 2];
+    const distance = Math.sqrt(ox * ox + oy * oy + oz * oz) || 1e-9;
     const error = distance - rest;
     const weight = fighter.invMass[i] + fighter.invMass[j] + compliance / (h * h);
     const lambda = -error / weight;
-    const normal = vec.scale(offset, 1 / distance);
+    const inverse = 1 / distance;
     for (let axis = 0; axis < 3; axis += 1) {
-      fighter.x[i * 3 + axis] += normal[axis] * lambda * fighter.invMass[i];
-      fighter.x[j * 3 + axis] -= normal[axis] * lambda * fighter.invMass[j];
+      const normal = (axis === 0 ? ox : axis === 1 ? oy : oz) * inverse;
+      x[i * 3 + axis] += normal * lambda * fighter.invMass[i];
+      x[j * 3 + axis] -= normal * lambda * fighter.invMass[j];
       if (!reposition) continue;
-      fighter.prev[i * 3 + axis] += normal[axis] * lambda * fighter.invMass[i];
-      fighter.prev[j * 3 + axis] -= normal[axis] * lambda * fighter.invMass[j];
+      fighter.prev[i * 3 + axis] += normal * lambda * fighter.invMass[i];
+      fighter.prev[j * 3 + axis] -= normal * lambda * fighter.invMass[j];
     }
   }
 }
@@ -6035,6 +6201,7 @@ let crowdHipX = new Float64Array(0);
 let crowdHipZ = new Float64Array(0);
 let crowdBeyond = new Float64Array(0);
 const crowdNeighbours = [];
+const contactGrid = floorGrid();
 
 /**
  * A big fight's contacts: near pairs are found through a grid, in the same
@@ -6064,10 +6231,17 @@ function collideCrowd(world, time, substep) {
   // Candidates once a step (the grid, its lookups and sorts were a tenth of
   // a big fight's step when made every substep); the exact range each substep.
   if (world.contactCache?.time !== world.time || world.contactCache.count !== count) {
-    const hips = [];
-    for (let index = 0; index < count; index += 1) hips.push([hipX[index], hipZ[index]]);
-    const grid = spatialGrid(hips, WORLD.contactRange + WORLD.contactMargin);
-    world.contactCache = { time: world.time, count, near: fighters.map((fighter, index) => (fighter.detail === 'proxy' ? [] : grid.near(index))) };
+    const grid = fillGrid(contactGrid, fighters, WORLD.contactRange + WORLD.contactMargin);
+    // (Its lists kept and refilled: footDown reads them, the step after, as they were left.)
+    const cache = (world.contactCache ??= { time: world.time, count, near: [] });
+    cache.time = world.time;
+    cache.count = count;
+    cache.near.length = count;
+    for (let index = 0; index < count; index += 1) {
+      const list = (cache.near[index] ??= []);
+      if (fighters[index].detail === 'proxy') list.length = 0;
+      else gridNear(grid, index, list);
+    }
   }
   const candidates = world.contactCache.near;
   // Two coarse fighters move only on their substeps: they are tested then.
@@ -6266,13 +6440,19 @@ function segmentsGap() {
 
 /** Closest points between two segments: parameters s on the first, t on the second. */
 export function closestBetween(p1, q1, p2, q2) {
-  const d1 = vec.sub(q1, p1);
-  const d2 = vec.sub(q2, p2);
-  const r = vec.sub(p1, p2);
-  const a = vec.dot(d1, d1);
-  const e = vec.dot(d2, d2);
-  const f = vec.dot(d2, r);
-  const clamp01 = (value) => Math.max(0, Math.min(1, value));
+  // (The segments' directions and offset in numbers: only the two closest points are made.)
+  const d1x = q1[0] - p1[0];
+  const d1y = q1[1] - p1[1];
+  const d1z = q1[2] - p1[2];
+  const d2x = q2[0] - p2[0];
+  const d2y = q2[1] - p2[1];
+  const d2z = q2[2] - p2[2];
+  const rx = p1[0] - p2[0];
+  const ry = p1[1] - p2[1];
+  const rz = p1[2] - p2[2];
+  const a = d1x * d1x + d1y * d1y + d1z * d1z;
+  const e = d2x * d2x + d2y * d2y + d2z * d2z;
+  const f = d2x * rx + d2y * ry + d2z * rz;
   let s;
   let t;
   if (a < 1e-12 && e < 1e-12) {
@@ -6280,27 +6460,31 @@ export function closestBetween(p1, q1, p2, q2) {
     t = 0;
   } else if (a < 1e-12) {
     s = 0;
-    t = clamp01(f / e);
+    t = clampShare(f / e);
   } else {
-    const c = vec.dot(d1, r);
+    const c = d1x * rx + d1y * ry + d1z * rz;
     if (e < 1e-12) {
       t = 0;
-      s = clamp01(-c / a);
+      s = clampShare(-c / a);
     } else {
-      const b = vec.dot(d1, d2);
+      const b = d1x * d2x + d1y * d2y + d1z * d2z;
       const denominator = a * e - b * b;
-      s = denominator > 1e-12 ? clamp01((b * f - c * e) / denominator) : 0;
+      s = denominator > 1e-12 ? clampShare((b * f - c * e) / denominator) : 0;
       t = (b * s + f) / e;
       if (t < 0) {
         t = 0;
-        s = clamp01(-c / a);
+        s = clampShare(-c / a);
       } else if (t > 1) {
         t = 1;
-        s = clamp01((b - c) / a);
+        s = clampShare((b - c) / a);
       }
     }
   }
-  return { s, t, onFirst: vec.add(p1, vec.scale(d1, s)), onSecond: vec.add(p2, vec.scale(d2, t)) };
+  return { s, t, onFirst: [p1[0] + d1x * s, p1[1] + d1y * s, p1[2] + d1z * s], onSecond: [p2[0] + d2x * t, p2[1] + d2y * t, p2[2] + d2z * t] };
+}
+
+function clampShare(value) {
+  return Math.max(0, Math.min(1, value));
 }
 
 /**
