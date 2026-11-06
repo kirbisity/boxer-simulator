@@ -1,28 +1,22 @@
-// Fighting ratings, built up from the like to the unlike. Every rating is a
-// Bradley-Terry strength fitted to all the bouts at once (his odds of beating
-// a man of strength r are s/r; a draw half each way, half a bout either way
-// added), Maximus held at 100 only at the end for the table, so a score is
-// proportional to inferred K/D. Ratings are relative within what has been
-// compared until the last stage joins everything. Which bouts are fought:
-//   1. The smallest groups: men of one era, ranged or close, with like
-//      weapons (all the early-modern spears across factions, all the medieval
-//      bows...), each against each (a large group by a ladder).
-//   2. Within an era and range, across the weapon groups.
-//   3. Within an era, ranged against close.
-//   4. Within each faction, across its unit types.
-//   5. Across factions: a few pairs to tell them apart.
-//   6. Across eras: the medieval against the modern and so on.
-// Groups not yet compared are joined by their ranks (top against top, middle
-// against middle, bottom against bottom), then each man meets the nearest by
-// strength on the other side. Last, spot checks: pairs drawn at random,
-// predicted before they are fought, to say how well the ratings hold.
-// Every pairing is fought adaptively: two bouts at a time (each man from
-// each corner), stopped once it is settled (RATING.settle), else at most
-// its cap. Writes src/ratings.js (generated: do not edit by hand).
-// Usage: node tools/ratings.js [max bouts a pairing = 16] [workers = 10] [spot checks = 30]
+// Fighting ratings against a panel. Every rating is a Bradley-Terry strength
+// fitted to all the bouts at once (his odds of beating a man of strength r are
+// s/r; a draw half each way, half a bout either way added), Maximus held at 100,
+// so a score is proportional to inferred K/D. Which bouts are fought:
+//   1. The panel: a few men spread over the range of strengths (the two
+//      references, Maximus and the monk, and those nearest given quantiles of
+//      the last table), each against each, to place them well.
+//   2. Everyone against every man on the panel.
+//   3. Everyone against the men nearest him by the strength so fitted: the
+//      panel places a man roughly; a near match says how far he really is
+//      (and places those weaker or stronger than the whole panel).
+//   4. Spot checks: pairs drawn at random, predicted before they are fought,
+//      to say how well the ratings hold.
+// Every pairing is fought adaptively: two bouts at a time (each man from each
+// corner), stopped once it is settled (RATING.settle), else at most its cap.
+// Writes src/ratings.js (generated: do not edit by hand).
+// Usage: node tools/ratings.js [max bouts a pairing = 6] [workers = 10] [spot checks = 12]
 //        node tools/ratings.js groups               (print the groups, fight nothing)
 //        node tools/ratings.js pairs JSON MAX   (a worker: one share of the pairings; sends their records)
-
 import { fork } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -37,13 +31,14 @@ import { STYLES } from '../src/moves.js';
 export const RATING = {
   references: { maximus: PRESETS.maximus, monk: PRESETS.staff }, seconds: 120, firstSeed: 900,
   // A pairing is settled after at least `minBouts` once one side has won `share` of them (draws half), else fought to its cap.
-  settle: { minBouts: 6, share: 0.85 },
-  // A group up to this size is fought each against each; a larger one by a ladder (each against `ladder` nearest).
-  roundRobin: 6, ladder: 3,
-  // Joining groups: each man against this many nearest by strength on the other side (after the rank pairs).
-  across: 2,
-  // Across factions and eras only each group's top, middle and bottom meet the others (a few pairs to tell them apart).
-  marks: 3,
+  settle: { minBouts: 4, share: 0.85 },
+  // The panel besides the references: the men nearest these quantiles of the last table's scores. Five spread over the
+  // range (a 100-fold one, a macaque to a bayara) put a near match within about ×2-3 of every man, where a pairing says most.
+  panelQuantiles: [0.1, 0.3, 0.5, 0.7, 0.9],
+  // The panel's own pairings are fought to this many bouts: every rating hangs on where the panel sits.
+  panelBouts: 12,
+  // Then each man against this many nearest by fitted strength (not already met).
+  nearest: 2,
   // A bout's score (0..1, to the first man): `health` of it from how much of each was left at the end (half and half: his health
   // left less the other's, a man out having none), the rest from who won (a win 1, a draw a half). A win at full health is 1;
   // a win barely alive ~0.75; a draw the healthier ahead.
@@ -227,18 +222,18 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const [pairs, most] = [JSON.parse(args[0]), Number(args[1])];
     process.send(pairs.map(([a, b]) => ({ a, b, record: settledRecord(inputsOf(a), inputsOf(b), most) })));
   } else {
-    const most = Number(mode ?? 16);
+    const most = Number(mode ?? 6);
     const workers = Number(args[0] ?? 10);
-    const spotChecks = Number(args[1] ?? 30);
+    const spotChecks = Number(args[1] ?? 12);
     const started = Date.now();
     const games = [];
     let bouts = 0;
     const fought = new Set();
     const keyOf = (a, b) => [a, b].sort().join('|');
-    const fight = async (label, pairs) => {
+    const fight = async (label, pairs, cap = most) => {
       const fresh = pairs.filter(([a, b]) => a !== b && !fought.has(keyOf(a, b)));
       for (const [a, b] of fresh) fought.add(keyOf(a, b));
-      const results = await inParallel('pairs', fresh, most, workers);
+      const results = await inParallel('pairs', fresh, cap, workers);
       const count = results.reduce((sum, { record: tally }) => sum + tally.wins + tally.losses + tally.draws, 0);
       bouts += count;
       console.log(`${label}: ${results.length} pairings, ${count} bouts (${(count / Math.max(1, results.length)).toFixed(1)} each), ${((Date.now() - started) / 1000).toFixed(0)} s`);
@@ -246,85 +241,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     };
     const keys = WARRIORS.map((warrior) => warrior.key);
     const factionOfKey = Object.fromEntries(WARRIORS.map((warrior) => [warrior.key, factionOf(warrior.inputs) ?? 'none']));
-    const tiers = Object.fromEntries(WARRIORS.map((warrior) => [warrior.key, tierOf(warrior)]));
-    let strength = Object.fromEntries(keys.map((key) => [key, 100]));
-    // Fit what has been fought so far, each connected part on its own (relative within it), held to a mean of 100.
-    const refit = () => {
-      const fitted = {};
-      const linked = new Map(keys.map((key) => [key, new Set()]));
-      for (const { a, b } of games) { linked.get(a)?.add(b); linked.get(b)?.add(a); }
-      const seen = new Set();
-      for (const start of keys) {
-        if (seen.has(start)) continue;
-        const part = [];
-        const stack = [start];
-        seen.add(start);
-        while (stack.length) { const key = stack.pop(); part.push(key); for (const next of linked.get(key) ?? []) if (!seen.has(next)) { seen.add(next); stack.push(next); } }
-        if (part.length === 1) { fitted[start] = 100; continue; }
-        const own = games.filter(({ a }) => part.includes(a));
-        const values = fitAll(own, part[0]);
-        const mean = Math.exp(part.reduce((sum, key) => sum + Math.log(values[key]), 0) / part.length);
-        for (const key of part) fitted[key] = (values[key] / mean) * 100;
-      }
-      strength = fitted;
-    };
-    const byStrength = (members) => [...members].sort((a, b) => strength[b] - strength[a]);
-    const nearest = (key, pool, count) => pool.filter((other) => other !== key).sort((x, y) => Math.abs(Math.log(strength[x] / strength[key])) - Math.abs(Math.log(strength[y] / strength[key]))).slice(0, count);
-    // Within a group: each against each, or a ladder for a large one (a first round against the neighbours in the
-    // roster's order, then each against the nearest by strength).
-    const within = async (label, groups) => {
-      const robin = [];
-      const large = [];
-      for (const members of Object.values(groups)) {
-        if (members.length <= RATING.roundRobin) for (let i = 0; i < members.length; i += 1) for (let j = i + 1; j < members.length; j += 1) robin.push([members[i], members[j]]);
-        else { large.push(members); members.forEach((key, index) => robin.push([key, members[(index + 1) % members.length]], [key, members[(index + 2) % members.length]])); }
-      }
-      games.push(...await fight(label, robin));
-      refit();
-      if (!large.length) return;
-      games.push(...await fight(`${label} (ladders)`, large.flatMap((members) => members.flatMap((key) => nearest(key, members, RATING.ladder).map((other) => [key, other])))));
-      refit();
-    };
-    // Join the groups inside each parent: rank pairs between every two groups, then each man against the nearest on
-    // the other side. `marks`: only each group's top, middle and bottom take part.
-    const join = async (label, parents, groupOf, { marks = false } = {}) => {
-      const ranks = [];
-      const sets = [];
-      for (const members of Object.values(parents)) {
-        const groups = Object.values(groupBy(members, tiers, groupOf)).map(byStrength);
-        for (let i = 0; i < groups.length; i += 1) for (let j = i + 1; j < groups.length; j += 1) {
-          const [x, y] = [groups[i], groups[j]];
-          for (const share of [0, 0.5, 1]) ranks.push([x[Math.round(share * (x.length - 1))], y[Math.round(share * (y.length - 1))]]);
-        }
-        sets.push(groups);
-      }
-      games.push(...await fight(`${label} (rank pairs)`, ranks));
-      refit();
-      const near = [];
-      for (const groups of sets) {
-        for (const group of groups) {
-          const others = groups.filter((other) => other !== group).flat();
-          const ranked = byStrength(group);
-          const who = marks ? [...new Set([ranked[0], ranked[Math.floor(ranked.length / 2)], ranked.at(-1)])] : ranked;
-          for (const key of who) for (const other of nearest(key, others, RATING.across)) near.push([key, other]);
-        }
-      }
-      games.push(...await fight(`${label} (nearest)`, near));
-      refit();
-    };
-    const everyone = { all: keys };
-    // 1. The smallest groups: one era, ranged or close, like weapons.
-    await within('1. like weapons within an era and range', groupBy(keys, tiers, (t) => `${t.era}|${t.range}|${t.family}`));
-    // 2. Within an era and range, across weapon groups.
-    await join('2. across weapons', groupBy(keys, tiers, (t) => `${t.era}|${t.range}`), (t) => t.family);
-    // 3. Within an era, ranged against close.
-    await join('3. ranged against close', groupBy(keys, tiers, (t) => t.era), (t) => t.range);
-    // 4. Within each faction, across its unit types (its men of other eras, ranges and weapons).
-    await join('4. within factions', groupBy(keys, tiers, (t) => t.faction), (t) => `${t.era}|${t.range}|${t.family}`);
-    // 5. Across factions: a few pairs from each faction's top, middle and bottom.
-    await join('5. across factions', everyone, (t) => t.faction, { marks: true });
-    // 6. Across eras.
-    await join('6. across eras', everyone, (t) => t.era, { marks: true });
+    // 1. The panel: the references, and the men nearest the quantiles of the last table (a man new to the roster has none).
+    const { RATINGS: last } = await import('../src/ratings.js');
+    const lastScores = keys.filter((key) => last.characters[key]).map((key) => [key, last.characters[key].score]).sort((x, y) => x[1] - y[1]);
+    const panel = [...new Set([...Object.values(referenceKey), ...RATING.panelQuantiles.map((quantile) => lastScores[Math.round(quantile * (lastScores.length - 1))][0])])];
+    console.log(`panel: ${panel.map((key) => byKey[key].title).join(', ')}`);
+    const panelPairs = [];
+    for (let i = 0; i < panel.length; i += 1) for (let j = i + 1; j < panel.length; j += 1) panelPairs.push([panel[i], panel[j]]);
+    games.push(...await fight('1. the panel, each against each', panelPairs, RATING.panelBouts));
+    // 2. Everyone against the panel.
+    games.push(...await fight('2. everyone against the panel', keys.filter((key) => !panel.includes(key)).flatMap((key) => panel.map((member) => [key, member]))));
+    let strength = fitAll(games, 'maximus');
+    // 3. Everyone against the nearest by that fit.
+    const nearestTo = (key) => keys.filter((other) => other !== key && !fought.has(keyOf(key, other))).sort((x, y) => Math.abs(Math.log(strength[x] / strength[key])) - Math.abs(Math.log(strength[y] / strength[key]))).slice(0, RATING.nearest);
+    games.push(...await fight('3. everyone against the nearest', keys.flatMap((key) => nearestTo(key).map((other) => [key, other]))));
     strength = fitAll(games, 'maximus');
     const provisional = { ...strength };
     // 4. Spot checks: random pairs, predicted from the rest before they are fought.
@@ -370,7 +300,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const entry of rated) (byType[entry.type] ??= []).push(strength[entry.key]);
     const types = Object.fromEntries(Object.entries(byType).map(([type, values]) => [type, rounded(Math.exp(values.reduce((sum, value) => sum + Math.log(value), 0) / values.length))]));
     const crossRecords = games.filter(({ a, b }) => !Object.values(referenceKey).includes(b) || !keys.includes(a)).map(({ a, b, record: tally }) => ({ a, b, ...tally }));
-    const header = `// GENERATED by tools/ratings.js (built up from the like: like weapons within an era and range, across weapons, ranged against close, within factions, across factions, across eras, ${spots.length} spot checks; each pairing fought until settled, at most ${most} bouts; ${bouts} bouts in all) — do not edit by hand; re-run the tool.\n// Score = strength fitted to all those bouts at once (Bradley-Terry), Maximus held at 100: ∝ inferred K/D.\n`;
+    const header = `// GENERATED by tools/ratings.js (everyone against a panel of ${panel.length} (${panel.join(', ')}), then the ${RATING.nearest} nearest by strength; ${spots.length} spot checks; each pairing fought until settled, at most ${most} bouts; ${bouts} bouts in all) — do not edit by hand; re-run the tool.\n// Score = strength fitted to all those bouts at once (Bradley-Terry), Maximus held at 100: ∝ inferred K/D.\n`;
     const body = `export const RATINGS = ${JSON.stringify({ references: Object.keys(RATING.references), bouts: most, totalBouts: bouts, characters, types, cross: crossRecords }, null, 1)};\n`;
     writeFileSync(new URL('../src/ratings.js', import.meta.url), header + body);
     for (const entry of [...rated].sort((a, b) => strength[b.key] - strength[a.key])) console.log(`${String(entry.score).padStart(6)}  (before spot checks ${String(entry.provisional).padStart(5)})  ${entry.title.padEnd(26)} ${entry.faction.padEnd(11)} ${entry.type}`);
