@@ -18,8 +18,11 @@ import { inFight, legShare } from './physics.js';
  */
 export const WOUNDED_AT = 0.25;
 
-/** The kinds of event that are a man's death: cut or shot down, bled out, drowned. */
-const DEATHS = new Set(['killed', 'bledOut', 'drowned']);
+/**
+ * The kinds of event that are a man's death: cut or shot down, bled out (collapsed of it: on a battlefield, left to
+ * die where he lies), died of the blood lost later (maiming.js: a limb lost, down or crawling off), drowned.
+ */
+const DEATHS = new Set(['killed', 'bledOut', 'died', 'drowned']);
 
 /** A death among the events, or his head off (a severed neck goes down as 'out', but no man lives through it). */
 const isDeath = (event) => DEATHS.has(event.kind) || (event.kind === 'severed' && event.joint === 'neck');
@@ -31,7 +34,7 @@ function killedIds(events) {
 
 /** Wounded: lived, and hurt past WOUNDED_AT, or a bone broken or a limb lost. */
 export function wounded(fighter) {
-  return Math.max(hurtShare(fighter), legShare(fighter)) >= WOUNDED_AT || (fighter.broken?.size ?? 0) > 0;
+  return Math.max(hurtShare(fighter), legShare(fighter)) >= WOUNDED_AT || (fighter.broken?.size ?? 0) > 0 || (fighter.severed?.length ?? 0) > 0;
 }
 
 /**

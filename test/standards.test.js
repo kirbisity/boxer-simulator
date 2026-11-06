@@ -98,13 +98,19 @@ test('a fallen leader\'s worn banner comes off his back and is taken up in the h
   assert.ok(world.fighters.some((fighter) => fighter.weapon?.held && fighter.weapon.kind === 'nobori' && fighter.corner === 'red'));
 });
 
-test('a broken knee: down, then on his knees crawling away, out of the fight', () => {
+test('a broken knee: down, then on his knees: fighting on from the ground with his nerve held, crawling away out of the fight once broken', () => {
   const world = duel('heavy', 'light');
   world.rules = { noPins: true };
   const fighter = world.fighters[0];
   breakJoint(world, fighter, 'lKnee');
   for (let t = 0; t < 8 && !fighter.crawling; t += 0.25) advance(world, 0.25, think);
   assert.ok(fighter.crawling);
+  assert.equal(inFight(fighter), Boolean(fighter.groundFight), 'in the fight only while he fights on from the ground');
+  // Broken (the fear model), he drags himself away: out of it, and the bout is the other man's.
+  for (let t = 0; t < 4 && fighter.state !== 'up'; t += 0.25) advance(world, 0.25, think);
+  Object.assign(fighter, { panicked: true, fear: 1, adrenaline: 0 });
+  advance(world, 0.25, think);
+  assert.equal(fighter.groundFight, false);
   assert.equal(inFight(fighter), false);
   assert.equal(boutWinner(world), 'blue');
 });

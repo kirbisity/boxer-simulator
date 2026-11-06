@@ -8,6 +8,7 @@ import { hurtShare, thinkAll } from './ai.js';
 import { withTanks } from './physics/flame.js';
 import { CUSTOM_STYLE_KEYS, MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, reviveFighter, startCrawl, startJump, throwPunch, WORLD } from './physics.js';
+import { bleedingFast } from './maiming.js';
 import { DEFAULT_LOOK, LOOK_OPTIONS } from './face.js';
 import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LOOK_ID, flattenView, loadLook, lookById, lookIdFromSearch, lookList, LOOKS, rememberedLookId, rememberLook } from './looks.js';
 import { installLooksBench } from './looksbench.js';
@@ -1363,6 +1364,8 @@ function renderHud() {
     const feeling = ` · fear ${Math.round((fighter.fear ?? 0) * 100)}% · adrenaline ${Math.round((fighter.adrenaline ?? 0) * 100)}%`;
     card.querySelector('.speed').textContent = `${fighter.stats.lastHandSpeed.toFixed(1)} m/s${mood}${feeling}`;
     card.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(fighter)) * 100)}%`;
+    // A great vessel open (a limb lost: maiming.js): the bar pulses and drains.
+    card.querySelector('.health').classList.toggle('bleeding', bleedingFast(fighter));
     let roster = card.querySelector('.roster');
     if (!roster) roster = card.appendChild(Object.assign(document.createElement('div'), { className: 'roster' }));
     roster.hidden = team.length < 2;
@@ -1404,6 +1407,7 @@ function logEvent(event) {
   else if (event.kind === 'panic' || event.kind === 'rally') text = `${event.kind === 'panic' ? '😱' : '🔥'} <b>${name(event.fighter)}</b> ${event.effects.join(', ')}`;
   else if (event.kind === 'staggered') text = `🌀 <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'died') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'drowned') text = `🌊 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;

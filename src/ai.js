@@ -6,7 +6,8 @@ import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volley
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
-import { aimPoint, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legShare, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { MAIMING, maimFear } from './maiming.js';
+import { aimPoint, armGone, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
@@ -629,7 +630,8 @@ function keepLeaders(world) {
     // Where they rally: the standard where it lies (taking it up comes first), else the general, the standard beside him.
     const at = lying ? lying.x : general ? point(general.x, P.pelvis) : point(bearer.x, P.pelvis);
     // The man going for it keeps going while he can, rather than two turning back and forth.
-    const able = side.filter((fighter) => fighter.state === 'up' && !fighter.panicked && !fighter.clinch && !fighter.pin);
+    // (Not a man crawling, nor one without the hand to carry it: maiming.js.)
+    const able = side.filter((fighter) => fighter.state === 'up' && !fighter.panicked && !fighter.clinch && !fighter.pin && !fighter.crawling && !armGone(fighter, 'r'));
     const going = lying && able.find((fighter) => fighter.id === standard.taker);
     const taker = lying ? going ?? nearestTo(able, at) : null;
     standard.taker = taker?.id;
@@ -1412,9 +1414,9 @@ function goForWeapon(world, fighter, opponent, dt) {
     return true;
   }
   // A man of a shield style who has lost his wants it back, whatever is in his hand.
-  const wantsShield = Boolean(STYLES[fighter.style]?.shield) && !fighter.shield;
-  // A beast (`unarmed` kit) takes up no weapon.
-  const wantsWeapon = !fighter.weapon?.held && !fighter.body.gear.unarmed;
+  const wantsShield = Boolean(STYLES[fighter.style]?.shield) && !fighter.shield && !armGone(fighter, 'l');
+  // A beast (`unarmed` kit) takes up no weapon; nor a man with no hand to hold it in (maiming.js).
+  const wantsWeapon = !fighter.weapon?.held && !fighter.body.gear.unarmed && !(armGone(fighter, 'l') && armGone(fighter, 'r'));
   // Nothing loose on the floor he wants (the usual case): no thought, and no draw on the bout's randomness.
   const loose = world.debris?.some((debris) => !debris.taken && debris.resting && ((debris.kind === 'weapon' && wantsWeapon) || (debris.kind === 'shield' && wantsShield)));
   if (!loose || fighter.clinch || fighter.pin || fighter.punch || !AI.pickup.enabled) {
@@ -1430,8 +1432,9 @@ function goForWeapon(world, fighter, opponent, dt) {
     // A standard is taken up only by its own side's chosen man (takeUpStandard).
     if (!debris || debris.taken || !debris.resting) return null;
     if (debris.kind === 'shield' ? !wantsShield : debris.kind !== 'weapon' || !wantsWeapon || WEAPONS[debris.weapon]?.flag) return null;
-    // Not a weapon he cannot lift (handling.js).
+    // Not a weapon he cannot lift (handling.js), nor one for a hand he has lost.
     if (debris.kind === 'weapon' && !handling(fighter.body, WEAPONS[debris.weapon]).canHold) return null;
+    if (debris.kind === 'weapon' && armGone(fighter, WEAPONS[debris.weapon].hand === 'l' ? 'l' : 'r')) return null;
     // Nor a bow or a gun he has nothing left to shoot from (physics/ranged.js ammoLeft).
     if (debris.kind === 'weapon' && WEAPONS[debris.weapon]?.ranged && ammoLeft(fighter, { spec: WEAPONS[debris.weapon] }) <= 0) return null;
     const mine = flat(debris.x, at);
@@ -1815,6 +1818,8 @@ export function surge(fighter, event) {
     if (severity > spec.hardFrom) rise = Math.max(rise, spec.hardHit * Math.min(2, severity - spec.hardFrom + 0.5));
   }
   if (event.kind === 'staggered' && event.fighter === fighter.id) rise = Math.max(rise, spec.hardHit);
+  // A limb of his cut off or broken (maiming.js): the body's alarm at its worst.
+  if ((event.kind === 'severed' || event.kind === 'broken') && event.fighter === fighter.id && event.joint !== 'neck') rise = Math.max(rise, MAIMING.adrenaline);
   if (rise > 0) fighter.adrenaline = Math.min(1, (fighter.adrenaline ?? 0) + rise * adrenalineGain(fighter));
 }
 
@@ -1862,17 +1867,19 @@ function couchedCharge(world, fighter, opponent, style, distance) {
   return true;
 }
 
-/** How many of his arms are broken (0, 1 or 2). */
-const brokenArms = (fighter) => (fighter.broken.has('lElbow') ? 1 : 0) + (fighter.broken.has('rElbow') ? 1 : 0);
+/** How many of his arms are lost to him, broken or cut off (0, 1 or 2). */
+const brokenArms = (fighter) => (armGone(fighter, 'l') ? 1 : 0) + (armGone(fighter, 'r') ? 1 : 0);
 
 /**
  * A broken limb puts a man on his knees, panicked or not: a leg that will
- * barely bear him, or an arm hanging. Less likely with adrenaline in him.
+ * barely bear him, or both arms gone (nothing left to fight with). Less likely
+ * with adrenaline in him. One arm lost is the fear model's (maiming.js: the
+ * shock of it), not this: he fights on with the other, or breaks.
  */
 function crawlOnBrokenLimb(world, fighter, dt) {
   const crawl = AI.crawl;
   if (fighter.state !== 'up' || fighter.crawling || fighter.mount) return;
-  const limbs = Math.min(1, Math.max(legShare(fighter), brokenArms(fighter) * crawl.perArm));
+  const limbs = Math.min(1, Math.max(legShare(fighter), Math.max(0, brokenArms(fighter) - 1) * crawl.perArm * 2));
   if (limbs <= crawl.limbFrom) return;
   const rate = crawl.limbRate * ((limbs - crawl.limbFrom) / (1 - crawl.limbFrom)) * (1 - crawl.adrenaline * fighter.adrenaline);
   if (world.random() < rate * dt) startCrawl(world, fighter, 'goes down on his knees, the limb broken');
@@ -2297,8 +2304,9 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const outmatched = Math.max(0, -nerve);
   const dread = opponent ? weaponDread(fighter, opponent) : 0;
   const shaken = world.leaders?.[fighter.corner]?.shaken ? spec.standardDown : 0;
-  const legs = ['lKnee', 'rKnee', 'lHip', 'rHip'].filter((joint) => fighter.broken.has(joint)).length;
-  const broken = brokenArms(fighter) * spec.brokenArm + Math.min(2, legs) * spec.brokenLeg;
+  const legs = (legGone(fighter, 'l') ? 1 : 0) + (legGone(fighter, 'r') ? 1 : 0);
+  // A limb broken or cut off: fear while it lasts, and the shock of losing it (maiming.js), fading.
+  const broken = brokenArms(fighter) * spec.brokenArm + legs * spec.brokenLeg + maimFear(fighter, world.time);
   const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter) + outnumberedFear(world, fighter) + generalFear(world, fighter) + shockFear(world, fighter);
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
@@ -2347,6 +2355,11 @@ function feelFear(world, fighter, nerve, dt, opponent = null) {
   const steadied = world.time < (fighter.steadyUntil ?? -Infinity) ? 1 - AI.rout.rally.steadied : 1;
   const target = fearTarget(world, fighter, nerve, opponent) * steadied;
   fighter.fear = (fighter.fear ?? 0) + (target - (fighter.fear ?? 0)) * Math.min(1, dt / spec.settle);
+  // The shock of a limb lost (maiming.js) is felt at once, not over `settle` s: whether he breaks is decided in the first moments.
+  if (fighter.maimShockAt !== undefined && fighter.maimFeltAt !== fighter.maimShockAt) {
+    fighter.maimFeltAt = fighter.maimShockAt;
+    fighter.fear = Math.max(fighter.fear, target);
+  }
   // Adrenaline holds him from breaking: easily in an even fight, hardly against a much deadlier man.
   const mismatch = Math.min(1, Math.max(0, -nerve) + (opponent ? weaponDread(fighter, opponent) : 0));
   const held = fighter.adrenaline > spec.adrenalineHolds + (AI.adrenaline.holdsOutmatched - spec.adrenalineHolds) * mismatch;
@@ -2797,6 +2810,52 @@ function crawlTarget(world, at, away, pressed) {
   return best;
 }
 
+/**
+ * A leg gone (physics.js fightFromGround), on his knees and not broken: he turns to the nearest enemy and strikes low at
+ * him when he is in reach (throwPunch fromKnees), with the hand he has left. Fear goes on as ever (feelFear): broken, he
+ * drops what he holds and crawls away (false: crawlAway has him).
+ */
+function groundFight(world, fighter, dt) {
+  // (The fight's events, felt as ever: adrenaline, who hit him.)
+  chooseFocus(world, fighter);
+  fighter.move = 0;
+  fighter.strafe = 0;
+  const opponent = nearestOpponent(world, fighter);
+  if (opponent) {
+    const nerve = confidence(fighter, opponent, world);
+    fighter.aiConfidence = nerve;
+    feelFear(world, fighter, nerve, dt, opponent);
+  }
+  if (fighter.panicked) {
+    fighter.groundFight = false;
+    fighter.crawlChosen = false;
+    return false;
+  }
+  if (!opponent) {
+    fighter.goTo = null;
+    return true;
+  }
+  fighter.focus = opponent.id;
+  const at = point(fighter.x, P.pelvis);
+  const his = point(opponent.x, P.pelvis);
+  // Turned to him where he kneels (a goal with no drive turns him: physics).
+  fighter.goTo = [his[0], 0, his[2]];
+  if (fighter.punch || fighter.cooldown > 0) return true;
+  const distance = Math.hypot(his[0] - at[0], his[2] - at[2]);
+  const choices = {};
+  for (const [name, weight] of Object.entries(STYLES[fighter.style]?.attacks ?? {})) {
+    const spec = MOVES[name];
+    if (spec.kind !== 'strike' || !spec.limb?.endsWith('Hand') || spec.path === 'aim' || limbGone(fighter, spec.limb)) continue;
+    const blade = spec.path === 'blade' ? bladeFor(fighter, spec) : fighter.weapon;
+    const held = blade?.held ? blade.spec : null;
+    if (spec.reach === 'weapon' && !held) continue;
+    if (distance <= moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius) choices[name] = weight;
+  }
+  const move = pick(choices, world.random);
+  if (move && throwPunch(world, fighter, move, 'legs')) fighter.cooldown = AI.restMin + world.random() * AI.restRange;
+  return true;
+}
+
 export function think(world, fighter, dt) {
   decide(world, fighter, dt);
   // Come back from a rout and not yet over it: he goes in at a hesitant walk, never a run (AI.rout rally).
@@ -2820,9 +2879,18 @@ function decide(world, fighter, dt) {
   }
   if (fighter.state !== 'up') {
     fighter.move = 0;
+    // Down with a limb just lost (a leg gone under him: maiming.js): the shock is felt where he lies, and whether he
+    // breaks says what he does once on his knees (physics.js: fights on from the ground, or drags himself away).
+    if (fighter.state === 'down' && fighter.maimShock && !fighter.panicked && !knowsNoFear(world, fighter)) {
+      chooseFocus(world, fighter);
+      const opponent = nearestOpponent(world, fighter);
+      if (opponent) feelFear(world, fighter, confidence(fighter, opponent, world), dt, opponent);
+    }
     return;
   }
   if (fighter.crawling) {
+    // A leg gone and his nerve held: he fights on from where he kneels, until he breaks.
+    if (fighter.groundFight && groundFight(world, fighter, dt)) return;
     // Crawled to the edge of a battle's field with nobody near: off it (AI.rout crawl).
     if (crawlingAway(fighter) && battleField(world, fighter) && atFieldEdge(world, fighter) && nearestFoeAt(world, fighter) > AI.rout.clearOf) {
       leaveField(world, fighter, 'crawls off the field');
@@ -3162,6 +3230,8 @@ function decide(world, fighter, dt) {
       continue;
     }
     if (!spacing.kickRoom && spec.limb.match(/Foot|Knee/)) continue;
+    // (Not with a limb he has lost.)
+    if (limbGone(fighter, spec.limb)) continue;
     const blade = spec.path === 'blade' ? bladeFor(fighter, spec) : fighter.weapon;
     const held = blade?.held ? blade.spec : null;
     if (spec.reach === 'weapon' && !held) continue;

@@ -328,6 +328,13 @@ input[type=range].tone::-moz-range-thumb, .slider.tone input[type=range]::-moz-r
 
 /* ---- Outside the sandbox: less to read, bigger and clearer ---- */
 .bar.health i { background: linear-gradient(90deg, #e0353b, #ffcf4a 45%, #57d68d); }
+/* Bleeding fast (a limb lost, a great vessel open: maiming.js): the bar's blood runs out of it, red streaks draining left, the bar pulsing. */
+.bar.health { position: relative; }
+.bar.health.bleeding { animation: bleed-pulse 0.9s ease-in-out infinite; }
+.bar.health.bleeding i { background: repeating-linear-gradient(90deg, #b3121e 0 10px, #e0353b 10px 20px); background-size: 40px 100%; animation: bleed-drain 0.6s linear infinite; }
+@keyframes bleed-drain { from { background-position: 0 0; } to { background-position: -40px 0; } }
+@keyframes bleed-pulse { 0%, 100% { box-shadow: 0 0 0 1px rgba(255, 40, 60, 0.4); } 50% { box-shadow: 0 0 0 1px rgba(255, 40, 60, 0.95), 0 0 9px rgba(255, 30, 50, 0.75); } }
+@media (prefers-reduced-motion: reduce) { .bar.health.bleeding, .bar.health.bleeding i { animation: none; } }
 body[data-game="sandbox"] .bar.health { display: none; }
 body:not([data-game="sandbox"]) .card .meta,
 body:not([data-game="sandbox"]) .bar.brain,
