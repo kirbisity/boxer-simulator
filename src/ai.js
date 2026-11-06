@@ -7,7 +7,7 @@ import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { MAIMING, maimFear } from './maiming.js';
-import { aimPoint, armGone, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { aimPoint, armGone, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
@@ -310,6 +310,10 @@ export const AI = {
   // against many and a battle: only who is there differs. (It stands in for
   // counting heads: three on one is three times one man's strength.)
   standing: { group: 3, groupFade: 3, near: 6, sight: 16, parity: 0.25, span: 0.9, fear: 0.5, steady: 0.25 },
+  // m: how far a man may have moved from where the think's grids hold him (thinkAll: companyFear, standingFear look for the
+  // men round him there) while the men think: a rider getting down steps WORLD.mount.dismount `beside` (0.9 m) off his
+  // horse's side, his hips from the saddle; twice that, for room. Each look reaches this much further into the grid.
+  fieldSlack: 2,
   // The field seen (outnumberedFear): in a battle (a side of `rout.minSide`
   // or more), what a man makes of the whole of it, not the knot before him:
   // how many of his own still fight (on their feet, not broken, not crawling
@@ -633,6 +637,35 @@ function pick(weights, random) {
 
 /** One AI decision tick for every fighter not driven by the player. */
 export function thinkAll(world, dt, playerIds = new Set()) {
+  seeingField(world, () => thinkEach(world, dt, playerIds));
+}
+
+// The field as this think finds it: every man's hips in two grids (cells of a knot's reach, AI.standing group and
+// groupFade, and of a man's sight, AI.standing sight), so that what a man sees round him (companyFear, standingFear) is
+// looked for among the men near him rather than all of them, every man, every think (a battle's thousands of pairs).
+// Only while thinkAll runs (`fieldSeen` its world): nothing moves while the men think.
+const nearGrid = floorGrid();
+const sightGrid = floorGrid();
+let fieldSeen = null;
+
+/** Run `think` with the field as it is now held in the grids (thinkAll's think; a test's). */
+export function seeingField(world, think) {
+  try {
+    fieldSeen = world;
+    fillGrid(nearGrid, world.fighters, AI.standing.group + AI.standing.groupFade);
+    fillGrid(sightGrid, world.fighters, AI.standing.sight);
+    return think();
+  } finally {
+    fieldSeen = null;
+  }
+}
+
+/** The men (indices) who may be within `radius` m of (x, z), from this think's grids (in index order if `sorted`); or null outside a think. */
+function menAround(world, grid, x, z, radius, sorted = true) {
+  return fieldSeen === world ? gridAround(grid, x, z, radius + AI.fieldSlack, sorted) : null;
+}
+
+function thinkEach(world, dt, playerIds) {
   keepGenerals(world, playerIds);
   keepLeaders(world);
   keepSides(world);
@@ -2240,27 +2273,53 @@ function keepSides(world) {
     if (fighter.aiWorth === undefined && fighter.aiStrength > 0) fighter.aiWorth = fighter.aiStrength;
   }
   for (const corner of ['red', 'blue']) {
-    const men = world.fighters.filter((fighter) => fighter.corner === corner);
-    if (!men.length) continue;
-    const side = (sides[corner] ??= { men: men.length, rear: null });
-    side.worth = men.reduce((sum, fighter) => sum + (fighter.aiWorth ?? 1), 0);
+    // (Each sum over his side's men in the order they stand in world.fighters, as a filter and a reduce made them.)
+    let count = 0;
+    let worthSum = 0;
+    for (const fighter of world.fighters) {
+      if (fighter.corner !== corner) continue;
+      count += 1;
+      worthSum += fighter.aiWorth ?? 1;
+    }
+    if (!count) continue;
+    const side = (sides[corner] ??= { men: count, rear: null });
+    side.worth = worthSum;
     // A man gone counts whole; one broken but still on the field, half (he may yet rally); each by what he was worth.
-    const lost = men.reduce((sum, fighter) => sum + (fighter.aiWorth ?? 1) * (!inFight(fighter) ? 1 : fighter.panicked ? 0.5 : 0), 0);
+    let lost = 0;
+    let fighting = 0;
+    let strength = 0;
+    const broken = [];
+    for (const fighter of world.fighters) {
+      if (fighter.corner !== corner) continue;
+      const inIt = inFight(fighter);
+      lost += (fighter.aiWorth ?? 1) * (!inIt ? 1 : fighter.panicked ? 0.5 : 0);
+      // Its men still fighting, and their strength (AI.outnumbered: the field seen; battleend.js: a battle decided).
+      if (stillFighting(fighter)) {
+        fighting += 1;
+        strength += fighter.aiStrength;
+      }
+      if (fighter.panicked && inIt) broken.push([fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
+      // Where his own fell (out, or crawling off), and when: seen by the men near him for a while (AI.morale).
+      if (fighter.goneAt === undefined && !inIt && !fighter.fled) fighter.goneAt = world.time;
+    }
     side.lost = lost / side.worth;
     // How much of it went in the last few seconds (AI.morale shock): kept as a short history.
-    side.history = (side.history ?? []).filter((entry) => world.time - entry[0] <= AI.morale.shockFor);
-    side.history.push([world.time, side.lost]);
-    side.shock = Math.max(0, side.lost - side.history[0][1]);
-    // Its men still fighting, and their strength (AI.outnumbered: the field seen; battleend.js: a battle decided).
-    const fighting = men.filter(stillFighting);
-    side.fighting = fighting.length;
-    side.strength = fighting.reduce((sum, fighter) => sum + fighter.aiStrength, 0);
-    side.broken = men.filter((fighter) => fighter.panicked && inFight(fighter)).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
-    // Where his own fell (out, or crawling off), and when, and what each was worth against the side's average: seen by the men near him for a while (AI.morale).
-    for (const fighter of men) if (fighter.goneAt === undefined && !inFight(fighter) && !fighter.fled) fighter.goneAt = world.time;
-    const average = side.worth / men.length;
-    const worth = (fighter) => Math.max(AI.morale.worthLeast, Math.min(AI.morale.worthMost, (fighter.aiWorth ?? average) / average));
-    side.fallen = men.filter((fighter) => fighter.goneAt !== undefined && world.time - fighter.goneAt < AI.morale.fallenFor).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2], worth(fighter)]);
+    // (Kept in the order of time: what has gone past shockFor is the oldest, at its front.)
+    const history = (side.history ??= []);
+    while (history.length && !(world.time - history[0][0] <= AI.morale.shockFor)) history.shift();
+    history.push([world.time, side.lost]);
+    side.shock = Math.max(0, side.lost - history[0][1]);
+    side.fighting = fighting;
+    side.strength = strength;
+    side.broken = broken;
+    // ...and what each fallen man was worth against the side's average.
+    const average = side.worth / count;
+    const fallen = [];
+    for (const fighter of world.fighters) {
+      if (fighter.corner !== corner || fighter.goneAt === undefined || !(world.time - fighter.goneAt < AI.morale.fallenFor)) continue;
+      fallen.push([fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2], Math.max(AI.morale.worthLeast, Math.min(AI.morale.worthMost, (fighter.aiWorth ?? average) / average))]);
+    }
+    side.fallen = fallen;
   }
   for (const [corner, other] of [['red', 'blue'], ['blue', 'red']]) {
     if (!sides[corner] || !sides[other] || sides[corner].rear) continue;
@@ -2321,7 +2380,11 @@ export function companyFear(world, fighter) {
   const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   let friends = 0;
   let formed = 0;
-  for (const other of world.fighters) {
+  // (Within a think, only the men in the grid's cells round him can be within `near`.)
+  const around = menAround(world, nearGrid, at[0], at[1], spec.near, false);
+  const count = around ? around.length : world.fighters.length;
+  for (let k = 0; k < count; k += 1) {
+    const other = world.fighters[around ? around[k] : k];
     if (other === fighter || other.state !== 'up' || other.crawling || other.fled || other.dormant || other.hidden) continue;
     if (Math.hypot(other.x[P.pelvis * 3] - at[0], other.x[P.pelvis * 3 + 2] - at[1]) > spec.near) continue;
     if (other.corner === fighter.corner) friends += other.panicked ? 0 : 1;
@@ -2362,6 +2425,8 @@ export function outnumberedFear(world, fighter) {
  */
 export function standingFear(world, fighter) {
   const spec = AI.standing;
+  // Within a think, on open ground: the same weighing, among the men the grids hold near him (standingFearNear).
+  if (fieldSeen === world && !world.arena.works) return standingFearNear(world, fighter);
   const where = (other) => [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]];
   const at = where(fighter);
   const enemies = world.fighters.filter((other) => hostile(other, fighter) && !other.dormant && !other.hidden && inFight(other));
@@ -2388,6 +2453,66 @@ export function standingFear(world, fighter) {
   const past = (value) => Math.max(0, Math.min(1, (value - spec.parity) / spec.span));
   const coming = Math.min(1, 1 - (nearestApart - spec.near) / (spec.sight - spec.near));
   return coming * (spec.fear * past(gap) - spec.steady * past(-gap));
+}
+
+/**
+ * standingFear on open ground within a think: the nearest enemy looked for among the men within his sight's cells, each
+ * knot's strength among the men within its reach's cells. Every man left out is one standingFear would find no nearer
+ * than `sight` or weigh at nothing (beyond group + groupFade m), and the rest are taken in the same order: the same sums.
+ */
+function standingFearNear(world, fighter) {
+  const spec = AI.standing;
+  const fighters = world.fighters;
+  const x = fighter.x[P.pelvis * 3];
+  const z = fighter.x[P.pelvis * 3 + 2];
+  // The nearest enemy: of those as near, the first in world.fighters (as standingFear's scan in order finds him).
+  let nearest = null;
+  let nearestIndex = -1;
+  let nearestApart = Infinity;
+  const seen = menAround(world, sightGrid, x, z, spec.sight, false);
+  for (let k = 0; k < seen.length; k += 1) {
+    const enemy = fighters[seen[k]];
+    if (!knotEnemy(enemy, fighter)) continue;
+    const apart = Math.hypot(enemy.x[P.pelvis * 3] - x, enemy.x[P.pelvis * 3 + 2] - z);
+    if (apart < nearestApart || (apart === nearestApart && seen[k] < nearestIndex)) {
+      nearest = enemy;
+      nearestIndex = seen[k];
+      nearestApart = apart;
+    }
+  }
+  if (!nearest || nearestApart >= spec.sight) return 0;
+  const middleX = nearest.x[P.pelvis * 3];
+  const middleZ = nearest.x[P.pelvis * 3 + 2];
+  const reach = spec.group + spec.groupFade;
+  let ours = strengthNow(fighter);
+  const mine = menAround(world, nearGrid, x, z, reach);
+  for (let k = 0; k < mine.length; k += 1) {
+    const other = fighters[mine[k]];
+    if (other !== fighter && other.corner === fighter.corner && !other.dormant) ours += knotWeight(other, x, z) * strengthNow(other);
+  }
+  let theirs = 0;
+  const knot = menAround(world, nearGrid, middleX, middleZ, reach);
+  for (let k = 0; k < knot.length; k += 1) {
+    const enemy = fighters[knot[k]];
+    if (knotEnemy(enemy, fighter)) theirs += knotWeight(enemy, middleX, middleZ) * strengthNow(enemy);
+  }
+  if (!theirs || !ours) return 0;
+  const gap = Math.log(theirs / ours);
+  const past = (value) => Math.max(0, Math.min(1, (value - spec.parity) / spec.span));
+  const coming = Math.min(1, 1 - (nearestApart - spec.near) / (spec.sight - spec.near));
+  return coming * (spec.fear * past(gap) - spec.steady * past(-gap));
+}
+
+/** An enemy standingFear weighs: hostile, awake, seen and in the fight. */
+function knotEnemy(other, fighter) {
+  return hostile(other, fighter) && !other.dormant && !other.hidden && inFight(other);
+}
+
+/** How fully a man counts in a knot round (x, z) (AI.standing): in full within `group` m, fading out over `groupFade` more. */
+function knotWeight(other, x, z) {
+  const spec = AI.standing;
+  const apart = Math.hypot(other.x[P.pelvis * 3] - x, other.x[P.pelvis * 3 + 2] - z);
+  return Math.max(0, Math.min(1, 1 - (apart - spec.group) / spec.groupFade));
 }
 
 /** How many times the shock of a thing (`what`: 'gun', 'horse') is to him: AI.shock `strange` if his people had never met it (FACTIONS `strangers`), else 1. */

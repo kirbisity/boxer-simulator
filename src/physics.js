@@ -4656,6 +4656,28 @@ export function fillGrid(grid, fighters, cell) {
 
 const byIndex = (a, b) => a - b;
 
+/**
+ * Every fighter (index) in the cells that a square `radius` m each way round (x, z) touches: all those within `radius` of
+ * it and some beyond (the caller measures). In index order, unless `sorted` is false (for a count, which needs none).
+ * Into the grid's own list unless given one.
+ */
+export function gridAround(grid, x, z, radius, sorted = true, found = grid.found) {
+  const cell = grid.cell;
+  found.length = 0;
+  const fromX = Math.floor((x - radius) / cell);
+  const toX = Math.floor((x + radius) / cell);
+  const fromZ = Math.floor((z - radius) / cell);
+  const toZ = Math.floor((z + radius) / cell);
+  for (let cx = fromX; cx <= toX; cx += 1) {
+    for (let cz = fromZ; cz <= toZ; cz += 1) {
+      const list = grid.cells.get(cx * 4096 + cz);
+      if (!list) continue;
+      for (let k = 0; k < list.length; k += 1) found.push(list[k]);
+    }
+  }
+  return sorted ? found.sort(byIndex) : found;
+}
+
 /** Every other fighter within the grid's cell of fighter `index`, in index order (the grid's own list: copy it to keep it). */
 export function gridNear(grid, index, found = grid.found) {
   const cell = grid.cell;
