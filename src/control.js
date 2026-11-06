@@ -540,6 +540,11 @@ export const MOVE_NAMES = {
   // The weapon arts (weaponarts.js), named as artdrama.js shows them.
   artIai: ['Iai', 'drawing cut'], artPommel: ['Knaufschlag', 'pommel strike'], artDrawCut: ['Drawing cut'], artWheel: ['Wheel cut'],
   artCrush: ['Crushing blow'], artCrushClub: ['Crushing blow'], artCrushOne: ['Crushing blow'], artSpear: ['Lunge'],
+  // (The situational arts: weaponarts.js ARTS.choices.)
+  artMordhau: ['Mordhau', 'the hilt as a hammer'], artHalfSword: ['Half-sword', 'into the gap'], artKesagiri: ['Kesagiri'], artTsuki: ['Tsuki', 'at the throat'],
+  artWristCut: ['Wrist cut'], artBackhand: ['Backhand whirl'], artLegSweep: ['Leg sweep'], artButt: ['Butt strike'], artCleave: ['Cleaving chop'],
+  artBeak: ['Beak', 'through the plate'], artHook: ['Hook and pull'], artGrappleStab: ['Grapple and stab'], artLiverHook: ['Liver hook'],
+  artSpinKick: ['Spinning kick'], artTeep: ['Teep', 'push kick'], artShieldBash: ['Shield bash'], artShieldBashThrust: ['Shield bash'], artShieldCut: ['Cut', 'over the shield'], artShieldThrust: ['Thrust', 'past the shield'],
 };
 
 /** A move's name, and a gloss if it has one: { name, gloss }. Unnamed: its key in words ("hammerOverhead" → "Hammer overhead"). */

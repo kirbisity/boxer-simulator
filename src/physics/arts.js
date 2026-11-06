@@ -7,6 +7,7 @@
 // Nothing here scales a blow: each only changes how the body and the weapon move, or which part of the
 // weapon meets him, and the physics makes of that what it is.
 
+import { P } from '../body.js';
 import { bladeTargets } from '../weapons.js';
 
 export const ART_MECHANICS = {
@@ -21,6 +22,11 @@ export const ART_MECHANICS = {
   // from the end of the grip, `handle`, plus the knob's own `knob`, to `handle` less `grip`): a longsword's pommel is a steel
   // disc or wheel of ~4 cm at the end of a ~24 cm grip. All of it blunt (`blunt`): a rounded steel knob neither cuts nor stabs.
   hilt: { knob: 0.03, grip: 0.07, blunt: 1 },
+  // The mordhau's (`hilt: 'cross'`): the sword held reversed, the hilt swung as a hammer's head, and what lands is the cross's
+  // quillon, a narrow bar of hard steel struck end on: like a war hammer's small face (weapons.js warhammer `crush` 0.7, a
+  // flanged mace's 0.45) it drives this share of its blow through plate rather than spreading it. (This model keeps the hands
+  // on the grip: the hilt's lever is the grip's length, not the half blade's a real mordhau has.)
+  cross: { crush: 0.6 },
   // An art measured to its distance (a move's `range`: where his hands are to pass as the stroke meets its mark, as a share of
   // his arm's reach before his hips, so that the weapon's head and not its haft meets him there): through the wind-up his eye
   // stays on his man, the stroke laid for where he stands now, and his feet take him in or back toward that distance, `gain`
@@ -31,6 +37,9 @@ export const ART_MECHANICS = {
   // effectiveMassAt's ordinary stroke): what meets the weapon there is the turning inertia of all of it. The trunk's share
   // behind the blow (`mass.body`) turns at `gyration` m about the spine (the trunk and shoulders, ~0.2 m), not at the hand.
   turning: { gyration: 0.2 },
+  // A hook (`hook`: the mace's, the hammer's head caught behind a knee or on a shield's rim; the spear's shaft reaping the feet):
+  // once it has caught, the arms draw it on, both hands' pull (their strike force) for `seconds` — a short hard heave.
+  hook: { seconds: 0.09 },
 };
 
 /**
@@ -119,7 +128,28 @@ export function strikeSpan(weapon, stroke) {
   return [-(spec.handle + ART_MECHANICS.hilt.knob), -(spec.handle - ART_MECHANICS.hilt.grip)];
 }
 
+/** The pommel's radius (m): a knob of ART_MECHANICS.hilt.knob, what strikes in a blow with the hilt. */
+export function hiltKnob() {
+  return ART_MECHANICS.hilt.knob;
+}
+
+/** The share of a mordhau's blow (`hilt: 'cross'`) the quillon drives through armour (ART_MECHANICS.cross). */
+export function hiltCrush() {
+  return ART_MECHANICS.cross.crush;
+}
+
 /** How a blow with the pommel harms: all blunt (in harmMix's shape). */
 export function hiltMix() {
   return { blunt: ART_MECHANICS.hilt.blunt, cut: 0, pierce: 0 };
+}
+
+/** How a weapon swung beak first harms (`beak`: the war hammer's spike behind its face): the weapon's own `beak` mix, no edge. */
+export function beakMix(weaponSpec) {
+  return { blunt: weaponSpec.beak.blunt ?? 0, cut: 0, pierce: weaponSpec.beak.pierce ?? 0 };
+}
+
+/** The impulse (N·s) of the arms' heave on a hook that has caught (ART_MECHANICS.hook): both hands' strike force, his strength. */
+export function hookPull(fighter) {
+  const hands = fighter.body.strikeForce;
+  return ART_MECHANICS.hook.seconds * (hands[P.lHand] + hands[P.rHand]) * Math.max(0.3, fighter.motorScale ?? 1);
 }

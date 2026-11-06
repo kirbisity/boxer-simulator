@@ -1,4 +1,4 @@
-// Weapon arts: the player's special attacks, one for each family of weapon (weapons.js `art`, a move in
+// Weapon arts: the player's special attacks, a few for each family of weapon (weapons.js `art` names the family's own, a move in
 // moves.js marked `art`), to be made only with his blood up — adrenaline very high — and at the cost of
 // the surge itself (it is spent in the doing; the stamina of an all-out effort is not counted against him: the surge
 // pays for it). Nothing here
@@ -7,6 +7,10 @@
 // ai.js AI.art) and laid on its mark with more care (physics/config.js WORLD.skill.artScatter). Every hand-to-hand weapon has
 // one, and every unarmed style (moves.js STYLES `art`); no gun or bow. The AI does not
 // make them: they are the player's (an AI man's adrenaline is ai.js's own, for his fear).
+//
+// Which of the family's arts is made is the situation's (chooseArt, ARTS.choices): what the player can see of his man (how far,
+// in what armour, his guard, charging or crowding in, where he stands, locked with him) picks it, and the button names it as it
+// changes (artLabel). One press, the art the moment asks for: the mordhau for a man in plate, the leg sweep for one charging in.
 //
 // The charge: once his adrenaline reaches ARTS.ready with a weapon that has an art, the art is charged (`artCharged`) and
 // stays so, whatever his adrenaline does after and whoever is near, until he makes it: a surge banked, his to spend when he
@@ -25,8 +29,11 @@
 import { AI, adrenalineGain, surge } from './ai.js';
 import { P } from './body.js';
 import { MOVES, STYLES } from './moves.js';
-import { hostile, inFight, opponentFor, point, reachOf, throwPunch } from './physics.js';
+import { hostile, inFight, opponentFor, perform, point, protectionAt, reachOf, throwPunch } from './physics.js';
+import { WORLD } from './physics/config.js';
+import { gapsOf } from './physics/gaps.js';
 import { startThrow, throwableOf, throwBlocked } from './physics/throwable.js';
+import { yawRotate } from './pose.js';
 
 export const ARTS = {
   // Adrenaline (0..1) at which an art can be made: very high, more than one hard exchange's worth (a knockdown alone gives
@@ -50,8 +57,150 @@ export const ARTS = {
   // made the moment he is free, so a press a beat early is not lost.
   askedFor: 0.4,
   // The art's name on its button.
-  labels: { artIai: 'Iai', artPommel: 'Pommel', artDrawCut: 'Draw cut', artWheel: 'Wheel', artCrush: 'Crush', artCrushClub: 'Crush', artCrushOne: 'Crush', artSpear: 'Lunge', artFleche: 'Flèche', artOverhand: 'Overhand', artRoundhouse: 'Roundhouse', artSlam: 'Slam' },
+  labels: {
+    artIai: 'Iai', artPommel: 'Pommel', artDrawCut: 'Draw cut', artWheel: 'Wheel', artCrush: 'Crush', artCrushClub: 'Crush', artCrushOne: 'Crush', artSpear: 'Lunge', artFleche: 'Flèche', artOverhand: 'Overhand', artRoundhouse: 'Roundhouse', artSlam: 'Slam',
+    artMordhau: 'Mordhau', artHalfSword: 'Half-sword', artKesagiri: 'Kesagiri', artTsuki: 'Tsuki', artWristCut: 'Wrist cut', artBackhand: 'Backhand whirl',
+    artLegSweep: 'Leg sweep', artButt: 'Butt strike', artCleave: 'Cleave', artBeak: 'Beak', artHook: 'Hook and pull', artGrapple: 'Grapple and stab',
+    artGrappleStab: 'Grapple and stab', artLiverHook: 'Liver hook', artHipThrow: 'Hip throw', artSpinKick: 'Spinning kick', artTeep: 'Teep',
+    artShieldBash: 'Bash and cut', artShieldBashThrust: 'Bash and thrust', artShieldCut: 'Bash and cut', artShieldThrust: 'Bash and thrust',
+  },
+  // The situational arts: which art the moment asks for (chooseArt), by his family's own art (its default, made when none of these
+  // is the case): each a move and when (the situation as he sees it, artSituation), the first that holds; `zone` where on him it
+  // goes (else the move's first). What he can see: how far his man is, what armour covers him where (plate or any rigid harness
+  // an edge cannot cut, mail, or none), how high his guard is, whether he is charging or crowding in, where he stands about him,
+  // whether they are locked together, his weapon and its hand. A man with a shield on his arm and an armed man square before it
+  // has the shield's art (`shield`) before any of his family's.
+  choices: {
+    // The long sword: a man in arms close, the half-sword's point into a gap; plate on his head, the mordhau; else the pommel.
+    artPommel: [
+      { art: 'artHalfSword', when: (s) => s.armour.trunk !== 'none' && s.distance < 1.15 },
+      { art: 'artMordhau', when: (s) => s.armour.head === 'plate' },
+    ],
+    // The katana and the ōdachi: an armoured man, or one out at the point's length, the tsuki at the throat; one close and square
+    // to him, kesagiri; else iai.
+    artIai: [
+      { art: 'artTsuki', when: (s) => (s.armour.trunk !== 'none' && s.distance > s.reach + 0.35) || s.distance > s.reach + 0.7 },
+      { art: 'artKesagiri', when: (s) => s.distance < s.reach && s.square },
+    ],
+    // The cutting sword in one hand: a man off to his left (the sword's off side), the backhand whirl; an armed man's weapon hand
+    // within reach, the wrist cut; else the drawing cut.
+    artDrawCut: [
+      { art: 'artBackhand', when: (s) => s.bearing > 0.45 },
+      { art: 'artWristCut', when: (s) => s.armed && s.handNear },
+    ],
+    // The spear: a man inside the point, the butt; one charging in, the leg sweep; else the lunge.
+    artSpear: [
+      { art: 'artButt', when: (s) => s.inside },
+      { art: 'artLegSweep', when: (s) => s.charging },
+    ],
+    // The polearm: a man lower than him or at the middle of its reach, the cleaving chop; else the wheel.
+    artWheel: [{ art: 'artCleave', when: (s) => s.lower || s.distance < s.reach * 0.75 }],
+    // The hammer, the club, the mace: plate and a beak to put into it, the beak; a shield or a braced guard, the hook; else the crush.
+    artCrush: [
+      { art: 'artBeak', when: (s) => s.beak && (s.armour.head === 'plate' || s.armour.trunk === 'plate') },
+      { art: 'artHook', when: (s) => s.shield || s.braced, zone: (s) => (s.shield ? 'shield' : 'shins') },
+    ],
+    artCrushClub: [{ art: 'artHook', when: (s) => s.shield || s.braced, zone: (s) => (s.shield ? 'shield' : 'shins') }],
+    artCrushOne: [{ art: 'artHook', when: (s) => s.shield || s.braced, zone: (s) => (s.shield ? 'shield' : 'shins') }],
+    // The dagger and the short point: a man to be seized (within the hands' reach), the grapple and stab (at the throat, or his
+    // bare face over a harness); else the flèche.
+    artFleche: [{ art: 'artGrapple', when: (s) => s.clinch, zone: (s) => (s.armour.head === 'none' && s.armour.trunk !== 'none' ? 'head' : 'throat') }],
+    // The empty hand: a thrower locked with him or at the hands' reach, the hip throw; his guard high, the liver hook; else the overhand.
+    artOverhand: [
+      { art: 'artHipThrow', when: (s) => s.thrower && s.clinch },
+      { art: 'artLiverHook', when: (s) => s.guardHigh },
+    ],
+    // The kicker: crowded, the teep; at the middle of a kick's reach (beyond his arm's, short of the leg's full length: his reach
+    // is his arm's, empty-handed), the spinning kick; else the roundhouse.
+    artRoundhouse: [
+      { art: 'artTeep', when: (s) => s.crowding },
+      { art: 'artSpinKick', when: (s) => s.distance > s.reach * 1.35 && s.distance < s.reach * 1.85 },
+    ],
+  },
+  // The shield's: an armed man square before it, within a step and the arm's reach (m, hips to hips).
+  shield: { within: 1.8, ahead: 0.5 },
+  // What counts (the situation): his armour at a part, `plate` when rigid (physics/gaps.js rigidFrom: an edge does not cut it),
+  // `mail` from this cut protection; `square` his chest within this (rad) of facing him; his hands above this share of the way
+  // from his hips to his neck, his guard high; coming in at `charging` m/s or more, charging; `crowding` within this share of the
+  // reach (or closing at `crowdingSpeed` inside it); `lower` his head so much (m) below his own; `inside`: within the point's
+  // start (`strikeFrom`) and `insideSlack` m of it, hips to hips; his weapon hand near, within his reach and `handSlack` m (a
+  // step) of his shoulder.
+  sense: { mail: 0.5, square: 0.6, guardHigh: 0.8, charging: 2.2, crowding: 1.1, crowdingWithin: 1.5, crowdingSpeed: 0.8, lower: 0.25, insideSlack: 0.45, handSlack: 0.35 },
 };
+
+/** The armour class at a part of him ('plate', 'mail' or 'none'), as ARTS.sense reads it. */
+function armourClass(man, key) {
+  const covered = protectionAt(man.body.gear, key);
+  if (covered.deflects || (covered.cut ?? 0) >= gapsOf(man.body.gear).rigidFrom) return 'plate';
+  return (covered.cut ?? 0) >= ARTS.sense.mail ? 'mail' : 'none';
+}
+
+/**
+ * The situation as he sees it for his art (pure): his man's distance (m, hips to hips) and his own reach (physics.js reachOf); the
+ * armour on his man's head, trunk and shins; whether his man stands square to him, his guard high, charging or crowding in, lower
+ * than him, inside his point, armed and his weapon hand within reach, with a shield, braced behind a block; where his man stands
+ * about him (`bearing`, rad, + to his left); whether they are locked together. Null with no man.
+ */
+export function artSituation(world, fighter, man) {
+  if (!man) return null;
+  const sense = ARTS.sense;
+  const hips = point(fighter.x, P.pelvis);
+  const his = point(man.x, P.pelvis);
+  const off = [his[0] - hips[0], 0, his[2] - hips[2]];
+  const distance = Math.hypot(off[0], off[2]);
+  const toHim = distance > 1e-6 ? [off[0] / distance, 0, off[2] / distance] : yawRotate([1, 0, 0], fighter.yaw);
+  const forward = yawRotate([1, 0, 0], fighter.yaw);
+  const left = yawRotate([0, 0, 1], fighter.yaw);
+  const hisForward = yawRotate([1, 0, 0], man.yaw);
+  const reach = reachOf(fighter);
+  const closing = -(man.rootVelocity[0] * toHim[0] + man.rootVelocity[1] * toHim[2]);
+  const chest = man.x[P.pelvis * 3 + 1] + (man.x[P.neck * 3 + 1] - man.x[P.pelvis * 3 + 1]) * sense.guardHigh;
+  const weapon = fighter.weapon?.held ? fighter.weapon : null;
+  const armed = Boolean(man.weapon?.held && !man.weapon.spec.ranged && !man.weapon.spec.shot && !man.weapon.spec.bow);
+  const hand = armed ? point(man.x, P[`${man.weapon.main}Hand`]) : null;
+  const shoulder = point(fighter.x, P[`${weapon?.main ?? 'r'}Shoulder`]);
+  const style = STYLES[fighter.style];
+  const neckGap = Math.hypot(man.x[P.neck * 3] - fighter.x[P.neck * 3], man.x[P.neck * 3 + 2] - fighter.x[P.neck * 3 + 2]);
+  return {
+    distance, reach,
+    bearing: Math.atan2(toHim[0] * left[0] + toHim[2] * left[2], toHim[0] * forward[0] + toHim[2] * forward[2]),
+    armour: { head: armourClass(man, 'head'), trunk: armourClass(man, 'trunk'), legs: armourClass(man, 'lShank') },
+    square: -(hisForward[0] * toHim[0] + hisForward[2] * toHim[2]) > Math.cos(sense.square),
+    guardHigh: man.guardHigh > 0 || (man.x[P.lHand * 3 + 1] > chest && man.x[P.rHand * 3 + 1] > chest),
+    charging: Boolean(man.rush) || closing >= sense.charging,
+    crowding: distance < reach * sense.crowding || (distance < reach * sense.crowdingWithin && closing >= sense.crowdingSpeed),
+    lower: Boolean(man.crawling) || man.x[P.head * 3 + 1] < fighter.x[P.head * 3 + 1] - sense.lower,
+    inside: Boolean(weapon) && distance < weapon.spec.strikeFrom + sense.insideSlack,
+    armed,
+    handNear: Boolean(hand) && Math.hypot(hand[0] - shoulder[0], hand[2] - shoulder[2]) <= reach + sense.handSlack,
+    shield: Boolean(man.shield),
+    braced: ['shieldBlock', 'weaponBlock', 'parry', 'guard'].includes(man.defence?.name),
+    clinch: fighter.clinch?.target === man.id || neckGap <= fighter.body.reach * WORLD.clinch.range,
+    beak: Boolean(weapon?.spec.beak),
+    thrower: Boolean(style?.throws || style?.shoulderThrow),
+    myShield: Boolean(fighter.shield),
+  };
+}
+
+/**
+ * The art the moment asks for (pure): { art, zone } — his family's art (artOf) unless one of its situational arts holds
+ * (ARTS.choices, the first that does), or the shield's (ARTS.shield); `zone` where on him (null: the move's first). With no man
+ * near (artTarget), his family's own. Null with no art.
+ */
+export function chooseArt(world, fighter, man = artTarget(world, fighter)) {
+  const own = artOf(fighter);
+  if (!own) return null;
+  const s = artSituation(world, fighter, man);
+  if (!s) return { art: own, zone: null };
+  // (The shield's first: a man with a shield on his arm meets an armed man square before it with its boss.)
+  const shield = ARTS.shield;
+  if (s.myShield && s.armed && fighter.weapon?.held && s.distance < shield.within && Math.abs(s.bearing) < shield.ahead && s.square) {
+    const harm = fighter.weapon.spec.harm;
+    return { art: (harm.thrust?.pierce ?? 0) > (harm.swing?.cut ?? 0) ? 'artShieldBashThrust' : 'artShieldBash', zone: null };
+  }
+  for (const choice of ARTS.choices[own] ?? []) if (choice.when(s)) return { art: choice.art, zone: choice.zone ? choice.zone(s) : null };
+  return { art: own, zone: null };
+}
 
 /** The art his weapon has (a move's name), or his style's with an empty hand, or null: none for a gun, a bow, or from the saddle. */
 export function artOf(fighter) {
@@ -80,7 +229,9 @@ export function artBlocked(fighter) {
   if (throwableOf(fighter)) return throwBlocked(fighter);
   const name = artOf(fighter);
   if (!name || !artPrimed(fighter)) return 'none';
-  if (fighter.state !== 'up' || fighter.punch || fighter.crawling || fighter.netted || fighter.pain || fighter.clinch || fighter.rush) return 'busy';
+  // (Locked with him, a thrower's art is his throw from the hold: not kept from him.)
+  const throwing = fighter.clinch && (STYLES[fighter.style]?.throws || STYLES[fighter.style]?.shoulderThrow) && !fighter.clinch.art;
+  if (fighter.state !== 'up' || fighter.punch || fighter.crawling || fighter.netted || fighter.pain || (fighter.clinch && !throwing) || fighter.rush) return 'busy';
   return null;
 }
 
@@ -111,11 +262,12 @@ function artIntoAir(world, fighter) {
   return [hips[0] + way[0] * reach, fighter.x[P.neck * 3 + 1] - 0.1, hips[2] + way[1] * reach];
 }
 
-/** The name of his art for the button. */
-export function artLabel(fighter) {
+/** The name of his art for the button: the one he would make now (chooseArt) when the world is given, else his family's. */
+export function artLabel(fighter, world = null) {
   const grenade = throwableOf(fighter);
   if (grenade) return grenade.label;
-  return ARTS.labels[artOf(fighter)] ?? 'Art';
+  const name = world ? chooseArt(world, fighter)?.art : artOf(fighter);
+  return ARTS.labels[name] ?? 'Art';
 }
 
 /**
@@ -128,10 +280,17 @@ export function startArt(world, fighter) {
   // A grenade first: thrown (physics/throwable.js), the art left charged for after.
   if (throwableOf(fighter)) return startThrow(world, fighter);
   const man = artTarget(world, fighter);
-  const name = artOf(fighter);
+  // The art the moment asks for (chooseArt): a strike, or a hold taken for a throw or a stab (`kind: 'clinch'`, grappling.js).
+  const { art: name, zone } = chooseArt(world, fighter, man);
   const spec = MOVES[name];
-  if (!throwPunch(world, fighter, name, spec.zones[0], man ? {} : { at: artIntoAir(world, fighter) })) return false;
-  if (spec.trueEdge) fighter.punch.edgeTilt = 0;
+  if (spec.kind === 'clinch') {
+    const holding = man && fighter.clinch?.target === man.id;
+    if (!man || (!holding && !perform(world, fighter, name))) return false;
+    fighter.clinch.art = { throw: Boolean(spec.throw), then: spec.then ?? null, zone };
+  } else {
+    if (!throwPunch(world, fighter, name, zone ?? spec.zones[0], man ? {} : { at: artIntoAir(world, fighter) })) return false;
+    if (spec.trueEdge) fighter.punch.edgeTilt = 0;
+  }
   fighter.artCharged = false;
   fighter.adrenaline = Math.max(0, (fighter.adrenaline ?? 0) - ARTS.spend);
   world.events.push({ time: world.time, kind: 'art', attacker: fighter.id, defender: man?.id, punch: name, effects: [ARTS.labels[name] ?? name] });
