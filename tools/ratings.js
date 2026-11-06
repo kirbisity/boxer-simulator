@@ -27,7 +27,7 @@ import { fork } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { PRESETS } from '../src/body.js';
-import { thinkAll } from '../src/ai.js';
+import { hurtShare, thinkAll } from '../src/ai.js';
 import { advance, boutWinner, createWorld, seededRandom } from '../src/physics.js';
 import { WARRIORS } from '../src/roster.js';
 import { factionOf } from '../src/outfits.js';
@@ -44,6 +44,10 @@ export const RATING = {
   across: 2,
   // Across factions and eras only each group's top, middle and bottom meet the others (a few pairs to tell them apart).
   marks: 3,
+  // A bout's score (0..1, to the first man): `health` of it from how much of each was left at the end (half and half: his health
+  // left less the other's, a man out having none), the rest from who won (a win 1, a draw a half). A win at full health is 1;
+  // a win barely alive ~0.75; a draw the healthier ahead.
+  health: 0.5,
 };
 
 /**
@@ -92,37 +96,50 @@ export function groupBy(keys, tiers, nameOf) {
   return groups;
 }
 
-/** One bout: who wins ('red', 'blue' or null for a draw at the bell). */
+/** One bout: who wins ('red', 'blue' or null for a draw at the bell), and red's score (boutScore). */
 function bout(red, blue, seed) {
   const world = createWorld([{ inputs: structuredClone(red), corner: 'red' }, { inputs: structuredClone(blue), corner: 'blue' }], { seed });
   for (let second = 0; second < RATING.seconds && !boutWinner(world); second += 1) advance(world, 1, (current, dt) => thinkAll(current, dt));
-  return boutWinner(world);
+  const winner = boutWinner(world);
+  const left = (fighter) => (fighter.state === 'out' ? 0 : 1 - hurtShare(fighter));
+  return { winner, score: boutScore(winner === 'red' ? 1 : winner === 'blue' ? 0 : 0.5, left(world.fighters[0]), left(world.fighters[1])) };
 }
+
+/** A bout's score to the first man (RATING.health): the result (1, a half, 0) and the health each had left (0..1). */
+export function boutScore(result, mine, theirs) {
+  return (1 - RATING.health) * result + RATING.health * (0.5 + 0.5 * (mine - theirs));
+}
+
+/** Add one pair of bouts (a as red, then as blue) to a's tally: wins, losses, draws and the summed score. */
+function tallyPair(tally, asRed, asBlue) {
+  if (asRed.winner === 'red') tally.wins += 1; else if (asRed.winner === 'blue') tally.losses += 1; else tally.draws += 1;
+  if (asBlue.winner === 'blue') tally.wins += 1; else if (asBlue.winner === 'red') tally.losses += 1; else tally.draws += 1;
+  tally.score += asRed.score + (1 - asBlue.score);
+}
+
+/** A record's score: its summed bout scores (an older record without one: its wins and half its draws). */
+export const scoreOf = (record) => record.score ?? record.wins + record.draws / 2;
+/** How many bouts a record holds. */
+const boutsOf = (record) => record.wins + record.losses + record.draws;
 
 /** A character's record against one reference: `bouts` from each corner. */
 export function record(inputs, reference, bouts) {
-  const tally = { wins: 0, losses: 0, draws: 0 };
+  const tally = { wins: 0, losses: 0, draws: 0, score: 0 };
   for (let index = 0; index < bouts; index += 1) {
     const seed = RATING.firstSeed + index;
-    const asRed = bout(inputs, reference, seed);
-    const asBlue = bout(reference, inputs, seed);
-    if (asRed === 'red') tally.wins += 1; else if (asRed === 'blue') tally.losses += 1; else tally.draws += 1;
-    if (asBlue === 'blue') tally.wins += 1; else if (asBlue === 'red') tally.losses += 1; else tally.draws += 1;
+    tallyPair(tally, bout(inputs, reference, seed), bout(reference, inputs, seed));
   }
   return tally;
 }
 
 /** A pairing fought until it is settled (RATING.settle) or `most` bouts: a's record against b. */
 export function settledRecord(a, b, most) {
-  const tally = { wins: 0, losses: 0, draws: 0 };
-  for (let index = 0; tally.wins + tally.losses + tally.draws < most; index += 1) {
+  const tally = { wins: 0, losses: 0, draws: 0, score: 0 };
+  for (let index = 0; boutsOf(tally) < most; index += 1) {
     const seed = RATING.firstSeed + index;
-    const asRed = bout(a, b, seed);
-    const asBlue = bout(b, a, seed);
-    if (asRed === 'red') tally.wins += 1; else if (asRed === 'blue') tally.losses += 1; else tally.draws += 1;
-    if (asBlue === 'blue') tally.wins += 1; else if (asBlue === 'red') tally.losses += 1; else tally.draws += 1;
-    const fought = tally.wins + tally.losses + tally.draws;
-    const share = (tally.wins + tally.draws / 2) / fought;
+    tallyPair(tally, bout(a, b, seed), bout(b, a, seed));
+    const fought = boutsOf(tally);
+    const share = tally.score / fought;
     if (fought >= RATING.settle.minBouts && (share >= RATING.settle.share || share <= 1 - RATING.settle.share)) break;
   }
   return tally;
@@ -138,8 +155,8 @@ export const kd = ({ wins, losses, draws }) => (wins + draws / 2 + 0.5) / (losse
  */
 export function fitStrength(against) {
   const slope = (x) => against.reduce((sum, { record, strength }) => {
-    const won = record.wins + record.draws / 2 + 0.5;
-    const lost = record.losses + record.draws / 2 + 0.5;
+    const won = scoreOf(record) + 0.5;
+    const lost = boutsOf(record) - scoreOf(record) + 0.5;
     const p = 1 / (1 + Math.exp(Math.log(strength) - x));
     return sum + won * (1 - p) - lost * p;
   }, 0);
@@ -162,8 +179,8 @@ export function fitAll(games, anchor, at = 100, steps = 2000) {
   const strength = Object.fromEntries(names.map((name) => [name, 1]));
   const won = Object.fromEntries(names.map((name) => [name, 0]));
   for (const { a, b, record } of games) {
-    won[a] += record.wins + record.draws / 2 + 0.5;
-    won[b] += record.losses + record.draws / 2 + 0.5;
+    won[a] += scoreOf(record) + 0.5;
+    won[b] += boutsOf(record) - scoreOf(record) + 0.5;
   }
   for (let step = 0; step < steps; step += 1) {
     const sums = Object.fromEntries(names.map((name) => [name, 0]));
@@ -331,7 +348,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       for (const { a, b, record: tally } of games) {
         for (const [name, reference] of Object.entries(referenceKey)) {
           if (a === key && b === reference) out[name] = tally;
-          if (b === key && a === reference) out[name] = { wins: tally.losses, losses: tally.wins, draws: tally.draws };
+          if (b === key && a === reference) out[name] = { wins: tally.losses, losses: tally.wins, draws: tally.draws, score: boutsOf(tally) - scoreOf(tally) };
         }
       }
       return out;
