@@ -92,6 +92,30 @@ test('a spear shaft carries the set brace figure into flesh, far less stopped on
   assert.ok(lance.weapon.wear.shaftStrength > 2 * median);
 });
 
+test('a shaft driven along its length is a column: a short or langeted one stronger, a long one keeps its section', () => {
+  const medianAlong = (kind) => {
+    const all = pieces(kind, 401).map(({ weapon, fighter }) => {
+      driveShaft(weapon, fighter, 0, 1, WORLD.wear.stop.flesh);
+      return weapon.wear;
+    });
+    const at = (key) => all.map((wear) => wear[key]).sort((a, b) => a - b)[200];
+    return { along: at('shaftStrength'), bend: at('shaftBend') };
+  };
+  const spear = medianAlong('longSpear');
+  assert.ok(Math.abs(spear.along / spear.bend - 1) < 1e-9, 'the reference column: as its section');
+  // The war hammer's 0.8 m of ash below its langets: Euler's (1.45 / 0.8)² ≈ 3.3 of the war spear's, across it the same.
+  const hammer = medianAlong('warhammer');
+  assert.ok(Math.abs(hammer.along / hammer.bend - (WORLD.wear.column / (WEAPONS.warhammer.strikeFrom - build('warhammer').langets)) ** 2) < 1e-9);
+  assert.ok(Math.abs(hammer.bend / spear.bend - 1) < 0.1, 'the same ash section, bent across');
+  // A hard hammer thrust square on plate (~400 J at a full step) next to never snaps it; a war spear's mostly would.
+  const snappedOnPlate = (kind, joules) => pieces(kind, 500).filter(({ weapon, fighter }) => driveShaft(weapon, fighter, 0, joules, stopIn({ pierce: 0.95, deflects: true })).snapped).length / 500;
+  assert.ok(snappedOnPlate('warhammer', 400) < 0.03, `${snappedOnPlate('warhammer', 400)}`);
+  assert.ok(snappedOnPlate('longSpear', 400) > 0.8);
+  // A pike's long slender shaft bows before it snaps: no weaker than its section.
+  const pike = medianAlong('pike');
+  assert.ok(Math.abs(pike.along / pike.bend - 1) < 1e-9);
+});
+
 test('a shaft snaps under a heavy blow across it and is hacked through by edges', () => {
   const [{ weapon, fighter }] = pieces('longSpear', 1);
   assert.equal(strikeShaft(weapon, fighter, 0, 50, 0), null, 'a parry with it');
