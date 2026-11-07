@@ -365,6 +365,9 @@ const QI = {
   design: { brigandine: 3, elite: 5 },
 };
 
+/** The mandarin-duck squad as Qi drilled it ([style, back, across] a man): the story's southern squads stand so (src/story/battles). */
+export const MANDARIN_DUCK = QI.squad;
+
 // How Qi's squads move and fight (formation.js drill): they stand and receive the raiders' rush, and
 // do not run at them (`advance` false); each man of a squad goes for a raider come near his place (`squad`), not the front rank only;
 // the fowling pieces behind the shields hold their fire until the raiders are within the range the gun carries true

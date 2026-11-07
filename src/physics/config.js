@@ -365,6 +365,18 @@ export const WORLD = {
       cerignola: { air: 22, humidity: 0.6 },
       catalaunian: { air: 25, humidity: 0.6 },
       sarhu: { air: 8, humidity: 0.5 },
+      // The story's Liaodong battles (src/story/battles/06-08), on the Sarhu hills' scene in their own seasons. Modern normals
+      // (China Meteorological Administration 1981-2010) less ~1 °C for the cold 1610s-20s of the Little Ice Age (Ge Quansheng et al.,
+      // Chinese temperature reconstructions: the 1620s among the coldest decades of the millennium in eastern China):
+      // - liaodong1618: the autumn watch (防秋, the 8th-9th months) by Fushun, late September: Fushun's September mean ~16 °C,
+      //   October's ~8; a cool, damp autumn day.
+      liaodong1618: { air: 12, humidity: 0.65 },
+      // - abdali1619: 三月初五 (18 April 1619) in the hills of Xinbin, ~500 m up: Xinbin's April mean ~7 °C; the spring's late
+      //   snow (the Ming columns held by it: zh.wikipedia 薩爾滸之戰), so colder: ~5 °C, the air damp with the thaw.
+      abdali1619: { air: 5, humidity: 0.6 },
+      // - hunriver1621: 天启元年三月十三 (~3 May 1621) by Shenyang: Shenyang's May mean ~17 °C, the first days of May ~15;
+      //   a dry Liaodong spring (relative humidity ~50%).
+      hunriver1621: { air: 14, humidity: 0.5 },
       // The arena in a Roman summer, sand under the sun.
       colosseum: { air: 30, humidity: 0.5 },
     },
