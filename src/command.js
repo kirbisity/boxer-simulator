@@ -22,6 +22,8 @@
 // A man broken (panicked), crawling away, fled, on horseback or down hears
 // nothing; once up he obeys whatever order stands. The giver out of the
 // fight, his order lapses.
+// Who hears him (`world.commandMen[corner]`, where it is set: story mode, by his rank): only those men (a squad
+// leader's squad), or nobody (a private soldier commands no one, and has no orders to give). Unset, his whole side.
 
 import { P } from './body.js';
 import { slotAt } from './formation.js';
@@ -70,8 +72,13 @@ export function canCommand(world, fighter) {
   if (!world || !fighter || fighter.state === 'out') return false;
   // (A squad with places of its own takes orders however small: two men are enough to be told back to them.)
   const least = world.formPlaces?.[fighter.corner] ? 2 : COMMAND.minSide;
+  const heard = world.commandMen?.[fighter.corner];
+  if (heard) return heard.some((id) => id !== fighter.id && world.fighters[id]?.state !== 'out');
   return world.fighters.filter((other) => other.corner === fighter.corner).length >= least;
 }
+
+/** Whether this man hears his side's orders: everyone, unless the side's orders reach only some (`world.commandMen`). */
+const hearsOrders = (world, fighter) => !world.commandMen?.[fighter.corner] || world.commandMen[fighter.corner].includes(fighter.id);
 
 /** The order his side is under ('rally', 'charge', 'hold'), or 'free'. */
 export function standingOrder(world, corner) {
@@ -118,7 +125,7 @@ export function clearOrders(world) {
 function rallyPlaces(world, by) {
   const spec = COMMAND.rally;
   const centre = commandAt(by);
-  const men = world.fighters.filter((fighter) => fighter.corner === by.corner && fighter !== by)
+  const men = world.fighters.filter((fighter) => fighter.corner === by.corner && fighter !== by && hearsOrders(world, fighter))
     .map((fighter) => ({ fighter, at: commandAt(fighter) }))
     .sort((a, b) => commandApart(a.at, centre) - commandApart(b.at, centre));
   const places = {};
@@ -143,7 +150,7 @@ function rallyPlaces(world, by) {
 /** The order this man is to obey now, or null: none, or he is in no state to hear it. His own record of it is fresh for a new order. */
 function orderFor(world, fighter) {
   const command = world.commands?.[fighter.corner];
-  if (!command || command.by === fighter.id) return null;
+  if (!command || command.by === fighter.id || !hearsOrders(world, fighter)) return null;
   if (fighter.state !== 'up' || fighter.panicked || fighter.crawling || fighter.fled || fighter.mount) return null;
   if (fighter.order?.serial !== command.serial) {
     const formation = fighter.slot ? world.formations?.[fighter.formation] : null;

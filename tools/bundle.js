@@ -10,7 +10,11 @@ import { transformSync } from 'esbuild';
 import { CUSTOM_BUDGET, CUSTOM_CSS, CUSTOM_DATA, CUSTOM_EXCLUDED, CUSTOM_STUBS, CUSTOM_TRANSFORMS } from './custom.js';
 
 // In load order: a module's top-level code may use only what comes before it. The looks (the kit, one file per look, then the registry) come before toon.js, which asks the registry which look is in force.
-const MODULES = ['aging', 'outfitsets', 'outfits', 'robotdogs', 'horses', 'physiology', 'maiming', 'body', 'physics/config', 'physics/overdraft', 'physics/heat', 'physics/terrain', 'physics/jump', 'joints', 'pose', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics/fieldworks', 'audio/surface', 'audio/log', 'physics/arts', 'physics/gaps', 'physics/footing', 'physics/press', 'physics/wear', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'physics/throwable', 'physics/brush', 'physics/whip', 'physics/flame', 'physics/rising', 'physics/gait', 'physics/mounted', 'cast', 'riding', 'command', 'ai', 'battletally', 'battleend', 'lastgate', 'gesture', 'finisher', 'lowstrike', 'runsteer', 'weaponarts', 'control', 'followcam', 'watchcam', 'cameraarm', 'occluders', 'camerarig', 'scenerylod', 'levelmode/quality', 'adaptres', 'rig', 'bodymesh', 'skintones', 'sculpt', 'skinrules', 'skindetail', 'skintex', 'detailmaps', 'loftbody', 'fleshbody', 'bodystyles', 'skinworker', 'looks/kit', 'looks/toon', 'looks/probe-lite', 'looks', 'blooddye', 'detailmaps-data', 'clothmaps-data', 'detailtex', 'helmstyle', 'helmforms', 'helmmaps-data', 'helmmaps', 'knighthelms-data', 'knighthelms', 'menpo', 'ground/painted', 'ground/living', 'scenery/skyball-photo-data', 'scenery/skyball', 'scenery/generated', 'scenery/trees', 'scenery', 'toon', 'chinahelms', 'chinahelmview', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'faceregions', 'photohair', 'hairswing', 'hairmass', 'photoface', 'photohead', 'facemorph', 'face', 'wardrobe', 'robotview', 'exoview', 'oyoroi', 'crowdview', 'crowdlod', 'props/town', 'props/rural', 'props/arena', 'props/harbour', 'props/coast', 'props/subway', 'props/jiangnan', 'props/cajamarca', 'props/plains', 'fightui/logic', 'fightui/icons', 'fightui/kit', 'fightui/command', 'fightui/buttons', 'fightui/target', 'fightui/index', 'fightui/toggle', 'fightui/marker', 'generalmark', 'depthrange', 'levelmode/kitpaint', 'levelmode/kitshadow', 'levelmode/kitwear', 'levelmode/kittex', 'levelmode/kitgeo', 'levelmode/kitchapel', 'levelmode/kitfilth', 'levelmode/kitprops', 'levelmode/stagelooks', 'levelmode/stormsky-data', 'levelmode/stagesky', 'levelmode/storm', 'levelmode/water', 'levelmode/kitwater', 'worksview', 'render', 'battlefx', 'machinefx', 'arrowsight', 'weaponview', 'wind', 'flameview', 'blastview', 'horsebard', 'horsemesh', 'horsehair', 'robotdogview', 'horseview', 'drama', 'hitfeel', 'hitfeelview', 'chargefeel', 'chargefeelview', 'artdrama', 'artdramaview', 'scenarios', 'battlethumbs', 'muster', 'musterview', 'ratings', 'roster', 'custombattle', 'squad', 'custombattleview', 'setcard', 'infopop', 'overdraftview', 'touch', 'tutorial', 'intro', 'levelmode/presets', 'levelmode/story', 'audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/spark', 'audio/sfx/ui', 'audio/sfx/thump', 'audio/sfx/art', 'audio/sfx/sampled', 'audio/samples', 'audio/families', 'audio/cries', 'audio/acoustics', 'audio/farfield', 'audio/charge', 'audio/flamesound', 'audio/ambience', 'audio/music/data/menu', 'audio/music/data/roman', 'audio/music/data/medieval', 'audio/music/data/japan', 'audio/music/data/china', 'audio/music/data/korea', 'audio/music/data/aztec', 'audio/music/data/ottoman', 'audio/music/data/modern', 'audio/music/data/scottish', 'audio/music/data/boss', 'audio/music/data/bosschoir', 'audio/music/data/victory', 'audio/music/data/defeat', 'audio/music/manifest', 'audio/music', 'audio/engine', 'audio/controls', 'audio/bench', 'lastgateview', 'menu', 'uicheck', 'looksbench', 'levelmode/stages/testyard-vault', 'levelmode/stages/testyard', 'levelmode/landform', 'levelmode/stages/dnbuild', 'levelmode/stages/dunnottar-sewer', 'levelmode/stages/dunnottar-vault', 'levelmode/stages/dunnottar-chapel', 'levelmode/stages/dunnottar-light', 'levelmode/stages/dunnottar', 'levelmode/stages', 'levelmode/awareness', 'levelmode/stage', 'levelmode/travel', 'levelmode/config', 'levelmode/adapter', 'levelmode/items', 'levelmode/loot', 'levelmode/attempts', 'levelmode/checkpoints', 'levelmode/interact', 'levelmode/cutscene', 'levelmode/ending', 'levelmode/level', 'levelmode/team', 'levelmode/sandbox', 'levelmode/teamview', 'levelmode/hud', 'levelmode/markers', 'levelmode/endingview', 'levelmode/cutsceneview', 'levelmode/torchpool', 'levelmode/visibility', 'levelmode/kit', 'levelmode/terrainview', 'levelmode/awarenessview', 'main'];
+const MODULES = ['aging', 'outfitsets', 'outfits', 'robotdogs', 'horses', 'physiology', 'maiming', 'body', 'physics/config', 'physics/overdraft', 'physics/heat', 'physics/terrain', 'physics/jump', 'joints', 'pose', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics/fieldworks', 'audio/surface', 'audio/log', 'physics/arts', 'physics/gaps', 'physics/footing', 'physics/press', 'physics/wear', 'physics', 'physics/ranged', 'physics/grappling', 'physics/net', 'physics/throwable', 'physics/brush', 'physics/whip', 'physics/flame', 'physics/rising', 'physics/gait', 'physics/mounted', 'cast', 'riding', 'command', 'ai', 'battletally', 'battleend', 'lastgate', 'gesture', 'finisher', 'lowstrike', 'runsteer', 'weaponarts', 'control', 'followcam', 'watchcam', 'cameraarm', 'occluders', 'camerarig', 'scenerylod', 'levelmode/quality', 'adaptres', 'rig', 'bodymesh', 'skintones', 'sculpt', 'skinrules', 'skindetail', 'skintex', 'detailmaps', 'loftbody', 'fleshbody', 'bodystyles', 'skinworker', 'looks/kit', 'looks/toon', 'looks/probe-lite', 'looks', 'blooddye', 'detailmaps-data', 'clothmaps-data', 'detailtex', 'helmstyle', 'helmforms', 'helmmaps-data', 'helmmaps', 'knighthelms-data', 'knighthelms', 'menpo', 'ground/painted', 'ground/living', 'scenery/skyball-photo-data', 'scenery/skyball', 'scenery/generated', 'scenery/trees', 'scenery', 'toon', 'chinahelms', 'chinahelmview', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'faceregions', 'photohair', 'hairswing', 'hairmass', 'photoface', 'photohead', 'facemorph', 'face', 'wardrobe', 'robotview', 'exoview', 'oyoroi', 'crowdview', 'crowdlod', 'props/town', 'props/rural', 'props/arena', 'props/harbour', 'props/coast', 'props/subway', 'props/jiangnan', 'props/cajamarca', 'props/plains', 'fightui/logic', 'fightui/icons', 'fightui/kit', 'fightui/command', 'fightui/buttons', 'fightui/target', 'fightui/index', 'fightui/toggle', 'fightui/marker', 'generalmark', 'depthrange', 'levelmode/kitpaint', 'levelmode/kitshadow', 'levelmode/kitwear', 'levelmode/kittex', 'levelmode/kitgeo', 'levelmode/kitchapel', 'levelmode/kitfilth', 'levelmode/kitprops', 'levelmode/stagelooks', 'levelmode/stormsky-data', 'levelmode/stagesky', 'levelmode/storm', 'levelmode/water', 'levelmode/kitwater', 'worksview', 'render', 'battlefx', 'machinefx', 'arrowsight', 'weaponview', 'wind', 'flameview', 'blastview', 'horsebard', 'horsemesh', 'horsehair', 'robotdogview', 'horseview', 'drama', 'hitfeel', 'hitfeelview', 'chargefeel', 'chargefeelview', 'artdrama', 'artdramaview', 'scenarios', 'battlethumbs', 'muster', 'musterview', 'ratings', 'roster', 'custombattle', 'squad', 'custombattleview', 'setcard', 'infopop', 'overdraftview', 'touch', 'tutorial', 'intro', 'levelmode/presets', 'levelmode/story', 'audio/synth', 'audio/ear', 'audio/sfx/impact', 'audio/sfx/clash', 'audio/sfx/wound', 'audio/sfx/swing', 'audio/sfx/step', 'audio/sfx/fall', 'audio/sfx/voice', 'audio/sfx/horse', 'audio/sfx/ranged', 'audio/sfx/world', 'audio/sfx/spark', 'audio/sfx/ui', 'audio/sfx/thump', 'audio/sfx/art', 'audio/sfx/sampled', 'audio/samples', 'audio/families', 'audio/cries', 'audio/acoustics', 'audio/farfield', 'audio/charge', 'audio/flamesound', 'audio/ambience', 'audio/music/data/menu', 'audio/music/data/roman', 'audio/music/data/medieval', 'audio/music/data/japan', 'audio/music/data/china', 'audio/music/data/korea', 'audio/music/data/aztec', 'audio/music/data/ottoman', 'audio/music/data/modern', 'audio/music/data/scottish', 'audio/music/data/boss', 'audio/music/data/bosschoir', 'audio/music/data/victory', 'audio/music/data/defeat', 'audio/music/manifest', 'audio/music', 'audio/engine', 'audio/controls', 'audio/bench', 'lastgateview', 'menu', 'uicheck', 'looksbench', 'levelmode/stages/testyard-vault', 'levelmode/stages/testyard', 'levelmode/landform', 'levelmode/stages/dnbuild', 'levelmode/stages/dunnottar-sewer', 'levelmode/stages/dunnottar-vault', 'levelmode/stages/dunnottar-chapel', 'levelmode/stages/dunnottar-light', 'levelmode/stages/dunnottar', 'levelmode/stages', 'levelmode/awareness', 'levelmode/stage', 'levelmode/travel', 'levelmode/config', 'levelmode/adapter', 'levelmode/items', 'levelmode/loot', 'levelmode/attempts', 'levelmode/checkpoints', 'levelmode/interact', 'levelmode/cutscene', 'levelmode/ending', 'levelmode/level', 'levelmode/team', 'levelmode/sandbox', 'levelmode/teamview', 'levelmode/hud', 'levelmode/markers', 'levelmode/endingview', 'levelmode/cutsceneview', 'levelmode/torchpool', 'levelmode/visibility', 'levelmode/kit', 'levelmode/terrainview', 'levelmode/awarenessview',
+  // story: (story mode, src/story/: its chapters and battles each imported whole by their index, so scoped; a new one goes in this block)
+  'story/life', 'story/battles/01-suppression', 'story/battles/index', 'story/chapters/01-suppression', 'story/chapters/comrades', 'story/chapters/index',
+  'story/runner', 'story/scenes/stage', 'story/storyview',
+  'main'];
 const args = process.argv.slice(2);
 const minify = !args.includes('--no-minify');
 // `--lite`: a smaller page (a test build, under 15 MB with nothing beside it): the heaviest baked pictures left out, each where the
@@ -22,8 +26,31 @@ const custom = args.includes('--custom');
 if (lite && custom) throw new Error('--lite and --custom are two different builds: pick one');
 const out = args.find((arg) => !arg.startsWith('--')) ?? (lite ? 'dist/gladiator-lite.html' : custom ? 'dist/gladiator-custom.html' : 'dist/gladiator.html');
 // The modules in this page, in order: a custom page's excluded modules gone, or in their place their stubs (CUSTOM_STUBS).
-const modules = custom ? MODULES.filter((name) => !CUSTOM_EXCLUDED(name) || CUSTOM_STUBS[name]) : MODULES;
+const listed = custom ? MODULES.filter((name) => !CUSTOM_EXCLUDED(name) || CUSTOM_STUBS[name]) : MODULES;
 const stubbed = (name) => custom && CUSTOM_EXCLUDED(name);
+// A module imported whole (`import * as name from './x.js'`: story mode's chapters and battles, each exporting the same
+// `chapter` or `battle`) is "scoped": its code wrapped in a function of its own, its exports returned as one object under a
+// name of its own (SCOPED_PREFIX + its path), so its names never meet another module's in the one scope; the importer's line
+// becomes `const name = <that object>;`. A scoped module goes just before the first module importing it, wherever it was listed
+// (so a story file added at the end of the list still loads in time).
+const SCOPED_PREFIX = 'SCOPED_MODULE_';
+const NAMESPACE_IMPORT = /^import \* as ([A-Za-z_$][\w$]*) from '(\.{1,2}\/[\w/-]+)\.js';\n/gm;
+const resolveFrom = (name, path) => new URL(`${path}.js`, `file:///src/${name}.js`).pathname.replace(/^\/src\//, '').replace(/\.js$/, '');
+const scopedName = (name) => `${SCOPED_PREFIX}${name.replace(/\W/g, '_')}`;
+const scoped = new Set();
+for (const name of listed) {
+  if (stubbed(name)) continue;
+  for (const [, , path] of readFileSync(`src/${name}.js`, 'utf8').matchAll(NAMESPACE_IMPORT)) scoped.add(resolveFrom(name, path));
+}
+const modules = [...listed];
+for (const target of scoped) {
+  if (!modules.includes(target)) continue;
+  const first = modules.findIndex((name) => !stubbed(name) && [...readFileSync(`src/${name}.js`, 'utf8').matchAll(NAMESPACE_IMPORT)].some(([, , path]) => resolveFrom(name, path) === target));
+  if (first !== -1 && modules.indexOf(target) > first) {
+    modules.splice(modules.indexOf(target), 1);
+    modules.splice(first, 0, target);
+  }
+}
 // `--plan`: the page's modules as JSON (in, stubbed, left out), nothing built.
 if (args.includes('--plan')) {
   console.log(JSON.stringify({ modules, stubbed: modules.filter(stubbed), excluded: MODULES.filter((name) => !modules.includes(name)) }));
@@ -95,12 +122,23 @@ function strip(name) {
     if (!source.includes(SAMPLE_EMBED_LINE)) throw new Error(`src/audio/samples.js: no '${SAMPLE_EMBED_LINE}' to fill`);
     source = source.replace(SAMPLE_EMBED_LINE, sampleEmbed());
   }
-  return source
+  const body = source
+    // A module imported whole: its object, made where it was (scoped, above).
+    .replace(NAMESPACE_IMPORT, (line, alias, path) => `const ${alias} = ${scopedName(resolveFrom(name, path))};\n`)
     .replace(/^import [^;]+;\n/gm, '')
     // Re-exports (export { x } from './y.js') name what is already in the shared scope.
     .replace(/^export \{[^}]*\} from [^;]+;\n/gm, '')
     .replace(/^export (async function|const|function\*|function|class|let) /gm, '$1 ');
+  if (!scoped.has(name) || stubbed(name)) return body;
+  const exported = [...source.matchAll(/^export (?:async function|const|function\*|function|class|let) +([A-Za-z_$][\w$]*)/gm)].map(([, identifier]) => identifier);
+  return `const ${scopedName(name)} = (() => {\n${body}\nreturn { ${exported.join(', ')} };\n})();\n`;
 }
+/** The top-level names a module puts in the one scope: a scoped module only its object's, an importer its whole-module aliases too. */
+const topNames = (name) => {
+  if (scoped.has(name) && !stubbed(name)) return [scopedName(name)];
+  const source = sourceOf(name);
+  return [...declared(source), ...[...source.matchAll(NAMESPACE_IMPORT)].map(([, alias]) => alias)];
+};
 const lateImports = [];
 const code = modules.map((name) => {
   const source = sourceOf(name);
@@ -112,6 +150,7 @@ const code = modules.map((name) => {
   for (const [, names, path] of source.matchAll(/(?:\{([^}]*)\} )?from '(\.{1,2}\/[\w/-]+)\.js'/g)) {
     const imported = new URL(`${path}.js`, `file:///src/${name}.js`).pathname.replace(/^\/src\//, '').replace(/\.js$/, '');
     if (!MODULES.includes(imported)) throw new Error(`src/${name}.js imports ${imported}.js, which is not in MODULES`);
+    if (scoped.has(imported) && names !== undefined) throw new Error(`src/${name}.js imports names from ${imported}.js, which is imported whole elsewhere (scoped): import it whole here too`);
     if (!modules.includes(imported)) throw new Error(`src/${name}.js imports ${imported}.js, which this build leaves out with no stand-in (tools/custom.js CUSTOM_STUBS)`);
     // A stand-in must declare every name imported from it, or the page dies when the name is first used.
     if (stubbed(imported)) {
@@ -120,7 +159,7 @@ const code = modules.map((name) => {
       if (lacking.length) throw new Error(`src/${name}.js imports ${lacking.join(', ')} from ${imported}.js, which the custom build's stand-in for it lacks (tools/custom.js CUSTOM_STUBS)`);
     }
     // The bundle is one scope in list order: a module's top level may use only what is above it (a const below it is still in its temporal dead zone: the page dies at load with a blank screen, though the ES-module page works).
-    if (MODULES.indexOf(imported) > MODULES.indexOf(name)) lateImports.push(`${name} imports ${imported}`);
+    if (modules.indexOf(imported) > modules.indexOf(name)) lateImports.push(`${name} imports ${imported}`);
   }
   return `// ---- src/${name}.js ----\n${stripped}`;
 }).join('\n');
@@ -132,7 +171,7 @@ if (lateImports.length) console.warn(`${lateImports.length} imports point below 
 // stop the page with a SyntaxError, so refuse to write it.
 const seen = new Map();
 for (const name of modules) {
-  for (const identifier of declared(sourceOf(name))) {
+  for (const identifier of topNames(name)) {
     if (seen.has(identifier)) throw new Error(`${identifier} is declared in both ${seen.get(identifier)} and ${name}`);
     seen.set(identifier, name);
   }
