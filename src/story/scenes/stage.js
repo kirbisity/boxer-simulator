@@ -37,7 +37,7 @@ export const STORY_SCENE = {
   kneel: 1.2,
   // Where he stands over the body: this far (m) from its hips, on the side its face will turn to; the stoop's lean and how far (m)
   // over the body the spear's hands are held.
-  standOff: 0.8,
+  standOff: 1.1,
   stoop: { share: 0.35, lean: 0.3, handsUp: 0.75 },
   // Kneeling: his lean forward over it, bowed.
   bow: { search: 0.35, still: 0.3 },

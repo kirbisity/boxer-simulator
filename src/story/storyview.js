@@ -52,6 +52,8 @@ export const STORY_WORDS = {
   luckSoFar: { zh: '至今的运气', en: 'Luck so far' },
   noChapters: { zh: '还没有章节。', en: 'No chapters yet.' },
   skip: { zh: '点击继续', en: 'Tap to go on' },
+  firstLast: { zh: '第一仗，就是最后一仗。', en: 'His first battle was his last.' },
+  cleanRun: { zh: '在这之前，每一仗他都是第一次就活了下来。', en: 'Every battle before this one, he came through at the first try.' },
 };
 
 const STORY_STYLE = `
@@ -88,7 +90,7 @@ const STORY_STYLE = `
 #story-layer .sv-page h2 { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #a89c84; font-weight: 400; margin: 22px 0 6px; }
 #story-layer .sv-page p { margin: 0 0 6px; line-height: 1.65; font-size: 17px; }
 #story-layer .sv-page .sv-luck { font-size: 22px; color: #f3dca0; }
-#story-layer .sv-page ul { margin: 0; padding-left: 1.2em; line-height: 1.6; }
+#story-layer .sv-page ul { margin: 0; padding: 0; list-style: none; line-height: 1.6; }
 #story-layer .sv-page .sv-buttons { margin-top: 26px; }
 body[data-game="story"] #restart { display: none !important; }
 body.story-card .fight-ui, body.story-card .hud, body.story-card #icons, body.story-card .camera-bar, body.story-scene .fight-ui, body.story-scene .hud, body.story-scene #icons { visibility: hidden !important; }
@@ -389,7 +391,8 @@ export function installStory(hooks) {
     redraw = () => showEnding(page);
     hooks.pause(true);
     const chapter = CHAPTERS.find((each) => each.n === page.chapter);
-    const luckText = storyLuckText(page.luck ?? { odds: 1, percent: 100 });
+    // (A man who fell: his luck is that of the battles he came through; his first battle his last, it says so.)
+    const luckText = page.kind !== 'lived' && !page.passed?.length ? STORY_WORDS.firstLast : page.kind !== 'lived' && page.luck?.never ? STORY_WORDS.cleanRun : storyLuckText(page.luck ?? { odds: 1, percent: 100 });
     // (A member a card brought into his life is `true` there: read as his entry in chapters/family.js.)
     const family = Object.entries(page.family ?? {}).filter(([, person]) => person).map(([who, raw]) => {
       const person = typeof raw === 'object' ? raw : { ...STORY_FAMILY[who], alive: true };
