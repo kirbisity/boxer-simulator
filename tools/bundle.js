@@ -238,7 +238,7 @@ if (minify) {
 }
 if (/<\/script/i.test(pageCode + pageWorker)) throw new Error('a closing script tag inside the code would end the page\'s script early');
 // A custom page is opened as a file of its own (not inside the review copy's wrapper): it says its encoding itself.
-const page = `${custom ? '<meta charset="utf-8">\n' : ''}${title}\n${fonts}\n<style>\n${css}</style>\n${markup}\n${three}\n<script type="text/plain" id="skin-worker-source">\n${pageWorker}</script>\n<script type="module">\n${pageCode}</script>\n`;
+const page = `<meta charset="utf-8">\n${title}\n${fonts}\n<style>\n${css}</style>\n${markup}\n${three}\n<script type="text/plain" id="skin-worker-source">\n${pageWorker}</script>\n<script type="module">\n${pageCode}</script>\n`;
 const bytes = Buffer.byteLength(page);
 if (custom && bytes >= CUSTOM_BUDGET) throw new Error(`the custom page is ${bytes} bytes, over its budget of ${CUSTOM_BUDGET} (tools/custom.js CUSTOM_BUDGET): leave out more (CUSTOM_GROUND_TILES first); ${out} not written`);
 writeFileSync(out, page);
