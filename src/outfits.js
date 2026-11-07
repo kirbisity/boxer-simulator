@@ -1308,8 +1308,8 @@ export const OUTFITS = {
   // face mask. Covered from head to knee: a blade glances off it as off a
   // knight's plate, and so do arrows.
   mingElite: {
-    // Rides (Ming elite cavalry on northern horses).
-    horse: 'steppe',
+    // Rides (Ming elite cavalry: the generals' household men on the pick of the border army's bought horses, horses.js mingBorder).
+    horse: 'mingBorder',
     // Trained: a general's household men (jiading), picked and kept by him, the best the Ming fielded, but drilled to a
     // regular's level more than an elite's: the Ming army of the 1610s was a byword for neglected drill (`skill`).
     skill: 0.55,
@@ -1890,7 +1890,8 @@ export const OUTFITS = {
   // dismayed by the glitter of the 'helmets and breastplates of Margianian
   // steel' when the Parthians threw off their coverings.
   cataphract: {
-    horse: 'arabian', barding: 'lamellar',
+    // (The Nisaean horse of Media, the Turkoman kind: horses.js turkoman.)
+    horse: 'turkoman', barding: 'lamellar',
     faction: 'parthians',
     skill: 0.65,
     label: 'Parthian cataphract — scale and kontos', movement: 'limited', fists: 'gauntlet',
@@ -1913,7 +1914,8 @@ export const OUTFITS = {
   // the composite bow and a full quiver, a dagger or short sword. The bulk of
   // Surena's ten thousand.
   parthianArcher: {
-    horse: 'arabian',
+    // (The Parthians' Turkoman horses: horses.js turkoman.)
+    horse: 'turkoman',
     faction: 'parthians',
     skill: 0.55,
     label: 'Parthian horse archer — tunic and bashlyk', movement: 'good', fists: 'bare',
@@ -1980,8 +1982,8 @@ export const OUTFITS = {
   // sides (`krugDisc`), or the bekhter's rows of narrow plates down the chest
   // buckled shut, laminated shoulders (`bekhter`).
   ottomanHeavy: {
-    // Rides (the sipahi: the Sultan's horsemen).
-    horse: 'arabian',
+    // Rides (the sipahi: the Sultan's horsemen, on Turkoman horses: horses.js turkoman).
+    horse: 'turkoman',
     skill: 0.6,
     faction: 'ottomans',
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
@@ -2021,7 +2023,7 @@ export const OUTFITS = {
     // edge of reach that holds most men, and a comrade cut down beside him can send him at the killer.
     frenzy: true,
     // Rides (the gazi raiders rode Turkoman horses).
-    horse: 'arabian',
+    horse: 'turkoman',
     faction: 'ottomans',
     label: 'Alp — Osman\'s gazi', movement: 'good', fists: 'bare',
     // The kılıç at his belt, the gazi's long curved sword (WEAPONS.kilij).

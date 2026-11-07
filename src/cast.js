@@ -534,7 +534,8 @@ export function mingHorseman(random = Math.random, style = 'dao') {
   const kind = 'mingIronLamellar';
   const base = varyCharacter(PRESETS.guandao, random, { sex: 'male' });
   const name = `${pickOne(['Li', 'Zhang', 'Wang', 'Zhu', 'Ma', 'Sun', 'Qian', 'Xu', 'Tang', 'Gao', 'Shen', 'Yu'], random)} ${pickOne(['Biao', 'Yong', 'Zhen', 'Hu', 'Fei', 'Cheng', 'Guo', 'Kai', 'Lei', 'Meng', 'Tai', 'Wei'], random)}`;
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [], mounted: true };
+  // On the Ming border army's own horses (horses.js mingBorder), not the Mongol's his coat is cut after (the kit's steppe horse).
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random), horse: 'mingBorder' }, accessories: [], mounted: true };
   return builtLike(soldier, PERIOD_BUILD.ming.elite, random);
 }
 

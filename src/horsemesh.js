@@ -76,6 +76,10 @@ export const HORSE_BUILD = {
   warhorse: { bulk: 1.02, deep: 0.01, back: 1, neck: { bulk: 1.02, arch: 0.04 }, head: { length: 1, dish: 0, size: 1 }, legs: 1, feather: 0.3, mane: { length: 0.22, upright: 0.08 }, tail: { length: 0.5, carriage: [0.6, 1.05, 1.35, 1.5, 1.55], lift: 0.7 }, saddle: 'war', headAngle: 0.78 },
   arabian: { bulk: 0.9, deep: 0, back: 0.93, neck: { bulk: 0.88, arch: 0.07 }, head: { length: 0.92, dish: 0.014, size: 0.9 }, legs: 0.86, feather: 0, mane: { length: 0.27, upright: 0.04 }, tail: { length: 0.5, carriage: [-0.55, -0.15, 0.3, 0.75, 1.1], lift: 1 }, saddle: 'light', headAngle: 0.95 },
   steppe: { bulk: 1.08, deep: 0.012, back: 0.97, neck: { bulk: 1.1, arch: -0.01 }, head: { length: 1.05, dish: -0.004, size: 1.08 }, legs: 1.06, feather: 0.2, mane: { length: 0.2, upright: 0.4 }, tail: { length: 0.58, carriage: [0.55, 1, 1.3, 1.45, 1.55], lift: 0.6 }, saddle: 'steppe', headAngle: 0.62 },
+  // (The Turkoman: the Arab's lean build, longer in the leg and neck, a straighter face; the Ming border horse: the steppe
+  // horse's, a little finer.)
+  turkoman: { bulk: 0.88, deep: 0, back: 1.02, neck: { bulk: 0.86, arch: 0.05 }, head: { length: 1, dish: 0, size: 0.94 }, legs: 0.84, feather: 0, mane: { length: 0.18, upright: 0.04 }, tail: { length: 0.5, carriage: [-0.2, 0.3, 0.75, 1.05, 1.3], lift: 0.9 }, saddle: 'light', headAngle: 0.9 },
+  mingBorder: { bulk: 1.04, deep: 0.01, back: 0.98, neck: { bulk: 1.04, arch: 0 }, head: { length: 1.03, dish: -0.002, size: 1.04 }, legs: 1.02, feather: 0.15, mane: { length: 0.2, upright: 0.3 }, tail: { length: 0.56, carriage: [0.55, 1, 1.3, 1.45, 1.55], lift: 0.6 }, saddle: 'steppe', headAngle: 0.66 },
   japanese: { bulk: 1.1, deep: 0.014, back: 0.96, neck: { bulk: 1.08, arch: 0 }, head: { length: 1.04, dish: 0, size: 1.08 }, legs: 1.08, feather: 0.1, mane: { length: 0.2, upright: 0.3 }, tail: { length: 0.5, carriage: [0.6, 1.05, 1.35, 1.5, 1.55], lift: 0.6 }, saddle: 'kura', headAngle: 0.66 },
 };
 
