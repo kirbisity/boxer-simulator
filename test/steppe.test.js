@@ -24,7 +24,7 @@ test('Saladin: the sultanates\' flagship (Ayyubids and Ottomans under one factio
   const { WARRIORS } = await import('../src/roster.js');
   assert.equal(of('saladin'), 'ottomans');
   assert.equal(FACTIONS.ottomans.label, 'Sultanates');
-  assert.match(FACTIONS.ottomans.blurb, /Ayyubid/);
+  assert.match(FACTIONS.ottomans.blurb.en, /Ayyubid/);
   const flagships = WARRIORS.filter((warrior) => warrior.faction === 'ottomans' && warrior.flagship);
   assert.deepEqual(flagships.map((warrior) => warrior.key), ['saladin']);
   const { protection } = OUTFITS.saladin;
