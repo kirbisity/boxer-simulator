@@ -367,6 +367,15 @@ export const WORLD = {
       sarhu: { air: 8, humidity: 0.5 },
       // The arena in a Roman summer, sand under the sun.
       colosseum: { air: 30, humidity: 0.5 },
+      // Story mode's Korea (src/story/battles): each the 1991-2020 normals of the nearest station (Wikipedia's climate
+      // tables) less ~1 °C for the Little Ice Age's cold 1590s. Pyongyang, 8 February 1593: between January's mean
+      // (-5.4 °C) and February's (-2.0), humidity ~67%; the Daedong was frozen hard enough to cross that night.
+      pyongyang: { air: -4, humidity: 0.67 },
+      // Byeokjegwan, north of Hanseong (Seoul), 27 February 1593: Seoul's February mean 0.7 °C, rising to ~2 by its end;
+      // the paddies thawing to mud. Humidity ~55-60%.
+      byeokjegwan: { air: 1, humidity: 0.6 },
+      // Ulsan, the siege of 29 January - 19 February 1598: Ulsan's January mean 2.4 °C (nights -1.8), humidity ~49%.
+      ulsan: { air: 1, humidity: 0.5 },
     },
   },
   // The share of that he still gets in the middle of a blow of his own: he does not stop breathing to swing (at 0, as it was,
