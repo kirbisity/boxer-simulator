@@ -5,6 +5,8 @@
 import { NAMES_PEOPLE } from './names-people.js';
 import { NAMES_KIT } from './names-kit.js';
 import { NAMES_WORLD } from './names-world.js';
+import { NAMES_BATTLES } from './names-battles.js';
+import { NAMES_EVENTS } from './names-events.js';
 
-export const NAME_TABLES = { NAMES_PEOPLE, NAMES_KIT, NAMES_WORLD };
+export const NAME_TABLES = { NAMES_PEOPLE, NAMES_KIT, NAMES_WORLD, NAMES_BATTLES, NAMES_EVENTS };
 export const NAMES_ZH = Object.assign({}, ...Object.values(NAME_TABLES));
