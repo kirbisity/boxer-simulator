@@ -14,8 +14,10 @@ export const PEOPLES = {
   // generally 162-167); the soldier's ration about a sheng and a half of grain a day (about 1 kg: ~3000 kcal) with
   // little meat, often in arrears (`calories`); a garrison man (weisuo) drilled little, his officers' tenant as much as
   // their soldier (`exercise`).
+  // The fighting men set a little above that mean by the user's choice (2026-11-07): soldiers were picked, and men of
+  // the records' size read too small to today's eye.
   ming: {
-    heightCm: 165, weightKg: 64, calories: 2900, exercise: 0.5,
+    heightCm: 166, weightKg: 65, calories: 3000, exercise: 0.5,
     ranks: {
       garrison: {},
       // The regulars in brigandine: paid men, picked a little for size, drilled.
@@ -77,13 +79,16 @@ export const PEOPLES = {
   // levies and at the bow and on horse from boyhood, but no giants: Qing bannermen and their descendants about
   // 165-168 cm, heavy for it (`weightKg`, the steppe's build). The hunt (the banner company was the hunting band) kept
   // them harder than a garrison man (`exercise`).
+  // The fighting men set well above that mean by the user's choice (2026-11-07): the companies sent their strongest,
+  // the banners were hunters fed on meat, and they must stand up to the Sultanates' men (ottoman); kept close to the
+  // builds first given them (177-182 cm), a few centimetres down.
   jurchen: {
-    heightCm: 167, weightKg: 76, calories: 3500, exercise: 0.75,
+    heightCm: 171, weightKg: 81, calories: 4300, exercise: 0.85,
     ranks: {
       // The company (niru) sent its able-bodied men to war, not all of them: a little above the people.
-      banner: { heightCm: 1, weightKg: 1, exercise: 0.05 },
+      banner: { heightCm: 2, weightKg: 2, exercise: 0.05 },
       // The Bayara, the guard: picked from the companies for strength and the bow (Yangguri, Darhan: body.js).
-      bayara: { heightCm: 4, weightKg: 4, exercise: 0.1 },
+      bayara: { heightCm: 6, weightKg: 7, exercise: 0.1 },
     },
   },
   // Japanese men of the Sengoku and Edo periods: from skeletons about 155-158 cm (Hiramoto's series: Muromachi ~157,

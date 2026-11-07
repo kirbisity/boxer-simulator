@@ -234,7 +234,7 @@ export const PRESETS = {
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },
   guandao: {
-    name: 'Liu Ting', style: 'guandao', sex: 'male', heightCm: PEOPLES.ming.heightCm + 7, frame: 'medium', age: 40, exercise: PEOPLES.ming.exercise + 0.1, calories: PEOPLES.ming.calories + 500,
+    name: 'Liu Ting', style: 'guandao', sex: 'male', heightCm: PEOPLES.ming.heightCm + 12, frame: 'medium', age: 40, exercise: PEOPLES.ming.exercise + 0.1, calories: PEOPLES.ming.calories + 500,
     outfit: { kind: 'mingElite', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
