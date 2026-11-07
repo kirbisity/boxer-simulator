@@ -92,10 +92,10 @@ export function screenOnPath(world, from, to, missile) {
 }
 
 /** Whether a missile from `from` to `to` gets there (no screen on the way stops it). */
-export const clearShot = (world, from, to, missile) => !screenOnPath(world, from, to, missile)?.stops;
+export const screensClear = (world, from, to, missile) => !screenOnPath(world, from, to, missile)?.stops;
 
 /** The missile a man looses (an arrow, a ball), for what a screen does to it; null if he has none ready to loose. */
-function missileOfMan(enemy) {
+function coverMissileOfMan(enemy) {
   const spec = enemy.weapon?.held ? enemy.weapon.spec : null;
   if (!spec?.ranged) return null;
   if (spec.bow) return { area: COVER.arrowArea, joules: ARROW.joules };
@@ -126,7 +126,7 @@ export function exposureOf(world, fighter, strength = () => 1) {
     if (apart >= spec.sight) continue;
     const weight = strength(enemy) * Math.min(1, (spec.sight - apart) / (spec.sight - spec.near));
     if (weight <= 0) continue;
-    const missile = missileOfMan(enemy);
+    const missile = coverMissileOfMan(enemy);
     let reach;
     if (missile) {
       const head = point(enemy.x, P.head);
@@ -136,7 +136,7 @@ export function exposureOf(world, fighter, strength = () => 1) {
       for (const [part, up] of spec.marks) {
         const mark = point(fighter.x, P[part]);
         mark[1] += up;
-        if (clearShot(world, muzzle, mark, missile)) seen += 1;
+        if (screensClear(world, muzzle, mark, missile)) seen += 1;
       }
       reach = seen / spec.marks.length;
     } else {

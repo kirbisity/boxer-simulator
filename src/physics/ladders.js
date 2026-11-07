@@ -88,10 +88,10 @@ export function createLadders(world, arena) {
 }
 
 /** A man's whole mass (kg), his armour and kit with him: his parts'. */
-const massOf = (fighter) => fighter.invMass.reduce((sum, inverse) => sum + (inverse > 0 ? 1 / inverse : 0), 0);
+const ladderMassOf = (fighter) => fighter.invMass.reduce((sum, inverse) => sum + (inverse > 0 ? 1 / inverse : 0), 0);
 
 /** His footing's height (m) over the ladder's foot. */
-function footingUp(works, ladder, fighter) {
+function ladderFootingUp(works, ladder, fighter) {
   return reliefAt(works, fighter.root[0], fighter.root[1]) - ladder.base;
 }
 
@@ -104,7 +104,7 @@ function onLadderLine(ladder, fighter, back) {
   return Math.abs(along) < LADDERS.lane && outward < back && outward > -ladder.run - 0.15;
 }
 
-const standing = (fighter) => fighter.state === 'up' && !fighter.panicked && !fighter.fled && !fighter.crawling && !fighter.mount;
+const ladderStanding = (fighter) => fighter.state === 'up' && !fighter.panicked && !fighter.fled && !fighter.crawling && !fighter.mount;
 
 /** The torque (N·m) about its foot its own weight and its climbers' hold it to the wall with, and its climbers. */
 export function ladderLoad(world, ladder, works = worksOf(world.arena)) {
@@ -116,10 +116,10 @@ export function ladderLoad(world, ladder, works = worksOf(world.arena)) {
   for (const fighter of world.fighters) {
     if (fighter.corner !== ladder.attackers || fighter.state !== 'up' || fighter.mount) continue;
     if (!onLadderLine(ladder, fighter, 0.6)) continue;
-    const up = footingUp(works, ladder, fighter);
+    const up = ladderFootingUp(works, ladder, fighter);
     if (up < spec.climber) continue;
     climbers.push({ fighter, up });
-    torque += g * massOf(fighter) * run * Math.min(1, up / ladder.height);
+    torque += g * ladderMassOf(fighter) * run * Math.min(1, up / ladder.height);
   }
   return { torque, climbers };
 }
@@ -136,8 +136,8 @@ export function stepLadders(world, dt) {
       const head = ladder.head;
       const near = (fighter, within) => Math.hypot(fighter.root[0] - head[0], fighter.root[1] - head[2]) < within;
       // Held: an attacker at its head.
-      const held = world.fighters.some((fighter) => fighter.corner === ladder.attackers && standing(fighter) && near(fighter, spec.held) && footingUp(works, ladder, fighter) > ladder.height - spec.heldBelow);
-      const pushers = held ? [] : world.fighters.filter((fighter) => fighter.corner !== ladder.attackers && fighter.corner !== 'grey' && standing(fighter) && !fighter.punch && near(fighter, spec.reach) && footingUp(works, ladder, fighter) > ladder.height - 0.3).slice(0, spec.pushers);
+      const held = world.fighters.some((fighter) => fighter.corner === ladder.attackers && ladderStanding(fighter) && near(fighter, spec.held) && ladderFootingUp(works, ladder, fighter) > ladder.height - spec.heldBelow);
+      const pushers = held ? [] : world.fighters.filter((fighter) => fighter.corner !== ladder.attackers && fighter.corner !== 'grey' && ladderStanding(fighter) && !fighter.punch && near(fighter, spec.reach) && ladderFootingUp(works, ladder, fighter) > ladder.height - 0.3).slice(0, spec.pushers);
       if (!pushers.length) {
         ladder.push = 0;
         continue;
@@ -149,12 +149,12 @@ export function stepLadders(world, dt) {
       }
       ladder.push += dt;
       if (ladder.push < spec.pushSeconds) continue;
-      pushOff(world, ladder, pushers, load.climbers);
+      ladderPushOff(world, ladder, pushers, load.climbers);
       continue;
     }
     ladder.tilt = Math.min(1, ladder.tilt + dt / spec.fallSeconds);
     // Lying: raised by enough of its men at its foot, none of them on the wall's side of it.
-    const raisers = world.fighters.filter((fighter) => fighter.corner === ladder.attackers && standing(fighter) && Math.hypot(fighter.root[0] - ladder.x, fighter.root[1] - ladder.z) < spec.raiseWithin && (fighter.root[0] - ladder.x) * ladder.out[0] + (fighter.root[1] - ladder.z) * ladder.out[1] > 0);
+    const raisers = world.fighters.filter((fighter) => fighter.corner === ladder.attackers && ladderStanding(fighter) && Math.hypot(fighter.root[0] - ladder.x, fighter.root[1] - ladder.z) < spec.raiseWithin && (fighter.root[0] - ladder.x) * ladder.out[0] + (fighter.root[1] - ladder.z) * ladder.out[1] > 0);
     ladder.raise = raisers.length >= spec.raisers ? ladder.raise + dt : 0;
     if (ladder.raise < spec.raiseSeconds) continue;
     ladder.up = true;
@@ -169,7 +169,7 @@ export function stepLadders(world, dt) {
 }
 
 /** Over it goes: the gap closed, the men on it thrown out from the face and falling from where they stood on it. */
-function pushOff(world, ladder, pushers, climbers) {
+function ladderPushOff(world, ladder, pushers, climbers) {
   const spec = LADDERS;
   ladder.up = false;
   ladder.push = 0;

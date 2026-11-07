@@ -33,7 +33,7 @@ import { screenOnPath } from './cover.js';
 import { reliefAt, worksOf } from './fieldworks.js';
 
 /** The Ming jin (斤) in kg (~590 g in the Wanli years). */
-const JIN = 0.59;
+const MING_JIN = 0.59;
 
 export const ARTILLERY = {
   gravity: 9.81,
@@ -77,9 +77,9 @@ export const ARTILLERY = {
     // five chambers. Its ball by the 125 : 1 of the largest (殊域周咨录): ~1.2 jin, ~0.7 kg, lead over iron. Canister (群子):
     // the ball's weight in small iron balls of ~14 g (the size of 無敌大将军's, below): ~50.
     folangji: {
-      kg: 150 * JIN,
+      kg: 150 * MING_JIN,
       chambers: 5,
-      ballKg: (150 / 125) * JIN,
+      ballKg: (150 / 125) * MING_JIN,
       canister: { pellets: 50, pelletKg: 0.014, cone: 0.045 },
       // m/s: the source gives none. A short-chambered breech-loader leaks gas at the chamber's joint; ~300 m/s is under the
       // 400-450 m/s of a long European culverin of the time (Hall, Weapons and Warfare in Renaissance Europe, 1997).
@@ -106,10 +106,10 @@ export const ARTILLERY = {
     // chambers, each charged with a heavy ball and 365 iron pellets (its canister). Its ball by the 125 : 1: ~8.4 jin, ~5 kg;
     // its pellets the ball's weight in 365: ~14 g each.
     dajiangjun: {
-      kg: 1050 * JIN,
+      kg: 1050 * MING_JIN,
       chambers: 3,
-      ballKg: (1050 / 125) * JIN,
-      canister: { pellets: 365, pelletKg: ((1050 / 125) * JIN) / 365, cone: 0.05 },
+      ballKg: (1050 / 125) * MING_JIN,
+      canister: { pellets: 365, pelletKg: ((1050 / 125) * MING_JIN) / 365, cone: 0.05 },
       // m/s: none given; a heavier charge in a stouter chamber than the folangji's (an estimate).
       velocity: 330,
       // s: a 50-80 kg chamber lifted in and out by two men (Shen Fei Pao's chambers, Jun Qi Tu Shuo: 80 jin), and charged.
@@ -142,7 +142,7 @@ export function tissueLoss(kg, area, joules, path) {
 }
 
 /** What the reference matchlock ball (the wound table's) leaves along the same path: what the table's figures are for. */
-function referenceLoss(path) {
+function ballReferenceLoss(path) {
   const spec = ARTILLERY.referenceBall;
   const { area } = ballShape(spec.kg, spec.density);
   return tissueLoss(spec.kg, area, MATCHLOCK.energy, path).left;
@@ -171,7 +171,7 @@ export function createArtillery(world, pieces) {
 }
 
 /** Whether a crew man is fit to serve: on his feet, not broken, not off the field. */
-const fit = (fighter) => fighter && fighter.state === 'up' && !fighter.panicked && !fighter.fled && !fighter.crawling;
+const crewFit = (fighter) => fighter && fighter.state === 'up' && !fighter.panicked && !fighter.fled && !fighter.crawling;
 
 /** His post at his gun: behind its breech, each man in turn to one side or the other and further back. */
 export function postOf(piece, fighter) {
@@ -184,8 +184,8 @@ export function postOf(piece, fighter) {
 }
 
 /** The crew men standing at their gun now. */
-function crewAt(world, piece) {
-  return piece.crew.map((id) => world.fighters[id]).filter((fighter) => fit(fighter) && Math.hypot(fighter.root[0] - postOf(piece, fighter)[0], fighter.root[1] - postOf(piece, fighter)[1]) < ARTILLERY.at);
+function gunCrewAt(world, piece) {
+  return piece.crew.map((id) => world.fighters[id]).filter((fighter) => crewFit(fighter) && Math.hypot(fighter.root[0] - postOf(piece, fighter)[0], fighter.root[1] - postOf(piece, fighter)[1]) < ARTILLERY.at);
 }
 
 /** Whether a crew man stays with his gun: it has charges left, and no enemy is on him. */
@@ -219,7 +219,7 @@ export function serveGun(world, fighter) {
 }
 
 /** The point to lay on in a man: his chest, or if the works hide it, his head; null if neither can be hit from the muzzle. */
-function markIn(world, muzzle, fighter, missile) {
+function gunMarkIn(world, muzzle, fighter, missile) {
   for (const [part, up] of [['neck', -0.25], ['head', 0]]) {
     const mark = point(fighter.x, P[part]);
     mark[1] += up;
@@ -229,7 +229,7 @@ function markIn(world, muzzle, fighter, missile) {
 }
 
 /** The gun's muzzle, laid on `bearing` (rad in the floor, from +x toward +z) and `elevation`. */
-function muzzleOf(piece, bearing = piece.bearing, elevation = piece.elevation) {
+function gunMuzzle(piece, bearing = piece.bearing, elevation = piece.elevation) {
   const ground = piece.ground ?? 0;
   const spec = piece.spec;
   const flat = Math.cos(elevation) * spec.length * 0.5;
@@ -237,16 +237,16 @@ function muzzleOf(piece, bearing = piece.bearing, elevation = piece.elevation) {
 }
 
 /** Within the gun's arc (rad either side of where it faces). */
-const inArc = (piece, bearing) => Math.abs(Math.atan2(Math.sin(bearing - piece.facing), Math.cos(bearing - piece.facing))) <= piece.arc;
+const gunInArc = (piece, bearing) => Math.abs(Math.atan2(Math.sin(bearing - piece.facing), Math.cos(bearing - piece.facing))) <= piece.arc;
 
 /**
  * The gun's mark: of the enemy on their feet within its range and arc whose chest or head its ball can reach (the works
  * not in the way) and with none of its own men within `lane` m of the line short of him, the one with the most of his men
  * along the line beyond him (a ball goes on through a file; canister spreads into a knot), the nearer first.
  */
-function pickMark(world, piece) {
+function gunPickMark(world, piece) {
   const spec = piece.spec;
-  const muzzle = muzzleOf(piece);
+  const muzzle = gunMuzzle(piece);
   const ball = ballShape(spec.ballKg);
   const missile = { area: ball.area, joules: 0.5 * spec.ballKg * spec.velocity ** 2 };
   let best = null;
@@ -255,8 +255,8 @@ function pickMark(world, piece) {
     const dx = enemy.root[0] - piece.at[0];
     const dz = enemy.root[1] - piece.at[1];
     const apart = Math.hypot(dx, dz);
-    if (apart > spec.range || apart < 1.5 || !inArc(piece, Math.atan2(dz, dx))) continue;
-    const mark = markIn(world, muzzle, enemy, missile);
+    if (apart > spec.range || apart < 1.5 || !gunInArc(piece, Math.atan2(dz, dx))) continue;
+    const mark = gunMarkIn(world, muzzle, enemy, missile);
     if (!mark) continue;
     const way = [dx / apart, dz / apart];
     let fouled = false;
@@ -282,16 +282,16 @@ function pickMark(world, piece) {
 export function stepArtillery(world, dt) {
   const artillery = world.artillery;
   if (!artillery) return;
-  for (const piece of artillery.pieces) servePiece(world, piece, dt);
-  if (artillery.balls.length) flyBalls(world, dt);
+  for (const piece of artillery.pieces) gunServe(world, piece, dt);
+  if (artillery.balls.length) gunFlyBalls(world, dt);
 }
 
-function servePiece(world, piece, dt) {
+function gunServe(world, piece, dt) {
   const spec = piece.spec;
   const works = worksOf(world.arena);
   piece.ground = works ? reliefAt(works, piece.at[0], piece.at[1]) : 0;
   piece.recoil = Math.max(0, piece.recoil - dt * 0.5);
-  const men = crewAt(world, piece);
+  const men = gunCrewAt(world, piece);
   piece.served = men.length;
   if (!men.length) return;
   // The chambers: a spent one in the breech is swapped for a charged one; a man to spare charges the spent ones.
@@ -317,7 +317,7 @@ function servePiece(world, piece, dt) {
   piece.pickIn -= dt;
   if (piece.pickIn <= 0) {
     piece.pickIn = ARTILLERY.pick;
-    const picked = pickMark(world, piece);
+    const picked = gunPickMark(world, piece);
     piece.mark = picked?.mark ?? null;
     piece.markId = picked?.enemy.id ?? null;
   } else if (piece.markId !== null) {
@@ -325,7 +325,7 @@ function servePiece(world, piece, dt) {
     if (enemy.state !== 'up') piece.mark = null;
   }
   if (!piece.mark) return;
-  const muzzle = muzzleOf(piece);
+  const muzzle = gunMuzzle(piece);
   const dx = piece.mark[0] - piece.at[0];
   const dz = piece.mark[2] - piece.at[1];
   const wanted = Math.atan2(dz, dx);
@@ -347,7 +347,7 @@ export function firePiece(world, piece, gunner, load = null) {
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   const apart = piece.mark ? Math.hypot(piece.mark[0] - piece.at[0], piece.mark[2] - piece.at[1]) : Infinity;
   const kind = load ?? (piece.load === 'auto' ? (apart <= spec.canisterWithin ? 'canister' : 'ball') : piece.load);
-  const muzzle = muzzleOf(piece);
+  const muzzle = gunMuzzle(piece);
   const aim = (bearing, elevation) => [Math.cos(elevation) * Math.cos(bearing), Math.sin(elevation), Math.cos(elevation) * Math.sin(bearing)];
   const bearing = piece.bearing + gauss() * spec.spread;
   const elevation = piece.elevation + gauss() * spec.spread;
@@ -368,7 +368,7 @@ export function firePiece(world, piece, gunner, load = null) {
 }
 
 /** Every ball in the air: drag and gravity, then what it meets on this step's way, nearest first, until it is spent. */
-function flyBalls(world, dt) {
+function gunFlyBalls(world, dt) {
   const spec = ARTILLERY;
   const works = worksOf(world.arena);
   for (const ball of world.artillery.balls) {
@@ -384,10 +384,10 @@ function flyBalls(world, dt) {
     // What it meets on the way, one thing at a time (a man, then the man behind him, all in this step's flight).
     for (let guard = 0; guard < 12 && !ball.done; guard += 1) {
       const joules = 0.5 * ball.kg * vec.dot(ball.v, ball.v);
-      const body = bodyOnPath(world, ball, from, to);
+      const body = ballBodyOnPath(world, ball, from, to);
       const horse = horseOnPath(world, null, from, to);
       const screen = screenOnPath(world, from, to, { area: ball.area, joules });
-      const ground = groundOnPath(works, from, to);
+      const ground = ballGroundOnPath(works, from, to);
       const firsts = [body && { s: body.s, what: 'body' }, horse && !ball.passed.has(`h${horse.horse.id}`) && { s: horse.s, what: 'horse' }, screen && { s: screen.s, what: 'screen' }, ground !== null && { s: ground, what: 'ground' }].filter(Boolean).sort((a, b) => a.s - b.s);
       if (!firsts.length) break;
       const first = firsts[0];
@@ -400,7 +400,7 @@ function flyBalls(world, dt) {
           ball.done = true;
           world.events.push({ time: world.time, kind: 'cannonHit', piece: ball.piece, target: 'works', point: at, effects: ['into the wall'] });
         } else ball.v = vec.scale(ball.v, Math.sqrt(screen.left / joules));
-      } else graze(ball, at, works);
+      } else ballGraze(ball, at, works);
       // On from where it met it, the rest of this step's way at the speed it has now.
       const rest = (1 - first.s) * dt;
       from = vec.add(at, vec.scale(ball.v, 1e-4));
@@ -414,7 +414,7 @@ function flyBalls(world, dt) {
 }
 
 /** Where on the way (share) the ball comes down to the ground (the relief there), or null. */
-function groundOnPath(works, from, to) {
+function ballGroundOnPath(works, from, to) {
   const floor = (p) => (works ? reliefAt(works, p[0], p[2]) : 0);
   const below = (s) => vec.lerp(from, to, s)[1] - floor(vec.lerp(from, to, s));
   if (below(1) > 0) return null;
@@ -430,7 +430,7 @@ function groundOnPath(works, from, to) {
 }
 
 /** The ball at the ground: a graze (shallow: it bounds on, slower) or buried (steep). */
-function graze(ball, at, works) {
+function ballGraze(ball, at, works) {
   const spec = ARTILLERY;
   const flat = Math.hypot(ball.v[0], ball.v[2]);
   const slant = Math.atan2(-ball.v[1], flat);
@@ -447,7 +447,7 @@ function graze(ball, at, works) {
  * The first man on the ball's way not yet gone through, with every part of him it passes through on this line: { s (share
  * of the way to the first), fighter, path (m of him it goes through), part (the capsule it goes through most of), point }.
  */
-function bodyOnPath(world, ball, from, to) {
+function ballBodyOnPath(world, ball, from, to) {
   const length = vec.length(vec.sub(to, from));
   if (length < 1e-9) return null;
   const along = vec.scale(vec.sub(to, from), 1 / length);
@@ -500,7 +500,7 @@ function ballInBody(world, ball, body, at) {
   const gunner = world.fighters[ball.gunner];
   if (victim.state === 'out') return;
   // The wound: the matchlock ball's, as many times over as this one left more energy in him along the same path.
-  const share = loss.left / Math.max(1, referenceLoss(body.path));
+  const share = loss.left / Math.max(1, ballReferenceLoss(body.path));
   const scaled = (table) => Object.fromEntries(Object.entries(table).map(([part, value]) => [part, value * share]));
   const shot = { energy: joules, lethal: scaled(MATCHLOCK.lethal), bleed: scaled(MATCHLOCK.bleed), limbBreak: 1, impulse: ball.kg * (speedBefore - speedAfter), killedBy: ball.kind === 'canister' ? 'cut down by canister' : 'struck by a cannon ball' };
   const event = { time: world.time, kind: 'shot', attacker: gunner.id, defender: victim.id, weapon: piece.kind, gun: true, load: ball.kind, from: [...ball.x], to: at, target: key, point: at, normal: vec.scale(vec.normalize(ball.v), -1), harm: 0, energy: joules, deposited: loss.left, armourTook: armour, path: body.path, kept: left / Math.max(1e-9, joules), effects: [] };
