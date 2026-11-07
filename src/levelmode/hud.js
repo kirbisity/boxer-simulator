@@ -14,6 +14,7 @@ import { bossBar, storyBusy } from './story.js';
 import { createTeamView } from './teamview.js';
 import { wornCard } from '../outfits.js';
 import { setCardElement } from '../setcard.js';
+import { getLang, onLangChange, t, tname } from '../i18n.js';
 
 export const LEVEL_HUD = {
   // The toast stays this long (s).
@@ -56,7 +57,7 @@ export function installLevelHud(root, hooks) {
     const button = items.appendChild(levelElement('button', 'lv-item', `${levelIcon(kind)}<b class="lv-count"></b><kbd>${LEVEL_HUD.keys[kind]}</kbd>`));
     button.type = 'button';
     button.dataset.item = kind;
-    button.setAttribute('aria-label', kind === 'bandage' ? 'Bandage' : 'Tonic');
+    button.setAttribute('aria-label', t(kind === 'bandage' ? 'level.bandage' : 'level.tonic'));
     button.addEventListener('pointerdown', (press) => {
       press.preventDefault();
       press.stopPropagation();
@@ -68,7 +69,7 @@ export function installLevelHud(root, hooks) {
   const kitButton = items.appendChild(levelElement('button', 'lv-item', `${levelIcon('outfit')}<kbd>${LEVEL_HUD.keys.kit.toUpperCase()}</kbd>`));
   kitButton.type = 'button';
   kitButton.dataset.item = 'kit';
-  kitButton.setAttribute('aria-label', 'Your kit');
+  kitButton.setAttribute('aria-label', t('level.yourKit'));
   const sheet = root.appendChild(levelElement('div', 'lv-kit'));
   sheet.hidden = true;
   const toggleKit = () => {
@@ -78,7 +79,7 @@ export function installLevelHud(root, hooks) {
     const card = setCardElement(wornCard(me.body.inputs, me.body.bodyMassKg ?? 75), null);
     card.querySelector('.set-portrait').remove();
     card.classList.add('lv-kit-card');
-    sheet.replaceChildren(levelElement('b', 'lv-kit-title', 'Your kit'), card, levelElement('span', 'lv-kit-close', 'Tap to close'));
+    sheet.replaceChildren(levelElement('b', 'lv-kit-title', t('level.yourKit')), card, levelElement('span', 'lv-kit-close', t('level.tapToClose')));
     sheet.hidden = false;
   };
   kitButton.addEventListener('pointerdown', (press) => {
@@ -94,6 +95,12 @@ export function installLevelHud(root, hooks) {
   const bar = root.appendChild(levelElement('div', 'lv-action', '<span class="lv-action-label"></span><i><b></b></i>'));
   bar.hidden = true;
   const team = createTeamView(root, hooks);
+  // A language switch while the HUD is up: its fixed words again (the rest is redrawn as it changes).
+  const offLang = onLangChange(() => {
+    for (const [kind, button] of Object.entries(buttons)) button.setAttribute('aria-label', t(kind === 'bandage' ? 'level.bandage' : 'level.tonic'));
+    kitButton.setAttribute('aria-label', t('level.yourKit'));
+    sheet.hidden = true;
+  });
   const toastLine = root.appendChild(levelElement('div', 'lv-toast'));
   toastLine.hidden = true;
   let toastUntil = -Infinity;
@@ -131,8 +138,9 @@ export function installLevelHud(root, hooks) {
   };
   window.addEventListener('keydown', onKey, true);
 
+  // (Words from the stage's data come English and are put into the language here, at the screen: i18n.js tname.)
   function toast(text) {
-    toastLine.textContent = text;
+    toastLine.textContent = tname(text);
     toastLine.hidden = false;
     toastLine.classList.remove('lv-toast-in');
     void toastLine.offsetWidth;
@@ -158,14 +166,15 @@ export function installLevelHud(root, hooks) {
     const action = level.action;
     bar.hidden = !action;
     if (action) {
-      bar.querySelector('.lv-action-label').textContent = action.label;
+      bar.querySelector('.lv-action-label').textContent = tname(action.label);
       bar.querySelector('b').style.width = `${Math.round(Math.min(1, action.t / action.seconds) * 100)}%`;
     }
     const choice = action || level.dying ? null : contextFor(world);
     pill.hidden = !choice;
-    if (choice && choice.id !== shown) {
-      shown = choice.id;
-      pill.querySelector('.lv-label').textContent = choice.label;
+    // (Keyed by the language and the word too: a switch mid-run redraws the pill.)
+    if (choice && `${choice.id}|${getLang()}|${choice.label}` !== shown) {
+      shown = `${choice.id}|${getLang()}|${choice.label}`;
+      pill.querySelector('.lv-label').textContent = tname(choice.label);
       pill.querySelector('.lv-icon').outerHTML = levelIcon(choice.icon);
       pill.classList.toggle('disabled', Boolean(choice.disabled));
     }
@@ -174,7 +183,7 @@ export function installLevelHud(root, hooks) {
     const boss = bossStatus(world);
     // (The bar of a boss who is out stays only if it was up: it empties and fades, and the cutscene's title takes over.)
     if (boss.show && !bossShown && !boss.felled) {
-      bossBar.show(boss.name, boss.title);
+      bossBar.show(tname(boss.name), tname(boss.title));
       bossShown = true;
     } else if (!boss.show && bossShown) {
       bossBar.hide();
@@ -200,5 +209,5 @@ export function installLevelHud(root, hooks) {
     }
   }
 
-  return { update, reset, toast, destroy: () => { window.removeEventListener('keydown', onKey, true); team.destroy(); for (const node of [pill, items, bar, toastLine]) node.remove(); } };
+  return { update, reset, toast, destroy: () => { offLang(); window.removeEventListener('keydown', onKey, true); team.destroy(); for (const node of [pill, items, bar, toastLine]) node.remove(); } };
 }

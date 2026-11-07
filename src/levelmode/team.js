@@ -14,15 +14,16 @@ import { P } from '../body.js';
 import { hurtShare } from '../ai.js';
 import { mindState } from './awareness.js';
 import { levelOf, say } from './items.js';
+import { t, tname } from '../i18n.js';
 
 export const TEAM = {
   // m: within this a living comrade has his name and pip over his head (the HUD's panel lists them always).
   markerRange: 12,
   // What the screen is told.
   gateText: 'Your comrades hold the gate',
-  fallenText: (name) => `${name} has fallen`,
+  fallenText: (name) => t('level.comradeFallen', { name: tname(name) }),
   // The player's own blow on a comrade: what he says (at most once in this many seconds: a flurry is one complaint).
-  struckText: (name) => `${name}: "Watch it!"`,
+  struckText: (name) => t('level.comradeStruck', { name: tname(name) }),
   struckEvery: 3,
 };
 

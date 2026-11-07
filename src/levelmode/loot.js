@@ -9,6 +9,7 @@ import { handling } from '../handling.js';
 import { WEAPONS } from '../weapons.js';
 import { LEVEL_CONFIG } from './config.js';
 import { beginAction, feetFloor, levelOf, say } from './items.js';
+import { t, tname } from '../i18n.js';
 
 /** The same outfit? (kind, design, colours, headgear) */
 function sameKit(a, b) {
@@ -81,8 +82,15 @@ export function swapOutfits(world, dead) {
   level.rebuild.add(0);
   level.rebuild.add(dead.id);
   world.events.push({ time: world.time, kind: 'changed', fighter: 0, effects: [`puts on ${theirs.name}'s ${outfitName(theirs)}`] });
-  say(world, { type: 'toast', text: `You put on the ${outfitName(theirs)}` });
+  say(world, { type: 'toast', text: t('level.putOn', { outfit: outfitWorn(theirs) }) });
   return true;
+}
+
+/** The outfit put on, for the toast: in English its words (outfitName), in Chinese the kit's whole name (i18n.js tname). */
+function outfitWorn(inputs) {
+  const label = OUTFITS[inputs.outfit?.kind]?.label;
+  const named = label ? tname(label) : null;
+  return named && named !== label ? named : outfitName(inputs);
 }
 
 /** An outfit in words ("Levy — quilted jack" gives "quilted jack": the kit's label after its dash). */
