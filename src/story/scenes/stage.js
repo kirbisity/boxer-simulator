@@ -29,6 +29,7 @@
 import { P } from '../../body.js';
 import { createFighter, dropWeapon, knockOut, placeFighter, placeOnFloor, WORLD } from '../../physics.js';
 import { holdPlayer } from '../../levelmode/items.js';
+import { worksOf } from '../../physics/fieldworks.js';
 import { placeMounted } from '../../physics/mounted.js';
 import { storyText } from '../life.js';
 import { STORY_SET } from './sets.js';
@@ -42,8 +43,10 @@ export const STORY_SCENE = {
   bars: 0.8,
   // A tap skips a line, but not before this (s into it).
   skipAfter: 0.6,
-  // The turn (s): the stoop with the spear, then the roll of the body over this long, eased.
-  turn: { stoop: 0.5, roll: 1.6 },
+  // The turn (s): the stoop with the spear, then the roll of the body over this long, eased; rolled onto his back, his chest
+  // turned `toward` him (the share of the way over to him from straight up: a body left half on its side rolls back over
+  // as its own weight settles it, ~0.3 stays on its back).
+  turn: { stoop: 0.5, roll: 1.6, toward: 0.3 },
   // The kneel and the rise (s), eased.
   kneel: 1.2,
   // Where he stands over the body: this far (m) from its hips, on the side its face will turn to; the stoop's lean and how far (m)
@@ -54,7 +57,9 @@ export const STORY_SCENE = {
   bow: { search: 0.35, still: 0.3 },
   // The scene's camera: a low shot across the two of them (rad of pitch, m away, m over the middle it looks at), from the side,
   // `turn` rad off the line from the body to him; back far enough that the ground round them is in it, the two of them alone.
-  camera: { pitch: 0.28, distance: 4.0, lift: 0.2, turn: 2.1 },
+  // If a wall or screen of the field's works stands between (a fence he fell by), the first of `turns` (rad, from the same
+  // line) that sees past it.
+  camera: { pitch: 0.28, distance: 4.0, lift: 0.2, turn: 2.1, turns: [-2.1, 1.5, -1.5, 2.7, -2.7, 0.9, -0.9] },
   // The last line held this long (s) after it is read, the bars still in.
   endHold: 1.6,
   // Round the two of them (m from the middle of the body and where he stands over it): nobody else lies this close in the shot,
@@ -65,7 +70,23 @@ export const STORY_SCENE = {
   clearStanding: 9,
   // A set scene: the dark it opens in held this long (s) before it lifts (the world drawn under it).
   openDark: 0.5,
+  // How the dead lie (layOut): not laid out straight as on a bier but as a man falls, each his own way (seeded by who he is),
+  // then left to the body's own weight a moment (`settle` s of the ragdoll, physics.js's limp body on the floor) before he is
+  // left lying. In his own frame, rad: each arm thrown out from his side by `arm` [least, most] and bent at the elbow by
+  // `elbow`; the legs a little apart (`leg`), one knee drawn up and out (`knee`: the one leg, as a man falls forward over a
+  // bent knee); the head turned on the neck (`head`, as a face-down man's lies on its cheek). The ranges are what bodies
+  // photographed where they fell show (an arm anywhere from along the side to flung out level with the shoulder, seldom
+  // both alike).
+  sprawl: { arm: [0.1, 1.6], elbow: [0.1, 1.1], leg: [0.04, 0.3], knee: [0.3, 1.1], head: 0.45, settle: 1.4 },
 };
+
+/** A number in [-1, 1] for a man and a key, the same each time: his own way of standing, his own way of lying. */
+export function sceneVary(fighter, key) {
+  let hash = 2166136261;
+  for (const char of `${fighter.id}:${fighter.body?.inputs?.name ?? ''}:${key}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  return (hash / 4294967295) * 2 - 1;
+}
+const sceneRange = ([least, most], vary) => least + ((most - least) * (vary + 1)) / 2;
 
 const sceneSmooth = (u) => {
   const t = Math.min(1, Math.max(0, u));
@@ -89,8 +110,14 @@ export function bodyAxes(fighter) {
   return { pelvis, axis, chest };
 }
 
-/** Turn a body about its own long axis through its hips by `angle` (rad), and set it on the floor (its lowest part at `floor`). */
-export function rollBody(fighter, angle, floor = 0) {
+// The trunk and head: what a body turned over rests on (its limbs fall where the roll leaves them).
+const SCENE_TRUNK = [P.head, P.neck, P.lShoulder, P.rShoulder, P.pelvis, P.lHip, P.rHip];
+
+/**
+ * Turn a body about its own long axis through its hips by `angle` (rad), and set it on the floor (its lowest part at `floor`;
+ * `trunk`: its trunk's lowest, the limbs left to the floor's own push, as a body being rolled over flops).
+ */
+export function rollBody(fighter, angle, floor = 0, { trunk = false } = {}) {
   const { pelvis, axis } = bodyAxes(fighter);
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
@@ -103,17 +130,18 @@ export function rollBody(fighter, angle, floor = 0) {
     for (let c = 0; c < 3; c += 1) x[index * 3 + c] = pelvis[c] + v[c] * cos + k[c] * sin + axis[c] * along;
   }
   let low = Infinity;
-  for (let index = 0; index < x.length / 3; index += 1) low = Math.min(low, x[index * 3 + 1] - (fighter.radius?.[index] ?? 0.05));
+  for (const index of trunk ? SCENE_TRUNK : x.keys()) if (index < x.length / 3) low = Math.min(low, x[index * 3 + 1] - (fighter.radius?.[index] ?? 0.05));
   for (let index = 1; index < x.length; index += 3) x[index] += floor - low;
   fighter.prev.set(x);
   fighter.v?.fill?.(0);
 }
 
 /**
- * Lay a body out straight where it lies, face down (the way a man falls forward into mud), its head the way it lay: his own
- * body's proportions (a fresh standing figure of his inputs, physics.js createFighter), the arms down at his sides and the legs
- * together, turned to lie along the ground; then left lying still (out past WORLD.goneSeconds: not simulated, as the long dead
- * of a battle are), so the scene alone moves it.
+ * Lay a body down where it lies, face down (the way a man falls forward into mud), its head the way it lay: his own body's
+ * proportions (a fresh standing figure of his inputs, physics.js createFighter), sprawled as STORY_SCENE.sprawl has it (the
+ * arms thrown out, a knee drawn up, the head turned: his own way), turned to lie along the ground; then his own weight lets it
+ * settle (the ragdoll on the floor, `sprawl.settle` s) before it is left lying still (out past WORLD.goneSeconds: not
+ * simulated, as the long dead of a battle are), so the scene alone moves it.
  */
 export function layOut(fighter, floor = 0, toward = null) {
   const stand = createFighter(fighter.body.inputs, { id: fighter.id, corner: fighter.corner, x: 0, facing: 0, random: () => 0.5 });
@@ -122,20 +150,33 @@ export function layOut(fighter, floor = 0, toward = null) {
   const pelvis = at(P.pelvis);
   // The standing figure straightened, relative to its hips (x ahead, y up, z to his left).
   const local = Array.from({ length: stand.x.length / 3 }, (_, index) => sceneSub(at(index), pelvis));
-  const up = (from, by) => [local[from][0] * 0, local[from][1] + by, local[from][2]];
   local[P.neck] = [0, length(P.pelvis, P.neck), 0];
   local[P.head] = [0, local[P.neck][1] + length(P.neck, P.head), 0];
+  const sprawl = STORY_SCENE.sprawl;
+  // A limb's way in the plane of his back (his frame: y up the body, z to his left), `angle` rad out from straight down.
+  const outward = (angle, side) => [0, -Math.cos(angle), side * Math.sin(angle)];
+  const reach = (from, way, by) => from.map((value, c) => value + way[c] * by);
+  const headTurn = sceneVary(fighter, 'head') * sprawl.head;
+  local[P.head] = reach(local[P.neck], [0, Math.cos(headTurn), Math.sin(headTurn)], length(P.neck, P.head));
   for (const [shoulder, elbow, hand, side] of [[P.lShoulder, P.lElbow, P.lHand, 1], [P.rShoulder, P.rElbow, P.rHand, -1]]) {
     const width = Math.abs(local[shoulder][2]) || 0.17;
+    // (Seldom both alike: the right arm mostly the other way from the left.)
+    const vary = side === 1 ? sceneVary(fighter, 'arm') : -0.6 * sceneVary(fighter, 'arm') + 0.4 * sceneVary(fighter, 'armOther');
+    const thrown = sceneRange(sprawl.arm, vary);
+    const bent = thrown + sceneRange(sprawl.elbow, sceneVary(fighter, `elbow${side}`));
     local[shoulder] = [0, local[P.neck][1] - 0.04, side * width];
-    local[elbow] = [0, local[shoulder][1] - length(shoulder, elbow), side * (width + 0.03)];
-    local[hand] = [0, local[elbow][1] - length(elbow, hand), side * (width + 0.05)];
+    local[elbow] = reach(local[shoulder], outward(thrown, side), length(shoulder, elbow));
+    local[hand] = reach(local[elbow], outward(bent, side), length(elbow, hand));
   }
+  // (The one knee drawn up: the left or the right, as he fell.)
+  const drawn = sceneVary(fighter, 'knee') > 0 ? 1 : -1;
   for (const [hip, knee, foot, side] of [[P.lHip, P.lKnee, P.lFoot, 1], [P.rHip, P.rKnee, P.rFoot, -1]]) {
     const width = Math.abs(local[hip][2]) || 0.09;
+    const apart = sceneRange(sprawl.leg, sceneVary(fighter, `leg${side}`));
+    const bend = side === drawn ? sceneRange(sprawl.knee, sceneVary(fighter, 'kneeBend')) : 0;
     local[hip] = [0, local[hip][1], side * width];
-    local[knee] = up(hip, -length(hip, knee));
-    local[foot] = up(knee, -length(knee, foot));
+    local[knee] = reach(local[hip], outward(apart + bend, side), length(hip, knee));
+    local[foot] = reach(local[knee], outward(apart - bend * 0.4, side), length(knee, foot));
   }
   // Lying: his up along the ground the way his head lay, his front down; his left (a proper turn, not a mirror) across.
   const now = scenePoint(fighter, P.pelvis);
@@ -153,7 +194,14 @@ export function layOut(fighter, floor = 0, toward = null) {
   for (let index = 1; index < x.length; index += 3) x[index] += floor - low;
   fighter.prev.set(x);
   fighter.v?.fill?.(0);
-  fighter.outFor = WORLD.goneSeconds + 1;
+  settleBody(fighter);
+}
+
+/** A body left to its own weight a moment (STORY_SCENE.sprawl.settle s of the ragdoll), then lying still, unsimulated. */
+export function settleBody(fighter) {
+  fighter.outFor = WORLD.goneSeconds - STORY_SCENE.sprawl.settle;
+  // (Woken, if he had come to rest: physics.js lets a still body sleep.)
+  fighter.stillFor = 0;
 }
 
 /** The angle (rad) about its long axis that turns a body's chest to face `toward` (a direction: [0, -1, 0] face down). */
@@ -247,6 +295,7 @@ export function createScenePlay(world, scene, { hero, cast = {}, fallen = [], la
     staged, figures: staged ? figures.map((figure) => ({ ...figure })) : null, camera, cameras: { main: camera, ...cameras }, cameraAt: 0,
     dark: staged ? { from: 1, to: 0, at: STORY_SCENE.openDark, seconds: STORY_SCENE.cut.lift } : null,
     falls: [],
+    cameraTurn: undefined,
   };
 }
 
@@ -347,9 +396,62 @@ export function stageSetFigures(world, figures) {
     fighter.walking = true;
     figure.since = -Infinity;
     figure.share = STORY_SET.poses[figure.pose] ? 1 : 0;
+    fighter.ease = STORY_SET.poses[figure.pose] ? undefined : easeFor(fighter, { walking: figure.pose === 'walk' });
     if (figure.pose === 'lie' || figure.pose === 'lieUp') layDead(world, fighter, { up: figure.pose === 'lieUp', yaw: figure.yaw });
   }
   return figures;
+}
+
+/**
+ * How a man stands at ease (STORY_SET.ease; physics.js easePose takes it): his free hands down by his thighs, a long weapon
+ * grounded by his foot or a short one held point down (`walking`: only the weapon, at the slope or low, his arms left to the
+ * stride), the shield hung at his side, the feet side by side; his own lean, weight shift and turn of the head, and the slow
+ * sway of a man standing (`time`, s).
+ */
+export function easeFor(fighter, { walking = false, time = 0 } = {}) {
+  const spec = STORY_SET.ease;
+  const toSide = ([ahead, up, out], side) => [ahead, up, side === 'l' ? out : -out];
+  // A hand let down by his side (`ahead`, `out` of height, the arm `hang` of its length below the shoulder: his own body's).
+  const H = fighter.body.heightM;
+  const L = fighter.body.lengths;
+  const shoulder = [0, L.ankle + L.shank + L.thigh + L.trunk - 0.025 * H, L.shoulderSpan / 2];
+  const hanging = ({ ahead, out, hang }) => {
+    const arm = (L.upperArm + L.forearmToFist) * hang;
+    const across = out * H - shoulder[2];
+    const down = Math.sqrt(Math.max(0, arm * arm - (ahead * H) ** 2 - across * across));
+    return [ahead, (shoulder[1] - down) / H, out];
+  };
+  const hands = walking ? {} : { l: toSide(hanging(spec.hand), 'l'), r: toSide(hanging(spec.hand), 'r') };
+  if (fighter.shield && !walking) hands.l = toSide(spec.shield, 'l');
+  let bladeDir = null;
+  const weapon = fighter.weapon?.held ? fighter.weapon : null;
+  if (weapon) {
+    const side = weapon.main;
+    const long = weapon.spec.length + weapon.spec.handle >= spec.grounded.from;
+    if (long && !walking) {
+      // Stood on its butt: the hand as high up the shaft as its grip is from the butt (on the floor), within his reach.
+      const grounded = spec.grounded;
+      const up = Math.min(grounded.most, Math.max(grounded.hand[1], (weapon.spec.handle * Math.cos(grounded.lean) + grounded.floor) / H));
+      hands[side] = toSide([grounded.hand[0], up, grounded.hand[2]], side);
+      bladeDir = toSide([Math.sin(grounded.lean) * 0.4, Math.cos(grounded.lean), Math.sin(grounded.lean)], side);
+    } else {
+      const carry = long ? spec.carried : spec.low;
+      hands[side] = toSide(Array.isArray(carry.hand) ? carry.hand : hanging(carry.hand), side);
+      bladeDir = toSide(carry.dir, side);
+    }
+  }
+  if (walking) return { hands, bladeDir };
+  const vary = spec.vary;
+  const weight = sceneVary(fighter, 'weight');
+  return {
+    hands, bladeDir,
+    stance: { ...spec.stance, stagger: spec.stance.stagger * Math.sign(sceneVary(fighter, 'foot') || 1) },
+    roll: vary.roll * weight + spec.sway.roll * Math.sin(Math.PI * 2 * spec.sway.hz * time + (fighter.id ?? 0) * 1.7),
+    hipYaw: vary.hipYaw * weight,
+    twist: vary.twist * sceneVary(fighter, 'twist'),
+    lean: vary.lean * sceneVary(fighter, 'lean'),
+    headOffset: [0, -Math.abs(vary.head * sceneVary(fighter, 'nod')), vary.head * sceneVary(fighter, 'head')],
+  };
 }
 
 /** A figure's hands for his pose: behind his back (bound), or held out before him to meet another's (a child's round his). */
@@ -366,7 +468,14 @@ function setHands(fighter, figure, share) {
     const out = [pelvis[0] + forward[0] * 0.42, (neck[1] + pelvis[1]) / 2 - 0.02 * share, pelvis[2] + forward[2] * 0.42];
     return [out.map((v, i) => v + left[i] * 0.05), out.map((v, i) => v - left[i] * 0.05)];
   }
-  // At rest on his thighs, as a man kneels or squats with nothing in his hands.
+  return restHands(fighter);
+}
+
+/** A kneeling man's hands at rest on his thighs, as a man kneels or squats with nothing in his hands (STORY_SET.rest). */
+function restHands(fighter) {
+  const pelvis = scenePoint(fighter, P.pelvis);
+  const forward = [Math.cos(fighter.yaw), 0, -Math.sin(fighter.yaw)];
+  const left = [-forward[2], 0, forward[0]];
   const rest = STORY_SET.rest;
   const knee = [pelvis[0] + forward[0] * rest.ahead, pelvis[1] + rest.up, pelvis[2] + forward[2] * rest.ahead];
   return [knee.map((v, i) => v + left[i] * rest.apart), knee.map((v, i) => v - left[i] * rest.apart)];
@@ -389,6 +498,7 @@ export function poseSetFigures(world, figures, time) {
         fighter.strafe = 0;
         fighter.running = pace > spec.run;
         fighter.kneel = undefined;
+        fighter.ease = easeFor(fighter, { walking: true });
         continue;
       }
       Object.assign(figure, { pose: figure.walk.then ?? 'stand', since: time, share: 0 });
@@ -396,6 +506,8 @@ export function poseSetFigures(world, figures, time) {
     holdPlayer(fighter);
     const pose = STORY_SET.poses[figure.pose];
     const eased = sceneSmooth((time - figure.since) / STORY_SCENE.kneel);
+    // (Standing, at ease; down on his knees, the kneel has his hands.)
+    fighter.ease = pose ? undefined : easeFor(fighter, { time: world.time });
     if (pose) {
       figure.share = Math.max(figure.share ?? 0, eased);
       const share = pose.share * figure.share;
@@ -465,7 +577,8 @@ function beginStage(play, stage) {
   if (stage === 'cut') play.cut = { at: play.time };
   if (stage === 'turn' && body) {
     // Face up, the chest turned toward where he stands.
-    const toward = play.side ? [play.side[0], 0.6, play.side[2]] : [0, 1, 0];
+    const lean = STORY_SCENE.turn.toward;
+    const toward = play.side ? [play.side[0] * lean, 1, play.side[2] * lean] : [0, 1, 0];
     play.roll = { from: 0, total: rollToward(body, sceneNorm(toward)), done: 0, at: play.time + STORY_SCENE.turn.stoop };
   }
   if (stage === 'kneel' && hero?.weapon) dropWeapon(play.world, hero, 'dropped');
@@ -499,7 +612,8 @@ function poseHero(play) {
   } else if (stage === 'kneel' || stage === 'search' || stage === 'still') {
     const share = stage === 'kneel' ? Math.max(kneel.share ?? 0, sceneSmooth(since / STORY_SCENE.kneel)) : 1;
     const chest = body ? scenePoint(body, P.neck).map((value, index) => (value + scenePoint(body, P.pelvis)[index] * 0.6) / 1.6) : null;
-    const hands = stage === 'kneel' || !chest ? null : [[chest[0], chest[1] + 0.04, chest[2] - 0.1], [chest[0], chest[1] + 0.04, chest[2] + 0.1]];
+    // (Kneeling, his hands on his thighs; searching and still, on the body.)
+    const hands = stage === 'kneel' || !chest ? restHands(hero) : [[chest[0], chest[1] + 0.04, chest[2] - 0.1], [chest[0], chest[1] + 0.04, chest[2] + 0.1]];
     hero.kneel = { share, lean: STORY_SCENE.bow[stage] ?? 0.2, hands };
   } else if (stage === 'rise') {
     const share = 1 - sceneSmooth(since / STORY_SCENE.kneel);
@@ -515,7 +629,9 @@ function rollStep(play) {
   const wanted = play.roll.total * u;
   const by = wanted - play.roll.done;
   if (Math.abs(by) > 1e-4) {
-    rollBody(body, by);
+    // (Turned over by the trunk, his limbs left to fall where they will, his own weight on them as he goes.)
+    rollBody(body, by, 0, { trunk: true });
+    settleBody(body);
     play.roll.done = wanted;
   }
   if (u >= 1) play.roll = null;
@@ -558,6 +674,8 @@ export function stepScene(play, dt) {
     play.into = 0;
     if (play.index >= play.lines.length) {
       play.done = true;
+      // (At ease no longer: whatever comes next has them as it finds them.)
+      for (const fighter of play.world.fighters) fighter.ease = undefined;
       due.push('done');
     } else {
       due.push({ line: play.index });
@@ -578,6 +696,8 @@ export function sceneThink(play) {
     poseSetFigures(play.world, play.figures, play.time);
     return;
   }
+  // (The fighting over: every man still on his feet stands at ease, the hero too while he is not stooped or down by the body.)
+  for (const fighter of play.world.fighters) if (fighter.state === 'up' && !fighter.kneel) fighter.ease = easeFor(fighter, { time: play.world.time });
   poseHero(play);
 }
 
@@ -637,5 +757,32 @@ export function sceneFocus(play) {
   const lying = body ? scenePoint(body, P.pelvis) : head;
   const middle = [(head[0] + lying[0]) / 2, Math.min(head[1], 0.9) * 0.5 + STORY_SCENE.camera.lift, (head[2] + lying[2]) / 2];
   const across = Math.atan2(head[2] - lying[2], head[0] - lying[0]);
-  return { target: middle, yaw: across + STORY_SCENE.camera.turn, pitch: STORY_SCENE.camera.pitch, distance: STORY_SCENE.camera.distance };
+  // (The side chosen once the scene is set, and kept: the camera does not jump from side to side as he moves.)
+  if (play.set && play.cameraTurn === undefined) play.cameraTurn = sceneCameraTurn(play.world, middle, across);
+  return { target: middle, yaw: across + (play.cameraTurn ?? STORY_SCENE.camera.turn), pitch: STORY_SCENE.camera.pitch, distance: STORY_SCENE.camera.distance };
+}
+
+/** The way round the two of them the camera stands (rad off the line from the body to him): its own, else one no wall hides. */
+function sceneCameraTurn(world, middle, across) {
+  const spec = STORY_SCENE.camera;
+  const turns = [spec.turn, ...spec.turns];
+  const yaw = sceneClearYaw(world, [middle[0], middle[2]], spec.distance * Math.cos(spec.pitch), turns.map((turn) => across + turn));
+  return yaw === null ? spec.turn : turns[turns.findIndex((turn) => across + turn === yaw)];
+}
+
+/**
+ * Of the camera's ways round a point on the floor (`yaws`, rad, in the order wanted; the camera `reach` m out on the floor),
+ * the first from which no wall or screen of the field's works stands between it and the point; null if every one is hidden.
+ */
+export function sceneClearYaw(world, at, reach, yaws) {
+  const works = worksOf(world?.arena);
+  const walls = works ? [...(works.walls ?? []), ...(works.screens ?? [])] : [];
+  // Whether the floor's line from a to b crosses the wall's (2D: a wall stands taller than the shot's low eye).
+  const side = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const crosses = (a, b, wall) => side(a, b, wall.a) * side(a, b, wall.b) < 0 && side(wall.a, wall.b, a) * side(wall.a, wall.b, b) < 0;
+  for (const yaw of yaws) {
+    const eye = [at[0] + Math.cos(yaw) * reach, at[1] + Math.sin(yaw) * reach];
+    if (!walls.some((wall) => crosses(at, eye, wall))) return yaw;
+  }
+  return null;
 }

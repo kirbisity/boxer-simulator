@@ -28,6 +28,34 @@ export const STORY_SET = {
   },
   // Where the hands of a man down on his knees rest (m from his hips: ahead, up, apart): on his thighs.
   rest: { ahead: 0.24, up: -0.2, apart: 0.14 },
+  // A man standing in a scene stands at ease: nobody here is fighting (stage.js easeFor, physics.js easePose). Each place is in
+  // his own frame, shares of his height (ahead, up, out to his side), each way a direction (ahead, up, out).
+  // - hand: a free hand hanging by the thigh (`ahead`, `out` of height), the arm let down to `hang` of its length (the elbow
+  //   soft, not locked); the walk's own swing held them at the hip and out, the elbows akimbo, as no one stands.
+  // - grounded: a weapon as long as `from` m or more (a spear, a pike, a glaive) stood on its butt by his foot, the shaft up
+  //   and leaning out a little (`lean` rad), the hand round it at the hip (`hand`, raised to where the butt meets the floor, no
+  //   higher than `most`): how a man with a pole arm stands in the ranks when no one is coming, its weight on the ground,
+  //   not on his arms (a 2.6 m pike is ~2-3 kg, held out level for long by no one). Shorter: `low`, a sword or a club held by
+  //   his side point down, the point a little ahead of his foot (no scabbard is drawn: a drawn blade rests so).
+  // - carried: on the march (walking), a long weapon at the slope, the hand at the shoulder and the shaft back over it
+  //   (`dir`); a short one `low`.
+  // - shield: its arm let down, the shield hung against the leg.
+  // - stance: at ease, not in a guard (walk mode's own stance, physics/config.js WORLD.walk: upright, the knees straight, no
+  //   turn of the body): the feet side by side (`even`), barely one before the other (`stagger`), a little apart (`width`).
+  // - vary: no two men stand alike (sceneVary, seeded by who he is): the weight on one leg (`roll` rad of the trunk over it,
+  //   `hipYaw` the hips turned with it), the shoulders turned (`twist`), the head tilted and turned (`head`, of height), a
+  //   lean (`lean`), one foot ahead or the other; `sway`, the slow sway of a man standing (rad of roll, its Hz: a standing
+  //   man's body sways ~0.1-0.3 Hz, a few mm to a cm).
+  ease: {
+    hand: { ahead: 0.03, out: 0.12, hang: 0.95 },
+    grounded: { from: 1.5, hand: [0.07, 0.47, 0.15], most: 0.56, lean: 0.07, floor: 0.02 },
+    low: { hand: { ahead: 0.05, out: 0.135, hang: 0.93 }, dir: [0.3, -1, 0.06] },
+    carried: { hand: [0.06, 0.7, 0.13], dir: [-0.7, 1, 0.12] },
+    shield: [0.05, 0.5, 0.17],
+    stance: { blade: 0, crouch: 0, lean: 0.03, guardHeight: 0, width: 0.85, stagger: 0.25, even: 1 },
+    vary: { roll: 0.05, hipYaw: 0.12, twist: 0.14, head: 0.012, lean: 0.035 },
+    sway: { roll: 0.012, hz: 0.14 },
+  },
   // A walking figure's pace (the share of his stride the gait is asked for: 0.5 comes to ~0.7 m/s, an unhurried walk; 0.9 a
   // run of ~3 m/s; past `run` he runs) and how close (m) he stops to where he goes; one who comes up to another (the stage word
   // `approach`) comes slowly (`slow`, ~0.55 m/s) and stops `short` m from him, at arm's length.
@@ -376,8 +404,10 @@ export const STORY_SETS = {
       { role: 'soldier', count: 7, from: [8, -4.4], step: [0, 1.1], face: [0, 0], pose: 'stand' },
       { role: 'northSoldier', count: 8, from: [9.4, -4.9], step: [0, 1.1], face: [0, 0], pose: 'stand' },
     ],
-    // From the front of the ranks, looking up at it: the head against the grey sky, the official under it.
-    camera: { target: [1.0, 3.0, -0.6], yaw: 0.3, pitch: -0.32, distance: 6.4, drift: { distance: -0.03 } },
+    // From the side of the ground, a man's height, looking up the pole: the head against the grey sky in the upper third
+    // (~0.2 m across at ~5 m, near fifty pixels of the frame), the pole going down out of it (the official has his own shot;
+    // from the ranks, looking up, the head was a speck at the top and the front rank's helmets crowded the frame).
+    camera: { target: [0.3, 4.4, -0.3], yaw: 1.2, pitch: -0.42, distance: 6, drift: { distance: -0.03 } },
     cameras: {
       // Up at the head, close, against the grey sky.
       head: { target: [0.05, 5.1, 0.1], yaw: 0.5, pitch: -0.62, distance: 3.6, drift: { distance: -0.03 } },
@@ -439,7 +469,8 @@ export const STORY_SETS = {
       { who: 'jin', at: [0.6, 0.4], face: [-0.4, -0.5], pose: 'stand' },
       { who: 'hero', at: [-0.5, -0.5], face: [0.6, 0.4], pose: 'stand', rank: 'soldier' },
     ],
-    camera: { target: [0, 1.25, 0], yaw: -2.6, pitch: 0.12, distance: 3.6, drift: { yaw: 0.012 } },
+    // Three-quarters off his shoulder, Jin's face to it (straight down the line between them, he hid Jin).
+    camera: { target: [0, 1.25, 0], yaw: -1.76, pitch: 0.12, distance: 3.6, drift: { yaw: 0.012 } },
   },
   // A house in Chi'an: Jin's mother at the door.
   motherDoor: {
