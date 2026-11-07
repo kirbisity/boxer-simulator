@@ -87,14 +87,16 @@ test('a wall: its face kept by a stone line, open only at its ladders, the walk 
 
 test('men at the foot of a ladder climb it to the walk', () => {
   const { works, walk } = wallWorks({ x: 0, z: [-9, 9], height: 4.5, ladders: [0] });
-  // Three spearmen below, four men holding the walk (a drill holds them at their places: formation.js, four or more).
+  // Three spearmen below, four men holding the walk (a drill holds them at their places: formation.js, four or more),
+  // along it away from the ladder's head (at its head they shove it off: test/climbing.test.js).
   // (Relentless, so that they go in at once: three men alone below a wall hesitate, as men do: ai.js AI.hesitation.)
   const red = [0, 1, 2].map(() => ({ inputs: { ...PRESETS.mingSpear, relentless: true }, corner: 'red' }));
   const blue = [0, 1, 2, 3].map(() => ({ inputs: { ...PRESETS.mingSpear }, corner: 'blue' }));
-  const formation = { red: { front: 0, layout: [[1.5, 1], [2.5, -1], [3.5, 0]] }, blue: { front: 0, layout: [-3, -1, 1, 3].map((z) => [walk[0] + 1.5, z]), drill: { advance: false } } };
+  const formation = { red: { front: 0, layout: [[1.5, 1], [2.5, -1], [3.5, 0]] }, blue: { front: 0, layout: [-5, -3, 3, 5].map((z) => [walk[0] + 1.5, z]), drill: { advance: false } } };
   const world = createWorld([...red, ...blue], { seed: 1, arena: { halfX: 10, halfZ: 9, works }, formation });
   let highest = 0;
-  for (let t = 0; t < 30; t += 0.1) {
+  // (The ladder lies at the foot first: raised, then climbed.)
+  for (let t = 0; t < 40; t += 0.1) {
     advance(world, 0.1, (current, dt) => thinkAll(current, dt));
     for (const fighter of world.fighters.slice(0, 3)) highest = Math.max(highest, fighter.lift ?? 0);
   }

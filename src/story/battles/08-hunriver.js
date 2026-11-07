@@ -26,15 +26,28 @@
 // The camp's guns: two folangji in its carts' intervals, served by the Zhejiang and household men there (HUNRIVER.artillery),
 // their charges running out as the day's powder did. What the game cannot show: the war carts (their line is the palisade's),
 // and the Jin's own cannon (turned on the Sichuan camp, not this one). The river is five li from the camp, off this field.
+// The approach: the camp stood five li (~2.9 km) from the river (浙兵布阵于浑河五里之外: zh.wikipedia 渾河之戰, after 明史 卷271);
+// the Jin crossed it and came on across the open plain, surrounding the camp, and its guns fired on them "until the powder
+// was gone". Here they form up `formUp` m out from the camp all round (a few hundred metres: at the reach the camp's folangji
+// are laid out to, ARTILLERY's 300 m, beyond which their shot is spent on nothing) and close on it across the open ground
+// under its fire; the battle's time is that walk and the fight.
 // The ground: the camp a square palisade with a gap in each side (the carts' intervals), a trench outside it. The hero is one of
 // the camp's leaders, where his rank stands him. Whether he dies is the battle's: nothing here is tuned to an outcome.
 
 import { bannerman, mingSoldier } from '../../cast.js';
+import { BATTLE_END } from '../../battleend.js';
+import { DRILL } from '../../formation.js';
 import { seededRandom } from '../../physics.js';
 import { northName, northPlace, northSides, northStyles } from './north.js';
 
+// m from the camp's middle the Jin form up (above).
+const HUNRIVER_FORM_UP = 300;
+// s: the walk in from there at a drilled line's steady pace (formation.js DRILL).
+const HUNRIVER_MARCH = Math.round(HUNRIVER_FORM_UP / DRILL.pace);
+
 export const HUNRIVER = {
   year: 1621,
+  formUp: HUNRIVER_FORM_UP,
   // The camp's men, each [unit, kit rank, style, x, z, part]: x toward the Jin's main side (+x, the river's), z across.
   camp: [
     // The Zhejiang men: four at the palisade on the main face, a folangji's crew of two behind them, the squad's leader; the side faces.
@@ -73,20 +86,22 @@ export const HUNRIVER = {
   // Qi Jiguang's discipline (as his own level's: scenarios.js qiJiguangLevel), the camp holding its ground (formation.js DRILL).
   discipline: 1,
   drill: { advance: false },
-  // The Jin: the banner men in two rings round the camp (m from its middle), the horse further out.
+  // The Jin: the banner men in two rings round the camp (m from its middle) at the form-up line, the horse further out.
   banners: { spear: 18, dao: 9, guandao: 7, manchuBow: 22 },
-  rings: [17, 20],
+  rings: [HUNRIVER_FORM_UP, HUNRIVER_FORM_UP + 3],
   inner: 30,
   bayara: { bayaraLance: 6, bayaraBow: 6 },
-  horseRing: 23.5,
+  horseRing: HUNRIVER_FORM_UP + 6.5,
   // The camp's works: its palisade (half the square's side, m; the stalks' height; a gap in each side, m wide) and its trench
   // (its line's half side, and its profile across: some 0.8 m deep and 2.4 m wide, its spoil thrown into the palisade's foot).
   // Its stalks plastered with mud (外涂泥巴): a screen of daub (physics/cover.js earth) some 0.1 m thick, which stops an arrow and
   // only slows a ball (its thickness not given: an estimate).
   palisade: { half: 7.5, height: 1.5, gap: 2, cover: { material: 'earth', thick: 0.1 } },
   trench: { half: 9.3, profile: [[-1.2, 0], [-0.6, -0.8], [0.6, -0.8], [1.2, 0]] },
-  arena: { halfX: 30, halfZ: 26 },
-  seconds: 300,
+  // The plain round the camp out past the horse's ring.
+  arena: { halfX: HUNRIVER_FORM_UP + 15, halfZ: HUNRIVER_FORM_UP + 15 },
+  // The walk in from the form-up line, and the fight's five minutes.
+  seconds: 300 + HUNRIVER_MARCH,
   view: {
     scene: 'sarhu',
     // A dry spring day on the Liaodong plain, the smoke of Shenyang's fall and the Sichuan camp's in the air.
@@ -172,6 +187,8 @@ export const BATTLE_HUNRIVER = {
         },
         place: HUNRIVER.view.scene,
         climate: 'hunriver1621',
+        // (Judged on strength left only after the walk in and the battle's own time: battleend.js.)
+        timeLimit: BATTLE_END.timeLimit + HUNRIVER_MARCH,
         // (The camp is cast first: a crew man's place in `camp` is his fighter's index.)
         artillery: options.artillery === false ? [] : HUNRIVER.artillery,
       },

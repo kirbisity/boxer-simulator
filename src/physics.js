@@ -19,7 +19,7 @@ import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pi
 import { flyNets } from './physics/net.js';
 import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/throwable.js';
 import { createArtillery, stepArtillery } from './physics/artillery.js';
-import { createLadders, stepLadders } from './physics/ladders.js';
+import { climbLadder, createLadders, stepLadders } from './physics/ladders.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, beakMix, coiledTwist, hiltCrush, hiltKnob, hiltMix, hookPull, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
@@ -37,7 +37,7 @@ import { ARM_CUTS, brokenLevel, feelShock, LEG_CUTS, MAIMING, openArtery, player
 import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
-import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, reliefAt, stepOnWorks, worksOf } from './physics/fieldworks.js';
+import { collideWorks, faceBetween, faceOutside, FIELDWORKS, floorFor, keepRootOff, looseFloor, mireStep, reliefAt, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { chooseHorseDetail, collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, SEATED_PARTICLES, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
@@ -181,6 +181,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // A gun's crew man (physics/artillery.js: the index of the gun he serves), and how much of him the enemy can get at where
     // he stands (physics/cover.js exposureOf: { at, value }).
     gunCrew: undefined, exposure: undefined,
+    // On a scaling ladder (physics/ladders.js: { ladder (its index), up (m climbed), top (his hands free over the walk's
+    // edge) }), and the place at a lying ladder's foot he is sent to raise it from ({ ladder, at: [x, z] }).
+    climbing: undefined, ladderPost: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
     aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiBreather: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null, aiGuardSeen: undefined, aiPunished: undefined,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
@@ -1698,7 +1701,7 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
-export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null, artillery = null } = {}) {
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null, artillery = null, timeLimit = null } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
@@ -1833,6 +1836,9 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // things that stand, are pushed off and are raised (physics/ladders.js), from the arena's works.
   world.artillery = createArtillery(world, artillery);
   world.siegeLadders = createLadders(world, arena);
+  // A battle's own length (s) before it is judged on the strength each side has left (battleend.js BATTLE_END.timeLimit):
+  // one fought after a long approach across the field has that walk and the fight's own time.
+  world.timeLimit = timeLimit;
   return world;
 }
 
@@ -2090,6 +2096,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   const fromKnees = fighter.crawling && (fighter.player || fighter.groundFight) && spec?.kind === 'strike' && spec.limb?.endsWith('Hand') && spec.path !== 'aim';
   // Nothing with a limb he has lost (a hand or an arm cut off or broken, a leg gone: maiming.js).
   if (spec?.kind === 'strike' && limbGone(fighter, spec.limb)) return false;
+  // On a ladder his hands are on its rungs: he strikes only from its head, over the walk's edge (physics/ladders.js).
+  if (fighter.climbing && !fighter.climbing.top) return false;
   if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
   // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
   if (blade && fighter.caught && blade === caughtBlade(fighter)) return false;
@@ -4062,6 +4070,8 @@ function moveRoot(world, fighter, dt) {
     fighter.rootVelocity = [0, 0];
     return;
   }
+  // On a scaling ladder: it carries his stance, up its rungs at a climb's pace (physics/ladders.js).
+  if (fighter.climbing && climbLadder(world, fighter, dt)) return;
   // Facing his man, or the place he is going (a weapon on the floor).
   // A place he means to strike (faceAt, for a moment) first; then where he is going; then his man.
   const facing = fighter.faceAt && world.time < fighter.faceAt.until ? fighter.faceAt.at : null;
@@ -4206,16 +4216,41 @@ function moveRoot(world, fighter, dt) {
   const { halfX, halfZ, drop } = world.arena;
   const margin = WORLD.footing.edgeMargin;
   const walkedFrom = fighter.root[1];
+  const stoodAt = [fighter.root[0], fighter.root[1]];
   fighter.root[0] += fighter.rootVelocity[0] * dt;
   fighter.root[1] += fighter.rootVelocity[1] * dt;
   // Toward a drop edge his own steps never take him past the floor's edge (he keeps off it, as at any edge).
   if (drop) fighter.root[1] = Math.min(fighter.root[1], Math.max(halfZ - margin, walkedFrom));
+  // His own steps do not take him up or down a face of the works (FIELDWORKS.face: a wall's stone): he goes along it
+  // as far as it lets him (each way on the floor in turn), his way into it given up.
+  if (works && faceBetween(works, stoodAt, fighter.root)) {
+    const alongX = [fighter.root[0], stoodAt[1]];
+    const alongZ = [stoodAt[0], fighter.root[1]];
+    const kept = !faceBetween(works, stoodAt, alongX) ? alongX : !faceBetween(works, stoodAt, alongZ) ? alongZ : stoodAt;
+    fighter.rootVelocity = [(kept[0] - stoodAt[0]) / Math.max(dt, 1e-9), (kept[1] - stoodAt[1]) / Math.max(dt, 1e-9)];
+    fighter.root = [...kept];
+  }
+  const walked = [fighter.root[0], fighter.root[1]];
   // A shove moves the stance too: the root drifts to where the pelvis was pushed.
   const pelvis = point(fighter.x, P.pelvis);
   const rootPelvis = toWorld(fighter, fighter.desired[P.pelvis]);
   const follow = Math.min(1, dt * WORLD.footing.followPushed);
   fighter.root[0] += (pelvis[0] - rootPelvis[0]) * follow;
   fighter.root[1] += (pelvis[2] - rootPelvis[2]) * follow;
+  // ... a shove neither up a face (he is pressed against it) nor down one, unless the ground beyond is a fall below him (off
+  // a wall-walk's edge in a ladder's gap: he goes over and falls; the last centimetres of the face's foot only hold him).
+  const shoved = works ? faceBetween(works, walked, fighter.root) : 0;
+  if (shoved) {
+    const way = [fighter.root[0] - walked[0], fighter.root[1] - walked[1]];
+    const size = Math.hypot(way[0], way[1]) || 1;
+    const reach = FIELDWORKS.face.reach / size;
+    const beyond = reliefAt(works, fighter.root[0] + way[0] * reach, fighter.root[1] + way[1] * reach);
+    if (shoved < 0 && fighter.lift - beyond > FIELDWORKS.face.drop) {
+      fall(world, fighter, 'pushed off the edge');
+      return;
+    }
+    fighter.root = walked;
+  }
   fighter.root[0] = Math.max(-(halfX - margin), Math.min(halfX - margin, fighter.root[0]));
   // ... but a shove can: out across the strip to the edge and over it.
   fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
@@ -5836,7 +5871,18 @@ function collideGround(world, fighter, h, arena) {
       fighter.x[base + 2] = drop.at;
       fighter.prev[base + 2] = Math.max(fighter.prev[base + 2], drop.at);
     }
-    const floor = fighter.radius[index] + (works ? floorFor(works, fighter, index, fighter.x[base], fighter.x[base + 2]) : floorUnder(arena, fighter.x[base + 2]));
+    let floor = fighter.radius[index] + (works ? floorFor(works, fighter, index, fighter.x[base], fighter.x[base + 2]) : floorUnder(arena, fighter.x[base + 2]));
+    // In a face of the works (a wall's sheer stone in a ladder's gap: FIELDWORKS.face), not come down onto it from above,
+    // the part is put back out of its side, its motion into it gone and along it kept, as a wall stops it; it is not set
+    // up on its top (each substep's lift onto the relief there, the joints pulling the rest after it, flung a man walking
+    // into the gap metres into the air).
+    if (works && fighter.x[base + 1] < floor && fighter.prev[base + 1] < floor - 1e-4) {
+      const out = faceOutside(works, fighter.x[base], fighter.x[base + 2], fighter.x[base + 1] - fighter.radius[index]);
+      if (out) {
+        pushOutOfFace(fighter, base, out);
+        floor = fighter.radius[index] + floorFor(works, fighter, index, fighter.x[base], fighter.x[base + 2]);
+      }
+    }
     if (fighter.x[base + 1] < floor) {
       // Arriving this substep (it was clear of the floor): how fast it hit.
       if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, (fighter.prev[base + 1] - fighter.x[base + 1]) / h);
@@ -5865,6 +5911,21 @@ function collideGround(world, fighter, h, arena) {
   }
   // The stakes and walls keep his parts out of them.
   if (works) collideWorks(world, fighter);
+}
+
+/** A part put at `out` ({ at: [x, z], up: the face's way up on the floor }), its motion up into the face gone. */
+function pushOutOfFace(fighter, base, out) {
+  let vx = fighter.x[base] - fighter.prev[base];
+  let vz = fighter.x[base + 2] - fighter.prev[base + 2];
+  const into = vx * out.up[0] + vz * out.up[1];
+  if (into > 0) {
+    vx -= out.up[0] * into;
+    vz -= out.up[1] * into;
+  }
+  fighter.x[base] = out.at[0];
+  fighter.x[base + 2] = out.at[1];
+  fighter.prev[base] = out.at[0] - vx;
+  fighter.prev[base + 2] = out.at[1] - vz;
 }
 
 /**

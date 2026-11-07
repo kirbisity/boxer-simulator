@@ -17,7 +17,7 @@
 // - or, at `timeLimit` s of battle, whichever side has the more fighting
 //   strength holds the field; within `drawWithin` of even (a ratio), a draw:
 //   both sides drew off (an afternoon of fighting with neither side broken
-//   ended at dusk, each claiming it).
+//   ended at dusk, each claiming it). A battle with a long approach (its world's `timeLimit`) has the walk on top.
 // Decided, the battle goes on (main.js: the player still has his man, the
 // winners still chase): the decision is kept on the world (world.verdict),
 // never taken back. The level tool (tools/levels.js) ends its battles by the
@@ -92,7 +92,7 @@ export function judgeBattle(world) {
   // Both gone at once (the last two killing each other): the one that went first lost.
   const lost = BATTLE_CORNERS.filter((corner) => since[corner] !== null && world.time - since[corner] >= BATTLE_END.holdFor).sort((a, b) => since[a] - since[b])[0];
   if (lost) return (world.verdict = { winner: foeCorner(lost), how: 'collapsed', time: world.time });
-  if (world.time >= BATTLE_END.timeLimit) {
+  if (world.time >= (world.timeLimit ?? BATTLE_END.timeLimit)) {
     const [red, blue] = [sides.red.strength, sides.blue.strength];
     const even = Math.max(red, blue) <= BATTLE_END.drawWithin * Math.min(red, blue);
     return (world.verdict = { winner: even ? null : red > blue ? 'red' : 'blue', how: 'time', time: world.time });

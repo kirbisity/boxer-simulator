@@ -16,6 +16,14 @@
 //    night over the frozen Daedong.
 //  - The wall's height is not given in the sources checked; Joseon stone town walls ran ~4-6 m (Seoul's 5-8). Here 4.5 m.
 //
+// The approach: the columns form up out of the walls' shot and cross the open ground to them under it, as the storming
+// columns did (the Japanese held the walls with their matchlocks; Li Rusong put their guns' reach at "a few hundred paces"
+// against his cannon's five or six li: Swope, "Turning the Tide", War & Society 21:2, 2003). Here they form up 300 m from the
+// wall's foot (`approach.formUp`: a few hundred metres, beyond a matchlock's aimed fire of ~100 m and at the edge of where
+// its ball still flies), and the stretch's two guns are laid 200 m from it (`approach.guns`: inside a folangji's reach of the
+// walk, ARTILLERY's 300 m, out of the walk's aimed shot). The march across is at the drill's pace (formation.js DRILL), the
+// last of it at a run; the battle's time is that and the storm's.
+//
 // Numbers: one stretch of wall. The southern troops at three ladders, against the stretch's defenders: 60 Ming
 // (three ladder columns of 17 - shields, spears, dao, wolf-brushes as Qi armed his squads -, eight fowling pieces behind,
 // an officer) against 18 Japanese (8 guns and bows, 6 yari, 4 samurai), 3.3 : 1, as the whole army's 43,000 against
@@ -27,21 +35,31 @@
 // the guns. His living comrades in the places nearest his.
 
 import { mingSoldier, sengokuWarrior } from '../../cast.js';
+import { BATTLE_END } from '../../battleend.js';
+import { DRILL } from '../../formation.js';
 import { seededRandom } from '../../physics.js';
 import { wallWorks } from '../ground/walls.js';
 import { koreaAssemble, koreaRowOf, koreaRows, koreaSeat, koreaStyles } from './korea.js';
 
+// m from the wall's foot (above): where the columns form up, and where the stretch's guns are laid.
+const PYONGYANG_APPROACH = { formUp: 300, guns: 200 };
+// s: the march across it at the drill's pace.
+const PYONGYANG_MARCH = Math.round(PYONGYANG_APPROACH.formUp / DRILL.pace);
+// (The wall's foot: x = 1, the attackers' side -x; the columns' first row at the form-up line.)
+const PYONGYANG_FRONT = 1 - PYONGYANG_APPROACH.formUp;
+
 export const PYONGYANG_1593 = {
   year: 1593,
+  approach: PYONGYANG_APPROACH,
   wall: { x: 1, height: 4.5, ladders: [-6, 0, 6] },
-  arena: { halfX: 15, halfZ: 9 },
+  // The field from behind the form-up line to the wall (the town's side as deep: the arena is the same either way of its middle).
+  arena: { halfX: PYONGYANG_APPROACH.formUp + 15, halfZ: 9 },
   // A ladder's column: four abreast, 1.3 m apart (room to run with a shield; packed to a metre they trip on each other
-  // as they set off), rows 1.6 m behind each other; the first row 8 m out from the wall's foot (the last of the run in
-  // under fire), the shields first.
-  column: { styles: ['swordShield', 'swordShield', 'swordShield', 'swordShield', 'spear', 'spear', 'spear', 'spear', 'langxian', 'dao', 'dao', 'langxian', 'spear', 'spear', 'spear', 'spear', 'dao'], abreast: 4, spacing: 1.3, rowSpacing: 1.6, front: -7 },
+  // as they set off), rows 1.6 m behind each other; the first row at the form-up line, the shields first.
+  column: { styles: ['swordShield', 'swordShield', 'swordShield', 'swordShield', 'spear', 'spear', 'spear', 'spear', 'langxian', 'dao', 'dao', 'langxian', 'spear', 'spear', 'spear', 'spear', 'dao'], abreast: 4, spacing: 1.3, rowSpacing: 1.6, front: PYONGYANG_FRONT },
   // The fowling pieces behind the columns, shooting at the walk; the column's officer (a 把总) with them.
-  guns: { count: 8, x: -12, from: -7, to: 7 },
-  officer: [-11.5, 0],
+  guns: { count: 8, x: PYONGYANG_FRONT - 5, from: -7, to: 7 },
+  officer: [PYONGYANG_FRONT - 4.5, 0],
   // The guns (physics/artillery.js). Li Rusong brought 200+ guns (Hawley, The Imjin War, 2005, p. 54); on the 8th they
   // pounded the gates (a gate broken by them, Turnbull 2008 p. 60) and drove back Konishi's sortie (p. 61). His southern
   // troops were Qi Jiguang's, whose cart camps carried the folangji and the great general (练兵实纪 杂集). At the army's
@@ -49,9 +67,9 @@ export const PYONGYANG_1593 = {
   // so the stretch is given a light folangji and one great general behind its columns, each with its crew (gunners with
   // their sabres), laying ball on the walk between the ladders (`load`). A judgement, said so: `artillery: false` leaves them out.
   artillery: [
-    // (Each laid between two of the fowling pieces' places, z = -5, -3 and 3, 5: its line clear of them.)
-    { kind: 'folangji', at: [-14, -4], facing: [1, 0], arc: 0.7, crew: 2, load: 'ball' },
-    { kind: 'dajiangjun', at: [-14.2, 4], facing: [1, 0], arc: 0.5, crew: 4, load: 'ball' },
+    // (Each at the guns' line, between the columns' lanes, z = -4 and 4.)
+    { kind: 'folangji', at: [1 - PYONGYANG_APPROACH.guns, -4], facing: [1, 0], arc: 0.7, crew: 2, load: 'ball' },
+    { kind: 'dajiangjun', at: [1 - PYONGYANG_APPROACH.guns - 0.2, 4], facing: [1, 0], arc: 0.5, crew: 4, load: 'ball' },
   ],
   // The garrison on this stretch of the walk: shooters along the parapet between the ladders, yari at each ladder's
   // head, samurai behind them.
@@ -63,7 +81,7 @@ export const PYONGYANG_1593 = {
     backAt: 1.9,
   },
   // Where a man of each rank and place stands in the middle column ([x, z]).
-  rows: { front: [-7, -0.65], second: [-8.6, -0.65], rear: [-13.4, 0], squadLeader: [-8.6, 1.95], officer: [-11.5, 0] },
+  rows: { front: [PYONGYANG_FRONT, -0.65], second: [PYONGYANG_FRONT - 1.6, -0.65], rear: [PYONGYANG_FRONT - 6.4, 0], squadLeader: [PYONGYANG_FRONT - 1.6, 1.95], officer: [PYONGYANG_FRONT - 4.5, 0] },
   // The southern troops' discipline (ai.js AI.morale; scenarios.js QI_DISCIPLINE): Qi Jiguang's law and drill, in
   // which Wu Weizhong's and Luo Shangzhi's men were raised.
   discipline: 1,
@@ -78,7 +96,8 @@ export const pyongyangBattle = {
   year: PYONGYANG_1593.year,
   title: { zh: '平壤登城', en: 'The walls of Pyongyang' },
   view: { scene: 'sengoku', camera: { yaw: -0.9, pitch: 0.38, distance: 22, maxDistance: 30 } },
-  seconds: 180,
+  // The march across the approach at the drill's pace, and the storm's three minutes.
+  seconds: 180 + PYONGYANG_MARCH,
   setup(life, seed = 1, options = {}) {
     const random = seededRandom(seed);
     const spec = PYONGYANG_1593;
@@ -121,6 +140,8 @@ export const pyongyangBattle = {
         seed,
         arena: { ...spec.arena, works },
         place: 'pyongyang',
+        // (Judged on strength left only after the march and the battle's own time: battleend.js.)
+        timeLimit: BATTLE_END.timeLimit + PYONGYANG_MARCH,
         // (Red is cast first: a crew man's index in red is his fighter's.)
         artillery: guns,
         formation: {

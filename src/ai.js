@@ -19,6 +19,7 @@ import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
 import { atGun, serveGun } from './physics/artillery.js';
+import { raiseLadder } from './physics/ladders.js';
 import { exposureOf } from './physics/cover.js';
 import { heatStrain } from './physics/heat.js';
 import { ammoLeft, bowArcFouled, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
@@ -3475,6 +3476,8 @@ function decide(world, fighter, dt) {
   if (fighter.panicked && rout(world, fighter, opponent)) return;
   // A gun's crew man serves his gun while no enemy is on him (physics/artillery.js).
   if (fighter.gunCrew !== undefined && !fighter.panicked && serveGun(world, fighter)) return;
+  // A man sent to raise a scaling ladder goes to its foot and raises it while no enemy is on him (physics/ladders.js).
+  if (fighter.ladderPost && !fighter.panicked && raiseLadder(world, fighter)) return;
   if (style.passive || fighter.panicked) {
     fighter.hesitant = null;
     keepAway(world, fighter, opponent, dt);
