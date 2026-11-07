@@ -56,8 +56,8 @@ export const ARTILLERY = {
   bounce: 0.35,
   // m/s: a ball slower than this has nothing left that the game counts (a spent ball rolling still broke legs: not modelled).
   spent: 40,
-  // m: a ball this far off the field is gone.
-  far: 90,
+  // m: a ball this far beyond the field's edge is gone.
+  far: 10,
   // A man of the crew is at his gun within `at` m of his post (his post `postBack` m behind its breech and `postSide` m to
   // one side, each in turn); he leaves it to fight a man come within `defendWithin` m of him.
   at: 1.2,
@@ -408,7 +408,7 @@ function gunFlyBalls(world, dt) {
       if (vec.length(ball.v) < spec.spent) ball.done = true;
     }
     ball.x = to;
-    if (Math.abs(ball.x[0]) > spec.far || Math.abs(ball.x[2]) > spec.far || ball.x[1] < -1 || ball.age > 6) ball.done = true;
+    if (Math.abs(ball.x[0]) > world.arena.halfX + spec.far || Math.abs(ball.x[2]) > world.arena.halfZ + spec.far || ball.x[1] < -1 || ball.age > 6) ball.done = true;
   }
   if (world.artillery.balls.length > 256 && world.artillery.balls.every((ball, index) => index > 64 || ball.done)) world.artillery.balls = world.artillery.balls.filter((ball) => !ball.done);
 }

@@ -116,6 +116,24 @@ export const FIELDWORKS = {
     // The grade is read this far (m) either side of where he stands.
     span: 0.35,
   },
+  face: {
+    // A slope steeper than this grade (rise over run: ~72°) is a face, not a bank: a man does not walk up or down it.
+    // The steepest banks the battle maps dig (a ditch's spoil thrown up at ~2.2-2.4 : 1, Cerignola's and the trench's) are
+    // scrambled over; a town wall's sheer stone (story/ground/walls.js: 4.5 m over a 0.3 m run, 15 : 1) is climbed only by
+    // a ladder (physics/ladders.js). His stance stops at its foot or at its top, and a part of him run into it from the
+    // side is stopped by it as by a wall, not set up on top of it (which flung a man walking into a ladder's gap metres up);
+    // shoved over its top edge, he falls from it (physics.js moveRoot).
+    steepest: 3,
+    // m: the steps a part inside a face is looked for a way out of its side in, and the height over the ground there it
+    // may be put at (a centimetre or two: the stone's roughness).
+    tread: 0.02,
+    // m: how far out of a face's side a part inside it is looked for a way out (a hand or a knee pressed into the stone
+    // goes back out of it, not up over it; a face's whole run here is 0.3 m).
+    reach: 0.6,
+    // m: shoved over a face's edge with the ground beyond more than this below his feet (a knee's height, as a stair is
+    // stepped down: WORLD.terrain stepDown), he falls from it; less, he is only held at it.
+    drop: 0.45,
+  },
   mud: {
     // Bekker's sinkage, z = depth × (p / pressure)^exponent: a mud's `depth` (m) is how far a man pressing on it
     // `pressure` (Pa) sinks, deeper as he presses harder, to the firm layer `firm` m down (a ploughed field's pan,
@@ -373,6 +391,40 @@ export function reliefAt(works, x, z) {
   return height;
 }
 
+/**
+ * Whether a move over the ground from `from` to `to` ([x, z]) runs into a face (FIELDWORKS.face): the relief rising or
+ * falling across it at a grade steeper than the steepest bank (however short the move: no creeping up it a little at a
+ * time). +1 up a face, -1 down one, 0 neither.
+ */
+export function faceBetween(works, from, to) {
+  if (!works?.ditches.length) return 0;
+  const spec = FIELDWORKS.face;
+  const rise = reliefAt(works, to[0], to[1]) - reliefAt(works, from[0], from[1]);
+  if (Math.abs(rise) < 1e-4) return 0;
+  const run = Math.hypot(to[0] - from[0], to[1] - from[1]);
+  return Math.abs(rise) > spec.steepest * run ? Math.sign(rise) : 0;
+}
+
+/**
+ * A point inside a face (FIELDWORKS.face) at (x, z), `height` m up (under the relief there): the nearest place out of its
+ * side at that height, straight down the face's slope, and the face's way up on the floor: { at: [x, z], up: [ux, uz] };
+ * null where the ground there is no face (a bank: the part stands on it) or no side of it is within reach.
+ */
+export function faceOutside(works, x, z, height) {
+  const spec = FIELDWORKS.face;
+  const e = 0.02;
+  const gx = (reliefAt(works, x + e, z) - reliefAt(works, x - e, z)) / (2 * e);
+  const gz = (reliefAt(works, x, z + e) - reliefAt(works, x, z - e)) / (2 * e);
+  const grade = Math.hypot(gx, gz);
+  if (grade <= spec.steepest) return null;
+  const up = [gx / grade, gz / grade];
+  for (let d = spec.tread; d <= spec.reach; d += spec.tread) {
+    const at = [x - up[0] * d, z - up[1] * d];
+    if (reliefAt(works, at[0], at[1]) <= height + spec.tread) return { at, up };
+  }
+  return null;
+}
+
 /** How far (m) a point is inside a soft place drawn as the ellipse in its box (negative: outside). */
 function softEllipseInside(area, x, z) {
   const hx = (area.x[1] - area.x[0]) / 2;
@@ -465,8 +517,8 @@ export function mireStep(world, dt) {
     const rate = FIELDWORKS.mud.sinkRate * dt;
     mired.sunk += Math.max(-rate, Math.min(rate, sink - mired.sunk));
     mired.footing = soft ? 1 - (1 - soft.area.footing) * soft.share : 1;
-    // (A jump holds the stance itself; a rider's is the saddle's.)
-    if (!fighter.jump) {
+    // (A jump holds the stance itself; a rider's is the saddle's; a man on a ladder stands on its rungs: physics/ladders.js.)
+    if (!fighter.jump && !fighter.climbing) {
       fighter.lift = reliefAt(works, x, z) - mired.sunk;
       plantOnWorks(works, fighter, mired.sunk);
     }
@@ -487,7 +539,12 @@ function plantOnWorks(works, fighter, sunk) {
     feet.l.floor = feet.r.floor = fighter.lift;
     return;
   }
-  const floorAt = (at) => reliefAt(works, at[0], at[2]) - Math.min(footSink(works, fighter, at[0], at[2]), sunk + FIELDWORKS.mud.stride);
+  // A foot is not set down across a face (FIELDWORKS.face) from where he stands: a step up onto a wall's top from its
+  // foot is no step (the foot meets the face: collideGround), nor is one off its edge. There, his stance's own floor.
+  const floorAt = (at) => {
+    if (faceBetween(works, fighter.root, [at[0], at[2]])) return fighter.lift;
+    return reliefAt(works, at[0], at[2]) - Math.min(footSink(works, fighter, at[0], at[2]), sunk + FIELDWORKS.mud.stride);
+  };
   for (const foot of [feet.l, feet.r]) {
     if (foot.lifted) continue;
     if (foot.step) {

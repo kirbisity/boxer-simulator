@@ -19,6 +19,8 @@ const siegeTally = (world) => {
     pushedLoaded: ladders.reduce((sum, ladder) => sum + ladder.pushedLoaded, 0),
     thrown: ladders.reduce((sum, ladder) => sum + ladder.thrown, 0),
     raised: ladders.reduce((sum, ladder) => sum + ladder.raised, 0),
+    climbed: ladders.reduce((sum, ladder) => sum + (ladder.climbed ?? 0), 0),
+    fellOff: ladders.reduce((sum, ladder) => sum + (ladder.fell ?? 0), 0),
     screened: world.screened ?? 0,
   };
 };

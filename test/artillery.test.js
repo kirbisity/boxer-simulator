@@ -12,7 +12,7 @@ import { advance, createWorld, placeFighter, placeOnFloor, point, seededRandom }
 import { reliefAt, worksOf } from '../src/physics/fieldworks.js';
 import { ARTILLERY, firePiece, tissueLoss } from '../src/physics/artillery.js';
 import { COVER, exposureOf, screenOnPath } from '../src/physics/cover.js';
-import { LADDERS, ladderLoad, stepLadders } from '../src/physics/ladders.js';
+import { boardLadder, LADDERS, ladderLoad, ladderPlace, standLadder, stepLadders } from '../src/physics/ladders.js';
 import { wallWorks } from '../src/story/ground/walls.js';
 import { ARROW, MATCHLOCK } from '../src/weapons.js';
 
@@ -141,14 +141,15 @@ function ladderWorld({ seed = 3, climbers = 1, atHead = false, defenderAt = 0.3 
   return { world, walk };
 }
 
-/** Climbers stood on the ladder's face, `up` m above its foot each (their footing there: the rampart's relief at their root). */
+/** The ladder stood against the wall, and climbers on it, `up` m above its foot each (on its rungs there). */
 function onLadder(world, ids, ups) {
+  const ladder = world.siegeLadders[0];
+  if (!ladder.up) standLadder(world, ladder);
   ids.forEach((id, k) => {
     const fighter = world.fighters[id];
-    // The face rises over its 0.3 m run: a man `up` m on it stands that share of the way across it.
-    const x = 1 + 0.3 * (ups[k] / 4.5);
-    placeOnFloor(fighter, x, 0, ups[k], fighter.yaw);
-    fighter.root = [x, 0];
+    const [x, z] = ladderPlace(ladder, ups[k]);
+    placeOnFloor(fighter, x, z, ups[k], fighter.yaw);
+    boardLadder(world, fighter, ladder, ups[k]);
   });
 }
 

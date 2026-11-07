@@ -45,7 +45,8 @@ export const COVER = {
   // hand at arm's length): what pokes through a crenel or over a parapet while he stands at it.
   shooterOut: 0.9,
   // Who is weighed: enemies within `sight` m (as far as a man takes in the field before him: AI.standing sight's 16 m,
-  // and a gun's or a bow's reach beyond it), in full within `near` m, fading to nothing at `sight`.
+  // and a gun's or a bow's reach beyond it), in full within `near` m, fading to nothing at `sight`. With none so near, the
+  // field's men as if come on to `near` m along their lines.
   near: 8,
   sight: 40,
   // Worked out again only this often (s): it moves as the men move, not every step.
@@ -104,11 +105,32 @@ function coverMissileOfMan(enemy) {
 }
 
 /**
+ * The share of his head, chest and hips (COVER.marks) a missile has a clear way to, loosed by a man whose hips stand at
+ * `from` ([x, z]) with his head at `head` ([x, y, z]).
+ */
+function coverSeenFrom(world, fighter, from, head, missile) {
+  const spec = COVER;
+  const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  const apart = Math.hypot(from[0] - at[0], from[1] - at[1]);
+  const out = spec.shooterOut / Math.max(spec.shooterOut, apart);
+  const muzzle = [head[0] + (at[0] - from[0]) * out, head[1] - spec.shooterUp, head[2] + (at[1] - from[1]) * out];
+  let seen = 0;
+  for (const [part, up] of spec.marks) {
+    const mark = point(fighter.x, P[part]);
+    mark[1] += up;
+    if (screensClear(world, muzzle, mark, missile)) seen += 1;
+  }
+  return seen / spec.marks.length;
+}
+
+/**
  * How much of him the enemy round him can get at (0 nothing, 1 all), from the geometry of the works: each enemy within
  * COVER.sight m (by `strength(enemy)` and how near he is) counts for the share of the man's head, chest and hips his
  * missile has a clear way to (a man loosing an arrow or a ball), or for how much nearer than its way round the man is to
  * him on foot (a man with a blade: physics/fieldworks.js walkingDistance, over a wall's face only by its ladders, up a
- * rampart only as fast as it is climbed). On open ground it is 1: nothing covers him. Kept in `fighter.exposure`.
+ * rampart only as fast as it is climbed). With none of them within sight, what the works will leave open of him when they
+ * have come on to `near` m.
+ * On open ground it is 1: nothing covers him. Kept in `fighter.exposure`.
  */
 export function exposureOf(world, fighter, strength = () => 1) {
   const works = worksOf(world.arena);
@@ -117,35 +139,35 @@ export function exposureOf(world, fighter, strength = () => 1) {
   if (cached && world.time - cached.at < COVER.every && world.time >= cached.at) return cached.value;
   const spec = COVER;
   const at = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
-  let weighed = 0;
-  let open = 0;
-  for (const enemy of world.fighters) {
-    if (!hostile(enemy, fighter) || enemy.dormant || enemy.hidden || !inFight(enemy)) continue;
-    const from = [enemy.x[P.pelvis * 3], enemy.x[P.pelvis * 3 + 2]];
-    const apart = Math.hypot(from[0] - at[0], from[1] - at[1]);
-    if (apart >= spec.sight) continue;
-    const weight = strength(enemy) * Math.min(1, (spec.sight - apart) / (spec.sight - spec.near));
-    if (weight <= 0) continue;
+  const enemies = world.fighters.filter((enemy) => hostile(enemy, fighter) && !enemy.dormant && !enemy.hidden && inFight(enemy));
+  // How much of him one of them can get at from `from` ([x, z], his hips; his head `head`), `apart` m off.
+  const reachFrom = (enemy, from, head, apart) => {
     const missile = coverMissileOfMan(enemy);
-    let reach;
-    if (missile) {
-      const head = point(enemy.x, P.head);
-      const out = spec.shooterOut / Math.max(spec.shooterOut, apart);
-      const muzzle = [head[0] + (at[0] - from[0]) * out, head[1] - spec.shooterUp, head[2] + (at[1] - from[1]) * out];
-      let seen = 0;
-      for (const [part, up] of spec.marks) {
-        const mark = point(fighter.x, P[part]);
-        mark[1] += up;
-        if (screensClear(world, muzzle, mark, missile)) seen += 1;
-      }
-      reach = seen / spec.marks.length;
-    } else {
-      reach = Math.min(1, Math.max(0.05, apart) / Math.max(0.05, walkingDistance(world, from, at)));
+    return missile ? coverSeenFrom(world, fighter, from, head, missile) : Math.min(1, Math.max(0.05, apart) / Math.max(0.05, walkingDistance(world, from, at)));
+  };
+  const weigh = (seen) => {
+    let weighed = 0;
+    let open = 0;
+    for (const enemy of enemies) {
+      const from = [enemy.x[P.pelvis * 3], enemy.x[P.pelvis * 3 + 2]];
+      const apart = Math.hypot(from[0] - at[0], from[1] - at[1]);
+      const each = seen(enemy, from, apart);
+      if (!each || each.weight <= 0) continue;
+      weighed += each.weight;
+      open += each.weight * reachFrom(enemy, each.from, each.head, each.apart);
     }
-    weighed += weight;
-    open += weight * reach;
-  }
-  const value = weighed > 0 ? open / weighed : 1;
+    return weighed > 0 ? open / weighed : null;
+  };
+  // Those within sight, by how near.
+  let value = weigh((enemy, from, apart) => (apart >= spec.sight ? null : { weight: strength(enemy) * Math.min(1, (spec.sight - apart) / (spec.sight - spec.near)), from, head: point(enemy.x, P.head), apart }));
+  // None of them yet within sight (an army forming up out on the field): what the works will leave open of him when they
+  // come, each of them as if come on along his line to `near` m of him.
+  value ??= weigh((enemy, from, apart) => {
+    const share = spec.near / Math.max(spec.near, apart);
+    const to = [at[0] + (from[0] - at[0]) * share, at[1] + (from[1] - at[1]) * share];
+    const head = point(enemy.x, P.head);
+    return { weight: strength(enemy), from: to, head: [to[0] + head[0] - from[0], head[1], to[1] + head[2] - from[1]], apart: Math.min(apart, spec.near) };
+  }) ?? 1;
   fighter.exposure = { at: world.time, value };
   return value;
 }
