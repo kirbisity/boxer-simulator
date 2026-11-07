@@ -17,7 +17,7 @@
 // 1 to 4. At about one man to 280: 18 in the camp and 68 round it.
 // - Zhejiang men (3,000 of 5,000): 10, in the brigandine (outfits.js mingBrigandine, the cloth-faced coat standing for their thick
 //   cotton armour), spears, sabres, a wolf-brush and a shield, and a folangji's crew; Qi Jin's men in his uncle's tradition, built and
-//   trained as Qi Jiguang's (cast.js PERIOD_BUILD.qi) and holding to his discipline.
+//   trained as Qi Jiguang's (peoples.js PEOPLES.qi) and holding to his discipline.
 // - Household troops (2,000): 6, the officers' own men in the elite's coat: Qi Jin, Tong Zhongkui and Chen Ce among them.
 // - Sichuan survivors through the bridge: 2, in the levy's hemp vest, with the long spear (the white staff is a hooked spear; the
 //   game's spear stands for it).
@@ -67,7 +67,7 @@ export const HUNRIVER = {
     tong: { zh: '童仲揆', en: 'Tong Zhongkui' },
     chen: { zh: '陈策', en: 'Chen Ce' },
   },
-  // Each unit's people (cast.js PERIOD_BUILD) and coat (outfits.js designs).
+  // Each unit's people (peoples.js PEOPLES) and coat (outfits.js designs).
   people: { zhejiang: 'qi', household: 'mingSouth', sichuan: 'mingSouth' },
   design: { brigandine: 0, elite: 0, garrison: 1 },
   // Qi Jiguang's discipline (as his own level's: scenarios.js qiJiguangLevel), the camp holding its ground (formation.js DRILL).

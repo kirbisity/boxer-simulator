@@ -5,6 +5,7 @@
 import { ageing } from './aging.js';
 import { boneTScore, caloriesForBodyFat, settleComposition, starvation } from './physiology.js';
 import { gearTraits, OUTFITS } from './outfits.js';
+import { PEOPLES } from './peoples.js';
 
 export const PARTICLES = [
   'head', 'neck', 'lShoulder', 'rShoulder', 'lElbow', 'rElbow', 'lHand', 'rHand',
@@ -118,18 +119,8 @@ export const DEFAULT_INPUTS = {
   look: { skinTone: 'medium', hairStyle: 'cleanShort', hairColor: '#20160f', facialHair: 'none', eyeColor: 'brown' },
 };
 
-// Peoples: what the men of a time and place were, from the records; a preset of that people gives his height, diet and
-// training as his own difference from them (picked for size, fed better, drilled harder), so the whole people moves together.
-const PEOPLES = {
-  // Ming China, c. 1600: Ming burials of northern Han men give a stature about 164-166 cm; the soldier's ration about a
-  // sheng and a half of grain a day (about 1 kg: ~3000 kcal) with little meat, often in arrears (`calories`); a garrison man
-  // (weisuo) drilled little, his officers' tenant as much as their soldier (`exercise`).
-  ming: { heightCm: 165, calories: 2900, exercise: 0.5 },
-  // The Jianzhou Jurchen of Nurhaci (Sarhu, 1619): hunters, herders and farmers, more meat and dairy than the Ming's
-  // levies and at the bow and on horse from boyhood, but no giants: Qing bannermen and their descendants about 165-168 cm.
-  // The hunt (the banner company was the hunting band) kept them harder than a garrison man (`exercise`).
-  jurchen: { heightCm: 167, calories: 3500, exercise: 0.75 },
-};
+// A preset of a people (peoples.js PEOPLES) gives his height, diet and training as his own difference from them (picked
+// for size, fed better, drilled harder), so the whole people moves together, and the soldiers cast for its battles with it.
 
 // `look` is appearance only; nothing in the simulation reads it.
 export const PRESETS = {

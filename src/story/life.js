@@ -30,7 +30,7 @@ export const STORY = {
   ranks: ['soldier', 'squadLeader', 'officer'],
   // His place in the line: the front rank, the second, the rear (a battle file reads it to stand him there).
   places: ['front', 'second', 'rear'],
-  // A Yiwu man: a southerner (cast.js PERIOD_BUILD.mingSouth), a garrison spearman when he enters the register.
+  // A Yiwu man: a southerner (peoples.js PEOPLES.mingSouth), a garrison spearman when he enters the register.
   people: 'mingSouth',
   style: 'spear',
   // The hero's own name, both ways, unless the chapters name him (chapters/family.js STORY_HERO, given as `hero`).

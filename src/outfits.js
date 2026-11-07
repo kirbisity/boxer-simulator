@@ -1345,8 +1345,8 @@ export const OUTFITS = {
   // them in its banner's colour. Their armour (mianjia, cloth armour) is the Ming brigandine's make, iron plates
   // riveted inside a long studded coat with its apron and shoulder guards, under a black helmet with its studded
   // hood; but heavier made than the Ming regular's issue, its plates thicker and closer, often worn two coats deep
-  // in the front ranks, and known for it: guarded about as the Ming elite's coat is. And the men in it (cast.js
-  // PERIOD_BUILD jurchen): hunters fed on meat, drilled in their companies from boyhood, and steady
+  // in the front ranks, and known for it: guarded about as the Ming elite's coat is. And the men in it
+  // (peoples.js PEOPLES jurchen): hunters fed on meat, drilled in their companies from boyhood, and steady
   // (`courage`, above the Ming regular's and as high as their elite's), the front ranks at Sarhu in two coats.
   bannerArmour: {
     // Trained: a banner man was a soldier for life, his company's hunts its drill (`skill`: OUTFITS' tiers, the

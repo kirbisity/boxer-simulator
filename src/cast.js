@@ -4,6 +4,7 @@
 // from the characters there are, made different the same way.
 
 import { buildBody, FRAMES, normaliseInputs, PRESETS } from './body.js';
+import { peopleBuilds } from './peoples.js';
 import { defaultHeadgear, familyKinds, headgearOptions, OUTFITS, randomColors, randomDesign } from './outfits.js';
 import { caloriesForWeight, settleComposition } from './physiology.js';
 import { STYLES } from './moves.js';
@@ -412,81 +413,9 @@ export function wokouRaider(random = Math.random, style = 'dao', people = 'chine
   return builtLike(soldier, japanese ? PERIOD_BUILD.japanese.raider : PERIOD_BUILD.mingSouth.raider, random);
 }
 
-/**
- * Builds of the late sixteenth century, by people and rank: mean height (cm)
- * and weight (kg), and training. Northern Chinese soldiers stood around
- * 166–171 cm; Japanese men of the period around 155–160 cm, lighter.
- * Each man varies by `CAST.height` cm and a few kilograms.
- */
-const PERIOD_BUILD = {
-  ming: { garrison: { heightCm: 166, weightKg: 64, exercise: 0.6 }, brigandine: { heightCm: 168, weightKg: 67, exercise: 0.68 }, elite: { heightCm: 171, weightKg: 71, exercise: 0.75 } },
-  // Southern Chinese (Zhejiang, Fujian) stood a little shorter than northern
-  // men. Koxinga picked his "iron men" by strength (they had to lift a stone
-  // lion): his elite is the big men of his army.
-  // Sea raiders: short, thick men of the boats and the oar, heavy for their height.
-  mingSouth: { garrison: { heightCm: 163, weightKg: 59, exercise: 0.55 }, brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8 }, raider: { heightCm: 160, weightKg: 64, exercise: 0.66 } },
-  // Qi Jiguang's army (1559 on): not the weisuo's hereditary men but Yiwu
-  // miners and hill farmers he recruited himself, after seeing the Yiwu men
-  // fight the silver-mine feud of 1558. He chose them for it (the Jixiao
-  // xinshu wants countrymen, strong and plain, and turns away the quick-
-  // talking men of the towns), fed and paid them, and drilled them daily
-  // with weapon and shield: a few kilograms heavier than the coast's other
-  // regulars (mingSouth brigandine, 165 cm 62 kg), of the same height, and
-  // harder worked (`exercise`). And trained: `skill` (body.js; their kit,
-  // the brigandine's, is 0.35, a regular's) half again, a man who has struck
-  // and parried at the post every day for a year, short of the 0.45 of a
-  // professional elite. His guards are his household men, as Koxinga's elite.
-  qi: { brigandine: { heightCm: 165, weightKg: 65, exercise: 0.8, skill: 0.5 }, elite: { heightCm: 170, weightKg: 70, exercise: 0.8, skill: 0.55 } },
-  // The weisuo garrisons of the Zhejiang coast in the 1550s, as the raids found them: hereditary soldier households, unpaid, their men
-  // worked as servants by their officers, the able-bodied long run off. What was left to muster was a mixed lot, drawn by `mix`
-  // ([share, what differs from the rest of the build]): the household soldiers, grown men in their twenties and thirties, lean and
-  // little drilled; the old, men in their late forties and fifties and past sixty, stooped, their wind and their joints half gone,
-  // kept on the rolls for their fathers' sake; and the thin, underfed boys and young men, small, light and hardly exercised (a
-  // bad year's hunger takes strength and wind, body.js: a body below its healthy weight is older than its years), taught
-  // nothing (`skill`, the levy's). Half again the usual spread of height and weight (`spread`). The few regulars among them are as Koxinga's (mingSouth).
-  mingCoast: {
-    garrison: {
-      heightCm: 162, weightKg: 54, exercise: 0.45, spread: 1.5,
-      mix: [
-        [0.4, { ages: [[1, 22, 40]] }],
-        [0.3, { ages: [[1, 47, 66]], exercise: 0.35 }],
-        [0.3, { ages: [[1, 16, 30]], heightCm: 156, weightKg: 45, exercise: 0.3, skill: 0.15 }],
-      ],
-    },
-    brigandine: { heightCm: 165, weightKg: 62, exercise: 0.65 },
-  },
-  japanese: { ashigaru: { heightCm: 157, weightKg: 55, exercise: 0.6 }, samurai: { heightCm: 160, weightKg: 58, exercise: 0.7 }, ronin: { heightCm: 158, weightKg: 60, exercise: 0.92 }, raider: { heightCm: 155, weightKg: 60, exercise: 0.72 }, sohei: { heightCm: 160, weightKg: 62, exercise: 0.8, skill: 0.6 } },
-  // Castilian men of the early 1500s about 165 cm; the Mexica a few
-  // centimetres shorter, lean, trained for war from youth in the telpochcalli.
-  // The men who crossed to the Indies were picked and hardened (veterans of
-  // Italy, hidalgos raised to arms): well above the Castilian mean, big hard men toughened by years of war.
-  spanish: { soldier: { heightCm: 172, weightKg: 72, exercise: 0.84 }, officer: { heightCm: 174, weightKg: 75, exercise: 0.86 } },
-  mexica: { warrior: { heightCm: 160, weightKg: 58, exercise: 0.72 }, elite: { heightCm: 162, weightKg: 60, exercise: 0.82 } },
-  // Andean men of the Inca period: from highland skeletons about 157–160 cm,
-  // short and stocky, broad and deep in the chest (bodies made at 2,700 m and
-  // more), heavy for their height. The commons (hatun runa) carried, built and
-  // walked the roads under the mit'a; the litter's bearers (the Lucanas) were
-  // picked for it. The lords of the Inca's lineage ate better and were trained
-  // to arms in their youth (the warachikuy): a little taller and fitter.
-  inca: { commoner: { heightCm: 157, weightKg: 62, exercise: 0.7 }, noble: { heightCm: 160, weightKg: 65, exercise: 0.74 } },
-  // The Hospitaller knights at Rhodes, nobles of France, Spain, Italy and England, fed and trained
-  // from boyhood; their sergeants and gunners. Ottoman soldiers of the 1500s
-  // about 165–168 cm; the Janissaries picked young (the devşirme) for build.
-  hospitaller: { knight: { heightCm: 170, weightKg: 71, exercise: 0.75 }, sergeant: { heightCm: 167, weightKg: 66, exercise: 0.65 } },
-  // The fighting men above that: the Janissaries picked from the devşirme's tallest and strongest boys and drilled
-  // for life, the sipahis landholders fed on meat and at arms from boyhood; the azaps levied but sturdy peasants.
-  ottoman: { azap: { heightCm: 175, weightKg: 80, exercise: 0.88 }, janissary: { heightCm: 180, weightKg: 88, exercise: 0.96 }, heavy: { heightCm: 180, weightKg: 91, exercise: 0.95 } },
-  // Medieval Mongol and Oirat men, from skeletons about 163–167 cm, lean and hard.
-  // Steppe men: short and squat, heavy for their height (riders' bodies, fed on meat and milk).
-  steppe: { light: { heightCm: 164, weightKg: 74, exercise: 0.7 }, medium: { heightCm: 165, weightKg: 78, exercise: 0.66 }, heavy: { heightCm: 167, weightKg: 83, exercise: 0.62 } },
-  // The Jurchen of the Later Jin (Nurhaci's banners, 1610s): hunters, herders and farmers of the Liaodong frontier,
-  // fed on meat and millet, at the bow and on horse from boyhood and drilled in their companies (niru) on the great
-  // hunts; the Ming's men saw them as big and hard. Taller than the Ming's northern men and heavier, stronger than
-  // even the Ming's picked elite (above); the Bayara picked from them for strength and the bow.
-  jurchen: { banner: { heightCm: 176, weightKg: 84, exercise: 0.92 }, bayara: { heightCm: 179, weightKg: 88, exercise: 0.95 } },
-  // Dutch soldiers of the 1660s, among Europe's taller men then.
-  dutch: { soldier: { heightCm: 168, weightKg: 65, exercise: 0.6 }, officer: { heightCm: 170, weightKg: 68, exercise: 0.6 } },
-};
+// Builds by people and rank (mean height, weight, training): peoples.js PEOPLES, the one table the named presets
+// (body.js) are drawn from too. Each man varies about his rank's by `CAST.height` cm and a few kilograms (builtLike).
+const PERIOD_BUILD = peopleBuilds();
 
 // ---- The Inca at Cajamarca (scenarios.js cajamarca) ----
 
@@ -746,17 +675,7 @@ export function parthianRider(random = Math.random, style = 'steppeBow', rank = 
 
 // ---- Agincourt and Cerignola: the battles of the bow and the ditch ----
 
-// Builds of the men of those battles (PERIOD_BUILD, joined here). English archers of the fifteenth
-// century, from the Mary Rose's bowmen and the Towton grave: ~171 cm, heavy-boned and strong in the
-// shoulders from a boyhood at the butts; the men-at-arms of either side, fed and trained to arms, about
-// the same. The Swiss and the Landsknechts of 1500 a little shorter, hardened by years of campaigning.
-// The Gascon and Picard foot of the French host, smaller men of the commons.
-Object.assign(PERIOD_BUILD, {
-  english: { archer: { heightCm: 171, weightKg: 70, exercise: 0.86 }, manAtArms: { heightCm: 172, weightKg: 74, exercise: 0.8 } },
-  french: { knight: { heightCm: 171, weightKg: 73, exercise: 0.78 }, foot: { heightCm: 167, weightKg: 64, exercise: 0.62 } },
-  swiss: { pike: { heightCm: 168, weightKg: 67, exercise: 0.8 } },
-  landsknecht: { pike: { heightCm: 168, weightKg: 67, exercise: 0.74 } },
-});
+// The English, French, Swiss and Landsknecht builds are PERIOD_BUILD's (peoples.js PEOPLES).
 
 /**
  * An English or Welsh archer of 1415: the war bow (longbow), the padded jack in one of its liveries, a

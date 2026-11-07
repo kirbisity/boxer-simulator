@@ -261,7 +261,7 @@ const ZEELANDIA = {
 // against a garrison with one or two brigandine regulars among it.
 // The coast garrisons on paper were a good many (a weisuo's rolls ran to hundreds),
 // the raiding bands a few score: here the garrison has the numbers. What it lacks is
-// the men: old, underfed and undrilled (cast.js PERIOD_BUILD mingCoast), with a few
+// the men: old, underfed and undrilled (peoples.js PEOPLES mingCoast), with a few
 // bows and nothing that fires powder. Whether they stand is for the general weighing
 // of strength to say (ai.js AI.standing), not for this table.
 const WOKOU = {

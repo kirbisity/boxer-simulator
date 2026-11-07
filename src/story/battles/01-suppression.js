@@ -10,7 +10,7 @@
 //   At one man in four: 28. Its arms the garrison's (Ming huidian 会典 issue for weisuo men: the long spear, the waist sabre,
 //   the bow): spears in the front ranks, sabres and bows behind; a few riders, the company commander (百户) and his household
 //   men, for a southern garrison had few horses. Its kit the garrison's padded coat (outfits.js mingGarrison), its men
-//   built as the south's (cast.js PERIOD_BUILD.mingSouth). Drawn up in ranks and walked at them (formation.js drill).
+//   built as the south's (peoples.js PEOPLES.mingSouth). Drawn up in ranks and walked at them (formation.js drill).
 // - The refugees: no count survives for an event like this; a column of famine refugees from a few villages ran to some
 //   hundreds, most of them women, children and the old. Its men of an age to stand against a company: about 240, two to
 //   each soldier. At the same one in four: 60. Starved (cast.js starvedRebel: a BMI of 14-15.5, which takes their strength

@@ -11,7 +11,7 @@
 //   mandarin-duck squad (鸳鸯阵: two shields, two wolf-brushes, four spears, three fowling pieces and its leader as this game
 //   draws it up, scenarios.js MANDARIN_DUCK); four squads to a 哨, 48 men and its chief ("四队为一哨，四哨为一官，四官为一总，
 //   四总为一营": 《戚继光御倭的鸳鸯阵战术》, 文史知识 2015.9, p. 38, after the Jixiao xinshu 纪效新书). At full size: no scaling.
-//   The southern regulars in brigandine (outfits.js mingBrigandine), built as the south's men (cast.js PERIOD_BUILD.mingSouth).
+//   The southern regulars in brigandine (outfits.js mingBrigandine), built as the south's men (peoples.js PEOPLES.mingSouth).
 //   Their two scouts on horse have ridden back to the fort with the word: none on the field.
 // - The raiders: a Later Jin party of a niru's men (a niru, 牛录, 300 men on its roll from 1601, never all out at once): a few
 //   picked men on horse and the rest banner men come down off their horses to fight in their armour, as the Jurchen did. (The
