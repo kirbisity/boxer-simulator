@@ -29,6 +29,7 @@
 import { P } from '../../body.js';
 import { createFighter, dropWeapon, knockOut, placeFighter, placeOnFloor, WORLD } from '../../physics.js';
 import { holdPlayer } from '../../levelmode/items.js';
+import { placeMounted } from '../../physics/mounted.js';
 import { storyText } from '../life.js';
 import { STORY_SET } from './sets.js';
 
@@ -53,15 +54,15 @@ export const STORY_SCENE = {
   bow: { search: 0.35, still: 0.3 },
   // The scene's camera: a low shot across the two of them (rad of pitch, m away, m over the middle it looks at), from the side,
   // `turn` rad off the line from the body to him; back far enough that the ground round them is in it, the two of them alone.
-  camera: { pitch: 0.36, distance: 4.2, lift: 0.18, turn: 2.5 },
+  camera: { pitch: 0.28, distance: 4.0, lift: 0.2, turn: 2.1 },
   // The last line held this long (s) after it is read, the bars still in.
   endHold: 1.6,
   // Round the two of them (m from the middle of the body and where he stands over it): nobody else lies this close in the shot,
   // and no one stands within `standing` (the company drawn up further off, waiting to fall in); any other man of the field
   // there is moved out to it, and the weapons and hats lying there with him (in the dark), so the two of them have the ground
   // to themselves.
-  clear: 3.4,
-  clearStanding: 7,
+  clear: 4.2,
+  clearStanding: 9,
   // A set scene: the dark it opens in held this long (s) before it lifts (the world drawn under it).
   openDark: 0.5,
 };
@@ -272,7 +273,9 @@ function clearRound(play, body, standAt) {
     if (other === body || other === hero) continue;
     const by = outTo([other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]], other.state === 'out' ? STORY_SCENE.clear : STORY_SCENE.clearStanding);
     if (!by) continue;
-    placeFighter(other, other.root[0] + by[0], other.root[1] + by[1]);
+    // (A man on his horse goes with it, the two set down together.)
+    if (other.mount && other.state !== 'out') placeMounted(other, other.mount.at[0] + by[0], other.mount.at[1] + by[1], other.yaw);
+    else placeFighter(other, other.root[0] + by[0], other.root[1] + by[1]);
     other.v?.fill?.(0);
   }
   // What lies on the ground there (dropped weapons, hats knocked off), but his own.
@@ -578,10 +581,13 @@ export function sceneThink(play) {
   poseHero(play);
 }
 
-/** The world's men the scene holds (they think nothing of their own while it plays): a set's every figure, else the hero. */
+/**
+ * The world's men the scene holds (they think nothing of their own while it plays): a set's every figure; on a battle's field,
+ * everyone (the fighting is over while he kneels: nobody walks back into the shot, or at him).
+ */
 export function sceneHeld(play) {
   if (!play || play.done) return [];
-  const indices = play.staged ? play.figures.map((figure) => figure.index) : [play.hero];
+  const indices = play.staged ? play.figures.map((figure) => figure.index) : play.world.fighters.map((_, index) => index);
   return indices.map((index) => play.world.fighters[index]?.id).filter((id) => id !== undefined);
 }
 
