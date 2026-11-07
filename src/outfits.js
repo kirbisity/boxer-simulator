@@ -1394,14 +1394,15 @@ export const OUTFITS = {
     spare: 'dagger',
     deflects: true,
     arrowproof: true,
-    // The Ming elite's coat and a mail shirt under it (the 'three coats' of the Qing accounts: what is true of it is the
-    // mail under the brigandine): ~26 kg on an 89 kg man.
-    extraMass: 0.29,
+    // The Ming elite's coat (~17 kg on an 89 kg man) and a mail shirt under it (the 'three coats' of the Qing accounts: what
+    // is true of it is the mail under the brigandine; `under`, UNDER_ARMOUR.mail, its ~9 kg added): ~26 kg in all.
+    extraMass: 0.19,
+    under: 'mail',
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
     // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
     protection: { blunt: 0.72, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
-    // Between the coat's plates and wherever they part, the mail under it (not the lacing alone): a point meets rings there.
-    gaps: { mail: 'all' },
+    // The coat's lacing parts as the banner coat's does; between the plates and wherever they part, the mail under it (UNDER_ARMOUR.mail `zones`).
+    gaps: { lacing: 0.1 },
     courage: 0.45,
     designs: [
       bayaraDesign('Blue brocade', '#5a78a6', '#1f2f5a'),
@@ -2854,7 +2855,8 @@ export function firstDesignOf(kind, key) {
 export function setCard(kind, key, bodyKg = 75) {
   const set = outfitSets(kind).find((each) => each.key === key) ?? outfitSets(kind)[0];
   const spec = setSpec(kind, set.key);
-  const protection = { ...NO_PROTECTION, ...spec.protection };
+  const under = UNDER_ARMOUR[spec.under] ?? null;
+  const protection = layeredProtection({ ...NO_PROTECTION, ...spec.protection }, under);
   const at = (...names) => {
     const own = names.map((name) => protection.regions?.[name]).find(Boolean);
     return { blunt: own?.blunt ?? protection.blunt, cut: own?.cut ?? protection.cut, pierce: own?.pierce ?? protection.pierce };
@@ -2863,7 +2865,7 @@ export function setCard(kind, key, bodyKg = 75) {
   const helmet = spec.helmet ?? HELMETS[look.head?.kind] ?? null;
   return {
     kind, key: set.key, name: set.name, blurb: set.blurb, faction: spec.faction ?? 'ring',
-    kg: (spec.extraMass ?? 0) * bodyKg, movement: spec.movement ?? 'excellent',
+    kg: ((spec.extraMass ?? 0) + (under?.extraMass ?? 0)) * bodyKg, movement: spec.movement ?? 'excellent',
     torso: at('torso'), head: at('head'), arm: at('UpperArm', 'limb'),
     helmetKg: helmet?.mass ?? 0, face: helmet && helmet.mass > 0.5 ? helmet.face ?? (look.head?.mask ? 'closed' : 'open') : 'bare',
     finishes: set.designs.filter((design) => !OUTFITS[kind].designs[design]?.levelOnly).length,
@@ -3117,6 +3119,54 @@ function helmFaceOf(inputs, spec, look) {
 }
 
 /** A kit's protection with nothing over the head (its helm off): a bare head takes a blow, a cut and a ball as skin does. */
+/**
+ * Armour worn under a kit's own: a man two coats deep (double armour). The Later Jin's front ranks went so: the Korean
+ * envoy Jeong Chung-sin (1621) saw long armour on their horsemen, short armour on the foot, and men in two coats; Xiong
+ * Tingbi wrote of the heavily armoured "death troops" (死兵) put in front; the Manchu annals (《满文老档》) count heavy,
+ * light and cotton armour, the cotton worn over the heavy to storm a wall (all as quoted secondhand). A kit's own `under`
+ * (the Bayara's), or a man's (`outfit.under`: the front-rank banner men, cast.js bannerman), names one of these.
+ * Each layer stops what its material stops, in order: a blow on the coat meets the coat, and what the coat lets through
+ * meets the layer under it (each kind of harm kept out 1 − (1 − outer)(1 − under), where the layer `covers`); a blow
+ * into a gap of the coat (physics/gaps.js) meets the layer where it lies under that gap (`zones`). Its weight adds to the
+ * kit's (`extraMass`, a share of the body), and it keeps heat in as another garment does (`skin`: the share of the
+ * trunk's and the limbs' skin it lies over, physics/heat.js kitHeat).
+ * - mail: a riveted mail shirt to mid-thigh with sleeves to the elbow, the 'light armour' under the coat (the Qing
+ *   accounts' mail under the brigandine). Guarded as the gaps' mail (weapons.js BLADES.gaps.layers: an edge turned, a
+ *   point less, a blow little spread); a ball it slows only a little (mail is no proof against shot: Williams, *The
+ *   Knight and the Blast Furnace*, 2003). ~8 kg (surviving mail shirts 6–10 kg) on an 80 kg man.
+ */
+export const UNDER_ARMOUR = {
+  mail: {
+    label: 'Mail shirt', extraMass: 0.1,
+    guard: { blunt: 0.3, cut: 0.85, pierce: 0.55 }, bullet: 0.1,
+    covers: ['torso', 'UpperArm', 'Thigh'], zones: ['armpit', 'groin', 'neck', 'elbow', 'lacing'],
+    skin: { trunk: 1, limb: 0.35 },
+  },
+};
+
+/** What the kit keeps out at `region` (torso, or a part: UpperArm, Thigh), as protectionAt would find it there. */
+function protectionIn(protection, region) {
+  const regions = protection.regions ?? {};
+  return regions[region] ?? (region === 'torso' ? null : regions.limb) ?? protection;
+}
+
+/** A kit's protection with a layer under it (UNDER_ARMOUR): each region it covers guarded by the two in order. */
+export function layeredProtection(protection, layer) {
+  if (!layer) return protection;
+  const through = (outer, under) => 1 - (1 - (outer ?? 0)) * (1 - under);
+  const regions = { ...protection.regions };
+  for (const region of layer.covers) {
+    const outer = protectionIn(protection, region);
+    regions[region] = { ...protection.regions?.[region], blunt: through(outer.blunt, layer.guard.blunt), cut: through(outer.cut, layer.guard.cut), pierce: through(outer.pierce, layer.guard.pierce) };
+  }
+  return { ...protection, bullet: { ...protection.bullet, torso: through(protection.bullet?.torso, layer.bullet) }, regions };
+}
+
+/** The layer he wears under his kit (UNDER_ARMOUR), his own before the kit's, or null. */
+export function underArmourOf(inputs, spec = outfitOf(inputs).spec) {
+  return UNDER_ARMOUR[inputs.outfit?.under ?? spec.under] ?? null;
+}
+
 function bareHeaded(protection) {
   return { ...protection, bullet: { ...protection.bullet, head: 0 }, regions: { ...protection.regions, head: { blunt: 0, cut: 0, pierce: 0, deflects: false } } };
 }
@@ -3137,6 +3187,7 @@ export function gearTraits(inputs) {
   const female = inputs.sex === 'female';
   const bySex = female ? spec.female ?? {} : {};
   const feet = (female && look.femaleFeet) || look.feet;
+  const under = underArmourOf(inputs, spec);
   return {
     ...MOVEMENT[spec.movement],
     // (A man's own `outfit.balance` before the kit's: a giant who swings a poleaxe and keeps his feet.)
@@ -3145,10 +3196,13 @@ export function gearTraits(inputs) {
     heelLift: heelLift(feet?.heels, (inputs.heightCm ?? 175) / 100),
     kick: bySex.kick ?? spec.kick ?? 1,
     // The kit's weight as a share of the body's; a man's own (`outfit.extraMass`) before the kit's (a giant in a harness that weighs what a harness weighs).
-    extraMass: inputs.outfit?.extraMass ?? Math.max(0, (spec.extraMass ?? 0) + helmShift),
+    // (And a layer under the kit, UNDER_ARMOUR: its weight added.)
+    extraMass: inputs.outfit?.extraMass ?? Math.max(0, (spec.extraMass ?? 0) + (under?.extraMass ?? 0) + helmShift),
     // The part of that weight that is not armour (an exoframe's frame, a robot's battery): poise counts it as a load (physics poiseOf).
     carriedShare: inputs.outfit?.carriedShare ?? spec.carriedShare ?? 0,
-    protection: inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : helmedBy({ ...NO_PROTECTION, ...spec.protection }, wornHelm(inputs)),
+    protection: layeredProtection(inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : helmedBy({ ...NO_PROTECTION, ...spec.protection }, wornHelm(inputs)), under),
+    // The layer under his kit (UNDER_ARMOUR), or null: under its gaps (physics/gaps.js gapUnder), and its heat (physics/heat.js).
+    under,
     deflects: Boolean(spec.deflects),
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
     headLocked: Boolean(spec.headLocked) && !headChanged,

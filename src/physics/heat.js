@@ -54,7 +54,10 @@ export function kitHeat(fighter) {
   const protection = gear.protection ?? {};
   const share = spec.skinShare;
   const cover = (bare ? 0 : share.head * coverAt(protection, 'head')) + share.trunk * coverAt(protection, 'torso') + share.limb * coverAt(protection, 'limb');
-  const clo = spec.clothes + spec.armour * cover;
+  // A layer worn under the kit (outfits.js UNDER_ARMOUR: double armour) is another garment: its cover adds to the coat's.
+  const under = gear.under;
+  const layer = under ? (share.trunk * under.skin.trunk + share.limb * under.skin.limb) * Math.max(under.guard.blunt, under.guard.cut) : 0;
+  const clo = spec.clothes + spec.armour * (cover + layer);
   const heightCm = (body.heightM ?? 1.75) * 100;
   const area = 0.007184 * body.bodyMassKg ** 0.425 * heightCm ** 0.725;
   const closed = !bare && (gear.helmFace === 'closed' || gear.helmFace === 'sealed');

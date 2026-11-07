@@ -309,7 +309,10 @@ export function bannerman(random = Math.random, style = 'spear', rank = 'banner'
   const kind = rank === 'bayara' ? 'bayara' : 'bannerArmour';
   const base = varyCharacter(rank === 'bayara' ? PRESETS.bayara : PRESETS.bannerBow, random, { sex: 'male' });
   const name = pickOne(['Akdun', 'Baturu', 'Mergen', 'Hūsun', 'Erdemu', 'Fulu', 'Sure', 'Kicebe', 'Ilan', 'Duin', 'Tulai', 'Gaha'], random);
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random) }, accessories: [], ...(mounted ? { mounted: true } : {}) };
+  // A banner man who closes (spear, sabre, guandao) stands in the front ranks, the 'death troops' (死兵) in two coats: a mail
+  // shirt under his banner coat (outfits.js UNDER_ARMOUR); the archers behind them in the one (the Bayara's mail is his kit's).
+  const front = rank === 'banner' && !STYLES[style]?.ranged;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random), ...(front ? { under: 'mail' } : {}) }, accessories: [], ...(mounted ? { mounted: true } : {}) };
   return builtLike(soldier, PERIOD_BUILD.jurchen[rank], random);
 }
 
