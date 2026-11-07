@@ -107,9 +107,10 @@ export const PEOPLES = {
   spanish: {
     heightCm: 165, weightKg: 66, exercise: 0.6,
     ranks: {
-      soldier: { heightCm: 3, weightKg: 3, exercise: 0.24 },
+      // Set well above the Castilian mean by the user's choice (2026-11-03, "taller and stronger"), kept as chosen.
+      soldier: { heightCm: 7, weightKg: 6, exercise: 0.24 },
       // The hidalgos, fed as their rank was.
-      officer: { heightCm: 5, weightKg: 6, exercise: 0.26 },
+      officer: { heightCm: 9, weightKg: 9, exercise: 0.26 },
     },
   },
   // The Mexica a few centimetres shorter than the Castilians (Tlatelolco and Valley of Mexico series about 160-163 cm),
@@ -146,11 +147,12 @@ export const PEOPLES = {
   // strongest boys and drilled for life; the heavy sipahis landholders fed on meat and at arms from boyhood. Heavy for
   // their height (`weightKg`), as their men were built.
   ottoman: {
-    heightCm: 167, weightKg: 73, exercise: 0.88,
+    // Set well above that range by the user's choice (2026-11-03, "much stronger"), kept as chosen.
+    heightCm: 175, weightKg: 80, exercise: 0.88,
     ranks: {
       azap: {},
-      janissary: { heightCm: 5, weightKg: 7, exercise: 0.08 },
-      heavy: { heightCm: 4, weightKg: 9, exercise: 0.07 },
+      janissary: { heightCm: 5, weightKg: 8, exercise: 0.08 },
+      heavy: { heightCm: 5, weightKg: 11, exercise: 0.07 },
     },
   },
   // Medieval Mongol and Oirat men, from skeletons about 163-167 cm, lean and hard. Steppe men: short and squat, heavy
