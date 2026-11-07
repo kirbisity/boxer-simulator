@@ -49,7 +49,7 @@ test('the home menu offers Battle Mode and Level Mode (no "Levels"), and Level M
     const menus = installMenus({ onMenu() {}, attract() {}, onStage: (key) => started.push(key), level() {}, tutorial() {} });
     menus.home();
     const titles = cards(byId.home).map(titleOf);
-    assert.deepEqual(titles, ['Career', 'Battle Mode', 'Level Mode', 'Last Stand Squad', 'Deadliest Warrior', 'Who Wins?', 'Sandbox']);
+    assert.deepEqual(titles, ['Career', 'Story', 'Battle Mode', 'Level Mode', 'Last Stand Squad', 'Deadliest Warrior', 'Who Wins?', 'Sandbox']);
     cardTitled(byId.home, 'Level Mode').onclick();
     assert.equal(byId['stages-screen'].hidden, false);
     assert.equal(byId.home.hidden, true);
