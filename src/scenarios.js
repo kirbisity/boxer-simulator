@@ -456,7 +456,7 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true, 
   return {
     title: "Qi Jiguang's army",
     place: 'Taizhou, Zhejiang · 1561',
-    blurb: { en: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in close-ordered mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, and the fowling pieces in two ranks behind the shields, holding their fire until the raiders are close, then firing by ranks past the shields' shoulders while the front holds the raiders at the line.", zh: '还是那帮倭寇，还是那样的江南小城，只是隔了七年。戚继光练出来的这支兵，是义乌的矿徒和庄稼汉，在他的军法底下操到能当一个人使：身披布面甲，十二人一队，结成鸳鸯阵——藤牌在前，狼筅迎面捅进倭寇脸上，长枪从筅后递出；两排鸟铳伏在牌后，倭寇不到跟前不放，到了跟前，贴着牌肩一排一排地打，前排就把人死死钉在阵线上。' },
+    blurb: { en: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in close-ordered mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, and the fowling pieces in two ranks behind the shields, holding their fire until the raiders are close, then firing by ranks past the shields' shoulders while the front holds the raiders at the line.", zh: '还是那帮倭寇，还是那样的江南小城，隔了七年。戚继光招的是义乌的矿徒和庄稼汉，拿军法操到能当一个人使：身披布面甲，十二人一队，结鸳鸯阵——藤牌在前，狼筅迎着倭寇的脸捅，长枪从筅后递出；两排鸟铳伏在牌后，不到跟前不放，到了跟前，贴着牌肩一排一排打，前排把人死死钉在阵线上。' },
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9, ...(works ? { works } : {}) },
@@ -1040,7 +1040,7 @@ const HORSE_FIRST = { by: 3, release: 40 };
 const AGINCOURT_LEVEL = {
   title: 'Agincourt',
   place: 'Agincourt, Artois · 25 October 1415',
-  blurb: { en: "King Henry's archers stand behind their stakes at the narrow end of a ploughed field, soaked by a night's rain, between two woods. The French men-at-arms come on across it on foot in plate, sinking to the knee, crowded together as the woods close in; their horse rides first at the archers. Thirty archers and five men-at-arms against twenty-eight men-at-arms, three lances and four crossbows.", zh: '亨利五世的弓手站在木桩后面，守着一块刚犁过的田的窄头，两边是树林，昨夜一场雨浇了个透。法国重甲兵披着板甲，徒步踩过这片烂泥，一脚陷到膝盖；越往前林子越收，人越挤成一团；他们的骑兵先朝弓手冲了过去。三十名弓手、五名重甲兵，对二十八名重甲兵、三名骑枪手、四名弩手。' },
+  blurb: { en: "King Henry's archers stand behind their stakes at the narrow end of a ploughed field, soaked by a night's rain, between two woods. The French men-at-arms come on across it on foot in plate, sinking to the knee, crowded together as the woods close in; their horse rides first at the archers. Thirty archers and five men-at-arms against twenty-eight men-at-arms, three lances and four crossbows.", zh: '亨利王的弓手守在田地窄头的木桩后面：地刚犁过，夹在两片树林中间，昨夜一场雨浇了个透。法国重甲兵披着板甲徒步过来，一脚泥陷到膝盖，林子越往前越收，人越挤越紧；他们的骑兵先朝弓手冲。弓手三十、重甲兵五，对重甲兵二十八、骑枪三、弩手四。' },
   scene: 'agincourt',
   weather: { fog: [28, 120], sky: 0.8, pale: 0.75, sun: 0.55 },
   arena: { ...AGINCOURT.arena, works: agincourtWorks() },
@@ -1064,7 +1064,7 @@ const AGINCOURT_LEVEL = {
 const CERIGNOLA_LEVEL = {
   title: 'Cerignola',
   place: 'Cerignola, Apulia · 28 April 1503',
-  blurb: { en: "Gonzalo de Córdoba's men stand behind a fresh ditch and its bank on a vineyard slope: a rank of German pikes along the bank, his arquebusiers three deep close behind them firing between the pikemen's files, the rest of the pikes and the sword-and-buckler men behind. At dusk the French gendarmes in plate on barded horses charge it, and the Swiss columns follow them in: the ditch stops the horse, the pikes hold the bank, and the volleys come rank after rank. Thirty-five of Spain against eight gendarmes, twenty-two Swiss and five crossbowmen.", zh: '贡萨洛·德·科尔多瓦的人马守在葡萄园坡上一道新挖的壕沟和土堤后面：堤上一排德意志长枪，火绳枪手三排紧贴其后，从枪兵的行列缝里开火；其余的长枪和圆盾剑士压在后头。黄昏时分，法兰西重骑披着板甲、骑着披甲马冲了上来，瑞士方阵跟着压上：壕沟挡住了马，长枪守住了堤，排枪一排接一排。西班牙三十五人，对八名法兰西重骑、二十二名瑞士枪兵、五名弩手。' },
+  blurb: { en: "Gonzalo de Córdoba's men stand behind a fresh ditch and its bank on a vineyard slope: a rank of German pikes along the bank, his arquebusiers three deep close behind them firing between the pikemen's files, the rest of the pikes and the sword-and-buckler men behind. At dusk the French gendarmes in plate on barded horses charge it, and the Swiss columns follow them in: the ditch stops the horse, the pikes hold the bank, and the volleys come rank after rank. Thirty-five of Spain against eight gendarmes, twenty-two Swiss and five crossbowmen.", zh: '贡萨洛·德·科尔多瓦的人守在葡萄园坡上，前面一道新挖的壕沟、一道土堤：堤上一排德意志长枪，火绳枪手三排紧贴在后，从枪兵行间开火；其余长枪和圆盾剑士押在后头。黄昏，法兰西重骑披板甲、骑披甲马冲上来，瑞士方阵跟着压上：沟挡住了马，枪守住了堤，排枪一排接一排。西班牙三十五人，对法兰西重骑八名、瑞士枪兵二十二名、弩手五名。' },
   scene: 'cerignola',
   weather: { fog: [18, 110], sky: 0.35, pale: 0.3, sun: 0.7 },
   arena: { ...CERIGNOLA.arena, works: cerignolaWorks() },
@@ -1128,7 +1128,7 @@ export const SCENARIOS = {
   legion: {
     title: 'Rome against Han',
     place: 'A what-if · the 1st century',
-    blurb: { en: 'A legion of the early Empire meets a Han army of crossbowmen: twenty-nine legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into twenty-nine crossbows; the front ranks meet, the rest hold their places. Six auxiliary horse in mail ride on one flank and six Han horsemen on the other, and charge it when the lines close.', zh: '帝国初年的一个罗马军团，撞上一支汉军弩兵：二十九名军团兵身披环片甲，手持大盾短剑，把盾叠成龟甲阵，一步步顶着二十九张弩往前走；前排接战，其余原地不动。一侧是六名披锁甲的辅助骑兵，另一侧是六名汉骑，两军一接上，就从侧翼冲进去。' },
+    blurb: { en: 'A legion of the early Empire meets a Han army of crossbowmen: twenty-nine legionaries in segmented iron with scutum and gladius, closed up under their shields in the testudo as they walk up into twenty-nine crossbows; the front ranks meet, the rest hold their places. Six auxiliary horse in mail ride on one flank and six Han horsemen on the other, and charge it when the lines close.', zh: '帝国初年的罗马军团，撞上一支汉军弩兵：二十九名军团兵，环片甲，大盾短剑，盾叠成龟甲阵，顶着二十九张弩一步步往上走；前排接战，其余原地不动。一翼是六名披锁甲的辅助骑兵，另一翼是六名汉骑，两阵一接，就冲进去。' },
     scene: 'plain',
     arena: LEGION.arena,
     camera: { yaw: -0.5, pitch: 0.45, distance: 20, maxDistance: 26 },
@@ -1152,7 +1152,7 @@ export const SCENARIOS = {
   mobei: {
     title: 'Mobei',
     place: 'North of the Gobi · 119 BC',
-    blurb: { en: "Wei Qing has crossed the desert to the chanyu's own ground. Twenty-three Han crossbowmen in iron lamellar stand at the edge of the plain, his horse — sabre, spear and bow — on both flanks; against them come thirty-five Xiongnu, every man a horse archer in felt and leather, riding in to shoot and wheeling away.", zh: '卫青穿过大漠，打到了单于的老巢。二十三名汉军弩手身披铁札甲，列在平原边上，刀、枪、弓骑分护两翼；对面来的是三十五名匈奴人，个个是穿毡裹皮的骑射手，冲上来放一轮箭，拨马就走。' },
+    blurb: { en: "Wei Qing has crossed the desert to the chanyu's own ground. Twenty-three Han crossbowmen in iron lamellar stand at the edge of the plain, his horse — sabre, spear and bow — on both flanks; against them come thirty-five Xiongnu, every man a horse archer in felt and leather, riding in to shoot and wheeling away.", zh: '卫青穿过大漠，打到了单于的家门口。二十三名汉军弩手身披铁札甲，列在平原边上，两翼是刀、枪、弓骑；迎面来的是三十五个匈奴人，个个是穿毡裹皮的骑射手，冲上来放一轮箭，拨马就走。' },
     scene: 'mobei',
     arena: MOBEI.arena,
     spread: 1,
@@ -1175,7 +1175,7 @@ export const SCENARIOS = {
   carrhae: {
     title: 'Carrhae',
     place: 'The plain by Harran, Mesopotamia · June 53 BC',
-    blurb: { en: "Crassus's legion stands in a square under a sky of arrows. Forty legionaries of the Republic in mail and bronze, shields locked, and five of Publius Crassus's Gallic horse; round them ride twenty-one Parthian horse archers, who never close and never run short — the camel train behind them brings fresh arrows — and three cataphracts, man and horse in iron scale, held back for anyone who breaks out.", zh: '克拉苏的军团结成方阵，头顶是遮天的箭雨。四十名共和国军团兵，锁甲青铜，盾牌相扣，外加小克拉苏麾下五名高卢骑兵；绕着他们打转的是二十一名帕提亚骑射手，从不近身，箭也从不见底——后头的骆驼队一驮一驮地往上送——还有三名人马俱披铁鳞甲的具装骑兵，专等谁沉不住气冲出阵来。' },
+    blurb: { en: "Crassus's legion stands in a square under a sky of arrows. Forty legionaries of the Republic in mail and bronze, shields locked, and five of Publius Crassus's Gallic horse; round them ride twenty-one Parthian horse archers, who never close and never run short — the camel train behind them brings fresh arrows — and three cataphracts, man and horse in iron scale, held back for anyone who breaks out.", zh: '克拉苏的军团结成方阵，头顶是满天的箭。四十名共和国军团兵，锁甲铜盔，盾牌相扣，外加小克拉苏手下五名高卢骑兵；二十一名帕提亚骑射手绕着他们打转，从不近身，箭也从不见底——后头骆驼队一驮一驮往上送；另有三名人马俱披铁鳞的具装骑兵，专等谁冲出阵来。' },
     scene: 'carrhae',
     arena: CARRHAE.arena,
     spread: 1,
@@ -1200,7 +1200,7 @@ export const SCENARIOS = {
   catalaunian: {
     title: 'The Catalaunian Plains',
     place: 'Champagne, Gaul · 20 June 451',
-    blurb: { en: "Aetius's Romans and Theoderic's Visigoths stand against Attila. Twelve Roman foot in mail with oval shields and spears, and six Roman archers on their flank, hold the line beside eleven Visigoths, six Visigoth horse on the flank; eleven Huns ride round them shooting — horse archers and a few of Attila's nobles — and twenty-four Ostrogoths and Gepids, Attila's subject peoples, come on behind them on foot.", zh: '埃提乌斯的罗马人和狄奥多里克的西哥特人，一同迎战阿提拉。十二名罗马步兵，锁甲、椭圆盾、长矛，侧翼六名罗马弓手，和十一名西哥特人并肩守住阵线，另有六名西哥特骑兵护翼；十一名匈人绕阵放箭——骑射手，外加几名阿提拉的贵族——身后，二十四名东哥特人和格皮德人，阿提拉治下的附庸，徒步压了上来。' },
+    blurb: { en: "Aetius's Romans and Theoderic's Visigoths stand against Attila. Twelve Roman foot in mail with oval shields and spears, and six Roman archers on their flank, hold the line beside eleven Visigoths, six Visigoth horse on the flank; eleven Huns ride round them shooting — horse archers and a few of Attila's nobles — and twenty-four Ostrogoths and Gepids, Attila's subject peoples, come on behind them on foot.", zh: '埃提乌斯的罗马人和狄奥多里克的西哥特人，一同迎战阿提拉。十二名罗马步兵，锁甲、椭圆盾、长矛，侧翼六名罗马弓手，跟十一名西哥特人并肩守住阵线，六名西哥特骑兵护住一翼；十一个匈人绕阵放箭——骑射手，加上几个阿提拉的贵族——后面，二十四名东哥特人和格皮德人，阿提拉治下的附庸，徒步压上来。' },
     scene: 'catalaunian',
     arena: CATALAUNIAN.arena,
     spread: 1,
@@ -1239,7 +1239,7 @@ export const SCENARIOS = {
   rebellion: {
     title: 'Peasant Rebellion',
     place: 'The market square, Maidstone, Kent · June 1381',
-    blurb: { en: 'The town has risen. Two lords in plate ride in on their destriers, with three of their foot soldiers behind them, to put it down — and meet twenty peasants with spears in the market square.', zh: '镇子反了。两位身披板甲的老爷骑着战马进城来镇压，身后跟着三个家兵——在集市广场上，迎面是二十个攥着长矛的农民。' },
+    blurb: { en: 'The town has risen. Two lords in plate ride in on their destriers, with three of their foot soldiers behind them, to put it down — and meet twenty peasants with spears in the market square.', zh: '镇子反了。两位老爷披着板甲、骑着战马进城来镇压，身后跟着三个步卒——集市广场上，迎面是二十个攥着长矛的农民。' },
     scene: 'town',
     weather: { fog: WEATHER_MIST.rebellion, sky: 0.55, pale: 0.55, sun: 0.9 },
     arena: { halfX: 9, halfZ: 7 },
@@ -1270,7 +1270,7 @@ export const SCENARIOS = {
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: { en: 'The battle that ends the Sengoku. Thirty-four of the East in red against thirty-five of the West in black and blue, in the morning fog: bows and teppō in front, spears, blades and polearms behind, and six mounted samurai on a flank of each army to charge when the lines close.', zh: '终结战国的一战。东军三十四人着红，西军三十五人着黑蓝，在晨雾里对阵：弓和铁炮在前，长枪、刀和长柄兵器在后，两军侧翼各有六名骑马武士，等阵线一接，就冲进去。' },
+    blurb: { en: 'The battle that ends the Sengoku. Thirty-four of the East in red against thirty-five of the West in black and blue, in the morning fog: bows and teppō in front, spears, blades and polearms behind, and six mounted samurai on a flank of each army to charge when the lines close.', zh: '终结战国的一战。晨雾里，东军三十四人着红，西军三十五人着黑蓝：弓和铁炮在前，长枪、刀、长柄兵器在后，两军侧翼各有六名骑马武士，阵线一接就冲进去。' },
     scene: 'sengoku',
     weather: { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
     arena: { halfX: 17, halfZ: 11 },
@@ -1296,7 +1296,7 @@ export const SCENARIOS = {
   pyongyang: {
     title: 'Pyongyang',
     place: 'Pyongyang, Joseon · 8 February 1593',
-    blurb: { en: 'The Ming army retakes the city from the Japanese. Fifteen Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and eleven of Li Rusong\'s horsemen in iron lamellar on the flank, against forty-four Japanese samurai and ashigaru.', zh: '明军从日军手里夺回平壤。十五名明军——精锐披钉甲，使大刀、放火铳；布面甲兵持刀牌、长枪和鸟铳——侧翼是李如松的十一名铁札甲骑兵，对阵四十四名日本武士和足轻。' },
+    blurb: { en: 'The Ming army retakes the city from the Japanese. Fifteen Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and eleven of Li Rusong\'s horsemen in iron lamellar on the flank, against forty-four Japanese samurai and ashigaru.', zh: '明军从日军手里夺回平壤。十五名明军——精锐披钉甲，使大刀、放火铳；布面甲兵持刀牌、长枪、鸟铳——侧翼是李如松的十一名铁札甲骑兵，对阵日本武士和足轻四十四人。' },
     scene: 'sengoku',
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
@@ -1316,7 +1316,7 @@ export const SCENARIOS = {
   sarhu: {
     title: 'Sarhu',
     place: 'Sarhu and Jiefan, by the Hun River, Liaodong · 14 April 1619',
-    blurb: { en: "Du Song's column has crossed the Hun River ahead of the other three, and Nurhaci has brought his eight banners against it alone. Thirty of the Ming — a few of Du Song's household elite, regulars in brigandine and garrison men, a handful of gunners in front — meet twenty-eight banner men in studded coats of plates, spears, sabres and guandao before the archers with the heavy Manchu bow, and three Bayara of the guard riding on the flank with the heavy spear. The Ming had more guns; the fight went on into the dusk and the mist, and wet powder and the columns' distance from each other did the rest.", zh: '杜松这一路抢在另外三路前头渡过了浑河，努尔哈赤便把八旗兵全压到他一路上。明军三十人——杜松的几名家丁精锐、布面甲兵、卫所兵，前头一小撮火铳手——迎面是二十八名八旗兵，身披钉甲，长枪、腰刀、大刀在前，后面是拉重弓的弓手，侧翼还有三名巴牙喇护军，提着重枪骑马包抄。明军的火器更多；可仗一直打到黄昏起雾，火药受了潮，四路兵又隔得老远——剩下的，不用多说。' },
+    blurb: { en: "Du Song's column has crossed the Hun River ahead of the other three, and Nurhaci has brought his eight banners against it alone. Thirty of the Ming — a few of Du Song's household elite, regulars in brigandine and garrison men, a handful of gunners in front — meet twenty-eight banner men in studded coats of plates, spears, sabres and guandao before the archers with the heavy Manchu bow, and three Bayara of the guard riding on the flank with the heavy spear. The Ming had more guns; the fight went on into the dusk and the mist, and wet powder and the columns' distance from each other did the rest.", zh: '杜松这一路抢在另外三路前头渡过浑河，努尔哈赤就把八旗全压在他一路上。明军三十人——杜松的几个家丁精锐，布面甲兵，卫所兵，前头一小撮火铳手——迎面是二十八名八旗兵：钉甲，长枪、腰刀、大刀在前，后头是拉重弓的弓手，侧翼还有三骑巴牙喇，提着重枪包抄。明军火器多；可仗打进了黄昏和雾里，火药受了潮，四路兵又隔得老远——剩下的就不用说了。' },
     scene: 'sarhu',
     weather: { fog: WEATHER_MIST.sarhu, sky: 0.6, pale: 0.6, sun: 0.7 },
     arena: { halfX: 14, halfZ: 9 },
@@ -1341,7 +1341,7 @@ export const SCENARIOS = {
   cajamarca: {
     title: 'Cajamarca',
     place: 'The square of Cajamarca, Peru · 16 November 1532',
-    blurb: { en: "Late in the afternoon Atahualpa is carried into the walled square among his lords and attendants, unarmed by his own order, in their finest woven tunics. Pizarro's men wait out of sight in the doorways of the long halls round it: steel, horses and guns these people have never seen. At the signal Candia's gun fires and horse and foot burst out from every side.", zh: '日头偏西，阿塔瓦尔帕坐着肩舆，被抬进四面围墙的广场，身边簇拥着贵族和侍从，个个穿着最好的织袍——按他自己的命令，谁都没带兵器。皮萨罗的人藏在四周长厅的门洞里，看不见：钢铁、马、火枪，这些人一样都没见过。信号一到，坎迪亚的炮一响，骑兵步兵从四面八方一齐杀出。' },
+    blurb: { en: "Late in the afternoon Atahualpa is carried into the walled square among his lords and attendants, unarmed by his own order, in their finest woven tunics. Pizarro's men wait out of sight in the doorways of the long halls round it: steel, horses and guns these people have never seen. At the signal Candia's gun fires and horse and foot burst out from every side.", zh: '日头偏西，阿塔瓦尔帕被抬进四面围墙的广场，身边簇拥着贵族和侍从，个个穿最好的织袍，照他自己的命令，谁都没带兵器。皮萨罗的人藏在四周长厅的门洞里，不露面：钢铁、马、火枪，这些人一样也没见过。信号一到，坎迪亚的炮一响，马兵步兵从四面八方杀出来。' },
     scene: 'cajamarca',
     arena: { halfX: 16, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.48, distance: 19, maxDistance: 25 },
@@ -1359,7 +1359,7 @@ export const SCENARIOS = {
   zeelandia: {
     title: 'Fort Zeelandia',
     place: 'Baxemboy, Formosa · 1661',
-    blurb: { en: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers and pikemen march out to meet his army on the sand: masked iron men in scale, regulars in the brigandine vest and in iron lamellar, garrison troops and a few Japanese.", zh: '郑成功登陆，要拿下热兰遮城。荷兰东印度公司的火枪手和长枪兵开出城来，在沙滩上迎战：对面是戴铁面、披鳞甲的铁人，穿布面甲背心和铁札甲的正兵，营兵，还有几个日本人。' },
+    blurb: { en: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers and pikemen march out to meet his army on the sand: masked iron men in scale, regulars in the brigandine vest and in iron lamellar, garrison troops and a few Japanese.", zh: '郑成功登陆，要拿热兰遮城。荷兰东印度公司的火枪手和长枪兵开出城，在沙滩上迎战他的大军：戴铁面、披鳞甲的铁人，穿布面甲背心和铁札甲的正兵，营兵，还有几个日本人。' },
     scene: 'coastFort',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
@@ -1384,7 +1384,7 @@ export const SCENARIOS = {
   rhodes: {
     title: 'Siege of Rhodes',
     place: 'Bastion of Aragon, Rhodes · 24 September 1522',
-    blurb: { en: "Süleyman's general assault on the breaches. The Knights of St John in plate, with their sergeants and gunners, meet the Janissaries with yatagan and gun, the azaps' spears and bows, and heavy men in mail-and-plate.", zh: '苏莱曼对城墙缺口发起总攻。圣约翰骑士团的骑士身披板甲，带着军士和炮手，迎战手持弯刀和火枪的耶尼切里、阿扎普的长矛和弓，还有披锁子板甲的重甲兵。' },
+    blurb: { en: "Süleyman's general assault on the breaches. The Knights of St John in plate, with their sergeants and gunners, meet the Janissaries with yatagan and gun, the azaps' spears and bows, and heavy men in mail-and-plate.", zh: '苏莱曼对城墙缺口发起总攻。圣约翰骑士团的骑士披板甲，带军士和炮手迎战：对面是挥弯刀、放火枪的耶尼切里，阿扎普的长矛和弓，和披锁子连板甲的重兵。' },
     scene: 'coastFort',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
@@ -1401,7 +1401,7 @@ export const SCENARIOS = {
   wokou: {
     title: 'Wokou raid',
     place: 'A water town, Zhejiang · 1554',
-    blurb: { en: 'Sea raiders come up the canals in the morning mist, a Japanese band: rōnin at their head and samurai in their armour, the rest barefoot, some in pieces of armour, a few Chinese pirates hanging back behind them: long swords and great two-handed swords, yari, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison, more of them than the raiders: old men, thin boys and the underfed in hemp vests, spears and dao and a few bows, no guns, and a pair of brigandine regulars among them.', zh: '晨雾里，一伙海寇顺着河道摸了上来，是一帮日本人：打头的是浪人，后面跟着披甲的武士，其余的光着脚，有的身上挂着几片甲，几个中国海盗缩在最后：长刀、野太刀、长枪、腰刀，几乎看不见一杆火器。在桥边的集市广场上，他们撞上了镇上的守军，人数比倭寇多：老头、瘦小子、吃不饱的穷汉，穿着麻布坎肩，拿着长枪腰刀，几张弓，没有火器，当中夹着两个穿布面甲的正兵。' },
+    blurb: { en: 'Sea raiders come up the canals in the morning mist, a Japanese band: rōnin at their head and samurai in their armour, the rest barefoot, some in pieces of armour, a few Chinese pirates hanging back behind them: long swords and great two-handed swords, yari, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison, more of them than the raiders: old men, thin boys and the underfed in hemp vests, spears and dao and a few bows, no guns, and a pair of brigandine regulars among them.', zh: '晨雾里，一伙海寇顺着河道摸上来，是日本人：浪人打头，披甲的武士跟着，其余光着脚，有的身上挂几片甲，几个中国海盗缩在最后——长刀、野太刀、长枪、腰刀，几乎不见火器。桥边集市上，他们撞上了镇里的守军，人比倭寇多：老头、瘦小子、吃不饱的穷汉，一身麻布坎肩，长枪腰刀，几张弓，没有火器，当中夹着两个穿布面甲的正兵。' },
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9 },
@@ -1420,7 +1420,7 @@ export const SCENARIOS = {
   port: {
     title: 'Pier 9',
     place: 'Container port, Yokohama · 2:15 a.m.',
-    blurb: { en: 'A raid on a handover between the containers. Four SWAT officers — two pistols, two batons — against six yakuza: four knives, a katana, and one gun.', zh: '集装箱之间一场交易，被堵了个正着。四名特警——两把手枪、两根警棍——对六个极道：四把刀、一把武士刀、一支枪。' },
+    blurb: { en: 'A raid on a handover between the containers. Four SWAT officers — two pistols, two batons — against six yakuza: four knives, a katana, and one gun.', zh: '集装箱堆里一场交货，被人堵了。四名特警——两把手枪、两根警棍——对六个极道：四把刀，一把武士刀，一支枪。' },
     scene: 'port',
     arena: { halfX: 10, halfZ: 6 },
     camera: { yaw: -0.6, pitch: 0.36, distance: 9, maxDistance: 11 },
