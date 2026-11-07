@@ -169,6 +169,8 @@ test('Level 1\'s scene staged on its field: the body laid face down, turned face
   const { setup, world, run } = levelOne();
   const brother = world.fighters[setup.comrades.brother];
   knockOut(world, brother, { time: world.time, effects: [] }, 'cut down', 'killed');
+  // The field after the battle: the column gone (dormant: not stepped), so nobody fights round the scene.
+  for (const fighter of world.fighters) if (fighter.corner === 'blue' && fighter !== brother) fighter.dormant = true;
   // The chapter's own scene (the writer's: its subject found as the brother who fell, opened in the dark, the body turned), else a stand-in.
   const scene = run.chapter.scenes?.[0] ?? { id: 'brother', script: [{ who: 'narrator', stage: 'cut', line: T('') }, { who: 'hero', stage: 'turn', line: T('') }, { who: 'narrator', stage: 'kneel', line: T('') }, { who: 'narrator', stage: 'search', line: T('') }] };
   const play = createScenePlay(world, scene, { hero: setup.player, cast: setup.comrades, fallen: ['brother'], language: 'en' });
