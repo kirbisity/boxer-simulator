@@ -45,6 +45,7 @@ import { beginCrowdBatches, CROWD_VIEW, endCrowdBatches } from './crowdview.js';
 import { crowdLod, protectedMen, STAGE_CROWD_VIEW } from './crowdlod.js';
 import { updateNets } from './arenaview.js';
 import { blastEvent, createBlastScreen, fragmentEvent, updateThrown } from './blastview.js';
+import { artilleryFired, artilleryHit, updateArtillery } from './artilleryview.js';
 import { DETAIL_MAPS } from './detailmaps.js';
 import { setHelmStyle } from './helmstyle.js';
 import { bareCrowdHead, BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray, warmSevered } from './render.js';
@@ -1304,6 +1305,7 @@ function drawWorld(dt, drawIt = true) {
   updateArrows(scene, world);
   updateNets(scene, world, dt * (state.paused ? 0 : state.speed));
   updateThrown(scene, world);
+  updateArtillery(scene, world);
   blastScreen.update(state.paused ? 0 : dt);
   updateWhips(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
@@ -1349,7 +1351,10 @@ function consumeEvents() {
     // (A robot dog struck, robotdogs.js `machine`: sparks off its shell, not blood.)
     if (event.kind === 'horseHit' && event.cut + event.pierce > 1) (state.world.horses?.[event.horse]?.spec?.machine ? spawnSparks(scene, event.point, 10) : woundBlood(scene, event));
     if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
-    if (event.kind === 'shot') spawnShot(scene, machine ? { ...event, harm: 0 } : event);
+    // (A gun's ball, physics/artillery.js: its own blood or grit, its flash at the muzzle with the 'cannon' event: artilleryview.js.)
+    if (event.kind === 'shot') (event.gun ? artilleryHit(scene, event) : spawnShot(scene, machine ? { ...event, harm: 0 } : event));
+    if (event.kind === 'cannon') artilleryFired(scene, event);
+    if (event.kind === 'cannonHit') artilleryHit(scene, { ...event, target: 'works' });
     // A grenade gone off and its fragments' strikes (blastview.js); the white-out and the ringing only for the man played.
     if (event.kind === 'blast') blastEvent(scene, event, { playerId: state.mode === 'play' && state.game !== 'intro' ? player()?.id ?? null : null, screen: blastScreen, audio });
     if (event.kind === 'fragment') fragmentEvent(scene, machine ? { ...event, harm: 0, plate: true } : event);

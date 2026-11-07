@@ -14,6 +14,8 @@ import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
 import { storyLadders } from './story/ground/wallview.js';
 
 export const WORKS_VIEW = {
+  // A daubed screen's mud (a palisade with `cover`): grey-brown dried clay.
+  daub: 0x7d6a52,
   // A stake's shaft and its buried length (m), as fieldworks.js FIELDWORKS.stake's radius.
   stake: { radius: 0.04, buried: 0.4, bark: 0x6a5238, cut: 0xc8b48a },
   // A palisade: a post every `post` m (`radius`, `sunk` below ground), two rails lashed across them (`rails`, heights as shares of the wall's).
@@ -251,6 +253,16 @@ function worksPalisade(wall) {
     holder.position.set(wall.a[0] + wall.u[0] * wall.length / 2, wall.height * share, wall.a[1] + wall.u[1] * wall.length / 2);
     rail.castShadow = true;
     group.add(holder);
+  }
+  // A screen plastered over it (`cover`: the Hun River camp's sorghum stalks daubed with mud, physics/cover.js): a mud face
+  // over the posts, as thick as the screen is.
+  if (wall.cover) {
+    const face = new THREE.Mesh(new THREE.BoxGeometry(wall.cover.thick, wall.height, wall.length), worksLit(WORKS_VIEW.daub));
+    face.rotation.y = angle;
+    face.position.set(wall.a[0] + wall.u[0] * wall.length / 2, wall.height / 2, wall.a[1] + wall.u[1] * wall.length / 2);
+    face.castShadow = true;
+    face.receiveShadow = true;
+    group.add(face);
   }
   return group;
 }
