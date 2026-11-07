@@ -614,7 +614,7 @@ function chooseStrategy(world, fighter, opponent, dt) {
   else if (!hurt && finishing && !['pressure', 'brawler'].includes(fighter.aiStrategy) && !held) next = world.random() < 0.5 ? 'pressure' : 'brawler';
   else if (!fighter.aiStrategy || fighter.aiStrategyFor <= 0) {
     const pressed = AI.press.on ? AI.press.plans : {};
-    next = pick(Object.fromEntries(Object.entries(STRATEGIES).map(([key, plan]) => [key, plan.weight * (STYLES[fighter.style].plans?.[key] ?? 1) * (pressed[key] ?? 1)])), world.random);
+    next = pickWeighted(Object.fromEntries(Object.entries(STRATEGIES).map(([key, plan]) => [key, plan.weight * (STYLES[fighter.style].plans?.[key] ?? 1) * (pressed[key] ?? 1)])), world.random);
   }
   if (next) {
     if (next !== fighter.aiStrategy) world.events.push({ time: world.time, kind: 'strategy', fighter: fighter.id, strategy: next, effects: [] });
@@ -625,7 +625,7 @@ function chooseStrategy(world, fighter, opponent, dt) {
   return STRATEGIES[fighter.aiStrategy];
 }
 
-function pick(weights, random) {
+function pickWeighted(weights, random) {
   const entries = Object.entries(weights).filter(([, weight]) => weight > 0);
   let roll = random() * entries.reduce((sum, [, weight]) => sum + weight, 0);
   for (const [key, weight] of entries) {
@@ -1179,7 +1179,7 @@ function pickDefence(style, incoming, random, heavy = 0, long = false) {
     delete answers.slip;
     delete answers.roll;
     delete answers.leanBack;
-    return pick(answers, random) ?? 'sidestep';
+    return pickWeighted(answers, random) ?? 'sidestep';
   }
   if (heavy > 0) {
     // A heavy blow: anyone takes his body out of its way rather than meet it.
@@ -1212,7 +1212,7 @@ function pickDefence(style, incoming, random, heavy = 0, long = false) {
     delete answers.check;
     if (!spec.limb.endsWith('Hand')) delete answers.parry;
   }
-  return pick(answers, random) ?? 'guard';
+  return pickWeighted(answers, random) ?? 'guard';
 }
 
 /**
@@ -3346,7 +3346,7 @@ function groundFight(world, fighter, dt) {
     if (spec.reach === 'weapon' && !held) continue;
     if (distance <= moveRange(spec, fighter.body, held) + opponent.body.lengths.headRadius) choices[name] = weight;
   }
-  const move = pick(choices, world.random);
+  const move = pickWeighted(choices, world.random);
   if (move && throwPunch(world, fighter, move, 'legs')) fighter.cooldown = AI.restMin + world.random() * AI.restRange;
   return true;
 }
@@ -3788,7 +3788,7 @@ function decide(world, fighter, dt) {
     if (free) for (const [name, weight] of Object.entries(style.clinchStrikes)) if (!fighter.clinch.hands.includes(MOVES[name].limb[0])) choices[name] = weight;
   }
   const worth = senseArmour(fighter, opponent, choices);
-  let move = pick(choices, random);
+  let move = pickWeighted(choices, random);
   if (!move) return;
   // Open a combination that starts with a punch that reaches from here (as often as its moves get through his kit).
   let combo = null;
@@ -3797,7 +3797,7 @@ function decide(world, fighter, dt) {
   // (None open from here: tried as ever, and come to nothing.)
   const comboOdds = openers && Object.keys(openers).length ? Math.max(...Object.keys(openers).map(comboWorth)) : 1;
   if (openers && random() < (style.comboChance ?? 0) * comboOdds) {
-    const sequence = pick(openers, random);
+    const sequence = pickWeighted(openers, random);
     if (sequence) [move, ...combo] = sequence.split(' ');
   }
   // Now and then, one big shot instead: a power strike loaded up and thrown alone.
@@ -3864,7 +3864,7 @@ function riposte(world, fighter, striker, style, distance) {
     if (blade?.held && distance <= moveRange(spec, fighter.body, blade.spec) + striker.body.lengths.headRadius) choices[name] = weight;
   }
   senseArmour(fighter, striker, choices);
-  const move = pick(choices, random);
+  const move = pickWeighted(choices, random);
   if (!move) return false;
   perform(world, fighter, 'weaponBlock', { from: striker.id });
   const spec = MOVES[move];

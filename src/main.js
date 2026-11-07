@@ -2,6 +2,7 @@
 // draws it. The simulation runs at a fixed step whatever the frame rate.
 
 import { greyedHair } from './aging.js';
+import { getLang, LANG_NAMES, onLangChange, t, toggleLang, translatePage } from './i18n.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
@@ -1596,6 +1597,21 @@ $('#pause').addEventListener('click', () => {
   state.paused = !state.paused;
   $('#pause').textContent = state.paused ? 'Play' : 'Pause';
 });
+// The language switch (src/i18n.js): it names the other language, in that language; a tap flips the whole page live.
+function showLangSwitch() {
+  const other = getLang() === 'zh' ? 'en' : 'zh';
+  const button = $('#lang-switch');
+  button.textContent = other === 'zh' ? LANG_NAMES.zh : 'EN';
+  button.lang = other === 'zh' ? 'zh-CN' : 'en';
+  button.title = t('common.langSwitch');
+}
+$('#lang-switch').addEventListener('click', () => toggleLang());
+onLangChange(() => {
+  translatePage();
+  showLangSwitch();
+});
+translatePage();
+showLangSwitch();
 // Restart: the bout from the beginning, running (not left paused).
 $('#restart').addEventListener('click', () => {
   // In a stage: from the last rest if one was reached (the button says so), else from the start.
