@@ -1693,7 +1693,7 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
-export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null } = {}) {
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
@@ -1787,7 +1787,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const horses = [];
   if (mounted) for (const fighter of fighters) if (riding(fighter.body.inputs)) horses.push(createHorse(fighter, horses.length, random));
   // The air of the place (`place`: its scene's key; WORLD.heat.climates): how fast a man sheds the heat of the fight there.
-  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses, climate: climateOf(place) };
+  // A battle fought in a scene another season shares (`climate`: its own key, the story's Liaodong battles on the Sarhu hills) gives its own air.
+  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses, climate: climateOf(climate ?? place) };
   // A fight with weapons in it: someone came armed (a weapon in hand or a sidearm in his kit). A bout of bare hands (the ring, the
   // cage, a brawl) is not one, and no one in it draws a knife on a man who is down (finisher.js).
   world.armed = fighters.some((fighter) => fighter.weapon || fighter.body.gear.sidearm);

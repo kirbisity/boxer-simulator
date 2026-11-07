@@ -3873,6 +3873,28 @@ const boxer = window.boxer = {
     $('#modes button[data-value="watch"]')?.click();
     return state.world.fighters.map((fighter) => fighter.style);
   },
+  // A story battle's setup (src/story/battles: { fighters, options, view }) shown and watched as it is, for its shots
+  // (the story's own screens are the engine's: src/story/storyview.js). `await import('./src/story/battles/08-hunriver.js')`
+  // in the page, then boxer.storyBattle(battle.setup(life, seed)).
+  storyBattle: (setup) => {
+    skipIntro();
+    menus.close();
+    document.body.classList.remove('sheet');
+    const entries = setup.fighters.map(({ inputs, corner }) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner }));
+    state.world = createWorld(entries, setup.options);
+    clearGore(scene);
+    setPlace(scene, setup.view.scene, setup.options.arena, setup.view.weather);
+    Object.assign(scene.orbit, setup.view.camera);
+    watchCam = createWatchCam();
+    state.eventCursor = 0;
+    state.finishedAt = null;
+    resetDrama(state.drama);
+    resetChargeFeel();
+    $('#banner').hidden = true;
+    rebuildViews();
+    $('#modes button[data-value="watch"]')?.click();
+    return state.world.fighters.length;
+  },
   // Shots and sparks (tests, shots): fire a shot event ({ from, to, weapon, attacker }); throw sparks at a point; let them run on `seconds`.
   fx: {
     shot: (event) => spawnShot(scene, { attacker: 0, time: state.world.time, point: event.to, normal: [0, 0, 1], harm: 0, ...event }),

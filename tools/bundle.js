@@ -16,7 +16,8 @@ const MODULES = ['aging', 'outfitsets', 'outfits', 'robotdogs', 'horses', 'physi
   'story/chapters/comrades', 'story/chapters/kit', 'story/chapters/family', 'story/chapters/01-suppression', 'story/chapters/02-wokou',
   'story/chapters/03-pyongyang', 'story/chapters/04-byeokjegwan', 'story/chapters/05-ulsan', 'story/chapters/06-liaodong',
   'story/chapters/07-sarhu', 'story/chapters/08-hunriver', 'story/chapters/flashbacks', 'story/chapters/index',
-  'story/battles/01-suppression', 'story/battles/index',
+  'story/battles/01-suppression', 'story/battles/north', 'story/battles/06-liaodong', 'story/battles/07-sarhu', 'story/battles/08-hunriver',
+  'story/battles/index',
   'story/runner', 'story/scenes/stage', 'story/storyview',
   'main'];
 const args = process.argv.slice(2);
