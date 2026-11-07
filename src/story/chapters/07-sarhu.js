@@ -8,7 +8,7 @@
 // the hilltop, Liu killed (3/4-5); some 3,000 Zhejiang men dead; Gang's surrender; Qiao Yiqi's suicide; the supervisor
 // Kang Yingqian "escaping with his life alone"; 310-odd officers and 45,800-odd soldiers dead; Yang jailed, executed in
 // 1629 (明史 卷259; zh.wikipedia 萨尔浒之战). The muster's empty names (空额) are the period's commonplace, told as his.
-import { chapAlive, chapFallenCard, chapFamily, chapHeroUp, chapJudgementCard, chapLivedCard } from './kit.js';
+import { chapFallenCard, chapFamily, chapHeroUp, chapJudgementCard, chapLivedCard } from './kit.js';
 
 export const CHAPTER_SARHU = {
   id: 'sarhu', n: 7, year: 1619,
