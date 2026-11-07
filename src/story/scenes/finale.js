@@ -52,7 +52,7 @@ export const STORY_FINALE = {
     'fb-wang-alive': { year: 1620, set: 'pagesSun' },
     'fb-children': { year: 1621, set: 'doorway' },
     'fb-shen': { year: 1621, set: 'shen' },
-    'fb-last-tag': { year: 1621, set: 'field', camera: { target: [0.3, 0.06, -0.05], yaw: -1.2, pitch: 1.12, distance: 1.5, drift: { distance: -0.04 } } },
+    'fb-last-tag': { year: 1621, set: 'field', camera: { target: [0.4, 0.03, -0.12], yaw: -1.4, pitch: 1.2, distance: 1.15, drift: { distance: -0.03 } } },
   },
   // What a life cannot leave out, each a group of which one is kept (the heaviest of them, if the draw took none).
   keep: [

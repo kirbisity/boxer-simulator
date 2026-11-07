@@ -23,6 +23,7 @@
 //   fall      laid down dead where he is (in the dark, if the screen is going dark)
 //   approach  he walks to the hero (the hero: to the line's other speaker), and stops a little short
 //   dark      the screen goes dark and stays so          lift    the dark lifts
+//   shot:name the camera moves to the set's shot of that name (its `cameras`), and `shot:main` back to its own
 // A set scene opens in the dark (the page builds its world under it) and lifts. A line may have its own `when(life)`.
 
 import { P } from '../../body.js';
@@ -233,7 +234,7 @@ function sceneLineLength(play, index) {
  * storySetSetup, placed and posed by the scene), `camera` (a set's).
  * Returns the play's state; `stepScene` moves it on.
  */
-export function createScenePlay(world, scene, { hero, cast = {}, fallen = [], language = 'en', life = null, figures = null, camera = null } = {}) {
+export function createScenePlay(world, scene, { hero, cast = {}, fallen = [], language = 'en', life = null, figures = null, camera = null, cameras = {} } = {}) {
   const staged = Boolean(figures);
   const subjectId = staged ? null : sceneSubject(scene, cast, fallen);
   const lines = sceneLines(scene, subjectId, life, staged).map((line) => ({ ...line, seconds: lineSeconds(line, language) }));
@@ -242,7 +243,7 @@ export function createScenePlay(world, scene, { hero, cast = {}, fallen = [], la
     index: 0, into: 0, time: 0, set: false, done: false, roll: null, stage: null, stageSince: 0, cut: null, ending: 0,
     // A set's figures, each { index, who, at, yaw, pose, since, share, walk }, and its camera; the screen's own dark
     // ({ from, to, at, seconds }: a set scene opens in it); the men to lay down once it is dark.
-    staged, figures: staged ? figures.map((figure) => ({ ...figure })) : null, camera,
+    staged, figures: staged ? figures.map((figure) => ({ ...figure })) : null, camera, cameras: { main: camera, ...cameras }, cameraAt: 0,
     dark: staged ? { from: 1, to: 0, at: STORY_SCENE.openDark, seconds: STORY_SCENE.cut.lift } : null,
     falls: [],
   };
@@ -437,7 +438,9 @@ function setLineWords(play, line) {
   for (const { word, who, to } of sceneWords(line)) {
     if (word === 'dark') play.dark = { from: sceneDark(play), to: 1, at: play.time, seconds: STORY_SCENE.cut.close };
     else if (word === 'lift') play.dark = { from: sceneDark(play), to: 0, at: play.time, seconds: STORY_SCENE.cut.lift };
-    else setWord(play, word, who ?? (play.cast[line.who] !== undefined ? line.who : 'hero'), to);
+    else if (word === 'shot') {
+      if (play.cameras[who]) Object.assign(play, { camera: play.cameras[who], cameraAt: play.time });
+    } else setWord(play, word, who ?? (play.cast[line.who] !== undefined ? line.who : 'hero'), to);
   }
 }
 
@@ -620,7 +623,7 @@ export function setFocus(camera, time) {
 
 /** Where the scene's camera looks, and from where: { target [x, y, z], yaw, pitch, distance } (the page eases its orbit to it). */
 export function sceneFocus(play) {
-  if (play.staged) return setFocus(play.camera, play.time);
+  if (play.staged) return setFocus(play.camera, play.time - play.cameraAt);
   const hero = sceneHeroOf(play);
   const body = sceneSubjectOf(play);
   if (!hero) return null;

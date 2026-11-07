@@ -75,7 +75,7 @@ function propFeather(feather) {
 function propPatch(prop, { snow = false } = {}) {
   // (Snow a little warm and lit of itself: lit only by the sky's blue it reads as ice.)
   const material = propLit(snow ? 0xe6e0d6 : new THREE.Color(prop.colour ?? '#7a6a52').getHex(), {
-    ...(snow ? { emissive: 0x77736c } : {}),
+    ...(snow ? { emissive: 0x58554f } : {}),
     roughness: prop.wet ? 0.55 : snow ? 0.8 : 0.95, transparent: true, opacity: snow ? prop.cover ?? 1 : 1, alphaMap: propFeather(STORY_PROPS.ground.feather),
     depthWrite: false, polygonOffset: true, polygonOffsetFactor: snow ? -2 : -1, polygonOffsetUnits: snow ? -2 : -1,
   });

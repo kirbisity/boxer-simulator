@@ -57,6 +57,8 @@ export const STORY_WORDS = {
   skip: { zh: '点击继续', en: 'Tap to go on' },
   firstLast: { zh: '第一仗，就是最后一仗。', en: 'His first battle was his last.' },
   span: { zh: (born, died) => `${born}—${died}`, en: (born, died) => `${born}-${died}` },
+  // How a man died, where a card gives it as a kind (`dies: { jin: 'executed' }`, a fatal choice's `how`).
+  kinds: { executed: { zh: '被斩首', en: 'beheaded' } },
   cleanRun: { zh: '在这之前，每一仗他都是第一次就活了下来。', en: 'Every battle before this one, he came through at the first try.' },
 };
 
@@ -345,7 +347,7 @@ export function installStory(hooks) {
       }
       hooks.stage(setup, { paused: false });
       world = hooks.world();
-      play = createScenePlay(world, sceneDef, { hero: setup.player, cast: setup.comrades, figures: setup.figures, camera: setup.camera, language, life: run.life });
+      play = createScenePlay(world, sceneDef, { hero: setup.player, cast: setup.comrades, figures: setup.figures, camera: setup.camera, cameras: setup.cameras, language, life: run.life });
     } else {
       if (!world || !fight) {
         storySceneDone(run);
@@ -531,6 +533,8 @@ export function installStory(hooks) {
     return showEnding(page);
   }
 
+  /** How a man died, in the language shown: words given both ways, or a kind (STORY_WORDS.kinds). */
+  const howSaid = (how) => (typeof how === 'string' ? say(STORY_WORDS.kinds[how] ?? how) : say(how));
   const nameList = (people) => (people.length ? people.map((person) => say(person.name)).join(language === 'zh' ? '、' : ', ') : word('nobody'));
 
   function showEnding(page) {
@@ -542,10 +546,10 @@ export function installStory(hooks) {
     // (A member a card brought into his life is `true` there: read as his entry in chapters/family.js.)
     const family = Object.entries(page.family ?? {}).filter(([, person]) => person).map(([who, raw]) => {
       const person = typeof raw === 'object' ? raw : { ...STORY_FAMILY[who], alive: true };
-      const how = typeof person.diedAt?.how === 'string' ? person.diedAt.how : say(person.diedAt?.how);
+      const how = howSaid(person.diedAt?.how);
       return svEl('li', { textContent: `${say(person.name ?? who)}: ${person.alive === false ? `${word('dead')}${how ? `, ${how}` : ''}` : word('alive')}` });
     });
-    const fallen = (page.fallen ?? []).map((person) => svEl('li', { textContent: `${say(person.name)}${person.diedAt?.how ? `: ${say(person.diedAt.how)}` : ''}` }));
+    const fallen = (page.fallen ?? []).map((person) => svEl('li', { textContent: `${say(person.name)}${person.diedAt?.how ? `: ${howSaid(person.diedAt.how)}` : ''}` }));
     const where = [say(page.where ?? chapter?.title), page.year ? word('year', page.year) : null, page.age ? word('age', page.age) : null].filter(Boolean).join(' · ');
     const lived = page.kind === 'lived';
     const buttons = svEl('div', { className: 'sv-buttons' },
@@ -557,7 +561,7 @@ export function installStory(hooks) {
       svEl('p', { textContent: where }),
       page.text ? svEl('p', { textContent: say(page.text) }) : null,
       page.how ? svEl('h2', { textContent: word('how') }) : null,
-      page.how ? svEl('p', { textContent: say(page.how) }) : null,
+      page.how ? svEl('p', { textContent: howSaid(page.how) }) : null,
       svEl('h2', { textContent: word('outlived') }), svEl('p', { textContent: nameList(page.outlived ?? []) }),
       fallen.length ? svEl('h2', { textContent: word('fallen') }) : null, fallen.length ? svEl('ul', {}, ...fallen) : null,
       family.length ? svEl('h2', { textContent: word('family') }) : null, family.length ? svEl('ul', {}, ...family) : null,
@@ -628,15 +632,16 @@ export function installStory(hooks) {
       startScene(sceneDef);
       return Boolean(STORY_SETS[id]);
     },
-    // The finale for the stand-in life (chapter 8's): its battle's field staged, the hero struck down in it, and the life seen.
-    finale: () => {
+    // The finale for the stand-in life (chapter 8's): its battle's field staged, the hero struck down in it (or, `lived`, come
+    // through it and taken by the night: the finale lays him down), and the life seen.
+    finale: ({ lived = false } = {}) => {
       const setup = storyBattleSetup(run, battleSeed(run.chapter));
       hooks.stage(setup, { paused: false });
       fight = { setup, watch: storyWatch(setup), last: null, done: false };
       storyCommandMen(hooks.world(), setup, life);
       const world = hooks.world();
-      knockOut(world, world.fighters[setup.player], { time: world.time, effects: [], attacker: null }, 'cut down under the company flag', 'killed');
-      run.dying = { kind: 'battle', how: { zh: '战死', en: 'killed' }, text: run.chapter.ending?.text ?? null, where: run.chapter.title };
+      if (!lived) knockOut(world, world.fighters[setup.player], { time: world.time, effects: [], attacker: null }, 'cut down under the company flag', 'killed');
+      run.dying = lived ? { kind: 'lived' } : { kind: 'battle', how: { zh: '战死', en: 'killed' }, text: run.chapter.ending?.text ?? null, where: run.chapter.title };
       run.phase = 'finale';
       return flow();
     },

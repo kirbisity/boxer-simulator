@@ -182,8 +182,8 @@ export const CHAPTER_ULSAN = {
       adjust: (life) => (chapFlag(life, 'watchedJin') ? {} : { hero: { face: [24, 2.5] } }),
       script: [
         { who: 'narrator', line: { zh: '教场上的旗杆，平日挂的是操练的号旗。', en: 'On ordinary days the flagpole on the drill ground flew the drill signals.' } },
-        { who: 'jin', line: { zh: '二哥，你别看。', en: 'Don\'t look, Er.' } },
-        { who: 'officer', stage: ['dark', 'fall:jin', 'fall:condemned'], line: { zh: '斩！', en: 'Strike!' } },
+        { who: 'jin', stage: 'shot:jin', line: { zh: '二哥，你别看。', en: 'Don\'t look, Er.' } },
+        { who: 'officer', stage: ['dark', 'fall:jin', 'fall:condemned', 'shot:main'], line: { zh: '斩！', en: 'Strike!' } },
         { who: 'narrator', stage: 'lift', line: { zh: '那天的风从关外吹过来，跟平常一样。', en: 'The wind that day came from beyond the Wall, the same as any day.' } },
       ],
     },

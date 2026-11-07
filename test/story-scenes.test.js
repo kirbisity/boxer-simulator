@@ -19,7 +19,7 @@ import { storySetSetup, STORY_SET, STORY_SETS } from '../src/story/scenes/sets.j
 import { createFinalePlay, finaleFlashbacks, finaleLook, finaleSeconds, finaleShots, stepFinale, STORY_FINALE } from '../src/story/scenes/finale.js';
 
 // The stage words a script may use (scenes/stage.js): the body scene's, and a set's.
-const STAGE_WORDS = new Set(['cut', 'approach', 'turn', 'kneel', 'search', 'still', 'rise', 'dark', 'lift', 'fall', ...Object.keys(STORY_SET.poses)]);
+const STAGE_WORDS = new Set(['cut', 'approach', 'turn', 'kneel', 'search', 'still', 'rise', 'dark', 'lift', 'fall', 'shot', ...Object.keys(STORY_SET.poses)]);
 
 /** A life entered to chapter `n` (every comrade who joins by then), then `effects` (flags, family, `dies`) and the men who `fell` in n. */
 function lifeAt(n, { seed = 5, effects = {}, fell = [] } = {}) {
@@ -64,7 +64,11 @@ test('every chapter scene resolves to a playable script: lines in both languages
       assert.ok(scene.script?.length, `${scene.id}: a script`);
       for (const line of scene.script) {
         assert.ok(line.line?.zh !== undefined && line.line?.en !== undefined, `${scene.id}: a line in both languages`);
-        for (const { word } of sceneWords(line)) assert.ok(STAGE_WORDS.has(word), `${scene.id}: stage word ${word}`);
+        for (const { word, who } of sceneWords(line)) {
+          assert.ok(STAGE_WORDS.has(word), `${scene.id}: stage word ${word}`);
+          // A shot named is one of its set's.
+          if (word === 'shot') assert.ok(who === 'main' || STORY_SETS[scene.set]?.cameras?.[who], `${scene.id}: shot ${who}`);
+        }
       }
       if (scene.set) assert.ok(STORY_SETS[scene.set], `${scene.id}: set ${scene.set}`);
       if (scene.after) assert.ok(beforeCards.has(scene.after), `${scene.id}: after a card of its chapter (${scene.after})`);

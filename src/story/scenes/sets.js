@@ -221,6 +221,8 @@ export function storySetSetup(set, life, { year = life.year ?? 1587, memory = fa
     // (The page's orbit takes the view's yaw, pitch and distance; the scene's camera, its target and drift, is `camera`.)
     view: { scene: set.place ?? 'plain', weather: set.weather ?? null, camera: { yaw: set.camera?.yaw ?? 0, pitch: set.camera?.pitch ?? 0.2, distance: set.camera?.distance ?? 5 } },
     camera: set.camera ? structuredClone(set.camera) : null,
+    // (Its other shots, by name, for a line's `shot:name`.)
+    cameras: structuredClone(set.cameras ?? {}),
     player,
     comrades: cast,
     figures,
@@ -322,6 +324,10 @@ export const STORY_SETS = {
     ],
     // Over his shoulder from the barracks' side: the row and the pole down the ground, the companies drawn up beside it.
     camera: { target: [4.5, 1.0, 1.3], yaw: 0.51, pitch: 0.075, distance: 8.6, drift: { distance: -0.04 } },
+    cameras: {
+      // Jin at the foot of the pole, low, the row beyond him.
+      jin: { target: [0.9, 0.7, 0.4], yaw: 0.9, pitch: 0.12, distance: 3.2, drift: { distance: -0.03 } },
+    },
   },
   // The same ground with no one he knows in the row (Jin dead in Korea already, or the scene of the strangers' deaths).
   drillGroundOthers: {
@@ -364,7 +370,6 @@ export const STORY_SETS = {
     props: [{ kind: 'ground', at: [0, 0], radius: 20, colour: '#8c8478' }, { kind: 'pole', at: [0, 0], height: 6, head: true }, { kind: 'snow', at: [0, 0], radius: 22, cover: 0.35 }],
     figures: [
       { role: 'official', at: [1.6, -1.4], face: [6, -1], pose: 'stand' },
-      { role: 'officer', at: [2.2, 1.6], face: [6, 1], pose: 'stand' },
       { who: 'hero', at: [8, 0.4], face: [0, 0], pose: 'stand', style: 'spear' },
     ],
     rows: [
@@ -373,6 +378,14 @@ export const STORY_SETS = {
     ],
     // From the front of the ranks, looking up at it: the head against the grey sky, the official under it.
     camera: { target: [1.0, 3.0, -0.6], yaw: 0.3, pitch: -0.32, distance: 6.4, drift: { distance: -0.03 } },
+    cameras: {
+      // Up at the head, close, against the grey sky.
+      head: { target: [0.05, 5.1, 0.1], yaw: 0.5, pitch: -0.62, distance: 3.6, drift: { distance: -0.03 } },
+      // The official under it, the pole rising out of the frame.
+      official: { target: [1.6, 1.45, -1.2], yaw: 0.35, pitch: 0.02, distance: 4.2, drift: { distance: -0.03 } },
+      // Him in the front rank, the men either side.
+      ranks: { target: [8, 1.5, 0.3], yaw: 3.0, pitch: 0.05, distance: 3.4, drift: { distance: -0.03 } },
+    },
   },
   // Wherever he is tied for it: the same pole, empty, and him at its foot (the Sarhu muster's fatal word).
   poleSelf: {
@@ -629,22 +642,22 @@ export const STORY_SETS = {
     props: [
       { kind: 'ground', at: [0, 0], radius: 16, colour: '#5e5244' },
       { kind: 'fence', from: [7, 3.4], to: [-7, 3.4], height: 1.5, burning: true },
-      { kind: 'flag', at: [0.9, 1.2], yaw: 2.2, fallen: true, colour: '#b03a2a' },
+      { kind: 'flag', at: [-0.9, 2.1], yaw: 2.7, fallen: true, colour: '#b03a2a' },
       // His waist tag (腰牌), come loose on its cord, by his hip.
       { kind: 'tag', at: [0.42, -0.12], yaw: 0.4 },
     ],
     // Him on his back, his head to the fence; the men of his who fell round him; the Jin standing beyond, in the smoke.
     figures: [
       { who: 'hero', at: [0, 0], face: [0, 3], pose: 'lieUp' },
-      { who: 'shen', at: [1.3, -0.8], face: 2.4, pose: 'lie', dead: true },
-      { who: 'lou', at: [-1.5, 0.8], face: -0.6, pose: 'lie', dead: true },
-      { who: 'ma', at: [1.9, 1.6], face: 1.0, pose: 'lie', dead: true },
-      { who: 'zhu', at: [-1.8, -1.3], face: 0.3, pose: 'lie', dead: true },
+      { who: 'shen', at: [1.4, -0.7], face: 2.4, pose: 'lie', dead: true, style: 'unskilled' },
+      { who: 'lou', at: [-1.6, 0.9], face: -0.6, pose: 'lie', dead: true, style: 'unskilled' },
+      { who: 'ma', at: [1.9, 1.7], face: 1.0, pose: 'lie', dead: true, style: 'unskilled' },
+      { who: 'zhu', at: [-1.9, -1.2], face: 0.3, pose: 'lie', dead: true, style: 'unskilled' },
       { role: 'soldier', at: [-0.6, 2.4], face: 1.8, pose: 'lie' },
       { role: 'jinSoldier', at: [2.6, -2.4], face: 2.9, pose: 'lie' },
       { role: 'jinSoldier', at: [-2.5, 6.5], face: [0, 0], pose: 'stand' },
       { role: 'jinSoldier', at: [2.8, 7.5], face: [0, 0], pose: 'stand' },
     ],
-    camera: { target: [0, 0.6, 1.2], yaw: -1.75, pitch: 0.42, distance: 5.4, drift: { distance: -0.05 } },
+    camera: { target: [0, 0.3, 0.5], yaw: -1.75, pitch: 0.55, distance: 4.8, drift: { distance: -0.05 } },
   },
 };

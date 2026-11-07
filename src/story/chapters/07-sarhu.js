@@ -180,9 +180,9 @@ export const CHAPTER_SARHU = {
       id: 'sarhu-pole', at: 'before', after: 'sarhu-oath', set: 'poleHead',
       script: [
         { who: 'narrator', line: { zh: '辽阳教场，二月。竿子上挂着白云龙的头。', en: 'The Liaoyang drill ground, the second month. Bai Yunlong\'s head hung on the pole.' } },
-        { who: 'official', line: { zh: '临阵脱逃者，以此为例。', en: 'Let this be the example for any man who runs.' } },
-        { who: 'hero', line: { zh: '他是从抚顺跑回来的。抚顺的守将投了降，娶了人家的孙女。', en: 'He ran back from Fushun. The commander at Fushun surrendered, and married their khan\'s granddaughter.' } },
-        { who: 'narrator', line: { zh: '投降的那个，竿子够不着。', en: 'The one who surrendered, the pole could not reach.' } },
+        { who: 'official', stage: 'shot:official', line: { zh: '临阵脱逃者，以此为例。', en: 'Let this be the example for any man who runs.' } },
+        { who: 'hero', stage: 'shot:ranks', line: { zh: '他是从抚顺跑回来的。抚顺的守将投了降，娶了人家的孙女。', en: 'He ran back from Fushun. The commander at Fushun surrendered, and married their khan\'s granddaughter.' } },
+        { who: 'narrator', stage: 'shot:head', line: { zh: '投降的那个，竿子够不着。', en: 'The one who surrendered, the pole could not reach.' } },
       ],
     },
     // He spoke out at the muster: tied at the foot of the same pole (the fatal choice's scene, before its page).
