@@ -186,6 +186,8 @@ export function storyLifeLived(run) {
 /** The battle's setup for this life at a seed (the battle file's `setup`), kept on the run. */
 export function storyBattleSetup(run, seed = 1) {
   run.setup = run.battle.setup(run.life, seed);
+  // How it is shown ({ scene, weather, camera }): the setup's, else the battle's own (a battle may give it once for all setups).
+  run.setup.view ??= run.battle.view ?? null;
   run.seed = seed;
   return run.setup;
 }

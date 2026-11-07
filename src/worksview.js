@@ -11,6 +11,7 @@
 import { reliefAt, softAt, worksOf } from './physics/fieldworks.js';
 import { kwtCreate } from './levelmode/kitwater.js';
 import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
+import { storyLadders } from './story/ground/wallview.js';
 
 export const WORKS_VIEW = {
   // A stake's shaft and its buried length (m), as fieldworks.js FIELDWORKS.stake's radius.
@@ -90,6 +91,8 @@ export function showWorks(view, arena) {
   group.add(stakes.group);
   for (const wall of works.walls) group.add(wall.kind === 'wood' ? worksWoodEdge(wall, random, arena) : wall.kind === 'stone' ? worksStoneWall(wall) : worksPalisade(wall));
   if (spec.gatehouse) group.add(worksGatehouse(spec.gatehouse));
+  // Siege ladders at the gaps of a wall to storm (story mode: story/ground/walls.js).
+  if (spec.ladders?.length) group.add(storyLadders(spec.ladders));
   view.scene.add(group);
   view.works = { group, stakes, broken: 0, water, waterAt: -Infinity };
 }

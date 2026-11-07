@@ -35,7 +35,7 @@ import { ARM_CUTS, brokenLevel, feelShock, LEG_CUTS, MAIMING, openArtery, player
 import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
-import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, stepOnWorks, worksOf } from './physics/fieldworks.js';
+import { collideWorks, floorFor, keepRootOff, looseFloor, mireStep, reliefAt, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { chooseHorseDetail, collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, SEATED_PARTICLES, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
@@ -1778,6 +1778,15 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     }
   }
   for (const fighter of fighters) fighter.arena = arena;
+  // On fieldworks with relief (a bank, a rampart, a hill: physics/fieldworks.js ditches), each man stood on the ground where he is
+  // placed, not at y = 0 inside it (the stance snaps to the relief on the first step, and a body sunk a metre in is flung out).
+  const works = worksOf(arena);
+  if (works?.ditches.length) {
+    for (const fighter of fighters) {
+      const ground = reliefAt(works, fighter.root[0], fighter.root[1]);
+      if (ground !== 0 && !riding(fighter.body.inputs)) placeOnFloor(fighter, fighter.root[0], fighter.root[1], ground, fighter.yaw);
+    }
+  }
   // Headgear the outfit allows (a crest needs a kabuto; a headset no helmet).
   const props = fighters.flatMap((fighter) => (fighter.body.inputs.accessories ?? []).filter((kind) => headgearOptions(outfitOf(fighter.body.inputs).kind).includes(kind)).map((kind) => ({ kind, owner: fighter.id, attached: true, x: point(fighter.x, P.head), v: [0, 0, 0], spin: [0, 0, 0], turn: [0, 0, 0], resting: false })));
   // (`rules.noStandards`, level mode: no side raises a standard or forms up on a leader.)

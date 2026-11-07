@@ -2708,7 +2708,8 @@ function enterStoryWorld(setup, { paused = false } = {}) {
   state.playSide = corner;
   state.lead = { red: 0, blue: 0, [corner]: setup.fighters.slice(0, setup.player).filter((entry) => entry.corner === corner).length };
   state.world = createWorld(setup.fighters, setup.options);
-  const place = setup.options.place ?? 'field';
+  // (The scene is the view's; a battle's `options.place` may be only its climate's key.)
+  const place = setup.view?.scene ?? setup.options.place ?? 'field';
   presentWorld(place, setup.options.arena, setup.view ?? null);
   state.sideAsked = true;
   takeSide(corner);

@@ -13,7 +13,8 @@
 /** Modules left out (each one's stub, if kept code imports it, is in STUBS). */
 export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KEPT_LEVEL.includes(name)
   || /^audio\/music\/data\//.test(name)
-  || /^story\//.test(name)
+  // (Story mode's ground, its walls and ladders, is kept: worksview.js draws ladders on any battle's works.)
+  || /^story\/(?!ground\/)/.test(name)
   || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
