@@ -16,13 +16,13 @@
 // table: Liu Ting's own 1,838, Zu Tianding ~2,000, Yao Guofu 3,000, Zhou Wen 1,500, Jiang Wanhua ~2,000, Xu Jiusi ~500, Zhou
 // Yiming's Zhejiang troops 1,500); against it the Jin's forty thousand, 1 to 3.2. At about one man to 590: 21 Ming and 68 Jin.
 // - Liu Ting's household (家丁, his 1,838: 15%): 3, he and two of his men, on horse (mingHorseman: Liaodong iron lamellar; his own
-//   cavalry). Liu Ting born c. 1558, sixty-one.
+//   cavalry). (His age is not given: his birth year is not in the sources used here.)
 // - Zhou Yiming's Zhejiang troops (12%): 3, regulars in brigandine with gun, spear and shield (built as the south's).
 // - The rest of the southern troops (Sichuan, Huguang, Fujian men: 73%): 15, half regulars in brigandine, half the levy's hemp
 //   vest. The column had no great guns and few firearms (zh.wikipedia: "又无大炮火器"): bows, not guns, among them.
 // - Hong Taiji's men on the ridge (his Plain White banner, 正白), 40: spears, sabres, guandao before the archers with the heavy bow.
 // - Daišan's on the flank (his two Red banners, 正红 / 镶红), 28: 18 on foot and 10 on horse (the riders in the Bayara's kit, the
-//   game's one mounted Jurchen kit). Hong Taiji was twenty-seven, Daišan thirty-six.
+//   game's one mounted Jurchen kit). Hong Taiji (born November 1592) was twenty-six, Daišan (born 1583) thirty-five.
 // The ground: the column in file along the valley floor; the ridge rising on its right (+x) to Abdali's top, the hillside on its
 // left (-x) where Daišan came. The Jin wait hidden (formation `ambush`) until the signal, as the column marched in not knowing.
 // Nothing is tuned to an outcome: the men as cast, the ratio as stated.
@@ -86,7 +86,7 @@ function sarhu1619Column(random) {
   const men = household.map((style, index) => {
     const inputs = mingHorseman(random, style);
     const at = [files[index % 2], head + riderGap + Math.floor(index / 2) * riderGap];
-    if (index === 0) return { inputs: { ...inputs, name: 'Liu Ting', age: 61 }, name: { zh: '刘綎', en: 'Liu Ting' }, at, role: 'officer', unit: 'household', named: true };
+    if (index === 0) return { inputs: { ...inputs, name: 'Liu Ting' }, name: { zh: '刘綎', en: 'Liu Ting' }, at, role: 'officer', unit: 'household', named: true };
     return { inputs, name: northName(inputs), at, role: 'rear', unit: 'household' };
   });
   let rank = 0;
@@ -116,12 +116,12 @@ function sarhu1619Jin(random) {
     });
   };
   const ridge = block(northStyles(ridgeMen), ridgeAt, (style) => bannerman(random, style, 'banner', { design: ridgeDesign }));
-  // Hong Taiji among his men on the ridge top (born 1592).
-  ridge[0] = { ...ridge[0], inputs: { ...ridge[0].inputs, name: 'Hong Taiji', age: 27 }, name: { zh: '皇太极', en: 'Hong Taiji' } };
+  // Hong Taiji among his men on the ridge top (born November 1592: twenty-six).
+  ridge[0] = { ...ridge[0], inputs: { ...ridge[0].inputs, name: 'Hong Taiji', age: 26 }, name: { zh: '皇太极', en: 'Hong Taiji' } };
   const flank = block(northStyles(flankMen), flankAt, (style, index) => bannerman(random, style, 'banner', { design: flankDesigns[index % flankDesigns.length] }));
   const horse = block(northStyles(flankHorse), flankHorseAt, (style) => bannerman(random, style, 'bayara', { mounted: true }));
-  // Daišan at the head of his horse (born 1583).
-  horse[0] = { ...horse[0], inputs: { ...horse[0].inputs, name: 'Daišan', age: 36 }, name: { zh: '代善', en: 'Daišan' } };
+  // Daišan at the head of his horse (born 1583: thirty-five).
+  horse[0] = { ...horse[0], inputs: { ...horse[0].inputs, name: 'Daišan', age: 35 }, name: { zh: '代善', en: 'Daišan' } };
   return [...ridge, ...flank, ...horse];
 }
 
