@@ -1,13 +1,15 @@
 // A choice's details in a pop-up over the screen (its armour card, its description), so the choices themselves stay small:
 // opened by the ⓘ on the choice, a right-click or a long press on it; closed by a tap outside, the ✕ or Escape.
 
+import { t } from './i18n.js';
+
 // How long a finger rests on a choice before its details open (ms), and how far it may drift and still count (px).
 const INFO_POP = { holdMs: 480, slopPx: 10 };
 
 let openPop = null;
 
 /** Open `content` (a node) in the pop-up, closing any other; returns the function that closes it. */
-export function openInfoPop(content, { label = 'Details', onClose = null } = {}) {
+export function openInfoPop(content, { label = t('cards.details'), onClose = null } = {}) {
   openPop?.();
   const close = () => {
     if (openPop !== close) return;
@@ -23,7 +25,7 @@ export function openInfoPop(content, { label = 'Details', onClose = null } = {})
     press.stopImmediatePropagation();
     close();
   };
-  const shut = Object.assign(document.createElement('button'), { type: 'button', className: 'info-pop-close', textContent: '✕', ariaLabel: 'Close', onclick: close });
+  const shut = Object.assign(document.createElement('button'), { type: 'button', className: 'info-pop-close', textContent: '✕', ariaLabel: t('cards.close'), onclick: close });
   const card = document.createElement('div');
   card.className = 'info-pop-card';
   card.append(content, shut);
@@ -38,7 +40,7 @@ export function openInfoPop(content, { label = 'Details', onClose = null } = {})
 }
 
 /** The small ⓘ button that opens a choice's details (`open`), never the choice itself. */
-export function infoButton(open, label = 'Details') {
+export function infoButton(open, label = t('cards.details')) {
   const button = Object.assign(document.createElement('button'), { type: 'button', className: 'info-btn', textContent: 'i', title: label, ariaLabel: label });
   button.addEventListener('click', (click) => { click.stopPropagation(); open(); });
   return button;

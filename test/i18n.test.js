@@ -18,6 +18,15 @@ const keep = new Set(KEEP_ENGLISH);
 const blank = (text) => typeof text !== 'string' || !text.trim();
 const placeholders = (text) => [...text.matchAll(/\{(\w+)\}/g)].map(([, name]) => name).sort();
 const CJK = /[㐀-鿿]/;
+/**
+ * A zh that is Chinese, or has no words to translate (only placeholders, glyphs and numbers), or is the English kept on purpose
+ * (the en, its glyphs and trailing marks aside, on KEEP_ENGLISH).
+ */
+function chineseOrKept({ en, zh }) {
+  if (CJK.test(zh) || !zh.replace(/\{\w+\}/g, '').replace(/[^\p{L}]+/gu, '')) return true;
+  const kept = en.replace(/\{\w+\}/g, '').replace(/^[^\p{L}]+|[^\p{L}!.]+$/gu, '').trim();
+  return keep.has(kept) || keep.has(en);
+}
 
 test('every UI string has both languages, the same placeholders, and Chinese unless it is kept English on purpose', () => {
   const seen = new Map();
@@ -27,7 +36,7 @@ test('every UI string has both languages, the same placeholders, and Chinese unl
       seen.set(key, table);
       assert.ok(!blank(entry.en) && !blank(entry.zh), `${table} ${key}: en and zh both wanted`);
       assert.deepEqual(placeholders(entry.zh), placeholders(entry.en), `${key}: the zh has other placeholders than the en`);
-      if (!CJK.test(entry.zh)) assert.ok(keep.has(entry.en.replace(/^[^\w]+/u, '').trim()) || keep.has(entry.en), `${key}: zh '${entry.zh}' is not Chinese and '${entry.en}' is not in KEEP_ENGLISH`);
+      assert.ok(chineseOrKept(entry), `${key}: zh '${entry.zh}' is not Chinese and '${entry.en}' is not in KEEP_ENGLISH`);
     }
   }
 });
@@ -86,7 +95,7 @@ test('every { en, zh } text in the data has both, non-empty, and the Chinese is 
       for (const [path, text] of bilingual(value, `${file.replace(SRC, '')}:${name}`)) {
         count += 1;
         if (blank(text.en) || blank(text.zh)) bad.push(`${path}: missing a language`);
-        else if (!CJK.test(text.zh) && !keep.has(text.en)) bad.push(`${path}: zh '${text.zh.slice(0, 40)}' is not Chinese`);
+        else if (!chineseOrKept(text)) bad.push(`${path}: zh '${text.zh.slice(0, 40)}' is not Chinese`);
       }
     }
   }

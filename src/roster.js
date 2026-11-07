@@ -8,9 +8,24 @@ import { factionOf, outfitOf, OUTFITS } from './outfits.js';
 import { RATINGS } from './ratings.js';
 import { WEAPONS } from './weapons.js';
 import { withTanks } from './physics/flame.js';
+import { getLang, tname } from './i18n.js';
 
 /** A style's name, and its weapon when the name does not already say it. */
 export const styleName = (style) => (style.weapon && WEAPONS[style.weapon].label.toLowerCase() !== style.label.toLowerCase() ? `${style.label} · ${WEAPONS[style.weapon].label}` : style.label);
+
+/** styleName as shown, in the language in force (src/i18n.js): the style's and its weapon's names from the names catalogue. */
+export const styleNameShown = (style) => (style.weapon && WEAPONS[style.weapon].label.toLowerCase() !== style.label.toLowerCase() ? `${tname(style.label)} · ${tname(WEAPONS[style.weapon].label)}` : tname(style.label));
+
+/**
+ * A warrior's line under his name (its `line`, how he fights and what he wears) in the language in force: the kit's name
+ * past its dash ('Knight — full plate' → 'full plate', '骑士——全身板甲' → '全身板甲'), left off when the style already says it.
+ */
+export function lineShown(inputs) {
+  const style = STYLES[inputs.style];
+  const armour = OUTFITS[inputs.outfit?.kind]?.label ?? '';
+  const worn = !armour || armour.startsWith(style.label) ? null : getLang() === 'en' ? armour.replace(/^.* — /, '') : tname(armour).split('——').pop();
+  return [styleNameShown(style), worn].filter(Boolean).join(' · ');
+}
 
 /** The character who fights in a style. */
 const preset = (style) => Object.values(PRESETS).find((entry) => entry.style === style);
@@ -143,16 +158,16 @@ const unitNamed = ({ base, ...entry }) => {
 export const WARRIORS = [
   warrior('plate', 'Sir Edric', PRESETS.knight),
   // The knights' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
-  { ...warrior('templar', 'Knights Templar', PRESETS.templar), flagship: true, legend: { order: 1, kicker: 'The Crusader', line: 'A warrior monk of the Crusades: arming sword, heater shield, mail and the great helm.' } },
-  { ...warrior('joan', 'Joan of Arc', PRESETS.joan), legend: { order: 2, kicker: 'Joan of Arc', line: 'White plate, bareheaded, the arming sword; she bears the standard when she leads.' } },
+  { ...warrior('templar', 'Knights Templar', PRESETS.templar), flagship: true, legend: { order: 1, kicker: { en: 'The Crusader', zh: '十字军' }, line: { en: 'A warrior monk of the Crusades: arming sword, heater shield, mail and the great helm.', zh: '十字军里的武装修士：佩剑、骑士盾、锁子甲，头上一顶桶盔。' } } },
+  { ...warrior('joan', 'Joan of Arc', PRESETS.joan), legend: { order: 2, kicker: { en: 'Joan of Arc', zh: '贞德' }, line: { en: 'White plate, bareheaded, the arming sword; she bears the standard when she leads.', zh: '一身白甲，不戴头盔，手握佩剑；冲锋在前时，旗帜由她亲自扛。' } } },
   // Maximilian I, the great jouster, on foot in his Gestech harness with the lance: a legend, not the flagship.
-  { ...warrior('maximilian', 'Maximilian I', PRESETS.maximilian), legend: { order: 2.5, kicker: 'The Last Knight', line: 'The jousting emperor in his Stechzeug: the frog-mouthed helm bolted to the breast, and the lance.' } },
+  { ...warrior('maximilian', 'Maximilian I', PRESETS.maximilian), legend: { order: 2.5, kicker: { en: 'The Last Knight', zh: '最后的骑士' }, line: { en: 'The jousting emperor in his Stechzeug: the frog-mouthed helm bolted to the breast, and the lance.', zh: '爱比武的皇帝，披挂比武重甲：蛙嘴盔直接栓死在胸甲上，手里一杆骑枪。' } } },
   warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', heightCm: 160, calories: 3525, outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
   // The Japanese flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
-  { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true, legend: { order: 3, kicker: 'Great-armour samurai', line: 'The great archer of the Hōgen war, in ō-yoroi: the long yumi, then the blade.' } },
+  { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true, legend: { order: 3, kicker: { en: 'Great-armour samurai', zh: '大铠武士' }, line: { en: 'The great archer of the Hōgen war, in ō-yoroi: the long yumi, then the blade.', zh: '保元之乱的大弓手，身披大铠：先放长弓，再拔刀。' } } },
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
   warrior('sohei', 'Musashibō Benkei', PRESETS.sohei),
   warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
@@ -164,11 +179,11 @@ export const WARRIORS = [
   warrior('shaolin', 'Tanzong', PRESETS.staff),
   warrior('taichi', 'Chen Fake', PRESETS.taichi),
   warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
-  { ...warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda), legend: { order: 5, kicker: 'Wanyan Wuzhu', line: 'The Jin heavy guard: wolf-tooth mace and iron buckler, armoured head to foot.' } },
-  { ...warrior('guanYu', 'Guan Yu', PRESETS.guanYu), legend: { order: 6, kicker: 'God of War', line: 'The Green Dragon Crescent Blade: great sweeping cuts from far off.' } },
+  { ...warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda), legend: { order: 5, kicker: { en: 'Wanyan Wuzhu', zh: '完颜兀术' }, line: { en: 'The Jin heavy guard: wolf-tooth mace and iron buckler, armoured head to foot.', zh: '金国重甲亲军：狼牙棒配铁盾，从头裹到脚。' } } },
+  { ...warrior('guanYu', 'Guan Yu', PRESETS.guanYu), legend: { order: 6, kicker: { en: 'God of War', zh: '武圣' }, line: { en: 'The Green Dragon Crescent Blade: great sweeping cuts from far off.', zh: '青龙偃月刀：隔着老远，大开大合地抡过来。' } } },
   warrior('hanCrossbow', 'Li Ling', PRESETS.hanCrossbow),
   warrior('wuxia', 'Pei Min', PRESETS.wuxia),
-  { ...warrior('kheshig', 'Subutai', PRESETS.kheshig), legend: { order: 10, kicker: 'The Khan\'s Guard', line: 'Quick arrows from the composite bow, then straight in with the flanged mace.' } },
+  { ...warrior('kheshig', 'Subutai', PRESETS.kheshig), legend: { order: 10, kicker: { en: 'The Khan\'s Guard', zh: '大汗宿卫' }, line: { en: 'Quick arrows from the composite bow, then straight in with the flanged mace.', zh: '复合弓连珠快箭，射完提骨朵直接冲进来。' } } },
   warrior('esen', 'Esen Taishi', PRESETS.maceShield),
   warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),
   // An iron-clad horse archer: the bow, then the sabre (his kit's sidearm) up close.
@@ -177,21 +192,21 @@ export const WARRIORS = [
   // A Cuman (Kipchak) of the 12th-13th-century steppe: the bow, then the sabre, in plated mail and the masked helmet.
   warrior('cuman', 'Konchak', PRESETS.cuman),
   // The sultanates' flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
-  { ...warrior('saladin', 'Saladin', PRESETS.saladin), flagship: true, legend: { order: 9, kicker: 'Sultan of Egypt and Syria', line: 'The straight Ayyubid sword and round shield: patient, quick to answer.' } },
+  { ...warrior('saladin', 'Saladin', PRESETS.saladin), flagship: true, legend: { order: 9, kicker: { en: 'Sultan of Egypt and Syria', zh: '埃及与叙利亚的苏丹' }, line: { en: 'The straight Ayyubid sword and round shield: patient, quick to answer.', zh: '阿尤布直剑配圆盾：沉得住气，还手极快。' } } },
   warrior('gaziAlp', 'Turgut Alp', PRESETS.gaziAlp),
   warrior('sipahi', 'Davud the sipahi', PRESETS.sipahi),
   warrior('janissary', 'Ulubatlı Hasan', PRESETS.yatagan),
   warrior('janissaryGun', 'Mehmed Çavuş', PRESETS.yatagan, { name: 'Mehmed Çavuş', style: 'matchlock', outfit: { kind: 'janissary', design: 1 } }),
   warrior('azapArcher', 'Ali the azap', PRESETS.azap),
   warrior('azapSpear', 'Yusuf the azap', PRESETS.azap, { name: 'Yusuf the azap', style: 'spear', outfit: { kind: 'azap', design: 1 } }),
-  { ...warrior('ronin', 'Miyamoto Musashi', PRESETS.ronin), legend: { order: 4, kicker: 'The Sword Saint', line: 'The masterless swordsman with two swords: one meets the blade while the other cuts.' } },
+  { ...warrior('ronin', 'Miyamoto Musashi', PRESETS.ronin), legend: { order: 4, kicker: { en: 'The Sword Saint', zh: '剑圣' }, line: { en: 'The masterless swordsman with two swords: one meets the blade while the other cuts.', zh: '无主的浪人，双刀在手：一把迎住来刀，另一把趁隙就砍。' } } },
   warrior('wokou', 'Wang Zhi', PRESETS.mingDao, { name: 'Wang Zhi', outfit: { kind: 'wokou', design: 0 } }),
   warrior('hidalgo', 'Hernán Cortés', PRESETS.hidalgo),
   warrior('rodelero', 'Bernal Díaz', PRESETS.rodelero),
   warrior('arquebusier', 'Diego de Ordaz', PRESETS.knight, { name: 'Diego de Ordaz', exercise: 0.66, heightCm: 175, calories: 4025, style: 'matchlock', outfit: { kind: 'conquistadorQuilted', design: 1 }, accessories: [] }),
   warrior('vocMusketeer', 'Hans Pedel', PRESETS.knight, { name: 'Hans Pedel', exercise: 0.66, heightCm: 175, calories: 4025, style: 'matchlock', outfit: { kind: 'conquistadorQuilted', design: 3 }, accessories: [] }),
   warrior('vocPikeman', 'Jan de Vries', PRESETS.knight, { name: 'Jan de Vries', exercise: 0.66, heightCm: 175, calories: 4025, style: 'spear', outfit: { kind: 'conquistadorPlate', design: 3 }, accessories: [] }),
-  { ...warrior('eagle', 'Cuauhtémoc', PRESETS.macuahuitl), legend: { order: 11, kicker: 'The Last Emperor', line: 'The last tlatoani of Tenochtitlan: the obsidian-edged macuahuitl and a feathered shield.' } },
+  { ...warrior('eagle', 'Cuauhtémoc', PRESETS.macuahuitl), legend: { order: 11, kicker: { en: 'The Last Emperor', zh: '最后的皇帝' }, line: { en: 'The last tlatoani of Tenochtitlan: the obsidian-edged macuahuitl and a feathered shield.', zh: '特诺奇蒂特兰最后的君主：黑曜石剑棍，一面羽毛盾。' } } },
   warrior('jaguar', 'Ocelotl', PRESETS.tepoztopilli),
   warrior('mexica', 'Yaotl', PRESETS.contender, { name: 'Yaotl', heightCm: 160, calories: 3200, exercise: 0.75, sex: 'male', style: 'macuahuitl', outfit: { kind: 'mexicaWarrior', design: 0 }, accessories: [], look: { skinTone: 'medium', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
   warrior('taekwondo', 'Kim Min-jun', PRESETS.taekwondo),
@@ -218,8 +233,8 @@ export const WARRIORS = [
   warrior('thraex', 'Spartacus', PRESETS.thraex),
   warrior('retiarius', 'Kalendio', PRESETS.retiarius),
   warrior('scissor', 'Astacius', PRESETS.scissor),
-  { ...warrior('maximus', 'Maximus', PRESETS.maximus), legend: { order: 7, kicker: 'The General', line: 'A legion swordsman in the arena: gladius, no shield, a veteran\'s parries.' } },
-  { ...warrior('commodus', 'Commodus', PRESETS.commodus), legend: { order: 8, kicker: 'The Emperor', line: 'The emperor as Hercules: lion skin and club, heavy blows.' } },
+  { ...warrior('maximus', 'Maximus', PRESETS.maximus), legend: { order: 7, kicker: { en: 'The General', zh: '将军' }, line: { en: 'A legion swordsman in the arena: gladius, no shield, a veteran\'s parries.', zh: '进了竞技场的军团剑士：一把短剑，不拿盾，老兵的格挡功夫。' } } },
+  { ...warrior('commodus', 'Commodus', PRESETS.commodus), legend: { order: 8, kicker: { en: 'The Emperor', zh: '皇帝' }, line: { en: 'The emperor as Hercules: lion skin and club, heavy blows.', zh: '扮成赫拉克勒斯的皇帝：披狮皮，抡棍棒，下手沉。' } } },
   warrior('lorarius', 'Felix the lorarius', PRESETS.whip),
   warrior('legionary', 'Gaius Valerius Crispus', PRESETS.legionary),
   warrior('centurion', 'Marcus Caelius', PRESETS.centurion),
