@@ -17,6 +17,7 @@
 
 import { levelOf } from './items.js';
 import { comradesOf } from './team.js';
+import { getLang, tname } from '../i18n.js';
 
 // The events that put a man out (physics.js knockOut: the `kind` it was given, and the death event's `attacker` is who is credited).
 const OUT_KINDS = new Set(['knockout', 'killed', 'bledOut', 'drowned', 'out']);
@@ -224,11 +225,134 @@ function taleLast(final, seed, failures) {
  * operative who stayed below with Caby as the new Noname. With no deaths it is the one night alone. The same log always gives the same words.
  * (Past TALE_MOST failures the first two and the last two are told in full, and a line sums up the rest.)
  */
-export function attemptStory(log) {
+export function attemptStory(log, lang = getLang()) {
+  if (lang === 'zh') return attemptStoryZh(log);
   const seed = taleHash(JSON.stringify(log));
   const failed = log.failed;
   const told = failed.length > TALE_MOST
     ? [...failed.slice(0, 2).map((record) => taleFailure(record, log, seed)), taleBetween(failed.slice(2, -2), seed), ...failed.slice(-2).map((record) => taleFailure(record, log, seed))]
     : failed.map((record) => taleFailure(record, log, seed));
   return [...told, taleLast(log.final, seed, failed.length)].join(' ');
+}
+
+
+// ---- The story in Chinese -----------------------------------------------------------------------------------------
+// Not the English put word for word: the same log, the same seed and the same choices, told as Chinese tells it (a list joined
+// with 、 and 和, the count in Chinese numerals, the names and places from the names catalogue: i18n.js tname).
+
+/** 1 to 99 in Chinese numerals (一, 十二, 二十三); beyond, the digits. */
+function taleNumeralZh(number) {
+  const digits = '零一二三四五六七八九';
+  if (number < 10) return digits[number];
+  if (number < 100) return `${number >= 20 ? digits[Math.floor(number / 10)] : ''}十${number % 10 ? digits[number % 10] : ''}`;
+  return String(number);
+}
+
+const taleNameZh = (name) => tname(name);
+
+/** 甲、乙和丙. */
+function taleListZh(names) {
+  const named = names.map(taleNameZh);
+  return named.length < 2 ? named.join('') : `${named.slice(0, -1).join('、')}和${named[named.length - 1]}`;
+}
+
+function taleDurationZh(seconds) {
+  if (seconds < 45) return '不到一分钟';
+  const minutes = Math.round(seconds / 60);
+  return minutes <= 1 ? '一分钟上下' : `大约${taleNumeralZh(minutes)}分钟`;
+}
+
+/** Who is beside him, as a clause of its own ("玛伦在你身边"), or alone. */
+const taleCompanyZh = (names, seed, salt) => (names.length
+  ? `${taleListZh(names)}${talePick(seed, salt, ['在你身边', '陪在你左右', '跟在你身后'])}`
+  : talePick(seed, salt, ['你孤身一人', '你独自一人']));
+
+function taleEndingZh(record, seed) {
+  const where = record.place ? taleNameZh(record.place) : '黑暗里';
+  const killer = record.killer ? taleNameZh(record.killer) : null;
+  const salt = record.number * 31;
+  if (killer) {
+    return talePick(seed, salt + 5, [
+      `最后在${where}被${killer}了结`,
+      `最后在${where}倒在${killer}手下`,
+      `在${where}，${killer}送你上了路`,
+      `到了${where}，命就交在了${killer}手里`,
+    ]);
+  }
+  const cause = record.cause ?? '';
+  if (/sea/.test(cause)) return talePick(seed, salt + 5, [`在${where}被海浪卷走`, `从${where}落进海里，再没浮上来`]);
+  if (/edge|fell/.test(cause)) return talePick(seed, salt + 5, [`在${where}一脚踏空，摔死了`, `从${where}的崖边栽了下去`]);
+  if (/blood|internal/.test(cause)) return talePick(seed, salt + 5, [`在${where}流尽了血`, `在${where}伤重不治`]);
+  return talePick(seed, salt + 5, [`死在了${where}`, `在${where}断了气`]);
+}
+
+function taleFailureZh(record, log, seed) {
+  const salt = record.number * 31;
+  const opener = talePick(seed, salt, [`第${taleNumeralZh(record.number)}次`, `第${taleNumeralZh(record.number)}回`, `第${taleNumeralZh(record.number)}次尝试`]);
+  const starts = taleNameZh(record.from ?? log.start);
+  const began = record.from
+    ? talePick(seed, salt + 1, [`你从${starts}出发`, `你在${starts}醒来`, `你从${starts}动身`])
+    : talePick(seed, salt + 1, [`你从${starts}出发`, `你从${starts}动身`, `你从${starts}起步`]);
+  const company = taleCompanyZh(record.comrades, seed, salt + 2);
+  const rested = record.rest && record.rest !== record.from ? `，在${taleNameZh(record.rest)}歇过脚` : '';
+  let sentence = `${opener}，${began}，${company}${rested}，${taleEndingZh(record, seed)}。`;
+  if (record.fallen.length) sentence += `${taleListZh(record.fallen)}${talePick(seed, salt + 3, ['比你先倒下了', '先走了一步', '没能撑得比你久'])}。`;
+  if (taleHash(`${seed}:${record.number}:time`) % 3 === 0) sentence += `前后撑了${taleDurationZh(record.seconds)}。`;
+  return sentence;
+}
+
+function taleBetweenZh(middle, seed) {
+  const places = new Map();
+  for (const record of middle) if (record.place) places.set(record.place, (places.get(record.place) ?? 0) + 1);
+  const [place] = [...places.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0] ?? [];
+  const count = taleNumeralZh(middle.length);
+  const tail = place ? `，大多死在${taleNameZh(place)}一带` : '';
+  return talePick(seed, 7, [
+    `之后又有${count}次，结局都一样${tail}。`,
+    `又是${count}个夜晚，都断送在黑暗里${tail}。`,
+    `再往后，又败了${count}次${tail}。`,
+  ]);
+}
+
+function taleLastZh(final, seed, failures) {
+  const ordinal = `第${taleNumeralZh(final.number)}次`;
+  const company = taleCompanyZh(final.comrades, seed, 900);
+  const lost = final.comrades.filter((name) => !final.survivors.includes(name));
+  let left;
+  if (!final.comrades.length) left = talePick(seed, 901, ['你是一个人进去的，礼拜堂门口没有人等你。', '你独自前来，也就没有谁要你回去找。']);
+  else if (!lost.length) left = talePick(seed, 901, [`${taleListZh(final.comrades)}在礼拜堂门口，等一个再也没回来的人。`, `${taleListZh(final.comrades)}守在礼拜堂门口。你再没回去找他们。`]);
+  else if (lost.length === final.comrades.length) left = talePick(seed, 901, [`${taleListZh(lost)}没能活着看到礼拜堂。`, '最后只剩你一个人往前走，每一个名字你都记着。']);
+  else left = `${taleListZh(final.survivors)}在礼拜堂门口等你；${taleListZh(lost)}没能撑到那里。`;
+  const reached = failures
+    ? talePick(seed, 902, [
+      `${ordinal}是最后一次。${company}，你穿过黑暗，越过狱卒——他身后的屋子，空空如也。`,
+      `然后是${ordinal}。${company}，这一回你没有倒下；可狱卒身后，只有一间空屋。`,
+      `${ordinal}，${company}，你总算越过了狱卒，他身后的屋里一个人也没有。`,
+    ])
+    : talePick(seed, 902, [
+      `一个夜晚，一次尝试：${company}，你爬上悬崖，杀穿守军，越过狱卒——他身后的屋子是空的。`,
+      `没有第二次。${company}，你走了进去，没有倒下，狱卒身后的屋子却空着。`,
+      `第一次，也是唯一的一次：${company}，你顶着风暴一路杀上来，越过狱卒，只看见一间空屋。`,
+    ]);
+  const took = taleHash(`${seed}:took`) % 2 === 0 ? `前后用了${taleDurationZh(final.seconds)}。` : '';
+  const end = final.outcome === 'fell'
+    ? talePick(seed, 903, [
+      '你没能再爬出去。女王的人追了下来，你倒在卡比身旁，倒在城堡底下的黑暗里——新的无名者，也是最后一个。',
+      '你再没回到地面。城堡底下，新的无名者守着那片黑暗，守到守不住为止，最后倒在卡比身边。',
+    ])
+    : talePick(seed, 903, [
+      '你没有再爬出去。你和卡比一起留在城堡底下的黑暗里；新的无名者在那里等着，等下一个来的人。',
+      '你再没回到地面。城堡底下，卡比身旁，新的无名者在黑暗里等着下一个人。',
+    ]);
+  return `${reached}${left}${failures ? '' : took}${end}`;
+}
+
+/** attemptStory in Chinese: the same log, the same picks (the seed is the log's), the same shape. */
+function attemptStoryZh(log) {
+  const seed = taleHash(JSON.stringify(log));
+  const failed = log.failed;
+  const told = failed.length > TALE_MOST
+    ? [...failed.slice(0, 2).map((record) => taleFailureZh(record, log, seed)), taleBetweenZh(failed.slice(2, -2), seed), ...failed.slice(-2).map((record) => taleFailureZh(record, log, seed))]
+    : failed.map((record) => taleFailureZh(record, log, seed));
+  return [...told, taleLastZh(log.final, seed, failed.length)].join('');
 }

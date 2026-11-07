@@ -11,9 +11,11 @@
   /* The lock-on's own colour: its button, and the name over the man it is on. */
   --lock: #ff5c7a;
   --green: #57d68d;
-  --display: 'Oswald', 'Arial Narrow', Impact, sans-serif;
-  --body: 'IBM Plex Sans', system-ui, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  /* Chinese: the system's own CJK faces after the Latin ones (Oswald and Plex have no Chinese), so each glyph finds a face; no font files. */
+  --cjk: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'Source Han Sans SC', 'WenQuanYi Micro Hei';
+  --display: 'Oswald', 'Arial Narrow', Impact, var(--cjk), sans-serif;
+  --body: 'IBM Plex Sans', system-ui, var(--cjk), sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, var(--cjk), monospace;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -1497,3 +1499,13 @@ body[data-game="lastgate"] .hud, body[data-game="lastgate"] .log { display: none
 .cards.compact { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
 .cards.compact .card-choice { min-height: 44px; padding: 6px 36px 6px 10px; align-content: center; }
 .cards.compact .card-choice b { font-size: 13.5px; line-height: 1.15; }
+
+/* The language switch (src/i18n.js): a small pill in the footer, beside Pause and Restart. */
+.lang-switch { min-width: 44px; font-family: var(--body); }
+/* Chinese: the caps-and-tracking of the Latin display face spaces Chinese glyphs too wide; line breaks by Chinese rules. */
+html:lang(zh) { line-break: strict; }
+html:lang(zh) h1, html:lang(zh) h2, html:lang(zh) .banner p, html:lang(zh) .card .top, html:lang(zh) .choice b { letter-spacing: 0.02em; }
+/* Chinese has no italic: the browser only slants the glyphs (a fake oblique), so the italic lines stand upright in Chinese. */
+html:lang(zh) :is(em, i, .set-blurb, .story-line.story-tale, .lg-hero-words small, .tw-line, #art-name) { font-style: normal; }
+/* A phone's footer has no room for it beside the fight's own buttons (it wraps a second row): there the language is in Settings (Menu → ⚙). */
+@media (max-width: 560px) { .lang-switch { display: none; } }

@@ -8,6 +8,7 @@
 import { fightUiButtons, fightUiColour, fightUiReady, fightUiZoneOf, FIGHT_UI } from './logic.js';
 import { fightUiIcon } from './icons.js';
 import { fightUiElement, fightUiFlash, fightUiPaintReady } from './kit.js';
+import { getLang, t, tname } from '../i18n.js';
 
 // Where each button sits: its centre, px left of the right edge and above the footer, round the guard's.
 const FIGHT_UI_SLOTS = [[206, 64], [186, 140], [128, 194], [52, 210], [282, 112], [262, 196]];
@@ -16,12 +17,15 @@ export function fightUiActionButtons(root, kit, hooks) {
   const cluster = root.appendChild(fightUiElement('div', 'fu-buttons'));
   let style = null;
   let buttons = [];
+  // The language the buttons were labelled in (src/i18n.js): a switch relabels them at the next update.
+  let labelledIn = null;
 
   function build() {
     style = kit.me()?.style;
+    labelledIn = getLang();
     buttons = fightUiButtons(kit.moves()).slice(0, FIGHT_UI_SLOTS.length).map((group, index) => {
       const element = fightUiElement('button', 'fu-btn', '<i class="fu-btn-icon"></i><span class="fu-btn-name"></span><span class="fu-btn-dots"></span><kbd></kbd>');
-      element.setAttribute('aria-label', FIGHT_UI.groupNames[group.group]);
+      element.setAttribute('aria-label', t(`fightui.group.${group.group}`));
       element.dataset.group = group.group;
       element.style.setProperty('--fu-col', fightUiColour(group.group));
       element.querySelector('kbd').textContent = String(index + 1);
@@ -44,7 +48,7 @@ export function fightUiActionButtons(root, kit, hooks) {
   function show(button) {
     const entry = button.group.moves[button.next];
     button.element.querySelector('.fu-btn-icon').innerHTML = fightUiIcon(entry);
-    button.element.querySelector('.fu-btn-name').textContent = entry.name;
+    button.element.querySelector('.fu-btn-name').textContent = tname(entry.name);
     button.element.querySelector('.fu-btn-dots').innerHTML = button.group.moves.length > 1 ? button.group.moves.map((_, index) => `<i class="${index === button.next ? 'on' : ''}"></i>`).join('') : '';
   }
 
@@ -77,7 +81,7 @@ export function fightUiActionButtons(root, kit, hooks) {
   function update() {
     const me = kit.me();
     if (!me) return;
-    if (me.style !== style) build();
+    if (me.style !== style || labelledIn !== getLang()) build();
     for (const button of buttons) fightUiPaintReady(button.element, fightUiReady(me, button.group.moves[button.next].move));
   }
 

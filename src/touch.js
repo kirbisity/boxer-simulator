@@ -27,6 +27,7 @@ import { ARTS, artBlocked, artLabel, artPrimed } from './weaponarts.js';
 import { throwableOf } from './physics/throwable.js';
 import { bleedingFast } from './maiming.js';
 import { horseHealth } from './physics/mounted.js';
+import { getLang, t, tname } from './i18n.js';
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -60,7 +61,8 @@ const uiElement = (tag, className, text) => Object.assign(document.createElement
  */
 export function installFightControls(root, hooks) {
   const surface = root.appendChild(uiElement('div', 'touch-surface'));
-  surface.setAttribute('aria-label', 'Fight: drag the stick at the bottom left to move, anywhere else to look about; tap your man where to hit him, press and hold to shove or hold a man down');
+  surface.setAttribute('aria-label', t('touch.surface'));
+  surface.dataset.i18nAria = 'touch.surface';
   // The movement stick: a fixed pad, low at the left, its ring and knob drawn faintly at rest.
   const stick = root.appendChild(uiElement('div', 'stick'));
   stick.setAttribute('aria-hidden', 'true');
@@ -85,13 +87,13 @@ export function installFightControls(root, hooks) {
   const mark = root.appendChild(uiElement('div', 'tap-mark'));
   mark.hidden = true;
   const guard = root.appendChild(uiElement('button', 'fight-button guard-button'));
-  guard.innerHTML = '<b>🛡</b><span>Guard</span>';
+  guard.innerHTML = `<b>🛡</b><span data-i18n="touch.guard">${t('touch.guard')}</span>`;
   const action = root.appendChild(uiElement('button', 'fight-button action-button'));
   action.innerHTML = '<b></b><span></span>';
   // The weapon art's own button (weaponarts.js): shown, glowing, from the moment the art is charged until it is made; dimmed
   // (and saying why, small) while he has not the stamina for it.
   const art = root.appendChild(uiElement('button', 'fight-button art-button'));
-  art.innerHTML = '<b>✦</b><span class="label">Art</span><span class="why"></span><kbd>P</kbd>';
+  art.innerHTML = `<b>✦</b><span class="label">${t('touch.art')}</span><span class="why"></span><kbd>P</kbd>`;
   art.hidden = true;
   // The sidearm (the bow slung for it, and back: physics.js swapSidearm) and the horse (down from it, up onto one beside him:
   // physics/mounted.js): small, beside the right-hand stack, there only while they can be pressed.
@@ -103,25 +105,30 @@ export function installFightControls(root, hooks) {
   horseButton.hidden = true;
   const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
   lock.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.lock}</b><span class="label">Lock</span><span class="who"></span><kbd>Tab</kbd>`;
-  lock.setAttribute('aria-label', 'Lock on');
+  lock.setAttribute('aria-label', t('touch.lockOn'));
   // Jump (over the Guard) and Crawl (under it; Stand while he crawls: the one button both ways): round, in the right-hand stack.
   const jump = root.appendChild(uiElement('button', 'fight-button jump-button'));
-  jump.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.jump}</b><span>Jump</span><kbd>Space</kbd>`;
-  jump.setAttribute('aria-label', 'Jump');
+  jump.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.jump}</b><span data-i18n="touch.jump">${t('touch.jump')}</span><kbd>Space</kbd>`;
+  jump.setAttribute('aria-label', t('touch.jump'));
+  jump.dataset.i18nAria = 'touch.jump';
   const crawl = root.appendChild(uiElement('button', 'fight-button crawl-button'));
   crawl.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.crawl}</b><span class="label">Crawl</span><kbd>C</kbd>`;
-  crawl.setAttribute('aria-label', 'Crawl');
+  crawl.setAttribute('aria-label', t('touch.crawl'));
+  crawl.dataset.i18nAria = 'touch.crawl';
   const status = root.appendChild(uiElement('div', 'player-status'));
-  status.innerHTML = '<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" title="Adrenaline"><i></i></div><div class="horse-row" hidden title="His horse"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>';
+  status.innerHTML = `<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" data-i18n-title="touch.adrenaline" title="${t('touch.adrenaline')}"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>`;
   // Adrenaline: a hair-thin line under stamina, a tick where his weapon's art comes within reach (weaponarts.js ARTS.ready).
   status.querySelector('.adrenaline').style.setProperty('--ready', `${ARTS.ready * 100}%`);
   const marker = root.appendChild(uiElement('div', 'target-marker'));
-  marker.innerHTML = '<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div><div class="horse-row" hidden title="His horse"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>';
+  marker.innerHTML = `<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>`;
   let incoming = null;
   const touches = new Map();
   let stickId = null;
   let guardDown = null;
   let lastAction = null;
+  // The language the words set on a change were set in, and whether the hints speak to a mouse.
+  let labelledIn = getLang();
+  let hintMouse = false;
   let markAt = -Infinity;
   const awake = new Map();
   let active = false;
@@ -235,8 +242,9 @@ export function installFightControls(root, hooks) {
 
   /** The hints in the words of the hand in use: a finger, or a mouse and keys. */
   function wordHints(mouse) {
-    hintOf.look.textContent = mouse ? 'Drag or right-drag · look' : 'Drag anywhere · look';
-    hintOf.move.textContent = mouse ? 'WASD' : 'Move';
+    hintMouse = mouse;
+    hintOf.look.textContent = mouse ? t('touch.lookMouse') : t('touch.lookTouch');
+    hintOf.move.textContent = mouse ? 'WASD' : t('touch.moveTouch');
   }
 
   /** The knob follows the thumb, out to the ring. */
@@ -440,7 +448,7 @@ export function installFightControls(root, hooks) {
     const label = marker.querySelector('.incoming');
     if (punch && punch !== incoming?.punch && punch.spec?.kind === 'strike') {
       incoming = { punch, start: now };
-      label.textContent = moveName(punch.type).name;
+      label.textContent = tname(moveName(punch.type).name);
       label.classList.add('show');
     }
     if (incoming && now - incoming.start > TOUCH.incomingSeconds) {
@@ -473,19 +481,25 @@ export function installFightControls(root, hooks) {
     // A man running does not guard (control.js): the button is greyed.
     guard.classList.toggle('blocked', Boolean(me.runMode));
     // The special button: one place, its label what it would do now.
+    // A switch of language (src/i18n.js): the words that are set only on a change are set again.
+    if (labelledIn !== getLang()) {
+      labelledIn = getLang();
+      lastAction = undefined;
+      wordHints(hintMouse);
+    }
     const name = contextAction(world, me);
     if (name !== lastAction) {
       lastAction = name;
       action.disabled = !name;
       action.classList.toggle('idle', !name);
       action.querySelector('b').textContent = name ? ACTIONS[name].icon : '·';
-      action.querySelector('span').textContent = name ? ACTIONS[name].label : 'Action';
+      action.querySelector('span').textContent = name ? t(`action.${name}`) : t('touch.action');
     }
     // The art's own button: there while charged, named for his weapon's art; dimmed, with a word why, while winded.
     const charged = artPrimed(me);
     if (art.hidden === charged) art.hidden = !charged;
     if (charged) {
-      const label = artLabel(me, world);
+      const label = tname(artLabel(me, world));
       if (art.querySelector('.label').textContent !== label) art.querySelector('.label').textContent = label;
       const winded = artBlocked(me) === 'winded';
       // (A grenade carried has the button first: its own mark, no adrenaline asked: physics/throwable.js.)
@@ -493,33 +507,34 @@ export function installFightControls(root, hooks) {
       const glyph = grenade ? '💣' : '✦';
       if (art.querySelector('b').textContent !== glyph) art.querySelector('b').textContent = glyph;
       art.classList.toggle('winded', winded);
-      art.querySelector('.why').textContent = winded ? 'winded' : '';
-      art.setAttribute('aria-label', grenade ? `${label}: throw it` : winded ? `${label}: weapon art, too winded` : `${label}: weapon art`);
+      art.querySelector('.why').textContent = winded ? t('touch.winded') : '';
+      art.setAttribute('aria-label', t(grenade ? 'touch.artThrow' : winded ? 'touch.artWinded' : 'touch.artReady', { label }));
     }
     // The sidearm button: while the bow can be slung for it (or taken up again); the horse button: while he can get down or up.
     const swapping = sidearmSwapReady(me);
     if (swap.hidden === swapping) swap.hidden = !swapping;
     if (swapping) {
-      const label = me.stowed ? (me.stowed.weapon?.spec.label ?? 'Bow') : 'Sidearm';
+      const label = me.stowed ? (me.stowed.weapon?.spec.label ? tname(me.stowed.weapon.spec.label) : t('touch.bow')) : t('touch.sidearm');
       if (swap.querySelector('.label').textContent !== label) swap.querySelector('.label').textContent = label;
       swap.querySelector('b').textContent = me.stowed ? '🏹' : '🗡';
     }
     const riding = horseAction(world, me);
     if (horseButton.hidden === Boolean(riding)) horseButton.hidden = !riding;
-    if (riding) horseButton.querySelector('.label').textContent = ACTIONS[riding].label;
+    if (riding) horseButton.querySelector('.label').textContent = t(`action.${riding}`);
     const locked = orders.lock !== null ? world.fighters[orders.lock] : null;
     // Lock: a target sight; locked, lit, saying so and on whom.
     lock.classList.toggle('on', Boolean(locked));
     const who = locked ? firstNameOf(locked) : '';
-    if (lock.querySelector('.who').textContent !== who || lock.querySelector('.label').textContent !== (locked ? 'Locked' : 'Lock')) {
-      lock.querySelector('.label').textContent = locked ? 'Locked' : 'Lock';
+    const lockWord = locked ? t('touch.locked') : t('touch.lock');
+    if (lock.querySelector('.who').textContent !== who || lock.querySelector('.label').textContent !== lockWord) {
+      lock.querySelector('.label').textContent = lockWord;
       lock.querySelector('.who').textContent = who;
-      lock.setAttribute('aria-label', locked ? `Locked on ${who}: press to let go` : 'Lock on');
+      lock.setAttribute('aria-label', locked ? t('touch.lockedOn', { who }) : t('touch.lockOn'));
     }
     // Crawl lit while he crawls, dimmed while it cannot be pressed (locked on, down, mounted); its word is what a press does.
     crawl.classList.toggle('on', Boolean(me.crawling));
     crawl.classList.toggle('blocked', !crawlReady(world, me, orders));
-    crawl.querySelector('.label').textContent = me.crawling ? 'Stand' : 'Crawl';
+    crawl.querySelector('.label').textContent = me.crawling ? t('touch.stand') : t('touch.crawl');
     // Jump dimmed while he cannot (in the air, crawling, down, hurt, too weak, getting his legs back after a landing).
     const canJump = !jumpNow(world, me).blocked;
     jump.classList.toggle('blocked', !canJump);
@@ -528,7 +543,8 @@ export function installFightControls(root, hooks) {
     status.querySelector('.name').textContent = firstNameOf(me);
     // (A great vessel open, a limb lost: maiming.js. The bar drains and pulses; BLEEDING when nothing else is to say.)
     const bleeding = bleedingFast(me);
-    status.querySelector('.tag').textContent = me.state === 'down' ? 'DOWN' : me.pin ? 'HOLDING' : me.dazed > 0 ? 'DAZED' : me.stagger > 0 ? 'REELING' : me.reloading ? 'LOADING' : bleeding ? 'BLEEDING' : '';
+    const tag = me.state === 'down' ? 'down' : me.pin ? 'holding' : me.dazed > 0 ? 'dazed' : me.stagger > 0 ? 'reeling' : me.reloading ? 'loading' : bleeding ? 'bleeding' : null;
+    status.querySelector('.tag').textContent = tag ? t(`touch.tag.${tag}`) : '';
     status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
     status.querySelector('.health').classList.toggle('bleeding', bleeding);
     paintStamina(status.querySelector('.stamina'), me.stamina);
@@ -567,7 +583,7 @@ export function installFightControls(root, hooks) {
     row.querySelector('i').style.width = `${Math.round((1 - health.harm) * 100)}%`;
     row.querySelector('.bar').classList.toggle('bleeding', health.bleeding);
     row.classList.toggle('down', health.down);
-    row.title = health.down ? 'His horse is down' : health.lame ? 'His horse is lame' : health.bleeding ? 'His horse is bleeding' : 'His horse';
+    row.title = t(health.down ? 'touch.horseDown' : health.lame ? 'touch.horseLame' : health.bleeding ? 'touch.horseBleeding' : 'touch.horse');
   }
 
   function setActive(on) {
@@ -610,7 +626,9 @@ function capture(element, pointerId) {
 
 /** A man's first name; a rank or title ("Sir Edric", "Sgt. Cole") gives way to the name after it. */
 const firstNameOf = (fighter) => {
-  const words = fighter.body.inputs.name.split(' ');
+  const full = fighter.body.inputs.name;
+  if (tname(full) !== full) return tname(full);
+  const words = full.split(' ');
   // "The Forger": the article is part of it (a bare "The" says nothing).
   if (words[0] === 'The' && words[1]) return `The ${words[1]}`;
   return (/\.$/.test(words[0]) || ['Sir', 'Officer'].includes(words[0])) && words[1] ? words[1] : words[0];

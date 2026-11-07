@@ -8,6 +8,7 @@
 
 import { WORLD } from './physics/config.js';
 import { fadeOf, staminaBar } from './physics/overdraft.js';
+import { t } from './i18n.js';
 
 /** What the pulse does to the fade at this strength, `beat` 0..1: it dips by up to `pulse` of itself, more the deeper he is. */
 export function pulsedFade(strength, beat) {
@@ -61,5 +62,5 @@ export function paintStamina(bar, stamina) {
   if (segment) segment.style.width = `${Math.round(debt * 100)}%`;
   bar.classList.toggle('overdrawn', debt > 0);
   if (bar.dataset.title === undefined) bar.dataset.title = bar.title;
-  bar.title = debt > 0 ? `Stamina overdrawn: ${Math.round(debt * 100)}% of the way to a faint` : bar.dataset.title;
+  bar.title = debt > 0 ? t('fight.overdrawn', { share: Math.round(debt * 100) }) : bar.dataset.i18nTitle ? t(bar.dataset.i18nTitle) : bar.dataset.title;
 }

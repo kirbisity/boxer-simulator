@@ -21,6 +21,7 @@
 import { capsOf, countUnits, drawUp, formationsOf, intoZone, inZone, MUSTER, roomFor, unitOf, unitsOf, zoneOf } from './muster.js';
 import { STYLES } from './moves.js';
 import { ARMIES } from './scenarios.js';
+import { onLangChange, SEP, t, tname } from './i18n.js';
 
 // The map's look: the floor's colour by its place (the ground it is drawn on), the sides' colours, sizes.
 const MUSTER_VIEW = {
@@ -48,6 +49,11 @@ const MUSTER_VIEW = {
   wheelStep: 1.25,
 };
 
+/** A label kept English in the data ("Ashigaru · Yari", a side's name), each part in the language in force. */
+const musterWords = (line) => String(line ?? '').split(SEP).map(tname).join(SEP);
+/** A label given as a string, or as a function (read again when the language changes). */
+const musterLabel = (label) => (typeof label === 'function' ? label() : label);
+
 const musterEl = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children.filter((child) => child !== null && child !== undefined));
@@ -58,9 +64,10 @@ const musterEl = (tag, props = {}, ...children) => {
  * Open the setup screen for a battle in `root`: `key` and `level` (scenarios.js battleOf, or a custom battle's:
  * custombattle.js customLevel, with its men's `places` and `formations`), `onStart(setup)` when the player starts it,
  * `onBack()` to go back, `onChange(sides, lead)` whenever an army changes (a custom battle keeps it), and the
- * words of its back and reset buttons (`backLabel`, `resetLabel`).
+ * words of its back and reset buttons (`backLabel`, `resetLabel`; each a string, or a function that gives it in the language
+ * in force, so a switch while the screen is open redraws it).
  */
-export function musterScreen(root, { key, level, onStart, onBack, onChange = null, lead = null, formations = {}, backLabel = '← Back', resetLabel = '↺ As the level', locked = false, corners = ['red', 'blue'], startLabel = '▶ Start battle', lede = null }) {
+export function musterScreen(root, { key, level, onStart, onBack, onChange = null, lead = null, formations = {}, backLabel = () => t('muster.back'), resetLabel = () => t('muster.reset'), locked = false, corners = ['red', 'blue'], startLabel = () => t('muster.start'), lede = null }) {
   const cast = level.cast(Math.random);
   const units = { red: unitsOf(level, 'red'), blue: unitsOf(level, 'blue') };
   // Each side: the level's own (`custom` false: its men drawn where the level puts them), or the player's (a custom battle's men where he left them).
@@ -89,8 +96,16 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   root.replaceChildren();
   root.className = 'screen muster';
   const head = musterEl('header', { className: 'muster-head' },
-    musterEl('button', { className: 'back', type: 'button', textContent: backLabel, onclick: onBack }),
-    musterEl('div', { className: 'titles' }, musterEl('h1', { textContent: level.title }), musterEl('p', { className: 'lede', textContent: lede ?? (level.places ? `${level.place} · place your armies, then fight.` : 'Set up the armies — or start as it was.') })));
+    musterEl('button', { className: 'back', type: 'button', onclick: onBack }),
+    musterEl('div', { className: 'titles' }, musterEl('h1'), musterEl('p', { className: 'lede' })));
+  /** The head's and the foot's words, in the language in force. */
+  const label = () => {
+    head.querySelector('.back').textContent = musterLabel(backLabel);
+    head.querySelector('h1').textContent = tname(level.title);
+    head.querySelector('.lede').textContent = musterLabel(lede) ?? (level.places ? t('muster.ledePlaces', { place: tname(level.place) }) : t('muster.lede'));
+    reset.textContent = musterLabel(resetLabel);
+    start.textContent = musterLabel(startLabel);
+  };
   const sideTabs = musterEl('div', { className: 'muster-sides', role: 'tablist' });
   const canvas = musterEl('canvas', { className: 'muster-canvas' });
   const pick = musterEl('div', { className: 'muster-pick', hidden: true });
@@ -99,15 +114,15 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   const map = musterEl('div', { className: 'muster-map' }, canvas, pick, hint, zoomBar);
   const tabs = musterEl('div', { className: 'muster-tabs', role: 'tablist' });
   const panel = musterEl('div', { className: 'muster-panel' });
-  const reset = musterEl('button', { type: 'button', className: 'muster-reset', textContent: resetLabel });
-  const start = musterEl('button', { type: 'button', className: 'primary muster-start', textContent: startLabel });
+  const reset = musterEl('button', { type: 'button', className: 'muster-reset' });
+  const start = musterEl('button', { type: 'button', className: 'primary muster-start' });
   const foot = musterEl('div', { className: 'muster-foot' }, reset, start);
   const aside = musterEl('aside', { className: 'muster-aside' }, sideTabs, tabs, panel, foot);
   root.append(head, musterEl('div', { className: 'muster-body' }, map, aside));
 
   const side = () => sides[view.corner];
   const unitById = (corner, id) => units[corner].find((unit) => unit.id === id);
-  const kindOf = (corner, inputs) => unitOf(units[corner], inputs)?.label ?? STYLES[inputs.style]?.label ?? inputs.style;
+  const kindOf = (corner, inputs) => musterWords(unitOf(units[corner], inputs)?.label ?? STYLES[inputs.style]?.label ?? inputs.style);
 
   /** A side about to be changed by hand: from here on it is the player's (the level's men, where they stood, to start from). */
   function own(corner) {
@@ -135,7 +150,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   /** Room for `count` more on a side under the caps (the level's: muster.js capsOf): how many fit. */
   function room(corner, count) {
     const fits = roomFor(level, { red: sides.red.men.length, blue: sides.blue.men.length }, corner, count);
-    if (fits < count) say(sides[corner].men.length + fits >= caps.side ? `At most ${caps.side} a side.` : `At most ${caps.total} in all.`);
+    if (fits < count) say(sides[corner].men.length + fits >= caps.side ? t('muster.capSide', { n: caps.side }) : t('muster.capTotal', { n: caps.total }));
     return fits;
   }
 
@@ -422,7 +437,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
         if (chosen && inZone(level, chosen.corner, at, 0.5)) {
           own(chosen.corner).places[chosen.index] = intoZone(level, chosen.corner, at);
           sides[chosen.corner].formation = 'hand';
-        } else say(chosen ? 'Put him on the shaded ground.' : 'Tap a man, then where he should stand — or drag him.');
+        } else say(chosen ? t('muster.putHim') : t('muster.tapMan'));
       }
     } else if (done.man && !done.moved) {
       // A tap on a man: pick him (again: let him go).
@@ -436,7 +451,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
       if (inZone(level, view.corner, at, 0.5)) add(view.corner, view.brush[view.corner], 1, at);
       else {
         const other = view.corner === 'red' ? 'blue' : 'red';
-        say(inZone(level, other, at, 0.5) ? `That is ${other}'s ground: switch to ${other} to set it up.` : 'Put men down on the shaded ground.');
+        say(inZone(level, other, at, 0.5) ? t('muster.otherGround', { side: t(`muster.${other}`) }) : t('muster.putMen'));
       }
     } else if (!done.man && done.moved) fillBox(view.corner, toFloor(f, done.from), toFloor(f, done.to));
     refresh();
@@ -455,10 +470,10 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
 
   function drawZoomBar() {
     zoomBar.replaceChildren(
-      musterEl('button', { type: 'button', textContent: '+', title: 'Zoom in', ariaLabel: 'Zoom in', onclick: () => zoomAt(MUSTER_VIEW.zoomStep) }),
-      musterEl('button', { type: 'button', textContent: '−', title: 'Zoom out', ariaLabel: 'Zoom out', disabled: view.zoom <= 1, onclick: () => zoomAt(1 / MUSTER_VIEW.zoomStep) }),
-      musterEl('button', { type: 'button', textContent: '⤢', title: 'The whole field', ariaLabel: 'Show the whole field', disabled: view.zoom <= 1, onclick: () => { view.zoom = 1; view.pan = [0, 0]; refresh(); } }),
-      musterEl('button', { type: 'button', className: view.panning ? 'on' : '', textContent: '✋', title: 'Drag to move the map', ariaLabel: 'Drag to move the map', ariaPressed: String(view.panning), onclick: () => { view.panning = !view.panning; refresh(); } }));
+      musterEl('button', { type: 'button', textContent: '+', title: t('muster.zoomIn'), ariaLabel: t('muster.zoomIn'), onclick: () => zoomAt(MUSTER_VIEW.zoomStep) }),
+      musterEl('button', { type: 'button', textContent: '−', title: t('muster.zoomOut'), ariaLabel: t('muster.zoomOut'), disabled: view.zoom <= 1, onclick: () => zoomAt(1 / MUSTER_VIEW.zoomStep) }),
+      musterEl('button', { type: 'button', textContent: '⤢', title: t('muster.whole'), ariaLabel: t('muster.wholeAria'), disabled: view.zoom <= 1, onclick: () => { view.zoom = 1; view.pan = [0, 0]; refresh(); } }),
+      musterEl('button', { type: 'button', className: view.panning ? 'on' : '', textContent: '✋', title: t('muster.pan'), ariaLabel: t('muster.pan'), ariaPressed: String(view.panning), onclick: () => { view.panning = !view.panning; refresh(); } }));
   }
 
   // ---- The panels -----------------------------------------------------------------------
@@ -471,21 +486,21 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     sideTabs.replaceChildren(...corners.map((corner) => {
       const army = sides[corner];
       // A side's name: its armies' (the Spaniards & Tlaxcala).
-      const name = level.sideNames?.[corner] ?? ((level.armies?.[corner] ?? []).map((armyKey) => ARMIES[armyKey].label).join(' & ') || corner);
+      const name = level.sideNames?.[corner] ? tname(level.sideNames[corner]) : ((level.armies?.[corner] ?? []).map((armyKey) => tname(ARMIES[armyKey].label)).join(' & ') || t(`muster.${corner}`));
       return musterEl('button', {
         type: 'button', role: 'tab', className: `muster-side ${corner}${view.corner === corner ? ' on' : ''}`, ariaSelected: String(view.corner === corner),
         onclick: () => { view.corner = corner; view.selected = null; refresh(); },
-      }, musterEl('b', { textContent: name }), musterEl('span', { textContent: `${army.men.length} men${level.places ? '' : ` · ${army.custom ? 'yours' : 'as the level'}`}` }));
+      }, musterEl('b', { textContent: name }), musterEl('span', { textContent: `${t('muster.men', { n: army.men.length })}${level.places ? '' : ` · ${army.custom ? t('muster.yours') : t('muster.asLevel')}`}` }));
     }));
   }
 
   function drawTabs() {
-    const names = locked ? { formation: 'Formation' } : { units: 'Units', formation: 'Formation', you: 'Play as' };
+    const names = locked ? { formation: t('muster.tab.formation') } : { units: t('muster.tab.units'), formation: t('muster.tab.formation'), you: t('muster.tab.you') };
     tabs.replaceChildren(...Object.entries(names).map(([tab, label]) => musterEl('button', {
       type: 'button', role: 'tab', className: view.tab === tab && !view.folded ? 'on' : '', textContent: label, ariaSelected: String(view.tab === tab),
       onclick: () => { view.tab = tab; view.folded = false; refresh(); },
     })), musterEl('button', {
-      type: 'button', className: 'muster-fold', textContent: view.folded ? '▴' : '▾', title: view.folded ? 'Show the panel' : 'Fold the panel away: more map', ariaLabel: view.folded ? 'Show the panel' : 'Hide the panel', ariaExpanded: String(!view.folded),
+      type: 'button', className: 'muster-fold', textContent: view.folded ? '▴' : '▾', title: view.folded ? t('muster.showPanel') : t('muster.foldPanel'), ariaLabel: view.folded ? t('muster.showPanel') : t('muster.hidePanel'), ariaExpanded: String(!view.folded),
       onclick: () => { view.folded = !view.folded; refresh(); },
     }));
   }
@@ -501,16 +516,19 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
         refresh();
       };
       // A row a kind of man: tap it to put that kind down on the map; − and + take one off or add one (+5 five), drawn up in the side's order.
-      const rows = units[corner].map((unit) => musterEl('div', { className: `muster-unit-row${unit.id === view.brush[corner] ? ' on' : ''}` },
-        musterEl('button', {
-          type: 'button', className: `muster-unit${unit.id === view.brush[corner] ? ' on' : ''}`, title: `Tap the map to place ${unit.label}`,
-          onclick: () => { view.brush[corner] = unit.id; refresh(); },
-        }, musterEl('span', { textContent: `${unit.mounted ? '🐎 ' : ''}${unit.label}` }), musterEl('b', { textContent: String(counts[unit.id] ?? 0) })),
-        musterEl('button', { type: 'button', className: 'step', textContent: '−', ariaLabel: `One ${unit.label} fewer`, disabled: !counts[unit.id], onclick: () => fewer(unit) }),
-        musterEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: `One more ${unit.label}`, onclick: () => { add(corner, unit.id, 1); refresh(); } }),
-        musterEl('button', { type: 'button', className: 'step', textContent: '+5', ariaLabel: `Five more ${unit.label}`, onclick: () => { add(corner, unit.id, 5); refresh(); } })));
-      const total = Number.isFinite(caps.total) ? ` · ${sides.red.men.length + sides.blue.men.length} / ${caps.total} in all` : '';
-      panel.replaceChildren(musterEl('p', { className: 'muster-note' }, musterEl('b', { textContent: `${army.men.length} / ${caps.side}` }), ` men${total} · ★ kind: tap the map to place`), musterEl('div', { className: 'muster-units' }, ...rows));
+      const rows = units[corner].map((unit) => {
+        const name = musterWords(unit.label);
+        return musterEl('div', { className: `muster-unit-row${unit.id === view.brush[corner] ? ' on' : ''}` },
+          musterEl('button', {
+            type: 'button', className: `muster-unit${unit.id === view.brush[corner] ? ' on' : ''}`, title: t('muster.placeUnit', { unit: name }),
+            onclick: () => { view.brush[corner] = unit.id; refresh(); },
+          }, musterEl('span', { textContent: `${unit.mounted ? '🐎 ' : ''}${name}` }), musterEl('b', { textContent: String(counts[unit.id] ?? 0) })),
+          musterEl('button', { type: 'button', className: 'step', textContent: '−', ariaLabel: t('squad.fewer', { unit: name }), disabled: !counts[unit.id], onclick: () => fewer(unit) }),
+          musterEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: t('squad.more', { unit: name }), onclick: () => { add(corner, unit.id, 1); refresh(); } }),
+          musterEl('button', { type: 'button', className: 'step', textContent: '+5', ariaLabel: t('muster.fiveMore', { unit: name }), onclick: () => { add(corner, unit.id, 5); refresh(); } }));
+      });
+      const total = Number.isFinite(caps.total) ? t('muster.inAll', { n: sides.red.men.length + sides.blue.men.length, total: caps.total }) : '';
+      panel.replaceChildren(musterEl('p', { className: 'muster-note' }, musterEl('b', { textContent: `${army.men.length} / ${caps.side}` }), t('muster.unitsNote', { total })), musterEl('div', { className: 'muster-units' }, ...rows));
     } else if (view.tab === 'formation') {
       const shapes = formationsOf();
       panel.replaceChildren(
@@ -522,13 +540,13 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
             mine.places = drawUp(level, corner, mine.men, shape.key);
             refresh();
           },
-        }, musterEl('i', { textContent: shape.glyph, ariaHidden: 'true' }), musterEl('span', { textContent: shape.key === 'level' ? level.formationLabel ?? shape.label : shape.label })))),
-        musterEl('p', { className: 'muster-note', textContent: army.formation === 'hand' ? `Placed by hand. Pick a formation to draw them all up again.${locked ? ' In the fight, Formation (−) sends them back to these places.' : ''}` : 'Bows and guns go in front of a line or a skirmish screen, behind a block or a wedge; riders wait on the flanks.' }));
+        }, musterEl('i', { textContent: shape.glyph, ariaHidden: 'true' }), musterEl('span', { textContent: tname(shape.key === 'level' ? level.formationLabel ?? shape.label : shape.label) })))),
+        musterEl('p', { className: 'muster-note', textContent: army.formation === 'hand' ? `${t('muster.byHand')}${locked ? t('muster.byHandLocked') : ''}` : t('muster.shapesNote') }));
     } else {
       const lead = view.lead;
       panel.replaceChildren(
-        musterEl('p', { className: 'muster-note', textContent: lead ? `You play ${lead.man.name}, ${kindOf(lead.corner, lead.man).toLowerCase()} (${lead.corner}).` : 'Tap any man on the map, then “Play as him”. Or choose nobody, and pick a side when the battle opens.' }),
-        lead ? musterEl('button', { type: 'button', textContent: 'Choose nobody', onclick: () => { view.lead = null; refresh(); } }) : null);
+        musterEl('p', { className: 'muster-note', textContent: lead ? t('muster.youPlay', { name: tname(lead.man.name), kind: kindOf(lead.corner, lead.man).toLowerCase(), side: t(`muster.${lead.corner}`) }) : t('muster.tapAny') }),
+        lead ? musterEl('button', { type: 'button', textContent: t('muster.nobody'), onclick: () => { view.lead = null; refresh(); } }) : null);
     }
   }
 
@@ -539,13 +557,13 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     const inputs = sides[chosen.corner].men[chosen.index];
     const played = view.lead?.man === inputs;
     if (locked) {
-      pick.replaceChildren(musterEl('div', { className: 'muster-who' }, musterEl('b', { textContent: `${played ? '★ ' : ''}${inputs.name}` }), musterEl('span', { textContent: `${kindOf(chosen.corner, inputs)} · tap the ground to move him` })));
+      pick.replaceChildren(musterEl('div', { className: 'muster-who' }, musterEl('b', { textContent: `${played ? '★ ' : ''}${tname(inputs.name)}` }), musterEl('span', { textContent: t('muster.moveHim', { kind: kindOf(chosen.corner, inputs) }) })));
       return;
     }
     pick.replaceChildren(
-      musterEl('div', { className: 'muster-who' }, musterEl('b', { textContent: inputs.name }), musterEl('span', { textContent: kindOf(chosen.corner, inputs) })),
-      musterEl('button', { type: 'button', className: played ? 'on' : 'primary', textContent: played ? '★ Playing' : '▶ Play as him', onclick: () => { view.lead = played ? null : { corner: chosen.corner, man: inputs }; refresh(); } }),
-      musterEl('button', { type: 'button', textContent: '✕ Remove', onclick: () => { remove(chosen.corner, chosen.index); refresh(); } }));
+      musterEl('div', { className: 'muster-who' }, musterEl('b', { textContent: tname(inputs.name) }), musterEl('span', { textContent: kindOf(chosen.corner, inputs) })),
+      musterEl('button', { type: 'button', className: played ? 'on' : 'primary', textContent: played ? t('muster.playing') : t('muster.playAs'), onclick: () => { view.lead = played ? null : { corner: chosen.corner, man: inputs }; refresh(); } }),
+      musterEl('button', { type: 'button', textContent: t('muster.remove'), onclick: () => { remove(chosen.corner, chosen.index); refresh(); } }));
   }
 
   function refresh() {
@@ -555,7 +573,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     drawTabs();
     drawPanel();
     drawPick();
-    hint.textContent = view.note || (locked ? 'Drag a man to his place · or tap him, then the ground' : view.panning ? 'Drag to move the map · ✋ again to place men' : 'Tap the shaded ground to place · drag a man to move him · drag open ground for a block');
+    hint.textContent = view.note || (locked ? t('muster.hintLocked') : view.panning ? t('muster.hintPan') : t('muster.hint'));
     view.note = '';
     reset.disabled = !side().custom;
     start.disabled = corners.some((corner) => !sides[corner].men.length);
@@ -581,5 +599,15 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
 
   // Drawn again whenever the map's room changes (shown, turned, the window resized).
   new ResizeObserver(() => draw()).observe(map);
+  label();
   refresh();
+  // The language switched while the screen is open: its words again, the armies as they are; once it is left, nothing.
+  const off = onLangChange(() => {
+    if (!root.contains(head)) {
+      off();
+      return;
+    }
+    label();
+    refresh();
+  });
 }

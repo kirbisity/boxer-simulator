@@ -4,6 +4,7 @@
 // touches the simulation: it only changes how fast it is stepped and drawn.
 
 import { P } from './body.js';
+import { t } from './i18n.js';
 
 export const DRAMA = {
   // Simulated seconds per real second at the slowest, how long the moment
@@ -151,7 +152,7 @@ export function addIcon(drama, moment, now) {
   if (!spec || !holder) return;
   const element = document.createElement('div');
   element.className = `event-icon ${spec.tone}`;
-  element.innerHTML = `<span class="glyph">${moment.icon ?? spec.glyph}</span><b>${spec.label}</b>`;
+  element.innerHTML = `<span class="glyph">${moment.icon ?? spec.glyph}</span><b>${t(`drama.${moment.kind}`)}</b>`;
   holder.append(element);
   drama.icons.push({ element, fighter: moment.fighter, particle: moment.particle, start: now });
 }

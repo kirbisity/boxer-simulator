@@ -5,6 +5,7 @@
 import { P } from '../body.js';
 import { TEAM, teamStatus } from './team.js';
 import { levelOf } from './items.js';
+import { tname } from '../i18n.js';
 
 const teamElement = (tag, className, html = '') => Object.assign(document.createElement(tag), { className, innerHTML: html });
 
@@ -28,9 +29,11 @@ export function createTeamView(root, hooks) {
     if (!node) {
       node = panel.appendChild(teamElement('div', 'lv-mate', '<i class="lv-dot"></i><b></b><span class="lv-mate-bar"><i></i></span>'));
       node.dataset.spawn = entry.spawn;
-      node.querySelector('b').textContent = entry.name;
       rows.set(entry.id, node);
     }
+    // (Set each time it differs: a language switch renames him at once.)
+    const name = tname(entry.name);
+    if (node.querySelector('b').textContent !== name) node.querySelector('b').textContent = name;
     return node;
   }
 
@@ -38,9 +41,10 @@ export function createTeamView(root, hooks) {
     let node = tags.get(entry.id);
     if (!node) {
       node = pips.appendChild(teamElement('div', 'lv-pip', '<i></i><b></b>'));
-      node.querySelector('b').textContent = entry.name;
       tags.set(entry.id, node);
     }
+    const name = tname(entry.name);
+    if (node.querySelector('b').textContent !== name) node.querySelector('b').textContent = name;
     return node;
   }
 

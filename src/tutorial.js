@@ -7,6 +7,8 @@
 // step, swings a staff at him; the sword knocked from his hands for the
 // special button.
 
+import { getLang, onLangChange, t } from './i18n.js';
+
 export const TUTORIAL = {
   // rad of view turned to finish looking about.
   lookFor: 1.6,
@@ -140,6 +142,68 @@ export const TUTORIAL_STEPS = [
   },
 ];
 
+/** The steps' words in Chinese, by step (the English stays on the step itself, where the tests read it). */
+export const TUTORIAL_STEPS_ZH = {
+  look: {
+    title: '看看四周',
+    touch: '在摇杆和按键以外的<b>任意位置</b>拖动，转动视角。双指捏合缩放。',
+    mouse: '按住<b>鼠标右键</b>拖动（或左键，在摇杆以外的任意位置）转动视角。滚轮缩放。',
+  },
+  move: {
+    title: '移动',
+    touch: '拖动左下角的<b>摇杆</b>。推到边上并按住就是奔跑（兵器放低，没有格挡）。走到埃德里克跟前。',
+    mouse: '<b>W A S D</b> 或<b>方向键</b>朝镜头方向走；按住 <b>Shift</b> 奔跑（兵器放低，没有格挡）。走到埃德里克跟前。',
+  },
+  lock: {
+    title: '锁定',
+    touch: '点<b>锁定</b>（准星图标，在“爬行”左边）。移动时你会一直面朝埃德里克，镜头把你们俩都框在画面里。',
+    mouse: '按 <b>Tab</b> 锁定。移动时你会一直面朝埃德里克，镜头把你们俩都框在画面里。',
+  },
+  strike: {
+    title: '出招',
+    touch: '<b>在埃德里克身上点你要砍的地方</b>：头、身子或腿，左边或右边（用“按键”操作时，点彩色按键）。每种颜色是一种招式。砍出<b>三种不同</b>的招。',
+    mouse: '<b>在埃德里克身上点你要砍的地方</b>：头、身子或腿，左边或右边（用“按键”操作时，点彩色按键或按 1–6）。砍出<b>三种不同</b>的招。',
+  },
+  combo: {
+    title: '连招',
+    touch: '<b>在同一个地方快速连点两下</b>：一刀下去，紧跟着下一刀，这就是连招。',
+    mouse: '<b>在同一个地方快速连点两下</b>：一刀下去，紧跟着下一刀，这就是连招。',
+  },
+  shove: {
+    title: '推搡',
+    touch: '在任意位置<b>按住不放</b>，把他推开。对方倒地时，这一下能把他按住。',
+    mouse: '<b>按住</b>鼠标键不放，把他推开。对方倒地时，这一下能把他按住。',
+  },
+  guard: {
+    title: '格挡',
+    touch: '埃德里克要朝你挥过来了。<b>按住格挡 🛡</b>，用剑架住。轻点一下则是闪避。',
+    mouse: '埃德里克要朝你挥过来了。<b>按住 T</b>，用剑架住。轻点一下则是闪避。',
+  },
+  pickUp: {
+    title: '特殊键',
+    touch: '你的剑被打飞了。<b>特殊键</b>（右侧最上方）会随情况变化：现在它写着<b>捡起 ✋</b>。点它。',
+    mouse: '你的剑被打飞了。<b>特殊动作</b>会随情况变化：现在是<b>捡起 ✋</b>。按 <b>F</b>。',
+  },
+  unlock: {
+    title: '解除锁定',
+    touch: '再点一下亮着的<b>锁定</b>，放开埃德里克。镜头又回到你身后。',
+    mouse: '再按一下 <b>Tab</b>，放开埃德里克。镜头又回到你身后。',
+  },
+  jump: {
+    title: '跳跃',
+    touch: '点<b>跳跃</b>（右侧，格挡上方）。跳多高全看你这副身子：腿力、体重、盔甲、累不累。能跳上矮台，跃过沟坎。',
+    mouse: '按<b>空格</b>跳跃。跳多高全看你这副身子：腿力、体重、盔甲、累不累。能跳上矮台，跃过沟坎。',
+  },
+  crawl: {
+    title: '爬行',
+    touch: '点<b>爬行</b>（右侧最下方），手脚着地：身子低，走得慢，不容易被发现。再点一下（<b>站起</b>）起身。锁定时不能爬。',
+    mouse: '按 <b>C</b> 手脚着地：身子低，走得慢，不容易被发现。再按一下起身。锁定时不能爬。',
+  },
+};
+
+/** A step's words (`title`, `touch`, `mouse`) in the language in force: its English, or its `zh` (TUTORIAL_STEPS_ZH). */
+const tutorialWords = (step, field) => (getLang() === 'zh' && TUTORIAL_STEPS_ZH[step.key]?.[field]) || step[field];
+
 /** A step's progress, from nothing. */
 const freshProgress = () => ({ look: 0, walked: 0, near: false, locked: false, kinds: new Set(), combos: 0, holds: 0, blocked: 0, guarded: 0, armed: false, landed: 0, crawled: false, stood: false });
 
@@ -216,13 +280,20 @@ export function installTutorial(root, hooks) {
   card.hidden = true;
   card.setAttribute('aria-live', 'polite');
   card.innerHTML = '<div class="head"><em class="count"></em><b class="title"></b><span class="tick">✓</span></div><p class="text"></p>'
-    + '<div class="actions"><button type="button" class="skip">Skip step</button><button type="button" class="exit" hidden>Menu</button></div>';
+    + `<div class="actions"><button type="button" class="skip">${t('tutorial.skipStep')}</button><button type="button" class="exit" hidden>${t('tutorial.menu')}</button></div>`;
   // Out of the whole yard to the home screen, at any moment: big, in the corner, always there.
-  const skipAll = root.appendChild(cardElement('button', 'tutorial-skip', 'Skip tutorial <b>›</b>'));
+  const skipAll = root.appendChild(cardElement('button', 'tutorial-skip', t('tutorial.skipAll')));
   skipAll.type = 'button';
   skipAll.hidden = true;
-  skipAll.setAttribute('aria-label', 'Skip the tutorial: go to the menu');
+  skipAll.setAttribute('aria-label', t('tutorial.skipAllLabel'));
   skipAll.addEventListener('click', () => hooks.exit());
+  // The card in the new language when it changes (src/i18n.js), mid-step too.
+  onLangChange(() => {
+    card.querySelector('.exit').textContent = t('tutorial.menu');
+    skipAll.innerHTML = t('tutorial.skipAll');
+    skipAll.setAttribute('aria-label', t('tutorial.skipAllLabel'));
+    if (run) show();
+  });
   let run = null;
   let device = 'touch';
   let doneAt = null;
@@ -234,18 +305,18 @@ export function installTutorial(root, hooks) {
     card.classList.toggle('finished', !step);
     card.classList.remove('done');
     if (!step) {
-      card.querySelector('.count').textContent = 'Training yard';
-      card.querySelector('.title').textContent = 'Well done';
-      card.querySelector('.text').innerHTML = 'That is every control. Lock on, cut where you tap him, guard when he swings, and the special button does the rest. Back to the menu in a moment.';
-      card.querySelector('.skip').textContent = 'Again';
+      card.querySelector('.count').textContent = t('tutorial.yard');
+      card.querySelector('.title').textContent = t('tutorial.welldone');
+      card.querySelector('.text').innerHTML = t('tutorial.finished');
+      card.querySelector('.skip').textContent = t('tutorial.again');
       card.querySelector('.exit').hidden = false;
       skipAll.hidden = true;
       return;
     }
-    card.querySelector('.count').textContent = `Training yard · ${run.index + 1} of ${TUTORIAL_STEPS.length}`;
-    card.querySelector('.title').textContent = step.title;
-    card.querySelector('.text').innerHTML = device === 'mouse' ? step.mouse : step.touch;
-    card.querySelector('.skip').textContent = 'Skip step';
+    card.querySelector('.count').textContent = t('tutorial.count', { at: run.index + 1, of: TUTORIAL_STEPS.length });
+    card.querySelector('.title').textContent = tutorialWords(step, 'title');
+    card.querySelector('.text').innerHTML = tutorialWords(step, device === 'mouse' ? 'mouse' : 'touch');
+    card.querySelector('.skip').textContent = t('tutorial.skipStep');
     card.querySelector('.exit').hidden = true;
     skipAll.hidden = false;
   }

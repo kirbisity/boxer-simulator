@@ -10,6 +10,7 @@ import { opponentFor } from '../physics.js';
 import { attackMark, moveName } from '../control.js';
 import { FIGHT_UI, fightUiColour, fightUiMoves, fightUiZoneOf } from './logic.js';
 import { FIGHT_UI_OUTCOME_GLYPHS, fightUiIcon } from './icons.js';
+import { t, tname } from '../i18n.js';
 
 export const FIGHT_UI_KIT = {
   // The word stays this long (s) from the blow, and this long after how it went is known.
@@ -93,7 +94,7 @@ export function fightUiLegend() {
     straight: { travel: null, group: 'straight', limb: 'fist', side: 0 }, side: { travel: [1, 0], group: 'side', limb: 'fist' }, down: { travel: [0, -1], group: 'down', limb: 'fist' },
     rising: { travel: [0, 1], group: 'rising', limb: 'fist' }, low: { travel: [1, 0.1], group: 'low', limb: 'foot' }, push: { travel: null, group: 'push', limb: 'body' },
   };
-  return FIGHT_UI.groups.map((group) => `<span class="fu-key" style="--fu-col:${fightUiColour(group)}"><i>${fightUiIcon(sample[group], { mark: false })}</i>${FIGHT_UI.groupNames[group]}</span>`).join('');
+  return FIGHT_UI.groups.map((group) => `<span class="fu-key" style="--fu-col:${fightUiColour(group)}"><i>${fightUiIcon(sample[group], { mark: false })}</i>${t(`fightui.group.${group}`)}</span>`).join('');
 }
 
 /**
@@ -208,7 +209,7 @@ export function fightUiKit(root, hooks) {
       const colour = entry ? fightUiColour(entry.group) : '#ffffff';
       toast.style.setProperty('--fu-col', colour);
       toast.querySelector('.fu-toast-icon').innerHTML = entry ? fightUiIcon(entry, { mark: false }) : '';
-      toast.querySelector('.fu-toast-name').textContent = entry?.name ?? moveName(punch.type).name;
+      toast.querySelector('.fu-toast-name').textContent = tname(entry?.name ?? moveName(punch.type).name);
       toast.querySelector('.fu-toast-outcome span').textContent = '';
       toast.querySelector('.fu-toast-outcome i').innerHTML = '';
       toast.dataset.outcome = '';
@@ -232,7 +233,7 @@ export function fightUiKit(root, hooks) {
         strike.outcomeAt = now;
         strike.event = event;
         toast.dataset.outcome = outcome;
-        toast.querySelector('.fu-toast-outcome span').textContent = FIGHT_UI_OUTCOME_WORDS[outcome];
+        toast.querySelector('.fu-toast-outcome span').textContent = t(`fightui.outcome.${outcome}`);
         toast.querySelector('.fu-toast-outcome i').innerHTML = FIGHT_UI_OUTCOME_GLYPHS[outcome] ?? '';
         marks()?.land(outcome, strike.event?.point ?? null);
         for (const listener of listeners) listener.outcome?.(strike);

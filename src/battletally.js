@@ -8,6 +8,7 @@
 
 import { hurtShare } from './ai.js';
 import { inFight, legShare } from './physics.js';
+import { t } from './i18n.js';
 
 /**
  * How hurt a man who lived must be to count as wounded (0..1, of hurtShare or
@@ -84,11 +85,11 @@ export function battleTally(world) {
  * then became of the runners; else it was cut down.
  */
 export function howBeaten(side) {
-  if (side.broke * 2 >= side.men && side.broke > 0) return side.fled * 2 >= side.men ? 'broke and fled the field' : 'broke and ran';
-  return side.killed === side.men ? 'were cut down to the last man' : 'were cut down';
+  if (side.broke * 2 >= side.men && side.broke > 0) return t(side.fled * 2 >= side.men ? 'tally.brokeFled' : 'tally.brokeRan');
+  return t(side.killed === side.men ? 'tally.cutLast' : 'tally.cut');
 }
 
-/** The summary's rows, in order: [field, label], each shown only when some side has any (men always). */
+/** The summary's rows, in order: [field, label], each shown only when some side has any (men always); tallyRows gives the label in the language in force (tally.<field>). */
 export const TALLY_ROWS = [
   ['men', 'Men'],
   ['killed', 'Killed'],
@@ -101,7 +102,7 @@ export const TALLY_ROWS = [
 
 /** The rows worth showing for a tally: men, and every other row some side has any of. */
 export function tallyRows(tally) {
-  return TALLY_ROWS.filter(([field]) => field === 'men' || tally.red[field] > 0 || tally.blue[field] > 0);
+  return TALLY_ROWS.filter(([field]) => field === 'men' || tally.red[field] > 0 || tally.blue[field] > 0).map(([field]) => [field, t(`tally.${field}`)]);
 }
 
 /**
@@ -127,15 +128,15 @@ export function notableFacts(world, nameOf = (fighter) => fighter.body.inputs.na
     return true;
   }, 2);
   const blows = kills ? null : top((event) => event.kind === 'landed', 3);
-  if (kills) facts.push({ label: 'Most kills', who: kills.fighter, name: nameOf(kills.fighter), count: kills.count });
-  else if (blows) facts.push({ label: 'Most blows', who: blows.fighter, name: nameOf(blows.fighter), count: blows.count });
+  if (kills) facts.push({ label: t('tally.mostKills'), who: kills.fighter, name: nameOf(kills.fighter), count: kills.count });
+  else if (blows) facts.push({ label: t('tally.mostBlows'), who: blows.fighter, name: nameOf(blows.fighter), count: blows.count });
   const arrows = world.events.filter((event) => event.kind === 'loosed').length;
   const shots = world.events.filter((event) => event.kind === 'shot').length;
   // A general cut down, or broken, and command passed (ai.js AI.general).
   const generals = world.events.filter((event) => event.kind === 'generalFell').length;
-  if (generals) facts.push({ label: generals > 1 ? 'Generals fallen' : 'A general fell', count: generals });
-  if (arrows) facts.push({ label: 'Arrows loosed', count: arrows });
-  if (shots) facts.push({ label: 'Shots fired', count: shots });
+  if (generals) facts.push({ label: t(generals > 1 ? 'tally.generals' : 'tally.general'), count: generals });
+  if (arrows) facts.push({ label: t('tally.arrows'), count: arrows });
+  if (shots) facts.push({ label: t('tally.shots'), count: shots });
   return facts;
 }
 

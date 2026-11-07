@@ -9,6 +9,7 @@
 import { LAST_GATE, LAST_GATE_MODES, lastGateClock, lastGatePosterWords, lastGateShareText } from './lastgate.js';
 import { FACTIONS } from './outfits.js';
 import { readSquad, SQUAD, squadCanAdd, squadSpent, squadStep, squadUnits, writeSquad } from './squad.js';
+import { getLang, onLangChange, pick, SEP, t, tname } from './i18n.js';
 
 const lgEl = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
@@ -18,6 +19,11 @@ const lgEl = (tag, props = {}, ...children) => {
 
 // How long (ms) a word in the middle stays.
 const LAST_GATE_TOAST_MS = 1800;
+
+/** A line of names kept English in the data ("Ashigaru · Yari"), each part in the language in force. */
+const lgWords = (line) => String(line ?? '').split(SEP).map(tname).join(SEP);
+/** A faction's name with its glyph, as a group's heading. */
+const lgFaction = (faction) => `${FACTIONS[faction]?.glyph ?? ''} ${tname(FACTIONS[faction]?.label ?? faction)}`;
 
 /** A rating's stars as text: ★ for each, ☆ to five. */
 const lgStars = (count) => `${'★'.repeat(count)}${'☆'.repeat(Math.max(0, 5 - count))}`;
@@ -30,14 +36,27 @@ export function createLastGateView(root) {
   const squadKills = lgEl('b', { className: 'lg-squad-kills', textContent: '0' });
   const men = lgEl('b', { className: 'lg-men', textContent: '0' });
   const best = lgEl('b', { className: 'lg-best', textContent: '–' });
-  const stat = (label, value, title, className = '') => lgEl('span', { className: `lg-stat ${className}`, title }, lgEl('em', { textContent: label }), value);
+  // Each stat's label and tooltip by key (squad.stat.<key>, …Tip), set again when the language changes.
+  const labelled = [];
+  const stat = (key, value, className = '') => {
+    const label = lgEl('em');
+    const node = lgEl('span', { className: `lg-stat ${className}` }, label, value);
+    labelled.push(() => {
+      label.textContent = t(`squad.stat.${key}`);
+      node.title = t(`squad.stat.${key}Tip`);
+    });
+    return node;
+  };
   const hud = lgEl('div', { className: 'lg-hud', hidden: true, ariaLive: 'off' },
-    stat('Wave', wave, 'The wave now'),
-    stat('Time', time, 'How long the squad has lasted'),
-    stat('You', kills, 'Your kills'),
-    stat('Squad', squadKills, 'Your men\'s kills'),
-    stat('Men', men, 'Your men still on their feet'),
-    stat('Best', best, 'This level\'s best: kills', 'lg-best-stat'));
+    stat('wave', wave),
+    stat('time', time),
+    stat('you', kills),
+    stat('squad', squadKills),
+    stat('men', men),
+    stat('best', best, 'lg-best-stat'));
+  const relabel = () => labelled.forEach((set) => set());
+  relabel();
+  onLangChange(relabel);
   const toast = lgEl('div', { className: 'lg-toast', hidden: true, ariaLive: 'polite' });
   const card = lgEl('div', { className: 'lg-end', hidden: true, role: 'dialog', ariaModal: 'true' });
   root.append(hud, toast, card);
@@ -67,7 +86,7 @@ export function createLastGateView(root) {
       card.hidden = true;
       toast.hidden = true;
       shown = {};
-      say('Hold the line', 'lg-hint');
+      say(t('squad.hold'), 'lg-hint');
     },
     /** Each frame: the strip as the run stands (`up`/`all`: the squad's men on their feet, and in all; `best`: the level's best run or null). */
     update(run, { up = 0, all = 0, best: record = null } = {}) {
@@ -81,8 +100,8 @@ export function createLastGateView(root) {
     },
     /** The run's news: a wave come, a wave cleared. */
     news(item) {
-      if (item.kind === 'wave') say(`Wave ${item.wave}`, 'lg-wave-word');
-      else if (item.kind === 'cleared') say(`Wave ${item.wave} cleared`, 'lg-cleared');
+      if (item.kind === 'wave') say(t('squad.waveCome', { n: item.wave }), 'lg-wave-word');
+      else if (item.kind === 'cleared') say(t('squad.waveCleared', { n: item.wave }), 'lg-cleared');
     },
     /**
      * The end: the run's poster (`result`: lastgate.js lastGateResult; `hero`: his fighter drawn alone, a canvas clear round
@@ -100,35 +119,35 @@ export function createLastGateView(root) {
       const fallback = lgEl('textarea', { className: 'lg-share-text', readOnly: true, value: line, hidden: true, rows: 2 });
       const share = async () => {
         const blob = await new Promise((done) => (poster.toBlob ? poster.toBlob(done, 'image/png') : done(null)));
-        const how = await lastGateShare({ blob, text: line, title: LAST_GATE.title, save: lastGateSave });
+        const how = await lastGateShare({ blob, text: line, title: tname(LAST_GATE.title), save: lastGateSave });
         note.hidden = !['download', 'copied', 'select', 'text'].includes(how);
-        note.textContent = { download: 'Poster saved; the line is copied.', copied: 'Copied: paste it anywhere.', select: 'Copy the line below.', text: 'Shared.' }[how] ?? '';
+        note.textContent = ['download', 'copied', 'select', 'text'].includes(how) ? t(`squad.note.${how}`) : '';
         fallback.hidden = how !== 'select';
         if (how === 'select') fallback.select();
       };
       const board = lgEl('div', { className: 'lg-end-board', hidden: true },
-        ranked?.rank ? lgEl('p', { className: 'lg-rank', textContent: ranked.rank === 1 ? 'Your best run yet' : `Your #${ranked.rank} run` }) : null,
+        ranked?.rank ? lgEl('p', { className: 'lg-rank', textContent: ranked.rank === 1 ? t('squad.rankBest') : t('squad.rank', { n: ranked.rank }) }) : null,
         lastGateBoardList(ranked?.runs ?? [], ranked?.rank ?? null));
-      const boardButton = lgEl('button', { type: 'button', className: 'lg-board-link', textContent: '🏆 Best runs', onclick: () => {
+      const boardButton = lgEl('button', { type: 'button', className: 'lg-board-link', textContent: t('squad.board'), onclick: () => {
         board.hidden = !board.hidden;
-        boardButton.textContent = board.hidden ? '🏆 Best runs' : '✕ Close';
+        boardButton.textContent = board.hidden ? t('squad.board') : t('squad.boardClose');
       } });
       const figure = (value, label) => lgEl('span', { className: 'lg-score-figure' }, lgEl('b', { textContent: value }), lgEl('span', { textContent: label }));
       const score = lgEl('div', { className: 'lg-score' },
-        figure(String(result.heroKills), 'yours'),
-        figure(String(result.squadKills), 'squad'),
-        figure(String(result.waves), result.waves === 1 ? 'wave' : 'waves'),
-        figure(lastGateClock(result.seconds), 'lasted'),
-        ranked?.rank === 1 ? lgEl('em', { className: 'lg-new-best', textContent: '★ New best' }) : null);
+        figure(String(result.heroKills), t('squad.score.yours')),
+        figure(String(result.squadKills), t('squad.score.squad')),
+        figure(String(result.waves), t(result.waves === 1 ? 'squad.score.wave' : 'squad.score.waves')),
+        figure(lastGateClock(result.seconds), t('squad.score.lasted')),
+        ranked?.rank === 1 ? lgEl('em', { className: 'lg-new-best', textContent: t('squad.newBest') }) : null);
       card.replaceChildren(lgEl('div', { className: 'lg-end-stack' },
         lgEl('div', { className: 'lg-poster-frame' }, poster, board),
         score,
         note, fallback,
         lgEl('div', { className: 'lg-actions' },
-          lgEl('button', { type: 'button', textContent: '☰', title: 'Menu', ariaLabel: 'Menu', onclick: menu }),
-          squad ? lgEl('button', { type: 'button', className: 'lg-squad', textContent: '⚔ Squad', title: 'Change the squad', onclick: squad }) : null,
-          lgEl('button', { type: 'button', className: 'lg-share', textContent: '↗ Share', onclick: share }),
-          lgEl('button', { type: 'button', className: 'primary', textContent: '↻ Again', onclick: again })),
+          lgEl('button', { type: 'button', textContent: '☰', title: t('squad.menu'), ariaLabel: t('squad.menu'), onclick: menu }),
+          squad ? lgEl('button', { type: 'button', className: 'lg-squad', textContent: t('squad.squad'), title: t('squad.squadTip'), onclick: squad }) : null,
+          lgEl('button', { type: 'button', className: 'lg-share', textContent: t('squad.share'), onclick: share }),
+          lgEl('button', { type: 'button', className: 'primary', textContent: t('squad.again'), onclick: again })),
         boardButton));
       card.hidden = false;
     },
@@ -145,15 +164,15 @@ export function createLastGateView(root) {
 
 /** The best runs, as a short ranked list (`mark`: this run's place, lit). Also the menu's. */
 export function lastGateBoardList(runs, mark = null) {
-  if (!runs.length) return lgEl('p', { className: 'lg-board-empty', textContent: 'No runs yet. How long can your squad last?' });
+  if (!runs.length) return lgEl('p', { className: 'lg-board-empty', textContent: t('squad.boardEmpty') });
   const day = (date) => {
     const at = new Date(date);
-    return Number.isNaN(at.getTime()) ? '' : at.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    return Number.isNaN(at.getTime()) ? '' : at.toLocaleDateString(getLang() === 'zh' ? 'zh-CN' : undefined, { day: 'numeric', month: 'short' });
   };
   return lgEl('ol', { className: 'lg-board' }, ...runs.map((run, index) => lgEl('li', { className: index + 1 === mark ? 'mine' : '' },
     lgEl('span', { className: 'lg-board-rank', textContent: String(index + 1) }),
-    lgEl('b', { textContent: `${run.kills} kill${run.kills === 1 ? '' : 's'}` }),
-    lgEl('span', { className: 'lg-board-waves', textContent: `${run.waves ?? 0} wave${run.waves === 1 ? '' : 's'}` }),
+    lgEl('b', { textContent: t(run.kills === 1 ? 'squad.kill' : 'squad.kills', { n: run.kills }) }),
+    lgEl('span', { className: 'lg-board-waves', textContent: t(run.waves === 1 ? 'squad.wave' : 'squad.waves', { n: run.waves ?? 0 }) }),
     lgEl('span', { textContent: lastGateClock(run.seconds) }),
     lgEl('span', { className: 'lg-board-date', textContent: day(run.date) }))));
 }
@@ -168,7 +187,8 @@ export function lastGateBoardList(runs, mark = null) {
  * name and look (`portrait`: a promise of a picture's url, or null), `onBack()`, `onNext(men, picks)` with the squad's men
  * (squad.js squadMen) when the player goes on to place them; the squad bought is kept in `storage` for the next visit.
  */
-export function lastStandBuilder(root, { mode, onBack, onNext, portrait = null, storage = globalThis.localStorage }) {
+export function lastStandBuilder(root, options) {
+  const { mode, onBack, onNext, portrait = null, storage = globalThis.localStorage } = options;
   const spec = LAST_GATE_MODES[mode] ?? LAST_GATE_MODES.samurai;
   const units = squadUnits(spec.factions);
   let picks = readSquad(mode, units, { storage, prefer: spec.soldier });
@@ -176,43 +196,44 @@ export function lastStandBuilder(root, { mode, onBack, onNext, portrait = null, 
   root.replaceChildren();
   root.className = 'screen ls-builder';
   const head = lgEl('header', { className: 'screen-head' },
-    lgEl('button', { className: 'back', type: 'button', textContent: '← Back', onclick: onBack }),
+    lgEl('button', { className: 'back', type: 'button', textContent: t('common.back'), onclick: onBack }),
     lgEl('div', { className: 'titles' },
-      lgEl('h1', { textContent: `${spec.glyph} ${spec.title}` }),
-      lgEl('p', { className: 'lede', textContent: `Level ${spec.level} · ${spec.region}. Pick your squad: ${SQUAD.budget} points, up to ${SQUAD.most} men beside you.` })));
+      lgEl('h1', { textContent: `${spec.glyph} ${tname(spec.title)}` }),
+      lgEl('p', { className: 'lede', textContent: t('squad.lede', { level: spec.level, region: tname(spec.region), budget: SQUAD.budget, most: SQUAD.most }) })));
   const look = lgEl('img', { alt: '', draggable: false });
   portrait?.then((url) => { look.src = url; });
   const heroRow = lgEl('div', { className: 'ls-hero' },
     lgEl('span', { className: 'ls-hero-look' }, look),
-    lgEl('span', { className: 'ls-hero-words' }, lgEl('em', { textContent: 'You · free' }), lgEl('b', { textContent: `${spec.label} · ${spec.weapon}` }), lgEl('span', { textContent: spec.strength })));
+    lgEl('span', { className: 'ls-hero-words' }, lgEl('em', { textContent: t('squad.youFree') }), lgEl('b', { textContent: `${tname(spec.label)} · ${tname(spec.weapon)}` }), lgEl('span', { textContent: pick(spec.strength) })));
   const purse = lgEl('div', { className: 'ls-purse' });
   const list = lgEl('div', { className: 'ls-units' });
-  const next = lgEl('button', { type: 'button', className: 'primary ls-next', textContent: 'Place the squad →' });
+  const next = lgEl('button', { type: 'button', className: 'primary ls-next', textContent: t('squad.next') });
   root.append(head, lgEl('div', { className: 'ls-body' }, heroRow, purse, list, lgEl('div', { className: 'ls-foot' }, next)));
 
   function draw() {
     const { points, men } = squadSpent(units, picks);
     purse.replaceChildren(
-      lgEl('span', { className: 'ls-points' }, lgEl('b', { textContent: String(SQUAD.budget - points) }), ' points left'),
+      lgEl('span', { className: 'ls-points' }, lgEl('b', { textContent: String(SQUAD.budget - points) }), t('squad.pointsLeft')),
       lgEl('span', { className: 'ls-bar', ariaHidden: 'true' }, lgEl('i', { style: `width: ${Math.min(100, (100 * points) / SQUAD.budget)}%` })),
-      lgEl('span', { className: 'ls-men' }, lgEl('b', { textContent: String(men + 1) }), ` men · ${SQUAD.most + 1} at most`),
-      lgEl('button', { type: 'button', className: 'ls-clear', textContent: 'Clear', disabled: !men, onclick: () => { picks = {}; changed(); } }));
+      lgEl('span', { className: 'ls-men' }, lgEl('b', { textContent: String(men + 1) }), t('squad.menMost', { most: SQUAD.most + 1 })),
+      lgEl('button', { type: 'button', className: 'ls-clear', textContent: t('squad.clear'), disabled: !men, onclick: () => { picks = {}; changed(); } }));
     const row = (unit) => {
       const count = picks[unit.key] ?? 0;
+      const name = lgWords(unit.label);
       return lgEl('div', { className: `ls-unit${count ? ' on' : ''}` },
         lgEl('span', { className: 'ls-unit-words' },
-          lgEl('b', { textContent: `${unit.label}${unit.shoots ? ' 🏹' : ''}` }),
-          lgEl('span', { className: 'ls-stars', title: `${unit.stars} of 5 stars (its rating)`, textContent: lgStars(unit.stars) }),
-          lgEl('small', { textContent: unit.line })),
-        lgEl('span', { className: 'ls-cost', title: 'Its price in points' }, lgEl('b', { textContent: String(unit.cost) }), ' pts'),
-        lgEl('button', { type: 'button', className: 'step', textContent: '−', ariaLabel: `One ${unit.label} fewer`, disabled: !count, onclick: () => { picks = squadStep(units, picks, unit.key, -1); changed(); } }),
+          lgEl('b', { textContent: `${name}${unit.shoots ? ' 🏹' : ''}` }),
+          lgEl('span', { className: 'ls-stars', title: t('squad.stars', { n: unit.stars }), textContent: lgStars(unit.stars) }),
+          lgEl('small', { textContent: lgWords(unit.line) })),
+        lgEl('span', { className: 'ls-cost', title: t('squad.priceTip') }, lgEl('b', { textContent: String(unit.cost) }), t('squad.pts')),
+        lgEl('button', { type: 'button', className: 'step', textContent: '−', ariaLabel: t('squad.fewer', { unit: name }), disabled: !count, onclick: () => { picks = squadStep(units, picks, unit.key, -1); changed(); } }),
         lgEl('b', { className: 'ls-count', textContent: String(count) }),
-        lgEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: `One more ${unit.label}`, disabled: !squadCanAdd(units, picks, unit.key), onclick: () => { picks = squadStep(units, picks, unit.key, 1); changed(); } }));
+        lgEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: t('squad.more', { unit: name }), disabled: !squadCanAdd(units, picks, unit.key), onclick: () => { picks = squadStep(units, picks, unit.key, 1); changed(); } }));
     };
     const group = (label, members) => (members.length ? [lgEl('h3', { className: 'ls-group', textContent: label }), ...members.map(row)] : []);
-    const own = spec.factions.flatMap((faction) => group(`${FACTIONS[faction]?.glyph ?? ''} ${FACTIONS[faction]?.label ?? faction}`, units.filter((unit) => unit.faction === faction)));
-    const toggle = lgEl('button', { type: 'button', className: 'ls-others', textContent: others ? '▾ Mercenaries: every other fighter' : '▸ Mercenaries: every other fighter', ariaExpanded: String(others), onclick: () => { others = !others; draw(); } });
-    const rest = others ? Object.keys(FACTIONS).filter((faction) => !spec.factions.includes(faction)).flatMap((faction) => group(`${FACTIONS[faction].glyph ?? ''} ${FACTIONS[faction].label}`, units.filter((unit) => unit.faction === faction))) : [];
+    const own = spec.factions.flatMap((faction) => group(lgFaction(faction), units.filter((unit) => unit.faction === faction)));
+    const toggle = lgEl('button', { type: 'button', className: 'ls-others', textContent: others ? t('squad.mercsOpen') : t('squad.mercsShut'), ariaExpanded: String(others), onclick: () => { others = !others; draw(); } });
+    const rest = others ? Object.keys(FACTIONS).filter((faction) => !spec.factions.includes(faction)).flatMap((faction) => group(lgFaction(faction), units.filter((unit) => unit.faction === faction))) : [];
     const scroll = list.scrollTop;
     list.replaceChildren(...own, toggle, ...rest);
     list.scrollTop = scroll;
@@ -223,6 +244,11 @@ export function lastStandBuilder(root, { mode, onBack, onNext, portrait = null, 
   }
   next.addEventListener('click', () => onNext(units.flatMap((unit) => Array.from({ length: picks[unit.key] ?? 0 }, () => unit.make())), picks));
   draw();
+  // The language switched while the builder is open: drawn again in it (the squad is kept in storage); once it is left, nothing.
+  const off = onLangChange(() => {
+    off();
+    if (root.contains(head)) lastStandBuilder(root, options);
+  });
 }
 
 // ---- The poster -------------------------------------------------------------------------------------------------------------
@@ -259,7 +285,7 @@ export async function lastGatePoster(words, hero = null) {
   canvas.width = w;
   canvas.height = h;
   const g = canvas.getContext('2d');
-  const display = (size, weight = 700) => `${weight} ${size}px Oswald, Impact, 'Arial Narrow', sans-serif`;
+  const display = (size, weight = 700) => `${weight} ${size}px Oswald, Impact, 'Arial Narrow', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif`;
   const rand = lgPosterRandom(17);
   // The sky and the ground.
   const sky = g.createLinearGradient(0, 0, 0, h);

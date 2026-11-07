@@ -2,6 +2,8 @@
 // (master, effects, ambience, music and voices, and the Speakers toggle), and the menus' own sounds (a click on a button, a confirm on
 // one that starts something, a back). Browser only.
 
+import { onLangChange, t } from '../i18n.js';
+
 /** The speaker's icon, on or struck through (inline SVG, as the fight UI's icons are). */
 export function speakerIcon(muted) {
   const waves = muted
@@ -19,8 +21,8 @@ export function installMuteButton(engine, parent = document.body) {
   const draw = () => {
     const muted = engine.settings.muted;
     button.innerHTML = speakerIcon(muted);
-    button.setAttribute('aria-label', muted ? 'Sound off: turn it on' : 'Sound on: mute it');
-    button.title = muted ? 'Sound off (tap to turn on)' : 'Sound on (tap to mute)';
+    button.setAttribute('aria-label', muted ? t('settings.audio.offLabel') : t('settings.audio.onLabel'));
+    button.title = muted ? t('settings.audio.offTitle') : t('settings.audio.onTitle');
     button.setAttribute('aria-pressed', String(muted));
   };
   button.addEventListener('click', (press) => {
@@ -29,27 +31,28 @@ export function installMuteButton(engine, parent = document.body) {
     engine.toggleMute();
   });
   engine.onChange(draw);
+  onLangChange(draw);
   draw();
   parent.append(button);
   return button;
 }
 
 /** The mixer's sliders, as they are labelled. */
-const MIXER_LEVELS = [['master', 'Master'], ['effects', 'Effects'], ['voices', 'Voices'], ['ambience', 'Ambience'], ['music', 'Music']];
+const MIXER_LEVELS = [['master', 'settings.audio.master'], ['effects', 'settings.audio.effects'], ['voices', 'settings.audio.voices'], ['ambience', 'settings.audio.ambience'], ['music', 'settings.audio.music']];
 
 /** The Audio section of the settings: a slider for each level and the Speakers toggle, saved as they change. */
 export function audioMixer(engine) {
   const section = document.createElement('section');
   section.className = 'audio-mixer';
-  section.setAttribute('aria-label', 'Audio');
+  section.setAttribute('aria-label', t('settings.audio'));
   const title = document.createElement('h2');
-  title.textContent = 'Audio';
+  title.textContent = t('settings.audio');
   section.append(title);
   for (const [name, label] of MIXER_LEVELS) {
     const row = document.createElement('label');
     row.className = 'mixer-row';
     const words = document.createElement('span');
-    words.textContent = label;
+    words.textContent = t(label);
     const slider = document.createElement('input');
     slider.type = 'range';
     slider.min = '0';
@@ -69,14 +72,14 @@ export function audioMixer(engine) {
   const toggle = document.createElement('label');
   toggle.className = 'mixer-row mixer-toggle';
   const words = document.createElement('span');
-  words.textContent = 'Speakers';
+  words.textContent = t('settings.audio.speakers');
   const box = document.createElement('input');
   box.type = 'checkbox';
   box.checked = engine.speakers();
   box.dataset.setting = 'speakers';
   const note = document.createElement('em');
   const explain = () => {
-    note.textContent = box.checked ? 'Stereo panning; behind sounds duller' : '3-D for headphones: front, back and height';
+    note.textContent = box.checked ? t('settings.audio.speakersOn') : t('settings.audio.speakersOff');
   };
   explain();
   box.addEventListener('change', () => {
@@ -87,7 +90,7 @@ export function audioMixer(engine) {
   const mute = document.createElement('label');
   mute.className = 'mixer-row mixer-toggle';
   const muteWords = document.createElement('span');
-  muteWords.textContent = 'Mute';
+  muteWords.textContent = t('settings.audio.mute');
   const muteBox = document.createElement('input');
   muteBox.type = 'checkbox';
   muteBox.checked = engine.settings.muted;

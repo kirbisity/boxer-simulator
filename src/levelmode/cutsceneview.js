@@ -13,6 +13,7 @@ import { P } from '../body.js';
 import { CUTSCENE, createCutscene, cutsceneHolds, cutsceneLook, cutscenePhase, cutsceneSpeed, skipCutscene, stepCutscene } from './cutscene.js';
 import { TWIST, endingHold, endingOf, endingRelease, endingWatched, nonameOf } from './ending.js';
 import { bossStatus } from './level.js';
+import { t, tname } from '../i18n.js';
 
 /** How the camera frames the boss (it is a camera, not a timing, so it lives here): a low angle, a little way off, looking up at a giant. */
 export const CUTSCENE_CAMERA = {
@@ -58,11 +59,11 @@ export function createCutsceneDirector(hooks) {
     layer.setAttribute('aria-hidden', 'true');
     const embers = Array.from({ length: 16 }, (_, index) => `<i style="left:${(index * 53 + 11) % 100}%;animation-delay:${((index * 37) % 50) / 10}s;animation-duration:${5 + (index % 5)}s"></i>`).join('');
     layer.innerHTML = `<div class="cs-bar cs-top"></div><div class="cs-bar cs-bottom"></div><div class="cs-embers">${embers}</div>
-      <div class="cs-title"><div class="cs-name"><span></span><em>·</em><b>${CUTSCENE.words.felled}</b></div><div class="cs-rule"></div><p class="cs-line"></p></div>
-      <div class="cs-skip">Tap to skip</div>`;
-    layer.querySelector('.cs-name span').textContent = name.toUpperCase();
+      <div class="cs-title"><div class="cs-name"><span></span><em>·</em><b>${t('level.felled')}</b></div><div class="cs-rule"></div><p class="cs-line"></p></div>
+      <div class="cs-skip">${t('level.tapToSkip')}</div>`;
+    layer.querySelector('.cs-name span').textContent = tname(name).toUpperCase();
     layer.querySelector('.cs-line').innerHTML = CUTSCENE.words.line.map((line) => `<span></span>`).join('');
-    layer.querySelectorAll('.cs-line span').forEach((span, index) => { span.textContent = CUTSCENE.words.line[index]; });
+    layer.querySelectorAll('.cs-line span').forEach((span, index) => { span.textContent = tname(CUTSCENE.words.line[index]); });
     nodes = {
       top: layer.querySelector('.cs-top'), bottom: layer.querySelector('.cs-bottom'), title: layer.querySelector('.cs-title'),
       line: layer.querySelector('.cs-line'), embers: layer.querySelector('.cs-embers'), skip: layer.querySelector('.cs-skip'),
@@ -86,7 +87,7 @@ export function createCutsceneDirector(hooks) {
     run = { world, state: createCutscene(), yaw: null };
     endingWatched(world);
     endingHold(world, true);
-    build(bossStatus(world).name || 'The boss');
+    build(bossStatus(world).name || t('level.theBoss'));
     return true;
   }
 
@@ -261,7 +262,7 @@ export function createTwistDirector(hooks) {
     nodes.black.style.opacity = String(look.black);
     nodes.top.style.transform = `scaleY(${look.bars})`;
     nodes.bottom.style.transform = `scaleY(${look.bars})`;
-    if (lineUp && nodes.line.textContent !== line.text) nodes.line.textContent = line.text;
+    if (lineUp && nodes.line.textContent !== tname(line.text)) nodes.line.textContent = tname(line.text);
     nodes.line.classList.toggle('shown', lineUp);
     document.body.classList.toggle('cutscene', look.bars > 0.05);
   }

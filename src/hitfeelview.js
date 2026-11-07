@@ -5,6 +5,18 @@
 /* global THREE */
 
 import { HITFEEL } from './hitfeel.js';
+import { pick, t } from './i18n.js';
+
+// The settings' words for each effect (hitfeel.js keeps its English label and note), in either language.
+const HITFEEL_WORDS = {
+  kick: { label: { en: 'Camera kick', zh: '镜头震动' }, note: { en: 'The view jolts along the blow', zh: '画面顺着这一击猛地一抖' } },
+  hitStop: { label: { en: 'Hit-stop', zh: '顿帧' }, note: { en: 'A heavy blow holds the moment', zh: '重击落下，时间顿住一瞬' } },
+  puff: { label: { en: 'Impact mist', zh: '击打尘雾' }, note: { en: 'Sweat and dust off the struck place', zh: '挨打处溅起汗水和尘土' } },
+  vignette: { label: { en: 'Dark edges', zh: '暗角' }, note: { en: 'The edges dim on a heavy blow', zh: '重击时画面四周一暗' } },
+  haptic: { label: { en: 'Vibration', zh: '振动' }, note: { en: 'A buzz on phones that have it', zh: '支持的手机会震一下' } },
+  thump: { label: { en: 'Body thump', zh: '闷响' }, note: { en: 'A low thud under the blow', zh: '这一击底下一声低沉的闷响' } },
+  fov: { label: { en: 'Focus punch', zh: '视野收缩' }, note: { en: 'The view narrows for an instant', zh: '视野一瞬间收窄' } },
+};
 
 export const HITFEEL_VIEW = {
   // The mist's colour: a warm pale grey, sweat and dust in the scene's light (not a white flash).
@@ -128,9 +140,9 @@ export function createHitFeelView(view, { layer = null, audio = null, vibrate = 
 export function hitFeelPanel(settings, save) {
   const section = document.createElement('section');
   section.className = 'audio-mixer hit-feel';
-  section.setAttribute('aria-label', 'Hit feel');
+  section.setAttribute('aria-label', t('settings.hitfeel'));
   const title = document.createElement('h2');
-  title.textContent = 'Hit feel';
+  title.textContent = t('settings.hitfeel');
   section.append(title);
   for (const [name, spec] of Object.entries(HITFEEL.effects)) {
     const value = settings[name];
@@ -144,8 +156,10 @@ export function hitFeelPanel(settings, save) {
     box.checked = value.on;
     box.dataset.hitfeel = name;
     const label = document.createElement('span');
-    label.textContent = spec.label;
-    label.title = spec.note;
+    const effectWords = HITFEEL_WORDS[name];
+    const shownLabel = effectWords ? pick(effectWords.label) : spec.label;
+    label.textContent = shownLabel;
+    label.title = effectWords ? pick(effectWords.note) : spec.note;
     words.append(box, label);
     const slider = document.createElement('input');
     slider.type = 'range';
@@ -154,7 +168,7 @@ export function hitFeelPanel(settings, save) {
     slider.step = '5';
     slider.value = String(Math.round(value.intensity * 100));
     slider.dataset.hitfeelIntensity = name;
-    slider.setAttribute('aria-label', `${spec.label} intensity`);
+    slider.setAttribute('aria-label', t('settings.hitfeel.intensity', { label: shownLabel }));
     slider.disabled = !value.on;
     const shown = document.createElement('output');
     shown.textContent = `${slider.value}%`;
@@ -173,7 +187,7 @@ export function hitFeelPanel(settings, save) {
   }
   const note = document.createElement('p');
   note.className = 'hit-feel-note';
-  note.textContent = 'How your blows land, each scaled by the blow itself. To try some alone: #hitfeel=kick,thump at the end of the address (or all, none).';
+  note.textContent = t('settings.hitfeel.note');
   section.append(note);
   return section;
 }

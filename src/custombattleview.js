@@ -7,6 +7,7 @@ import { addBattleThumb } from './battlethumbs.js';
 import { changeBattle, CUSTOM_BATTLE, customCounts, customSetup, customFactions, customLevel, readCustomBattle, settleBattle, writeCustomBattle } from './custombattle.js';
 import { unitOf } from './muster.js';
 import { musterScreen } from './musterview.js';
+import { getLang, onLangChange, SEP, t, tname } from './i18n.js';
 
 const customEl = (tag, props = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
@@ -20,9 +21,9 @@ function sideLine(battle, corner) {
   const counts = Object.entries(customCounts(battle.sides[corner])).sort((a, b) => b[1] - a[1]);
   const named = counts.map(([id, count]) => {
     const unit = level.units[corner].find((each) => each.id === id);
-    return `${count} ${unit.mounted ? '🐎 ' : ''}${unit.label}`;
+    return `${count} ${unit.mounted ? '🐎 ' : ''}${String(unit.label).split(SEP).map(tname).join(SEP)}`;
   });
-  return `${battle.sides[corner].men.length} men${named.length ? ` · ${named.join(', ')}` : ''}`;
+  return t('battle.sideLine', { n: battle.sides[corner].men.length, named: named.length ? ` · ${named.join(getLang() === 'zh' ? '、' : ', ')}` : '' });
 }
 
 /**
@@ -33,33 +34,42 @@ export function customBattleScreen(root, { onBack, onFight, storage = globalThis
   let battle = readCustomBattle(storage);
   const keep = () => writeCustomBattle(battle, storage);
 
+  // On a switch of language while the first screen is open, it is drawn again (the setup screen redraws itself: musterview.js).
+  let pickerHead = null;
+  const off = onLangChange(() => {
+    if (!root.isConnected || !pickerHead) return;
+    if (root.contains(pickerHead)) picker();
+    else if (!root.querySelector('.muster-head')) off();
+  });
+
   function picker() {
     root.replaceChildren();
     root.className = 'screen custom-battle';
     const head = customEl('header', { className: 'custom-head' },
-      customEl('button', { className: 'back', type: 'button', textContent: '← Back', onclick: onBack }),
-      customEl('div', { className: 'titles' }, customEl('h1', { textContent: CUSTOM_BATTLE.title }), customEl('p', { className: 'lede', textContent: 'Pick the ground and a faction a side; then count in the fighters and place them.' })));
-    const maps = customEl('div', { className: 'custom-maps', role: 'radiogroup', ariaLabel: 'The ground' }, ...Object.entries(CUSTOM_BATTLE.maps).map(([key, map]) => {
+      customEl('button', { className: 'back', type: 'button', textContent: t('common.back'), onclick: onBack }),
+      customEl('div', { className: 'titles' }, customEl('h1', { textContent: tname(CUSTOM_BATTLE.title) }), customEl('p', { className: 'lede', textContent: t('battle.customLede') })));
+    pickerHead = head;
+    const maps = customEl('div', { className: 'custom-maps', role: 'radiogroup', ariaLabel: t('battle.ground') }, ...Object.entries(CUSTOM_BATTLE.maps).map(([key, map]) => {
       const card = customEl('button', {
         type: 'button', role: 'radio', className: `custom-map${battle.map === key ? ' on' : ''}`, ariaChecked: String(battle.map === key),
         onclick: () => { battle = changeBattle(battle, { map: key }); keep(); picker(); },
-      }, customEl('span', { className: 'glyph', textContent: map.glyph, ariaHidden: 'true' }), customEl('b', { textContent: map.label }));
+      }, customEl('span', { className: 'glyph', textContent: map.glyph, ariaHidden: 'true' }), customEl('b', { textContent: tname(map.label) }));
       return addBattleThumb(card, `map-${key}`);
     }));
     const factions = customFactions();
     const side = (corner) => customEl('section', { className: `custom-side ${corner}` },
-      customEl('h2', { textContent: corner === 'red' ? 'Red side' : 'Blue side' }),
-      customEl('div', { className: 'custom-factions', role: 'radiogroup', ariaLabel: `${corner} faction` }, ...factions.map((faction) => customEl('button', {
+      customEl('h2', { textContent: t(corner === 'red' ? 'battle.redSide' : 'battle.blueSide') }),
+      customEl('div', { className: 'custom-factions', role: 'radiogroup', ariaLabel: t('battle.faction', { side: t(`muster.${corner}`) }) }, ...factions.map((faction) => customEl('button', {
         type: 'button', role: 'radio', className: `custom-faction${battle.factions[corner] === faction.key ? ' on' : ''}`, ariaChecked: String(battle.factions[corner] === faction.key),
         onclick: () => { battle = changeBattle(battle, { factions: { [corner]: faction.key } }); keep(); picker(); },
-      }, customEl('i', { textContent: faction.glyph, ariaHidden: 'true' }), customEl('span', { textContent: faction.label })))),
+      }, customEl('i', { textContent: faction.glyph, ariaHidden: 'true' }), customEl('span', { textContent: tname(faction.label) })))),
       customEl('p', { className: 'custom-line', textContent: sideLine(battle, corner) }));
     const foot = customEl('div', { className: 'custom-foot' },
-      customEl('button', { type: 'button', className: 'custom-quick', textContent: '▶ Fight as it is', disabled: !battle.sides.red.men.length || !battle.sides.blue.men.length, onclick: () => onFight(customSetup(battle)) }),
-      customEl('button', { type: 'button', className: 'primary custom-next', textContent: 'Fighters & placing →', onclick: placing }));
+      customEl('button', { type: 'button', className: 'custom-quick', textContent: t('battle.fightAsIs'), disabled: !battle.sides.red.men.length || !battle.sides.blue.men.length, onclick: () => onFight(customSetup(battle)) }),
+      customEl('button', { type: 'button', className: 'primary custom-next', textContent: t('battle.placing'), onclick: placing }));
     root.append(head,
       customEl('div', { className: 'custom-body' },
-        customEl('section', { className: 'custom-ground' }, customEl('h2', { textContent: 'The ground' }), maps),
+        customEl('section', { className: 'custom-ground' }, customEl('h2', { textContent: t('battle.ground') }), maps),
         customEl('div', { className: 'custom-sides' }, side('red'), side('blue'))),
       foot);
     root.querySelector('.custom-map.on')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
@@ -74,8 +84,8 @@ export function customBattleScreen(root, { onBack, onFight, storage = globalThis
       level,
       formations,
       lead: battle.lead,
-      backLabel: '← Ground & sides',
-      resetLabel: '↺ As it was',
+      backLabel: () => t('battle.backGround'),
+      resetLabel: () => t('battle.resetCustom'),
       onBack: picker,
       onChange: (sides, lead) => {
         battle = settleBattle({

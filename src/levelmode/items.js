@@ -8,6 +8,7 @@
 import { soundEvent } from '../audio/log.js';
 import { P } from '../body.js';
 import { LEVEL_CONFIG } from './config.js';
+import { t, tname } from '../i18n.js';
 
 export const ITEM_KINDS = ['bandage', 'tonic'];
 
@@ -61,7 +62,7 @@ export function cancelAction(world, why = 'interrupted') {
   if (!action) return;
   level.action = null;
   world.fighters[0].tending = undefined;
-  say(world, { type: 'toast', text: `${action.label} ${why}` });
+  say(world, { type: 'toast', text: why === 'interrupted' ? t('level.actionInterrupted', { action: tname(action.label) }) : `${action.label} ${why}` });
   world.events.push({ time: world.time, kind: 'actionStopped', fighter: 0, action: action.kind, effects: [why] });
 }
 
@@ -118,7 +119,7 @@ export function useItem(world, kind) {
   const me = world.fighters[0];
   const reason = whyNot(world, kind);
   if (reason) {
-    say(world, { type: 'toast', text: reason === 'not bleeding' ? 'You are not bleeding' : reason === 'not hurt' ? 'You are not hurt' : `Cannot use ${kind}: ${reason}` });
+    say(world, { type: 'toast', text: reason === 'not bleeding' ? 'You are not bleeding' : reason === 'not hurt' ? 'You are not hurt' : ITEM_KINDS.includes(kind) ? t(`level.cannotUse.${kind}`, { reason: tname(reason) }) : `Cannot use ${kind}: ${reason}` });
     return false;
   }
   if (kind === 'bandage') {
@@ -205,12 +206,12 @@ export function collectItem(world, item) {
   }
   if (ITEM_KINDS.includes(item.kind)) {
     if (level.inventory[item.kind] >= LEVEL_CONFIG.cap[item.kind]) {
-      say(world, { type: 'toast', text: `You cannot carry more ${item.kind}s` });
+      say(world, { type: 'toast', text: t(`level.carryNoMore.${item.kind}`) });
       return false;
     }
     level.inventory[item.kind] += 1;
     level.taken.add(item.id);
-    say(world, { type: 'toast', text: `${item.kind === 'bandage' ? 'Bandage' : 'Tonic'} taken (${level.inventory[item.kind]})` });
+    say(world, { type: 'toast', text: t(`level.taken.${item.kind}`, { count: level.inventory[item.kind] }) });
     return pickedUp(world, item);
   }
   return false;

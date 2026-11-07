@@ -7,6 +7,7 @@
 import { normaliseInputs } from '../body.js';
 import { placeOnFloor } from '../physics.js';
 import { levelPreset } from './presets.js';
+import { t, tname } from '../i18n.js';
 import { createLevelWorld } from './level.js';
 import { mechanismsOf, resetSeals, setMechanism, updateStage } from './stage.js';
 import { comradesOf } from './team.js';
@@ -100,4 +101,4 @@ export function travelTo(world, place) {
 }
 
 /** The words the ending cards add to a sandbox run, else null. */
-export const sandboxBadge = (world) => (world.stage?.sandbox ? `Sandbox run · ${world.fighters[0].body.inputs.name}${world.stage.cheated ? ' · fast travel used' : ''}` : null);
+export const sandboxBadge = (world) => (world.stage?.sandbox ? `${t('level.sandboxRun')} · ${tname(world.fighters[0].body.inputs.name)}${world.stage.cheated ? ` · ${t('level.fastTravelUsed')}` : ''}` : null);
