@@ -22,6 +22,7 @@
 
 import { UI } from './i18n/ui.js';
 import { NAMES_ZH } from './i18n/names.js';
+import { NAME_PARTS, NAME_PARTS_EAST, NAME_TITLES } from './i18n/names-parts.js';
 
 /** The languages, in the order the switch shows them. */
 export const LANGS = ['en', 'zh'];
@@ -37,6 +38,8 @@ export const KEEP_ENGLISH = ['KO', 'K.O.', 'VS', 'Fight!', 'Round', 'Victory', '
 
 /** The language a first visit opens in: Chinese for a browser set to any Chinese, else English. */
 function browserLang() {
+  // (No page: node's tests and tools read English whatever the machine's locale.)
+  if (!globalThis.document) return 'en';
   try {
     const wanted = (globalThis.navigator?.languages?.[0] ?? globalThis.navigator?.language ?? '').toLowerCase();
     return wanted.startsWith('zh') ? 'zh' : 'en';
@@ -116,7 +119,45 @@ export function t(key, vars) {
 /** A proper name kept English in the data, in the language in force. */
 export function tname(english) {
   if (langNow === 'en' || english === null || english === undefined) return english ?? '';
-  return NAMES_ZH[english] ?? english;
+  return NAMES_ZH[english] ?? personalName(english) ?? english;
+}
+
+/**
+ * A soldier's own name, made of parts (cast.js: 'Wang Da', 'Sgt. Reyes', 'Hans von Uri', 'Wat the Miller'), in Chinese part by
+ * part (src/i18n/names-parts.js): the longest run of words found first; East Asian names run together (王大, 井伊直政), any
+ * other with the transliteration's dot (汉斯·冯·乌里); a title or rank after the name, as Chinese has it (雷耶斯中士).
+ * A token with a digit in it (a second 'Wang 2', an android's 'H-1 Unit 523') is kept as it is, run onto the part before it.
+ * All or nothing: a name with any part not in the tables stays English. Null when it is not one.
+ */
+function personalName(english) {
+  const words = english.split(' ').filter(Boolean);
+  const parts = [];
+  const titles = [];
+  let east = true;
+  for (let at = 0; at < words.length;) {
+    if (/\d/.test(words[at])) {
+      if (parts.length) parts[parts.length - 1] += words[at];
+      else parts.push(words[at]);
+      at += 1;
+      continue;
+    }
+    let found = false;
+    for (let end = words.length; end > at && !found; end -= 1) {
+      const run = words.slice(at, end).join(' ');
+      const zh = NAME_TITLES[run] ?? NAME_PARTS_EAST[run] ?? NAME_PARTS[run];
+      if (zh === undefined) continue;
+      if (run in NAME_TITLES) titles.push(zh);
+      else {
+        if (!(run in NAME_PARTS_EAST)) east = false;
+        if (zh) parts.push(zh);
+      }
+      at = end;
+      found = true;
+    }
+    if (!found) return null;
+  }
+  if (!parts.length) return null;
+  return parts.join(east ? '' : '·') + titles.join('');
 }
 
 /** Names joined as the language joins a list. */
