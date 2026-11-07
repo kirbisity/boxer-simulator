@@ -1,4 +1,4 @@
-// The way in: a home screen, and from it (in this order) Career (to come),
+// The way in: a home screen, and from it (in this order) Career (to come), Story,
 // Battle Mode, Level Mode, The Last Gate, Deadliest Warrior, Who Wins? (the quick battle: a random fighter) and the Sandbox; and a character
 // creator that goes one plain
 // question at a time. The menus only choose fighters and places; the
@@ -125,6 +125,8 @@ export function installMenus(game) {
     body.parentElement.classList.add('home');
     body.append(el('div', { className: 'choices home-choices' },
       choice({ glyph: '🏆', kicker: 'Coming soon', title: 'Career', text: 'One fighter, bout after bout, as he rises. Being built now.', tone: 'career' }),
+      // Story mode (src/story/): one Ming conscript's life, its own screen (storyview.js), opened over the fight behind the menus.
+      choice({ glyph: '📜', kicker: 'New · 1587-1621', title: 'Story', text: 'One Ming soldier\'s life, from the register to the Hun River. 中文 / English.', onClick: () => { close(); game.story?.(); }, tone: 'gold' }),
       choice({ glyph: '🗺️', kicker: 'Set fights', title: 'Battle Mode', text: 'Historical battles in set places. Start with the tutorial.', onClick: levels, tone: 'gold' }),
       choice({ glyph: '🏰', kicker: 'New · Stage 1', title: 'Level Mode', text: 'Fight your way up a storm-swept fortress, one stage at a time.', onClick: stages, tone: 'storm' }),
       choice({ glyph: '🛡️', kicker: 'New · Score', title: LAST_GATE.title, text: 'Pick your squad, set its formation, and stand against wave after wave. How many can you kill, how long can you last?', onClick: () => lastGate(), tone: 'mist' }),

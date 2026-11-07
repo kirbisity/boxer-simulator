@@ -1,7 +1,7 @@
 // The custom build (`node tools/bundle.js --custom` → dist/gladiator-custom.html): a test bed that is only the sandbox (custom
 // mode: the fighter builder and its fights), opened at once, in one file under 15 MB. The fights are the same code as the full
 // game's (physics, AI, weapons, outfits, fire, sound effects, the builder's roster and presets); what custom mode never reaches is
-// left out: level mode (the Dunnottar stages, their kit, the storm and its sky photographs, the story, cutscenes and HUD), Last
+// left out: level mode (the Dunnottar stages, their kit, the storm and its sky photographs, the story, cutscenes and HUD), story mode, Last
 // Stand Squad (and its squad builder), the intro, the tutorial, the home screen and its other modes, and the music (its cues
 // gone, the engine plays its stings instead, as with a cue that is missing).
 //
@@ -13,6 +13,7 @@
 /** Modules left out (each one's stub, if kept code imports it, is in STUBS). */
 export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KEPT_LEVEL.includes(name)
   || /^audio\/music\/data\//.test(name)
+  || /^story\//.test(name)
   || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
@@ -49,6 +50,12 @@ const missing = (what) => `() => { throw new Error('${what}: not in the custom b
 
 /** Stand-ins for the excluded modules that kept code imports, by module (ES module source, as a module file would be). */
 export const CUSTOM_STUBS = {
+  // Story mode (src/story/): not here; the page's hooks into it inert.
+  'story/storyview': `
+export function installStory() {
+  return { open() { throw new Error('story mode: not in the custom build (tools/custom.js)'); }, tick() {}, think() {}, steer() {}, close() {}, leave() {}, holding: () => false, filming: false, active: false, hooks: {} };
+}
+`,
   // The home screen: there is none; "the menu" is the sandbox (entered at once, and kept as it is from inside it).
   menu: `
 export function installMenus(game) {

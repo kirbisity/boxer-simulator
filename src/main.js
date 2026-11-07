@@ -87,6 +87,7 @@ import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigi
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
+import { installStory } from './story/storyview.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -422,6 +423,12 @@ function newBout() {
   const place = scenario?.scene ?? (cramped ? 'field' : state.place);
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
   state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation, place });
+  presentWorld(place, arena, scenario);
+  if (state.game === 'tutorial') placeYard();
+}
+
+/** The world just made, shown: its place built (`scenario`: its weather and camera, or null for the usual ringside view), the views, the HUD, the controls fresh. */
+function presentWorld(place, arena, scenario) {
   clearGore(scene);
   setPlace(scene, place, arena, scenario?.weather);
   fightMarks.reset();
@@ -444,7 +451,6 @@ function newBout() {
   renderHud();
   state.orders = newOrders();
   fightControls.reset();
-  if (state.game === 'tutorial') placeYard();
 }
 
 /** Rebuild the fighters' models, for a new bout or a new shading style. */
@@ -639,6 +645,8 @@ function thinkForBout(world, dt) {
     player().runMode = false;
     holdPlayer(player());
   }
+  // A story scene: he is the scene's (src/story/scenes/stage.js poses him), not the player's.
+  else if (state.game === 'story' && story.holding()) story.think(world);
   // Walking about (V), the keys steer him; otherwise he does as the orders say.
   else if (player().walking) {
     walkAbout(player());
@@ -857,6 +865,8 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
   if (state.world.stage?.level) drainLevel();
   // Last Stand Squad ends when the hero falls or the squad is down (lastgate.js), not as a battle does.
   if (state.world.lastGate) return lastGateFrame(state.world);
+  // Story mode watches its own battle (src/story/storyview.js: his place, its end, a scene) and has no banner.
+  if (state.game === 'story') return story.tick(state.world);
   // The intro has one side only, and the tutorial's partner is there to be struck: no bout to win.
   if (state.game === 'intro' || state.game === 'tutorial') return;
   // A stage has no banner (levelmode bannerWinner is none there). A duel or a small fight ends with its last man;
@@ -1135,6 +1145,7 @@ function followCamera(fighter, dt) {
   if (endingCam) endingCamera(dt);
   cutsceneDirector.steer(dt);
   if (state.world.stage?.level) twistDirector.steer(state.world);
+  if (state.game === 'story') story.steer(dt);
 }
 
 /** The men as the watching camera sees them: where each stands, how high his neck is, and whether he is left lying. */
@@ -1225,7 +1236,7 @@ function drawWorld(dt, drawIt = true) {
   // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js), from the man played (a cutscene's or the ending's camera is looking at someone else: from what it looks at).
   // The viewer's own turn of the view only shortens.
   // (In a stage, the whole castle's walls, not only the sections awake: a section waking is no jump of the camera. Paused, the camera holds still.)
-  const own = followed && !endingCam && !cutsceneDirector.active && !twistDirector.active;
+  const own = followed && !endingCam && !cutsceneDirector.active && !twistDirector.active && !story.filming;
   if (!sheet) cameraRig.update(scene, { terrain: world.stage ? cameraTerrain(world) : null, room: world.stage ? null : cameraWalls, subject: own ? followView.subject : null, free: !followed || followCam.state.wasManual, dt: cameraDt });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
@@ -2588,6 +2599,7 @@ function setGame(game, next = null) {
     delete document.body.dataset.tutorialStep;
   }
   if (game !== 'lastgate') lastGateView.hide();
+  if (state.game === 'story' && game !== 'story') story.leave();
   state.game = game;
   state.next = next;
   $('#restart').textContent = 'Restart';
@@ -2680,6 +2692,48 @@ function enterLevel(key, setup = null) {
   state.sideAsked = true;
   takeSide(setup.lead.corner);
 }
+
+// ---- Story mode (src/story/storyview.js): a chapter's battle, the hero played ------------------------------------------
+
+/**
+ * A story battle's world (src/story/runner.js: a battle file's setup), shown and played as its hero: the man played is
+ * `setup.player`; held still (`paused`) for the cards over it, or fighting.
+ */
+function enterStoryWorld(setup, { paused = false } = {}) {
+  if (state.game !== 'story') setGame('story');
+  leaveStage();
+  state.scenario = null;
+  state.muster = null;
+  const corner = setup.fighters[setup.player]?.corner ?? 'red';
+  state.playSide = corner;
+  state.lead = { red: 0, blue: 0, [corner]: setup.fighters.slice(0, setup.player).filter((entry) => entry.corner === corner).length };
+  state.world = createWorld(setup.fighters, setup.options);
+  const place = setup.options.place ?? 'field';
+  presentWorld(place, setup.options.arena, setup.view ?? null);
+  state.sideAsked = true;
+  takeSide(corner);
+  boxer.finishBuilding();
+  state.paused = paused;
+  return state.world;
+}
+
+const story = installStory({
+  storage: browserStorage,
+  stage: enterStoryWorld,
+  world: () => state.world,
+  pause: (on) => {
+    state.paused = Boolean(on);
+    $('#pause').textContent = state.paused ? 'Play' : 'Pause';
+  },
+  orbit: () => scene.orbit,
+  // Autoplay (tests, shots): the hero left to his own mind, the camera watching; off, he is played again.
+  watch: (on) => {
+    if (on) $('#modes button[data-value="watch"]').click();
+    else if (state.mode !== 'play') takeSide(state.playSide);
+  },
+  home: () => goHome(),
+  closeMenus: () => menus.close(),
+});
 
 // ---- The tutorial: the training yard ----------------------------------------------
 // The player with a katana, in the Colosseum's sand, against Sir Edric in
@@ -3314,6 +3368,8 @@ const menus = installMenus({
   // Last Stand Squad: the level and the squad picked, straight into the run; its board for the menu.
   lastGate: enterLastGate,
   lastGateBoard,
+  // Story mode (src/story/): its own screen over the fight behind the menus.
+  story: () => story.open(),
   stats: (inputs) => deriveStats(buildBody(normaliseInputs(structuredClone(inputs)))),
   calorieRange: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean),
   hours: exerciseHours,
@@ -3540,6 +3596,8 @@ installLooksBench({
 // Test hook: step the world by seconds without the frame clock.
 const boxer = window.boxer = {
   state,
+  // Story mode's test hooks (src/story/storyview.js): open, begin, answer(i), autoplay(on), endBattle, skipLine, state(), language(l).
+  story: story.hooks,
   scene,
   // Last Stand Squad at this level ('samurai', 'knight', 'mongol', 'police': lastgate.js LAST_GATE_MODES), from anywhere
   // (tests, shots); `setup` its squad ({ men, places }), else the level's own five at their posts.

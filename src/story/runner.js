@@ -290,8 +290,8 @@ function storyFallOf(world, setup, fighter) {
   // (By one of his own: an arrow from the rank behind, a spear in the press.)
   const own = by && by.corner === fighter.corner;
   const text = !attacker ? { ...words }
-    : own ? { zh: `${words.zh}，死在自己人${attacker.zh}手里`, en: `${words.en}, by one of his own, ${attacker.en}` }
-      : { zh: `${words.zh}，死在${attacker.zh}手里`, en: `${words.en}, by ${attacker.en}` };
+    : own ? { zh: `${words.zh}。下手的是自己人${attacker.zh}`, en: `${words.en}, by one of his own, ${attacker.en}` }
+      : { zh: `${words.zh}。下手的是${attacker.zh}`, en: `${words.en}, by ${attacker.en}` };
   return { kind, reason: event?.effects?.[0] ?? null, by: attacker, text, time: event?.time ?? world.time };
 }
 
