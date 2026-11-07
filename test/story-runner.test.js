@@ -11,7 +11,7 @@ import { thinkAll } from '../src/ai.js';
 import { canCommand, giveOrder } from '../src/command.js';
 import { storyNewLife } from '../src/story/life.js';
 import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCommandMen, storyCurrent, storyNextChapter, storyRunBattle, storySceneDone, storyWatch, storyWatchStep, STORY_JUDGEMENT, STORY_RUN } from '../src/story/runner.js';
-import { bodyAxes, createScenePlay, sceneLook, sceneThink, stepScene } from '../src/story/scenes/stage.js';
+import { bodyAxes, createScenePlay, sceneLook, sceneThink, stepScene, STORY_SCENE } from '../src/story/scenes/stage.js';
 import { CHAPTERS, COMRADES as STORY_PEOPLE, STORY_FAMILY, STORY_HERO } from '../src/story/chapters/index.js';
 import { STORY_BATTLES } from '../src/story/battles/index.js';
 
@@ -184,7 +184,17 @@ test('Level 1\'s scene staged on its field: the body laid face down, turned face
       thinkAll(current, dt, new Set([setup.player]));
       sceneThink(play);
     });
-    if (play.set && downFirst === null) downFirst = bodyAxes(brother).chest[1];
+    if (play.set && downFirst === null) {
+      downFirst = bodyAxes(brother).chest[1];
+      // The ground round the two of them cleared: no other body within STORY_SCENE.clear of their middle, no one standing nearer than clearStanding.
+      const hero = world.fighters[setup.player];
+      const middle = [(hero.x[P.pelvis * 3] + brother.x[P.pelvis * 3]) / 2, (hero.x[P.pelvis * 3 + 2] + brother.x[P.pelvis * 3 + 2]) / 2];
+      for (const other of world.fighters) {
+        if (other === hero || other === brother) continue;
+        const distance = Math.hypot(other.x[P.pelvis * 3] - middle[0], other.x[P.pelvis * 3 + 2] - middle[1]);
+        assert.ok(distance >= (other.state === 'out' ? STORY_SCENE.clear : STORY_SCENE.clearStanding) - 0.2, `${other.id} cleared (${distance.toFixed(2)} m)`);
+      }
+    }
     if (['kneel', 'search', 'still'].includes(play.stage)) kneeled = Math.max(kneeled, world.fighters[setup.player].kneel?.share ?? 0);
   }
   assert.ok(play.done);

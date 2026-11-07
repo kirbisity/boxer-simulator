@@ -51,6 +51,7 @@ export const CHAPTER_SARHU = {
           effects: { flags: { spokeOut: true } },
           fatal: {
             how: 'executed',
+            scene: 'sarhu-pole-self',
             text: {
               zh: '文官没有发火。他问了他的名字，记下来，叫人把他押回辽阳，绑在白云龙挂过的那根竿子底下。经略的令旗一挥，陈二成了第二个祭旗的人。罪名是“沮挠军心”。四路大军照期出塞，几天之内死了四万五千八百多人。他说的话，一个字也没有错。',
               en: 'The official did not raise his voice. He asked his name, wrote it down, and had him taken back to Liaoyang and tied at the foot of the pole where Bai Yunlong had hung. The Superintendent\'s flag dipped, and Chen Er was the second sacrifice to it. The charge was "undermining the army\'s resolve". The four armies marched on the day appointed, and within days forty-five thousand eight hundred of them were dead. Not one word he had said was wrong.',
@@ -175,12 +176,21 @@ export const CHAPTER_SARHU = {
   ],
   scenes: [
     {
-      id: 'sarhu-pole', at: 'before',
+      // Played as the oath card is read (scenes/sets.js poleHead): the drill ground, the head on the pole, the ranks.
+      id: 'sarhu-pole', at: 'before', after: 'sarhu-oath', set: 'poleHead',
       script: [
         { who: 'narrator', line: { zh: '辽阳教场，二月。竿子上挂着白云龙的头。', en: 'The Liaoyang drill ground, the second month. Bai Yunlong\'s head hung on the pole.' } },
-        { who: 'official', line: { zh: '临阵脱逃者，以此为例。', en: 'Let this be the example for any man who runs.' } },
-        { who: 'hero', line: { zh: '他是从抚顺跑回来的。抚顺的守将投了降，娶了人家的孙女。', en: 'He ran back from Fushun. The commander at Fushun surrendered, and married their khan\'s granddaughter.' } },
-        { who: 'narrator', line: { zh: '投降的那个，竿子够不着。', en: 'The one who surrendered, the pole could not reach.' } },
+        { who: 'official', stage: 'shot:official', line: { zh: '临阵脱逃者，以此为例。', en: 'Let this be the example for any man who runs.' } },
+        { who: 'hero', stage: 'shot:ranks', line: { zh: '他是从抚顺跑回来的。抚顺的守将投了降，娶了人家的孙女。', en: 'He ran back from Fushun. The commander at Fushun surrendered, and married their khan\'s granddaughter.' } },
+        { who: 'narrator', stage: 'shot:head', line: { zh: '投降的那个，竿子够不着。', en: 'The one who surrendered, the pole could not reach.' } },
+      ],
+    },
+    // He spoke out at the muster: tied at the foot of the same pole (the fatal choice's scene, before its page).
+    {
+      id: 'sarhu-pole-self', at: 'fatal', set: 'poleSelf',
+      script: [
+        { who: 'narrator', line: { zh: '辽阳教场。白云龙挂过的那根竿子底下。', en: 'The Liaoyang drill ground. The foot of the pole where Bai Yunlong had hung.' } },
+        { who: 'official', stage: 'dark', line: { zh: '沮挠军心。', en: '"Undermining the army\'s resolve."' } },
       ],
     },
   ],
