@@ -4,11 +4,14 @@
 
 import { FIGHT_UI_DESIGNS, fightUiChoose, fightUiPreferred } from './index.js';
 import { fightUiElement, fightUiLegend } from './kit.js';
+import { onLangChange, t } from '../i18n.js';
 
 /** Wire the footer's switch (index.html #fightui-pick): its buttons choose; its key shows the colours. */
 export function fightUiWireToggle(pick) {
   if (!pick) return;
-  const legend = document.body.appendChild(fightUiElement('div', 'fu-legend fu-legend-pop', `<b>Colours of the blows</b>${fightUiLegend()}`));
+  const legend = document.body.appendChild(fightUiElement('div', 'fu-legend fu-legend-pop', `<b>${t('menu.controls.legend')}</b>${fightUiLegend()}`));
+  // In the new language when it changes (the legend's own rows too, as fightui/kit.js words them).
+  onLangChange(() => { legend.innerHTML = `<b>${t('menu.controls.legend')}</b>${fightUiLegend()}`; });
   legend.id = 'fightui-legend';
   legend.hidden = true;
   const key = pick.querySelector('.fu-pick-key');
@@ -35,11 +38,12 @@ export function fightUiWireToggle(pick) {
 
 /** The home screen's line: "Controls: Body", a tap flips to the other. */
 export function fightUiHomeSwitch(make) {
-  const label = () => `🎮 Controls: ${FIGHT_UI_DESIGNS[fightUiPreferred()].name}`;
+  const designName = (id) => ({ target: t('menu.controls.body'), buttons: t('menu.controls.buttons') })[id] ?? FIGHT_UI_DESIGNS[id].name;
+  const label = () => t('menu.controls', { name: designName(fightUiPreferred()) });
   const button = make(label(), () => {
     fightUiChoose(fightUiPreferred() === 'target' ? 'buttons' : 'target');
     button.textContent = label();
   });
-  button.title = 'How you attack in a fight: tap where to hit on a figure of your man (Body), or a coloured button for each kind of blow (Buttons)';
+  button.title = t('menu.controls.title');
   return button;
 }

@@ -7,6 +7,7 @@
 
 import { FACTIONS } from './outfits.js';
 import { WARRIORS } from './roster.js';
+import { pick, SEP, t, tname } from './i18n.js';
 
 export const INTRO = {
   storageKey: 'gladiator.introSeen',
@@ -139,6 +140,8 @@ const introNode = (tag, className, text) => {
   if (text !== undefined) node.textContent = text;
   return node;
 };
+/** A caption's words in the language in force: a `{ en, zh }` text, or a line of names joined by ' · '. */
+const introWords = (text) => (text && typeof text === 'object' ? pick(text) : String(text ?? '').split(SEP).map(tname).join(SEP));
 
 let introRunning = null;
 
@@ -169,16 +172,16 @@ export function playIntro(stage, onDone) {
   const plan = introPlan(introLegends(), { reduced });
   const root = introNode('div', 'intro');
   root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-label', 'Intro: the legends');
+  root.setAttribute('aria-label', t('intro.label'));
   if (reduced) root.classList.add('reduced');
   const title = introNode('div', 'intro-title');
-  title.append(introNode('em', '', 'The legends of'), introNode('h1', '', 'Gladiator'), introNode('p', '', 'Fighters of bone, muscle and steel — every blow simulated.'));
+  title.append(introNode('em', '', t('intro.legendsOf')), introNode('h1', '', 'Gladiator'), introNode('p', '', t('menu.home.lede')));
   const card = introNode('div', 'intro-card');
   const head = introNode('div', 'intro-faction');
   const captions = introNode('div', 'intro-captions');
-  const skip = introNode('button', 'intro-skip', 'Skip ›');
+  const skip = introNode('button', 'intro-skip', t('intro.skip'));
   skip.type = 'button';
-  skip.setAttribute('aria-label', 'Skip the intro');
+  skip.setAttribute('aria-label', t('intro.skipLabel'));
   const progress = introNode('div', 'intro-progress');
   const black = introNode('div', 'intro-black');
   root.append(title, head, captions, card, progress, skip, black);
@@ -206,18 +209,18 @@ export function playIntro(stage, onDone) {
     if (carded === index || !plan.chapters[index]) return;
     carded = index;
     const faction = FACTIONS[plan.chapters[index].faction] ?? { label: plan.chapters[index].faction, glyph: '', blurb: '' };
-    card.replaceChildren(introNode('span', 'glyph', faction.glyph), introNode('h2', '', faction.label), introNode('p', '', faction.blurb));
+    card.replaceChildren(introNode('span', 'glyph', faction.glyph), introNode('h2', '', tname(faction.label)), introNode('p', '', pick(faction.blurb)));
   };
   // Its shot's faction above, and a caption for each man below.
   const fillCaptions = (chapter) => {
     const faction = FACTIONS[chapter.faction] ?? { label: chapter.faction, glyph: '' };
-    head.replaceChildren(introNode('span', '', `${faction.glyph} ${faction.label}`));
+    head.replaceChildren(introNode('span', '', `${faction.glyph} ${tname(faction.label)}`));
     // Left to right as they stand (the camera looks at them from in front).
     const shown = [...chapter.legends].sort((a, b) => a.x - b.x);
     captions.style.setProperty('--count', String(shown.length));
     captions.replaceChildren(...shown.map((legend) => {
       const box = introNode('div', 'intro-caption');
-      box.append(introNode('em', '', legend.kicker), introNode('b', '', legend.name), introNode('span', '', legend.line));
+      box.append(introNode('em', '', introWords(legend.kicker)), introNode('b', '', tname(legend.name)), introNode('span', '', introWords(legend.line)));
       return box;
     }));
   };
@@ -381,7 +384,7 @@ export function playIntro(stage, onDone) {
       if (!lineupKeys) {
         stage.lineup();
         lineupKeys = lineupCamera();
-        title.querySelector('em').textContent = 'The legends';
+        title.querySelector('em').textContent = t('intro.legends');
         title.classList.add('low');
         title.querySelector('p').textContent = plan.chapters.map((chapter) => FACTIONS[chapter.faction]?.glyph ?? '').join(' ');
         last = performance.now();
