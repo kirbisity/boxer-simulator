@@ -114,6 +114,20 @@ export const MATCHLOCK = {
   // pouch of balls: ~20-30 shots (an ashigaru's cartridge box held about as many). In all, the loaded one counted.
   ammo: 24,
 };
+// (The Japanese teppō is this gun as listed: well made in the Sakai and Kunitomo workshops, its ball through layered damp
+// felt at 80 paces (Song Yingchang's trial, 1593, as quoted secondhand: why the Ming put iron inside their cotton coats).
+// Its fire drilled in volleys is the drill's (formation.js), not the gun's.)
+
+/**
+ * The Ming bird gun (鸟铳, niaochong): the same gun, copied from the Japanese and Portuguese matchlocks taken at Shuangyu
+ * in 1548 (Zheng Ruozeng, 《筹海图编》; Qi Jiguang, 《纪效新书》: as quoted secondhand), the same bore, ball and charge
+ * (`energy` as the matchlock's). But made in the Ming arsenals by unpaid craftsmen to a price: barrels badly bored and
+ * badly welded, the ball loose in them, guns that burst, so that the men feared to put their faces to them (Zhao Shizhen,
+ * 《神器谱》, 1598, as quoted in Andrade, *The Gunpowder Age*, 2016): wider in its shot (`spread` 0.018, the teppō's
+ * 0.014: a loose ball leaves the muzzle off the line by its windage) and failing to fire half as often again (`misfire`
+ * 0.12, the teppō's 0.08). The weapon's make for the Ming men (WEAPONS.matchlock `makes`).
+ */
+export const NIAOCHONG = { ...MATCHLOCK, spread: 0.018, misfire: 0.12 };
 
 /**
  * The san yan chong (三眼銃, "three-eyed gun"): three short iron barrels in
@@ -123,6 +137,9 @@ export const MATCHLOCK = {
  * (~350 J) that scatters (`spread`). Ming border troops did not reload it in
  * the press of a fight: they swung it as a club, the iron barrels its head.
  * Dimensions are estimates (the sources give none): ~1.3 m, ~4 kg.
+ * Cheap, short and inaccurate: no sights, fired from the hip or under the arm, the shot not aimed (Qi Jiguang's complaint
+ * of the northern troops' fast guns, 快枪, in 《练兵实纪》, as quoted secondhand), a wide `spread` (0.05, the matchlock's
+ * 0.014); its iron touch-holes lit by hand from a slow match, so one in eight fails (`misfire`).
  */
 export const THREE_EYED = {
   // Its barrels are short (~30 cm, a hand cannon's): the charge burns out of the muzzle before it has driven the ball far, ~200 J
@@ -454,6 +471,8 @@ export const WEAPONS = {
     // The muzzle from the trigger hand (along the barrel, above it), m.
     muzzle: [1.0, 0.02],
     shot: MATCHLOCK,
+    // As each people made it (physics.js madeSpec, by his kit's faction): the Ming arsenals' bird gun (NIAOCHONG).
+    makes: { chinese: { shot: NIAOCHONG } },
   },
   // The three-eyed gun (see THREE_EYED): fired from the hip with the shaft
   // under the arm; empty, a club with an iron head (`crush`: the barrels'
@@ -1768,6 +1787,8 @@ export function createWeapon(kind) {
     // What a weapon gains in the fight, named here (unset) so that every weapon has one shape.
     handling: undefined, charges: undefined, colour: undefined, edge: undefined, dulled: undefined, spent: undefined,
     draw: undefined, facing: undefined, rope: undefined, wear: undefined,
+    // Whose make it is (a key of its spec's `makes`), or null: the weapon as listed.
+    make: null,
   };
 }
 
