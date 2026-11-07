@@ -259,7 +259,8 @@ const twistDirector = createTwistDirector({ orbit: () => scene.orbit, roomTest: 
 const paceNow = () => Math.min(timeScale(state.drama, realSeconds()), cutsceneDirector.speed());
 // The page's pace: that, held a moment more by a hit-stop of the player's blow (hitfeel.js), and slowed through a weapon art's
 // wind-up and held at its contact (artdrama.js). The frame's pace only: never the physics step, never boxer.advance or playFrames.
-const fightPace = () => paceNow() * hitFeel.pace(realSeconds()) * artDrama.pace(realSeconds());
+// (Story mode's finale slows the field he lies on: src/story/scenes/finale.js.)
+const fightPace = () => paceNow() * hitFeel.pace(realSeconds()) * artDrama.pace(realSeconds()) * (state.game === 'story' ? story.pace() : 1);
 const levelHud = installLevelHud($('#fight-ui'), { world: () => state.world, active: () => Boolean(state.world?.stage?.level) && state.mode === 'play', now: realSeconds, camera: () => scene.camera });
 
 // The ring on the floor round the man locked on.
@@ -614,6 +615,8 @@ function thinkForBout(world, dt) {
   for (const fighter of world.fighters) if (Boolean(fighter.player) !== players.has(fighter.id)) fighter.player = players.has(fighter.id);
   // Standing still: no thinking at all; he stays where he is, guard down, and takes what comes.
   const still = new Set(players);
+  // A story scene's figures (src/story/scenes/stage.js): held where the scene puts them, posed by it.
+  if (state.game === 'story') for (const id of story.held()) still.add(id);
   // Crawling (the sandbox's look at it): that side down on its knees, still in the fight; the player's man as he chooses.
   const crawlSide = !state.scenario && state.standStill.startsWith('crawl:') ? state.standStill.slice(6) : null;
   for (const fighter of world.fighters) {
@@ -1315,7 +1318,8 @@ function drawWorld(dt, drawIt = true) {
   // The marks keep the fight's pace: slowed with it (a slow-motion moment, ¼×), still while it is paused.
   fightMarksClock += dt * (state.paused ? 0 : state.speed * fightPace());
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
-  generalMarks.update(world);
+  // (Not over a story scene's figures: nobody there leads a side.)
+  generalMarks.update(story.filming ? null : world);
   // A cut-off piece's program (its man's material, unskinned) built while he is new, not on the frame of the cut (render.js warmSevered).
   warmSevered(scene, state.views);
   if (drawIt) render(scene);

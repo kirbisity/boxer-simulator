@@ -26,6 +26,7 @@ export const CHAPTER_ULSAN = {
           effects: { flags: { joinedProtest: true } },
           fatal: {
             how: 'executed',
+            scene: 'ulsan-drillground-self',
             text: {
               zh: '兵变九天就平了。事后清点，南兵死了一百六十多人；也有人说一千三百，有人说三千三百。数目随说的人变，人是一样地死。陈二的名字在被斩的名单上。胡怀德凌迟。兵部定的罪名是“谋反”。他们讨的那份饷，后来照裁兵的规矩，一并免了。',
               en: 'The mutiny was put down in nine days. By the count afterwards some hundred and sixty southern men were dead; others said thirteen hundred, or three thousand three hundred. The figure changed with the teller; the men died the same. Chen Er\'s name was on the list of the beheaded. Hu Huaide was put to the slow death. The Ministry of War called it rebellion. The pay they had asked for was struck off the books, as the rules for disbanded men allowed.',
@@ -172,14 +173,37 @@ export const CHAPTER_ULSAN = {
       ]),
   ],
   scenes: [
+    // The ninth day on the drill ground (the card before it: Jin Aman bound at the flagpole, watched or turned from). Staged on
+    // its own set (scenes/sets.js drillGround): the pole, the condemned on their knees, Jin among them, him by the barracks;
+    // facing it if he chose to watch, his back to it if he turned away. The blow is not shown: the dark comes down on it.
     {
-      id: 'ulsan-drillground', at: 'before',
-      when: (life) => chapAlive(life, 'jin'),
+      id: 'ulsan-drillground', at: 'before', after: 'ulsan-jin', set: 'drillGround', year: 1595,
+      when: (life) => chapFlag(life, 'jinExecuted'),
+      adjust: (life) => (chapFlag(life, 'watchedJin') ? {} : { hero: { face: [24, 2.5] } }),
       script: [
         { who: 'narrator', line: { zh: '教场上的旗杆，平日挂的是操练的号旗。', en: 'On ordinary days the flagpole on the drill ground flew the drill signals.' } },
-        { who: 'jin', stage: 'kneel', line: { zh: '二哥，你别看。', en: 'Don\'t look, Er.' } },
-        { who: 'officer', line: { zh: '斩！', en: 'Strike!' } },
-        { who: 'narrator', line: { zh: '那天的风从关外吹过来，跟平常一样。', en: 'The wind that day came from beyond the Wall, the same as any day.' } },
+        { who: 'jin', line: { zh: '二哥，你别看。', en: 'Don\'t look, Er.' } },
+        { who: 'officer', stage: ['dark', 'fall:jin', 'fall:condemned'], line: { zh: '斩！', en: 'Strike!' } },
+        { who: 'narrator', stage: 'lift', line: { zh: '那天的风从关外吹过来，跟平常一样。', en: 'The wind that day came from beyond the Wall, the same as any day.' } },
+      ],
+    },
+    // The same day with no one of his in the row: Jin Aman dead in Korea already (the card 'ulsan-jin-gone').
+    {
+      id: 'ulsan-drillground-others', at: 'before', after: 'ulsan-jin-gone', set: 'drillGroundOthers', year: 1595,
+      adjust: (life) => (chapFlag(life, 'stayedIn') ? { hero: { face: [24, 2.5] } } : {}),
+      script: [
+        { who: 'narrator', line: { zh: '第九天，教场上跪了一排南兵，都是东征回来的。', en: 'On the ninth day a row of southern men knelt on the drill ground, all of them back from Korea.' } },
+        { who: 'officer', stage: ['dark', 'fall:condemned'], line: { zh: '斩！', en: 'Strike!' } },
+        { who: 'narrator', stage: 'lift', line: { zh: '那天的风从关外吹过来，跟平常一样。', en: 'The wind that day came from beyond the Wall, the same as any day.' } },
+      ],
+    },
+    // He went to the drill ground: his own name on the list of the beheaded (the fatal choice's scene, before its page).
+    {
+      id: 'ulsan-drillground-self', at: 'fatal', set: 'drillGroundSelf', year: 1595,
+      script: [
+        { who: 'narrator', line: { zh: '第九天。名单念到了陈二。', en: 'The ninth day. The list came to Chen Er.' } },
+        { who: 'jin', when: (life) => chapAlive(life, 'jin'), line: { zh: '二哥。', en: 'Er.' } },
+        { who: 'officer', stage: 'dark', line: { zh: '斩！', en: 'Strike!' } },
       ],
     },
   ],

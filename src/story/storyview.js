@@ -10,13 +10,16 @@
 // step (a scene's posing), steer(dt) after the follow camera is placed; holding() says the hero is the scene's, not the player's.
 // Test hooks: window.boxer.story (main.js puts `hooks` there).
 
-import { CHAPTERS, COMRADES, STORY_FAMILY, STORY_HERO } from './chapters/index.js';
+import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from './chapters/index.js';
 import { STORY_BATTLES } from './battles/index.js';
-import { STORY, storyBeginAnew, storyLoad, storyLuck, storyLuckText, storyNewLife, storyRetry, storySave, storyText } from './life.js';
+import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
 import { storyGetLang, storyOnLang, storySetLang } from './language.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyLifeLived, storyNextChapter, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyFinaleDone, storyLifeLived, storyNextChapter, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
-import { createScenePlay, sceneFocus, sceneLook, sceneThink, skipSceneLine, stepScene } from './scenes/stage.js';
+import { P } from '../body.js';
+import { createScenePlay, layDead, poseSetFigures, sceneFocus, sceneHeld, sceneLook, sceneThink, setFocus, skipSceneLine, stageSetFigures, stepScene } from './scenes/stage.js';
+import { storySetSetup, STORY_SETS } from './scenes/sets.js';
+import { createFinalePlay, finaleLook, finaleShots, skipFinale, stepFinale, STORY_FINALE } from './scenes/finale.js';
 
 // The page's own words, both ways.
 export const STORY_WORDS = {
@@ -53,6 +56,7 @@ export const STORY_WORDS = {
   noChapters: { zh: '还没有章节。', en: 'No chapters yet.' },
   skip: { zh: '点击继续', en: 'Tap to go on' },
   firstLast: { zh: '第一仗，就是最后一仗。', en: 'His first battle was his last.' },
+  span: { zh: (born, died) => `${born}—${died}`, en: (born, died) => `${born}-${died}` },
   cleanRun: { zh: '在这之前，每一仗他都是第一次就活了下来。', en: 'Every battle before this one, he came through at the first try.' },
 };
 
@@ -84,6 +88,9 @@ const STORY_STYLE = `
 #story-layer .sv-bar.bottom { bottom: 0; transform-origin: bottom; }
 #story-layer .sv-line { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%); width: min(760px, calc(100% - 32px)); text-align: center; font-size: clamp(17px, 2.4vw, 22px); line-height: 1.6; color: #f1e9d6; text-shadow: 0 1px 6px #000; min-height: 2em; transition: opacity 0.6s; }
 #story-layer .sv-line.narrator { font-style: italic; color: #d9cfba; }
+#story-layer .sv-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.85) 100%); opacity: 0; pointer-events: none; }
+#story-layer .sv-line.finale { color: #ece4d0; font-size: clamp(17px, 2.3vw, 21px); letter-spacing: 0.02em; }
+#story-layer .sv-line.letter { bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100% - 32px)); font-size: clamp(17px, 2.2vw, 20px); line-height: 1.9; color: #e8dfc8; }
 #story-layer .sv-page { position: absolute; inset: 0; background: rgba(8,7,6,0.94); overflow-y: auto; display: flex; justify-content: center; padding: 48px 16px 32px; }
 #story-layer .sv-page article { width: min(640px, 100%); }
 #story-layer .sv-page h1 { font-size: clamp(30px, 6vw, 46px); margin: 0 0 4px; font-weight: 600; letter-spacing: 0.06em; }
@@ -123,8 +130,9 @@ export function installStory(hooks) {
   let view = null;
   // The battle as it is fought: its setup, the watch on his place, the world's time at the last tick.
   let fight = null;
-  // A scene playing: its play (scenes/stage.js) and its nodes.
+  // A scene playing: its play (scenes/stage.js) and its nodes; the finale (scenes/finale.js) as it plays.
   let scene = null;
+  let finale = null;
   let autoplay = false;
   // What is on: 'screen' | 'card' | 'battle' | 'scene' | 'ending' | null; and how to draw it again (a language switch).
   let redraw = null;
@@ -186,6 +194,7 @@ export function installStory(hooks) {
   }
 
   function close() {
+    if (finale) endFinale();
     scene = null;
     fight = null;
     run = null;
@@ -212,7 +221,7 @@ export function installStory(hooks) {
   // (A retry's life is the checkpoint, the man as he entered the chapter: it is entered afresh.)
   function beginChapter(chapter) {
     if (!chapter) return open();
-    run = createChapterRun(life, chapter, { battles: STORY_BATTLES, comrades: COMRADES });
+    run = createChapterRun(life, chapter, { battles: STORY_BATTLES, comrades: COMRADES, flashbacks: FLASHBACKS });
     life = run.life;
     save();
     // The still scene behind the cards: the battle's field with its men drawn up, held.
@@ -231,6 +240,7 @@ export function installStory(hooks) {
     if (current.kind === 'card') return showCard(current.card);
     if (current.kind === 'battle') return startBattle();
     if (current.kind === 'scene') return startScene(current.scene);
+    if (current.kind === 'finale') return startFinale(current);
     if (current.kind === 'dead') return showEnding(current.page);
     if (current.kind === 'done') return nextChapter();
     return null;
@@ -281,6 +291,7 @@ export function installStory(hooks) {
 
   /** After the world's steps each frame: the watch on his place, and the end of the battle. */
   function tick(world) {
+    if (finale) return finaleTick(world);
     if (scene) return sceneTick(world);
     if (!fight || fight.done || !run || storyCurrent(run).kind !== 'battle' || view !== 'battle') return null;
     const dt = world.time - (fight.last ?? world.time);
@@ -307,20 +318,47 @@ export function installStory(hooks) {
 
   // ---- A scene -------------------------------------------------------------------------------------------------------------
 
+  /** The overlay a scene or the finale is filmed under: the dark, the bars, a vignette, the line. */
+  function filmNodes(onTap) {
+    const nodes = { black: svEl('div', { className: 'sv-black' }), vignette: svEl('div', { className: 'sv-vignette' }), top: svEl('div', { className: 'sv-bar top' }), bottom: svEl('div', { className: 'sv-bar bottom' }), line: svEl('p', { className: 'sv-line' }) };
+    const root = svEl('div', { className: 'sv-scene', onpointerdown: (event) => { event.preventDefault(); onTap(); } }, nodes.vignette, nodes.black, nodes.top, nodes.bottom, nodes.line);
+    return { nodes, root };
+  }
+
+  /** The year a scene is set in: the chapter's (a scene before the battle, of the years before it, has its own `year`). */
+  const sceneYear = (sceneDef) => sceneDef.year ?? run.chapter.year;
+
   function startScene(sceneDef) {
-    const world = hooks.world();
-    if (!world || !fight) {
-      storySceneDone(run);
-      return flow();
+    // A scene on a set of its own (the drill ground, the yard, the gate by lantern): its world built for it, its figures the
+    // life's people as they are now.
+    const set = sceneDef.set ? STORY_SETS[sceneDef.set] : null;
+    let world = hooks.world();
+    let play;
+    if (set) {
+      const setup = storySetSetup(set, run.life, { year: sceneYear(sceneDef), seed: battleSeed(run.chapter), memory: Boolean(sceneDef.memory) });
+      // (The scene's own changes to the set for this life: `adjust(life)` → { who: { face, pose } }, as he faces the pole or turns from it.)
+      const adjust = typeof sceneDef.adjust === 'function' ? sceneDef.adjust(run.life) ?? {} : {};
+      for (const figure of setup.figures) {
+        const change = adjust[figure.who];
+        if (change?.pose) figure.pose = change.pose;
+        if (change?.face) figure.yaw = Math.atan2(-(change.face[1] - figure.at[1]), change.face[0] - figure.at[0]);
+      }
+      hooks.stage(setup, { paused: false });
+      world = hooks.world();
+      play = createScenePlay(world, sceneDef, { hero: setup.player, cast: setup.comrades, figures: setup.figures, camera: setup.camera, language, life: run.life });
+    } else {
+      if (!world || !fight) {
+        storySceneDone(run);
+        return flow();
+      }
+      // Who fell, for a scene about a body: the named men who fell in the battle, then his family in it (whom the story mourns).
+      const states = run.outcome?.comrades ?? {};
+      const ids = Object.keys(fight.setup.comrades ?? {});
+      const fallen = [...ids.filter((id) => states[id] && states[id] !== 'alive'), ...ids.filter((id) => run.life.family[id])];
+      play = createScenePlay(world, sceneDef, { hero: fight.setup.player, cast: fight.setup.comrades, fallen, language, life: run.life });
     }
-    // Who fell, for a scene about a body: the named men who fell in the battle, then his family in it (whom the story mourns).
-    const states = run.outcome?.comrades ?? {};
-    const ids = Object.keys(fight.setup.comrades ?? {});
-    const fallen = [...ids.filter((id) => states[id] && states[id] !== 'alive'), ...ids.filter((id) => run.life.family[id])];
-    const play = createScenePlay(world, sceneDef, { hero: fight.setup.player, cast: fight.setup.comrades, fallen, language });
-    const nodes = { black: svEl('div', { className: 'sv-black' }), top: svEl('div', { className: 'sv-bar top' }), bottom: svEl('div', { className: 'sv-bar bottom' }), line: svEl('p', { className: 'sv-line' }) };
-    const root = svEl('div', { className: 'sv-scene', onpointerdown: (event) => { event.preventDefault(); skipSceneLine(play); } }, nodes.black, nodes.top, nodes.bottom, nodes.line);
-    scene = { play, nodes, last: world.time };
+    const { nodes, root } = filmNodes(() => skipSceneLine(play));
+    scene = { play, nodes, last: world.time, world, set: Boolean(set) };
     redraw = () => { play.language = language; layer.replaceChildren(root, langSwitch()); };
     show('scene', root);
     hooks.watch(false);
@@ -339,34 +377,142 @@ export function installStory(hooks) {
   }
 
   function sceneTick(world) {
+    // (A world built for the scene starts its own clock.)
+    if (world !== scene.world) Object.assign(scene, { world, last: world.time });
     const dt = world.time - scene.last;
     scene.last = world.time;
     const due = dt > 0 ? stepScene(scene.play, dt) : [];
     drawScene();
     if (!due.includes('done')) return null;
+    const wasSet = scene.set;
     scene = null;
     hooks.pause(true);
     storySceneDone(run);
     save();
+    // Back from a set to the cards: the battle's field behind them again, held still.
+    if (wasSet && fight && storyCurrent(run).kind === 'card') {
+      hooks.stage(fight.setup, { paused: true });
+      storyCommandMen(hooks.world(), fight.setup, life);
+    }
     return flow();
   }
 
-  /** Inside each step of the world: the scene's posing of the hero. */
-  function think() {
-    if (scene) sceneThink(scene.play);
+  // ---- The finale: he lies dying, and the life comes back to him --------------------------------------------------------
+
+  const stageCanvas = () => document.querySelector('#stage');
+
+  function startFinale(current) {
+    const world = hooks.world();
+    const shots = finaleShots(run.life, current.flashbacks?.length ? current.flashbacks : FLASHBACKS);
+    const play = createFinalePlay(shots, { language });
+    const { nodes, root } = filmNodes(() => skipFinale(play));
+    // The battle's world, where he lies (taken by the night, if the battle left him standing: the after-cards say how).
+    const hero = fight && world ? world.fighters[fight.setup.player] : null;
+    if (hero && hero.state !== 'out') layDead(world, hero, { up: true, reason: 'fell under the company flag' });
+    finale = { play, nodes, root, world, last: world?.time ?? 0, hero: fight?.setup.player ?? null, figures: null, camera: null, shot: -1 };
+    redraw = () => { play.language = language; layer.replaceChildren(root, langSwitch()); };
+    show('scene', root);
+    hooks.watch(false);
+    hooks.pause(false);
+    finaleShot(0);
+    drawFinale();
   }
 
-  /** After the follow camera: in a scene, the camera eased onto the two of them. */
+  /** A shot begins: its world built (in the dark the shot before closed to), its figures placed, its camera. */
+  function finaleShot(index) {
+    const shot = finale.play.shots[index];
+    finale.shot = index;
+    if (shot.first) {
+      finale.figures = null;
+      finale.camera = null;
+      return;
+    }
+    if (shot.kind === 'black') return;
+    const set = STORY_SETS[shot.set] ?? STORY_SETS.field;
+    const setup = storySetSetup(set, run.life, { year: shot.year ?? 1621, memory: shot.kind === 'memory', seed: index + 1, alias: shot.alias ?? {} });
+    for (const figure of setup.figures) if (shot.poses?.[figure.who]) figure.pose = shot.poses[figure.who];
+    hooks.stage(setup, { paused: false });
+    const world = hooks.world();
+    finale.world = world;
+    finale.last = world.time;
+    finale.figures = stageSetFigures(world, setup.figures.map((figure) => ({ ...figure })));
+    const camera = shot.camera ?? setup.camera;
+    finale.camera = { ...camera, distance: camera.distance * (shot.closer ?? 1) };
+    finale.since = world.time;
+  }
+
+  function drawFinale() {
+    const look = finaleLook(finale.play);
+    const nodes = finale.nodes;
+    nodes.black.style.opacity = String(look.black);
+    nodes.top.style.transform = `scaleY(${look.bars})`;
+    nodes.bottom.style.transform = `scaleY(${look.bars})`;
+    nodes.vignette.style.opacity = String(look.vignette);
+    const text = look.line?.text ?? '';
+    if (nodes.line.textContent !== text) nodes.line.textContent = text;
+    nodes.line.className = `sv-line finale${look.kind === 'black' ? ' letter' : ''}`;
+    const canvas = stageCanvas();
+    if (canvas) canvas.style.filter = `grayscale(${look.grey.toFixed(3)}) sepia(${look.warm.toFixed(3)}) brightness(${look.dim.toFixed(3)})`;
+  }
+
+  function finaleTick(world) {
+    if (world !== finale.world) Object.assign(finale, { world, last: world.time });
+    return null;
+  }
+
+  /**
+   * Each drawn frame (`dt` s of the page's own clock: the finale is not the world's, which is slowed on the field and starts
+   * again with each set's world): the finale on, its shots begun as they come.
+   */
+  function finaleFrame(dt) {
+    const due = dt > 0 ? stepFinale(finale.play, Math.min(dt, 0.1)) : [];
+    for (const event of due) if (event.shot !== undefined && event.shot > 0) finaleShot(event.shot);
+    drawFinale();
+    if (!due.includes('done')) return null;
+    endFinale();
+    storyFinaleDone(run);
+    save();
+    return flow();
+  }
+
+  /** The finale's film taken down (the canvas's own colour back). */
+  function endFinale() {
+    const canvas = stageCanvas();
+    if (canvas) canvas.style.filter = '';
+    finale = null;
+    hooks.pause(true);
+  }
+
+  /** The finale's camera: on him where he fell (from above, coming down), else the shot's set. */
+  function finaleFocus() {
+    if (finale.camera) return setFocus(finale.camera, finale.world.time - (finale.since ?? 0));
+    const hero = finale.hero !== null ? finale.world?.fighters[finale.hero] : null;
+    if (!hero) return null;
+    const at = [hero.x[P.pelvis * 3], hero.x[P.pelvis * 3 + 1], hero.x[P.pelvis * 3 + 2]];
+    const into = finale.play.into;
+    const spec = STORY_FINALE.camera;
+    return { target: [at[0], Math.max(0.1, at[1] * 0.6), at[2]], yaw: spec.yaw + into * spec.turn, pitch: spec.pitch, distance: Math.max(spec.near, spec.far - into * spec.closing) };
+  }
+
+  /** Inside each step of the world: the scene's posing of the hero, or a set's figures. */
+  function think() {
+    if (scene) sceneThink(scene.play);
+    if (finale?.figures) poseSetFigures(finale.world, finale.figures, finale.world.time - (finale.since ?? 0));
+  }
+
+  /** After the follow camera: in a scene, the camera eased onto the shot. */
   function steer(dt) {
-    if (!scene) return;
-    const focus = sceneFocus(scene.play);
+    if (finale) finaleFrame(dt);
+    const focus = scene ? sceneFocus(scene.play) : finale ? finaleFocus() : null;
     if (!focus) return;
     const orbit = hooks.orbit();
+    const film = scene ?? finale;
     // The scene's own camera, kept from frame to frame (the follow camera sets the orbit afresh each frame): from where the
     // orbit was when the scene began, eased onto the shot (about two thirds of the way in a second); then the orbit is it.
-    const cam = (scene.cam ??= { target: [orbit.target.x, orbit.target.y, orbit.target.z], yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance });
-    // (In the dark of a cut it is there at once: the dark lifts on the shot.)
-    const ease = sceneLook(scene.play).black > 0.95 ? 1 : 1 - Math.exp(-dt * 1.1);
+    const cam = (film.cam ??= { target: [orbit.target.x, orbit.target.y, orbit.target.z], yaw: orbit.yaw, pitch: orbit.pitch, distance: orbit.distance });
+    // (In the dark it is there at once: the dark lifts on the shot.)
+    const black = scene ? sceneLook(scene.play).black : finaleLook(finale.play).black;
+    const ease = black > 0.95 ? 1 : 1 - Math.exp(-dt * 1.1);
     for (let axis = 0; axis < 3; axis += 1) cam.target[axis] += (focus.target[axis] - cam.target[axis]) * ease;
     cam.yaw += Math.atan2(Math.sin(focus.yaw - cam.yaw), Math.cos(focus.yaw - cam.yaw)) * ease;
     cam.pitch += (focus.pitch - cam.pitch) * ease;
@@ -407,7 +553,7 @@ export function installStory(hooks) {
       svEl('button', { type: 'button', className: `sv-go${lived ? ' main' : ''}`, textContent: word('anew'), onclick: beginAnew }),
       svEl('button', { type: 'button', className: 'sv-go', textContent: word('menu'), onclick: leaveToMenu }));
     const article = svEl('article', { dataset: { ending: page.kind } },
-      svEl('h1', { textContent: `${say(page.name)} · ${lived ? word('lived') : word('fell')}` }),
+      svEl('h1', { textContent: page.finale ? `${say(page.name)} · ${word('span', life?.hero?.born ?? STORY.born, page.year)}` : `${say(page.name)} · ${lived ? word('lived') : word('fell')}` }),
       svEl('p', { textContent: where }),
       page.text ? svEl('p', { textContent: say(page.text) }) : null,
       page.how ? svEl('h2', { textContent: word('how') }) : null,
@@ -442,7 +588,67 @@ export function installStory(hooks) {
       if (hero && hero.state !== 'out') knockOut(world, hero, { time: world.time, effects: [], attacker: null }, 'struck down (a test)', 'killed');
       return Boolean(hero);
     },
-    skipLine: () => (scene ? skipSceneLine(scene.play) : false),
+    skipLine: () => (scene ? skipSceneLine(scene.play) : finale ? skipFinale(finale.play) : false),
+    // A stand-in life at chapter `n` (shots and checks of one scene without playing the life to it): a new man, every chapter to
+    // `n` entered (its comrades with him), then `effects` (life.js storyApplyEffects: flags, family, rank, `dies`), the men who
+    // `fell` in chapter n's battle, and the run of chapter n begun.
+    stand: (n, { seed = 11, effects = {}, fell = [] } = {}) => {
+      hooks.closeMenus?.();
+      life = storyNewLife(life, { seed, family: STORY_FAMILY, hero: STORY_HERO });
+      for (const chapter of CHAPTERS.filter((each) => each.n <= n)) storyEnterChapter(life, chapter, { comrades: COMRADES });
+      storyApplyEffects(life, effects);
+      for (const id of fell) storyMarkDead(life, id, { how: { zh: '战死', en: 'killed' } });
+      const chapter = CHAPTERS.find((each) => each.n === n);
+      run = createChapterRun(life, chapter, { battles: STORY_BATTLES, comrades: COMRADES, flashbacks: FLASHBACKS });
+      run.index = (chapter.before ?? []).length;
+      run.pending = [];
+      return { chapter: chapter.id, comrades: life.comrades.map((comrade) => `${comrade.id}${comrade.alive ? '' : ' (dead)'}`) };
+    },
+    // Play one of the stand-in chapter's scenes now (by id): a set's on its own world; a body's on the battle's field, held
+    // still, its subject (or the chapter's family in it) struck down first.
+    playScene: (id) => {
+      const sceneDef = run.chapter.scenes?.find((each) => each.id === id);
+      if (!sceneDef) return false;
+      if (!sceneDef.set && run.battle) {
+        const setup = storyBattleSetup(run, battleSeed(run.chapter));
+        hooks.stage(setup, { paused: true });
+        fight = { setup, watch: storyWatch(setup), last: null, done: false };
+        const world = hooks.world();
+        for (const who of Object.keys(setup.comrades ?? {})) if (run.life.family[who]) knockOut(world, world.fighters[setup.comrades[who]], { time: world.time, effects: [], attacker: null }, 'cut down', 'killed');
+        run.outcome = { hero: 'alive', comrades: {} };
+      }
+      run.pending = [sceneDef];
+      startScene(sceneDef);
+      return true;
+    },
+    // A set shown by itself (shots of the sets: scenes/sets.js), its figures the stand-in life's people at `year`, remembered.
+    showSet: (id, year = 1600) => {
+      const sceneDef = { id, set: id, year, memory: true, script: [{ who: 'narrator', line: { zh: id, en: id } }] };
+      run.pending = [sceneDef];
+      startScene(sceneDef);
+      return Boolean(STORY_SETS[id]);
+    },
+    // The finale for the stand-in life (chapter 8's): its battle's field staged, the hero struck down in it, and the life seen.
+    finale: () => {
+      const setup = storyBattleSetup(run, battleSeed(run.chapter));
+      hooks.stage(setup, { paused: false });
+      fight = { setup, watch: storyWatch(setup), last: null, done: false };
+      storyCommandMen(hooks.world(), setup, life);
+      const world = hooks.world();
+      knockOut(world, world.fighters[setup.player], { time: world.time, effects: [], attacker: null }, 'cut down under the company flag', 'killed');
+      run.dying = { kind: 'battle', how: { zh: '战死', en: 'killed' }, text: run.chapter.ending?.text ?? null, where: run.chapter.title };
+      run.phase = 'finale';
+      return flow();
+    },
+    // The finale's shots (their ids), and a jump to one (`at`: an index; the world of that shot built, the clock set into it by `into` s).
+    finaleShots: () => (finale ? finale.play.shots.map((shot) => shot.id ?? shot.kind) : run?.phase === 'finale' ? finaleShots(run.life, FLASHBACKS).map((shot) => shot.id ?? shot.kind) : []),
+    finaleJump: (at, into = 0) => {
+      if (!finale) return false;
+      finale.play.index = at;
+      finale.play.into = into;
+      finaleShot(at);
+      return true;
+    },
     retry,
     anew: beginAnew,
     state: () => ({
@@ -451,6 +657,7 @@ export function installStory(hooks) {
       card: view === 'card' ? storyCurrent(run).card?.id ?? null : null,
       chapter: run?.chapter?.n ?? null,
       scene: scene ? { id: scene.play.scene.id, line: scene.play.index, lines: scene.play.lines.length } : null,
+      finale: finale ? { shot: finale.play.index, shots: finale.play.shots.length, id: finale.play.shots[finale.play.index]?.id ?? finale.play.shots[finale.play.index]?.kind, into: finale.play.into, look: finaleLook(finale.play) } : null,
       watch: fight?.watch ? { away: fight.watch.away, leftPlace: fight.watch.leftPlace, decidedAt: fight.watch.decidedAt, downAt: fight.watch.downAt } : null,
       outcome: run?.outcome ?? null,
       life: life ? { lives: life.lives, chapter: life.chapter, rank: life.rank, place: life.place, attempts: life.attempts, dead: Boolean(life.dead), comrades: life.comrades.map((comrade) => ({ id: comrade.id, alive: comrade.alive })), family: life.family, luck: storyLuck(life) } : null,
@@ -464,10 +671,14 @@ export function installStory(hooks) {
   return {
     open, tick, think, steer, close,
     hooks: testHooks,
-    /** The hero is the scene's (not the player's) while a scene plays. */
-    holding: () => Boolean(scene),
+    /** The hero is the scene's (not the player's) while a scene or the finale plays. */
+    holding: () => Boolean(scene || finale),
+    /** The men a scene holds still (they think nothing of their own): main.js leaves them out of the AI's thinking. */
+    held: () => (scene ? sceneHeld(scene.play) : finale?.figures ? finale.figures.map((figure) => finale.world.fighters[figure.index]?.id).filter((id) => id !== undefined) : []),
+    /** The world's pace (a share): slowed while he lies dying on the field. */
+    pace: () => (finale ? finaleLook(finale.play).pace : 1),
     /** A scene's camera is on. */
-    get filming() { return Boolean(scene); },
+    get filming() { return Boolean(scene || finale); },
     /** The game has left story mode (main.js setGame): take everything down. */
     leave: () => { if (!layer.hidden) close(); },
     get active() { return !layer.hidden; },

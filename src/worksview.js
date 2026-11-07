@@ -12,6 +12,7 @@ import { reliefAt, softAt, worksOf } from './physics/fieldworks.js';
 import { kwtCreate } from './levelmode/kitwater.js';
 import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
 import { storyLadders } from './story/ground/wallview.js';
+import { storyProps, storyPropsTick } from './story/ground/props.js';
 
 export const WORKS_VIEW = {
   // A stake's shaft and its buried length (m), as fieldworks.js FIELDWORKS.stake's radius.
@@ -93,12 +94,16 @@ export function showWorks(view, arena) {
   if (spec.gatehouse) group.add(worksGatehouse(spec.gatehouse));
   // Siege ladders at the gaps of a wall to storm (story mode: story/ground/walls.js).
   if (spec.ladders?.length) group.add(storyLadders(spec.ladders));
+  // A story scene's set pieces (story/ground/props.js: a flagpole, lanterns, a house front …).
+  const props = spec.props?.length ? storyProps(spec.props) : null;
+  if (props) group.add(props);
   view.scene.add(group);
-  view.works = { group, stakes, broken: 0, water, waterAt: -Infinity };
+  view.works = { group, stakes, broken: 0, water, waterAt: -Infinity, props };
 }
 
 /** Each frame: the water rung by the men and horses wading in it, and the stakes the battle has broken lie over. */
 export function updateWorksView(view, world) {
+  if (view.works?.props) storyPropsTick(view.works.props, performance.now() / 1000);
   const water = view.works?.water;
   if (water && world) {
     // (A battle begun again, its clock back at nought: the rings of the one before are forgotten.)

@@ -261,6 +261,8 @@ function applyWeather(view) {
   if (!group) return;
   const mist = weather?.sky ?? 0;
   if (weather?.sun) view.lights.sun.intensity *= weather.sun;
+  // Dusk or night (a story scene's: `dim`, the share of the sky's light left): the key, rim and sky light cut with the sun.
+  if (weather?.dim !== undefined) for (const light of ['key', 'rim', 'hemi']) view.lights[light].intensity *= weather.dim;
   // Mist pales the horizon (the look's own, already the fog's colour) toward a damp grey-white: the fog, the background and the sky's horizon all take it.
   const fog = view.scene.fog;
   if (weather?.fog && fog) {

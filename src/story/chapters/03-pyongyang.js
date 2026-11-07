@@ -169,7 +169,7 @@ export const CHAPTER_PYONGYANG = {
   ],
   scenes: [
     {
-      id: 'pyongyang-tally', at: 'after',
+      id: 'pyongyang-tally', at: 'after', set: 'gateHeads',
       when: (life, outcome) => chapHeroUp(outcome),
       script: [
         { who: 'narrator', line: { zh: '那天夜里，北营门口挑着灯笼点首级，一颗一颗，像收秋。', en: 'That night at the northern camp\'s gate they counted heads by lantern, one by one, like a harvest coming in.' } },

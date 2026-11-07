@@ -232,14 +232,16 @@ export const CHAPTER_LIAODONG = {
   ],
   scenes: [
     {
-      id: 'liaodong-homecoming', at: 'after',
+      // The first time she saw him (the card 'liaodong-children': she was born in 1611), staged in the Suns' yard (scenes/sets.js).
+      id: 'liaodong-homecoming', at: 'after', set: 'yard', year: 1614,
       when: (life, outcome) => chapHeroUp(outcome) && chapFamily(life, 'daughter'),
       script: [
         { who: 'narrator', line: { zh: '辽阳城外，孙家的院子里晒着高粱。', en: 'Outside Liaoyang, sorghum was drying in the Suns\' yard.' } },
         { who: 'daughter', line: { zh: '娘，这个人是谁？', en: 'Mother, who is that man?' } },
         { who: 'wife', line: { zh: '是你爹。', en: 'That\'s your father.' } },
-        { who: 'hero', stage: 'kneel', line: { zh: '阿禾，过来。', en: 'Ahe. Come here.' } },
-        { who: 'narrator', line: { zh: '她没有过来。他就那么蹲着，蹲到她过来为止。', en: 'She did not come. So he stayed crouched there until she did.' } },
+        { who: 'hero', stage: 'crouch', line: { zh: '阿禾，过来。', en: 'Ahe. Come here.' } },
+        { who: 'narrator', when: (life) => chapFlag(life, 'waitedForAhe'), stage: 'approach:daughter', line: { zh: '她没有过来。他就那么蹲着，蹲到她过来为止。', en: 'She did not come. So he stayed crouched there until she did.' } },
+        { who: 'narrator', when: (life) => !chapFlag(life, 'waitedForAhe'), stage: 'rise:hero', line: { zh: '她没有过来，躲回了娘身后。他站起来，去把她抱了起来。她哭了。', en: 'She did not come. She went back behind her mother. He stood up, and went and picked her up, and she cried.' } },
       ],
     },
   ],

@@ -8,9 +8,13 @@
 //            each named man's fate), written into the life (who fell, and how), and a judgement card if he left his place
 //            (the chapter's own, or STORY_JUDGEMENT: charged, flogged or executed, by Qi Jiguang's law)
 //   after    its after-cards (they may read the outcome: when(life, outcome))
-//   scenes   its scenes at 'after' (each as its `when` allows), played by the page on the battle's own field
+//   scenes   its scenes at 'after' (each as its `when` allows), played by the page on the battle's own field (or on a set of
+//            their own: scenes/sets.js)
+//   finale   (the last chapter, `finale`): he lies dying, and the life comes back to him (scenes/finale.js), then the page
 //   done     the chapter lived through (his luck counts it), and the next chapter, or the end of the life
 // and a death anywhere (the battle, a fatal choice, the judgement) ends it on the ending page (life.js storyDie).
+// A scene `at: 'before'` plays before the chapter's first card, or (`after: <card id>`) as soon as that card is answered, if its
+// `when` holds then; a fatal choice's `scene` (the chapter's scene of that id) plays before its page.
 // `storyRunBattle` fights a chapter's battle headless (Node): the hero thinks for himself as every man does (ai.js).
 
 import { P } from '../body.js';
@@ -100,10 +104,17 @@ function storyWhen(item, life, outcome) {
 }
 
 /** Begin a chapter for this life: it is entered (its year, his age, who joins him, the checkpoint), its before-cards first. */
-export function createChapterRun(life, chapter, { battles = {}, comrades = [] } = {}) {
+export function createChapterRun(life, chapter, { battles = {}, comrades = [], flashbacks = [] } = {}) {
   storyEnterChapter(life, chapter, { comrades });
-  const run = { life, chapter, battle: battles[chapter.battle] ?? null, phase: 'before', index: 0, outcome: null, setup: null, death: null, queue: [], scene: null, sceneIndex: 0 };
+  const run = { life, chapter, battle: battles[chapter.battle] ?? null, phase: 'before', index: 0, outcome: null, setup: null, death: null, queue: [], scene: null, sceneIndex: 0, pending: [], flashbacks, dying: null };
+  // The scenes before any card.
+  storyQueueScenes(run, (scene) => scene.at === 'before' && !scene.after);
   return run;
+}
+
+/** Queue the chapter's scenes that `pick` chooses (and whose `when` holds now) to play next, before anything else. */
+function storyQueueScenes(run, pick) {
+  for (const scene of run.chapter.scenes ?? []) if (pick(scene) && storyWhen(scene, run.life, run.outcome)) run.pending.push(scene);
 }
 
 /** The cards of a phase still to come, as their `when` allows now. */
@@ -120,6 +131,9 @@ function storyCardsOf(run, phase) {
  */
 export function storyCurrent(run) {
   for (;;) {
+    // A scene a card or a fatal choice brought on plays before whatever comes next (the page of a death too).
+    if (run.pending?.length) return { kind: 'scene', scene: run.pending[0] };
+    if (run.phase === 'finale') return { kind: 'finale', dying: run.dying, flashbacks: run.flashbacks ?? [] };
     if (run.phase === 'dead') return { kind: 'dead', page: run.death };
     if (run.phase === 'done') return { kind: 'done' };
     if (run.phase === 'before' || run.phase === 'judged' || run.phase === 'after') {
@@ -137,6 +151,13 @@ export function storyCurrent(run) {
       while (run.sceneIndex < scenes.length && !storyWhen(scenes[run.sceneIndex], run.life, run.outcome)) run.sceneIndex += 1;
       if (run.sceneIndex < scenes.length) return { kind: 'scene', scene: scenes[run.sceneIndex] };
       storyPassChapter(run.life, run.chapter.n);
+      // The last chapter does not end with him walking away from it: the night takes him where he stands (its after-cards
+      // say so), and the finale is his.
+      if (run.chapter.finale) {
+        run.dying = { kind: 'lived' };
+        run.phase = 'finale';
+        continue;
+      }
       run.phase = 'done';
       continue;
     }
@@ -158,13 +179,37 @@ export function storyAnswer(run, choice = 0) {
   if (current.kind !== 'card') return current;
   const { fatal } = current.card.choices?.length ? storyChoose(run.life, current.card, choice) : { fatal: null };
   run.index += 1;
-  if (fatal) storyEnd(run, { kind: 'fatal', how: fatal.how, text: fatal.text ?? run.chapter.ending?.text, where: run.chapter.title });
+  if (fatal) {
+    storyEnd(run, { kind: 'fatal', how: fatal.how, text: fatal.text ?? run.chapter.ending?.text, where: run.chapter.title });
+    // The death itself, staged (the drill ground, the pole), before its page.
+    if (fatal.scene) storyQueueScenes(run, (scene) => scene.id === fatal.scene);
+  } else if (run.phase === 'before') storyQueueScenes(run, (scene) => scene.at === 'before' && scene.after === current.card.id);
   return storyCurrent(run);
 }
 
 /** The scene now is played: on to the next. */
 export function storySceneDone(run) {
-  if (storyCurrent(run).kind === 'scene') run.sceneIndex += 1;
+  if (run.pending?.length) run.pending.shift();
+  else if (storyCurrent(run).kind === 'scene') run.sceneIndex += 1;
+  return storyCurrent(run);
+}
+
+/**
+ * The finale is played (he has died, the life seen again): his page. Fallen in the battle, a death at this chapter as any other
+ * (the retry is the player's); through the battle and taken by the night, the life lived to its end.
+ */
+export function storyFinaleDone(run) {
+  if (run.phase !== 'finale') return storyCurrent(run);
+  const dying = run.dying ?? { kind: 'lived' };
+  run.dying = null;
+  if (dying.kind === 'lived') {
+    run.death = storyLivedThrough(run.life, { where: run.chapter.title, text: run.chapter.ending?.lived ?? run.chapter.ending?.text ?? null });
+    run.death.finale = true;
+    run.phase = 'dead';
+  } else {
+    storyEnd(run, dying);
+    run.death.finale = true;
+  }
   return storyCurrent(run);
 }
 
@@ -177,6 +222,7 @@ function storyEnd(run, death) {
 
 /** The life lived through every chapter there is: its last page. */
 export function storyLifeLived(run) {
+  if (run.phase === 'dead' && run.death) return run.death;
   run.death = storyLivedThrough(run.life, { where: run.chapter.title, text: run.chapter.ending?.lived ?? null });
   return run.death;
 }
@@ -186,6 +232,11 @@ export function storyLifeLived(run) {
 /** The battle's setup for this life at a seed (the battle file's `setup`), kept on the run. */
 export function storyBattleSetup(run, seed = 1) {
   run.setup = run.battle.setup(run.life, seed);
+  // His family the battle cast (his brother in the column): kept as the battle made them, so later scenes stage the same man.
+  for (const [who, index] of Object.entries(run.setup.comrades ?? {})) {
+    const member = run.life.family?.[who];
+    if (member && typeof member === 'object' && !member.inputs && run.setup.fighters[index]) member.inputs = structuredClone(run.setup.fighters[index].inputs);
+  }
   // How it is shown ({ scene, weather, camera }): the setup's, else the battle's own (a battle may give it once for all setups).
   run.setup.view ??= run.battle.view ?? null;
   run.seed = seed;
@@ -362,7 +413,12 @@ export function storyBattleDone(run, outcome) {
   const detail = outcome.detail ?? storyDetailOf(outcome);
   for (const [id, fate] of Object.entries(detail.comrades ?? {})) if (fate?.fell) storyMarkDead(run.life, id, { how: fate.how?.text ?? null });
   if (detail.hero.fell) {
-    storyEnd(run, { kind: 'battle', how: detail.hero.how?.text ?? null, text: run.chapter.ending?.text ?? null, where: run.chapter.title });
+    const death = { kind: 'battle', how: detail.hero.how?.text ?? null, text: run.chapter.ending?.text ?? null, where: run.chapter.title };
+    // In the last chapter he lies dying first, and the life comes back to him (the finale); then the page.
+    if (run.chapter.finale) {
+      run.dying = death;
+      run.phase = 'finale';
+    } else storyEnd(run, death);
     return storyCurrent(run);
   }
   const judgement = { ...STORY_JUDGEMENT, ...(run.chapter.judgement ?? {}) };

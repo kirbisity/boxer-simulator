@@ -104,7 +104,8 @@ test('every comrade named exists, and every comrade is built from a real preset'
       }
     }
     for (const scene of chapter.scenes) {
-      assert.ok(['before', 'after'].includes(scene.at), scene.id);
+      // (A fatal choice's scene, `at: 'fatal'`, plays before its page.)
+      assert.ok(['before', 'after', 'fatal'].includes(scene.at), scene.id);
       for (const line of scene.script) assert.ok(COMRADE_IDS.has(line.who) || ROLES.has(line.who), `${scene.id}: who ${line.who}`);
     }
   }

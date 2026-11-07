@@ -16,11 +16,20 @@
 //   rise      he gets up
 // A line with no stage word goes on as the last left it. The scene's `subject` is whose body it is (else the scene's id, if it
 // names one of the cast, else the first of the cast spoken of).
+//
+// A scene with a `set` (scenes/sets.js: the drill ground, the yard, the gate by lantern) is played on that set's own world, its
+// figures placed and held as the set says, and its stage words move whoever the line names (or `word:who`, or a list of them):
+//   kneel / bowed / crouch / sit   down as the set's poses have it, eased       rise    back up
+//   fall      laid down dead where he is (in the dark, if the screen is going dark)
+//   approach  he walks to the hero (the hero: to the line's other speaker), and stops a little short
+//   dark      the screen goes dark and stays so          lift    the dark lifts
+// A set scene opens in the dark (the page builds its world under it) and lifts. A line may have its own `when(life)`.
 
 import { P } from '../../body.js';
-import { createFighter, dropWeapon, knockOut, placeOnFloor, WORLD } from '../../physics.js';
+import { createFighter, dropWeapon, knockOut, placeFighter, placeOnFloor, WORLD } from '../../physics.js';
 import { holdPlayer } from '../../levelmode/items.js';
 import { storyText } from '../life.js';
+import { STORY_SET } from './sets.js';
 
 export const STORY_SCENE = {
   // A line stays up as long as it takes to read it twice, slowly (s): a base and so much a character, by language; never past `most`.
@@ -41,11 +50,19 @@ export const STORY_SCENE = {
   stoop: { share: 0.35, lean: 0.3, handsUp: 0.75 },
   // Kneeling: his lean forward over it, bowed.
   bow: { search: 0.35, still: 0.3 },
-  // The scene's camera: a low, close shot across the two of them (rad of pitch, m away, m over the middle it looks at), from the
-  // side, `turn` rad off the line from the body to him.
-  camera: { pitch: 0.32, distance: 3.0, lift: 0.15, turn: 1.25 },
+  // The scene's camera: a low shot across the two of them (rad of pitch, m away, m over the middle it looks at), from the side,
+  // `turn` rad off the line from the body to him; back far enough that the ground round them is in it, the two of them alone.
+  camera: { pitch: 0.36, distance: 4.2, lift: 0.18, turn: 2.5 },
   // The last line held this long (s) after it is read, the bars still in.
   endHold: 1.6,
+  // Round the two of them (m from the middle of the body and where he stands over it): nobody else lies this close in the shot,
+  // and no one stands within `standing` (the company drawn up further off, waiting to fall in); any other man of the field
+  // there is moved out to it, and the weapons and hats lying there with him (in the dark), so the two of them have the ground
+  // to themselves.
+  clear: 3.4,
+  clearStanding: 7,
+  // A set scene: the dark it opens in held this long (s) before it lifts (the world drawn under it).
+  openDark: 0.5,
 };
 
 const sceneSmooth = (u) => {
@@ -96,7 +113,7 @@ export function rollBody(fighter, angle, floor = 0) {
  * together, turned to lie along the ground; then left lying still (out past WORLD.goneSeconds: not simulated, as the long dead
  * of a battle are), so the scene alone moves it.
  */
-export function layOut(fighter, floor = 0) {
+export function layOut(fighter, floor = 0, toward = null) {
   const stand = createFighter(fighter.body.inputs, { id: fighter.id, corner: fighter.corner, x: 0, facing: 0, random: () => 0.5 });
   const at = (index) => scenePoint(stand, index);
   const length = (a, b) => Math.hypot(...sceneSub(at(a), at(b)));
@@ -121,7 +138,8 @@ export function layOut(fighter, floor = 0) {
   // Lying: his up along the ground the way his head lay, his front down; his left (a proper turn, not a mirror) across.
   const now = scenePoint(fighter, P.pelvis);
   const head = scenePoint(fighter, P.head);
-  const flat = [head[0] - now[0], 0, head[2] - now[2]];
+  // (Or the way the scene lays him: `toward`, his head that way.)
+  const flat = toward ? [toward[0], 0, toward[2]] : [head[0] - now[0], 0, head[2] - now[2]];
   const along = Math.hypot(flat[0], flat[2]) > 0.05 ? sceneNorm(flat) : [1, 0, 0];
   const left = [-along[2], 0, along[0]];
   const x = fighter.x;
@@ -160,42 +178,116 @@ function sceneSubject(scene, cast, fallen = []) {
   if (cast[scene.id] !== undefined) return scene.id;
   const spoken = scene.script?.map((line) => line.who).find((who) => cast[who] !== undefined && who !== 'hero');
   if (spoken) return spoken;
-  const mourns = scene.script?.some((line) => ['kneel', 'search', 'still', 'turn'].includes(line.stage));
+  const mourns = scene.script?.some((line) => sceneWords(line).some(({ word }) => ['kneel', 'search', 'still', 'turn'].includes(word)));
   return mourns ? fallen.find((id) => cast[id] !== undefined) ?? null : null;
+}
+
+/** A line's stage words, each with whom it moves (null: as the scene has it): 'kneel', 'fall:jin', ['dark', 'fall:jin']. */
+export function sceneWords(line) {
+  const words = Array.isArray(line?.stage) ? line.stage : line?.stage ? [line.stage] : [];
+  return words.map((entry) => {
+    const [word, who] = String(entry).split(':');
+    return { word, who: who ?? null };
+  });
+}
+
+/** A line is for this life (its own `when`, if it has one; a `when` that throws is not). */
+function sceneLineFor(line, life) {
+  if (typeof line.when !== 'function') return true;
+  try {
+    return Boolean(line.when(life));
+  } catch {
+    return false;
+  }
 }
 
 /**
  * The lines as staged: a scene about a body opens in the dark (its first line a `cut`, unless it stages something itself), and
- * a body that is to be knelt by is first turned over (a silent `turn` after the opening line, if the script has none).
+ * a body that is to be knelt by is first turned over (a silent `turn` after the opening line, if the script has none). A set
+ * scene's lines are as written.
  */
-function sceneLines(scene, subject) {
-  const lines = (scene.script ?? []).map((line) => ({ ...line }));
-  if (subject === null || !lines.length) return lines;
-  if (!lines[0].stage) lines[0].stage = 'cut';
-  if (!lines.some((line) => line.stage === 'turn')) lines.splice(1, 0, { who: 'narrator', stage: 'turn', line: { zh: '', en: '' } });
+function sceneLines(scene, subject, life, staged) {
+  const lines = (scene.script ?? []).filter((line) => sceneLineFor(line, life)).map((line) => ({ ...line }));
+  if (staged || subject === null || !lines.length) return lines;
+  if (!sceneWords(lines[0]).length) lines[0].stage = 'cut';
+  if (!lines.some((line) => sceneWords(line).some(({ word }) => word === 'turn'))) lines.splice(1, 0, { who: 'narrator', stage: 'turn', line: { zh: '', en: '' } });
   return lines;
 }
 
+/** How long a line holds (s): read, its dark closing first if it brings one, and the last held on. */
+function sceneLineLength(play, index) {
+  const line = play.lines[index];
+  if (!line) return 0;
+  const words = sceneWords(line).map(({ word }) => word);
+  const dark = words.includes('cut') ? STORY_SCENE.cut.close + STORY_SCENE.cut.hold : words.includes('dark') ? STORY_SCENE.cut.close : 0;
+  const opening = play.staged && index === 0 ? STORY_SCENE.openDark : 0;
+  return line.seconds + dark + opening + (index === play.lines.length - 1 ? STORY_SCENE.endHold : 0);
+}
+
 /**
- * Begin a scene on a world: `hero` the index of the man played, `cast` { id: index } (the battle's named men), `fallen` the
- * ids of those who fell in it, `language`.
+ * Begin a scene on a world: `hero` the index of the man played, `cast` { id: index } (the battle's named men, or a set's
+ * figures), `fallen` the ids of those who fell in it, `language`, `life` (for the lines' own `when`), `figures` (a set's: from
+ * storySetSetup, placed and posed by the scene), `camera` (a set's).
  * Returns the play's state; `stepScene` moves it on.
  */
-export function createScenePlay(world, scene, { hero, cast = {}, fallen = [], language = 'en' } = {}) {
-  const subjectId = sceneSubject(scene, cast, fallen);
-  const lines = sceneLines(scene, subjectId).map((line) => ({ ...line, seconds: lineSeconds(line, language) }));
+export function createScenePlay(world, scene, { hero, cast = {}, fallen = [], language = 'en', life = null, figures = null, camera = null } = {}) {
+  const staged = Boolean(figures);
+  const subjectId = staged ? null : sceneSubject(scene, cast, fallen);
+  const lines = sceneLines(scene, subjectId, life, staged).map((line) => ({ ...line, seconds: lineSeconds(line, language) }));
   return {
     world, scene, hero, cast, language, lines, subjectId, subject: subjectId !== null ? cast[subjectId] : null,
     index: 0, into: 0, time: 0, set: false, done: false, roll: null, stage: null, stageSince: 0, cut: null, ending: 0,
+    // A set's figures, each { index, who, at, yaw, pose, since, share, walk }, and its camera; the screen's own dark
+    // ({ from, to, at, seconds }: a set scene opens in it); the men to lay down once it is dark.
+    staged, figures: staged ? figures.map((figure) => ({ ...figure })) : null, camera,
+    dark: staged ? { from: 1, to: 0, at: STORY_SCENE.openDark, seconds: STORY_SCENE.cut.lift } : null,
+    falls: [],
   };
 }
 
 const sceneHeroOf = (play) => play.world.fighters[play.hero];
 const sceneSubjectOf = (play) => (play.subject !== null ? play.world.fighters[play.subject] : null);
 
+/**
+ * Clear the ground round the body: every other man of the field within STORY_SCENE.clear of the middle of the two of them moved
+ * straight out to that distance (in the dark: the shot is of the two of them alone).
+ */
+function clearRound(play, body, standAt) {
+  const pelvis = scenePoint(body, P.pelvis);
+  const centre = [(pelvis[0] + standAt[0]) / 2, (pelvis[2] + standAt[1]) / 2];
+  const hero = sceneHeroOf(play);
+  // How far a thing at `at` must go straight out from the middle to be `reach` from it ([dx, dz]), or null if it is far enough.
+  const outTo = (at, reach) => {
+    const off = [at[0] - centre[0], at[1] - centre[1]];
+    const distance = Math.hypot(off[0], off[1]);
+    if (distance >= reach) return null;
+    const way = distance > 0.05 ? [off[0] / distance, off[1] / distance] : [1, 0];
+    return [centre[0] + way[0] * reach - at[0], centre[1] + way[1] * reach - at[1]];
+  };
+  for (const other of play.world.fighters) {
+    if (other === body || other === hero) continue;
+    const by = outTo([other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]], other.state === 'out' ? STORY_SCENE.clear : STORY_SCENE.clearStanding);
+    if (!by) continue;
+    placeFighter(other, other.root[0] + by[0], other.root[1] + by[1]);
+    other.v?.fill?.(0);
+  }
+  // What lies on the ground there (dropped weapons, hats knocked off), but his own.
+  for (const thing of [...(play.world.debris ?? []), ...(play.world.props ?? [])]) {
+    if (thing.owner === hero?.id || !Array.isArray(thing.x) || thing.attached) continue;
+    const by = outTo([thing.x[0], thing.x[2]], STORY_SCENE.clear);
+    if (!by) continue;
+    thing.x[0] += by[0];
+    thing.x[2] += by[1];
+  }
+}
+
 /** The scene set, in the dark of a cut: the subject laid face down where he lies (out, if he was not), the hero over him. */
 function setScene(play) {
   play.set = true;
+  if (play.staged) {
+    stageSetFigures(play.world, play.figures);
+    return;
+  }
   const world = play.world;
   const hero = sceneHeroOf(play);
   const body = sceneSubjectOf(play);
@@ -217,7 +309,143 @@ function setScene(play) {
   hero.prev.set(hero.x);
   hero.v?.fill?.(0);
   play.side = side;
+  clearRound(play, body, at);
 }
+
+// ---- A set's figures --------------------------------------------------------------------------------------------------------
+
+/** Lay a man down dead where he stands: out, laid straight (face down, or face up: `up`). */
+export function layDead(world, fighter, { up = false, reason = 'lies dead', yaw = null } = {}) {
+  if (fighter.state !== 'out') knockOut(world, fighter, { time: world.time, effects: [], attacker: null }, reason, 'killed');
+  fighter.kneel = undefined;
+  // (Laid along the way he faced, his head that way: a set's `face`.)
+  layOut(fighter, 0, yaw === null ? null : [Math.cos(yaw), 0, -Math.sin(yaw)]);
+  if (up) rollBody(fighter, rollToward(fighter, [0, 1, 0]));
+}
+
+/**
+ * Put a set's figures where it says, before the first step (in the dark): each on his spot facing his way; the dead laid down;
+ * the kneeling already down (a set opens on the moment, not on the getting there).
+ */
+export function stageSetFigures(world, figures) {
+  for (const figure of figures) {
+    const fighter = world.fighters[figure.index];
+    if (!fighter) continue;
+    placeOnFloor(fighter, figure.at[0], figure.at[1], 0, figure.yaw);
+    fighter.yaw = figure.yaw;
+    fighter.prev.set(fighter.x);
+    fighter.v?.fill?.(0);
+    holdPlayer(fighter);
+    // Standing at ease (walk mode's stance: the guard down, the hands by his sides), not on guard: nobody here is fighting.
+    fighter.walking = true;
+    figure.since = -Infinity;
+    figure.share = STORY_SET.poses[figure.pose] ? 1 : 0;
+    if (figure.pose === 'lie' || figure.pose === 'lieUp') layDead(world, fighter, { up: figure.pose === 'lieUp', yaw: figure.yaw });
+  }
+  return figures;
+}
+
+/** A figure's hands for his pose: behind his back (bound), or held out before him to meet another's (a child's round his). */
+function setHands(fighter, figure, share) {
+  const pelvis = scenePoint(fighter, P.pelvis);
+  const forward = [Math.cos(fighter.yaw), 0, -Math.sin(fighter.yaw)];
+  const left = [-forward[2], 0, forward[0]];
+  if (STORY_SET.poses[figure.pose]?.behind) {
+    const back = [pelvis[0] - forward[0] * 0.2, pelvis[1] + 0.05, pelvis[2] - forward[2] * 0.2];
+    return [back.map((v, i) => v + left[i] * 0.06), back.map((v, i) => v - left[i] * 0.06)];
+  }
+  if (figure.hands === 'meet') {
+    const neck = scenePoint(fighter, P.neck);
+    const out = [pelvis[0] + forward[0] * 0.42, (neck[1] + pelvis[1]) / 2 - 0.02 * share, pelvis[2] + forward[2] * 0.42];
+    return [out.map((v, i) => v + left[i] * 0.05), out.map((v, i) => v - left[i] * 0.05)];
+  }
+  // At rest on his thighs, as a man kneels or squats with nothing in his hands.
+  const rest = STORY_SET.rest;
+  const knee = [pelvis[0] + forward[0] * rest.ahead, pelvis[1] + rest.up, pelvis[2] + forward[2] * rest.ahead];
+  return [knee.map((v, i) => v + left[i] * rest.apart), knee.map((v, i) => v - left[i] * rest.apart)];
+}
+
+/** Each step: every figure held where he is and posed as the set or the line says (the walkers walked), the dead left lying. */
+export function poseSetFigures(world, figures, time) {
+  const spec = STORY_SET.walk;
+  for (const figure of figures) {
+    const fighter = world.fighters[figure.index];
+    // (Not yet placed: the page may step the world once before the scene sets it.)
+    if (!fighter || fighter.state === 'out' || figure.since === undefined) continue;
+    if (figure.pose === 'walk' && figure.walk) {
+      const to = figure.walk.to;
+      const distance = Math.hypot(to[0] - fighter.root[0], to[1] - fighter.root[1]);
+      const pace = figure.walk.pace ?? spec.pace;
+      if (distance > (figure.walk.stop ?? spec.stop)) {
+        fighter.goTo = [to[0], 0, to[1]];
+        fighter.move = pace;
+        fighter.strafe = 0;
+        fighter.running = pace > spec.run;
+        fighter.kneel = undefined;
+        continue;
+      }
+      Object.assign(figure, { pose: figure.walk.then ?? 'stand', since: time, share: 0 });
+    }
+    holdPlayer(fighter);
+    const pose = STORY_SET.poses[figure.pose];
+    const eased = sceneSmooth((time - figure.since) / STORY_SCENE.kneel);
+    if (pose) {
+      figure.share = Math.max(figure.share ?? 0, eased);
+      const share = pose.share * figure.share;
+      fighter.kneel = { share, lean: figure.lean ?? pose.lean, hands: setHands(fighter, figure, share) };
+    } else if (fighter.kneel) {
+      // Getting up: the kneel let go, eased.
+      const share = (1 - eased) * (figure.from ?? fighter.kneel.share ?? 0);
+      figure.from ??= fighter.kneel.share ?? 0;
+      fighter.kneel = share > 0.02 ? { ...fighter.kneel, share, hands: null } : undefined;
+      if (!fighter.kneel) figure.from = undefined;
+    }
+  }
+}
+
+/** A figure is told a stage word (`who` a figure's name, or a role's: every figure of that role, as the row of the condemned). */
+function setWord(play, word, who) {
+  const named = play.figures.filter((each) => each.who === who);
+  const figures = named.length ? named : play.figures.filter((each) => String(each.who).startsWith(`${who}-`));
+  for (const figure of figures) setFigureWord(play, figure, word);
+}
+
+function setFigureWord(play, figure, word) {
+  const index = figure.index;
+  const fighter = play.world.fighters[index];
+  if (STORY_SET.poses[word]) Object.assign(figure, { pose: word, since: play.time, share: 0 });
+  else if (word === 'rise') Object.assign(figure, { pose: 'stand', since: play.time, from: undefined });
+  else if (word === 'fall') play.falls.push(figure);
+  else if (word === 'approach') {
+    // To the hero (the hero himself: to the first other figure who is not lying).
+    const toward = figure.index === play.hero ? play.figures.find((each) => each.index !== index && !['lie', 'lieUp'].includes(each.pose)) : play.figures.find((each) => each.index === play.hero);
+    const target = toward ? play.world.fighters[toward.index] : null;
+    if (!target || !fighter) return;
+    const at = [target.root[0], target.root[1]];
+    const off = [fighter.root[0] - at[0], fighter.root[1] - at[1]];
+    const distance = Math.hypot(off[0], off[1]) || 1;
+    const short = STORY_SET.walk.short;
+    Object.assign(figure, { pose: 'walk', walk: { to: [at[0] + (off[0] / distance) * short, at[1] + (off[1] / distance) * short], pace: STORY_SET.walk.slow, stop: 0.1 } });
+  }
+}
+
+/** A line's words begin: the screen's (dark, lift) and the figures' (each word to the one it names, else the line's speaker if he is a figure, else the hero). */
+function setLineWords(play, line) {
+  for (const { word, who } of sceneWords(line)) {
+    if (word === 'dark') play.dark = { from: sceneDark(play), to: 1, at: play.time, seconds: STORY_SCENE.cut.close };
+    else if (word === 'lift') play.dark = { from: sceneDark(play), to: 0, at: play.time, seconds: STORY_SCENE.cut.lift };
+    else setWord(play, word, who ?? (play.cast[line.who] !== undefined ? line.who : 'hero'));
+  }
+}
+
+/** The screen's own dark now (0..1): a set scene's opening, and its `dark` and `lift`. */
+function sceneDark(play) {
+  if (!play.dark) return 0;
+  const u = sceneSmooth((play.time - play.dark.at) / play.dark.seconds);
+  return play.dark.from + (play.dark.to - play.dark.from) * u;
+}
+
+// ---- The play ----------------------------------------------------------------------------------------------------------------
 
 /** A stage word begins. */
 function beginStage(play, stage) {
@@ -232,6 +460,17 @@ function beginStage(play, stage) {
     play.roll = { from: 0, total: rollToward(body, sceneNorm(toward)), done: 0, at: play.time + STORY_SCENE.turn.stoop };
   }
   if (stage === 'kneel' && hero?.weapon) dropWeapon(play.world, hero, 'dropped');
+}
+
+/** A line comes up: its stage words begin. */
+function beginLine(play, line) {
+  if (!line) return;
+  if (play.staged) {
+    setLineWords(play, line);
+    return;
+  }
+  const [first] = sceneWords(line);
+  if (first) beginStage(play, first.word);
 }
 
 /** The hero's pose for the stage now, each step. */
@@ -273,6 +512,17 @@ function rollStep(play) {
   if (u >= 1) play.roll = null;
 }
 
+/** The men to lay down in the dark: laid once it is dark (or at once, with no dark coming). */
+function fallStep(play) {
+  if (!play.falls.length) return;
+  if (play.dark && play.dark.to === 1 && sceneDark(play) < 0.98) return;
+  for (const figure of play.falls.splice(0)) {
+    const fighter = play.world.fighters[figure.index];
+    if (fighter) layDead(play.world, fighter);
+    figure.pose = 'lie';
+  }
+}
+
 /**
  * Move the scene on by `dt` s of the world's clock. Returns what fell due: { line } when a line comes up (its index), 'done' at
  * the end. The world itself is stepped by the page (or the test), the scene's posing each step through `sceneThink`.
@@ -284,17 +534,17 @@ export function stepScene(play, dt) {
     play.started = true;
     due.push({ line: 0 });
     const first = play.lines[0];
-    if (first?.stage) beginStage(play, first.stage);
-    if (first?.stage !== 'cut') setScene(play);
+    beginLine(play, first);
+    if (play.staged || sceneWords(first)[0]?.word !== 'cut') setScene(play);
   }
   play.time += dt;
   play.into += dt;
   // In a cut, the scene is set once the dark has closed.
   if (play.cut && !play.set && play.time - play.cut.at >= STORY_SCENE.cut.close) setScene(play);
+  fallStep(play);
   rollStep(play);
   const line = play.lines[play.index];
-  const length = (line?.seconds ?? 0) + (line?.stage === 'cut' ? STORY_SCENE.cut.close + STORY_SCENE.cut.hold : 0) + (play.index === play.lines.length - 1 ? STORY_SCENE.endHold : 0);
-  if (line && play.into >= length) {
+  if (line && play.into >= sceneLineLength(play, play.index)) {
     play.index += 1;
     play.into = 0;
     if (play.index >= play.lines.length) {
@@ -302,24 +552,37 @@ export function stepScene(play, dt) {
       due.push('done');
     } else {
       due.push({ line: play.index });
-      const next = play.lines[play.index];
-      if (next.stage) beginStage(play, next.stage);
+      beginLine(play, play.lines[play.index]);
     }
+  }
+  if (!play.lines.length && !play.done) {
+    play.done = true;
+    due.push('done');
   }
   return due;
 }
 
-/** Each step of the world while the scene plays: his pose as the stage has it (the page or the test calls it in the world's think). */
+/** Each step of the world while the scene plays: the poses as the stage has them (the page or the test calls it in the world's think). */
 export function sceneThink(play) {
   if (!play || play.done) return;
+  if (play.staged) {
+    poseSetFigures(play.world, play.figures, play.time);
+    return;
+  }
   poseHero(play);
+}
+
+/** The world's men the scene holds (they think nothing of their own while it plays): a set's every figure, else the hero. */
+export function sceneHeld(play) {
+  if (!play || play.done) return [];
+  const indices = play.staged ? play.figures.map((figure) => figure.index) : [play.hero];
+  return indices.map((index) => play.world.fighters[index]?.id).filter((id) => id !== undefined);
 }
 
 /** Skip to the next line (a tap), once the line has been up a moment. */
 export function skipSceneLine(play) {
   if (play.done || play.into < STORY_SCENE.skipAfter) return false;
-  const line = play.lines[play.index];
-  play.into = (line?.seconds ?? 0) + (line?.stage === 'cut' ? STORY_SCENE.cut.close + STORY_SCENE.cut.hold : 0) + (play.index === play.lines.length - 1 ? STORY_SCENE.endHold : 0);
+  play.into = sceneLineLength(play, play.index);
   return true;
 }
 
@@ -331,14 +594,30 @@ export function sceneLook(play) {
     const t = play.time - play.cut.at;
     black = t < spec.cut.close ? sceneSmooth(t / spec.cut.close) : 1 - sceneSmooth((t - spec.cut.close - spec.cut.hold) / spec.cut.lift);
   }
+  black = Math.max(black, sceneDark(play));
   const bars = play.done ? 0 : sceneSmooth(play.time / spec.bars);
   const line = play.lines[play.index];
-  const shown = line && (line.stage !== 'cut' || play.time - (play.cut?.at ?? 0) >= spec.cut.close);
+  const cutting = sceneWords(line).some(({ word }) => word === 'cut');
+  const opening = play.staged && play.index === 0 && play.time < spec.openDark;
+  const shown = line && !opening && (!cutting || play.time - (play.cut?.at ?? 0) >= spec.cut.close);
   return { black: Math.max(0, Math.min(1, black)), bars, line: shown ? { who: line.who, text: storyText(line.line, play.language) } : null };
+}
+
+/** A set's camera at `time` s into it: its own shot, drifting as it says (`drift`: rad of yaw a second, a share of its distance in ten). */
+export function setFocus(camera, time) {
+  if (!camera?.target) return null;
+  const drift = camera.drift ?? {};
+  return {
+    target: [...camera.target],
+    yaw: camera.yaw + (drift.yaw ?? 0) * time,
+    pitch: camera.pitch,
+    distance: camera.distance * Math.max(0.5, 1 + ((drift.distance ?? 0) * time) / 10),
+  };
 }
 
 /** Where the scene's camera looks, and from where: { target [x, y, z], yaw, pitch, distance } (the page eases its orbit to it). */
 export function sceneFocus(play) {
+  if (play.staged) return setFocus(play.camera, play.time);
   const hero = sceneHeroOf(play);
   const body = sceneSubjectOf(play);
   if (!hero) return null;
