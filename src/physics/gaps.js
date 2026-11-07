@@ -119,14 +119,17 @@ export function gapChance(gear, zone, mode) {
 
 /**
  * What a blow into gap `zone` of this kit meets: behind the sights or an open face, bare skin; where the kit has mail under
- * the gap (`gaps.mail`: zone names, or 'all' but the face), mail; else what is under all its plates (`gaps.under`: the arming
- * doublet) — never more than the armour there itself (`covered`).
+ * the gap (`gaps.mail`: zone names, or 'all' but the face), mail; where a layer worn under it reaches (`gear.under`), that
+ * layer; else what is under all its plates (`gaps.under`: the arming doublet) — never more than the armour there itself
+ * (`covered`).
  */
 export function gapUnder(gear, zone, covered) {
   const gaps = gapsOf(gear);
   const spec = BLADES.gaps.zones[zone];
   const mailed = gaps.mail === 'all' ? !spec?.under : gaps.mail?.includes(zone);
-  const under = mailed ? BLADES.gaps.layers.mail : spec?.under ? BLADES.gaps.layers[spec.under] : gaps.under;
+  // (A layer worn under the whole kit, outfits.js UNDER_ARMOUR, lies under the gaps it reaches: a mail shirt under the coat.)
+  const layered = !spec?.under && gear.under?.zones?.includes(zone);
+  const under = mailed ? BLADES.gaps.layers.mail : spec?.under ? BLADES.gaps.layers[spec.under] : layered ? gear.under.guard : gaps.under;
   return {
     blunt: Math.min(under.blunt ?? 0, covered.blunt ?? 0),
     cut: Math.min(under.cut ?? 0, covered.cut ?? 0),

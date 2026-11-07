@@ -16,27 +16,52 @@ import { ROBOT_DOGS, ROBOT_SHELL } from './robotdogs.js';
  * (rider, his kit, the barding) slows it (`HORSE_LOAD`).
  * Sources: the weights and heights of medieval horse bones (Clark, *The
  * Medieval Horse and its Equipment*; Ameen et al. 2021: few war horses over
- * 14.2–15 hands); Mongolian horses 12–14 hands, ~300 kg; racing and polo
- * figures for speed and turning (a gallop 12–17 m/s unladen at best, a
- * polo pony's turns at ~0.7 g).
+ * 14.2–15 hands); racing and polo figures for speed and turning (a gallop
+ * 12–17 m/s unladen at best, a polo pony's turns at ~0.7 g). Each breed's
+ * height and weight by its own line below. Paces go with size and build: the
+ * small horses no faster than the riding horses, the heaviest the slowest
+ * away and the widest in a turn; none tuned to a fight.
  */
 export const HORSES = {
-  // The great horse of the knights: tall, deep and strong, not fast.
-  destrier: { label: 'Destrier', mass: 600, withers: 1.58, gallop: 10.5, canter: 5.8, trot: 3.6, walk: 1.6, accel: 3.2, lateral: 5.5, spin: 1.3, coats: ['#3a2a1e', '#5a3a22', '#2a2622', '#8a8a86'] },
-  // The riding warhorse (courser, jennet, Andalusian; a Han or Ferghana horse): lighter, quicker.
-  warhorse: { label: 'Warhorse', mass: 480, withers: 1.52, gallop: 12, canter: 6, trot: 3.6, walk: 1.6, accel: 3.6, lateral: 6.5, spin: 1.5, coats: ['#6a3a1c', '#4a2a18', '#2a2420', '#9a6a3a'] },
-  // The Arab and Turkoman horses of Saladin's and the Sultan's horsemen: light, fast, quick to turn.
-  arabian: { label: 'Arabian', mass: 430, withers: 1.48, gallop: 12.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 4, lateral: 7, spin: 1.7, coats: ['#d8d2c6', '#7a4a24', '#5a3a22', '#3a2a20'] },
-  // The steppe horse (Mongol, Jurchen, the Ming's northern remounts): small, hardy, quick to turn.
-  steppe: { label: 'Steppe horse', mass: 320, withers: 1.34, gallop: 11, canter: 5.8, trot: 3.4, walk: 1.6, accel: 3.8, lateral: 7, spin: 1.8, coats: ['#8a6a42', '#5a4030', '#2a2420', '#b8a888', '#6a5a4a'] },
-  // The Japanese horse of the samurai (kiso, misaki): small, stocky.
-  japanese: { label: 'Japanese horse', mass: 320, withers: 1.3, gallop: 10, canter: 5.4, trot: 3.3, walk: 1.5, accel: 3.4, lateral: 6.5, spin: 1.7, coats: ['#3a2a1e', '#6a4a2a', '#2a2420', '#8a6a4a'] },
+  // The great horse of the knights: deep and strong, not fast, and no giant: most war horses' bones stand 14–15.2 hands
+  // (142–157 cm) and few over 15 (Clark 2004; Ameen et al. 2021, the English medieval horse bones), a heavy-boned horse of
+  // that height ~550 kg (was 1.58 m, 600 kg).
+  destrier: { label: 'Destrier', mass: 560, withers: 1.55, gallop: 10.5, canter: 5.8, trot: 3.6, walk: 1.6, accel: 3.2, lateral: 5.5, spin: 1.3, coats: ['#3a2a1e', '#5a3a22', '#2a2622', '#8a8a86'] },
+  // The riding warhorse (courser, jennet, Andalusian; a Han or Ferghana horse; the Romans' cavalry horses): lighter, quicker.
+  // The courser of the same bones as the destrier's lower half (Clark 2004); the Roman cavalry horses of the frontier finds
+  // 1.40–1.50 m (Junkelmann, *Die Reiter Roms*, 1990–92); ~14.3 hands, ~470 kg (was 1.52 m, 480 kg).
+  warhorse: { label: 'Warhorse', mass: 470, withers: 1.5, gallop: 12, canter: 6, trot: 3.6, walk: 1.6, accel: 3.6, lateral: 6.5, spin: 1.5, coats: ['#6a3a1c', '#4a2a18', '#2a2420', '#9a6a3a'] },
+  // The Arab horse of Saladin's horsemen: light, fast, quick to turn. The breed stands 142–152 cm and weighs 380–450 kg
+  // (the breed societies' standard; Edwards, *The Arabian*, 1973) (was 1.48 m, 430 kg).
+  arabian: { label: 'Arabian', mass: 420, withers: 1.47, gallop: 12.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 4, lateral: 7, spin: 1.7, coats: ['#d8d2c6', '#7a4a24', '#5a3a22', '#3a2a20'] },
+  // The Turkoman (Turkmen) horse of Central Asia, the Akhal-Teke's kind: the Nisaean horse of the Parthian and Persian
+  // cataphracts, the Turkmen frontier warriors' and the Ottoman sipahi's: tall, lean, long in the leg, a racer's
+  // endurance. 145–160 cm, 400–450 kg (the Akhal-Teke's breed figures, Hendricks, *International Encyclopedia of Horse
+  // Breeds*, 1995); quick, a little less handy than the smaller Arab.
+  turkoman: { label: 'Turkoman horse', mass: 430, withers: 1.53, gallop: 12.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 3.9, lateral: 6.8, spin: 1.6, coats: ['#b08a52', '#6a4a2a', '#3a2a20', '#c8b89a', '#4a3a30'] },
+  // The steppe horse (Mongol, Jurchen and Manchurian): small, hardy, quick to turn. 12–14 hands (122–142 cm), the
+  // Mongolian horse's mean 127–128 cm (Oklahoma State University, *Breeds of Livestock*), the Chinese Mongolian horse's
+  // 1.28 m, 300–360 kg (Hendricks 1995); a little under its old 1.34 m and 320 kg. Its gallop is a long-distance runner's
+  // (Mongolian horses race 15–30 km), no faster than a riding horse's over a sprint.
+  steppe: { label: 'Steppe horse', mass: 300, withers: 1.3, gallop: 11, canter: 5.8, trot: 3.4, walk: 1.6, accel: 3.8, lateral: 7, spin: 1.8, coats: ['#8a6a42', '#5a4030', '#2a2420', '#b8a888', '#6a5a4a'] },
+  // The Ming border army's horse: steppe-bred, but the pick of what the Ming bought at the Liaodong horse markets (from
+  // the Mongols and Jurchens) and through the tea-horse trade of the northwest (the tea-horse offices of Xining, Hezhou and
+  // Taozhou, horses of the Tibetan uplands: Rossabi, 'The Tea and Horse Trade with Inner Asia during the Ming', *Journal
+  // of Asian History* 4, 1970), the Hequ kind among them, larger than the Mongolian (the Hequ horse ~1.32–1.40 m, ~350 kg:
+  // Chinese breed surveys, as quoted secondhand). The generals' household cavalry rode the best of it. A little bigger than the Japanese horse: at
+  // Byeokjegwan (1593) the Japanese coveted the Ming's big horses (Tachibana house papers, as quoted secondhand).
+  mingBorder: { label: 'Ming border horse', mass: 350, withers: 1.36, gallop: 11, canter: 5.8, trot: 3.5, walk: 1.6, accel: 3.6, lateral: 6.8, spin: 1.7, coats: ['#6a4a2a', '#8a6a42', '#2a2420', '#5a3a22', '#b8a888'] },
+  // The Japanese horse of the samurai (the Kiso and Misaki kind): small and stocky. The horse bones of medieval Kamakura
+  // (the Zaimokuza site, 1333) stand ~109–140 cm, most about 130 (Hayashida Shigeyuki 1957, as quoted secondhand in the
+  // surveys of Japan's native breeds); the Kiso horse today ~133 cm, the Misaki ~130 cm: ~1.29 m, ~300 kg (was
+  // 1.30 m, 320 kg). Slower than the steppe horse and less handy (shorter-legged, heavier in the forehand).
+  japanese: { label: 'Japanese horse', mass: 300, withers: 1.29, gallop: 10, canter: 5.4, trot: 3.3, walk: 1.5, accel: 3.4, lateral: 6.5, spin: 1.7, coats: ['#3a2a1e', '#6a4a2a', '#2a2420', '#8a6a4a'] },
 };
 
 /**
  * What a load does to a horse: comfortable up to `easy` of its own weight
  * (cavalry manuals: a fifth to a quarter); past that its paces fall by
- * `slows` per unit of weight over (a 320 kg steppe horse under a 100 kg
+ * `slows` per unit of weight over (a 300 kg steppe horse under a 100 kg
  * man in iron and 30 kg of barding gallops a fifth slower). Getting away
  * and pulling up go as its own weight to its weight laden.
  */
@@ -96,9 +121,20 @@ export function bardingAt(barding, part, height = Infinity, withers = 1.5) {
 /** A mount's breed: a horse, or a robot dog (robotdogs.js). */
 export const breedOf = (key) => HORSES[key] ?? ROBOT_DOGS[key];
 
+/**
+ * The breed he rides: his own (`outfit.horse`, a breed key: a man of an army that bought its horses bigger than his kit's
+ * people rode, the Ming border cavalry in a Mongol-cut coat) before his kit's; null if he does not ride.
+ */
+export function breedKeyOf(inputs) {
+  const own = inputs.outfit?.horse;
+  const kit = outfitOf(inputs).spec.horse;
+  if (!breedOf(kit)) return null;
+  return HORSES[own] ? own : kit;
+}
+
 /** Whether a character rides: his kit names the horse his people rode. */
 export function canRide(inputs) {
-  return Boolean(breedOf(outfitOf(inputs).spec.horse));
+  return Boolean(breedKeyOf(inputs));
 }
 
 /**
@@ -109,7 +145,8 @@ export function canRide(inputs) {
  */
 export function mountOf(inputs) {
   const { spec, look } = outfitOf(inputs);
-  if (!breedOf(spec.horse)) return null;
+  const breed = breedKeyOf(inputs);
+  if (!breed) return null;
   const armor = look?.armor ?? {};
   const finish = {
     style: armor.fluted ? 'fluted' : armor.joust ? 'etched' : 'plain',
@@ -118,7 +155,7 @@ export function mountOf(inputs) {
     cloth: armor.cloth ?? armor.color ?? null,
     gold: armor.gold ?? null,
   };
-  return { breed: spec.horse, barding: BARDING[spec.barding] ? spec.barding : 'bare', finish };
+  return { breed, barding: BARDING[spec.barding] ? spec.barding : 'bare', finish };
 }
 
 /** Whether his kit is bolted to its mount (a robot dog's: robotdogs.js): he is always on it, never on foot. */

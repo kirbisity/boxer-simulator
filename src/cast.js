@@ -309,7 +309,10 @@ export function bannerman(random = Math.random, style = 'spear', rank = 'banner'
   const kind = rank === 'bayara' ? 'bayara' : 'bannerArmour';
   const base = varyCharacter(rank === 'bayara' ? PRESETS.bayara : PRESETS.bannerBow, random, { sex: 'male' });
   const name = pickOne(['Akdun', 'Baturu', 'Mergen', 'Hūsun', 'Erdemu', 'Fulu', 'Sure', 'Kicebe', 'Ilan', 'Duin', 'Tulai', 'Gaha'], random);
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random) }, accessories: [], ...(mounted ? { mounted: true } : {}) };
+  // A banner man who closes (spear, sabre, guandao) stands in the front ranks, the 'death troops' (死兵) in two coats: a mail
+  // shirt under his banner coat (outfits.js UNDER_ARMOUR); the archers behind them in the one (the Bayara's mail is his kit's).
+  const front = rank === 'banner' && !STYLES[style]?.ranged;
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random), ...(front ? { under: 'mail' } : {}) }, accessories: [], ...(mounted ? { mounted: true } : {}) };
   return builtLike(soldier, PERIOD_BUILD.jurchen[rank], random);
 }
 
@@ -534,7 +537,8 @@ export function mingHorseman(random = Math.random, style = 'dao') {
   const kind = 'mingIronLamellar';
   const base = varyCharacter(PRESETS.guandao, random, { sex: 'male' });
   const name = `${pickOne(['Li', 'Zhang', 'Wang', 'Zhu', 'Ma', 'Sun', 'Qian', 'Xu', 'Tang', 'Gao', 'Shen', 'Yu'], random)} ${pickOne(['Biao', 'Yong', 'Zhen', 'Hu', 'Fei', 'Cheng', 'Guo', 'Kai', 'Lei', 'Meng', 'Tai', 'Wei'], random)}`;
-  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [], mounted: true };
+  // On the Ming border army's own horses (horses.js mingBorder), not the Mongol's his coat is cut after (the kit's steppe horse).
+  const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random), horse: 'mingBorder' }, accessories: [], mounted: true };
   return builtLike(soldier, PERIOD_BUILD.ming.elite, random);
 }
 

@@ -257,7 +257,7 @@ function addParticleMass(fighter, index, kg) {
  * its shield onto the off forearm. A style without a weapon leaves the
  * hands empty.
  */
-function armFighter(fighter, styleKey, { random = Math.random, shield = true } = {}) {
+function armFighter(fighter, styleKey, { random = Math.random, shield = true, make = undefined } = {}) {
   // Mixed: one of its styles now, switching as he goes.
   if (STYLES[styleKey]?.mix) {
     fighter.mixed = styleKey;
@@ -278,7 +278,9 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   if (!style.weapon) return;
   // A style may hold its weapon otherwise than it is made to be held (`grip`:
   // a katana in one hand, the other holding a second blade).
-  const spec = gripSpec(style.weapon, style.grip);
+  // Made where his people made it (a weapon's `makes`, weapons.js: the Ming bird gun), or as the one he took up was made (`make`).
+  const madeBy = make !== undefined ? make : weaponMakeFor(style.weapon, fighter.body.inputs);
+  const spec = gripSpec(style.weapon, style.grip, madeBy);
   // Too heavy for him to hold out (handling.js): he fights without it.
   const handled = handling(fighter.body, spec);
   if (!handled.canHold) {
@@ -292,6 +294,7 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
   if (armGone(fighter, spec.hand === 'l' ? 'l' : 'r')) return;
   const weapon = createWeapon(style.weapon);
   weapon.spec = spec;
+  weapon.make = madeBy;
   weapon.twoHanded = spec.hands !== 'one';
   weapon.handling = handled;
   const shares = handShares(weapon.spec);
@@ -308,9 +311,28 @@ function armFighter(fighter, styleKey, { random = Math.random, shield = true } =
 }
 
 /** A weapon's spec as a style holds it: its own, or with `hands` as the style's `grip` says. */
-function gripSpec(kind, grip) {
-  const spec = WEAPONS[kind];
+function gripSpec(kind, grip, make = null) {
+  const spec = madeSpec(kind, make);
   return grip && grip !== spec.hands ? { ...spec, hands: grip } : spec;
+}
+
+/** Whose make of a weapon a man carries: his people's (his kit's faction, a key of the weapon's `makes`), or null for the weapon as listed. */
+function weaponMakeFor(kind, inputs) {
+  const makes = WEAPONS[kind]?.makes;
+  if (!makes || !inputs) return null;
+  const faction = factionOf(inputs);
+  return makes[faction] ? faction : null;
+}
+
+const madeSpecs = new Map();
+/** A weapon as one people made it (its `makes`: what differs, merged over it), kept so it is the same object each time. */
+function madeSpec(kind, make) {
+  const spec = WEAPONS[kind];
+  const own = make && spec.makes?.[make];
+  if (!own) return spec;
+  const id = `${kind}/${make}`;
+  if (!madeSpecs.has(id)) madeSpecs.set(id, { ...spec, ...own });
+  return madeSpecs.get(id);
 }
 
 /**
@@ -413,7 +435,7 @@ export function dropOffWeapon(world, fighter, reason, push = [0, 0, 0]) {
 function regrip(fighter, styleKey) {
   const weapon = fighter.weapon;
   const before = handShares(weapon.spec);
-  const spec = gripSpec(weapon.kind, STYLES[styleKey].grip);
+  const spec = gripSpec(weapon.kind, STYLES[styleKey].grip, weapon.make);
   const after = handShares(spec);
   addParticleMass(fighter, P[`${weapon.main}Hand`], weapon.spec.mass * (after.main - before.main));
   addParticleMass(fighter, P[`${weapon.off}Hand`], weapon.spec.mass * (after.off - before.off));
@@ -497,7 +519,7 @@ function releaseWeapon(world, fighter, reason, push, weapon = fighter.weapon) {
   // Shattered (a lance on plate) or broken (physics/wear.js): splinters, nothing whole left to pick up (breakWeapon throws the pieces).
   if (reason !== 'shattered' && reason !== 'broken') world.debris.push({
     id: world.debris.length, kind: 'weapon', weapon: weapon.kind, owner: fighter.id, x: centre, loaded: weapon.loaded, charges: weapon.charges,
-    colour: weapon.colour, wear: weapon.wear, v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
+    make: weapon.make ?? null, colour: weapon.colour, wear: weapon.wear, v: vec.add(vec.add(point(fighter.v, P[`${weapon.main}Hand`]), push), [0, 0.6, 0]), q: quatFromTo([0, 1, 0], weapon.dir),
     spin: [0, 1, 2].map(() => (random() < 0.5 ? -1 : 1) * (3 + random() * 6)), radius: spec.radius * 1.6, axis: [0, 1, 0], half: (spec.length + spec.handle) / 2, resting: false,
   });
   // The stroke it was making ends; with two blades, only its own.
@@ -749,7 +771,7 @@ function updatePickup(world, fighter, dt) {
     return;
   }
   if (fighter.weapon?.held) releaseWeapon(world, fighter, 'dropped', [0, 0, 0]);
-  armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false });
+  armFighter(fighter, styleForWeapon(debris.weapon), { random: world.random, shield: false, make: debris.make ?? null });
   // (A hand lost: a weapon of both hands taken up in the one he has, if he can: fitToHands.)
   fitToHands(world, fighter);
   if (debris.colour && fighter.weapon) fighter.weapon.colour = debris.colour;

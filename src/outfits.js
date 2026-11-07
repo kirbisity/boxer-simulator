@@ -490,6 +490,17 @@ export function heelFooting(heels) {
 // cannot); regulars 0.35-0.6 (drilled: they read a blow, late); elites 0.6-0.8 (trained from boyhood, or picked and drilled for
 // years: samurai, knights, the Khan's guard, the Iron Pagoda, gladiators); masters and legends 0.85-1 (ronin, sohei; a preset's
 // `hero`: 1). A kit without one is 0.5, the sports' (boxing, MMA, kung fu: trained, not soldiers).
+/**
+ * The Ming elite's and the Ming horseman's arm guards (笼手): solid tubes and lames of polished plain steel (素白精铁) from
+ * the shoulder to the wrist. The Japanese who fought them in Korea wrote that their arrows could not pierce the Ming iron
+ * arm guards (《天野源右卫门觉书》, as quoted secondhand); the guard as the Wubei yaolue (《武备要略》) describes it, a
+ * spaulder, a rerebrace of three pieces, a couter and a vambrace of three (as quoted in the Great Ming Military's 'Plate
+ * Armour of the Ming Dynasty', 2015). Solid plate, not plates in a coat: no seams for a point to find, an edge turned
+ * aside as off a knight's vambrace (the knight's harness: cut 1, pierce 0.95), a little short of the European harness's
+ * hardened steel; a blow spread as plate spreads it, over the quilted sleeve under it.
+ */
+const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.9, deflects: true };
+
 export const OUTFITS = {
   boxing: {
     faction: 'ring',
@@ -1308,12 +1319,12 @@ export const OUTFITS = {
   // face mask. Covered from head to knee: a blade glances off it as off a
   // knight's plate, and so do arrows.
   mingElite: {
-    // Rides (Ming elite cavalry on northern horses).
-    horse: 'steppe',
+    // Rides (Ming elite cavalry: the generals' household men on the pick of the border army's bought horses, horses.js mingBorder).
+    horse: 'mingBorder',
     // Trained: a general's household men (jiading), picked and kept by him, the best the Ming fielded, but drilled to a
     // regular's level more than an elite's: the Ming army of the 1610s was a byword for neglected drill (`skill`).
     skill: 0.55,
-    faction: 'chinese', bulletRating: 650, plated: true,
+    faction: 'chinese', bulletRating: 900, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     // The officer's helmet bright or black-lacquered, plain, with the lion face and wings, or gilt with guardians.
     finishes: MING_FINISHES,
@@ -1321,10 +1332,18 @@ export const OUTFITS = {
     spare: 'dagger',
     deflects: true,
     arrowproof: true,
-    // Armour at 0.55 of its old weight (was 0.45): long reinforced brigandine, arm guards, helmet: ~18 kg on a 73 kg man (real ~15–20 kg).
-    extraMass: 0.25,
-    // Pierce 0.75 (was 0.8): a point finds the plates' seams in the coat more than in a solid shell.
-    protection: { blunt: 0.65, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    // Long reinforced brigandine, arm guards, helmet: ~20 kg on a 73 kg man (real ~15–20 kg; the Wubei yaolue's ideal full
+    // iron armour 30 jin, ~18 kg, as quoted in the Great Ming Military, 2015): its plates heavier than a Japanese armour's
+    // (was 0.25, ~18 kg, the tōsei gusoku's own share), ~1.5 kg more iron in the coat.
+    extraMass: 0.27,
+    // The coat's plates thicker than the Japanese armour's lames and lapped (each plate over its neighbour by at least half a
+    // cun, the Wubei yaolue: much of the coat two plates deep): the Japanese in Korea saw armour of polished plain iron
+    // (素白精铁, 《天野源右卫门觉书》, as quoted secondhand), a sword turned off a Ming soldier's armour three times (《户川记》),
+    // armour of steel reaching the feet on horseback (Frois). So proof against a ball at least as the bullet-tested tōsei dō
+    // is (`bulletRating` 900, was 650; the trunk's share 0.55, was 0.5, as the tōsei's), and a blow spread at least as its
+    // solid lames spread it (blunt 0.7, was 0.65). Pierce 0.75: a point finds the plates' seams in the coat more than in a
+    // solid shell. The arms in the steel arm guards (MING_ARM_GUARD).
+    protection: { blunt: 0.7, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the brigandine coat's plates a little anywhere but the solid plates.
     // (No mail under its gaps: a Ming elite's voiders are not documented as the European ones are; the coat's padding.)
     gaps: { lacing: 0.1 },
@@ -1394,14 +1413,15 @@ export const OUTFITS = {
     spare: 'dagger',
     deflects: true,
     arrowproof: true,
-    // The Ming elite's coat and a mail shirt under it (the 'three coats' of the Qing accounts: what is true of it is the
-    // mail under the brigandine): ~26 kg on an 89 kg man.
-    extraMass: 0.29,
+    // The Ming elite's coat (~17 kg on an 89 kg man) and a mail shirt under it (the 'three coats' of the Qing accounts: what
+    // is true of it is the mail under the brigandine; `under`, UNDER_ARMOUR.mail, its ~9 kg added): ~26 kg in all.
+    extraMass: 0.19,
+    under: 'mail',
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
     // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
     protection: { blunt: 0.72, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
-    // Between the coat's plates and wherever they part, the mail under it (not the lacing alone): a point meets rings there.
-    gaps: { mail: 'all' },
+    // The coat's lacing parts as the banner coat's does; between the plates and wherever they part, the mail under it (UNDER_ARMOUR.mail `zones`).
+    gaps: { lacing: 0.1 },
     courage: 0.45,
     designs: [
       bayaraDesign('Blue brocade', '#5a78a6', '#1f2f5a'),
@@ -1641,10 +1661,12 @@ export const OUTFITS = {
     label: 'Ming — iron lamellar cavalry', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     arrowproof: true,
-    // Armour at 0.55 of its old weight (was 0.32): iron lamellar to the knee and helmet: ~14 kg on an 80 kg man.
-    extraMass: 0.176,
+    // Iron lamellar to the knee and helmet: ~14 kg on an 80 kg man; and the steel arm guards (MING_ARM_GUARD, a pair ~1.5 kg:
+    // the Ming horseman's, was 0.176 without them).
+    extraMass: 0.195,
     // Pierce 0.7 (was 0.72): a point finds the lacing between the lamellae; still heavy enough that a lance breaks on it (weapons.js `shatters`).
-    protection: { blunt: 0.5, cut: 0.88, pierce: 0.7, bullet: { head: 0.3, torso: 0.35, limb: 0.15 } },
+    // The arms in polished steel guards (MING_ARM_GUARD: the Ming horse at Byeokjegwan; the limbs' share of a ball 0.2, was 0.15, as the elite's).
+    protection: { blunt: 0.5, cut: 0.88, pierce: 0.7, bullet: { head: 0.3, torso: 0.35, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.3,
@@ -1890,7 +1912,8 @@ export const OUTFITS = {
   // dismayed by the glitter of the 'helmets and breastplates of Margianian
   // steel' when the Parthians threw off their coverings.
   cataphract: {
-    horse: 'arabian', barding: 'lamellar',
+    // (The Nisaean horse of Media, the Turkoman kind: horses.js turkoman.)
+    horse: 'turkoman', barding: 'lamellar',
     faction: 'parthians',
     skill: 0.65,
     label: 'Parthian cataphract — scale and kontos', movement: 'limited', fists: 'gauntlet',
@@ -1913,7 +1936,8 @@ export const OUTFITS = {
   // the composite bow and a full quiver, a dagger or short sword. The bulk of
   // Surena's ten thousand.
   parthianArcher: {
-    horse: 'arabian',
+    // (The Parthians' Turkoman horses: horses.js turkoman.)
+    horse: 'turkoman',
     faction: 'parthians',
     skill: 0.55,
     label: 'Parthian horse archer — tunic and bashlyk', movement: 'good', fists: 'bare',
@@ -1980,8 +2004,8 @@ export const OUTFITS = {
   // sides (`krugDisc`), or the bekhter's rows of narrow plates down the chest
   // buckled shut, laminated shoulders (`bekhter`).
   ottomanHeavy: {
-    // Rides (the sipahi: the Sultan's horsemen).
-    horse: 'arabian',
+    // Rides (the sipahi: the Sultan's horsemen, on Turkoman horses: horses.js turkoman).
+    horse: 'turkoman',
     skill: 0.6,
     faction: 'ottomans',
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
@@ -2021,7 +2045,7 @@ export const OUTFITS = {
     // edge of reach that holds most men, and a comrade cut down beside him can send him at the killer.
     frenzy: true,
     // Rides (the gazi raiders rode Turkoman horses).
-    horse: 'arabian',
+    horse: 'turkoman',
     faction: 'ottomans',
     label: 'Alp — Osman\'s gazi', movement: 'good', fists: 'bare',
     // The kılıç at his belt, the gazi's long curved sword (WEAPONS.kilij).
@@ -2852,7 +2876,8 @@ export function firstDesignOf(kind, key) {
 export function setCard(kind, key, bodyKg = 75) {
   const set = outfitSets(kind).find((each) => each.key === key) ?? outfitSets(kind)[0];
   const spec = setSpec(kind, set.key);
-  const protection = { ...NO_PROTECTION, ...spec.protection };
+  const under = UNDER_ARMOUR[spec.under] ?? null;
+  const protection = layeredProtection({ ...NO_PROTECTION, ...spec.protection }, under);
   const at = (...names) => {
     const own = names.map((name) => protection.regions?.[name]).find(Boolean);
     return { blunt: own?.blunt ?? protection.blunt, cut: own?.cut ?? protection.cut, pierce: own?.pierce ?? protection.pierce };
@@ -2861,7 +2886,7 @@ export function setCard(kind, key, bodyKg = 75) {
   const helmet = spec.helmet ?? HELMETS[look.head?.kind] ?? null;
   return {
     kind, key: set.key, name: set.name, blurb: set.blurb, faction: spec.faction ?? 'ring',
-    kg: (spec.extraMass ?? 0) * bodyKg, movement: spec.movement ?? 'excellent',
+    kg: ((spec.extraMass ?? 0) + (under?.extraMass ?? 0)) * bodyKg, movement: spec.movement ?? 'excellent',
     torso: at('torso'), head: at('head'), arm: at('UpperArm', 'limb'),
     helmetKg: helmet?.mass ?? 0, face: helmet && helmet.mass > 0.5 ? helmet.face ?? (look.head?.mask ? 'closed' : 'open') : 'bare',
     finishes: set.designs.filter((design) => !OUTFITS[kind].designs[design]?.levelOnly).length,
@@ -3115,6 +3140,54 @@ function helmFaceOf(inputs, spec, look) {
 }
 
 /** A kit's protection with nothing over the head (its helm off): a bare head takes a blow, a cut and a ball as skin does. */
+/**
+ * Armour worn under a kit's own: a man two coats deep (double armour). The Later Jin's front ranks went so: the Korean
+ * envoy Jeong Chung-sin (1621) saw long armour on their horsemen, short armour on the foot, and men in two coats; Xiong
+ * Tingbi wrote of the heavily armoured "death troops" (死兵) put in front; the Manchu annals (《满文老档》) count heavy,
+ * light and cotton armour, the cotton worn over the heavy to storm a wall (all as quoted secondhand). A kit's own `under`
+ * (the Bayara's), or a man's (`outfit.under`: the front-rank banner men, cast.js bannerman), names one of these.
+ * Each layer stops what its material stops, in order: a blow on the coat meets the coat, and what the coat lets through
+ * meets the layer under it (each kind of harm kept out 1 − (1 − outer)(1 − under), where the layer `covers`); a blow
+ * into a gap of the coat (physics/gaps.js) meets the layer where it lies under that gap (`zones`). Its weight adds to the
+ * kit's (`extraMass`, a share of the body), and it keeps heat in as another garment does (`skin`: the share of the
+ * trunk's and the limbs' skin it lies over, physics/heat.js kitHeat).
+ * - mail: a riveted mail shirt to mid-thigh with sleeves to the elbow, the 'light armour' under the coat (the Qing
+ *   accounts' mail under the brigandine). Guarded as the gaps' mail (weapons.js BLADES.gaps.layers: an edge turned, a
+ *   point less, a blow little spread); a ball it slows only a little (mail is no proof against shot: Williams, *The
+ *   Knight and the Blast Furnace*, 2003). ~8 kg (surviving mail shirts 6–10 kg) on an 80 kg man.
+ */
+export const UNDER_ARMOUR = {
+  mail: {
+    label: 'Mail shirt', extraMass: 0.1,
+    guard: { blunt: 0.3, cut: 0.85, pierce: 0.55 }, bullet: 0.1,
+    covers: ['torso', 'UpperArm', 'Thigh'], zones: ['armpit', 'groin', 'neck', 'elbow', 'lacing'],
+    skin: { trunk: 1, limb: 0.35 },
+  },
+};
+
+/** What the kit keeps out at `region` (torso, or a part: UpperArm, Thigh), as protectionAt would find it there. */
+function protectionIn(protection, region) {
+  const regions = protection.regions ?? {};
+  return regions[region] ?? (region === 'torso' ? null : regions.limb) ?? protection;
+}
+
+/** A kit's protection with a layer under it (UNDER_ARMOUR): each region it covers guarded by the two in order. */
+export function layeredProtection(protection, layer) {
+  if (!layer) return protection;
+  const through = (outer, under) => 1 - (1 - (outer ?? 0)) * (1 - under);
+  const regions = { ...protection.regions };
+  for (const region of layer.covers) {
+    const outer = protectionIn(protection, region);
+    regions[region] = { ...protection.regions?.[region], blunt: through(outer.blunt, layer.guard.blunt), cut: through(outer.cut, layer.guard.cut), pierce: through(outer.pierce, layer.guard.pierce) };
+  }
+  return { ...protection, bullet: { ...protection.bullet, torso: through(protection.bullet?.torso, layer.bullet) }, regions };
+}
+
+/** The layer he wears under his kit (UNDER_ARMOUR), his own before the kit's, or null. */
+export function underArmourOf(inputs, spec = outfitOf(inputs).spec) {
+  return UNDER_ARMOUR[inputs.outfit?.under ?? spec.under] ?? null;
+}
+
 function bareHeaded(protection) {
   return { ...protection, bullet: { ...protection.bullet, head: 0 }, regions: { ...protection.regions, head: { blunt: 0, cut: 0, pierce: 0, deflects: false } } };
 }
@@ -3135,6 +3208,7 @@ export function gearTraits(inputs) {
   const female = inputs.sex === 'female';
   const bySex = female ? spec.female ?? {} : {};
   const feet = (female && look.femaleFeet) || look.feet;
+  const under = underArmourOf(inputs, spec);
   return {
     ...MOVEMENT[spec.movement],
     // (A man's own `outfit.balance` before the kit's: a giant who swings a poleaxe and keeps his feet.)
@@ -3143,10 +3217,13 @@ export function gearTraits(inputs) {
     heelLift: heelLift(feet?.heels, (inputs.heightCm ?? 175) / 100),
     kick: bySex.kick ?? spec.kick ?? 1,
     // The kit's weight as a share of the body's; a man's own (`outfit.extraMass`) before the kit's (a giant in a harness that weighs what a harness weighs).
-    extraMass: inputs.outfit?.extraMass ?? Math.max(0, (spec.extraMass ?? 0) + helmShift),
+    // (And a layer under the kit, UNDER_ARMOUR: its weight added.)
+    extraMass: inputs.outfit?.extraMass ?? Math.max(0, (spec.extraMass ?? 0) + (under?.extraMass ?? 0) + helmShift),
     // The part of that weight that is not armour (an exoframe's frame, a robot's battery): poise counts it as a load (physics poiseOf).
     carriedShare: inputs.outfit?.carriedShare ?? spec.carriedShare ?? 0,
-    protection: inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : helmedBy({ ...NO_PROTECTION, ...spec.protection }, wornHelm(inputs)),
+    protection: layeredProtection(inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : helmedBy({ ...NO_PROTECTION, ...spec.protection }, wornHelm(inputs)), under),
+    // The layer under his kit (UNDER_ARMOUR), or null: under its gaps (physics/gaps.js gapUnder), and its heat (physics/heat.js).
+    under,
     deflects: Boolean(spec.deflects),
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
     headLocked: Boolean(spec.headLocked) && !headChanged,
