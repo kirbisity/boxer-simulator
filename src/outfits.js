@@ -490,6 +490,17 @@ export function heelFooting(heels) {
 // cannot); regulars 0.35-0.6 (drilled: they read a blow, late); elites 0.6-0.8 (trained from boyhood, or picked and drilled for
 // years: samurai, knights, the Khan's guard, the Iron Pagoda, gladiators); masters and legends 0.85-1 (ronin, sohei; a preset's
 // `hero`: 1). A kit without one is 0.5, the sports' (boxing, MMA, kung fu: trained, not soldiers).
+/**
+ * The Ming elite's and the Ming horseman's arm guards (笼手): solid tubes and lames of polished plain steel (素白精铁) from
+ * the shoulder to the wrist. The Japanese who fought them in Korea wrote that their arrows could not pierce the Ming iron
+ * arm guards (《天野源右卫门觉书》, as quoted secondhand); the guard as the Wubei yaolue (《武备要略》) describes it, a
+ * spaulder, a rerebrace of three pieces, a couter and a vambrace of three (as quoted in the Great Ming Military's 'Plate
+ * Armour of the Ming Dynasty', 2015). Solid plate, not plates in a coat: no seams for a point to find, an edge turned
+ * aside as off a knight's vambrace (the knight's harness: cut 1, pierce 0.95), a little short of the European harness's
+ * hardened steel; a blow spread as plate spreads it, over the quilted sleeve under it.
+ */
+const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.9, deflects: true };
+
 export const OUTFITS = {
   boxing: {
     faction: 'ring',
@@ -1313,7 +1324,7 @@ export const OUTFITS = {
     // Trained: a general's household men (jiading), picked and kept by him, the best the Ming fielded, but drilled to a
     // regular's level more than an elite's: the Ming army of the 1610s was a byword for neglected drill (`skill`).
     skill: 0.55,
-    faction: 'chinese', bulletRating: 650, plated: true,
+    faction: 'chinese', bulletRating: 900, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     // The officer's helmet bright or black-lacquered, plain, with the lion face and wings, or gilt with guardians.
     finishes: MING_FINISHES,
@@ -1321,10 +1332,18 @@ export const OUTFITS = {
     spare: 'dagger',
     deflects: true,
     arrowproof: true,
-    // Armour at 0.55 of its old weight (was 0.45): long reinforced brigandine, arm guards, helmet: ~18 kg on a 73 kg man (real ~15–20 kg).
-    extraMass: 0.25,
-    // Pierce 0.75 (was 0.8): a point finds the plates' seams in the coat more than in a solid shell.
-    protection: { blunt: 0.65, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    // Long reinforced brigandine, arm guards, helmet: ~20 kg on a 73 kg man (real ~15–20 kg; the Wubei yaolue's ideal full
+    // iron armour 30 jin, ~18 kg, as quoted in the Great Ming Military, 2015): its plates heavier than a Japanese armour's
+    // (was 0.25, ~18 kg, the tōsei gusoku's own share), ~1.5 kg more iron in the coat.
+    extraMass: 0.27,
+    // The coat's plates thicker than the Japanese armour's lames and lapped (each plate over its neighbour by at least half a
+    // cun, the Wubei yaolue: much of the coat two plates deep): the Japanese in Korea saw armour of polished plain iron
+    // (素白精铁, 《天野源右卫门觉书》, as quoted secondhand), a sword turned off a Ming soldier's armour three times (《户川记》),
+    // armour of steel reaching the feet on horseback (Frois). So proof against a ball at least as the bullet-tested tōsei dō
+    // is (`bulletRating` 900, was 650; the trunk's share 0.55, was 0.5, as the tōsei's), and a blow spread at least as its
+    // solid lames spread it (blunt 0.7, was 0.65). Pierce 0.75: a point finds the plates' seams in the coat more than in a
+    // solid shell. The arms in the steel arm guards (MING_ARM_GUARD).
+    protection: { blunt: 0.7, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the brigandine coat's plates a little anywhere but the solid plates.
     // (No mail under its gaps: a Ming elite's voiders are not documented as the European ones are; the coat's padding.)
     gaps: { lacing: 0.1 },
@@ -1642,10 +1661,12 @@ export const OUTFITS = {
     label: 'Ming — iron lamellar cavalry', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     arrowproof: true,
-    // Armour at 0.55 of its old weight (was 0.32): iron lamellar to the knee and helmet: ~14 kg on an 80 kg man.
-    extraMass: 0.176,
+    // Iron lamellar to the knee and helmet: ~14 kg on an 80 kg man; and the steel arm guards (MING_ARM_GUARD, a pair ~1.5 kg:
+    // the Ming horseman's, was 0.176 without them).
+    extraMass: 0.195,
     // Pierce 0.7 (was 0.72): a point finds the lacing between the lamellae; still heavy enough that a lance breaks on it (weapons.js `shatters`).
-    protection: { blunt: 0.5, cut: 0.88, pierce: 0.7, bullet: { head: 0.3, torso: 0.35, limb: 0.15 } },
+    // The arms in polished steel guards (MING_ARM_GUARD: the Ming horse at Byeokjegwan; the limbs' share of a ball 0.2, was 0.15, as the elite's).
+    protection: { blunt: 0.5, cut: 0.88, pierce: 0.7, bullet: { head: 0.3, torso: 0.35, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.3,

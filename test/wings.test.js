@@ -20,7 +20,7 @@ test('the cavalry helpers make riders in the kit of their time, on the horse the
   const east = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
   const cases = [
     ['a samurai', samuraiHorseman(random, east, 'spear'), 'japanese', 'bare', 'samurai'],
-    ['a Ming horseman', mingHorseman(random, 'dao'), 'steppe', 'bare', 'mingIronLamellar'],
+    ['a Ming horseman', mingHorseman(random, 'dao'), 'mingBorder', 'bare', 'mingIronLamellar'],
     ['a conquistador', conquistadorHorseman(random), 'warhorse', 'bare', 'conquistadorPlate'],
     ['a Roman auxiliary', romanHorseman(random), 'warhorse', 'bare', 'romanAuxiliary'],
     ['a Han horseman', hanHorseman(random, 'steppeBow'), 'warhorse', 'bare', 'hanCavalry'],

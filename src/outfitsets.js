@@ -302,17 +302,17 @@ export const OUTFIT_SETS = {
     {
       key: 'brigandineMasked', designs: [2], name: 'Ming elite — brigandine, masked helm',
       blurb: { en: 'The warlord’s private-guard brigandine, now with a steel helmet shaped like a snarling guardian beast. The best smiths in the province, paid to give the master’s anger a face.\nWhy hide a guard’s face? Because a faceless man can be sent to do anything: seize a rival’s family, burn a village behind on its taxes. When the master fell from favour, the mask went into chains with the household.\n“A beast at his master’s heel, or a beast led to slaughter. It all depended on whose name was on the arrest warrant.”', zh: '将门家丁的布面甲，这回配一顶钢盔，打成一头龇牙的镇兽。全省最好的匠人拿了钱，专给主子的火气打一张脸。\n家丁的脸为什么要遮？没有脸的人，什么差事都使得：抄政敌的家，烧欠税的村。等主子失了宠，这张面具就跟着一家老小一起上了枷。\n“是主子脚边的猛兽，还是牵去宰的牲口——就看拘票上写的是谁的名字。”' },
-      patch: { extraMass: 0.255, protection: { regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
+      patch: { extraMass: 0.275, protection: { regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
     },
     {
       key: 'scale', designs: [3], name: 'Ming elite — scale armour, open helm',
       blurb: { en: 'A long coat of steel scales, polished and gilded at the edges, under the plumed helmet. In a parade it shimmered like a goldfish — exactly as expensive as it looked, and about as useful.\nWho paid for all that shine? The Wanli Emperor refused to hold court for some twenty-five years. His guards stood gleaming before an empty hall, while silver meant for the border troops went on gilt and parades.\n“A shining guardsman, or an ornament by an empty throne. It all depended on whether the emperor ever bothered to come to work.”', zh: '一领长钢鳞甲，磨得锃亮，边上鎏金，头上一顶插缨的盔。阅兵时闪得像一条金鱼——看着多贵就多贵，看着多中用就多中用。\n这身亮堂，谁掏的钱？万历皇帝二十多年不上朝，他的侍卫在空荡荡的大殿前站得金光闪闪；本该发给边军的饷银，化成了金箔和仪仗。\n“是金光闪闪的侍卫，还是空龙椅边的一件摆设——就看皇上肯不肯上班。”' },
-      patch: { extraMass: 0.26, protection: { blunt: 0.6, cut: 0.96, pierce: 0.7 } },
+      patch: { extraMass: 0.28, protection: { blunt: 0.6, cut: 0.96, pierce: 0.7 } },
     },
     {
       key: 'scaleMasked', designs: [4], name: 'Ming elite — scale armour, masked helm',
       blurb: { en: 'Steel scales and the snarling beast mask together: the full kit of a warlord’s chosen few, heavy as duty and as hard to take off. Not an inch of the man shows — a walking statue of his master’s importance.\nYet what does a statue guard when the master is gone? In 1644 rebels marched into Beijing. The last Ming emperor hanged himself behind his palace, and the masked guards found there was no one left to guard.\n“The last wall of a dynasty, or an empty mask. It all depended on who opened the gates of Beijing.”', zh: '钢鳞甲加龇牙兽面盔：将门亲信的全副披挂，重得像差事，也像差事一样脱不下来。浑身不露一寸人——一尊会走路的雕像，雕的是主子有多要紧。\n主子没了，雕像还守什么？一六四四年，闯军进了北京。崇祯在宫后煤山上吊，戴面具的侍卫这才发现，没人可守了。\n“是一个王朝的最后一道墙，还是一张空面具——就看谁打开了北京的城门。”' },
-      patch: { extraMass: 0.265, protection: { blunt: 0.6, cut: 0.96, pierce: 0.7, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
+      patch: { extraMass: 0.285, protection: { blunt: 0.6, cut: 0.96, pierce: 0.7, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
     },
     {
       key: 'lamellar', designs: [5], name: 'Ming elite — iron lamellar',
