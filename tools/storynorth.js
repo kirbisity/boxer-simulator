@@ -23,8 +23,8 @@ export function storyNorthLife(battle, { rank = 'squadLeader', place = 'front' }
 }
 
 /** One battle of it at a seed: built from the setup as the engine would, fought to its decision and the chase. */
-export function storyNorthBattle(battle, life, { seed = 1, seconds = 240, step = 0.1 } = {}) {
-  const setup = battle.setup(life, seed);
+export function storyNorthBattle(battle, life, { seed = 1, seconds = 240, step = 0.1, setupOptions = {} } = {}) {
+  const setup = battle.setup(life, seed, setupOptions);
   const world = createWorld(setup.fighters.map(({ inputs, corner }) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner })), setup.options);
   let time = 0;
   let decided = null;

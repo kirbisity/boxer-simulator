@@ -15,13 +15,19 @@
 //    (FIELDWORKS.wall.root, 0.32 m): a man on the face is at a gap, or has come up onto the walk; he cannot walk along
 //    the face. A defender's spear reaches over the parapet (weapons are not kept out by a wall's line).
 //
-// What it leaves out (a full siege would need): ladders pushed off or broken (here they stand, as data), one man to a
-// rung (here as many as press into the gap's width), the climber's hands taken by the ladder (here he fights as he
-// climbs, as fast as his stance rises), stones and boiling water dropped from the top, a gate to batter, a breach's
-// rubble, and the shot and arrows stopped by the parapet (the fieldworks let shot through a wall's line: a man on the
-// walk and one below shoot each other as across open ground, from their own heights). The AI's weighing of strength
-// (ai.js AI.standing, AI.outnumbered) does not count the wall: a garrison outnumbered as castles were breaks as soon
-// as men on open ground at those odds would.
+//  - Cover: the face and its parapet are stone (physics/cover.js: `cover` masonry, STORY_WALL.thick): a ball or an arrow
+//    crossing the wall's line below the parapet's top goes into the stone, and in a ladder's gap below the walk (`solid`:
+//    the face is there, only the crenel above it is open). A man on the walk shows his head over the parapet; one at the
+//    wall's foot is under it, out of the defenders' shot (who had to lean out over it to reach him).
+//  - The ladders are objects (physics/ladders.js): one whose head no attacker holds is pushed off by a defender at it,
+//    if he can shift its load, and lies until the attackers at its foot raise it again.
+//  - The AI counts the wall (ai.js through physics/cover.js exposureOf): how much of a man the enemy's missiles and blades
+//    can get at from where they stand is what of their strength he weighs.
+//
+// What it leaves out (a full siege would need): one man to a rung (here as many as press into the gap's width), the
+// climber's hands taken by the ladder (here he fights as he climbs, as fast as his stance rises), stones and boiling
+// water dropped from the top, a gate to batter, a breach's rubble, the parapet's crenels and loopholes (here a defender
+// shoots over it), and the stone knocked away by the guns.
 
 import { FIELDWORKS } from '../../physics/fieldworks.js';
 
@@ -36,6 +42,9 @@ export const STORY_WALL = {
   ladder: 1.1,
   // The walk's width (m) on top: a Joseon town wall's ~3-4 m; a Japanese castle's wall-top narrower (its battle gives its own).
   walk: 3.5,
+  // The parapet's thickness (m) against shot (physics/cover.js masonry): a Korean town wall's stone parapet (yeojang) ~0.5-1 m,
+  // the thinner end (not measured in the sources checked).
+  thick: 0.6,
   // The inner ramp's run (m) per m of height: a mounting ramp of ~1 in 2.
   innerRun: 2,
 };
@@ -52,9 +61,13 @@ export function wallWorks({ x, z, height, base = 0, ladders = [], walk = STORY_W
   // The ditch's line runs along +z: its left (+offset) is +x, the defenders' side.
   const rampart = { from: [x, z[0]], to: [x, z[1]], profile: [[0, base], [run, top], [run + walk, top], [run + walk + top * inner, 0]] };
   const gaps = ladders.map((at) => [at - STORY_WALL.ladder / 2 - z[0], at + STORY_WALL.ladder / 2 - z[0]]).sort((a, b) => a[0] - b[0]);
-  const face = { points: [[x, z[0]], [x, z[1]]], height: top + parapet, kind, gaps };
+  const cover = { material: 'masonry', thick: STORY_WALL.thick };
+  // Against a missile: the face's stone to the walk (in a ladder's gap too), and the parapet on the walk's outer edge over it,
+  // open only at the ladders' heads (the crenel each is set to: above the walk, open).
+  const face = { points: [[x, z[0]], [x, z[1]]], height: top + parapet, kind, gaps, cover, solid: top, screenHeight: top };
+  const parapetLine = { points: [[x + run, z[0]], [x + run, z[1]]], height: top + parapet, kind, gaps, cover, solid: top, screen: true };
   return {
-    works: { ditches: [rampart], walls: [face], ladders: ladders.map((at) => ({ x, z: at, height, base, run })) },
+    works: { ditches: [rampart], walls: [face, parapetLine], ladders: ladders.map((at) => ({ x, z: at, height, base, run })) },
     walk: [x + run, x + run + walk],
   };
 }

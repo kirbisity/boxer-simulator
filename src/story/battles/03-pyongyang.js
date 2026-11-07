@@ -42,6 +42,17 @@ export const PYONGYANG_1593 = {
   // The fowling pieces behind the columns, shooting at the walk; the column's officer (a 把总) with them.
   guns: { count: 8, x: -12, from: -7, to: 7 },
   officer: [-11.5, 0],
+  // The guns (physics/artillery.js). Li Rusong brought 200+ guns (Hawley, The Imjin War, 2005, p. 54); on the 8th they
+  // pounded the gates (a gate broken by them, Turnbull 2008 p. 60) and drove back Konishi's sortie (p. 61). His southern
+  // troops were Qi Jiguang's, whose cart camps carried the folangji and the great general (练兵实纪 杂集). At the army's
+  // ~1 gun to 200 men this stretch's 60 would have a third of one: the guns were massed on the gates and the faces assaulted,
+  // so the stretch is given a light folangji and one great general behind its columns, each with its crew (gunners with
+  // their sabres), laying ball on the walk between the ladders (`load`). A judgement, said so: `artillery: false` leaves them out.
+  artillery: [
+    // (Each laid between two of the fowling pieces' places, z = -5, -3 and 3, 5: its line clear of them.)
+    { kind: 'folangji', at: [-14, -4], facing: [1, 0], arc: 0.7, crew: 2, load: 'ball' },
+    { kind: 'dajiangjun', at: [-14.2, 4], facing: [1, 0], arc: 0.5, crew: 4, load: 'ball' },
+  ],
   // The garrison on this stretch of the walk: shooters along the parapet between the ladders, yari at each ladder's
   // head, samurai behind them.
   defenders: {
@@ -68,7 +79,7 @@ export const pyongyangBattle = {
   title: { zh: '平壤登城', en: 'The walls of Pyongyang' },
   view: { scene: 'sengoku', camera: { yaw: -0.9, pitch: 0.38, distance: 22, maxDistance: 30 } },
   seconds: 180,
-  setup(life, seed = 1) {
+  setup(life, seed = 1, options = {}) {
     const random = seededRandom(seed);
     const spec = PYONGYANG_1593;
     const { works, walk } = wallWorks({ x: spec.wall.x, z: [-spec.arena.halfZ - 0.5, spec.arena.halfZ + 0.5], height: spec.wall.height, ladders: spec.wall.ladders });
@@ -82,6 +93,15 @@ export const pyongyangBattle = {
     const gunsAt = (k) => spec.guns.from + ((spec.guns.to - spec.guns.from) * k) / (spec.guns.count - 1);
     for (let k = 0; k < spec.guns.count; k += 1) add({ men: [southern('matchlock')], places: [[spec.guns.x, gunsAt(k)]] });
     add({ men: [southern('dao', 'elite')], places: [spec.officer] });
+    // Each gun's crew behind it (physics/artillery.js postOf puts them at their posts on the first step).
+    const guns = options.artillery === false ? [] : spec.artillery.map((gun) => {
+      const crew = [];
+      for (let k = 0; k < gun.crew; k += 1) {
+        crew.push(red.men.length);
+        add({ men: [southern('dao')], places: [[gun.at[0] - 0.9 - 0.6 * Math.floor(k / 2), gun.at[1] + (k % 2 ? 0.8 : -0.8)]] });
+      }
+      return { kind: gun.kind, at: gun.at, facing: gun.facing, arc: gun.arc, load: gun.load, crew };
+    });
     const seated = koreaSeat(life, red, { at: koreaRowOf(life, spec.rows), year: spec.year, design: spec.design });
     const blue = { men: [], places: [] };
     const rank = (style) => (style === 'katana' || style === 'naginata' || style === 'spear' ? 'samurai' : 'ashigaru');
@@ -101,6 +121,8 @@ export const pyongyangBattle = {
         seed,
         arena: { ...spec.arena, works },
         place: 'pyongyang',
+        // (Red is cast first: a crew man's index in red is his fighter's.)
+        artillery: guns,
         formation: {
           red: { front: 0, layout: built.layouts.red, discipline: spec.discipline },
           // The garrison holds the walk (formation.js drill, advance false): each man at his place, fighting whoever comes up to it.

@@ -18,6 +18,8 @@ import { expectedGap, gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
+import { atGun, serveGun } from './physics/artillery.js';
+import { exposureOf } from './physics/cover.js';
 import { heatStrain } from './physics/heat.js';
 import { ammoLeft, bowArcFouled, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
 import { rayBlocked } from './physics/terrain.js';
@@ -908,8 +910,9 @@ function takeUpStandard(world, fighter) {
  * past his leash after a blow); anyone else keeps near his side's standard.
  */
 function keepPlace(world, fighter) {
-  // Under an order (command.js), the order says where he stands.
+  // Under an order (command.js), the order says where he stands; at his gun, his post there (physics/artillery.js).
   if (orderKeepsPlace(world, fighter)) return;
+  if (fighter.gunCrew !== undefined && !fighter.panicked && atGun(world, fighter)) return;
   const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
   if (!formation) {
     keepWithLeader(world, fighter);
@@ -2413,7 +2416,8 @@ export function outnumberedFear(world, fighter) {
   const side = world.sides?.[fighter.corner];
   const other = world.sides?.[fighter.corner === 'red' ? 'blue' : 'red'];
   if (!side || !other || side.men < AI.rout.minSide || !other.strength) return 0;
-  const odds = other.strength / Math.max(1e-6, side.strength);
+  // Their strength as much of it as can get at him where he stands (physics/cover.js: behind a parapet, little of it).
+  const odds = (other.strength / Math.max(1e-6, side.strength)) * exposureOf(world, fighter, strengthNow);
   if (odds <= spec.from) return 0;
   const along = (low, high) => Math.max(0, Math.min(1, Math.log(odds / low) / Math.log(high / low)));
   return spec.fear * along(spec.from, spec.full) + (spec.most - spec.fear) * along(spec.full, spec.beyond);
@@ -2451,6 +2455,8 @@ export function standingFear(world, fighter) {
   for (const other of world.fighters) if (other !== fighter && other.corner === fighter.corner && !other.dormant) ours += weight(other, at) * strengthNow(other);
   let theirs = 0;
   for (const enemy of enemies) theirs += weight(enemy, middle) * strengthNow(enemy);
+  // (As much of theirs as can get at him where he stands, on the works: physics/cover.js exposureOf.)
+  theirs *= exposureOf(world, fighter, strengthNow);
   if (!theirs || !ours) return 0;
   const gap = Math.log(theirs / ours);
   const past = (value) => Math.max(0, Math.min(1, (value - spec.parity) / spec.span));
@@ -3467,6 +3473,8 @@ function decide(world, fighter, dt) {
     return;
   }
   if (fighter.panicked && rout(world, fighter, opponent)) return;
+  // A gun's crew man serves his gun while no enemy is on him (physics/artillery.js).
+  if (fighter.gunCrew !== undefined && !fighter.panicked && serveGun(world, fighter)) return;
   if (style.passive || fighter.panicked) {
     fighter.hesitant = null;
     keepAway(world, fighter, opponent, dt);
