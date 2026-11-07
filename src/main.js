@@ -3827,6 +3827,7 @@ const boxer = window.boxer = {
     clearGore(scene);
     setPlace(scene, setup.view.scene, setup.options.arena, setup.view.weather);
     Object.assign(scene.orbit, setup.view.camera);
+    watchCam = createWatchCam();
     state.eventCursor = 0;
     state.finishedAt = null;
     resetDrama(state.drama);

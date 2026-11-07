@@ -42,7 +42,7 @@ export function storyNorthBattle(battle, life, { seed = 1, seconds = 240, step =
   return { seed, seconds: Number(time.toFixed(1)), winner: world.verdict?.winner ?? null, hero: dead(setup.player), comrades: Object.values(setup.comrades).filter(dead).length, red: side('red'), blue: side('blue'), world, setup };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (typeof process !== 'undefined' && import.meta.url === `file://${process.argv[1]}`) {
   const [file, seeds = '10', seconds = '240', rank = 'squadLeader', place = 'front'] = process.argv.slice(2);
   const { battle } = await import(`../src/story/battles/${file}.js`);
   const results = [];
