@@ -216,7 +216,7 @@ export const OUTFIT_SETS = {
   samuraiTosei: [
     {
       key: 'sujiBachi', designs: [0, 1, 2, 3, 4, 5], name: 'Tōsei gusoku — suji-bachi kabuto',
-      blurb: { en: 'Late samurai armour from the age of guns: a solid iron breastplate tested against musket fire, the bullet’s dent proudly left in the front. A quality certificate, hammered into the chest.\nYet what armour is proof against peace? The Tokugawa shoguns gave Japan two and a half centuries of it, and the armour sat in storerooms. When the samurai class was abolished in the 1870s, sets like this were sold by the kilo to foreign collectors.\n“A shield against the musket, or a curio in a foreign parlour. It all depended on which century he was born in.”', zh: '铁炮时代的当世具足：一整块铁胸甲，拿铁炮试过，弹痕得意地留在正面——锤进胸口的一张合格证。\n挡得住铁炮，挡不住太平。德川家给了日本两百五十年太平，具足都进了库房。一八七〇年代废了武士，这样的甲论斤称，卖给了洋人收藏家。\n“是挡铁炮的盾，还是洋人客厅里的一件古董——就看他生在哪个世纪。”' },
+      blurb: { en: 'Late samurai armour from the age of guns: a solid iron breastplate tested against musket fire, the bullet’s dent proudly left in the front. A quality certificate, hammered into the chest.\nYet what armour is proof against peace? The Tokugawa shoguns gave Japan two and a half centuries of it, and the armour sat in storerooms, until no one remembered what it had been made for.\n“A shield against the musket, or a relic of a forgotten war. It all depended on which century he was born in.”', zh: '当世具足。铁炮时代的武者之甲，胸前一整块铁板。\n甲成之日，以铁炮试射，弹痕留在正面，如同烙下的印记。\n然而挡得住铁炮的甲，终究挡不住太平。德川治世两百五十年，具足尽数封入库中，再无人记得它为何而造。' },
       patch: {},
     },
     {
