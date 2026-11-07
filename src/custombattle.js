@@ -10,6 +10,7 @@ import { STYLES } from './moves.js';
 import { FACTIONS } from './outfits.js';
 import { WARRIORS } from './roster.js';
 import { drawUp, intoZone, MUSTER } from './muster.js';
+import { tname } from './i18n.js';
 
 export const CUSTOM_BATTLE = {
   // Its key where a level's would be (main.js state.scenario; the menu's card).
@@ -98,7 +99,7 @@ export function customLevel(battle) {
   const level = {
     title: CUSTOM_BATTLE.title,
     place: map.label,
-    blurb: `${sideNames.red} against ${sideNames.blue}, on the ${map.label.toLowerCase()}.`,
+    blurb: { en: `${sideNames.red} against ${sideNames.blue}, on the ${map.label.toLowerCase()}.`, zh: `${tname(sideNames.red)}对阵${tname(sideNames.blue)}，战于${tname(map.label)}。` },
     scene: battle.map in CUSTOM_BATTLE.maps ? battle.map : CUSTOM_BATTLE.first.map,
     arena: { ...map.arena },
     camera: { ...map.camera },

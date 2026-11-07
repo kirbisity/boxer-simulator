@@ -13,6 +13,7 @@ import { LAST_GATE, LAST_GATE_MODES, lastGateDefaultPlaces, lastGateZone } from 
 import { STYLES } from './moves.js';
 import { FACTIONS } from './outfits.js';
 import { ratingOf, starsOf, WARRIORS } from './roster.js';
+import { t, tname } from './i18n.js';
 
 export const SQUAD = {
   // Points to spend on the comrades: ~60 buys five ashigaru, three samurai, two footmen and a knight, or seven bowmen.
@@ -146,13 +147,13 @@ export function lastStandLevel(mode, men) {
   const front = -(gate.x + 3.5);
   const foot = places.filter((_, index) => !(index === 0 && rides));
   const units = [
-    { id: 'hero', label: `${spec.label} (you)`, mounted: rides, shoots: Boolean(STYLES[hero.style]?.ranged), make: () => structuredClone(hero), matches: (inputs) => inputs.name === hero.name && !inputs.rosterKey },
+    { id: 'hero', label: t('squad.you', { label: tname(spec.label) }), mounted: rides, shoots: Boolean(STYLES[hero.style]?.ranged), make: () => structuredClone(hero), matches: (inputs) => inputs.name === hero.name && !inputs.rosterKey },
     ...squadUnits(spec.factions).map((unit) => ({ id: unit.key, label: unit.label, mounted: false, shoots: unit.shoots, make: unit.make, matches: (inputs) => inputs.rosterKey === unit.key })),
   ];
   const zone = lastGateZone();
   const across = arena.halfZ - LAST_GATE.zone.edge;
   return {
-    title: `${spec.glyph} ${spec.title}`,
+    title: `${spec.glyph} ${tname(spec.title)}`,
     place: 'The gate',
     scene: LAST_GATE.place,
     arena: { halfX: arena.halfX, halfZ: arena.halfZ },

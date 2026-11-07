@@ -144,7 +144,7 @@ test('Qi Jiguang\'s level: his squads only, the idle guards (and the general\'s 
   const { blue } = level.cast(seededRandom(2));
   assert.equal(blue.length, 24, 'two squads of twelve');
   assert.ok(blue.every((man) => man.outfit.kind === 'mingBrigandine'), 'none in the elite\'s lamellar');
-  assert.ok(!level.roster.includes('guards'));
+  assert.ok(!level.roster.en.includes('guards'));
   const backs = level.formation.blue.layout.map(([back]) => back);
   assert.ok(Math.max(...backs) < 3, 'nobody standing idle far behind the squads');
 });

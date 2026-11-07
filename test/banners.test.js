@@ -154,7 +154,7 @@ test('Sarhu: the Ming a few elite, many in brigandine, some garrison men and a f
     // A small battle, as the others.
     assert.ok(red.length + blue.length <= 70);
   }
-  assert.match(SCENARIOS.sarhu.blurb, /guns/);
+  assert.match(SCENARIOS.sarhu.blurb.en, /guns/);
   assert.ok(SCENARIOS.sarhu.weather.fog);
   assert.deepEqual(SCENARIOS.sarhu.armies, { red: ['ming'], blue: ['banners'] });
   for (const kind of ['bannerArmour', 'bayara']) assert.ok(Object.values(ARMIES.banners.ranks).some((rank) => rank.kinds.includes(kind)));
