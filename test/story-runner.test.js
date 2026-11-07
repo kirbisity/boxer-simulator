@@ -214,3 +214,31 @@ test('Level 1\'s real battle, headless, a few seeds: reported (how often the her
   t.diagnostic(lines.join('\n'));
   t.diagnostic(`hero fell ${share(tally.hero)}, fled ${share(tally.fled)}, left his place ${share(tally.left)}; ${Object.entries(tally.people).map(([id, n]) => `${id} fell ${share(n)}`).join(', ')}`);
 });
+
+test('the whole life, every chapter there is, played headless: each battle\'s setup built for the life as it stands, a stub outcome, every card answered (its last choice), to the end', (t) => {
+  let life = storyNewLife(null, { seed: 21, family: STORY_FAMILY, hero: STORY_HERO });
+  let chapter = CHAPTERS[0];
+  const seen = [];
+  let page = null;
+  while (chapter && !page) {
+    const run = createChapterRun(life, chapter, { battles: STORY_BATTLES, comrades: STORY_PEOPLE });
+    for (let guard = 0; guard < 200; guard += 1) {
+      const now = storyCurrent(run);
+      if (now.kind === 'card') storyAnswer(run, Math.max(0, (now.card.choices?.length ?? 1) - 1));
+      else if (now.kind === 'battle') {
+        const setup = now.battle.setup(run.life, 5);
+        assert.ok(setup.fighters[setup.player], `${chapter.id}: the hero is in the battle`);
+        storyBattleDone(run, { hero: 'alive', leftPlace: false, won: true, comrades: Object.fromEntries(Object.keys(setup.comrades ?? {}).map((id) => [id, 'alive'])) });
+      } else if (now.kind === 'scene') storySceneDone(run);
+      else if (now.kind === 'dead') {
+        page = now.page;
+        break;
+      } else break;
+    }
+    seen.push(`${chapter.n}${run.battle ? '' : ' (no battle yet)'}${run.phase === 'dead' ? ' (died)' : ''}`);
+    life = run.life;
+    chapter = page ? null : storyNextChapter(CHAPTERS, chapter.n);
+  }
+  assert.ok(seen.length >= 1);
+  t.diagnostic(`chapters played: ${seen.join(', ')}${page ? `; ended by ${page.kind} at chapter ${page.chapter}` : '; lived through'}`);
+});
