@@ -188,6 +188,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     arrows: undefined, rounds: undefined, holdingShot: undefined,
     aiFleeing: undefined, aiFleeSince: undefined, aiCharge: undefined,
     mount: undefined, rideYaw: undefined, lift: undefined, carrier: undefined, faceAt: undefined, handsDown: undefined, pain: undefined, cuts: undefined,
+    // A story scene's standing at ease (story/scenes/stage.js: the hands, the weapon's carry, the feet and the trunk; easePose).
+    ease: undefined,
     // Level mode (terrain.js, levelmode/stage.js): dormant (his section is not active: he is not simulated, thought for or drawn), air (off the ground, falling), landedAt (the last hard landing), spawn (his post in the stage).
     dormant: undefined, air: undefined, landedAt: undefined, spawn: undefined,
     // A jump (physics/jump.js: startJump): jump (the one under way: { phase, t, ... }), jumpReadyAt (when he can jump again), jumpBody (his body's jump, cached),
@@ -2628,6 +2630,7 @@ function updateIntent(world, fighter, dt) {
       intent.offBladeDir = [0.45, -1, 0.1];
     }
   }
+  if (fighter.ease && fighter.state === 'up' && !fighter.punch && !fighter.kneel) easePose(fighter, intent);
   if (fighter.slip > 0) {
     // Aimed past where the head ends up: the muscles drive harder towards a
     // far target, and a slip must clear head and glove (~18 cm) in ~0.1 s.
@@ -2638,6 +2641,39 @@ function updateIntent(world, fighter, dt) {
   if (fighter.player && fighter.stamina < 0) slumpPose(world, fighter, intent, runPose);
   fighter.intent = intent;
   fighter.desired = desiredPose(fighter.body, intent);
+}
+
+/**
+ * A story scene's man standing at ease (story/scenes/stage.js sets `fighter.ease`; nothing else does): nobody near him is
+ * fighting, so the guard is let go. In his own frame (shares of his height): `hands` { l, r } where each hand is held (a hand
+ * not named is left as it was: a walker's swing), the weapon pointed `bladeDir` (and a second blade `offBladeDir`) in its one
+ * hand, no arm forced out to a weapon's reach; `stance` (the feet), and the trunk's `lean`, `roll`, `twist`, `hipYaw` and
+ * `headOffset` added to what he had.
+ */
+function easePose(fighter, intent) {
+  const ease = fighter.ease;
+  const H = fighter.body.heightM;
+  if (ease.stance) {
+    // (No guard's bounce or sway: a man standing at ease has his own, below.)
+    intent.stance = { ...intent.stance, ...ease.stance };
+    intent.dip = 0;
+    intent.shift = 0;
+    intent.twist = 0;
+  }
+  intent.lean += ease.lean ?? 0;
+  intent.twist += ease.twist ?? 0;
+  if (ease.roll) intent.roll = (intent.roll ?? 0) + ease.roll;
+  if (ease.hipYaw) intent.hipYaw = (intent.hipYaw ?? 0) + ease.hipYaw;
+  if (ease.headOffset) intent.headOffset = vec.add(intent.headOffset ?? [0, 0, 0], vec.scale(ease.headOffset, H));
+  for (const side of ['l', 'r']) if (ease.hands?.[side]) intent[`${side}Hand`] = vec.scale(ease.hands[side], H);
+  if (ease.bladeDir) intent.bladeDir = ease.bladeDir;
+  if (ease.offBladeDir) intent.offBladeDir = ease.offBladeDir;
+  if (ease.hands) {
+    intent.twoHanded = false;
+    intent.weaponArms = null;
+    intent.offArm = null;
+    intent.guardTight = false;
+  }
 }
 
 /**

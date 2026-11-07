@@ -258,3 +258,60 @@ test('the finale plays to its end: every shot\'s set built and posed for its lif
     assert.ok(darkBetween, 'dark between the shots');
   }
 });
+
+test('men standing in a scene stand at ease, not on guard: the long weapons grounded upright, the blades point down, the hands by their sides', () => {
+  // The sets with ranks of armed men (a row's figures are its `rows`), and sets with a sword drawn and a shield.
+  const cases = [['drillGround', 5, 1595, { effects: { flags: { jinExecuted: true }, dies: { jin: 'executed' } } }], ['poleHead', 7, 1619, {}], ['poleSelf', 7, 1619, {}], ['drillGroundSelf', 5, 1595, {}], ['snowRoad', 3, 1593, {}], ['gateHeads', 3, 1593, {}]];
+  let ranked = 0;
+  for (const [id, n, year, options] of cases) {
+    const setup = storySetSetup(STORY_SETS[id], lifeAt(n, options), { year });
+    const world = createWorld(setup.fighters, setup.options);
+    const figures = stageSetFigures(world, setup.figures.map((figure) => ({ ...figure })));
+    for (let t = 0; t < 2.5; t += 1 / 30) advance(world, 1 / 30, () => poseSetFigures(world, figures, t));
+    for (const figure of figures.filter((each) => each.pose === 'stand')) {
+      const fighter = world.fighters[figure.index];
+      const name = `${id}: ${figure.who}`;
+      assert.equal(fighter.state, 'up', `${name} on his feet`);
+      const H = fighter.body.heightM;
+      const shoulder = Math.max(fighter.x[P.lShoulder * 3 + 1], fighter.x[P.rShoulder * 3 + 1]);
+      if (String(figure.who).includes('-')) ranked += 1;
+      // A guard holds the weapon out level before him (a spear's point at his man's chest): at ease it is upright or hanging.
+      if (fighter.weapon?.held) {
+        const dir = fighter.weapon.dir;
+        const long = fighter.weapon.spec.length + fighter.weapon.spec.handle >= STORY_SET.ease.grounded.from;
+        if (long) assert.ok(dir[1] > 0.85, `${name}: his ${fighter.weapon.kind} grounded upright (${dir.map((v) => v.toFixed(2))})`);
+        else assert.ok(dir[1] < -0.7, `${name}: his ${fighter.weapon.kind} point down (${dir.map((v) => v.toFixed(2))})`);
+      }
+      // No hand up in a guard before the face or chest: each well below the shoulder (a grounded spear's hand at the hip).
+      for (const hand of [P.lHand, P.rHand]) assert.ok(fighter.x[hand * 3 + 1] < shoulder - 0.2 * H, `${name}: hand ${hand} down (${(fighter.x[hand * 3 + 1] / H).toFixed(2)} of his height)`);
+      assert.ok(fighter.ease && !fighter.intent.guardTight, `${name} at ease`);
+    }
+  }
+  assert.ok(ranked >= 20, `the ranks checked (${ranked})`);
+});
+
+test('the dead lie as they fell, not laid straight: an arm out from the side, the body settled on the ground', () => {
+  const setup = storySetSetup(STORY_SETS.flatsAfter, lifeAt(1), { year: 1587 });
+  const world = createWorld(setup.fighters, setup.options);
+  const figures = stageSetFigures(world, setup.figures.map((figure) => ({ ...figure })));
+  for (let t = 0; t < 3; t += 1 / 30) advance(world, 1 / 30, () => poseSetFigures(world, figures, t));
+  const at = (fighter, index) => [fighter.x[index * 3], fighter.x[index * 3 + 1], fighter.x[index * 3 + 2]];
+  const shapes = new Set();
+  for (const figure of figures.filter((each) => each.pose === 'lie')) {
+    const fighter = world.fighters[figure.index];
+    assert.equal(fighter.state, 'out');
+    // The way his body lies (hips to neck, on the floor), and how far each hand is out from that line.
+    const pelvis = at(fighter, P.pelvis);
+    const neck = at(fighter, P.neck);
+    const axis = [neck[0] - pelvis[0], neck[2] - pelvis[2]];
+    const length = Math.hypot(axis[0], axis[1]);
+    const out = [P.lHand, P.rHand].map((hand) => {
+      const h = at(fighter, hand);
+      return Math.abs(((h[0] - pelvis[0]) * axis[1] - (h[2] - pelvis[2]) * axis[0]) / length);
+    });
+    assert.ok(Math.max(...out) > 0.3, `${figure.who}: an arm thrown out (${out.map((v) => v.toFixed(2))} m from his line)`);
+    for (let index = 0; index < fighter.x.length / 3; index += 1) assert.ok(fighter.x[index * 3 + 1] < 0.45, `${figure.who}: lying on the ground`);
+    shapes.add(out.map((v) => v.toFixed(1)).join());
+  }
+  assert.ok(shapes.size >= 3, 'each his own way');
+});

@@ -52,7 +52,8 @@ export const STORY_FINALE = {
     'fb-wang-alive': { year: 1620, set: 'pagesSun' },
     'fb-children': { year: 1621, set: 'doorway' },
     'fb-shen': { year: 1621, set: 'shen' },
-    'fb-last-tag': { year: 1621, set: 'field', camera: { target: [0.4, 0.03, -0.12], yaw: -1.4, pitch: 1.2, distance: 1.15, drift: { distance: -0.03 } } },
+    // (Close on the tag, back far enough that his hand and hip by it read as his, not a dark mass across the frame.)
+    'fb-last-tag': { year: 1621, set: 'field', camera: { target: [0.4, 0.03, -0.12], yaw: -1.4, pitch: 1.2, distance: 1.7, drift: { distance: -0.03 } } },
   },
   // What a life cannot leave out, each a group of which one is kept (the heaviest of them, if the draw took none).
   keep: [
@@ -86,7 +87,9 @@ export const STORY_FINALE = {
   closer: 0.82,
   // The first shot, on the battle's own field: the camera over him where he fell, looking down (rad of pitch), turning slowly
   // (`turn` rad a second from `yaw`) and coming down from `far` m toward `near` (`closing` m a second).
-  camera: { yaw: -0.8, turn: 0.03, pitch: 1.05, far: 7, near: 3.2, closing: 0.6 },
+  // Its way round him is the first of `yaw` and `yaws` (rad more) from which no wall of the field's works (the fence he fell
+  // by) stands between (stage.js sceneClearYaw).
+  camera: { yaw: -0.8, yaws: [3.14, 1.57, -1.57, 0.8, -0.8, 2.4, -2.4], turn: 0.03, pitch: 1.1, far: 7, near: 3.2, closing: 0.6 },
 };
 
 /** A string hash (FNV-1a), for the life's own seed. */

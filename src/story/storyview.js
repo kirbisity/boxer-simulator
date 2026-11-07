@@ -17,7 +17,7 @@ import { storyGetLang, storyOnLang, storySetLang } from './language.js';
 import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyFinaleDone, storyLifeLived, storyNextChapter, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
 import { P } from '../body.js';
-import { createScenePlay, layDead, poseSetFigures, sceneFocus, sceneHeld, sceneLook, sceneThink, setFocus, skipSceneLine, stageSetFigures, stepScene } from './scenes/stage.js';
+import { createScenePlay, layDead, poseSetFigures, sceneFocus, sceneHeld, sceneClearYaw, sceneLook, sceneThink, setFocus, skipSceneLine, stageSetFigures, stepScene } from './scenes/stage.js';
 import { storySetSetup, STORY_SETS } from './scenes/sets.js';
 import { createFinalePlay, finaleLook, finaleShots, skipFinale, stepFinale, STORY_FINALE } from './scenes/finale.js';
 
@@ -85,14 +85,14 @@ const STORY_STYLE = `
 #story-layer .sv-hud .sv-away { color: #ff9b7a; display: block; margin-top: 3px; }
 #story-layer .sv-scene { position: absolute; inset: 0; pointer-events: auto; }
 #story-layer .sv-black { position: absolute; inset: 0; background: #000; opacity: 0; }
-#story-layer .sv-bar { position: absolute; left: 0; right: 0; height: 12vh; background: #000; transform: scaleY(0); }
+#story-layer .sv-bar { position: absolute; left: 0; right: 0; height: 14vh; background: #000; transform: scaleY(0); }
 #story-layer .sv-bar.top { top: 0; transform-origin: top; }
 #story-layer .sv-bar.bottom { bottom: 0; transform-origin: bottom; }
-#story-layer .sv-line { position: absolute; left: 50%; bottom: 3vh; transform: translateX(-50%); width: min(760px, calc(100% - 32px)); text-align: center; font-size: clamp(17px, 2.4vw, 22px); line-height: 1.6; color: #f1e9d6; text-shadow: 0 1px 6px #000; min-height: 2em; transition: opacity 0.6s; }
+#story-layer .sv-line { position: absolute; left: 50%; bottom: 0; height: 14vh; margin: 0; display: flex; align-items: center; justify-content: center; box-sizing: border-box; transform: translateX(-50%); width: min(760px, calc(100% - 32px)); text-align: center; font-size: clamp(17px, 2.4vw, 22px); line-height: 1.6; color: #f1e9d6; text-shadow: 0 1px 6px #000; min-height: 2em; transition: opacity 0.6s; }
 #story-layer .sv-line.narrator { font-style: italic; color: #d9cfba; }
 #story-layer .sv-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.85) 100%); opacity: 0; pointer-events: none; }
 #story-layer .sv-line.finale { color: #ece4d0; font-size: clamp(17px, 2.3vw, 21px); letter-spacing: 0.02em; }
-#story-layer .sv-line.letter { bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100% - 32px)); font-size: clamp(17px, 2.2vw, 20px); line-height: 1.9; color: #e8dfc8; }
+#story-layer .sv-line.letter { display: block; height: auto; bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100% - 32px)); font-size: clamp(17px, 2.2vw, 20px); line-height: 1.9; color: #e8dfc8; }
 #story-layer .sv-page { position: absolute; inset: 0; background: rgba(8,7,6,0.94); overflow-y: auto; display: flex; justify-content: center; padding: 48px 16px 32px; }
 #story-layer .sv-page article { width: min(640px, 100%); }
 #story-layer .sv-page h1 { font-size: clamp(30px, 6vw, 46px); margin: 0 0 4px; font-weight: 600; letter-spacing: 0.06em; }
@@ -411,7 +411,7 @@ export function installStory(hooks) {
     // The battle's world, where he lies (taken by the night, if the battle left him standing: the after-cards say how).
     const hero = fight && world ? world.fighters[fight.setup.player] : null;
     if (hero && hero.state !== 'out') layDead(world, hero, { up: true, reason: 'fell under the company flag' });
-    finale = { play, nodes, root, world, last: world?.time ?? 0, hero: fight?.setup.player ?? null, figures: null, camera: null, shot: -1 };
+    finale = { play, nodes, root, world, last: world?.time ?? 0, hero: fight?.setup.player ?? null, figures: null, camera: null, shot: -1, fieldYaw: undefined };
     redraw = () => { play.language = language; layer.replaceChildren(root, langSwitch()); };
     show('scene', root);
     hooks.watch(false);
@@ -493,7 +493,9 @@ export function installStory(hooks) {
     const at = [hero.x[P.pelvis * 3], hero.x[P.pelvis * 3 + 1], hero.x[P.pelvis * 3 + 2]];
     const into = finale.play.into;
     const spec = STORY_FINALE.camera;
-    return { target: [at[0], Math.max(0.1, at[1] * 0.6), at[2]], yaw: spec.yaw + into * spec.turn, pitch: spec.pitch, distance: Math.max(spec.near, spec.far - into * spec.closing) };
+    // (Its side chosen once, where no wall of the works hides him.)
+    finale.fieldYaw ??= sceneClearYaw(finale.world, [at[0], at[2]], spec.near * Math.cos(spec.pitch), [spec.yaw, ...spec.yaws.map((more) => spec.yaw + more)]) ?? spec.yaw;
+    return { target: [at[0], Math.max(0.1, at[1] * 0.6), at[2]], yaw: finale.fieldYaw + into * spec.turn, pitch: spec.pitch, distance: Math.max(spec.near, spec.far - into * spec.closing) };
   }
 
   /** Inside each step of the world: the scene's posing of the hero, or a set's figures. */
@@ -609,8 +611,8 @@ export function installStory(hooks) {
       return { chapter: chapter.id, comrades: life.comrades.map((comrade) => `${comrade.id}${comrade.alive ? '' : ' (dead)'}`) };
     },
     // Play one of the stand-in chapter's scenes now (by id): a set's on its own world; a body's on the battle's field, held
-    // still, its subject (or the chapter's family in it) struck down first.
-    playScene: (id) => {
+    // still, its subject (the chapter's family in it, and the comrades named in `fell`) struck down first.
+    playScene: (id, options = {}) => {
       const sceneDef = run.chapter.scenes?.find((each) => each.id === id);
       if (!sceneDef) return false;
       if (!sceneDef.set && run.battle) {
@@ -618,8 +620,15 @@ export function installStory(hooks) {
         hooks.stage(setup, { paused: true });
         fight = { setup, watch: storyWatch(setup), last: null, done: false };
         const world = hooks.world();
-        for (const who of Object.keys(setup.comrades ?? {})) if (run.life.family[who]) knockOut(world, world.fighters[setup.comrades[who]], { time: world.time, effects: [], attacker: null }, 'cut down', 'killed');
-        run.outcome = { hero: 'alive', comrades: {} };
+        // (And the comrades named to fall in this battle, `fell`: whom the scene mourns.)
+        const fell = new Set(options.fell ?? []);
+        const comrades = {};
+        for (const who of Object.keys(setup.comrades ?? {})) {
+          if (!run.life.family[who] && !fell.has(who)) continue;
+          knockOut(world, world.fighters[setup.comrades[who]], { time: world.time, effects: [], attacker: null }, 'cut down', 'killed');
+          comrades[who] = 'killed';
+        }
+        run.outcome = { hero: 'alive', comrades };
       }
       run.pending = [sceneDef];
       startScene(sceneDef);
