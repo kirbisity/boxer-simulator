@@ -170,8 +170,12 @@ const compiledWorks = new WeakMap();
  * - `stakes`: lines of stakes, each { from: [x, z], to: [x, z], rows, every (m along), rowGap (m back from
  *   the line, a row each), toward (+1 or -1: the way along x the points lean, at the enemy), height (m, the
  *   point's), reach (m, the point's lean out ahead of its foot), stagger (share of `every` each row shifts) }.
- * - `walls`: { points: [[x, z], ...] (a line through them), height (m), kind ('palisade' | 'wood'),
- *   gaps: [[from, to], ...] (m along the line where it is open) }.
+ * - `walls`: { points: [[x, z], ...] (a line through them), height (m), kind ('palisade' | 'wood' | 'stone'),
+ *   gaps: [[from, to], ...] (m along the line where it is open), cover (what it is made of against a missile: a key of
+ *   physics/cover.js COVER.materials, with `thick` m; none, as a palisade's rails or a wood's edge, lets shot through),
+ *   solid (m: the height below which a gap is still solid to a missile, a town wall's face under a ladder), screenHeight (m:
+ *   the height it covers to against a missile, if not its whole `height`), screen (true: a screen only, a parapet on a wall's
+ *   top that missiles meet and bodies do not: their wall is the face below it) }.
  * - `ditches`: { from: [x, z], to: [x, z] (its line), profile: [[offset, height], ...] (m across the line, to its
  *   left looking from `from` to `to`; the ground's height there, 0 beyond the ends of the profile) }; or, for a
  *   line that bends, `points: [[x, z, deep, wide], ...]` in place of `from` and `to`: at each point the profile's
@@ -211,8 +215,11 @@ function compileWorks(spec) {
     }
   }
   const walls = [];
+  const screens = [];
   for (const wall of spec.walls ?? []) {
     const points = wall.points;
+    // (A screen only, `screen`: a parapet atop a wall's mass, standing over a walk men are on; bodies meet the wall's face, not it.)
+    const into = wall.screen ? screens : walls;
     let along = 0;
     for (let k = 0; k + 1 < points.length; k += 1) {
       const a = points[k];
@@ -228,7 +235,19 @@ function compileWorks(spec) {
       for (const [p0, p1] of pieces) {
         const ux = (b[0] - a[0]) / length;
         const uz = (b[1] - a[1]) / length;
-        walls.push({ a: [a[0] + ux * p0, a[1] + uz * p0], b: [a[0] + ux * p1, a[1] + uz * p1], u: [ux, uz], length: p1 - p0, height: wall.height ?? 2, kind: wall.kind ?? 'palisade' });
+        into.push({ a: [a[0] + ux * p0, a[1] + uz * p0], b: [a[0] + ux * p1, a[1] + uz * p1], u: [ux, uz], length: p1 - p0, height: wall.height ?? 2, kind: wall.kind ?? 'palisade', cover: wall.cover ?? null, screenHeight: wall.screenHeight ?? wall.height ?? 2 });
+      }
+      // What stops a missile (physics/cover.js): the standing stretches to their top, and in each gap the solid mass below it
+      // (`solid` m: a town wall's face under its crenel, where a ladder stands; a cart's interval in a palisade has none).
+      if (wall.cover && wall.solid > 0) {
+        for (const [g0, g1] of wall.gaps ?? []) {
+          const from = Math.max(0, g0 - along);
+          const to = Math.min(length, g1 - along);
+          if (to - from <= 0.05) continue;
+          const ux = (b[0] - a[0]) / length;
+          const uz = (b[1] - a[1]) / length;
+          screens.push({ a: [a[0] + ux * from, a[1] + uz * from], b: [a[0] + ux * to, a[1] + uz * to], u: [ux, uz], length: to - from, height: wall.solid, screenHeight: wall.solid, kind: wall.kind ?? 'palisade', cover: wall.cover, gap: true });
+        }
       }
       along += length;
     }
@@ -241,7 +260,24 @@ function compileWorks(spec) {
   for (const stake of stakes) xs.push(stake.foot[0], stake.tip[0]), zs.push(stake.foot[1]);
   for (const wall of walls) xs.push(wall.a[0], wall.b[0]), zs.push(wall.a[1], wall.b[1]);
   const near = xs.length ? { x: [Math.min(...xs) - 1.5, Math.max(...xs) + 1.5], z: [Math.min(...zs) - 1.5, Math.max(...zs) + 1.5] } : null;
-  return { stakes, walls, ditches, soft, near, spec };
+  screens.unshift(...walls.filter((wall) => wall.cover));
+  return { stakes, walls, screens, ditches, soft, near, spec };
+}
+
+/**
+ * The walls a man meets in this world: the works' own, and the stretches the battle has closed (a scaling ladder pushed off
+ * its gap: physics/ladders.js puts the gap's piece of wall in `world.worksState.closed`). Without a world, the works' own.
+ */
+export function wallsOf(works, world = null) {
+  const closed = world?.worksState?.closed;
+  if (!closed?.length) return works.walls;
+  const state = world.worksState;
+  if (state.closedFor !== closed || state.closedVersion !== state.version) {
+    state.closedWalls = [...works.walls, ...closed];
+    state.closedFor = closed;
+    state.closedVersion = state.version;
+  }
+  return state.closedWalls;
 }
 
 /**
@@ -303,9 +339,9 @@ function onDitch(ditch, x, z) {
   return { across: best.side < 0 ? -best.off : best.off, deep: ease(ditch.deep), wide: ease(ditch.wide) };
 }
 
-/** The world's own state of its works: which stakes are broken. */
-function worksStateOf(world) {
-  world.worksState ??= { broken: new Set(), smother: 0 };
+/** The world's own state of its works: which stakes are broken, which stretches a battle has closed (physics/ladders.js). */
+export function worksStateOf(world) {
+  world.worksState ??= { broken: new Set(), smother: 0, closed: [], version: 0, closedWalls: null, closedFor: null, closedVersion: -1 };
   return world.worksState;
 }
 
@@ -510,7 +546,7 @@ export function slogCost(fighter, sunk) {
  * and the step turned along a wall he would walk into (within `wall.near` m of it, more as he nears it: a man at a fence
  * walks along it). Returns the step to take.
  */
-export function stepOnWorks(works, fighter, wanted) {
+export function stepOnWorks(works, fighter, wanted, world = null) {
   let [vx, vz] = wanted;
   const speed = Math.hypot(vx, vz);
   if (speed < 1e-6) return wanted;
@@ -525,7 +561,7 @@ export function stepOnWorks(works, fighter, wanted) {
     vz *= share;
   }
   const spec = FIELDWORKS.wall;
-  for (const wall of works.walls) {
+  for (const wall of wallsOf(works, world)) {
     const near = nearestOnWall(wall, x, z);
     if (near.distance > spec.near) continue;
     // Into it (toward its line): that much of the step is turned along it, all of it at `touch`.
@@ -565,7 +601,7 @@ export function walkingDistance(world, from, to) {
   if (!works) return straight;
   // Over a ditch and its bank, each stretch as long as its slope makes it to walk (FIELDWORKS.climb, as stepOnWorks slows him).
   let longest = works.ditches.length ? climbedDistance(works, from, to) : straight;
-  for (const wall of works.walls) {
+  for (const wall of wallsOf(works, world)) {
     if (!wallCrosses(from, to, wall.a, wall.b)) continue;
     const round = (end) => Math.hypot(end[0] - from[0], end[1] - from[1]) + Math.hypot(to[0] - end[0], to[1] - end[1]);
     longest = Math.max(longest, Math.min(round(wall.a), round(wall.b)));
@@ -627,10 +663,11 @@ function wallCrosses(p, q, a, b) {
 }
 
 /** A man's root (where his stance stands) kept off the walls. */
-export function keepRootOff(works, fighter) {
-  if (!works.walls.length) return;
+export function keepRootOff(works, fighter, world = null) {
+  const walls = wallsOf(works, world);
+  if (!walls.length) return;
   const spec = FIELDWORKS.wall;
-  for (const wall of works.walls) {
+  for (const wall of walls) {
     const near = nearestOnWall(wall, fighter.root[0], fighter.root[1]);
     if (near.distance >= spec.root) continue;
     const scale = near.distance > 1e-6 ? spec.root / near.distance : 0;
@@ -671,10 +708,11 @@ export function collideWorks(world, fighter) {
   if (hx < works.near.x[0] || hx > works.near.x[1] || hz < works.near.z[0] || hz > works.near.z[1]) return;
   const wallSpec = FIELDWORKS.wall;
   const stakeRadius = FIELDWORKS.stake.radius;
+  const walls = wallsOf(works, world);
   for (let index = 0; index < PARTICLES.length; index += 1) {
     const base = index * 3;
     const radius = fighter.radius[index];
-    for (const wall of works.walls) {
+    for (const wall of walls) {
       if (fighter.x[base + 1] - radius > wall.height) continue;
       const near = nearestOnWall(wall, fighter.x[base], fighter.x[base + 2]);
       const keep = radius + wallSpec.thick;

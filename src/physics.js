@@ -18,6 +18,8 @@ import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, loadStop,
 import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
 import { flyNets } from './physics/net.js';
 import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/throwable.js';
+import { createArtillery, stepArtillery } from './physics/artillery.js';
+import { createLadders, stepLadders } from './physics/ladders.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, beakMix, coiledTwist, hiltCrush, hiltKnob, hiltMix, hookPull, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
@@ -176,6 +178,9 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     artCharged: undefined,
     // A hand grenade carried (physics/throwable.js: { kind, left }, from his kit) and the throw under way ({ kind, hand, t, mark, lit, released }).
     throwable: undefined, throwing: undefined,
+    // A gun's crew man (physics/artillery.js: the index of the gun he serves), and how much of him the enemy can get at where
+    // he stands (physics/cover.js exposureOf: { at, value }).
+    gunCrew: undefined, exposure: undefined,
     aiRetargetAt: undefined, aiCombo: undefined, aiComboStep: undefined, aiComboZone: undefined, aiStrategy: undefined, aiStrategyFor: undefined,
     aiStrategySince: undefined, aiPressure: undefined, aiCadence: undefined, aiBreather: undefined, aiLastGap: undefined, aiLastHit: undefined, aiBurst: undefined, aiRoom: null, aiGuardSeen: undefined, aiPunished: undefined,
     aiFelt: undefined, aiDealt: undefined, aiCrawlAge: undefined, aiCrawlTo: undefined, aiEscapeAge: undefined, aiEscape: undefined,
@@ -1693,7 +1698,7 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
-export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null } = {}) {
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null, artillery = null } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
@@ -1797,7 +1802,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   if (mounted) for (const fighter of fighters) if (riding(fighter.body.inputs)) horses.push(createHorse(fighter, horses.length, random));
   // The air of the place (`place`: its scene's key; WORLD.heat.climates): how fast a man sheds the heat of the fight there.
   // A battle fought in a scene another season shares (`climate`: its own key, the story's Liaodong battles on the Sarhu hills) gives its own air.
-  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses, climate: climateOf(climate ?? place) };
+  const world = { time: 0, fighters, events: [], random, over: false, pendingImpulses: [], lastDt: 1 / 60, arena, props, debris: [], arrows: [], clashing: new Set(), rules, standards, horses, climate: climateOf(climate ?? place), screened: 0 };
   // A fight with weapons in it: someone came armed (a weapon in hand or a sidearm in his kit). A bout of bare hands (the ring, the
   // cage, a brawl) is not one, and no one in it draws a knife on a man who is down (finisher.js).
   world.armed = fighters.some((fighter) => fighter.weapon || fighter.body.gear.sidearm);
@@ -1824,6 +1829,10 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     world.ambush = { corner, signal: ambush.signal ?? 0, sprung: false, cursor: 0 };
     for (const fighter of fighters) if (fighter.corner === corner) fighter.hidden = true;
   }
+  // The guns standing on the field, each with its crew (`artillery`: physics/artillery.js), and a wall's scaling ladders as
+  // things that stand, are pushed off and are raised (physics/ladders.js), from the arena's works.
+  world.artillery = createArtillery(world, artillery);
+  world.siegeLadders = createLadders(world, arena);
   return world;
 }
 
@@ -3901,6 +3910,8 @@ export function step(world, dt) {
   if (world.arrows.length) flyArrows(world, dt);
   if (world.nets?.length) flyNets(world, dt);
   if (world.thrown?.length) flyThrown(world, dt);
+  if (world.artillery) stepArtillery(world, dt);
+  if (world.siegeLadders) stepLadders(world, dt);
   if (world.flame) stepFlame(world, dt);
   if (world.brushTouches) holdBrushes(world, dt);
   payForBlocks(world);
@@ -4162,7 +4173,7 @@ function moveRoot(world, fighter, dt) {
   if (fighter.spawn?.pen) keepToPen(fighter.spawn.pen, fighter, wanted, footwork);
   // On fieldworks: a ditch's slope slows him as it is steep, and a step into a palisade or a wood's edge goes along it.
   const works = worksOf(world.arena);
-  if (works) [wanted[0], wanted[1]] = stepOnWorks(works, fighter, wanted);
+  if (works) [wanted[0], wanted[1]] = stepOnWorks(works, fighter, wanted, world);
   // His blade caught in a wolf-brush: its branches in his face, he does not get in on its bearer (physics/brush.js).
   if (fighter.caught) [wanted[0], wanted[1]] = brushKeepsOff(world, fighter, wanted);
   // In a press (physics/press.js): the way he wants to go is his drive into the bodies before him, and he cannot step back into one bearing on him.
@@ -4209,7 +4220,7 @@ function moveRoot(world, fighter, dt) {
   // ... but a shove can: out across the strip to the edge and over it.
   fighter.root[1] = Math.max(-(halfZ - margin), Math.min(drop ? drop.at + WORLD.drop.footing : halfZ - margin, fighter.root[1]));
   if (world.arena.terrain) keepClearOfSolids(world.arena.terrain, fighter, operativeOf(world, fighter));
-  if (works) keepRootOff(works, fighter);
+  if (works) keepRootOff(works, fighter, world);
 }
 
 /**

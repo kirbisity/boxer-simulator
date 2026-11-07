@@ -15,6 +15,7 @@ import { WORLD } from './config.js';
 import { BARDING } from '../horses.js';
 import { gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
 import { flamePulse } from './flame.js';
+import { missileOf, screenOnPath } from './cover.js';
 
 /**
  * The gun arm for a shot: up from the guard and out along the line from the
@@ -497,6 +498,21 @@ export function flyArrows(world, dt) {
     const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
     // A horse nearer on its path than any man takes it (the riders' horses were what the archers hit most).
     const horseHit = horseOnPath(world, world.fighters[arrow.owner], arrow.x, to);
+    // A screen of the works before either (physics/cover.js: a parapet's stone, a camp's daub): it stops in it, or goes on
+    // through with what the screen did not take.
+    const share = arrow.energy ?? ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2;
+    const screen = screenOnPath(world, arrow.x, to, missileOf({ bow: true }, share * ARROW.joules));
+    if (screen && (!hit || screen.s < hit.s) && (!horseHit || screen.s < horseHit.s)) {
+      if (screen.stops) {
+        if (world.ear) soundEvent(world, 'arrowhit', { at: screen.point, speed: vec.length(arrow.v), covering: screen.wall.cover.material === 'masonry' ? 'stone' : 'ground', who: -1 });
+        arrow.x = screen.point;
+        arrow.landed = true;
+        arrow.age = 0;
+        world.screened += 1;
+        continue;
+      }
+      arrow.energy = share * (screen.left / (share * ARROW.joules));
+    }
     if (horseHit && (!hit || horseHit.s < hit.s)) {
       if (world.ear) soundEvent(world, 'arrowhit', { at: horseHit.point, speed: vec.length(arrow.v), covering: 'flesh', who: -1 });
       const energy = arrow.energy ?? ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2;
@@ -873,6 +889,18 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
     const manHit = firstHit(world, fighter, muzzle, end);
     // A horse nearer on the ball's line than any man takes it.
     const horseHit = horseOnPath(world, fighter, muzzle, end);
+    // A screen of the works before either (physics/cover.js): the ball stops in it, or comes out with what it did not take
+    // (its wound then that of the energy it has left: the round's figures are for its whole energy).
+    const energy = (shot?.energy ?? GUN.energy) / (shot?.pellets ?? 1);
+    const screen = screenOnPath(world, muzzle, end, missileOf(weapon.spec, energy));
+    if (screen && (!manHit || screen.s < manHit.s) && (!horseHit || screen.s < horseHit.s)) {
+      if (screen.stops) {
+        world.events.push({ time: world.time, kind: 'shot', attacker: fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: screen.point, target: 'works', point: screen.point, normal: vec.scale(flight, -1), harm: 0, effects: ['into the wall'] });
+        world.screened += 1;
+        continue;
+      }
+    }
+    const through = screen && screen.left < energy && shot ? screenedShot(shot, screen.left / energy) : shot;
     if (horseHit && (!manHit || horseHit.s < manHit.s)) {
       world.events.push({ time: world.time, kind: 'shot', attacker: fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: horseHit.point, target: 'horse', point: horseHit.point, normal: vec.scale(flight, -1), harm: 0, effects: ['into a horse'] });
       missileInHorse(world, fighter, horseHit, flight, (shot?.energy ?? GUN.energy) / (shot?.pellets ?? 1), { arrow: false });
@@ -882,7 +910,7 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
     const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(flight, -1), harm: 0, effects: [] };
     world.events.push(event);
     if (hit?.target === 'shield') event.effects.push('stopped by the shield');
-    else if (hit) bulletHit(world, fighter, hit, flight, event, shot);
+    else if (hit) bulletHit(world, fighter, hit, flight, event, through);
     else event.effects.push('missed');
   }
   // A turret's kick climbs its muzzle on the cradle and goes on through its mount into the robot (physics/mounted.js turretRecoil).
@@ -914,6 +942,12 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
     // What his weight could not soak up wrenches at his hands: shot after shot, he loses the gun.
     strainGrip(world, fighter, kick * (rocking / recoil.rockedOver - 1));
   }
+}
+
+/** A shot come through a screen with `share` of its energy: its wound and its knock that share of the round's. */
+function screenedShot(shot, share) {
+  const scaled = (table) => Object.fromEntries(Object.entries(table).map(([region, value]) => [region, value * share]));
+  return { ...shot, energy: shot.energy * share, lethal: scaled(shot.lethal ?? GUN.lethal), bleed: scaled(shot.bleed ?? GUN.bleed), impulse: (shot.impulse ?? GUN.impulse) * Math.sqrt(share) };
 }
 
 /**
