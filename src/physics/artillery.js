@@ -65,10 +65,10 @@ export const ARTILLERY = {
   postSide: 0.8,
   defendWithin: 2.6,
   // A mark is picked again every `pick` s; a gun fires when laid within `laid` rad of it. Its own men within `lane` m of
-  // the line before the mark foul it (the gunner holds his fire). Canister is loaded for marks within its `canisterWithin`.
+  // the line before the mark foul it (the gunner holds his fire: half a man's breadth and the ball's lay error clear of him). Canister is loaded for marks within its `canisterWithin`.
   pick: 1,
   laid: 0.012,
-  lane: 1,
+  lane: 0.6,
   // The guns.
   pieces: {
     // 佛郎机 (folangji), the breech-loading swivel gun: a long barrel taking pre-charged chambers (子铳) dropped into its open

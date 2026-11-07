@@ -16,16 +16,16 @@
 // army that surrounded it. Its size is given only as "tens of thousands" (数万); at the least reading of that, 20,000, it is
 // 1 to 4. At about one man to 280: 18 in the camp and 68 round it.
 // - Zhejiang men (3,000 of 5,000): 10, in the brigandine (outfits.js mingBrigandine, the cloth-faced coat standing for their thick
-//   cotton armour), spears, sabres, a few guns and a wolf-brush and a shield; Qi Jin's men in his uncle's tradition, built and
+//   cotton armour), spears, sabres, a wolf-brush and a shield, and a folangji's crew; Qi Jin's men in his uncle's tradition, built and
 //   trained as Qi Jiguang's (cast.js PERIOD_BUILD.qi) and holding to his discipline.
 // - Household troops (2,000): 6, the officers' own men in the elite's coat: Qi Jin, Tong Zhongkui and Chen Ce among them.
 // - Sichuan survivors through the bridge: 2, in the levy's hemp vest, with the long spear (the white staff is a hooked spear; the
 //   game's spear stands for it).
 // - The Jin round the camp: 56 banner men on foot (the spears, sabres and guandao before, the archers behind) and 12 on horse
 //   further out (the Bayara's kit, the game's one mounted Jurchen kit), all the colours.
-// What the game cannot show: the camp's cannon (the game has none; its guns here are the Zhejiang men's fowling pieces and
-// the household's three-eyed guns, which shoot what the game gives them, not the day's powder running out), and the war carts
-// (their line is the palisade's). The river is five li from the camp, off this field.
+// The camp's guns: two folangji in its carts' intervals, served by the Zhejiang and household men there (HUNRIVER.artillery),
+// their charges running out as the day's powder did. What the game cannot show: the war carts (their line is the palisade's),
+// and the Jin's own cannon (turned on the Sichuan camp, not this one). The river is five li from the camp, off this field.
 // The ground: the camp a square palisade with a gap in each side (the carts' intervals), a trench outside it. The hero is one of
 // the camp's leaders, where his rank stands him. Whether he dies is the battle's: nothing here is tuned to an outcome.
 
@@ -37,20 +37,30 @@ export const HUNRIVER = {
   year: 1621,
   // The camp's men, each [unit, kit rank, style, x, z, part]: x toward the Jin's main side (+x, the river's), z across.
   camp: [
-    // The Zhejiang men: four at the palisade on the main face, two guns behind them, the squad's leader; the side faces.
+    // The Zhejiang men: four at the palisade on the main face, a folangji's crew of two behind them, the squad's leader; the side faces.
     ['zhejiang', 'brigandine', 'spear', 6.6, -4.5, 'front'], ['zhejiang', 'brigandine', 'langxian', 6.6, -1.5, 'front'],
     ['zhejiang', 'brigandine', 'swordShield', 6.6, 1.5, 'front'], ['zhejiang', 'brigandine', 'spear', 6.6, 4.5, 'front'],
-    ['zhejiang', 'brigandine', 'matchlock', 5.2, -2, 'second'], ['zhejiang', 'brigandine', 'matchlock', 5.2, 2, 'second'],
+    ['zhejiang', 'brigandine', 'dao', 6.1, -0.8, 'second'], ['zhejiang', 'brigandine', 'dao', 6.1, 0.8, 'second'],
     ['zhejiang', 'brigandine', 'dao', 4.4, 0, 'lead'],
     ['zhejiang', 'brigandine', 'spear', 3, -6.6, 'front'], ['zhejiang', 'brigandine', 'dao', -3, -6.6, 'front'],
     ['zhejiang', 'brigandine', 'spear', 0, 6.6, 'front'],
-    // The household men: an officer's place behind the main face, two three-eyed guns on the rear face; the commanders (named below).
+    // The household men: an officer's place behind the main face, a folangji's crew on the rear face; the commanders (named below).
     ['household', 'elite', 'guandao', 3.4, 1.6, 'officer'],
-    ['household', 'elite', 'threeEyed', -6.6, -3, 'front'], ['household', 'elite', 'threeEyed', -6.6, 3, 'front'],
+    ['household', 'elite', 'dao', -6.1, -0.8, 'front'], ['household', 'elite', 'dao', -6.1, 0.8, 'front'],
     ['household', 'elite', 'guandao', 3.4, -1.6, 'named:qiJin'], ['household', 'elite', 'swordShield', 0, 1.2, 'named:tong'],
     ['household', 'elite', 'guandao', -1.2, -1, 'named:chen'],
     // The Sichuan men who got in by the bridge.
     ['sichuan', 'garrison', 'spear', -6.6, 0, 'front'], ['sichuan', 'garrison', 'spear', -3, 6.6, 'front'],
+  ],
+  // The camp's guns (physics/artillery.js): "列置战车枪炮" (it set out war carts and guns), and "明军以火器射击，杀伤相枕" (its
+  // guns' dead and wounded lay piled) until the powder was spent (zh.wikipedia 渾河之戰, after 明史 卷271 and 明熹宗实录). Qi
+  // Jiguang's cart camp, in which Qi Jin's men were raised, carried two folangji on each war cart (练兵实纪 杂集, its cart camp
+  // of ~3,100 men and 128 carts: one gun to ~12 men; the camp's 18 here, two guns). Each in a cart's interval (the palisade's gap)
+  // on the main face and the rear, its crew of two the Zhejiang and household men there (`crew`: their places in `camp`),
+  // loading canister for the Jin come within its reach. The camp's charges, `rounds` a gun, are an estimate (none is given).
+  artillery: [
+    { kind: 'folangji', at: [7, 0], facing: [1, 0], arc: 1.1, crew: [4, 5] },
+    { kind: 'folangji', at: [-7, 0], facing: [-1, 0], arc: 1.1, crew: [11, 12] },
   ],
   named: {
     qiJin: { zh: '戚金', en: 'Qi Jin' },
@@ -71,7 +81,9 @@ export const HUNRIVER = {
   horseRing: 23.5,
   // The camp's works: its palisade (half the square's side, m; the stalks' height; a gap in each side, m wide) and its trench
   // (its line's half side, and its profile across: some 0.8 m deep and 2.4 m wide, its spoil thrown into the palisade's foot).
-  palisade: { half: 7.5, height: 1.5, gap: 2 },
+  // Its stalks plastered with mud (外涂泥巴): a screen of daub (physics/cover.js earth) some 0.1 m thick, which stops an arrow and
+  // only slows a ball (its thickness not given: an estimate).
+  palisade: { half: 7.5, height: 1.5, gap: 2, cover: { material: 'earth', thick: 0.1 } },
   trench: { half: 9.3, profile: [[-1.2, 0], [-0.6, -0.8], [0.6, -0.8], [1.2, 0]] },
   arena: { halfX: 30, halfZ: 26 },
   seconds: 300,
@@ -92,7 +104,7 @@ function hunriverWorks() {
   const side = palisade.half * 2;
   const gaps = [0, 1, 2, 3].map((k) => [k * side + side / 2 - palisade.gap / 2, k * side + side / 2 + palisade.gap / 2]);
   return {
-    walls: [{ points: hunriverSquare(palisade.half), height: palisade.height, kind: 'palisade', gaps }],
+    walls: [{ points: hunriverSquare(palisade.half), height: palisade.height, kind: 'palisade', gaps, cover: palisade.cover }],
     ditches: [{ points: hunriverSquare(trench.half).map(([x, z]) => [x, z, 1, 1]), profile: trench.profile }],
   };
 }
@@ -141,7 +153,7 @@ export const BATTLE_HUNRIVER = {
   title: { zh: '浑河血战', en: 'The Hun River' },
   seconds: HUNRIVER.seconds,
   /** The Zhejiang camp (the hero among its leaders by his rank, his comrades beside him) and the Jin round it. */
-  setup(life, seed = 1) {
+  setup(life, seed = 1, options = {}) {
     const random = seededRandom(seed);
     const year = life.year ?? HUNRIVER.year;
     const red = hunriverCamp(random);
@@ -160,6 +172,8 @@ export const BATTLE_HUNRIVER = {
         },
         place: HUNRIVER.view.scene,
         climate: 'hunriver1621',
+        // (The camp is cast first: a crew man's place in `camp` is his fighter's index.)
+        artillery: options.artillery === false ? [] : HUNRIVER.artillery,
       },
       view: HUNRIVER.view,
       ...placed,

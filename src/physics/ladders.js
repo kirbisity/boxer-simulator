@@ -82,7 +82,7 @@ export function createLadders(world, arena) {
       head: [ladder.x - out[0] * (ladder.run ?? 0.3), (ladder.base ?? 0) + ladder.height, ladder.z - out[1] * (ladder.run ?? 0.3)],
       // Its gap's piece of the face, closed while it is down (fieldworks.js wallsOf).
       piece: { a: [ladder.x - u[0] * half, ladder.z - u[1] * half], b: [ladder.x + u[0] * half, ladder.z + u[1] * half], u, length: spec.width, height: wall?.height ?? (ladder.base ?? 0) + ladder.height + 1.1, kind: wall?.kind ?? 'stone', cover: null },
-      up: true, push: 0, raise: 0, tilt: 0, pushedOff: 0, raised: 0, thrown: 0,
+      up: true, push: 0, raise: 0, tilt: 0, pushedOff: 0, pushedLoaded: 0, raised: 0, thrown: 0,
     };
   });
 }
@@ -174,6 +174,7 @@ function pushOff(world, ladder, pushers, climbers) {
   ladder.up = false;
   ladder.push = 0;
   ladder.pushedOff += 1;
+  ladder.pushedLoaded += climbers.length ? 1 : 0;
   ladder.thrown += climbers.length;
   const state = worksStateOf(world);
   state.closed = [...state.closed, ladder.piece];
