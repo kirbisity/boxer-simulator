@@ -36,7 +36,7 @@ export const STORY_PROPS = {
   // A waist tag (腰牌): a wooden plaque 7 by 11 cm, a cord through its top; the characters on it too small to read at this distance.
   tag: { size: [0.07, 0.11, 0.012], wood: 0xb08a5a, ink: 0x2a2018, cord: 0x6a2a20 },
   // Footprints in snow: a pace every `pace` m, the feet `apart` m, each a dent `size` m.
-  tracks: { pace: 0.36, apart: 0.12, size: [0.13, 0.28], colour: 0xaab4bf },
+  tracks: { pace: 0.36, apart: 0.12, size: [0.13, 0.28], colour: 0x8c8a86 },
   // Trees at a wood's edge: larch and pine, a trunk and a dark crown, dusted with snow.
   trees: { trunk: 0x3e3228, crown: 0x36402e, snow: 0xe8ecef, height: [7, 11] },
   // A patch of ground (packed earth, mud, a yard) over the place's own floor, its edge feathered into it.

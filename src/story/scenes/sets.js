@@ -280,7 +280,7 @@ export const STORY_SETS = {
       { role: 'refugee', at: [0, 0], face: 1.2, pose: 'lie' },
       { who: 'hero', at: [0.9, -0.9], face: [0, 0], pose: 'stand', rank: 'soldier' },
     ],
-    camera: { target: [0.4, 0.6, -0.4], yaw: -2.4, pitch: 0.32, distance: 4.4, drift: { distance: -0.05 } },
+    camera: { target: [0.45, 0.6, -0.45], yaw: 0.5, pitch: 0.3, distance: 4.4, drift: { distance: -0.05 } },
   },
   // Yiwu, the 1570s: his brother on the path home with the carrying pole, the boy beside him.
   carryingPole: {
@@ -321,7 +321,7 @@ export const STORY_SETS = {
       { role: 'soldier', count: 7, from: [1.5, -6.8], step: [1.1, 0], face: [3, 0], pose: 'stand' },
     ],
     // Over his shoulder from the barracks' side: the row and the pole down the ground, the companies drawn up beside it.
-    camera: { target: [6, 1.25, 1.6], yaw: 0.3, pitch: 0.05, distance: 6.5, drift: { distance: -0.04 } },
+    camera: { target: [4.5, 1.0, 1.3], yaw: 0.51, pitch: 0.075, distance: 8.6, drift: { distance: -0.04 } },
   },
   // The same ground with no one he knows in the row (Jin dead in Korea already, or the scene of the strangers' deaths).
   drillGroundOthers: {
@@ -337,7 +337,7 @@ export const STORY_SETS = {
       { role: 'condemned', count: 6, from: [0.9, 0], step: [0, 1.4], face: [6, 3], pose: 'bowed' },
       { role: 'soldier', count: 7, from: [1.5, -5.5], step: [1.1, 0], face: [3, 0], pose: 'stand' },
     ],
-    camera: { target: [6, 1.25, 1.6], yaw: 0.3, pitch: 0.05, distance: 6.5, drift: { distance: -0.04 } },
+    camera: { target: [4.5, 1.0, 1.3], yaw: 0.51, pitch: 0.075, distance: 8.6, drift: { distance: -0.04 } },
   },
   // The same ground, and he is in the row (he went to the drill ground: the list of the beheaded).
   drillGroundSelf: {
@@ -372,7 +372,7 @@ export const STORY_SETS = {
       { role: 'northSoldier', count: 8, from: [9.4, -4.9], step: [0, 1.1], face: [0, 0], pose: 'stand' },
     ],
     // From the front of the ranks, looking up at it: the head against the grey sky, the official under it.
-    camera: { target: [1.5, 3.0, -0.3], yaw: 0.245, pitch: -0.12, distance: 5.8, drift: { distance: -0.04 } },
+    camera: { target: [1.0, 3.0, -0.6], yaw: 0.3, pitch: -0.32, distance: 6.4, drift: { distance: -0.03 } },
   },
   // Wherever he is tied for it: the same pole, empty, and him at its foot (the Sarhu muster's fatal word).
   poleSelf: {
@@ -440,10 +440,10 @@ export const STORY_SETS = {
     id: 'recite', place: 'plain', weather: SET_HAZE,
     props: [{ kind: 'ground', at: [0, 0], radius: 16, colour: SET_EARTH }],
     figures: [
-      { who: 'wang', at: [2.2, 0], face: [0, 0], pose: 'stand' },
-      { who: 'hero', at: [0, 0.6], face: [2.2, 0], pose: 'stand', rank: 'soldier', style: 'spear' },
-      { who: 'jin', at: [0, -0.6], face: [2.2, 0], pose: 'stand' },
-      { who: 'lou', at: [-0.2, 1.8], face: [2.2, 0], pose: 'stand' },
+      { who: 'wang', at: [2.2, 0], face: [0, 0], pose: 'stand', style: 'unskilled' },
+      { who: 'hero', at: [0, 0.6], face: [2.2, 0], pose: 'stand', rank: 'soldier', style: 'unskilled' },
+      { who: 'jin', at: [0, -0.6], face: [2.2, 0], pose: 'stand', style: 'unskilled' },
+      { who: 'lou', at: [-0.2, 1.8], face: [2.2, 0], pose: 'stand', style: 'unskilled' },
     ],
     camera: { target: [1.2, 1.2, 0.2], yaw: -2.2, pitch: 0.14, distance: 4.6, drift: { yaw: 0.01 } },
   },
@@ -496,8 +496,8 @@ export const STORY_SETS = {
     id: 'shen', place: 'sarhu', weather: { fog: [16, 90], sky: 0.65, pale: 0.7, sun: 0.8 },
     props: [{ kind: 'ground', at: [0, 0], radius: 16, colour: SET_EARTH }, { kind: 'fence', from: [4, -6], to: [4, 6], height: 1.5 }],
     figures: [
-      { who: 'shen', at: [0.7, 0.2], face: [-0.6, -0.2], pose: 'stand' },
-      { who: 'hero', at: [-0.6, -0.2], face: [0.7, 0.2], pose: 'stand', style: 'dao', rank: 'officer' },
+      { who: 'shen', at: [0.7, 0.2], face: [-0.6, -0.2], pose: 'stand', style: 'unskilled' },
+      { who: 'hero', at: [-0.6, -0.2], face: [0.7, 0.2], pose: 'stand', style: 'unskilled', rank: 'officer' },
     ],
     camera: { target: [0.1, 1.35, 0], yaw: -2.1, pitch: 0.08, distance: 3.4, drift: { yaw: 0.008 } },
   },

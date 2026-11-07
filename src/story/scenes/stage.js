@@ -182,12 +182,15 @@ function sceneSubject(scene, cast, fallen = []) {
   return mourns ? fallen.find((id) => cast[id] !== undefined) ?? null : null;
 }
 
-/** A line's stage words, each with whom it moves (null: as the scene has it): 'kneel', 'fall:jin', ['dark', 'fall:jin']. */
+/**
+ * A line's stage words, each with whom it moves (null: as the scene has it) and, for `approach`, to whom: 'kneel', 'fall:jin',
+ * ['dark', 'fall:jin'], 'approach:hero:daughter'.
+ */
 export function sceneWords(line) {
   const words = Array.isArray(line?.stage) ? line.stage : line?.stage ? [line.stage] : [];
   return words.map((entry) => {
-    const [word, who] = String(entry).split(':');
-    return { word, who: who ?? null };
+    const [word, who, to] = String(entry).split(':');
+    return { word, who: who ?? null, to: to ?? null };
   });
 }
 
@@ -404,21 +407,21 @@ export function poseSetFigures(world, figures, time) {
 }
 
 /** A figure is told a stage word (`who` a figure's name, or a role's: every figure of that role, as the row of the condemned). */
-function setWord(play, word, who) {
+function setWord(play, word, who, to = null) {
   const named = play.figures.filter((each) => each.who === who);
   const figures = named.length ? named : play.figures.filter((each) => String(each.who).startsWith(`${who}-`));
-  for (const figure of figures) setFigureWord(play, figure, word);
+  for (const figure of figures) setFigureWord(play, figure, word, to);
 }
 
-function setFigureWord(play, figure, word) {
+function setFigureWord(play, figure, word, to = null) {
   const index = figure.index;
   const fighter = play.world.fighters[index];
   if (STORY_SET.poses[word]) Object.assign(figure, { pose: word, since: play.time, share: 0 });
   else if (word === 'rise') Object.assign(figure, { pose: 'stand', since: play.time, from: undefined });
   else if (word === 'fall') play.falls.push(figure);
   else if (word === 'approach') {
-    // To the hero (the hero himself: to the first other figure who is not lying).
-    const toward = figure.index === play.hero ? play.figures.find((each) => each.index !== index && !['lie', 'lieUp'].includes(each.pose)) : play.figures.find((each) => each.index === play.hero);
+    // To the one named (`approach:who:to`), else to the hero (the hero himself: to the first other figure who is not lying).
+    const toward = to ? play.figures.find((each) => each.who === to) : figure.index === play.hero ? play.figures.find((each) => each.index !== index && !['lie', 'lieUp'].includes(each.pose)) : play.figures.find((each) => each.index === play.hero);
     const target = toward ? play.world.fighters[toward.index] : null;
     if (!target || !fighter) return;
     const at = [target.root[0], target.root[1]];
@@ -431,10 +434,10 @@ function setFigureWord(play, figure, word) {
 
 /** A line's words begin: the screen's (dark, lift) and the figures' (each word to the one it names, else the line's speaker if he is a figure, else the hero). */
 function setLineWords(play, line) {
-  for (const { word, who } of sceneWords(line)) {
+  for (const { word, who, to } of sceneWords(line)) {
     if (word === 'dark') play.dark = { from: sceneDark(play), to: 1, at: play.time, seconds: STORY_SCENE.cut.close };
     else if (word === 'lift') play.dark = { from: sceneDark(play), to: 0, at: play.time, seconds: STORY_SCENE.cut.lift };
-    else setWord(play, word, who ?? (play.cast[line.who] !== undefined ? line.who : 'hero'));
+    else setWord(play, word, who ?? (play.cast[line.who] !== undefined ? line.who : 'hero'), to);
   }
 }
 

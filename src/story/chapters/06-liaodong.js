@@ -241,7 +241,7 @@ export const CHAPTER_LIAODONG = {
         { who: 'wife', line: { zh: '是你爹。', en: 'That\'s your father.' } },
         { who: 'hero', stage: 'crouch', line: { zh: '阿禾，过来。', en: 'Ahe. Come here.' } },
         { who: 'narrator', when: (life) => chapFlag(life, 'waitedForAhe'), stage: 'approach:daughter', line: { zh: '她没有过来。他就那么蹲着，蹲到她过来为止。', en: 'She did not come. So he stayed crouched there until she did.' } },
-        { who: 'narrator', when: (life) => !chapFlag(life, 'waitedForAhe'), stage: 'rise:hero', line: { zh: '她没有过来，躲回了娘身后。他站起来，去把她抱了起来。她哭了。', en: 'She did not come. She went back behind her mother. He stood up, and went and picked her up, and she cried.' } },
+        { who: 'narrator', when: (life) => !chapFlag(life, 'waitedForAhe'), stage: 'approach:hero:daughter', line: { zh: '她没有过来，躲回了娘身后。他站起来，去把她抱了起来。她哭了。', en: 'She did not come. She went back behind her mother. He stood up, and went and picked her up, and she cried.' } },
       ],
     },
   ],
