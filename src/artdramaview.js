@@ -11,6 +11,7 @@ import { MOVES } from './moves.js';
 import { bladeFor, point } from './physics.js';
 import { strikeSpan } from './physics/arts.js';
 import { spawnBlood, spawnSparks } from './weaponview.js';
+import { tname } from './i18n.js';
 
 export const ARTDRAMA_VIEW = {
   // The trail's colour (added to the scene's light: pale steel, a little warm), and its brightest.
@@ -249,7 +250,7 @@ export function createArtDramaView(view, { flash = null, caption = null, audio =
     if (caption) {
       const line = drama.caption(now);
       if (line) {
-        if (caption.textContent !== line.text) caption.textContent = line.text;
+        if (caption.textContent !== tname(line.text)) caption.textContent = tname(line.text);
         caption.hidden = false;
         caption.style.opacity = line.opacity.toFixed(3);
       } else if (!caption.hidden) caption.hidden = true;

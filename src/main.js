@@ -2,7 +2,7 @@
 // draws it. The simulation runs at a fixed step whatever the frame rate.
 
 import { greyedHair } from './aging.js';
-import { getLang, LANG_NAMES, onLangChange, t, toggleLang, translatePage } from './i18n.js';
+import { getLang, LANG_NAMES, onLangChange, SEP, t, tname, toggleLang, translatePage } from './i18n.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { hurtShare, thinkAll } from './ai.js';
@@ -146,6 +146,7 @@ const state = {
 const realSeconds = () => performance.now() / 1000;
 /** A short name for crowded places: the first name, and its number if it has one ("Dave 2"). */
 const shortName = (name) => {
+  if (tname(name) !== name) return tname(name);
   const number = name.match(/ (\d+)$/);
   // A rank or title ("Sgt. Cole", "Sir Edric") gives way to the name after it.
   const words = name.split(' ');
@@ -511,7 +512,7 @@ const lastGateBoard = createLastGateBoard(browserStorage());
  * into the run, played.
  */
 function enterLastGate(heroKey, setup = null) {
-  setGame('lastgate', { text: 'Play again', retry: true, run: () => newBout() });
+  setGame('lastgate', { text: t('fight.playAgain'), textKey: 'fight.playAgain', retry: true, run: () => newBout() });
   state.lastGateHero = heroKey;
   state.lastGateSetup = setup;
   state.scenario = null;
@@ -586,7 +587,7 @@ const mustering = document.body.appendChild(Object.assign(document.createElement
 function showMustering() {
   const waiting = state.viewQueue?.length ?? 0;
   mustering.hidden = waiting === 0;
-  if (waiting) mustering.textContent = `Mustering the armies… ${state.views.length} / ${state.views.length + waiting}`;
+  if (waiting) mustering.textContent = t('fight.mustering', { done: state.views.length, total: state.views.length + waiting });
 }
 
 // ---- Loop -------------------------------------------------------------------
@@ -874,16 +875,21 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
     if (battle) return showSummary(state.world, verdict);
     const winner = verdict.winner;
     const team = state.world.fighters.filter((fighter) => fighter.corner === winner);
-    const name = team.length > 1 ? `${winner === 'red' ? 'Red' : 'Blue'} team` : team[0].body.inputs.name;
     // How it ended: the last fighter out on the losing side says.
-    const ends = { severed: 'Cut down', killed: 'Killed', bledOut: 'Bled out', drowned: 'Lost to the sea', knockout: 'KO', stopped: 'Stopped', pinned: 'Held down' };
-    const ending = [...state.world.events].reverse().find((event) => ends[event.kind] && state.world.fighters[event.fighter]?.corner !== winner);
-    $('#banner-text').textContent = `${ends[ending?.kind] ?? 'KO'} — ${name} wins`;
+    const ends = ['severed', 'killed', 'bledOut', 'drowned', 'knockout', 'stopped', 'pinned'];
+    const ending = [...state.world.events].reverse().find((event) => ends.includes(event.kind) && state.world.fighters[event.fighter]?.corner !== winner);
     hideSummary();
+    bannerRedraw = () => {
+      const name = team.length > 1 ? t(winner === 'red' ? 'fight.redTeam' : 'fight.blueTeam') : tname(team[0].body.inputs.name);
+      $('#banner-text').textContent = t('fight.wins', { how: t(`fight.end.${ending?.kind ?? 'knockout'}`), name });
+    };
+    bannerRedraw();
   }
 }
 
 // ---- The end of a battle: what it came to --------------------------------------------------------
+// The banner's words, drawn again in the language in force on a switch (src/i18n.js): the duel's line or the battle's summary.
+let bannerRedraw = null;
 // When a battle is decided (battleend.js: a side's fighting strength gone, or
 // the time limit), the banner becomes a short account of it: which side won,
 // by its own name, and a line a side of what it lost, in a slim card at the
@@ -898,10 +904,10 @@ function tick(seconds, { budget = SIM_BUDGET_MS } = {}) {
 /** A side's name: its armies' (ARMIES labels, without a muster's year: "The French"), else Red or Blue team. */
 function sideName(corner) {
   const own = levelNow()?.sideNames?.[corner];
-  if (own) return own;
+  if (own) return tname(own);
   const armies = (state.scenario && SCENARIOS[state.scenario]?.armies?.[corner]) || [];
-  const name = armies.map((key) => ARMIES[key]?.label?.replace(/, \d{3,4}$/, '')).filter(Boolean).join(' & ');
-  return name || `${corner === 'red' ? 'Red' : 'Blue'} team`;
+  const name = armies.map((key) => tname(ARMIES[key]?.label?.replace(/, \d{3,4}$/, ''))).filter(Boolean).join(getLang() === 'zh' ? '与' : ' & ');
+  return name || t(corner === 'red' ? 'fight.redTeam' : 'fight.blueTeam');
 }
 
 /** An element with a class and its text (or children). */
@@ -921,22 +927,28 @@ function summaryEl(tag, className, content = '') {
  * (verdict.winner null): neither side holds the field.
  */
 function showSummary(world, verdict) {
+  // (Drawn again, in the language in force, on a switch: src/i18n.js; open or folded as it was.)
+  bannerRedraw = () => {
+    const open = $('#banner').classList.contains('expanded');
+    showSummary(world, verdict);
+    $('#banner').classList.toggle('expanded', open);
+  };
   const winner = verdict.winner;
   const loser = winner === 'red' ? 'blue' : winner === 'blue' ? 'red' : null;
   const tally = battleTally(world);
   const names = { red: sideName('red'), blue: sideName('blue') };
-  const title = state.scenario ? levelNow()?.title : null;
-  $('#banner-eyebrow').textContent = [title, clock(world.time), verdict.how === 'time' ? 'time' : null].filter(Boolean).join(' · ');
+  const title = state.scenario ? tname(levelNow()?.title) : null;
+  $('#banner-eyebrow').textContent = [title, clock(world.time), verdict.how === 'time' ? t('fight.timeUp') : null].filter(Boolean).join(SEP);
   $('#banner-eyebrow').hidden = false;
-  if (winner) $('#banner-text').replaceChildren(summaryEl('span', `summary-winner ${winner}`, names[winner]), ' hold the field');
-  else $('#banner-text').replaceChildren('A drawn field');
+  if (winner) $('#banner-text').replaceChildren(summaryEl('span', `summary-winner ${winner}`, names[winner]), t('fight.holdField'));
+  else $('#banner-text').replaceChildren(t('fight.drawnField'));
   const won = (corner) => (corner === winner ? ' won' : '');
   // The brief: a line a side, what it lost (a nought left out; nothing lost, "unbroken").
   const brief = summaryEl('div', 'summary-brief', ['red', 'blue'].map((corner) => {
-    const lost = [['killed', 'killed'], ['wounded', 'wounded'], ['fled', 'fled']].filter(([field]) => tally[corner][field] > 0);
+    const lost = [['killed', t('fight.brief.killed')], ['wounded', t('fight.brief.wounded')], ['fled', t('fight.brief.fled')]].filter(([field]) => tally[corner][field] > 0);
     return summaryEl('div', 'brief-side', [
       summaryEl('span', `brief-name ${corner}${won(corner)}`, names[corner]),
-      summaryEl('span', 'brief-figures', lost.length ? lost.map(([field, label]) => `${tally[corner][field]} ${label}`).join(' · ') : 'unbroken'),
+      summaryEl('span', 'brief-figures', lost.length ? lost.map(([field, label]) => `${tally[corner][field]} ${label}`).join(SEP) : t('fight.brief.unbroken')),
     ]);
   }));
   // The tally: each side's figures either side of the labels down the middle, the winner's column the brighter, a nought faint.
@@ -945,12 +957,12 @@ function showSummary(world, verdict) {
   for (const [field, label] of tallyRows(tally)) cells.push(figure('red', field), summaryEl('span', 'tally-label', label), figure('blue', field));
   const verdictLine = loser
     ? summaryEl('div', 'summary-verdict', [summaryEl('span', loser, names[loser]), ` ${howBeaten(tally[loser])}`])
-    : summaryEl('div', 'summary-verdict', 'Neither side broke: at the end of the day both drew off');
+    : summaryEl('div', 'summary-verdict', t('fight.neitherBroke'));
   const full = [verdictLine, summaryEl('div', 'tally', cells)];
   const facts = notableFacts(world);
   if (facts.length) {
     full.push(summaryEl('div', 'summary-facts', facts.map((fact) => summaryEl('span', 'summary-fact', fact.who
-      ? [summaryEl('span', 'fact-label', fact.label), summaryEl('b', fact.who.corner, fact.name), summaryEl('b', '', String(fact.count))]
+      ? [summaryEl('span', 'fact-label', fact.label), summaryEl('b', fact.who.corner, tname(fact.name)), summaryEl('b', '', String(fact.count))]
       : [summaryEl('span', 'fact-label', fact.label), summaryEl('b', '', String(fact.count))]))));
   }
   $('#battle-summary').replaceChildren(brief, summaryEl('div', 'summary-full', full));
@@ -961,6 +973,7 @@ function showSummary(world, verdict) {
 
 /** The banner back to a plain one (a duel's). */
 function hideSummary() {
+  if (!$('#banner-eyebrow').hidden) bannerRedraw = null;
   $('#banner').classList.remove('summary-mode', 'expanded');
   $('#banner-eyebrow').hidden = true;
   $('#battle-summary').hidden = true;
@@ -990,7 +1003,7 @@ function drainLevel() {
     if (message.type === 'death') audioOutcome(world, 'defeat');
     else if (message.type === 'ending') audioOutcome(world, 'victory');
     if (message.type === 'toast') levelHud.toast(message.text);
-    else if (message.type === 'note') showNote(NOTES[message.key] ?? { title: 'A note', body: String(message.key) });
+    else if (message.type === 'note') showNote(NOTES[message.key] ?? { title: t('fight.aNote'), body: String(message.key) });
     else if (message.type === 'death') showDeath(() => {
       // Behind the dark: wake at the last rest (unless the bout has been left or begun again).
       if (state.world !== world) return;
@@ -1000,7 +1013,7 @@ function drainLevel() {
       fightControls.reset();
       followCam.reset();
     });
-    else if (message.type === 'phase2') levelHud.toast('The helm comes off');
+    else if (message.type === 'phase2') levelHud.toast(t('fight.helmOff'));
     else if (message.type === 'bossDown') cutsceneDirector.start(world);
     else if (message.type === 'line') twistDirector.say(world, message.text);
     // (Out of the chute 19 m down: the camera does not swoop after him, it is there.)
@@ -1008,8 +1021,7 @@ function drainLevel() {
     else if (message.type === 'ending') beginEnding(world);
     else if (message.type === 'rested') {
       // From now on the footer's Restart goes back to this rest, not the start.
-      $('#restart').textContent = 'Last rest';
-      $('#restart').title = 'Begin again from the last rest you reached';
+      labelKeyed($('#restart'), 'fight.lastRest', 'fight.lastRestTitle');
     }
   }
 }
@@ -1180,7 +1192,7 @@ function showCameraBar(watching) {
   if (!show) return;
   const free = watchCam.mode === 'free';
   const man = free && watchCam.focus !== null ? state.world.fighters[watchCam.focus] : null;
-  const note = man ? `Following ${shortName(man.body.inputs.name)}` : free ? 'Zoomed in' : 'Auto camera';
+  const note = man ? t('fight.following', { name: shortName(man.body.inputs.name) }) : free ? t('fight.zoomed') : t('fight.autoCamera');
   if (note === cameraNote) return;
   cameraNote = note;
   cameraBar.dataset.mode = free ? 'free' : 'auto';
@@ -1369,7 +1381,7 @@ function renderHud() {
     const card = $(`#hud-${corner}`);
     // The sandbox shows each lead's fighting rating (roster.js: ∝ inferred K/D; Maximus is 100).
     const rating = state.game === 'sandbox' ? ratingOf(fighter.body.inputs) : null;
-    card.querySelector('.name').textContent = rating ? `${fighter.body.inputs.name} · ⚔ ${rating}` : fighter.body.inputs.name;
+    card.querySelector('.name').textContent = rating ? `${tname(fighter.body.inputs.name)} · ⚔ ${rating}` : tname(fighter.body.inputs.name);
     paintStamina(card.querySelector('.stamina'), fighter.stamina);
     const capacity = concussionCapacity(fighter);
     card.querySelector('.brain i').style.width = `${Math.min(100, Math.round((fighter.concussion / capacity) * 100))}%`;
@@ -1377,11 +1389,11 @@ function renderHud() {
     const blood = card.querySelector('.blood');
     blood.hidden = !(fighter.bloodLost > 0);
     blood.querySelector('i').style.width = `${Math.min(100, Math.round(((fighter.bloodLost ?? 0) / collapseAt()) * 100))}%`;
-    card.querySelector('.kd').textContent = fighter.state === 'out' ? (state.world.fighters.length > 2 ? 'KILLED' : 'OUT') : fighter.state === 'down' ? 'DOWN' : fighter.panicked ? 'PANIC' : fighter.dazed > 0 ? 'DAZED' : fighter.stagger > 0 ? 'REELING' : `KD ${fighter.knockdowns}`;
+    card.querySelector('.kd').textContent = fighter.state === 'out' ? t(state.world.fighters.length > 2 ? 'fight.kd.killed' : 'fight.kd.out') : fighter.state === 'down' ? t('fight.kd.down') : fighter.panicked ? t('fight.kd.panic') : fighter.dazed > 0 ? t('fight.kd.dazed') : fighter.stagger > 0 ? t('fight.kd.reeling') : t('fight.kd.count', { n: fighter.knockdowns });
     const nerve = fighter.aiConfidence ?? 0;
-    const mood = nerve > 0.35 ? ' · confident' : nerve < -0.35 ? ' · wary' : '';
+    const mood = nerve > 0.35 ? t('fight.confident') : nerve < -0.35 ? t('fight.wary') : '';
     // The sandbox reads out fear and adrenaline; everywhere else, one health bar says enough.
-    const feeling = ` · fear ${Math.round((fighter.fear ?? 0) * 100)}% · adrenaline ${Math.round((fighter.adrenaline ?? 0) * 100)}%`;
+    const feeling = t('fight.feeling', { fear: Math.round((fighter.fear ?? 0) * 100), adrenaline: Math.round((fighter.adrenaline ?? 0) * 100) });
     card.querySelector('.speed').textContent = `${fighter.stats.lastHandSpeed.toFixed(1)} m/s${mood}${feeling}`;
     card.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(fighter)) * 100)}%`;
     // A great vessel open (a limb lost: maiming.js): the bar pulses and drains.
@@ -1563,10 +1575,8 @@ function refreshMountButton() {
   const riding = riders.filter(isMounted).length;
   button.disabled = riders.length === 0;
   button.dataset.all = String(riders.length > 0 && riding === riders.length);
-  button.textContent = riders.length > 0 && riding === riders.length ? '🐎 Dismount all' : '🐎 Mount all';
-  button.title = riders.length
-    ? `${riding} of the ${riders.length} who can ride are mounted. Each fighter's own Mounted choice is in Build fighters. They ride in whatever scene is chosen (the battle maps keep their own ground, with their cavalry already mounted).`
-    : 'Nobody here rides (knights, samurai, steppe, sultanates, Ming cavalry...)';
+  button.textContent = riders.length > 0 && riding === riders.length ? t('fight.dismountAll') : t('fight.mountAll');
+  button.title = riders.length ? t('fight.mountedCount', { riding, riders: riders.length }) : t('fight.nobodyRides');
 }
 $('#mounted').addEventListener('click', () => {
   const on = $('#mounted').dataset.all !== 'true';
@@ -1595,8 +1605,39 @@ segmented('#modes', (mode, button) => {
 });
 $('#pause').addEventListener('click', () => {
   state.paused = !state.paused;
-  $('#pause').textContent = state.paused ? 'Play' : 'Pause';
+  labelKeyed($('#pause'), state.paused ? 'fight.play' : 'fight.pause');
 });
+/**
+ * Words that a switch of language must change (src/i18n.js): `key` (and `titleKey`) kept on the element, so translatePage sets
+ * them again; set now in the language in force.
+ */
+function labelKeyed(element, key, titleKey = null) {
+  element.dataset.i18n = key;
+  element.textContent = t(key);
+  if (titleKey) {
+    element.dataset.i18nTitle = titleKey;
+    element.title = t(titleKey);
+  } else {
+    delete element.dataset.i18nTitle;
+    element.title = '';
+  }
+}
+/** An option (or optgroup, `group`) naming something the data keeps in English: shown in the language in force, renamed on a switch. */
+function nameOption(english, value, { prefix = '', suffix = '', group = false } = {}) {
+  const node = group ? document.createElement('optgroup') : new Option('', value);
+  Object.assign(node.dataset, { name: english, prefix, suffix });
+  if (group) node.label = `${prefix}${tname(english)}${suffix}`;
+  else node.textContent = `${prefix}${tname(english)}${suffix}`;
+  return node;
+}
+/** Every named option, renamed in the language in force (nameOption). */
+function renameOptions() {
+  for (const node of document.querySelectorAll('option[data-name], optgroup[data-name]')) {
+    const text = `${node.dataset.prefix ?? ''}${tname(node.dataset.name)}${node.dataset.suffix ?? ''}`;
+    if (node.tagName === 'OPTGROUP') node.label = text;
+    else node.textContent = text;
+  }
+}
 // The language switch (src/i18n.js): it names the other language, in that language; a tap flips the whole page live.
 function showLangSwitch() {
   const other = getLang() === 'zh' ? 'en' : 'zh';
@@ -1609,6 +1650,12 @@ $('#lang-switch').addEventListener('click', () => toggleLang());
 onLangChange(() => {
   translatePage();
   showLangSwitch();
+  renameOptions();
+  refreshMountButton();
+  cameraNote = null;
+  if (!$('#banner').hidden) bannerRedraw?.();
+  if (!$('#side-pick').hidden) labelSides();
+  if (!$('#builder').hidden || !$('#hero-builder').hidden) refreshBuilder();
 });
 translatePage();
 showLangSwitch();
@@ -1621,7 +1668,7 @@ $('#restart').addEventListener('click', () => {
   }
   newBout();
   state.paused = false;
-  $('#pause').textContent = 'Pause';
+  labelKeyed($('#pause'), 'fight.pause');
 });
 // A tap on a battle's summary (not on its buttons) opens its whole tally; another folds it back to the brief.
 $('#banner').addEventListener('click', (event) => {
@@ -1662,6 +1709,7 @@ function askConfirm(text, yesLabel, yes) {
   const card = $('#confirm-card');
   $('#confirm-text').textContent = text;
   $('#confirm-yes').textContent = yesLabel;
+  delete $('#confirm-yes').dataset.i18n;
   card.hidden = false;
   const close = () => { card.hidden = true; $('#confirm-yes').onclick = $('#confirm-no').onclick = null; };
   $('#confirm-yes').onclick = () => { close(); yes(); };
@@ -1706,14 +1754,14 @@ function openHeroBuilder() {
   $('#hero-builder').hidden = false;
   state.paused = true;
   const inLevel = state.game === 'level' && state.world?.stage?.sandbox;
-  $('#hero-apply').textContent = !inLevel ? 'Save' : state.world.stage.sandbox === 'ghost' ? 'Apply here' : 'Apply and restart the level';
+  labelKeyed($('#hero-apply'), !inLevel ? 'builder.save' : state.world.stage.sandbox === 'ghost' ? 'builder.applyHere' : 'builder.applyRestart');
   $('#hero-note').textContent = '';
   fillCornerForm('hero');
 }
 function closeHeroBuilder() {
   $('#hero-builder').hidden = true;
   state.paused = false;
-  $('#pause').textContent = 'Pause';
+  labelKeyed($('#pause'), 'fight.pause');
 }
 $('#level-character').addEventListener('click', openHeroBuilder);
 $('#ghost-character').addEventListener('click', openHeroBuilder);
@@ -1729,7 +1777,7 @@ $('#hero-apply').addEventListener('click', () => {
   const world = state.world;
   closeHeroBuilder();
   if (state.game !== 'level' || !world?.stage?.sandbox) {
-    if (!kept) levelHud.toast('Not kept: this browser would not store it');
+    if (!kept) levelHud.toast(t('fight.notKept'));
     return;
   }
   if (world.stage.sandbox === 'ghost') ghostPlayAs(null, state.levelPlayer);
@@ -1740,7 +1788,7 @@ for (const button of document.querySelectorAll('#ghost-mode [data-mode]')) {
   button.addEventListener('click', () => {
     const mode = button.dataset.mode;
     if (state.world?.stage?.sandbox === mode) return;
-    askConfirm(mode === 'real' ? 'Play for real? The level starts again from the beginning, and the garrison will fight you.' : 'Switch to the ghost walk? The level starts again from the beginning.', 'Start over', () => enterSandboxLevel(mode));
+    askConfirm(mode === 'real' ? t('fight.confirmReal') : t('fight.confirmGhost'), t('fight.startOver'), () => enterSandboxLevel(mode));
   });
 }
 // The stage's look (levelmode/stagelooks.js): a name in the ghost bar's Look select, `boxer.stageLook(name)`, or ?stagelook=; kept for next time.
@@ -1792,11 +1840,14 @@ function rememberedStageLook(ghost = false) {
 }
 const ghostAs = $('#ghost-as');
 ghostAs.append(
-  Object.assign(document.createElement('optgroup'), { label: 'Dunnottar' }),
-  Object.assign(document.createElement('optgroup'), { label: 'Everyone' }),
+  Object.assign(document.createElement('optgroup'), { label: t('fight.dunnottar') }),
+  Object.assign(document.createElement('optgroup'), { label: t('fight.everyone') }),
 );
-ghostAs.children[0].append(...Object.entries(LEVEL_PRESETS).map(([key, preset]) => new Option(preset.name, `level:${key}`)));
-ghostAs.children[1].append(...Object.entries(PRESETS).map(([key, preset]) => new Option(preset.name, `preset:${key}`)));
+ghostAs.children[0].dataset.i18nGroup = 'fight.dunnottar';
+ghostAs.children[1].dataset.i18nGroup = 'fight.everyone';
+ghostAs.children[0].append(...Object.entries(LEVEL_PRESETS).map(([key, preset]) => nameOption(preset.name, `level:${key}`)));
+ghostAs.children[1].append(...Object.entries(PRESETS).map(([key, preset]) => nameOption(preset.name, `preset:${key}`)));
+onLangChange(() => { for (const group of ghostAs.querySelectorAll('optgroup[data-i18n-group]')) group.label = t(group.dataset.i18nGroup); });
 ghostAs.addEventListener('change', () => ghostPlayAs(ghostAs.value));
 for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) {
   button.addEventListener('click', () => {
@@ -1810,7 +1861,7 @@ const ghostGo = $('#ghost-go');
 let ghostPlaces = [];
 function fillGhostGo() {
   ghostPlaces = state.world?.stage ? sandboxPlaces(travelPlaces(state.world.stage.def), state.world.stage.sandbox) : [];
-  ghostGo.replaceChildren(new Option('Go to…', ''), ...ghostPlaces.map((place, index) => new Option(place.label, String(index))));
+  ghostGo.replaceChildren(keyedOption('page.goToPick', ''), ...ghostPlaces.map((place, index) => nameOption(place.label, String(index))));
 }
 ghostGo.addEventListener('change', () => {
   const place = ghostPlaces[Number(ghostGo.value)];
@@ -1819,7 +1870,7 @@ ghostGo.addEventListener('change', () => {
   const world = state.world;
   if (!place || !world?.stage?.sandbox) return;
   if (!travelTo(world, place)) return;
-  if (world.stage.cheated) levelHud.toast('Fast travel: the run is marked as a sandbox cheat');
+  if (world.stage.cheated) levelHud.toast(t('fight.fastTravel'));
   followCam.reset();
 });
 
@@ -1828,7 +1879,7 @@ function syncGhostBar() {
   for (const button of document.querySelectorAll('#ghost-bar [data-speed]')) button.classList.toggle('on', Number(button.dataset.speed) === state.speed);
   for (const button of document.querySelectorAll('#ghost-mode [data-mode]')) button.classList.toggle('on', button.dataset.mode === state.world?.stage?.sandbox);
   const name = state.world?.fighters[0]?.body.inputs.name;
-  const match = [...ghostAs.options].find((option) => option.text === name);
+  const match = [...ghostAs.options].find((option) => (option.dataset.name ?? option.text) === name);
   if (match) ghostAs.value = match.value;
 }
 
@@ -2071,11 +2122,11 @@ function regreyHair(inputs) {
 }
 
 const FIELDS = [
-  { key: 'sex', label: 'Sex', type: 'select', options: ['male', 'female'] },
+  { key: 'sex', label: 'Sex', type: 'select', options: ['male', 'female'], optionKey: 'builder.o' },
   { key: 'heightCm', label: 'Height', type: 'range', min: 150, max: 210, step: 1, unit: 'cm' },
-  { key: 'frame', label: 'Frame', type: 'select', options: ['small', 'medium', 'large'] },
-  { key: 'age', label: 'Age', type: 'range', min: 18, max: 100, step: 1, unit: 'yr' },
-  { key: 'exercise', label: 'Exercise', type: 'range', min: 0, max: 1, step: 0.01, format: (value) => `${Math.round(exerciseHours(value))} h/wk` },
+  { key: 'frame', label: 'Frame', type: 'select', options: ['small', 'medium', 'large'], optionKey: 'builder.o' },
+  { key: 'age', label: 'Age', type: 'range', min: 18, max: 100, step: 1, format: (value) => t('builder.unit.yr', { n: value }) },
+  { key: 'exercise', label: 'Exercise', type: 'range', min: 0, max: 1, step: 0.01, format: (value) => t('builder.unit.hoursWeek', { n: Math.round(exerciseHours(value)) }) },
   // Body fat is not set but settles from what goes in and what is burnt; the
   // slider spans the intakes that settle between BMI 10 and BMI 100.
   { key: 'calories', label: 'Calories', type: 'range', step: 10, range: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean), format: (value) => `${Math.round(value).toLocaleString('en')} kcal` },
@@ -2085,11 +2136,11 @@ const FIELDS = [
 const HAIR_COLORS = { black: '#120d0a', 'dark brown': '#2a1a10', brown: '#6b4a2a', blond: '#c9a25e', red: '#8a3a1c', grey: '#8d8d8d' };
 // The compact grid: the fighting style first, then the look.
 const LOOK_FIELDS = [
-  { key: 'style', label: 'Style', options: CUSTOM_STYLE_KEYS, names: Object.fromEntries(CUSTOM_STYLE_KEYS.map((key) => [key, STYLES[key].label])), onInputs: true },
-  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, names: { cleanShort: 'clean short', midLong: 'mid-long', long: 'long', ringletPigtails: 'ringlet pigtails', ringlets: 'ringlets', ringletUpdo: 'ringlet updo', hime: 'hime cut (waist length)' } },
-  { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
-  { key: 'facialHair', label: 'Face', options: LOOK_OPTIONS.facialHair },
-  { key: 'eyeColor', label: 'Eyes', options: LOOK_OPTIONS.eyeColor },
+  { key: 'style', label: 'Style', options: CUSTOM_STYLE_KEYS, names: Object.fromEntries(CUSTOM_STYLE_KEYS.map((key) => [key, STYLES[key].label])), proper: true, onInputs: true },
+  { key: 'hairStyle', label: 'Hair', options: LOOK_OPTIONS.hairStyle, optionKey: 'builder.hair' },
+  { key: 'hairColor', label: 'Colour', options: Object.keys(HAIR_COLORS), optionKey: 'builder.c', toValue: (name) => HAIR_COLORS[name], fromValue: (hex) => Object.keys(HAIR_COLORS).find((name) => HAIR_COLORS[name] === hex) ?? 'black' },
+  { key: 'facialHair', label: 'Face', options: LOOK_OPTIONS.facialHair, optionKey: 'builder.beard' },
+  { key: 'eyeColor', label: 'Eyes', options: LOOK_OPTIONS.eyeColor, optionKey: 'builder.c' },
 ];
 
 // The outfit: which kind and which of its designs, its colours (the
@@ -2103,28 +2154,39 @@ const SET_NAMES = Object.fromEntries(OUTFIT_KEYS.flatMap((kind) => outfitSets(ki
 /** The helmet slot's options: the set's own, none, and every helm offered, under the faction it comes from. */
 function fillHelmOptions(select) {
   const helms = helmChoices();
-  select.replaceChildren(new Option("The set's own", 'own'), new Option('No helmet', 'none'), ...FACTION_KEYS.map((faction) => {
+  select.replaceChildren(keyedOption('builder.helmOwn', 'own'), keyedOption('builder.noHelmet', 'none'), ...FACTION_KEYS.map((faction) => {
     const group = helms.filter((helm) => helm.faction === faction);
     if (!group.length) return null;
-    const optgroup = document.createElement('optgroup');
-    optgroup.label = `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}`;
-    optgroup.append(...group.map((helm) => new Option(`${helm.name} (${helm.kg.toFixed(1)} kg)`, helm.key)));
+    const optgroup = nameOption(FACTIONS[faction].label, '', { prefix: `${FACTIONS[faction].glyph} `, group: true });
+    optgroup.append(...group.map((helm) => nameOption(helm.name, helm.key, { suffix: ` (${helm.kg.toFixed(1)} kg)` })));
     return optgroup;
   }).filter(Boolean));
+}
+/** An option whose words are a UI key (src/i18n/ui-builder.js): renamed on a switch by translatePage. */
+function keyedOption(key, value) {
+  const option = new Option(t(key), value);
+  option.dataset.i18n = key;
+  return option;
+}
+/** A field's choice: a proper name (a style, a set) in the names catalogue, a word in the builder's own table, or as it is. */
+function fieldOption(field, option) {
+  if (field.optionKey) return keyedOption(`${field.optionKey}.${option}`, option);
+  const english = field.names?.[option] ?? option;
+  return field.proper ? nameOption(english, option) : new Option(english, option);
 }
 /** The set picker's options: every set the builders offer, under its faction. */
 function fillSetOptions(select) {
   const sets = pickableSets();
   select.replaceChildren(...FACTION_KEYS.map((faction) => {
-    const group = Object.assign(document.createElement('optgroup'), { label: `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}` });
-    group.append(...sets.filter((set) => set.faction === faction).map((set) => new Option(set.name, `${set.kind}/${set.key}`)));
+    const group = nameOption(FACTIONS[faction].label, '', { prefix: `${FACTIONS[faction].glyph} `, group: true });
+    group.append(...sets.filter((set) => set.faction === faction).map((set) => nameOption(set.name, `${set.kind}/${set.key}`)));
     return group;
   }).filter((group) => group.children.length));
 }
 const OUTFIT_FIELDS = [
   {
     // The set worn (outfitsets.js): `kind/set`, offered under the factions (fillSetOptions); its first design put on.
-    key: 'set', label: 'Outfit', options: [], names: SET_NAMES,
+    key: 'set', label: 'Outfit', options: [], names: SET_NAMES, proper: true,
     get: (inputs) => `${outfitOf(inputs).kind}/${outfitOf(inputs).set}`,
     set: (inputs, value) => {
       const [kind, set] = value.split('/');
@@ -2154,11 +2216,11 @@ const OUTFIT_FIELDS = [
     get: (inputs) => outfitField(inputs).decor ?? 'none', set: (inputs, value) => { inputs.outfit = withFinish(outfitField(inputs), 'decor', value); },
   },
   {
-    key: 'top', label: 'Top', options: Object.keys(PICKER_COLORS),
+    key: 'top', label: 'Top', options: Object.keys(PICKER_COLORS), optionKey: 'builder.c',
     get: (inputs) => colorName(outfitField(inputs).colors?.top), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, top: PICKER_COLORS[value] ?? undefined }; },
   },
   {
-    key: 'bottom', label: 'Legs', options: Object.keys(PICKER_COLORS),
+    key: 'bottom', label: 'Legs', options: Object.keys(PICKER_COLORS), optionKey: 'builder.c',
     get: (inputs) => colorName(outfitField(inputs).colors?.bottom), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, bottom: PICKER_COLORS[value] ?? undefined }; },
   },
   {
@@ -2168,7 +2230,7 @@ const OUTFIT_FIELDS = [
     set: (inputs, value) => { inputs.accessories = value === 'none' ? [] : [value]; },
   },
   {
-    key: 'fists', label: 'Fists', options: ['outfit', 'bare', 'gloved'],
+    key: 'fists', label: 'Fists', options: ['outfit', 'bare', 'gloved'], optionKey: 'builder.o',
     get: (inputs) => (inputs.gloves === undefined ? 'outfit' : inputs.gloves ? 'gloved' : 'bare'),
     set: (inputs, value) => { if (value === 'outfit') delete inputs.gloves; else inputs.gloves = value === 'gloved'; },
   },
@@ -2180,7 +2242,7 @@ function fillMemberPicker(corner) {
   const picker = $(`#build-${corner} .member`);
   const size = state.teamSizes[corner];
   picker.closest('label').hidden = size < 2;
-  picker.replaceChildren(...state.rosters[corner].slice(0, size).map((fighter, index) => new Option(`${index + 1} · ${isMounted(fighter) ? '🐎 ' : ''}${fighter.name}${index === 0 ? ' (lead)' : ''}`, String(index))));
+  picker.replaceChildren(...state.rosters[corner].slice(0, size).map((fighter, index) => new Option(`${index + 1} · ${isMounted(fighter) ? '🐎 ' : ''}${tname(fighter.name)}${index === 0 ? t('builder.lead') : ''}`, String(index))));
   picker.value = String(state.editing[corner]);
 }
 
@@ -2193,15 +2255,16 @@ function buildCornerForm(corner) {
   const presetSelect = form.querySelector('.preset');
   // The characters under their factions.
   presetSelect.replaceChildren(...FACTION_KEYS.map((faction) => {
-    const group = document.createElement('optgroup');
-    group.label = `${FACTIONS[faction].glyph} ${FACTIONS[faction].label}`;
-    group.append(...Object.entries(PRESETS).filter(([, preset]) => factionOf(preset) === faction).map(([key, preset]) => new Option(preset.name, key)));
+    const group = nameOption(FACTIONS[faction].label, '', { prefix: `${FACTIONS[faction].glyph} `, group: true });
+    group.append(...Object.entries(PRESETS).filter(([, preset]) => factionOf(preset) === faction).map(([key, preset]) => nameOption(preset.name, key)));
     return group;
   }).filter((group) => group.children.length));
   // (The level character also has the Dunnottar cast, the Forger first.)
   if (corner === 'hero') {
-    const group = Object.assign(document.createElement('optgroup'), { label: '🏰 Dunnottar' });
-    group.append(...Object.entries(LEVEL_PRESETS).map(([key, preset]) => new Option(preset.name, `level:${key}`)));
+    const group = Object.assign(document.createElement('optgroup'), { label: t('builder.dunnottarCast') });
+    group.dataset.i18nGroup = 'builder.dunnottarCast';
+    onLangChange(() => { group.label = t('builder.dunnottarCast'); });
+    group.append(...Object.entries(LEVEL_PRESETS).map(([key, preset]) => nameOption(preset.name, `level:${key}`)));
     presetSelect.prepend(group);
   }
   const presetOf = (inputs) => Object.keys(PRESETS).find((key) => PRESETS[key].name === inputs.name) ?? (Object.keys(LEVEL_PRESETS).find((key) => LEVEL_PRESETS[key].name === inputs.name) ? `level:${Object.keys(LEVEL_PRESETS).find((key) => LEVEL_PRESETS[key].name === inputs.name)}` : null);
@@ -2219,9 +2282,9 @@ function buildCornerForm(corner) {
   fields.replaceChildren(...FIELDS.map((field) => {
     const row = document.createElement('label');
     row.className = 'field';
-    row.innerHTML = `<span>${field.label}</span>`;
+    row.innerHTML = `<span data-i18n="builder.f.${field.key}">${t(`builder.f.${field.key}`)}</span>`;
     const input = field.type === 'select' ? document.createElement('select') : document.createElement('input');
-    if (field.type === 'select') input.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
+    if (field.type === 'select') input.append(...field.options.map((option) => fieldOption(field, option)));
     else Object.assign(input, { type: 'range', min: field.min, max: field.max, step: field.step });
     input.dataset.key = field.key;
     const value = document.createElement('output');
@@ -2237,9 +2300,9 @@ function buildCornerForm(corner) {
   looks.replaceChildren(...LOOK_FIELDS.map((field) => {
     const row = document.createElement('label');
     row.className = 'look-field';
-    row.innerHTML = `<span>${field.label}</span>`;
+    row.innerHTML = `<span data-i18n="builder.f.${field.key}">${t(`builder.f.${field.key}`)}</span>`;
     const select = document.createElement('select');
-    select.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
+    select.append(...field.options.map((option) => fieldOption(field, option)));
     select.dataset.look = field.key;
     select.addEventListener('change', () => {
       if (field.onInputs) current(corner)[field.key] = select.value;
@@ -2263,9 +2326,9 @@ function buildCornerForm(corner) {
   outfit.replaceChildren(...OUTFIT_FIELDS.map((field) => {
     const row = document.createElement('label');
     row.className = 'look-field';
-    row.innerHTML = `<span>${field.label}</span>`;
+    row.innerHTML = `<span data-i18n="builder.f.${field.key}">${t(`builder.f.${field.key}`)}</span>`;
     const select = document.createElement('select');
-    select.append(...field.options.map((option) => new Option(field.names?.[option] ?? option, option)));
+    select.append(...field.options.map((option) => fieldOption(field, option)));
     select.dataset.outfit = field.key;
     select.addEventListener('change', () => {
       field.set(current(corner), select.value);
@@ -2288,7 +2351,7 @@ function buildCornerForm(corner) {
     box.value = code;
     try {
       await navigator.clipboard.writeText(code);
-      form.querySelector('.copy').textContent = 'Copied';
+      labelKeyed(form.querySelector('.copy'), 'builder.copied');
     } catch {
       box.select();
     }
@@ -2300,7 +2363,7 @@ function buildCornerForm(corner) {
       setCurrent(corner, normaliseInputs({ ...file.inputs, look: { ...DEFAULT_LOOK, ...file.inputs.look } }));
       fillCornerForm(corner);
     } catch {
-      form.querySelector('.code').value = 'That code is not a fighter file.';
+      form.querySelector('.code').value = t('builder.badCode');
     }
   });
   form.querySelector('.mount-check').addEventListener('change', (changed) => {
@@ -2326,7 +2389,7 @@ const kitOrigin = (inputs, regions) => originOf({ ...inputs, faceRegion: undefin
 function originRow(corner) {
   const row = document.createElement('label');
   row.className = 'look-field';
-  row.innerHTML = '<span>Origin</span>';
+  row.innerHTML = `<span data-i18n="builder.f.origin">${t('builder.f.origin')}</span>`;
   const select = document.createElement('select');
   select.dataset.look = 'faceRegion';
   select.addEventListener('change', () => {
@@ -2346,10 +2409,11 @@ function originRow(corner) {
 function skinRow(corner) {
   const row = document.createElement('label');
   row.className = 'look-field';
-  row.innerHTML = '<span>Skin</span>';
+  row.innerHTML = `<span data-i18n="builder.f.skin">${t('builder.f.skin')}</span>`;
   const input = Object.assign(document.createElement('input'), { type: 'range', step: 0.05, className: 'tone' });
   input.dataset.look = 'skinShade';
-  input.setAttribute('aria-label', 'Skin');
+  input.setAttribute('aria-label', t('builder.f.skin'));
+  input.dataset.i18nAria = 'builder.f.skin';
   input.addEventListener('input', () => {
     const inputs = current(corner);
     const look = lookOfCorner(corner);
@@ -2369,9 +2433,9 @@ function fillOriginRows(form, inputs) {
   const own = [inputs.look.faceRegion ?? []].flat()[0] ?? null;
   const kit = regions ? kitOrigin(inputs, regions) : null;
   if (regions) {
-    select.replaceChildren(new Option(`From the kit: ${regionName(kit)}`, ''), ...REGION_ORIGINS.map((group) => {
-      const optgroup = Object.assign(document.createElement('optgroup'), { label: group.label });
-      optgroup.append(...Object.keys(group.regions).filter((region) => regions.includes(region)).map((region) => new Option(group.regions[region], region)));
+    select.replaceChildren(new Option(t('builder.fromKit', { region: tname(regionName(kit)) }), ''), ...REGION_ORIGINS.map((group) => {
+      const optgroup = nameOption(group.label, '', { group: true });
+      optgroup.append(...Object.keys(group.regions).filter((region) => regions.includes(region)).map((region) => nameOption(group.regions[region], region)));
       return optgroup;
     }).filter((optgroup) => optgroup.children.length));
     select.value = own ?? '';
@@ -2388,7 +2452,7 @@ function fillOriginRows(form, inputs) {
 
 /** A select showing a value; one the list does not offer (the Forger's own style and kit) is added to it. */
 function showValue(select, value, names) {
-  if (![...select.options].some((option) => option.value === value)) select.append(new Option(`${names?.[value] ?? OUTFITS[value]?.label ?? STYLES[value]?.label ?? value}`, value));
+  if (![...select.options].some((option) => option.value === value)) select.append(nameOption(`${names?.[value] ?? OUTFITS[value]?.label ?? STYLES[value]?.label ?? value}`, value));
   select.value = value;
 }
 
@@ -2406,16 +2470,16 @@ function fillCornerForm(corner) {
   // The finishes of the set worn (its designs).
   const set = outfitSets(kind).find((each) => each.key === outfitOf(inputs).set);
   const offered = OUTFITS[kind].designs.map((design, index) => [design, index]).filter(([design, index]) => set.designs.includes(index) && (!design.levelOnly || index === outfitOf(inputs).design));
-  designSelect.replaceChildren(...offered.map(([design, index]) => new Option(design.label, String(index))));
+  designSelect.replaceChildren(...offered.map(([design, index]) => nameOption(design.label, String(index))));
   designSelect.closest('label').hidden = offered.length < 2;
   // Headgear this outfit allows; anything else is taken off.
   const headOptions = headgearOptions(kind);
   if (!headOptions.includes((inputs.accessories ?? [])[0] ?? 'none')) inputs.accessories = [];
-  outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => new Option(option === 'none' ? 'None' : HEADGEAR[option].label, option)));
+  outfit.querySelector('[data-outfit="headgear"]').replaceChildren(...headOptions.map((option) => (option === 'none' ? keyedOption('builder.o.none', option) : nameOption(HEADGEAR[option].label, option))));
   // The steels and decorations this kit offers; none: the pickers hidden.
   for (const [key, choices] of Object.entries(finishOptions(kind))) {
     const select = outfit.querySelector(`[data-outfit="${key}"]`);
-    select.replaceChildren(...(choices ?? []).map(([value, label]) => new Option(label, value)));
+    select.replaceChildren(...(choices ?? []).map(([value, label]) => nameOption(label, value)));
     select.closest('label').hidden = !choices;
   }
   for (const field of OUTFIT_FIELDS) showValue(outfit.querySelector(`[data-outfit="${field.key}"]`), field.get(inputs), field.names);
@@ -2426,7 +2490,7 @@ function fillCornerForm(corner) {
     const card = wornCard(inputs, buildBody(inputs).bodyMassKg);
     const picture = () => portrait(`set:${kind}/${set.key}`, setModel(kind, set.key));
     const tile = setCardElement(card, picture, { tile: true, tag: 'button' });
-    const pick = withInfo(tile, () => setCardElement(card, picture), `${card.name}: its story and its stats`);
+    const pick = withInfo(tile, () => setCardElement(card, picture), t('builder.storyOf', { name: tname(card.name) }));
     pick.classList.add('worn');
     tile.onclick = pick.openInfo;
     slot.replaceChildren(pick);
@@ -2441,8 +2505,8 @@ function fillCornerForm(corner) {
   mount.disabled = !rides || bolted;
   mount.checked = isMounted(inputs);
   const horse = mountOf(inputs);
-  form.querySelector('.mount-note').textContent = !rides ? 'his people did not ride' : bolted ? breedOf(horse.breed).label : mount.checked ? `${breedOf(horse.breed).label}${horse.barding === 'bare' ? '' : `, ${horse.barding} barding`}` : 'on foot';
-  form.querySelector('.copy').textContent = 'Copy code';
+  form.querySelector('.mount-note').textContent = !rides ? t('builder.noRide') : bolted ? tname(breedOf(horse.breed).label) : mount.checked ? (horse.barding === 'bare' ? tname(breedOf(horse.breed).label) : t('builder.barding', { breed: tname(breedOf(horse.breed).label), barding: tname(horse.barding) })) : t('builder.onFoot');
+  labelKeyed(form.querySelector('.copy'), 'builder.copyCode');
   for (const field of FIELDS) {
     const input = form.querySelector(`[data-key="${field.key}"]`);
     if (field.range) {
@@ -2462,15 +2526,15 @@ function fillCornerForm(corner) {
   }
   const body = buildBody(inputs);
   const stats = deriveStats(body);
-  const kg = (value) => (value > 0 ? `${Math.round(value)} kg` : 'cannot');
+  const kg = (value) => (value > 0 ? `${Math.round(value)} kg` : t('builder.d.cannot'));
   const rows = [
-    ['Weight', `${stats.weight.toFixed(1)} kg`], ['Body fat', `${(stats.bodyFat * 100).toFixed(1)}%`], ['BMI', stats.bmi.toFixed(1)],
-    ['Lean', `${stats.lean.toFixed(1)} kg`], ['Resting', `${Math.round(stats.rmr)} kcal`], ['Arm', `${Math.round(stats.arm)} cm`],
-    ['Bone T', stats.tScore.toFixed(1)], ['Squat', kg(stats.squat)], ['Bench', kg(stats.bench)],
-    ['Grip', `${Math.round(stats.grip)} kg`], ['30 m', Number.isFinite(stats.sprint) ? `${stats.sprint.toFixed(2)} s` : 'cannot'], ['Impact', `${Math.round(stats.impact)} J`],
-    ['Reach', `${Math.round(body.reach * 100)} cm`], ['Punch', `${Math.round(body.motorForce[7])} N`], ['Chin', `${body.chin.toFixed(2)} m/s`],
+    ['weight', `${stats.weight.toFixed(1)} kg`], ['bodyFat', `${(stats.bodyFat * 100).toFixed(1)}%`], ['bmi', stats.bmi.toFixed(1)],
+    ['lean', `${stats.lean.toFixed(1)} kg`], ['resting', `${Math.round(stats.rmr)} kcal`], ['arm', `${Math.round(stats.arm)} cm`],
+    ['bone', stats.tScore.toFixed(1)], ['squat', kg(stats.squat)], ['bench', kg(stats.bench)],
+    ['grip', `${Math.round(stats.grip)} kg`], ['sprint', Number.isFinite(stats.sprint) ? `${stats.sprint.toFixed(2)} s` : t('builder.d.cannot')], ['impact', `${Math.round(stats.impact)} J`],
+    ['reach', `${Math.round(body.reach * 100)} cm`], ['punch', `${Math.round(body.motorForce[7])} N`], ['chin', `${body.chin.toFixed(2)} m/s`],
   ];
-  form.querySelector('.derived').innerHTML = rows.map(([label, value]) => `<div><span>${label}</span><b>${value}</b></div>`).join('');
+  form.querySelector('.derived').innerHTML = rows.map(([label, value]) => `<div><span>${t(`builder.d.${label}`)}</span><b>${value}</b></div>`).join('');
   if (corner === 'hero') heroPreviewSoon();
 }
 
@@ -2498,7 +2562,7 @@ function chooseLevel(key, setup = null) {
   state.scenario = key;
   refreshBuilder();
   state.paused = false;
-  $('#pause').textContent = 'Pause';
+  labelKeyed($('#pause'), 'fight.pause');
   newBout();
 }
 
@@ -2511,7 +2575,10 @@ function refreshBuilder() {
     $(`#team-${corner}`).value = String(state.teamSizes[corner]);
     fillCornerForm(corner);
   }
-  $('#builder h1').textContent = scenario ? `Fighters · ${scenario.title}` : 'Fighters';
+  if (scenario) {
+    delete $('#builder h1').dataset.i18n;
+    $('#builder h1').textContent = t('builder.titleOf', { title: tname(scenario.title) });
+  } else labelKeyed($('#builder h1'), 'builder.title');
 }
 
 // ---- Setups: everything in the fight, as JSON to keep and load again ----------
@@ -2559,22 +2626,22 @@ $('#copy-setup').addEventListener('click', async () => {
   const button = $('#copy-setup');
   try {
     await navigator.clipboard.writeText(text);
-    button.textContent = 'Copied';
+    labelKeyed(button, 'builder.copied');
   } catch {
     box.select();
-    button.textContent = 'Select and copy';
+    labelKeyed(button, 'builder.selectCopy');
   }
-  setTimeout(() => { button.textContent = 'Copy setup'; }, 2500);
+  setTimeout(() => { labelKeyed(button, 'builder.copySetup'); }, 2500);
 });
 $('#load-setup').addEventListener('click', () => {
   const box = $('#setup-code');
   try {
     loadSetup(JSON.parse(box.value));
-    $('#load-setup').textContent = 'Loaded';
+    labelKeyed($('#load-setup'), 'builder.loaded');
   } catch (error) {
-    box.value = `That is not a setup (${error.message}). Paste one copied with Copy setup.`;
+    box.value = t('builder.badSetup', { error: error.message });
   }
-  setTimeout(() => { $('#load-setup').textContent = 'Load setup'; }, 2500);
+  setTimeout(() => { labelKeyed($('#load-setup'), 'builder.loadSetup'); }, 2500);
 });
 
 
@@ -2585,7 +2652,7 @@ $('#open-builder').addEventListener('click', () => {
 $('#close-builder').addEventListener('click', () => {
   $('#builder').hidden = true;
   state.paused = false;
-  $('#pause').textContent = 'Pause';
+  labelKeyed($('#pause'), 'fight.pause');
   newBout();
 });
 
@@ -2606,15 +2673,18 @@ function setGame(game, next = null) {
   if (game !== 'lastgate') lastGateView.hide();
   state.game = game;
   state.next = next;
-  $('#restart').textContent = 'Restart';
-  $('#restart').title = '';
+  labelKeyed($('#restart'), 'fight.restart');
   document.body.dataset.game = game;
-  $('#banner-again').textContent = next?.text ?? 'Next bout';
+  if (next?.textKey || !next?.text) labelKeyed($('#banner-again'), next?.textKey ?? 'fight.nextBout');
+  else {
+    delete $('#banner-again').dataset.i18n;
+    $('#banner-again').textContent = next.text;
+  }
   // Retry the same bout, beside a next that is something else (a new opponent); a next that is itself a retry stands alone.
   $('#banner-retry').hidden = !next || Boolean(next.retry);
   $('#builder').hidden = true;
   state.paused = false;
-  $('#pause').textContent = 'Pause';
+  labelKeyed($('#pause'), 'fight.pause');
   document.body.classList.remove('sheet');
   document.querySelector('#sheet-labels')?.replaceChildren();
 }
@@ -2644,15 +2714,21 @@ function askSide() {
   if (state.sideAsked) return;
   state.sideAsked = true;
   const pick = $('#side-pick');
+  labelSides();
+  pick.hidden = false;
+  state.paused = true;
+}
+
+/** The side picker's two sides: who leads each, his faction and style (or how many), in the language in force. */
+function labelSides() {
+  const pick = $('#side-pick');
   for (const corner of ['red', 'blue']) {
     const team = state.world.fighters.filter((fighter) => fighter.corner === corner);
     const lead = leadOf(state.world.fighters, corner, state.lead[corner])?.body.inputs;
     if (!lead) continue;
-    const faction = FACTIONS[factionOf(lead)]?.label ?? '';
-    pick.querySelector(`[data-side="${corner}"]`).innerHTML = `<em>Play as</em><b>${lead.name}</b><span>${[faction, team.length > 1 ? `${team.length} fighters` : STYLES[lead.style]?.label].filter(Boolean).join(' · ')}</span>`;
+    const faction = tname(FACTIONS[factionOf(lead)]?.label ?? '');
+    pick.querySelector(`[data-side="${corner}"]`).innerHTML = `<em>${t('fight.playAs')}</em><b>${tname(lead.name)}</b><span>${[faction, team.length > 1 ? t('fight.fighters', { n: team.length }) : tname(STYLES[lead.style]?.label)].filter(Boolean).join(SEP)}</span>`;
   }
-  pick.hidden = false;
-  state.paused = true;
 }
 
 $('#side-pick').addEventListener('click', (press) => {
@@ -2669,7 +2745,7 @@ $('#side-pick').addEventListener('click', (press) => {
 function takeSide(side) {
   $('#side-pick').hidden = true;
   state.paused = false;
-  $('#pause').textContent = 'Pause';
+  labelKeyed($('#pause'), 'fight.pause');
   // The footer's own buttons do the switching (hidden in a battle, there in the sandbox).
   const button = side === 'watch' ? $('#modes button[data-value="watch"]') : $(`#modes button[data-value="play"]${side === 'blue' ? '[data-side="blue"]' : ':not([data-side])'}`);
   button.click();
@@ -2681,13 +2757,13 @@ function attract() {
   // Back at the menus: the next part of the game entered asks for a side again.
   state.sideAsked = false;
   $('#side-pick').hidden = true;
-  match({ red: [randomGladiator()], blue: [randomGladiator()], place: 'colosseum', game: 'home', next: { text: 'Next bout', run: attract } });
+  match({ red: [randomGladiator()], blue: [randomGladiator()], place: 'colosseum', game: 'home', next: { text: t('fight.nextBout'), textKey: 'fight.nextBout', run: attract } });
   Object.assign(scene.orbit, { distance: 4.6, pitch: 0.12 });
 }
 
 /** Into a battle: the level's own, or as set up (`setup`, muster.js); a setup that chose the man played goes straight to him. */
 function enterLevel(key, setup = null) {
-  setGame('level', { text: 'Retry', retry: true, run: () => chooseLevel(key, setup) });
+  setGame('level', { text: t('fight.retry'), textKey: 'fight.retry', retry: true, run: () => chooseLevel(key, setup) });
   chooseLevel(key, setup);
   if (!setup?.lead) {
     askSide();
@@ -2808,7 +2884,7 @@ function observeYard() {
 function enterTutorial() {
   state.sideAsked = true;
   $('#side-pick').hidden = true;
-  match({ red: [YARD.trainee], blue: [YARD.partner], place: YARD.place, game: 'tutorial', next: { text: 'Again', retry: true, run: enterTutorial } });
+  match({ red: [YARD.trainee], blue: [YARD.partner], place: YARD.place, game: 'tutorial', next: { text: t('fight.again'), textKey: 'fight.again', retry: true, run: enterTutorial } });
   $('#modes button[data-value="play"]:not([data-side])').click();
   tutorial.start();
 }
@@ -2858,7 +2934,7 @@ function enterStage(key, { opening = false, sandbox = null, ghost: asGhost = fal
   if (!stage) throw new Error(`no stage called ${key}`);
   leaveStage();
   const run = (stageRun += 1);
-  setGame('level', { text: 'Retry', retry: true, run: () => enterStage(key, { sandbox, player }) });
+  setGame('level', { text: t('fight.retry'), textKey: 'fight.retry', retry: true, run: () => enterStage(key, { sandbox, player }) });
   state.stageOptions = { sandbox, player };
   state.scenario = null;
   state.seed += 1;
@@ -2937,7 +3013,7 @@ function restartStage() {
   fightControls.reset();
   followCam.reset();
   state.paused = false;
-  $('#pause').textContent = 'Pause';
+  labelKeyed($('#pause'), 'fight.pause');
 }
 
 /** The story's text for a stage (its card's title and lore): Stage 1's. */
@@ -2954,7 +3030,8 @@ function beginEnding(world) {
   fightControls.reset();
   endingCam = { k: 0, goal: 0 };
   // Every death was a failed attempt: the story of the night, told from the record, and how many tries it took.
-  const attempts = { count: attemptCount(world), story: attemptStory(attemptLog(world)) };
+  // (The story a getter: read when shown, it is told in the language in force: src/i18n.js.)
+  const attempts = { count: attemptCount(world), get story() { return attemptStory(attemptLog(world)); } };
   // A sandbox run says so on its cards; "Play again" is the same sandbox run, as the same man.
   const badge = sandboxBadge(world);
   const again = world.stage.sandbox ? { sandbox: world.stage.sandbox, player: state.stageOptions.player } : undefined;

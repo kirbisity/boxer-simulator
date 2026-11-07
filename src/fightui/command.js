@@ -9,6 +9,7 @@
 
 import { canCommand, COMMAND_ORDERS, ordersFor, standingOrder } from '../command.js';
 import { fightUiElement } from './kit.js';
+import { onLangChange, t } from '../i18n.js';
 
 export const FIGHT_UI_COMMAND = {
   // The call of a new order stays this long (s).
@@ -39,13 +40,13 @@ const FIGHT_UI_COMMAND_ICONS = {
 export function fightUiCommandBar(root, hooks) {
   const bar = root.appendChild(fightUiElement('div', 'fu-orders'));
   bar.setAttribute('role', 'group');
-  bar.setAttribute('aria-label', 'Orders to your men');
+  bar.setAttribute('aria-label', t('fightui.orders'));
   bar.hidden = true;
   const buttons = COMMAND_ORDERS.map((entry) => {
-    const button = fightUiElement('button', 'fu-order', `<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true">${FIGHT_UI_COMMAND_ICONS[entry.kind]}</svg><span>${entry.label}</span><kbd>${entry.key}</kbd>`);
+    const button = fightUiElement('button', 'fu-order', `<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true">${FIGHT_UI_COMMAND_ICONS[entry.kind]}</svg><span>${t(`order.${entry.kind}`)}</span><kbd>${entry.key}</kbd>`);
     button.type = 'button';
     button.dataset.order = entry.kind;
-    button.title = `${FIGHT_UI_COMMAND.calls[entry.kind]} (${entry.key})`;
+    button.title = `${t(`order.call.${entry.kind}`)} (${entry.key})`;
     // Its own press: never the fight surface's tap or drag beneath it.
     button.addEventListener('pointerdown', (press) => {
       press.preventDefault();
@@ -57,6 +58,15 @@ export function fightUiCommandBar(root, hooks) {
     return button;
   });
   bar.append(...buttons);
+  // A switch of language (src/i18n.js) relabels the pills and the bar.
+  onLangChange(() => {
+    bar.setAttribute('aria-label', t('fightui.orders'));
+    for (const button of buttons) {
+      const entry = COMMAND_ORDERS.find((each) => each.kind === button.dataset.order);
+      button.querySelector('span').textContent = t(`order.${entry.kind}`);
+      button.title = `${t(`order.call.${entry.kind}`)} (${entry.key})`;
+    }
+  });
   const said = root.appendChild(fightUiElement('div', 'fu-order-said'));
   said.hidden = true;
   let shown = null;
@@ -85,7 +95,7 @@ export function fightUiCommandBar(root, hooks) {
     const serial = world.commands?.[me.corner]?.serial ?? 0;
     const order = `${kind}:${serial}`;
     if (heard !== null && order !== heard) {
-      said.textContent = FIGHT_UI_COMMAND.calls[kind];
+      said.textContent = t(`order.call.${kind}`);
       said.hidden = false;
       said.classList.remove('fu-order-said-in');
       void said.offsetWidth;

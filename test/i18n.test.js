@@ -6,7 +6,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { KEEP_ENGLISH, LANGS, LANG_STORAGE_KEY, getLang, pick, setLang, t, tname } from '../src/i18n.js';
 import { UI, UI_TABLES } from '../src/i18n/ui.js';
-import { NAME_TABLES, NAMES_ZH } from '../src/i18n/names.js';
+import { NAME_TABLES } from '../src/i18n/names.js';
 
 const SRC = new URL('../src/', import.meta.url).pathname;
 const sourceFiles = (dir = SRC) => readdirSync(dir).flatMap((name) => {
@@ -57,8 +57,8 @@ test('every name in the names catalogue is Chinese, and no English name is in tw
   const seen = new Map();
   for (const [table, entries] of Object.entries(NAME_TABLES)) {
     for (const [english, zh] of Object.entries(entries)) {
-      if (seen.has(english)) assert.equal(zh, NAMES_ZH[english], `${english}: two tables give it two names`);
-      seen.set(english, table);
+      if (seen.has(english)) assert.equal(zh, seen.get(english)[1], `${english}: ${seen.get(english)[0]} and ${table} give it two names`);
+      seen.set(english, [table, zh]);
       assert.ok(!blank(zh), `${table} ${english}: no Chinese`);
       assert.ok(CJK.test(zh) || keep.has(english), `${table} ${english}: '${zh}' is not Chinese`);
     }
