@@ -19,7 +19,7 @@ import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
 import { heatStrain } from './physics/heat.js';
-import { ammoLeft, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
+import { ammoLeft, bowArcFouled, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
 import { rayBlocked } from './physics/terrain.js';
 import { dismount, dismountReady, horseHealth, turretLaid } from './physics/mounted.js';
 
@@ -994,14 +994,17 @@ function holdRank(world, fighter, opponent, style, dt) {
     if (fighter.punch || fighter.cooldown > 0 || away > DRILL.leash) return true;
     if (holdsFire(fighter, formation, distance)) return true;
     // A bow shoots from any rank: its arrow goes up over the heads in front (physics/ranged.js overHeads); his own
-    // men too near his man, or one too near to shoot over, it is held (shotFouled), and after a while at a man at
-    // grips with them, put by and the sidearm drawn (heldTooLong).
+    // men too near his man, or one too near to shoot over, or in the arrow's way as it would fly (bowArcFouled), it
+    // is held (shotFouled); no other man to shoot at clear of them (clearMark), he leans out of his place for a way
+    // past the man in it (DRILL.lean), and after a while at a man at grips with them, puts the bow by (heldTooLong).
     if (weapon.spec.bow) {
       const fouled = shotFouled(world, fighter, opponent, { overHeads: true });
       if (fouled) {
         const other = clearMark(world, fighter, { overHeads: true });
+        const inWay = !other && fouled === 'line' && bowArcFouled(world, fighter, aimPoint(opponent, 'body'));
         if (other) fighter.focus = other.id;
         else heldTooLong(world, fighter, fouled);
+        if (inWay) leanForLane(fighter, inWay, dt);
         return true;
       }
       heldTooLong(world, fighter, null);
@@ -3005,7 +3008,8 @@ function castAside(world, fighter, style) {
  * Whether a shot at his man now would put his own men in its way, so he holds it: any shot at a man with a comrade
  * within AI.gunCrowd of him (at grips with ours: a miss, or an arrow's drop, finds ours); a flat shot (a gun, a
  * crossbow, or a bow not shooting over heads) with a comrade near the line to him, too (teamSpacing). A bow in the
- * ranks puts its arrow up over the heads before it (physics/ranged.js overHeads), as archers shot over their own lines.
+ * ranks puts its arrow up over the heads before it (physics/ranged.js overHeads), as archers shot over their own lines,
+ * and holds it when that arc, traced as it would fly, meets one of his own (bowArcFouled).
  */
 function shotFouled(world, fighter, opponent, { overHeads = false } = {}) {
   const lineOfFire = world.stage ? AI.shotLineOfFire : AI.lineOfFire;
@@ -3028,6 +3032,9 @@ function shotFouled(world, fighter, opponent, { overHeads = false } = {}) {
     const across = Math.abs(offset[0] * ahead[1] - offset[1] * ahead[0]);
     if (along > 0.1 && along < length && across < lineOfFire + (mate.mount ? 0.5 : 0) && (mate.mount || along < AI.overHeadsFrom)) fouled = 'line';
   }
+  // Shot over the heads, the arrow's own path traced as it would fly: through the head of the man before him (pressed
+  // up to his back), or down among his own men, it is held (physics/ranged.js bowArcFouled).
+  if (!fouled && overHeads && bow && bowArcFouled(world, fighter, aimPoint(opponent, 'body'))) fouled = 'line';
   return fouled;
 }
 

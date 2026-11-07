@@ -348,8 +348,14 @@ export function drawBow(world, fighter, punch, target, intent) {
   const weapon = fighter.weapon;
   const mark = punch?.aim ?? (world.fighters[fighter.aimAt] ? toLocal(fighter, aimPoint(world.fighters[fighter.aimAt], 'body')) : null);
   if (!mark) return target;
-  const shoulder = toLocal(fighter, point(fighter.x, P[`${weapon.main}Shoulder`]));
-  const along = vec.normalize(vec.sub(mark, shoulder));
+  const shoulderAt = point(fighter.x, P[`${weapon.main}Shoulder`]);
+  const shoulder = toLocal(fighter, shoulderAt);
+  const flat = vec.normalize(vec.sub(mark, shoulder));
+  // Laid over the heads of his own men before him (overHeads), the bow arm goes up along the arc, the hand raised with it.
+  const laid = laidArrow(world, fighter, toWorld(fighter, target.hand), toWorld(fighter, mark), null, missileSpread(fighter));
+  const along = vec.normalize(vec.sub(toLocal(fighter, vec.add(shoulderAt, laid.dir)), shoulder));
+  const out = vec.sub(target.hand, shoulder);
+  const hand = vec.add(vec.add(shoulder, vec.scale(along, vec.dot(out, flat))), vec.sub(out, vec.scale(flat, vec.dot(out, flat))));
   const smooth = (value) => value * value * (3 - 2 * value);
   const drawing = punch?.spec.path === 'aim' ? (punch.fired ? 0 : smooth(Math.min(1, punch.t / (punch.quick ? punch.spec.quickFireAt : punch.spec.fireAt)))) : 0.12;
   weapon.draw = drawing;
@@ -357,11 +363,11 @@ export function drawBow(world, fighter, punch, target, intent) {
   // The string hand: from beside the grip back along the arrow to the cheek.
   const head = toLocal(fighter, point(fighter.x, P.head));
   const anchor = vec.add(head, [0.02, -0.07, -0.05]);
-  const rest = vec.sub(target.hand, vec.scale(along, 0.12));
+  const rest = vec.sub(hand, vec.scale(along, 0.12));
   intent[`${weapon.off}Hand`] = vec.lerp(rest, anchor, drawing);
   // The stave across the line: upright, canted a little.
   const up = vec.normalize(vec.sub([0.05, 1, 0], vec.scale(along, along[1])));
-  return { hand: target.hand, dir: up };
+  return { hand, dir: up };
 }
 
 /**
@@ -375,25 +381,19 @@ export function loose(world, fighter, bolt = null) {
     fighter.weapon.spent = true;
     return;
   }
-  // Arrows (and bolts) loosed this bout: a volley style counts them (ranged.volley).
-  fighter.loosed = (fighter.loosed ?? 0) + 1;
   const weapon = fighter.weapon;
   const grip = point(fighter.x, P[`${weapon.main}Hand`]);
   const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(grip, yawRotate([1, 0, 0], fighter.yaw));
-  const line = vec.sub(mark, grip);
-  const distance = vec.length(line);
-  let dir = vec.normalize(line);
-  // Aimed above the mark by the drop over the distance.
-  // A bow drawn only part way (too heavy for him: handling.js) casts the arrow that much slower.
-  const speed = (bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed) * (bolt ? 1 : (weapon.handling?.draw ?? 1));
-  let lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
-  // An arrow (not a bolt) loosed from a rank behind his own men goes up over their heads (ARROW.over): the
-  // elevation that clears the nearest comrade in the line, the shaft coming down beyond the mark among those behind it.
-  if (!bolt) lift = Math.max(lift, overHeads(world, fighter, grip, dir, distance));
-  dir = vec.normalize(vec.add(dir, [0, Math.tan(lift), 0]));
-  // On foot, a man shooting on the move shoots wide by his pace; in the saddle, by the horse's gait (SADDLE_SPREAD).
-  const unsteady = fighter.mount ? SADDLE_SPREAD[gaitAt(fighter.mount.speed).name] ?? 0 : GUN.movingSpread * Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
-  const spread = ((bolt?.spread ?? ARROW.spread) + unsteady) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * skillSpread(fighter);
+  const spread = missileSpread(fighter, bolt);
+  const laid = laidArrow(world, fighter, grip, mark, bolt, spread);
+  // An arrow with no arc over his own men's heads (overHeads), or whose path (the drawn shaft from his cheek to the bow
+  // hand, then its arc) goes through one of them, is not let go: he holds at the draw, as a gun's ball is held
+  // (comradeInLine), the arrow kept (arcFouled).
+  if (!bolt && (laid.over || arcFouled(world, fighter, sightFrom(fighter, weapon), grip, laid, spread))) return;
+  // Arrows (and bolts) loosed this bout: a volley style counts them (ranged.volley).
+  fighter.loosed = (fighter.loosed ?? 0) + 1;
+  const speed = laid.speed;
+  let dir = laid.dir;
   const random = world.random;
   const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
@@ -461,26 +461,141 @@ function resupplyInLine(world, fighter, weapon, carried) {
 }
 
 /**
- * The elevation (rad above the line to the mark) an arrow from `grip` must have to go over the heads of his own
- * men standing in the way (within ARROW.over.clear m of the line, short of the mark): over the highest of them by
- * `above` m, at most `most` rad; 0 with none in the way.
+ * How wide (rad, one deviation) his arrow or bolt (`bolt`) goes: on foot, a man shooting on the move shoots wide by his
+ * pace; in the saddle, by the horse's gait (SADDLE_SPREAD); reeling, the more; and by his skill.
  */
-function overHeads(world, fighter, grip, dir, distance) {
+function missileSpread(fighter, bolt = null) {
+  const unsteady = fighter.mount ? SADDLE_SPREAD[gaitAt(fighter.mount.speed).name] ?? 0 : GUN.movingSpread * Math.hypot(...(fighter.rootVelocity ?? [0, 0]));
+  return ((bolt?.spread ?? ARROW.spread) + unsteady) * (fighter.stagger > 0 ? GUN.reelingSpread : 1) * skillSpread(fighter);
+}
+
+/**
+ * An arrow (or a bolt) laid from `grip` on `mark`, before the shot's own error (of `spread` rad: missileSpread): its
+ * speed (a bow drawn only part way, too heavy for him, handling.js, casts it that much slower), the distance to the mark,
+ * and its direction, aimed above the mark by the drop over the distance. An arrow (not a bolt) from a rank behind his
+ * own men goes up over their heads, on the arc that comes down on the mark (overHeads): `over`, the comrade it cannot
+ * be got over (the shot is held), else null.
+ */
+function laidArrow(world, fighter, grip, mark, bolt = null, spread = ARROW.spread) {
+  const weapon = fighter.weapon;
+  const line = vec.sub(mark, grip);
+  const distance = vec.length(line);
+  const flat = vec.normalize(line);
+  const speed = (bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed) * (bolt ? 1 : (weapon.handling?.draw ?? 1));
+  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
+  const dir = vec.normalize(vec.add(flat, [0, Math.tan(lift), 0]));
+  if (bolt) return { speed, distance, dir, over: null };
+  return { distance, ...overHeads(world, fighter, mark, dir, speed, spread) };
+}
+
+/**
+ * The arc an arrow takes to come down on `mark` over the heads of his own men standing in its way (on foot, short of the
+ * mark): the flattest of them, from the drop's own `dir` at the full `speed` upward by ARROW.over.step rad to
+ * ARROW.over.most, the bow arm raised to each (the bow hand at full reach from his shoulder along it, as raisedAim holds
+ * it) and the bow drawn to the speed that lands it on the mark (no more than `speed`: drawn the less the higher it goes,
+ * as archers lobbed at a near mark over their ranks), whose path is FIRE_LANE's room (of `spread`) clear of each one's
+ * head. Returns { dir, speed, over }: `over` the comrade (as comradeInLane gives him) none of them gets over (the shot
+ * to be held; dir and speed then the flat shot's), else null.
+ */
+function overHeads(world, fighter, mark, dir, speed, spread) {
   const spec = ARROW.over;
-  let most = 0;
-  const flat = Math.hypot(dir[0], dir[2]) || 1;
-  const way = [dir[0] / flat, dir[2] / flat];
+  const g = ARROW.gravity;
+  const lengths = fighter.body.lengths;
+  const shoulder = point(fighter.x, P[`${fighter.weapon.main}Shoulder`]);
+  const reach = (lengths.upperArm + lengths.forearmToFist) * 0.97;
+  const range = Math.hypot(mark[0] - shoulder[0], mark[2] - shoulder[2]) || 1e-6;
+  const way = [(mark[0] - shoulder[0]) / range, (mark[2] - shoulder[2]) / range];
+  const room = (radius, across, along) => {
+    const wide = radius + FIRE_LANE.sway + FIRE_LANE.deviations * spread * Math.max(0, along);
+    return Math.abs(across) < wide ? Math.sqrt(wide * wide - across * across) : -Infinity;
+  };
+  // His men in the way: how far along the line from his shoulder each one's head is, how far off it, how high above it.
+  const heads = [];
   for (const mate of world.fighters) {
     if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out' || mate.mount) continue;
     const head = point(mate.x, P.head);
-    const offset = [head[0] - grip[0], head[2] - grip[2]];
+    const offset = [head[0] - shoulder[0], head[2] - shoulder[2]];
     const along = offset[0] * way[0] + offset[1] * way[1];
-    if (along <= 0.2 || along >= distance - 0.5) continue;
-    if (Math.abs(offset[0] * way[1] - offset[1] * way[0]) > spec.clear) continue;
-    const above = head[1] + spec.above - grip[1] - dir[1] / flat * along;
-    most = Math.max(most, Math.atan2(above, along));
+    if (along <= 0 || along >= range - 0.5) continue;
+    const across = offset[0] * way[1] - offset[1] * way[0];
+    const radius = capsules(mate).find((capsule) => capsule.key === 'head').radius;
+    if (room(radius, across, along + reach) > -Infinity) heads.push({ mate, along, across, radius, above: head[1] - shoulder[1] });
   }
-  return Math.min(spec.most, most);
+  // Whether the arc at elevation `angle`, from the bow hand raised to it, cast at `cast` m/s, passes each head by its
+  // room (square to the arc there, its spread grown over the drawn shaft and the flight to it, as arcFouled weighs it);
+  // a head nearer than the bow hand is in the way of the arm itself.
+  const clears = (angle, cast) => heads.every(({ along, across, radius, above }) => {
+    const ahead = along - reach * Math.cos(angle);
+    if (ahead <= 0) return false;
+    const fall = g / (cast * cast * Math.cos(angle) ** 2);
+    const height = reach * Math.sin(angle) + ahead * Math.tan(angle) - 0.5 * fall * ahead * ahead;
+    return (height - above) * Math.cos(Math.atan(Math.tan(angle) - fall * ahead)) >= room(radius, across, reach + ahead / Math.cos(angle));
+  });
+  const low = Math.atan2(dir[1], Math.hypot(dir[0], dir[2]));
+  if (clears(low, speed)) return { dir, speed, over: null };
+  for (let angle = low + spec.step; angle <= spec.most; angle += spec.step) {
+    // The cast that lands it on the mark from the bow hand at this elevation (range R, the mark `rise` above the hand):
+    // v² = gR² / 2cos²θ(R tanθ − rise).
+    const out = range - reach * Math.cos(angle);
+    const lofted = out * Math.tan(angle) - (mark[1] - shoulder[1] - reach * Math.sin(angle));
+    if (out <= 0 || lofted <= 0) continue;
+    const cast = Math.sqrt(g * out * out / (2 * Math.cos(angle) ** 2 * lofted));
+    if (cast > speed || !clears(angle, cast)) continue;
+    return { dir: [way[0] * Math.cos(angle), Math.sin(angle), way[1] * Math.cos(angle)], speed: cast, over: null };
+  }
+  const nearest = heads.reduce((best, head) => (!best || head.along < best.along ? head : best), null);
+  return { dir, speed, over: { fighter: nearest.mate, along: nearest.along, side: nearest.across >= 0 ? -1 : 1 } };
+}
+
+// An arrow's way past his own men, traced as it will fly (arcFouled): the drawn shaft from the nock at his cheek to the
+// bow hand (a man pressed up against the back of the one before him has his bow hand at that man's head, and nothing he
+// looses gets past it), then its arc under gravity from the bow, `step` s at a time (0.02 s: ~1 m of a war arrow's
+// flight, the arc's sag over it under a millimetre), until it is down or FIRE_LANE.beyond m past the mark. A comrade
+// within FIRE_LANE's room of it (his sway, and three deviations of the arrow's own spread over the way it has flown),
+// where he will be as it passes (his way over the ground now, carried on), fouls it. The massed archers of a deep line
+// shot over their own ranks this way, high enough to clear the heads in front and no flatter; a man too close behind
+// the one before him, or with his own men where it would come down, held.
+export const ARROW_PATH = { step: 0.02 };
+
+/**
+ * The comrade (as comradeInLane gives him) in the way of an arrow laid from the nock at `nock` through the bow hand at
+ * `grip` (`laid`: laidArrow's dir, speed, and distance to the mark), of `spread` rad (missileSpread), or null when its
+ * way is clear (ARROW_PATH).
+ */
+export function arcFouled(world, fighter, nock, grip, { dir, speed, distance }, spread) {
+  const shaft = comradeInLane(world, fighter, nock, grip, spread);
+  if (shaft) return shaft;
+  const step = ARROW_PATH.step;
+  const end = distance + FIRE_LANE.beyond;
+  let at = grip;
+  // (It leaves the bow with his own way over the ground as well as its cast, as loose() looses it.)
+  let v = vec.add(vec.scale(dir, speed), overGround(fighter));
+  let flown = vec.length(vec.sub(grip, nock));
+  let after = 0;
+  while (at[1] > 0 && Math.hypot(at[0] - grip[0], at[2] - grip[2]) < end) {
+    const next = vec.add(at, vec.scale(v, step));
+    const mate = comradeInLane(world, fighter, at, next, spread, { flown, after });
+    if (mate) return mate;
+    flown += vec.length(vec.sub(next, at));
+    after += step;
+    v = [v[0], v[1] - ARROW.gravity * step, v[2]];
+    at = next;
+  }
+  return null;
+}
+
+/**
+ * Whether a bow drawn now on `mark` (a world point) would put its arrow into his own men (overHeads, arcFouled): laid as loose()
+ * will lay it, from the bow hand out at full reach along its arc (raisedAim, drawBow) and the nock at his cheek. The comrade, or null.
+ */
+export function bowArcFouled(world, fighter, mark) {
+  const weapon = fighter.weapon;
+  const spread = missileSpread(fighter);
+  const laid = laidArrow(world, fighter, toWorld(fighter, raisedAim(fighter, toLocal(fighter, mark), weapon).hand), mark, null, spread);
+  if (laid.over) return laid.over;
+  const lengths = fighter.body.lengths;
+  const grip = vec.add(point(fighter.x, P[`${weapon.main}Shoulder`]), vec.scale(laid.dir, (lengths.upperArm + lengths.forearmToFist) * 0.97));
+  return arcFouled(world, fighter, sightFrom(fighter, weapon), grip, laid, spread);
 }
 
 /** Arrows in the air: they fall, and the first thing on their path takes them. */
@@ -735,19 +850,24 @@ export function sightFrom(fighter, weapon = fighter.weapon) {
 /**
  * The comrade whose body is in a shot's lane from `from` toward `to` (and FIRE_LANE.beyond past it when `beyond`),
  * the nearest along it, with `side` the way he stands off the line (+1 to the line's left, on the floor), or null
- * when the lane is clear (FIRE_LANE). `spread` (rad): the weapon's.
+ * when the lane is clear (FIRE_LANE). `spread` (rad): the weapon's. `flown` (m): the way the missile has come before `from` (an arc traced a
+ * piece at a time: arcFouled), its spread grown over it; `after` (s): how long the missile takes to get to `from`, each
+ * comrade weighed where his way over the ground will have taken him by then.
  */
-export function comradeInLane(world, fighter, from, to, spread, { beyond = false } = {}) {
-  const line = vec.sub(to, from);
+export function comradeInLane(world, fighter, lineFrom, to, spread, { beyond = false, flown = 0, after = 0 } = {}) {
+  const line = vec.sub(to, lineFrom);
   const reach = vec.length(line);
   if (reach < 1e-6) return null;
   const along = vec.scale(line, 1 / reach);
   const length = reach + (beyond ? FIRE_LANE.beyond : 0);
-  const end = vec.add(from, vec.scale(along, length));
-  const room = (distance) => FIRE_LANE.sway + FIRE_LANE.deviations * spread * Math.max(0, distance);
+  const room = (distance) => FIRE_LANE.sway + FIRE_LANE.deviations * spread * Math.max(0, distance + flown);
   let best = null;
   for (const mate of world.fighters) {
     if (mate === fighter || mate.corner !== fighter.corner || mate.state === 'out') continue;
+    // Where he will be when it gets there (`after` s, on his way over the ground now: a rider at the gallop crosses a
+    // lane in a fraction of an arrow's flight): the lane taken back by as much against him as he stands.
+    const from = after > 0 ? vec.sub(lineFrom, vec.scale(overGround(mate), after)) : lineFrom;
+    const end = vec.add(from, vec.scale(along, length));
     const hips = point(mate.x, P.pelvis);
     const s = Math.max(0, Math.min(length, vec.dot(vec.sub(hips, from), along)));
     if (vec.length(vec.sub(hips, vec.add(from, vec.scale(along, s)))) > FAR_OFF_LINE + room(length)) continue;
@@ -782,6 +902,9 @@ export function comradeInLine(world, fighter, weapon = fighter.weapon, aimedAt =
   const from = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, muzzleAt[0]));
   const mark = aimedAt ?? (fighter.punch?.aim ? toWorld(fighter, fighter.punch.aim) : vec.add(from, weapon.dir));
   const dir = slerpDir(vec.normalize(vec.sub(mark, from)), weapon.dir, GUN.barrelShare);
+  // The gun itself, cheek (or shoulder) to muzzle, past the head of the man before him: a muzzle at his ear or through
+  // the gap at his neck is a ball fired into him, however clear the lane beyond.
+  if (comradeInLane(world, fighter, sightFrom(fighter, weapon), from, 0)) return true;
   const hit = firstHit(world, fighter, from, vec.add(from, vec.scale(dir, GUN.range)));
   if (hit && hit.fighter.corner === fighter.corner && hit.fighter.state !== 'out') return true;
   // The ball wanders: a comrade's body close beside its path, short of the mark, is at risk too (FIRE_LANE): between

@@ -1689,9 +1689,11 @@ export const ARROW = {
   // through, spending proof / joules of itself on the armour. A war arrow (100-130 J) never does; a crossbow's 200 J bolt goes
   // through lamellar a quarter of the time and thin plate a tenth; a harness proofed against shot, not at all.
   rigidProof: { plate: 180, lamellar: 160, plateShare: 0.3 },
-  // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (within `clear` m of its
-  // line) by `above` m, at an elevation of `most` rad at most (the massed archery of a deep line: the rear ranks lob).
-  over: { clear: 0.6, above: 0.35, most: 0.75 },
+  // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (physics/ranged.js
+  // overHeads), on the arc that comes down on the mark, the bow drawn the less the higher it goes; tried from the flat
+  // shot upward `step` rad at a time (~0.6 deg, finer than an archer lays his bow) to `most` rad (43 deg: about the
+  // elevation of a bow's longest cast, the massed lob of the rear ranks; higher, an arrow only comes down slower and nearer).
+  over: { step: 0.01, most: 0.75 },
   // The share of a ball's energy left in a horse it strikes (the ball goes on through a body that size, or lodges with what
   // little it has left): a quarter, taken over the wound channel.
   horseShare: 0.25,
