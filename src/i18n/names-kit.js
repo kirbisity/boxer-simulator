@@ -557,4 +557,7 @@ export const NAMES_KIT = {
   'Unitree Go2': '宇树 Go2',
   'Boston Dynamics Spot': '波士顿动力 Spot',
   'Ghost Robotics Vision 60': '幽灵机器人 Vision 60',
+  // The kits above whose Chinese has no dash to cut at: their tails as a warrior's line shows them (src/i18n.js kitTail).
+  'jousting harness': '比武重甲',
+  'warrior monk': '僧兵袈裟',
 };

@@ -18,7 +18,7 @@ import { addBattleThumb } from './battlethumbs.js';
 import { musterScreen } from './musterview.js';
 import { customBattleScreen } from './custombattleview.js';
 import { CUSTOM_BATTLE } from './custombattle.js';
-import { pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
+import { lineShown, pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
 import { boltedOn, breedOf, canRide, mountOf } from './horses.js';
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
@@ -454,7 +454,7 @@ export function installMenus(game) {
       const loreButton = el('button', { type: 'button', className: 'dw-mount', textContent: t('menu.versus.armour'), title: t('menu.versus.armourTitle') });
       loreButton.onclick = () => openInfoPop(setCardElement(wornCard(shown.inputs), () => game.portrait(shown.key ?? `lore:${shown.title}`, shown.inputs)), { label: t('menu.versus.armourLabel', { name: tname(shown.title) }) });
       // Under his name: on horseback or not, his armour, and making your own instead, side by side.
-      side.title.replaceChildren(el('b', { textContent: tname(shown.title) }), starLine, el('span', { textContent: nameLine(shown.line) }), el('div', { className: 'dw-buttons' }, mount, loreButton, side.own));
+      side.title.replaceChildren(el('b', { textContent: tname(shown.title) }), starLine, el('span', { textContent: custom[corner] ? nameLine(shown.line) : lineShown(shown.inputs) }), el('div', { className: 'dw-buttons' }, mount, loreButton, side.own));
       if (custom[corner]) side.title.prepend(el('em', { textContent: t('menu.versus.yours') }));
     }
     const fightButton = el('button', { className: 'primary big dw-fight', type: 'button', textContent: t('menu.versus.fight') });

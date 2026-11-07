@@ -119,7 +119,20 @@ export function t(key, vars) {
 /** A proper name kept English in the data, in the language in force. */
 export function tname(english) {
   if (langNow === 'en' || english === null || english === undefined) return english ?? '';
-  return NAMES_ZH[english] ?? personalName(english) ?? english;
+  return NAMES_ZH[english] ?? kitTail(english) ?? personalName(english) ?? english;
+}
+
+// A kit's name past its dash, as a warrior's line shows it ('Knights Templar — mail, surcoat and great helm' → 'mail, surcoat
+// and great helm'): its Chinese the same way ('圣殿骑士——锁子甲、罩袍、桶盔' → '锁子甲、罩袍、桶盔'). Built once, on first need.
+let kitTails = null;
+function kitTail(english) {
+  if (!kitTails) {
+    kitTails = new Map();
+    for (const [name, zh] of Object.entries(NAMES_ZH)) {
+      if (name.includes(' — ') && zh.includes('——')) kitTails.set(name.split(' — ').pop(), zh.split('——').pop());
+    }
+  }
+  return kitTails.get(english);
 }
 
 /**
