@@ -72,12 +72,12 @@ const SUPPRESSION_NAMES = {
   refugees: [['老三', 'Laosan'], ['二郎', 'Erlang'], ['小六', 'Xiaoliu'], ['大狗', 'Dagou'], ['拴柱', 'Shuanzhu'], ['铁柱', 'Tiezhu'], ['狗蛋', 'Goudan'], ['老五', 'Laowu'], ['阿根', 'Agen'], ['水生', 'Shuisheng'], ['长生', 'Changsheng'], ['来福', 'Laifu']],
 };
 
-const pick = (list, random) => list[Math.floor(random() * list.length)];
+const suppressionPick = (list, random) => list[Math.floor(random() * list.length)];
 
 /** A name both ways from the tables: { zh, en }. */
 function suppressionName(random, given) {
-  const [zhSur, enSur] = pick(SUPPRESSION_NAMES.surnames, random);
-  const [zhGiven, enGiven] = pick(given, random);
+  const [zhSur, enSur] = suppressionPick(SUPPRESSION_NAMES.surnames, random);
+  const [zhGiven, enGiven] = suppressionPick(given, random);
   return { zh: `${zhSur}${zhGiven}`, en: `${enSur} ${enGiven}` };
 }
 
@@ -103,7 +103,7 @@ function suppressionLayout() {
 }
 
 /** The slots beside the hero's in his rank, nearest first: right, left, two right, two left, … (indices into the rank's men). */
-function besideOrder(rank, at) {
+function suppressionBeside(rank, at) {
   const [count] = SUPPRESSION.ranks[rank];
   const order = [];
   for (let step = 1; order.length < count - 1; step += 1) {
@@ -118,13 +118,13 @@ function besideOrder(rank, at) {
 function suppressionBrother(life, random) {
   const family = life.family?.brother ?? {};
   const man = starvedRebel(random);
-  const name = family.name ?? { zh: '吴大', en: 'Wu Da' };
+  const name = family.name ?? { zh: '陈大', en: 'Chen Da' };
   // A carrier's back and legs (he carried coal on a pole all his life: `exercise` a labourer's), starved as the rest.
   const inputs = normaliseInputs({ ...man, ...(family.inputs ?? {}), name: name.en, style: 'unskilled', age: life.year && family.born ? life.year - family.born : man.age, exercise: Math.max(man.exercise, 0.45) });
   return { inputs, name };
 }
 
-export const battle = {
+export const BATTLE_SUPPRESSION = {
   id: 'suppression',
   n: 1,
   year: 1587,
@@ -140,7 +140,7 @@ export const battle = {
   setup(life, seed = 1) {
     const random = seededRandom(seed);
     const { layout, firsts } = suppressionLayout();
-    const year = life.year ?? battle.year;
+    const year = life.year ?? BATTLE_SUPPRESSION.year;
     const names = {};
     // The foot, rank by rank.
     const foot = [];
@@ -157,7 +157,7 @@ export const battle = {
     foot[heroIndex] = { inputs: storyHeroInputs(life, year), name: life.hero.name };
     // His comrades still living, beside him in his rank, the closest bond nearest.
     const comrades = {};
-    const beside = besideOrder(rank, middle);
+    const beside = suppressionBeside(rank, middle);
     const living = life.comrades.filter((comrade) => comrade.alive).sort((a, b) => b.bond - a.bond);
     living.forEach((comrade, order) => {
       if (order >= beside.length) return;

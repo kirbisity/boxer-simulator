@@ -33,8 +33,8 @@ export const STORY = {
   // A Yiwu man: a southerner (cast.js PERIOD_BUILD.mingSouth), a garrison spearman when he enters the register.
   people: 'mingSouth',
   style: 'spear',
-  // The hero's own name, both ways (a placeholder until the writer's chapters name him: their `hero` overrides it).
-  name: { zh: '吴二', en: 'Wu Er' },
+  // The hero's own name, both ways, unless the chapters name him (chapters/family.js STORY_HERO, given as `hero`).
+  name: { zh: '陈二', en: 'Chen Er' },
 };
 
 const clone = (value) => (value === undefined ? undefined : structuredClone(value));
@@ -42,9 +42,9 @@ const isObject = (value) => value !== null && typeof value === 'object' && !Arra
 const ageIn = (born, year) => Math.max(16, Math.round(year - born));
 
 /** The hero's body as made when the life begins: a southern garrison spearman, from the life's seed. */
-function storyHeroBase(seed) {
+function storyHeroBase(seed, preset = null) {
   const random = seededRandom(seed);
-  const inputs = mingSoldier(random, STORY.style, 'garrison', { people: STORY.people });
+  const inputs = mingSoldier(random, PRESETS[preset]?.style ?? STORY.style, 'garrison', { people: STORY.people });
   return normaliseInputs({ ...inputs, name: STORY.name.en, outfit: { kind: STORY.kit.soldier, design: 0 } });
 }
 
@@ -70,7 +70,7 @@ function storyHash(text) {
 export function storyNewLife(previous = null, { seed = null, family = {}, hero = null } = {}) {
   const lives = (previous?.lives ?? 0) + 1;
   const heroSeed = seed ?? (storyHash(`hero:${lives}`) ^ (previous?.record?.length ?? 0));
-  const inputs = storyHeroBase(heroSeed);
+  const inputs = storyHeroBase(heroSeed, hero?.preset);
   const name = clone(hero?.name) ?? clone(STORY.name);
   inputs.name = name.en;
   const life = {
@@ -83,7 +83,9 @@ export function storyNewLife(previous = null, { seed = null, family = {}, hero =
     place: 'front',
     kit: STORY.kit.soldier,
     comrades: [],
-    family: Object.fromEntries(Object.entries(family).map(([who, entry]) => [who, { ...clone(entry), alive: entry.alive ?? true, diedAt: null }])),
+    // His family as the life begins: those born before him (his elder brother); the rest come into it by a card's choice
+    // (`family: { wife: true }`: chapters/family.js), and read as their entry there.
+    family: Object.fromEntries(Object.entries(family).filter(([, entry]) => (entry.born ?? -Infinity) < (hero?.born ?? STORY.born)).map(([who, entry]) => [who, { ...clone(entry), alive: true, diedAt: null }])),
     flags: {},
     passed: [],
     attempts: clone(previous?.attempts) ?? {},
@@ -137,9 +139,14 @@ export function storyEnterChapter(life, chapter, { comrades = [] } = {}) {
     if ((entry.joins ?? 1) > chapter.n || life.comrades.some((comrade) => comrade.id === entry.id)) continue;
     const inputs = storyComradeInputs(entry, storyHash(`${life.seed}:${entry.id}`));
     life.comrades.push({
-      id: entry.id, name: clone(entry.name) ?? { zh: entry.id, en: entry.id }, inputs, natural: inputs.look?.hairColor ?? null,
-      born: chapter.year - (inputs.age ?? 22), rank: entry.rank ?? 'soldier', alive: true, bond: entry.bond ?? 0, diedAt: null,
+      id: entry.id, name: clone(entry.name) ?? { zh: entry.id, en: entry.id }, inputs, natural: inputs.look?.hairColor ?? null, joins: entry.joins ?? 1,
+      born: entry.born ?? chapter.year - (inputs.age ?? 22), rank: entry.rank ?? 'soldier', alive: true, bond: entry.bond ?? 0, diedAt: null,
     });
+  }
+  // A comrade still living rises as his entry says (`rises`: [{ chapter, rank }]).
+  for (const comrade of life.comrades) {
+    const entry = comrades.find((each) => each.id === comrade.id);
+    for (const rise of entry?.rises ?? []) if (comrade.alive && rise.chapter <= chapter.n && STORY.ranks.includes(rise.rank)) comrade.rank = rise.rank;
   }
   life.checkpoint = storySnapshot(life);
   return life;
@@ -171,6 +178,8 @@ export function storyApplyEffects(life, effects = {}) {
   if (isObject(effects.family)) {
     for (const [who, change] of Object.entries(effects.family)) life.family[who] = isObject(change) ? { ...life.family[who], ...clone(change) } : clone(change);
   }
+  // A named man killed off the battlefield (`dies: { id: how }`: executed after the pay protest, …).
+  if (isObject(effects.dies)) for (const [id, how] of Object.entries(effects.dies)) storyMarkDead(life, id, { how });
   if (isObject(effects.comrades)) {
     for (const [id, change] of Object.entries(effects.comrades)) {
       const comrade = life.comrades.find((each) => each.id === id);

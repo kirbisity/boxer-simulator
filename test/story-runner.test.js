@@ -12,7 +12,7 @@ import { canCommand, giveOrder } from '../src/command.js';
 import { storyNewLife } from '../src/story/life.js';
 import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCommandMen, storyCurrent, storyNextChapter, storyRunBattle, storySceneDone, storyWatch, storyWatchStep, STORY_JUDGEMENT, STORY_RUN } from '../src/story/runner.js';
 import { bodyAxes, createScenePlay, sceneLook, sceneThink, stepScene } from '../src/story/scenes/stage.js';
-import { CHAPTERS, STORY_COMRADES, STORY_FAMILY } from '../src/story/chapters/index.js';
+import { CHAPTERS, COMRADES as STORY_PEOPLE, STORY_FAMILY, STORY_HERO } from '../src/story/chapters/index.js';
 import { STORY_BATTLES } from '../src/story/battles/index.js';
 
 const T = (en) => ({ zh: en, en });
@@ -26,16 +26,20 @@ const CHAPTER = {
     { id: 'never', when: () => false, text: T('Never shown'), choices: [] },
   ],
   after: [
-    { id: 'mourn', when: (life, outcome) => outcome?.comrades?.chen?.fell, text: T('Chen is dead.'), choices: [{ text: T('Bury him'), effects: { flags: { buried: 'chen' } } }] },
-    { id: 'quiet', when: (life, outcome) => !outcome?.comrades?.chen?.fell, text: T('Quiet.'), choices: [] },
+    { id: 'mourn', when: (life, outcome) => outcome?.comrades?.chen === 'dead', text: T('Chen is dead.'), choices: [{ text: T('Bury him'), effects: { flags: { buried: 'chen' } } }] },
+    { id: 'quiet', when: (life, outcome) => outcome?.comrades?.chen === 'alive', text: T('Quiet.'), choices: [] },
   ],
-  scenes: [{ id: 'chen', at: 'after', when: (life, outcome) => Boolean(outcome?.comrades?.chen?.fell), script: [{ who: 'narrator', line: T('…') }] }],
+  scenes: [{ id: 'chen', at: 'after', when: (life, outcome) => outcome?.comrades?.chen === 'dead', script: [{ who: 'narrator', line: T('…') }] }],
   ending: { text: T('He died young.') },
 };
+// The chapters' shape (src/story/chapters/kit.js), with the engine's `detail` beside it as storyReadOutcome gives it.
 const outcome = ({ fell = false, fled = false, leftPlace = null, chen = false } = {}) => ({
-  hero: { fell, fled, alive: !fell, how: fell ? { kind: 'killed', text: T('killed, by Wang') } : null, kills: 0, leftPlace },
-  comrades: { chen: { fell: chen, fled: false, alive: !chen, how: chen ? { text: T('bled to death') } : null }, lou: { fell: false, fled: false, alive: true, how: null } },
-  won: true,
+  hero: fled ? 'fled' : fell ? 'out' : 'alive', leftPlace: Boolean(leftPlace), won: true, comrades: { chen: chen ? 'dead' : 'alive', lou: 'alive' },
+  detail: {
+    hero: { fell, fled, alive: !fell, how: fell ? { kind: 'killed', text: T('killed, by Wang') } : null, kills: 0, leftPlace },
+    comrades: { chen: { fell: chen, fled: false, alive: !chen, how: chen ? { text: T('bled to death') } : null }, lou: { fell: false, fled: false, alive: true, how: null } },
+    won: true,
+  },
 });
 const begin = () => createChapterRun(storyNewLife(null, { seed: 7 }), CHAPTER, { battles: { stub: stubBattle }, comrades: COMRADES });
 
@@ -97,7 +101,8 @@ test('a fatal choice before the battle ends the life there; a chapter without it
   assert.equal(run.death.text.en, 'Beheaded');
   const unbattled = createChapterRun(storyNewLife(null, { seed: 1 }), { ...CHAPTER, battle: 'not-written' }, {});
   storyAnswer(unbattled);
-  assert.equal(storyAnswer(unbattled).card.id, 'quiet');
+  // (No battle, no outcome: the after-cards that read one are not shown.)
+  assert.equal(storyAnswer(unbattled).kind, 'done');
   assert.equal(storyNextChapter([{ n: 1 }, { n: 4 }, { n: 2 }], 1).n, 2);
   assert.equal(storyNextChapter([{ n: 1 }], 1), null);
 });
@@ -105,7 +110,7 @@ test('a fatal choice before the battle ends the life there; a chapter without it
 /** Level 1 for a fresh life: its chapter entered, the battle's setup and world at a seed. */
 function levelOne(seed = 3, rank = 'soldier') {
   const chapter = CHAPTERS.find((each) => each.n === 1);
-  const run = createChapterRun(storyNewLife(null, { seed: 11, family: STORY_FAMILY }), chapter, { battles: STORY_BATTLES, comrades: STORY_COMRADES });
+  const run = createChapterRun(storyNewLife(null, { seed: 11, family: STORY_FAMILY, hero: STORY_HERO }), chapter, { battles: STORY_BATTLES, comrades: STORY_PEOPLE });
   run.life.rank = rank;
   const battle = STORY_BATTLES[chapter.battle];
   const setup = battle.setup(run.life, seed);
@@ -164,8 +169,9 @@ test('Level 1\'s scene staged on its field: the body laid face down, turned face
   const { setup, world, run } = levelOne();
   const brother = world.fighters[setup.comrades.brother];
   knockOut(world, brother, { time: world.time, effects: [] }, 'cut down', 'killed');
-  const scene = run.chapter.scenes.find((each) => each.id === 'brother') ?? { id: 'brother', script: [{ who: 'narrator', stage: 'cut', line: T('') }, { who: 'hero', stage: 'turn', line: T('') }, { who: 'narrator', stage: 'kneel', line: T('') }, { who: 'narrator', stage: 'search', line: T('') }] };
-  const play = createScenePlay(world, scene, { hero: setup.player, cast: setup.comrades, language: 'en' });
+  // The chapter's own scene (the writer's: its subject found as the brother who fell, opened in the dark, the body turned), else a stand-in.
+  const scene = run.chapter.scenes?.[0] ?? { id: 'brother', script: [{ who: 'narrator', stage: 'cut', line: T('') }, { who: 'hero', stage: 'turn', line: T('') }, { who: 'narrator', stage: 'kneel', line: T('') }, { who: 'narrator', stage: 'search', line: T('') }] };
+  const play = createScenePlay(world, scene, { hero: setup.player, cast: setup.comrades, fallen: ['brother'], language: 'en' });
   assert.equal(play.subjectId, 'brother');
   const step = 1 / 30;
   let downFirst = null;
@@ -177,7 +183,7 @@ test('Level 1\'s scene staged on its field: the body laid face down, turned face
       sceneThink(play);
     });
     if (play.set && downFirst === null) downFirst = bodyAxes(brother).chest[1];
-    if (play.stage === 'search') kneeled = Math.max(kneeled, world.fighters[setup.player].kneel?.share ?? 0);
+    if (['kneel', 'search', 'still'].includes(play.stage)) kneeled = Math.max(kneeled, world.fighters[setup.player].kneel?.share ?? 0);
   }
   assert.ok(play.done);
   assert.ok(downFirst < -0.5, `laid face down (chest ${downFirst?.toFixed(2)})`);
@@ -193,8 +199,10 @@ test('Level 1\'s real battle, headless, a few seeds: reported (how often the her
   const tally = { hero: 0, fled: 0, left: 0, people: {} };
   const lines = [];
   for (let seed = 1; seed <= seeds; seed += 1) {
-    const run = createChapterRun(storyNewLife(null, { seed: 100 + seed, family: STORY_FAMILY }), chapter, { battles: STORY_BATTLES, comrades: STORY_COMRADES });
-    const { outcome: result, world } = storyRunBattle(battle, run.life, seed);
+    const run = createChapterRun(storyNewLife(null, { seed: 100 + seed, family: STORY_FAMILY, hero: STORY_HERO }), chapter, { battles: STORY_BATTLES, comrades: STORY_PEOPLE });
+    const { outcome: read, world } = storyRunBattle(battle, run.life, seed);
+    assert.ok(['alive', 'out', 'fled'].includes(read.hero));
+    const result = read.detail;
     assert.equal(typeof result.hero.fell, 'boolean');
     if (result.hero.fell) tally.hero += 1;
     if (result.hero.fled) tally.fled += 1;

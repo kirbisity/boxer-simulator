@@ -10,9 +10,10 @@
 // step (a scene's posing), steer(dt) after the follow camera is placed; holding() says the hero is the scene's, not the player's.
 // Test hooks: window.boxer.story (main.js puts `hooks` there).
 
-import { CHAPTERS, STORY_COMRADES, STORY_FAMILY } from './chapters/index.js';
+import { CHAPTERS, COMRADES, STORY_FAMILY, STORY_HERO } from './chapters/index.js';
 import { STORY_BATTLES } from './battles/index.js';
-import { STORY, storyBeginAnew, storyLanguage, storyLoad, storyLuck, storyLuckText, storyNewLife, storyRetry, storySave, storySetLanguage, storyText } from './life.js';
+import { STORY, storyBeginAnew, storyLoad, storyLuck, storyLuckText, storyNewLife, storyRetry, storySave, storyText } from './life.js';
+import { storyGetLang, storyOnLang, storySetLang } from './language.js';
 import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyLifeLived, storyNextChapter, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
 import { createScenePlay, sceneFocus, sceneLook, sceneThink, skipSceneLine, stepScene } from './scenes/stage.js';
@@ -109,7 +110,12 @@ export function installStory(hooks) {
   layer.hidden = true;
   document.body.append(layer);
 
-  let language = storyLanguage(hooks.storage());
+  // The language: story/language.js's (one place, to be pointed at the game's own setting, src/i18n.js).
+  let language = storyGetLang();
+  storyOnLang((next) => {
+    language = next;
+    redraw?.();
+  });
   let life = null;
   let run = null;
   let view = null;
@@ -138,10 +144,7 @@ export function installStory(hooks) {
 
   function setLanguage(next) {
     if (!STORY.languages.includes(next)) return language;
-    language = next;
-    storySetLanguage(hooks.storage(), next);
-    redraw?.();
-    return language;
+    return storySetLang(next);
   }
 
   /** Clear the layer and put this in it (with the language switch), or hide it. */
@@ -189,7 +192,7 @@ export function installStory(hooks) {
   }
 
   function beginAnew() {
-    life = life ? storyBeginAnew(life, { family: STORY_FAMILY }) : storyNewLife(null, { family: STORY_FAMILY });
+    life = life ? storyBeginAnew(life, { family: STORY_FAMILY, hero: STORY_HERO }) : storyNewLife(null, { family: STORY_FAMILY, hero: STORY_HERO });
     beginChapter(CHAPTERS[0]);
   }
 
@@ -207,7 +210,7 @@ export function installStory(hooks) {
   // (A retry's life is the checkpoint, the man as he entered the chapter: it is entered afresh.)
   function beginChapter(chapter) {
     if (!chapter) return open();
-    run = createChapterRun(life, chapter, { battles: STORY_BATTLES, comrades: STORY_COMRADES });
+    run = createChapterRun(life, chapter, { battles: STORY_BATTLES, comrades: COMRADES });
     life = run.life;
     save();
     // The still scene behind the cards: the battle's field with its men drawn up, held.
@@ -308,7 +311,11 @@ export function installStory(hooks) {
       storySceneDone(run);
       return flow();
     }
-    const play = createScenePlay(world, sceneDef, { hero: fight.setup.player, cast: fight.setup.comrades, language });
+    // Who fell, for a scene about a body: the named men who fell in the battle, then his family in it (whom the story mourns).
+    const states = run.outcome?.comrades ?? {};
+    const ids = Object.keys(fight.setup.comrades ?? {});
+    const fallen = [...ids.filter((id) => states[id] && states[id] !== 'alive'), ...ids.filter((id) => run.life.family[id])];
+    const play = createScenePlay(world, sceneDef, { hero: fight.setup.player, cast: fight.setup.comrades, fallen, language });
     const nodes = { black: svEl('div', { className: 'sv-black' }), top: svEl('div', { className: 'sv-bar top' }), bottom: svEl('div', { className: 'sv-bar bottom' }), line: svEl('p', { className: 'sv-line' }) };
     const root = svEl('div', { className: 'sv-scene', onpointerdown: (event) => { event.preventDefault(); skipSceneLine(play); } }, nodes.black, nodes.top, nodes.bottom, nodes.line);
     scene = { play, nodes, last: world.time };
@@ -383,7 +390,12 @@ export function installStory(hooks) {
     hooks.pause(true);
     const chapter = CHAPTERS.find((each) => each.n === page.chapter);
     const luckText = storyLuckText(page.luck ?? { odds: 1, percent: 100 });
-    const family = Object.entries(page.family ?? {}).map(([who, person]) => svEl('li', { textContent: `${say(person.name ?? who)}${person.role ? ` (${say(person.role)})` : ''}: ${person.alive === false ? `${word('dead')}${person.diedAt?.how ? `, ${say(person.diedAt.how)}` : ''}` : word('alive')}` }));
+    // (A member a card brought into his life is `true` there: read as his entry in chapters/family.js.)
+    const family = Object.entries(page.family ?? {}).filter(([, person]) => person).map(([who, raw]) => {
+      const person = typeof raw === 'object' ? raw : { ...STORY_FAMILY[who], alive: true };
+      const how = typeof person.diedAt?.how === 'string' ? person.diedAt.how : say(person.diedAt?.how);
+      return svEl('li', { textContent: `${say(person.name ?? who)}: ${person.alive === false ? `${word('dead')}${how ? `, ${how}` : ''}` : word('alive')}` });
+    });
     const fallen = (page.fallen ?? []).map((person) => svEl('li', { textContent: `${say(person.name)}${person.diedAt?.how ? `: ${say(person.diedAt.how)}` : ''}` }));
     const where = [say(page.where ?? chapter?.title), page.year ? word('year', page.year) : null, page.age ? word('age', page.age) : null].filter(Boolean).join(' · ');
     const lived = page.kind === 'lived';

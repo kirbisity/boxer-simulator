@@ -151,20 +151,39 @@ export function lineSeconds(line, language = 'en') {
   return Math.min(spec.most, spec.base + text.length * (spec.perChar[language] ?? spec.perChar.en));
 }
 
-/** Whose body the scene is about: its `subject`, else its id if that is one of the cast, else the first of the cast spoken of. */
-function sceneSubject(scene, cast) {
+/**
+ * Whose body the scene is about: its `subject`, else its id if that is one of the cast, else the first of the cast spoken of,
+ * else (a scene of mourning: a kneel in it) the first of the battle's named men who fell (`fallen`, in the setup's order).
+ */
+function sceneSubject(scene, cast, fallen = []) {
   if (scene.subject && cast[scene.subject] !== undefined) return scene.subject;
   if (cast[scene.id] !== undefined) return scene.id;
-  return scene.script?.map((line) => line.who).find((who) => cast[who] !== undefined && who !== 'hero') ?? null;
+  const spoken = scene.script?.map((line) => line.who).find((who) => cast[who] !== undefined && who !== 'hero');
+  if (spoken) return spoken;
+  const mourns = scene.script?.some((line) => ['kneel', 'search', 'still', 'turn'].includes(line.stage));
+  return mourns ? fallen.find((id) => cast[id] !== undefined) ?? null : null;
 }
 
 /**
- * Begin a scene on a world: `hero` the index of the man played, `cast` { id: index } (the battle's named men), `language`.
+ * The lines as staged: a scene about a body opens in the dark (its first line a `cut`, unless it stages something itself), and
+ * a body that is to be knelt by is first turned over (a silent `turn` after the opening line, if the script has none).
+ */
+function sceneLines(scene, subject) {
+  const lines = (scene.script ?? []).map((line) => ({ ...line }));
+  if (subject === null || !lines.length) return lines;
+  if (!lines[0].stage) lines[0].stage = 'cut';
+  if (!lines.some((line) => line.stage === 'turn')) lines.splice(1, 0, { who: 'narrator', stage: 'turn', line: { zh: '', en: '' } });
+  return lines;
+}
+
+/**
+ * Begin a scene on a world: `hero` the index of the man played, `cast` { id: index } (the battle's named men), `fallen` the
+ * ids of those who fell in it, `language`.
  * Returns the play's state; `stepScene` moves it on.
  */
-export function createScenePlay(world, scene, { hero, cast = {}, language = 'en' } = {}) {
-  const subjectId = sceneSubject(scene, cast);
-  const lines = (scene.script ?? []).map((line) => ({ ...line, seconds: lineSeconds(line, language) }));
+export function createScenePlay(world, scene, { hero, cast = {}, fallen = [], language = 'en' } = {}) {
+  const subjectId = sceneSubject(scene, cast, fallen);
+  const lines = sceneLines(scene, subjectId).map((line) => ({ ...line, seconds: lineSeconds(line, language) }));
   return {
     world, scene, hero, cast, language, lines, subjectId, subject: subjectId !== null ? cast[subjectId] : null,
     index: 0, into: 0, time: 0, set: false, done: false, roll: null, stage: null, stageSince: 0, cut: null, ending: 0,

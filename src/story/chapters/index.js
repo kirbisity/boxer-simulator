@@ -1,14 +1,25 @@
-// Story mode's chapters, in order (`CHAPTERS`), with the life's people (COMRADES, FAMILY) and the Hun River's memories
-// (FLASHBACKS). Each chapter is src/story/chapters/NN-<id>.js exporting `chapter` (shape: the story contract), imported whole
-// (`import * as`: tools/bundle.js keeps each file's names its own). Tolerant of gaps: a chapter not yet written is not listed,
-// and the engine goes on to the next chapter there is (src/story/runner.js storyNextChapter).
-// Adding one: an import line and its name in the list.
+// The story's chapters in the order of the life, with the named men and the Hun River flashbacks. Each chapter file
+// exports its chapter under its own name (CHAPTER_SUPPRESSION ...), not `chapter`, because the bundle is one shared
+// scope (tools/bundle.js); the engine reads them from here.
+//
+// Effects on a choice are plain data: { rank, place, flags, bond: { comradeId: n }, family: { wife|son|daughter: true },
+// dies: { comradeId: how } } (`dies`: a named man killed off the battlefield, as Jin Aman on the Shimenzhai drill
+// ground). A choice with `fatal` ends the life on its own page. The battle outcome the after-cards read is described in
+// ./kit.js.
+import { CHAPTER_SUPPRESSION } from './01-suppression.js';
+import { CHAPTER_WOKOU } from './02-wokou.js';
+import { CHAPTER_PYONGYANG } from './03-pyongyang.js';
+import { CHAPTER_BYEOKJEGWAN } from './04-byeokjegwan.js';
+import { CHAPTER_ULSAN } from './05-ulsan.js';
+import { CHAPTER_LIAODONG } from './06-liaodong.js';
+import { CHAPTER_SARHU } from './07-sarhu.js';
+import { CHAPTER_HUNRIVER } from './08-hunriver.js';
 
-import * as STORY_CHAPTER_01 from './01-suppression.js';
-import * as STORY_PEOPLE from './comrades.js';
+export { COMRADES } from './comrades.js';
+export { FLASHBACKS } from './flashbacks.js';
+export { STORY_FAMILY, STORY_HERO } from './family.js';
 
-export const CHAPTERS = [STORY_CHAPTER_01].map((module) => module.chapter).filter(Boolean).sort((a, b) => a.n - b.n);
-export const STORY_COMRADES = STORY_PEOPLE.COMRADES ?? [];
-export const STORY_FAMILY = STORY_PEOPLE.FAMILY ?? {};
-// The Hun River's memories (chapters/flashbacks.js, the writer's, when it is written: its import goes here).
-export const STORY_FLASHBACKS = [];
+export const CHAPTERS = [
+  CHAPTER_SUPPRESSION, CHAPTER_WOKOU, CHAPTER_PYONGYANG, CHAPTER_BYEOKJEGWAN,
+  CHAPTER_ULSAN, CHAPTER_LIAODONG, CHAPTER_SARHU, CHAPTER_HUNRIVER,
+];

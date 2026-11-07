@@ -313,10 +313,29 @@ function storyFateOf(world, setup, id) {
 }
 
 /**
- * The battle as the story reads it, from the world as it ended: the hero (fell, fled, alive; how; his kills; whether he left his
- * place and which way), each named man of the setup's `comrades` (his comrades, his brother), who won.
+ * The battle as the story reads it, from the world as it ended, in the chapters' shape (src/story/chapters/kit.js):
+ *   { hero: 'alive' | 'out' | 'fled', leftPlace: bool, won: bool, comrades: { [id]: 'alive' | 'out' | 'dead' } }
+ * ('dead': a death among the events; 'out': down on the field or left on it, which a battlefield counts with the dead; a man
+ * who fled is 'alive'), and beside it the detail the engine writes into the life and the pages: `detail.hero` (fell, fled,
+ * how, kills, leftPlace { way, seconds, metres }) and `detail.comrades[id]` (fell, fled, how).
  */
 export function storyReadOutcome(world, setup, watch) {
+  const detail = storyReadDetail(world, setup, watch);
+  const state = (fate) => (!fate?.fell ? 'alive' : STORY_DEATHS.has(fate.how?.kind) ? 'dead' : 'out');
+  return {
+    hero: detail.hero.fled ? 'fled' : detail.hero.fell ? 'out' : 'alive',
+    leftPlace: Boolean(detail.hero.leftPlace),
+    won: detail.won,
+    comrades: Object.fromEntries(Object.entries(detail.comrades).map(([id, fate]) => [id, state(fate)])),
+    detail,
+  };
+}
+
+// The out kinds that are a death (battletally.js's), as against a man left senseless or past going on.
+const STORY_DEATHS = new Set(['killed', 'bledOut', 'died', 'drowned']);
+
+/** The battle in detail (storyReadOutcome's `detail`). */
+function storyReadDetail(world, setup, watch) {
   const hero = world.fighters[setup.player];
   const fate = storyFateOf(world, setup, setup.player);
   const kills = world.events.filter((event) => event.attacker === hero.id && STORY_OUT_KINDS.has(event.kind) && event.fighter !== hero.id && world.fighters[event.fighter]?.corner !== hero.corner);
@@ -338,18 +357,32 @@ export function storyReadOutcome(world, setup, watch) {
  */
 export function storyBattleDone(run, outcome) {
   run.outcome = outcome;
-  for (const [id, fate] of Object.entries(outcome.comrades ?? {})) if (fate?.fell) storyMarkDead(run.life, id, { how: fate.how?.text ?? null });
-  if (outcome.hero.fell) {
-    storyEnd(run, { kind: 'battle', how: outcome.hero.how?.text ?? null, text: run.chapter.ending?.text ?? null, where: run.chapter.title });
+  const detail = outcome.detail ?? storyDetailOf(outcome);
+  for (const [id, fate] of Object.entries(detail.comrades ?? {})) if (fate?.fell) storyMarkDead(run.life, id, { how: fate.how?.text ?? null });
+  if (detail.hero.fell) {
+    storyEnd(run, { kind: 'battle', how: detail.hero.how?.text ?? null, text: run.chapter.ending?.text ?? null, where: run.chapter.title });
     return storyCurrent(run);
   }
   const judgement = { ...STORY_JUDGEMENT, ...(run.chapter.judgement ?? {}) };
+  // A chapter that judges a man out of his place among its own after-cards (an id ending '-judgement': kit.js
+  // chapJudgementCard) is not judged twice; fleeing the field is always the army's to judge.
+  const ownJudgement = (run.chapter.after ?? []).some((card) => String(card.id ?? '').endsWith('-judgement'));
   run.queue = [];
-  if (outcome.hero.fled) run.queue.push(judgement.fled);
-  else if (outcome.hero.leftPlace) run.queue.push(judgement[outcome.hero.leftPlace.way] ?? judgement.back);
+  if (detail.hero.fled) run.queue.push(judgement.fled);
+  else if (detail.hero.leftPlace && !ownJudgement) run.queue.push(judgement[detail.hero.leftPlace.way] ?? judgement.back);
   run.phase = 'judged';
   run.index = 0;
   return storyCurrent(run);
+}
+
+/** The detail of an outcome given only in the chapters' shape (a test's stub): fell, fled and left his place from the words. */
+function storyDetailOf(outcome) {
+  const fate = (word) => ({ fell: word === 'out' || word === 'dead', fled: word === 'fled', alive: word === 'alive' || word === 'fled', how: word === 'dead' ? { kind: 'killed', text: { ...STORY_FALLS.killed } } : word === 'out' ? { kind: 'fell', text: { ...STORY_FALLS.fell } } : null });
+  return {
+    hero: { ...fate(outcome.hero), kills: 0, leftPlace: outcome.leftPlace ? { way: outcome.leftWay ?? 'back', seconds: 0, metres: 0 } : null },
+    comrades: Object.fromEntries(Object.entries(outcome.comrades ?? {}).map(([id, word]) => [id, fate(word)])),
+    won: outcome.won ?? null,
+  };
 }
 
 /**
