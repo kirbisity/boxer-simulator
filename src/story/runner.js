@@ -448,12 +448,31 @@ export function storyReadOutcome(world, setup, watch) {
 // The out kinds that are a death (battletally.js's), as against a man left senseless or past going on.
 const STORY_DEATHS = new Set(['killed', 'bledOut', 'died', 'drowned']);
 
+/** Whether a world event is an enemy put out of the fight by the hero's own hand (a head of his). */
+const storyHeroKill = (world, hero, event) => event.attacker === hero.id && STORY_OUT_KINDS.has(event.kind) && event.fighter !== hero.id && world.fighters[event.fighter]?.corner !== hero.corner;
+
+/**
+ * The heads the hero has taken in this battle so far, read on from where the last call left off (`keep`: an object of the
+ * caller's, holding the place in world.events and the men counted), so that a frame reads only the events new since the last.
+ */
+export function storyHeadsIn(world, hero, keep) {
+  if (!hero) return 0;
+  keep.headsSeen ??= new Set();
+  keep.headsCursor ??= 0;
+  // (A world whose events were trimmed: read them again from the first; the set keeps each man once.)
+  if (keep.headsCursor > world.events.length) keep.headsCursor = 0;
+  for (; keep.headsCursor < world.events.length; keep.headsCursor += 1) {
+    const event = world.events[keep.headsCursor];
+    if (storyHeroKill(world, hero, event)) keep.headsSeen.add(event.fighter);
+  }
+  return keep.headsSeen.size;
+}
+
 /** The battle in detail (storyReadOutcome's `detail`). */
 function storyReadDetail(world, setup, watch) {
   const hero = world.fighters[setup.player];
   const fate = storyFateOf(world, setup, setup.player);
-  const kills = world.events.filter((event) => event.attacker === hero.id && STORY_OUT_KINDS.has(event.kind) && event.fighter !== hero.id && world.fighters[event.fighter]?.corner !== hero.corner);
-  const killed = new Set(kills.map((event) => event.fighter)).size;
+  const killed = new Set(world.events.filter((event) => storyHeroKill(world, hero, event)).map((event) => event.fighter)).size;
   const verdict = judgeBattle(world);
   const comrades = Object.fromEntries(Object.entries(setup.comrades ?? {}).map(([id, index]) => [id, storyFateOf(world, setup, index)]));
   return {
@@ -473,6 +492,8 @@ function storyReadDetail(world, setup, watch) {
 export function storyBattleDone(run, outcome) {
   run.outcome = outcome;
   const detail = outcome.detail ?? storyDetailOf(outcome);
+  // His own kills in it are his heads, whether he came through it or not (his last battle's are on his page too).
+  run.life.heads = (run.life.heads ?? 0) + (detail.hero.kills ?? 0);
   for (const [id, fate] of Object.entries(detail.comrades ?? {})) if (fate?.fell) storyMarkDead(run.life, id, { how: fate.how?.text ?? null });
   if (detail.hero.fell) {
     const death = { kind: 'battle', how: detail.hero.how?.text ?? null, text: run.chapter.ending?.text ?? null, where: run.chapter.title };

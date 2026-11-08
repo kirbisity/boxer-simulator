@@ -100,6 +100,9 @@ export function storyNewLife(previous = null, { seed = null, family = {}, hero =
     family: Object.fromEntries(Object.entries(family).filter(([, entry]) => (entry.born ?? -Infinity) < (hero?.born ?? STORY.born)).map(([who, entry]) => [who, { ...clone(entry), alive: true, diedAt: null }])),
     flags: {},
     passed: [],
+    // The enemy he cut down himself, all his battles (runner.js storyBattleDone adds each battle's): his heads (首级), the
+    // count the Ming paid and promoted by (ranks.js).
+    heads: 0,
     attempts: clone(previous?.attempts) ?? {},
     lives,
     record: clone(previous?.record) ?? [],
@@ -337,6 +340,7 @@ export function storyDie(life, death = {}) {
     family: clone(life.family),
     luck: { odds: luck.odds, percent: luck.percent, never: luck.never },
     passed: [...life.passed],
+    heads: life.heads ?? 0,
   };
   life.dead = page;
   life.record.push(page);
@@ -352,6 +356,7 @@ export function storyLivedThrough(life, ending = {}) {
     outlived: life.comrades.filter((comrade) => comrade.alive).map((comrade) => ({ id: comrade.id, name: clone(comrade.name) })),
     fallen: life.comrades.filter((comrade) => !comrade.alive).map((comrade) => ({ id: comrade.id, name: clone(comrade.name), diedAt: clone(comrade.diedAt) })),
     family: clone(life.family), luck: { odds: luck.odds, percent: luck.percent, never: luck.never }, passed: [...life.passed],
+    heads: life.heads ?? 0,
   };
   life.dead = page;
   life.record.push(page);

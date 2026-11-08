@@ -59,13 +59,11 @@ export const BYEOKJEGWAN_1593 = {
   design: { mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
-/** The two hills and the paddy between them. */
+/** The paddy between the two hills (the hills themselves not raised: below). */
 function byeokjegwanWorks(spec) {
-  const { halfX } = spec.arena;
-  const { edge, profile } = spec.hills;
-  // A ditch's profile is to its line's left (fieldworks.js): along -x, left is +z; along +x, -z.
-  const hill = (sign) => ({ from: [sign * (halfX + 1), sign * edge], to: [-sign * (halfX + 1), sign * edge], profile });
-  return mergeWorks({ ditches: [hill(1), hill(-1)], soft: [spec.paddy] });
+  // (The ground's relief is left out: a plain field, as the regular battles are fought on. Banks drawn as bare earth looked like
+  // plain lumps, and the relief made every man's footing and walk cost more.)
+  return mergeWorks({ soft: [spec.paddy] });
 }
 
 export const byeokjegwanBattle = {

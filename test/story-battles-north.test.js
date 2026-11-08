@@ -82,10 +82,10 @@ test('the parts of the line: a soldier in the front of a file, a squad leader at
 test('the ground: the rise and stream on the frontier, the valley under Abdali, the camp\'s two cart lines', () => {
   const works = (battle) => worksOf(battle.setup(storyNorthLife(battle), 1).options.arena);
   const frontier = works(liaodong);
-  assert.ok(reliefAt(frontier, 20, 0) > 2 && reliefAt(frontier, -10, 0) === 0, 'the raiders on the rise, the patrol on the flat');
+  assert.ok(reliefAt(frontier, 20, 0) === 0 && reliefAt(frontier, -10, 0) === 0, 'a plain field (no rise raised)');
   assert.ok(softAt(frontier, 2, 0) && !softAt(frontier, -6, 0), 'the stream between them');
   const valley = works(sarhu);
-  assert.ok(reliefAt(valley, 15, 0) > 4 && reliefAt(valley, -20, 0) > 3 && reliefAt(valley, -3, 0) === 0, 'the column on the valley floor between the heights');
+  assert.ok(reliefAt(valley, 15, 0) === 0 && reliefAt(valley, -20, 0) === 0, 'a plain field (no heights raised)');
   const camp = works(hunriver);
   assert.equal(camp.walls.length, 4, 'a cart line on the main face and the rear, each with its gun\'s gap');
   assert.equal(camp.ditches.length, 0, 'no trench: a plain field');

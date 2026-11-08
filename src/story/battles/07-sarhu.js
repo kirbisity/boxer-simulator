@@ -77,13 +77,11 @@ export const SARHU1619 = {
   },
 };
 
-/** The valley: the ridge and the hillside, each a long bank along z (its profile the ground's height across it). */
+/** The valley's floor (the ridge and the hillside not raised: below). */
 function sarhu1619Works() {
-  const { ridge, hillside, arena } = SARHU1619;
-  const along = [[0, -arena.halfZ - 1], [0, arena.halfZ + 1]];
-  // A bank's left (+x, going +z) is its profile's positive side.
-  const bank = (from, top, height, end) => ({ from: [from, along[0][1]], to: [from, along[1][1]], profile: [[0, 0], [top - from, height], [end - from, height]].sort((a, b) => a[0] - b[0]) });
-  return { ditches: [bank(ridge.from, ridge.top, ridge.height, arena.halfX + 2), bank(hillside.from, hillside.top, hillside.height, -arena.halfX - 2)] };
+  // (The ground's relief is left out: a plain field, as the regular battles are fought on. Banks drawn as bare earth looked like
+  // plain lumps, and the relief made every man's footing and walk cost more.)
+  return { ditches: [] };
 }
 
 /** The column: its riders at the head, then each company two abreast (or, `closed`, four), head to tail; each man's part in it. */

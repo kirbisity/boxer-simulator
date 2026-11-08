@@ -17,7 +17,7 @@ import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from './chap
 import { STORY_BATTLES } from './battles/index.js';
 import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
 import { storyGetLang, storyOnLang, storySetLang } from './language.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyDeploy, storyFinaleDone, storyLifeLived, storyNextChapter, storyPlaceOf, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyDeploy, storyFinaleDone, storyHeadsIn, storyLifeLived, storyNextChapter, storyPlaceOf, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
 import { STORY_DEPLOY_WORDS, storyDeployPostsIn } from './deploy.js';
 import { storyLooseHorse } from './remount.js';
@@ -65,6 +65,9 @@ export const STORY_WORDS = {
   horseNear: { zh: (way, m) => `空马${way}，${m} 米`, en: (way, m) => `A loose horse ${way}, ${m} m` },
   horseMount: { zh: '骑上这匹空马', en: 'Mount the loose horse' },
   luckSoFar: { zh: '至今的运气', en: 'Luck so far' },
+  // His heads (life.js `heads`): in the battle's corner, faintly; on his page, a line.
+  heads: { zh: (n) => `首级 ${n}`, en: (n) => `Heads ${n}` },
+  headsTaken: { zh: (n) => (n ? `他亲手斩获首级 ${n} 颗。` : '他没有斩获一颗首级。'), en: (n) => (n ? `He took ${n} ${n === 1 ? 'head' : 'heads'} with his own hand.` : 'He took no heads with his own hand.') },
   noChapters: { zh: '还没有章节。', en: 'No chapters yet.' },
   skip: { zh: '点击继续', en: 'Tap to go on' },
   firstLast: { zh: '第一仗，就是最后一仗。', en: 'His first battle was his last.' },
@@ -106,6 +109,8 @@ const STORY_STYLE = `
 #story-layer .sv-hud { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); background: rgba(12,10,8,0.62); border-radius: 6px; padding: 7px 14px; font-size: 14px; color: #ddd2bb; max-width: calc(100% - 180px); text-align: center; pointer-events: none; }
 #story-layer .sv-hud b { display: block; font-size: 12px; letter-spacing: 0.12em; color: #a89c84; font-weight: 400; }
 #story-layer .sv-hud .sv-away { color: #ff9b7a; display: block; margin-top: 3px; }
+#story-layer .sv-hud .sv-heads { display: block; margin-top: 4px; font-size: 11px; letter-spacing: 0.08em; color: #a89c84; opacity: 0.8; font-variant-numeric: tabular-nums; }
+#story-layer .sv-heads-line { opacity: 0.75; font-size: 0.92em; }
 #story-layer .sv-hud button.sv-speed { pointer-events: auto; display: block; margin: 5px auto 0; background: rgba(239,230,210,0.1); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 12px; padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 #story-layer .sv-hud button.sv-speed.on { background: #efe6d2; color: #1b1712; }
 #story-layer .sv-scene { position: absolute; inset: 0; pointer-events: auto; }
@@ -446,7 +451,11 @@ export function installStory(hooks) {
     horse.hidden = true;
     fight.horseNode = horse;
     fight.horseText = null;
-    show('battle', svEl('div', { className: 'sv-hud' }, svEl('b', { textContent: say(run.chapter.title) }), orders, away, horse, speed));
+    // His heads: those of his life so far and this battle's as he takes them (tick).
+    const heads = svEl('span', { className: 'sv-heads', textContent: word('heads', life.heads ?? 0) });
+    fight.headsNode = heads;
+    fight.headsShown = life.heads ?? 0;
+    show('battle', svEl('div', { className: 'sv-hud' }, svEl('b', { textContent: say(run.chapter.title) }), orders, away, horse, speed, heads));
     layer.querySelector('.sv-lang').style.pointerEvents = 'auto';
   }
 
@@ -458,6 +467,10 @@ export function installStory(hooks) {
     const dt = world.time - (fight.last ?? world.time);
     fight.last = world.time;
     if (dt > 0) storyWatchStep(fight.watch, world, fight.setup, dt);
+    if (fight.headsNode) {
+      const shown = (life.heads ?? 0) + storyHeadsIn(world, world.fighters[fight.setup.player], fight);
+      if (shown !== fight.headsShown) fight.headsNode.textContent = word('heads', (fight.headsShown = shown));
+    }
     if (fight.awayNode) {
       const { watch } = fight;
       const out = watch.away > STORY_PACE.hudAway;
@@ -755,6 +768,7 @@ export function installStory(hooks) {
       svEl('h2', { textContent: word('outlived') }), svEl('p', { textContent: nameList(page.outlived ?? []) }),
       fallen.length ? svEl('h2', { textContent: word('fallen') }) : null, fallen.length ? svEl('ul', {}, ...fallen) : null,
       family.length ? svEl('h2', { textContent: word('family') }) : null, family.length ? svEl('ul', {}, ...family) : null,
+      svEl('p', { className: 'sv-heads-line', textContent: word('headsTaken', page.heads ?? 0) }),
       svEl('h2', { textContent: word('luck') }), svEl('p', { className: 'sv-luck', textContent: say(luckText) }),
       svEl('p', { textContent: word('lives', page.life) }),
       buttons);

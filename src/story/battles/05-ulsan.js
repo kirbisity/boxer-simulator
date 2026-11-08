@@ -71,12 +71,11 @@ export const ulsanBattle = {
   setup(life, seed = 1) {
     const random = seededRandom(seed);
     const spec = ULSAN_1598;
-    const { wall, slope } = spec;
+    const { wall } = spec;
     const halfZ = spec.arena.halfZ + 0.5;
-    const { works: wallPart, walk } = wallWorks({ x: wall.x, z: [-halfZ, halfZ], height: wall.height, base: slope.base, walk: wall.walk, ladders: wall.ladders });
-    // The slope: a ditch along z whose profile rises from 0 at `from` to `base` at the wall's foot (its left, +x).
-    const hill = { from: [slope.from, -halfZ], to: [slope.from, halfZ], profile: [[0, 0], [wall.x - slope.from, slope.base]] };
-    const works = mergeWorks(wallPart, { ditches: [hill] });
+    // (The slope up to the wall's foot is left out: the wall stands on the plain, as the regular battles' walls do. A bank of
+    // bare earth looked like a plain lump, and the relief made every man's footing and walk cost more.)
+    const { works, walk } = wallWorks({ x: wall.x, z: [-halfZ, halfZ], height: wall.height, base: 0, walk: wall.walk, ladders: wall.ladders });
     const red = { men: [], places: [] };
     const add = (part) => {
       red.men.push(...part.men);

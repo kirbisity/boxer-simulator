@@ -75,12 +75,12 @@ export const LIAODONG = {
   },
 };
 
-/** The rise and the stream: the ridge a long bank across the field (its profile in x), the stream soft ground at its foot. */
+/** The stream across the field, soft ground (the rise beyond it not raised: below). */
 function liaodongWorks() {
-  const { ridge, stream, arena } = LIAODONG;
-  // A straight bank along z (its left is +x), its profile the rise's height across it, flat on top to the field's end.
-  const ditches = [{ from: [ridge.from, -arena.halfZ - 1], to: [ridge.from, arena.halfZ + 1], profile: [[0, 0], [ridge.top - ridge.from, ridge.height], [arena.halfX + 2 - ridge.from, ridge.height]] }];
-  return { ditches, soft: [{ ...stream, z: [-arena.halfZ - 1, arena.halfZ + 1] }] };
+  const { stream, arena } = LIAODONG;
+  // (The ground's relief is left out: a plain field, as the regular battles are fought on. Banks drawn as bare earth looked like
+  // plain lumps, and the relief made every man's footing and walk cost more.)
+  return { soft: [{ ...stream, z: [-arena.halfZ - 1, arena.halfZ + 1] }] };
 }
 
 // A squad's depth (m): its leader's place behind its shields (MANDARIN_DUCK).
