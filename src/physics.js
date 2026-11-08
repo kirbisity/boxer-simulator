@@ -3987,14 +3987,19 @@ export function step(world, dt) {
   world.lastDt = dt;
 }
 
-/** A coarse fighter steps on one substep in `stride`, that much further; a proxy not at all. */
+/**
+ * A coarse fighter steps on one substep in `stride`, that much further; an unseen one (an exchange the player does not
+ * perceive) on one in WORLD.tiers.unseen.stride, on the coarse men's beat; a proxy not at all.
+ */
 function steppingNow(fighter, substep, stride) {
-  return fighter.detail === 'full' || (fighter.detail === 'coarse' && substep % stride === stride - 1);
+  if (fighter.detail === 'full') return true;
+  if (fighter.detail === 'coarse') return substep % stride === stride - 1;
+  return fighter.detail === 'unseen' && substep % WORLD.tiers.unseen.stride === WORLD.tiers.unseen.stride - 1;
 }
 
-/** The time a fighter's substep spans: `stride` of them for a coarse one. */
+/** The time a fighter's substep spans: `stride` of them for a coarse one, WORLD.tiers.unseen.stride for an unseen one. */
 function spanOf(fighter, h, stride) {
-  return fighter.detail === 'coarse' ? stride * h : h;
+  return fighter.detail === 'coarse' ? stride * h : fighter.detail === 'unseen' ? WORLD.tiers.unseen.stride * h : h;
 }
 
 /**
@@ -4551,6 +4556,9 @@ function chooseDetail(world) {
     const targeted = targetedIds;
     targeted.clear();
     for (const fighter of world.fighters) if (fighter.punch) targeted.add(fighter.punch.target);
+    // Played as one man (ai.js AI.perceive sets each man's `unperceived` at his think): the exchanges he perceives.
+    const played = world.perceiver !== undefined && world.perceiver !== null;
+    if (played) markSeenExchanges(world);
     for (let index = 0; index < world.fighters.length; index += 1) {
       const fighter = world.fighters[index];
       if (fighter.dormant) continue;
@@ -4565,7 +4573,8 @@ function chooseDetail(world) {
         || targeted.has(fighter.id) || lastHit > world.time - WORLD.tiers.hitMemory || fighter.state === 'rising';
       // (A rider whose horse is going down or is in the air is in full: he may be thrown.)
       const unsteady = fighter.mount && (fighter.mount.state !== 'up' || fighter.mount.air);
-      if (exchanging || unsteady) fighter.detail = 'full';
+      // An exchange at hand neither man of which the player perceives is stepped at the coarser rate (WORLD.tiers.unseen).
+      if (exchanging || unsteady) fighter.detail = played && !unsteady && unseenExchange(world, fighter) ? 'unseen' : 'full';
       // A man standing in the ranks behind the front (formation.js) is only a pose, enemy near or not.
       else if (fighter.slot && !fighter.inFront && fighter.state === 'up' && world.formations?.[fighter.formation]) fighter.detail = 'proxy';
       else if (tier === 3 || fighter.state !== 'up') fighter.detail = 'coarse';
@@ -4587,6 +4596,55 @@ function chooseDetail(world) {
       fighter.unposedAt = world.steps;
     }
   }
+}
+
+// The men who must be stepped in full for whom they are in an exchange with (markSeenExchanges): kept from step to step.
+const seenExchanges = new Set();
+
+/**
+ * Who must be stepped in full for the man he is in an exchange with: whom a man the player perceives (ai.js AI.perceive:
+ * `unperceived` unset, as the player's own and a man not thought for, counts as perceived) strikes at or has picked out
+ * within reach of him, and a man within reach striking at or picking out one perceived; and any man held (a hold pulls him
+ * every substep: physics/grappling.js). An exchange at hand is seen or unseen as a whole: the player who sees one man of it
+ * sees the blows go both ways, and how the other man takes them. One beyond reach is not: of a shot at a man he sees, or a
+ * man coming on him from out of his view, what he sees is the arrow or ball (flown as ever: flyArrows) and the man when
+ * he comes into it; the shooter or the man coming on, unseen, is stepped so. (A shot at an unseen man by one perceived
+ * strikes him where his body is, however he is stepped.)
+ */
+function markSeenExchanges(world) {
+  seenExchanges.clear();
+  const fighters = world.fighters;
+  for (const fighter of fighters) {
+    if (fighter.punch) markExchange(fighters, fighter, fighter.punch.target);
+    markExchange(fighters, fighter, fighter.focus);
+    if (fighter.clinch) seenExchanges.add(fighter.clinch.target);
+    if (fighter.pin) seenExchanges.add(fighter.pin.target);
+  }
+}
+
+/**
+ * One pair in an exchange (markSeenExchanges): within reach of each other, each in full if the other is perceived. Within
+ * reach as the contacts have it (collideCrowd): hips within WORLD.contactRange, more what a weapon reaches past a body, more
+ * WORLD.contactMargin (what two men close in a step, as the contacts' grid allows for).
+ */
+function markExchange(fighters, fighter, other) {
+  if (other === undefined || other === null || !fighters[other]) return;
+  const them = fighters[other];
+  const reach = WORLD.contactRange + WORLD.contactMargin + beyondBody(fighter) + beyondBody(them);
+  const pelvis = P.pelvis * 3;
+  if ((fighter.x[pelvis] - them.x[pelvis]) ** 2 + (fighter.x[pelvis + 2] - them.x[pelvis + 2]) ** 2 > reach * reach) return;
+  if (fighter.unperceived !== true) seenExchanges.add(other);
+  if (fighters[other].unperceived !== true) seenExchanges.add(fighter.id);
+}
+
+/**
+ * Whether a man in an exchange is in one the player does not perceive (WORLD.tiers.unseen): not perceived himself, nor any
+ * man he is in it with (markSeenExchanges), and stepping as an unseen man can: on his feet or getting up, not on a horse,
+ * not holding or picking something up, not the player's own.
+ */
+function unseenExchange(world, fighter) {
+  return fighter.unperceived === true && (fighter.state === 'up' || fighter.state === 'rising') && !fighter.mount && !fighter.clinch
+    && !fighter.pin && !fighter.pickup && !world.keepFull?.has(fighter.id) && !seenExchanges.has(fighter.id);
 }
 
 /** Whether any of `near` (indices) is an enemy of the fighter's corner still in it. */
@@ -6369,6 +6427,11 @@ let crowdBeyond = new Float64Array(0);
 const crowdNeighbours = [];
 const contactGrid = floorGrid();
 
+/** How far (m) the weapon he holds reaches past what a body can (a lance's point, ~2.8 m out), as his last reachBound has it. */
+function beyondBody(fighter) {
+  return fighter.weapon?.held ? Math.max(0, (fighter.reachBound ?? 0) - REACH_MARGIN - WORLD.bodyReach) : 0;
+}
+
 /**
  * A big fight's contacts: near pairs are found through a grid, in the same
  * order as the all-pairs test of a small one; a proxy (posed, not simulated)
@@ -6392,7 +6455,7 @@ function collideCrowd(world, time, substep) {
     if (fighter.detail !== 'proxy') fighter.reachBound = reachBound(fighter);
     // A weapon reaching past what a body can (a lance's point, ~2.8 m out) widens the range by as much:
     // otherwise its point could never meet a man before he was inside it.
-    beyond[index] = fighter.weapon?.held ? Math.max(0, (fighter.reachBound ?? 0) - REACH_MARGIN - WORLD.bodyReach) : 0;
+    beyond[index] = beyondBody(fighter);
   }
   // Candidates once a step (the grid, its lookups and sorts were a tenth of
   // a big fight's step when made every substep); the exact range each substep.
@@ -6425,7 +6488,8 @@ function collideCrowd(world, time, substep) {
     for (let k = 0; k < mine.length; k += 1) {
       const b = mine[k];
       if (!((hipX[a] - hipX[b]) ** 2 + (hipZ[a] - hipZ[b]) ** 2 < (WORLD.contactRange + beyond[a] + beyond[b]) ** 2)) continue;
-      if (fighters[b].detail !== 'proxy' && (coarseSubstep || fighters[a].detail === 'full' || fighters[b].detail === 'full')) list.push(b);
+      // (On the substeps either of them moves: two coarse men's, an unseen pair's, every one with a man in full.)
+      if (fighters[b].detail !== 'proxy' && (coarseSubstep || steppingNow(fighters[a], substep, stride) || steppingNow(fighters[b], substep, stride))) list.push(b);
     }
   }
   for (let a = 0; a < count; a += 1) {
@@ -6433,7 +6497,8 @@ function collideCrowd(world, time, substep) {
     if (!list.length) continue;
     const attacker = fighters[a];
     const limbs = strikers(attacker);
-    const idleTested = substep % idleEvery === 0;
+    // (An unseen man's on the substeps he moves on: one in two already, and not the even ones the others' are tested on.)
+    const idleTested = attacker.detail === 'unseen' ? steppingNow(attacker, substep, stride) : substep % idleEvery === 0;
     for (let k = 0; k < list.length; k += 1) {
       const defender = fighters[list[k]];
       if (attacker.corner === defender.corner && !attacker.punch) continue;
