@@ -8,9 +8,8 @@
 //    Chinese city wall; a Japanese castle's inner terraces).
 //  - The face: a stone wall line along the rampart's outer foot, as high as the walk and its parapet. Nobody walks
 //    through it; a man coming at it is turned along it (fieldworks.js stepOnWorks), toward the nearer of its gaps.
-//  - Ladders: the gaps in that line, each a ladder's width, where the face is climbed. The climbing is the ditch's slope
-//    rule (FIELDWORKS.climb: a man is slowed to 1 / (1 + 2 × grade) of his pace), which over a sheer face comes to
-//    about half his walking pace upward, ~0.6 m/s with his weapon in hand (a fireman on a ladder climbs ~0.5 m/s).
+//  - Ladders: the gaps in that line, each a ladder's width (two men abreast), where the face is climbed: by the ladder
+//    standing in it (physics/ladders.js: its foot out at a steep stair's slope, gone up at a stair's pace, two lanes).
 //    The face's run (STORY_WALL.face) is kept under the distance a wall's line holds a man's stance off it
 //    (FIELDWORKS.wall.root, 0.32 m): a man on the face is at a gap, or has come up onto the walk; he cannot walk along
 //    the face. A defender's spear reaches over the parapet (weapons are not kept out by a wall's line).
@@ -24,12 +23,15 @@
 //  - The AI counts the wall (ai.js through physics/cover.js exposureOf): how much of a man the enemy's missiles and blades
 //    can get at from where they stand is what of their strength he weighs.
 //
-// What it leaves out (a full siege would need): one man to a rung (here as many as press into the gap's width), the
-// climber's hands taken by the ladder (here he fights as he climbs, as fast as his stance rises), stones and boiling
-// water dropped from the top, a gate to batter, a breach's rubble, the parapet's crenels and loopholes (here a defender
-// shoots over it), and the stone knocked away by the guns.
+// What it leaves out (a full siege would need): stones and boiling water dropped from the top, a gate to batter, a
+// breach's rubble, the parapet's crenels and loopholes (here a defender shoots over it), the stone knocked away by the
+// guns, and a Japanese castle's battered stone base (ishigaki) as a slope of its own: its foot was laid battered
+// and curved up to near the upright under the wall-top, the "fan slope" (as the face rule has it, steeper than 3 : 1 is no slope a man
+// walks or scrambles up), so the wall-top is reached by ladder there too, and a ladder set over a battered base needs a
+// face this model does not have. Ulsan's wall is a sheer 6 m face on its hill.
 
 import { FIELDWORKS } from '../../physics/fieldworks.js';
+import { LADDERS } from '../../physics/ladders.js';
 
 /** A wall's numbers, each against what it is set by. */
 export const STORY_WALL = {
@@ -38,8 +40,8 @@ export const STORY_WALL = {
   face: Math.min(0.3, FIELDWORKS.wall.root - 0.02),
   // The parapet over the walk (m): crenels at a man's chest, ~1-1.2 m (the merlons of the Last Gate's wall: worksview.js stone).
   parapet: 1.1,
-  // A ladder's width (m): a scaling ladder for one man abreast, ~0.6 m between its rails; the gap a little wider so a body passes.
-  ladder: 1.1,
+  // A ladder's gap (m): a two-abreast scaling ladder's width, a rail's room either side (physics/ladders.js LADDERS.width).
+  ladder: LADDERS.width,
   // The walk's width (m) on top: a Joseon town wall's ~3-4 m; a Japanese castle's wall-top narrower (its battle gives its own).
   walk: 3.5,
   // The parapet's thickness (m) against shot (physics/cover.js masonry): a Korean town wall's stone parapet (yeojang) ~0.5-1 m,

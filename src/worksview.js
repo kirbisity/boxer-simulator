@@ -95,7 +95,7 @@ export function showWorks(view, arena) {
   for (const wall of works.walls) group.add(wall.kind === 'wood' ? worksWoodEdge(wall, random, arena) : wall.kind === 'stone' ? worksStoneWall(wall) : worksPalisade(wall));
   if (spec.gatehouse) group.add(worksGatehouse(spec.gatehouse));
   // Siege ladders at the gaps of a wall to storm (story mode: story/ground/walls.js).
-  if (spec.ladders?.length) group.add(storyLadders(spec.ladders));
+  if (spec.ladders?.length) group.add(storyLadders(works, spec.ladders));
   // A story scene's set pieces (story/ground/props.js: a flagpole, lanterns, a house front …).
   const props = spec.props?.length ? storyProps(spec.props) : null;
   if (props) group.add(props);

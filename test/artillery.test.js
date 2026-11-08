@@ -12,7 +12,7 @@ import { advance, createWorld, placeFighter, placeOnFloor, point, seededRandom }
 import { reliefAt, worksOf } from '../src/physics/fieldworks.js';
 import { ARTILLERY, firePiece, tissueLoss } from '../src/physics/artillery.js';
 import { COVER, exposureOf, screenOnPath } from '../src/physics/cover.js';
-import { boardLadder, LADDERS, ladderLoad, ladderPlace, standLadder, stepLadders } from '../src/physics/ladders.js';
+import { boardLadder, LADDERS, ladderLoad, ladderPlace, ladderPushSeconds, standLadder, stepLadders } from '../src/physics/ladders.js';
 import { wallWorks } from '../src/story/ground/walls.js';
 import { ARROW, MATCHLOCK } from '../src/weapons.js';
 
@@ -162,7 +162,7 @@ test('a ladder: its load is its own and its climbers weight about its foot; push
   const load = ladderLoad(world, ladder);
   assert.equal(load.climbers.length, 1, 'the man on the face is on it');
   assert.ok(load.torque < LADDERS.push * ladder.height, 'one man can shove it with one man on it');
-  for (let t = 0; t < LADDERS.pushSeconds + 0.2 && ladder.up; t += 1 / 60) stepLadders(world, 1 / 60);
+  for (let t = 0; t < ladderPushSeconds(ladder) + 0.2 && ladder.up; t += 1 / 60) stepLadders(world, 1 / 60);
   assert.equal(ladder.up, false, 'pushed off');
   assert.equal(ladder.pushedOff, 1);
   assert.equal(climber.state, 'down', 'the man on it falls with it');

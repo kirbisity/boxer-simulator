@@ -19,7 +19,7 @@ import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pi
 import { flyNets } from './physics/net.js';
 import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/throwable.js';
 import { createArtillery, stepArtillery } from './physics/artillery.js';
-import { climbLadder, createLadders, stepLadders } from './physics/ladders.js';
+import { climbLadder, createLadders, LADDERS, stepLadders } from './physics/ladders.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, beakMix, coiledTwist, hiltCrush, hiltKnob, hiltMix, hookPull, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
@@ -4024,7 +4024,8 @@ function checkBalance(world, fighter) {
   const legLength = fighter.body.lengths.thigh + fighter.body.lengths.shank;
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
   // (Wet clay under him, fieldworks.js `mired`: a shove puts him down sooner.)
-  const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1) * (fighter.mired?.footing ?? 1);
+  // (On a ladder his hands are on its rails as well as his feet on a rung: LADDERS.climb.hold.)
+  const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1) * (fighter.mired?.footing ?? 1) * (fighter.climbing ? LADDERS.climb.hold : 1);
   // Knocked about in armour: reeling, not falling, unless it is too much.
   const pushed = knock / (WORLD.balance.speed * footing);
   const overreached = outside / (WORLD.balance.reach * legLength * footing);
