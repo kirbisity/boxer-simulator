@@ -86,8 +86,18 @@ export function nearestRegion(region, available) {
   return best;
 }
 
-/** The regions a fighter's face is drawn from: his own `faceRegion`, his outfit's, his kit's, or his skin tone's. */
+/**
+ * The kits worn by no human (an animal's coat, a machine's shell): such a fighter has no people and no origin, and no
+ * photo face (photoface.js). Never cast by skin tone: a gorilla's dark coat is not a people's skin, and to give an ape a
+ * human origin from it would repeat the racist likening of Black people to apes.
+ */
+export const NON_HUMAN_KITS = new Set(['silverback', 'humanoid', 'miniHumanoid', 'combatBot', 'monkeyFur', 'go2Dog', 'spotDog', 'vision60Dog']);
+/** Whether a fighter is a person, with a people and an origin (not an animal or a machine). */
+export const hasOrigin = (inputs) => !NON_HUMAN_KITS.has(inputs?.outfit?.kind) && !inputs?.build?.rigid;
+
+/** The regions a fighter's face is drawn from: his own `faceRegion`, his outfit's, his kit's, or his skin tone's (none for an animal or a machine). */
 export function regionsFor(inputs, outfitRegion = null) {
+  if (!hasOrigin(inputs)) return [];
   const own = inputs.faceRegion ?? inputs.look?.faceRegion ?? outfitRegion;
   if (own) return Array.isArray(own) ? own : [own];
   return kitRegions(inputs);
@@ -183,6 +193,7 @@ export function clampTone(region, tone) {
  * those there are.
  */
 export function originOf(inputs, available, outfitRegion = null) {
+  if (!hasOrigin(inputs)) return null;
   const own = inputs.faceRegion ?? inputs.look?.faceRegion ?? outfitRegion;
   const regions = own ? (Array.isArray(own) ? own : [own]) : kitRegions(inputs);
   return nearestRegion(regions[0], available);

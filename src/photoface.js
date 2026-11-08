@@ -20,7 +20,7 @@
 // as data URLs (PHOTO_FACE_EMBED). Missing, the heads stay drawn.
 
 /* global THREE */
-import { nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL, toneShift } from './faceregions.js';
+import { hasOrigin, nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL, toneShift } from './faceregions.js';
 import { luminance, shadeColor } from './skintones.js';
 import { SCALP_GLSL } from './photohair.js';
 
@@ -134,7 +134,6 @@ let photoCastCount = 0;
 export function resetPhotoCasting() {
   photoCastCount = 0;
 }
-const PHOTO_NO_FACE_KITS = new Set(['silverback', 'humanoid', 'miniHumanoid', 'combatBot', 'monkeyFur', 'go2Dog', 'spotDog', 'vision60Dog']);
 
 /**
  * The face a fighter is drawn with (the same for the same inputs, every time it is asked), or null (photo faces off, the manifest
@@ -145,7 +144,7 @@ const PHOTO_NO_FACE_KITS = new Set(['silverback', 'humanoid', 'miniHumanoid', 'c
  */
 export function photoFaceFor(inputs, outfitRegion = null) {
   if (!photoFacesOn() || !photoManifest.faces) return null;
-  if (PHOTO_NO_FACE_KITS.has(inputs.outfit?.kind) || inputs.build?.rigid) return null;
+  if (!hasOrigin(inputs)) return null;
   if (photoCasts.has(inputs)) return photoCasts.get(inputs);
   const sex = inputs.sex === 'female' ? 'female' : 'male';
   const available = Object.values(photoManifest.faces).filter((face) => face.sex === sex).map((face) => face.region);

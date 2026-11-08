@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 // Where a fighter is from (faceregions.js REGION_ORIGINS): chosen in the character creator apart from his kit, his skin
 // picked within the origin's range; everyone not given one is cast from his kit exactly as before.
 
-import { clampTone, KIT_REGIONS, nearestRegion, originOf, REGION_ORIGINS, REGION_PLACES, REGION_TONES, regionsFor, regionTone, setShade, settleOrigin, skinShadeOf, TONE_REGIONS, toneRange, toneShift, toneSpan } from '../src/faceregions.js';
+import { clampTone, KIT_REGIONS, nearestRegion, originOf, REGION_ORIGINS, REGION_PLACES, REGION_TONES, regionsFor, regionTone, setShade, settleOrigin, skinShadeOf, TONE_REGIONS, toneRange, toneShift, toneSpan, hasOrigin } from '../src/faceregions.js';
 import { buildBody, normaliseInputs, PRESETS } from '../src/body.js';
 import { redress } from '../src/cast.js';
 import { lookSkinHex, shadeColor, shadeTone, SKIN_TONES, toneShade } from '../src/skintones.js';
@@ -45,7 +45,8 @@ test('the tone range: the region\'s own tone and a step either way, cut by the l
 });
 
 test('every preset is cast from its kit as before: its default origin is its kit\'s commonest, and its skin is not shifted', () => {
-  for (const [key, preset] of Object.entries(PRESETS)) {
+  // (People only: an animal or a machine has no origin at all, origins-people.test.js.)
+  for (const [key, preset] of Object.entries(PRESETS).filter(([, preset]) => hasOrigin(preset))) {
     const inputs = normaliseInputs(structuredClone(preset));
     const kit = KIT_REGIONS[inputs.outfit?.kind] ?? TONE_REGIONS[inputs.look.skinTone ?? 'medium'] ?? TONE_REGIONS.medium;
     assert.deepEqual(regionsFor(inputs), kit, `${key}'s regions`);

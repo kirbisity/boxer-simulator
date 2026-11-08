@@ -86,7 +86,7 @@ import { stageCameraRoom } from './levelmode/kit.js';
 import { createLastGate, createLastGateBoard, drainLastGate, LAST_GATE, lastGateResult, stepLastGate } from './lastgate.js';
 import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceRegions, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
-import { originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
+import { hasOrigin, originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
@@ -2489,7 +2489,7 @@ function skinRow(corner) {
     const inputs = current(corner);
     const look = lookOfCorner(corner);
     const regions = photoFaceRegions(inputs.sex);
-    if (regions && !look.faceRegion) look.faceRegion = kitOrigin(inputs, regions);
+    if (regions && hasOrigin(inputs) && !look.faceRegion) look.faceRegion = kitOrigin(inputs, regions);
     setShade(look, Number(input.value));
     fillCornerForm(corner);
   });
@@ -2497,7 +2497,11 @@ function skinRow(corner) {
   return row;
 }
 function fillOriginRows(form, inputs) {
-  const regions = photoFaceRegions(inputs.sex);
+  // (An animal or a machine has no origin and no human skin: both rows hidden, nothing cast from its coat's colour.)
+  const person = hasOrigin(inputs);
+  form.querySelector('[data-look="skinShade"]').closest('label').hidden = !person;
+  const regions = person ? photoFaceRegions(inputs.sex) : null;
+  if (!person && inputs.look) delete inputs.look.faceRegion;
   inputs.look = settleOrigin({ ...DEFAULT_LOOK, ...inputs.look }, regions);
   const select = form.querySelector('[data-look="faceRegion"]');
   select.closest('label').hidden = !regions;
@@ -2510,7 +2514,7 @@ function fillOriginRows(form, inputs) {
       return optgroup;
     }).filter((optgroup) => optgroup.children.length));
     select.value = own ?? '';
-  }
+  } else select.replaceChildren();
   const origin = regions ? own ?? kit : null;
   const [low, high] = toneSpan(origin);
   const skin = form.querySelector('[data-look="skinShade"]');
