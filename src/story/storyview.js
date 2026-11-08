@@ -1,5 +1,6 @@
 // Story mode on the page: the Story entry's screen (the main menu's), its event cards over a still 3D scene (the chapter's battle
-// field, its men drawn up, held still), the battle played as the hero (main.js runs it; this watches it through `tick`), the
+// field, its men drawn up, held still), the deploy screen where his rank lets him draw them up (deploy.js), the battle played
+// as the hero (main.js runs it; this watches it through `tick`; a loose horse near him told of, remount.js), the
 // chapter's scenes (src/story/scenes/stage.js, filmed here: the bars, the dark, the lines, the camera), the ending pages (where he
 // fell, who outlived him, his family, his luck, the lives lived), retry as the same man or begin a new one, and the 中文 / English
 // switch (kept in this browser). The flow is src/story/runner.js's; the life is src/story/life.js's; nothing here decides anything.
@@ -7,6 +8,7 @@
 // main.js gives `installStory` its hooks: closeMenus(), storage(), stage(setup, { paused }) (build and show a story world, the hero played),
 // world(), pause(on), orbit() (the camera's orbit, to steer in a scene), watch(on) (the hero left to his own mind: the test bed's
 // autoplay), speed(n) (the world's pace, a multiple of real time: the frame's, never the physics step), home() (back to the menu).
+// horse() (the horse button pressed: up onto the loose horse beside him, remount.js).
 // It reads placeMark() each frame (his place on the field, for placemark.js). It calls back each frame: tick(world) after the world's steps, think(world) inside each
 // step (a scene's posing), steer(dt) after the follow camera is placed; holding() says the hero is the scene's, not the player's.
 // Test hooks: window.boxer.story (main.js puts `hooks` there).
@@ -15,8 +17,10 @@ import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from './chap
 import { STORY_BATTLES } from './battles/index.js';
 import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
 import { storyGetLang, storyOnLang, storySetLang } from './language.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyFinaleDone, storyLifeLived, storyNextChapter, storyPlaceOf, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyDeploy, storyFinaleDone, storyLifeLived, storyNextChapter, storyPlaceOf, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
+import { STORY_DEPLOY_WORDS, storyDeployPostsIn } from './deploy.js';
+import { storyLooseHorse } from './remount.js';
 import { P } from '../body.js';
 import { createScenePlay, layDead, poseSetFigures, sceneFocus, sceneHeld, sceneClearYaw, sceneLook, sceneThink, setFocus, skipSceneLine, stageSetFigures, stepScene } from './scenes/stage.js';
 import { storySetSetup, STORY_SETS } from './scenes/sets.js';
@@ -57,6 +61,9 @@ export const STORY_WORDS = {
   backTo: { zh: (way, s) => `回到你的位置（${way}）：还有 ${s} 秒，否则记你擅离队伍`, en: (way, s) => `Back to your place (${way}): ${s} s before you are charged` },
   ways: { ahead: { zh: '在前面', en: 'ahead' }, behind: { zh: '在后面', en: 'behind you' }, left: { zh: '在左边', en: 'to your left' }, right: { zh: '在右边', en: 'to your right' } },
   speed: { zh: (n) => `速度 ${n}×`, en: (n) => `Speed ${n}×` },
+  // A loose horse near him (remount.js): where it is, and, beside it, the control to mount it (the fight's horse button's).
+  horseNear: { zh: (way, m) => `空马${way}，${m} 米`, en: (way, m) => `A loose horse ${way}, ${m} m` },
+  horseMount: { zh: '骑上这匹空马', en: 'Mount the loose horse' },
   luckSoFar: { zh: '至今的运气', en: 'Luck so far' },
   noChapters: { zh: '还没有章节。', en: 'No chapters yet.' },
   skip: { zh: '点击继续', en: 'Tap to go on' },
@@ -114,6 +121,22 @@ const STORY_STYLE = `
 #story-layer .sv-page ul { margin: 0; padding: 0; list-style: none; line-height: 1.6; }
 #story-layer .sv-page .sv-buttons { margin-top: 26px; }
 body[data-game="story"] #restart { display: none !important; }
+#story-layer .sv-deploy { padding: 16px 18px 14px; }
+#story-layer .sv-deploy h2 { font-size: 21px; margin: 0 0 10px; font-weight: 600; letter-spacing: 0.04em; }
+#story-layer .sv-group { margin: 0 0 10px; }
+#story-layer .sv-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #a89c84; margin: 0 0 6px; }
+#story-layer .sv-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+#story-layer .sv-seg button { flex: 1 1 0; min-width: 6.5em; min-height: 40px; background: rgba(239,230,210,0.08); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 15px; cursor: pointer; touch-action: manipulation; }
+#story-layer .sv-seg button:hover { background: rgba(239,230,210,0.16); }
+#story-layer .sv-seg button.on { background: #efe6d2; color: #1b1712; border-color: #efe6d2; }
+#story-layer .sv-note { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: #cfc4ad; min-height: 3em; }
+#story-layer .sv-deploy .sv-go.main { width: 100%; text-align: center; margin-top: 2px; }
+#story-layer .sv-hud button.sv-horse { pointer-events: auto; display: block; margin: 6px auto 0; background: rgba(239,230,210,0.1); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 14px; padding: 5px 14px; font: inherit; font-size: 14px; cursor: default; touch-action: manipulation; }
+#story-layer .sv-hud button.sv-horse.ready { background: #f3dca0; color: #1b1712; border-color: #f3dca0; cursor: pointer; font-weight: 600; }
+#story-layer .sv-hud button.sv-horse kbd { font: inherit; font-size: 12px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 6px; opacity: 0.75; }
+@media (pointer: coarse) { #story-layer .sv-hud button.sv-horse kbd { display: none; } }
+@media (max-width: 520px) { #story-layer .sv-deploy h2 { font-size: 18px; margin-bottom: 8px; } #story-layer .sv-seg button { font-size: 14px; min-width: 5.5em; } #story-layer .sv-note { font-size: 13px; } }
+@media (max-height: 560px) { #story-layer .sv-note { min-height: 0; } #story-layer .sv-deploy { padding: 10px 14px; } #story-layer .sv-group { margin-bottom: 6px; } }
 body.story-card .fight-ui, body.story-card .hud, body.story-card #icons, body.story-card .camera-bar, body.story-scene .fight-ui, body.story-scene .hud, body.story-scene #icons { visibility: hidden !important; }
 @media (max-width: 520px) { #story-layer .sv-text { font-size: 17px; } #story-layer .sv-hud { max-width: calc(100% - 130px); font-size: 12px; } }
 `;
@@ -176,7 +199,7 @@ export function installStory(hooks) {
     view = kind;
     layer.replaceChildren(...nodes, langSwitch());
     layer.hidden = kind === null;
-    document.body.classList.toggle('story-card', kind === 'card' || kind === 'screen' || kind === 'ending');
+    document.body.classList.toggle('story-card', kind === 'card' || kind === 'deploy' || kind === 'screen' || kind === 'ending');
     document.body.classList.toggle('story-scene', kind === 'scene');
   }
 
@@ -254,6 +277,8 @@ export function installStory(hooks) {
   function flow() {
     const current = storyCurrent(run);
     if (current.kind === 'card') return showCard(current.card);
+    // Drawn up as the battle's defaults say, unasked, when the hero is the AI's (autoplay: tests and shots).
+    if (current.kind === 'deploy') return autoplay ? deployDone(null) : beginDeploy(current.offer);
     if (current.kind === 'battle') return startBattle();
     if (current.kind === 'scene') return startScene(current.scene);
     if (current.kind === 'finale') return startFinale(current);
@@ -278,6 +303,70 @@ export function installStory(hooks) {
     if (view !== 'card') return null;
     storyAnswer(run, index);
     save();
+    return flow();
+  }
+
+  // ---- Drawing up his men (deploy.js) ----------------------------------------------------------------------------------------
+
+  // What he has picked on the deploy screen ({ formation, post }), shown on the field behind it as he picks.
+  let drawn = null;
+
+  /**
+   * The deploy screen: the formations his rank lets him choose (or the one he is given), the places he may take in it, and
+   * the battle. A card at the foot of the screen over the field (no scrolling: a row of buttons a choice, its note below it);
+   * each pick stands the men on the field behind it as they would stand.
+   */
+  function showDeploy(offer, picked = null) {
+    drawn = picked ?? { ...offer.defaults };
+    redraw = () => showDeploy(offer, drawn);
+    hooks.pause(true);
+    const words = (key, ...args) => {
+      const entry = STORY_DEPLOY_WORDS[key][language] ?? STORY_DEPLOY_WORDS[key].en;
+      return typeof entry === 'function' ? entry(...args) : entry;
+    };
+    const group = (label, options, chosen, pick) => {
+      const row = svEl('div', { className: 'sv-seg', role: 'radiogroup' });
+      for (const option of options) row.append(svEl('button', { type: 'button', className: option.id === chosen ? 'on' : '', textContent: say(option.name), dataset: { id: option.id }, role: 'radio', ariaChecked: String(option.id === chosen), onclick: () => pick(option.id) }));
+      const note = options.find((option) => option.id === chosen)?.note;
+      return svEl('div', { className: 'sv-group' }, svEl('div', { className: 'sv-label', textContent: label }), row, svEl('p', { className: 'sv-note', textContent: note ? say(note) : '' }));
+    };
+    const repick = (change) => {
+      drawn = { ...drawn, ...change };
+      // A post that does not hold in the formation now picked gives way to one that does (deploy.js storyDeployResolve).
+      const holding = storyDeployPostsIn({ options: offer.posts ?? [] }, drawn.formation ?? offer.defaults.formation);
+      if (offer.posts && !holding.some((post) => post.id === drawn.post)) drawn.post = holding.some((post) => post.id === offer.defaults.post) ? offer.defaults.post : holding[0]?.id ?? null;
+      previewDeploy();
+      showDeploy(offer, drawn);
+    };
+    const kicker = svEl('div', { className: 'sv-kicker', textContent: `${say(run.chapter.title)} · ${word('year', run.chapter.year)}` });
+    const formations = offer.formations
+      ? group(words('formation'), offer.formations, drawn.formation, (id) => repick({ formation: id }))
+      : offer.ordered ? svEl('div', { className: 'sv-group' }, svEl('div', { className: 'sv-label', textContent: words('formation') }), svEl('p', { className: 'sv-note', textContent: words('ordered', say(offer.ordered.name)) })) : null;
+    const posts = offer.posts ? group(words('post'), storyDeployPostsIn({ options: offer.posts }, drawn.formation ?? offer.defaults.formation), drawn.post, (id) => repick({ post: id })) : null;
+    const go = svEl('button', { type: 'button', className: 'sv-go main', textContent: words('go'), onclick: () => deployDone(drawn) });
+    show('deploy', svEl('div', { className: 'sv-card-wrap' }, svEl('div', { className: 'sv-card sv-deploy', dataset: { card: 'deploy' } }, kicker, svEl('h2', { textContent: words('title') }), formations, posts, go)));
+  }
+
+  /** The deploy screen opened: the battle's defaults picked, the field behind it stood so. */
+  function beginDeploy(offer) {
+    drawn = { ...offer.defaults };
+    previewDeploy();
+    return showDeploy(offer, drawn);
+  }
+
+  /** The field behind the deploy screen, its men stood as now picked (held still). */
+  function previewDeploy() {
+    const setup = storyBattleSetup(run, battleSeed(run.chapter), drawn);
+    hooks.stage(setup, { paused: true });
+    storyCommandMen(hooks.world(), setup, life);
+    fight = { setup, watch: storyWatch(setup), last: null, done: false };
+  }
+
+  /** His men drawn up as picked (or, `chosen` null, as the battle's defaults): on to the battle. */
+  function deployDone(chosen) {
+    if (storyCurrent(run).kind !== 'deploy') return null;
+    storyDeploy(run, chosen);
+    drawn = null;
     return flow();
   }
 
@@ -324,7 +413,12 @@ export function installStory(hooks) {
     fight.awayNode = away;
     const speed = svEl('button', { type: 'button', className: `sv-speed${(fight.speed ?? 1) !== STORY_PACE.speeds[0] ? ' on' : ''}`, textContent: word('speed', fight.speed ?? STORY_PACE.speeds[0]), onclick: toggleSpeed });
     fight.speedNode = speed;
-    show('battle', svEl('div', { className: 'sv-hud' }, svEl('b', { textContent: say(run.chapter.title) }), orders, away, speed));
+    // A loose horse near him (remount.js): where it is; beside it, the control (tick keeps it up to date).
+    const horse = svEl('button', { type: 'button', className: 'sv-horse', onpointerdown: (press) => { press.preventDefault(); if (fight.horseReady) hooks.horse?.(); } });
+    horse.hidden = true;
+    fight.horseNode = horse;
+    fight.horseText = null;
+    show('battle', svEl('div', { className: 'sv-hud' }, svEl('b', { textContent: say(run.chapter.title) }), orders, away, horse, speed));
     layer.querySelector('.sv-lang').style.pointerEvents = 'auto';
   }
 
@@ -344,8 +438,22 @@ export function installStory(hooks) {
       const left = Math.ceil(STORY_RUN.leftPlace.seconds - watch.away);
       if (out) fight.awayNode.textContent = watch.leftPlace ? word('away', watch.away.toFixed(0)) : word('backTo', wayWord(watch.toPlace), Math.max(1, left));
     }
+    if (fight.horseNode) drawLooseHorse(world);
     if (!storyBattleOver(world, fight.setup, fight.watch, run.battle)) return null;
     return endBattle(world);
+  }
+
+  /** The loose-horse line of the HUD: hidden, where one is (in his own facing), or the control to mount it (beside it). */
+  function drawLooseHorse(world) {
+    const loose = storyLooseHorse(world, world.fighters[fight.setup.player]);
+    const node = fight.horseNode;
+    fight.horseReady = Boolean(loose?.ready);
+    const text = !loose ? null : loose.ready ? `🐎 ${word('horseMount')}` : `🐎 ${word('horseNear', wayWord(loose.toHorse), Math.round(loose.distance))}`;
+    if (text === fight.horseText) return;
+    fight.horseText = text;
+    node.hidden = !text;
+    node.classList.toggle('ready', fight.horseReady);
+    node.replaceChildren(text ?? '', ...(fight.horseReady ? [svEl('kbd', { textContent: '/' })] : []));
   }
 
   function endBattle(world = hooks.world()) {
@@ -661,8 +769,25 @@ export function installStory(hooks) {
       run.pending = [];
       return { chapter: chapter.id, comrades: life.comrades.map((comrade) => `${comrade.id}${comrade.alive ? '' : ' (dead)'}`) };
     },
-    // On to what the chapter asks for now (after `stand`: its battle, fought as the player would).
+    // On to what the chapter asks for now (after `stand`: its deploy screen where it has one, then its battle).
     go: () => flow(),
+    // The deploy screen answered (`chosen`: { formation, post }; null or nothing, the battle's defaults), or a pick on it
+    // (`pick`: true: shown on the screen and the field, not yet gone on).
+    deploy: (chosen = null, { pick = false } = {}) => {
+      if (view !== 'deploy') return false;
+      if (!pick) return deployDone(chosen ?? drawn);
+      const current = storyCurrent(run);
+      drawn = { ...drawn, ...chosen };
+      previewDeploy();
+      showDeploy(current.offer, drawn);
+      return drawn;
+    },
+    // The loose horse near him now (remount.js), as the HUD says it.
+    looseHorse: () => {
+      const world = hooks.world();
+      const loose = fight && world ? storyLooseHorse(world, world.fighters[fight.setup.player]) : null;
+      return loose ? { horse: loose.horse.id, distance: loose.distance, ready: loose.ready, toHorse: loose.toHorse } : null;
+    },
     // Play one of the stand-in chapter's scenes now (by id): a set's on its own world; a body's on the battle's field, held
     // still, its subject (the chapter's family in it, and the comrades named in `fell`) struck down first.
     playScene: (id, options = {}) => {
@@ -722,6 +847,8 @@ export function installStory(hooks) {
       view,
       phase: run?.phase ?? null,
       card: view === 'card' ? storyCurrent(run).card?.id ?? null : null,
+      deploy: view === 'deploy' ? { offer: storyCurrent(run).offer, drawn } : null,
+      drawnUp: run?.deploy ?? fight?.setup?.deploy ?? null,
       chapter: run?.chapter?.n ?? null,
       scene: scene ? { id: scene.play.scene.id, line: scene.play.index, lines: scene.play.lines.length } : null,
       finale: finale ? { shot: finale.play.index, shots: finale.play.shots.length, id: finale.play.shots[finale.play.index]?.id ?? finale.play.shots[finale.play.index]?.kind, into: finale.play.into, look: finaleLook(finale.play) } : null,

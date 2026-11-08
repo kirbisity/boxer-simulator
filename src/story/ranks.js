@@ -20,45 +20,55 @@
 //    post sold. A chapter's card does this with the effect `merit: 'withhold'`.
 // Names here are prefixed `story` because the bundle is one shared scope (tools/bundle.js).
 
+// The coat a rank is issued (`kit`, outfits.js), and why. A private soldier and a file leader stand in the file in the
+// garrison man's padded hemp (the 甲长 is a soldier among his five, paid and armed as one). A 队长 wears the brigandine,
+// the squad's coat (the patrol at Liaodong is all in it). A 哨长 is already in an officer's coat, a rank before he holds
+// a 哨官's command: he is the man a 哨官 picked to lead a platoon under him ("令各百总选旗总", the officer choosing his own),
+// and by the Wanli years such a man was the officer's own: the officers kept household men (家丁) at their own cost, the
+// best-armoured of the army, and armed the men they picked from their own stores, not the arsenal's (K. Swope, A Dragon's
+// Head and a Serpent's Tail, 2009, on the Liaodong commanders' 家丁; the household men of the Hun River camp,
+// battles/08-hunriver.js, wear this coat). So the better coat comes with being picked, not with the battle he wins.
+// (A comrade's kit is his command's: life.js STORY.kit.)
+
 /**
  * The ranks, lowest first. `scope`: which of the engine's three commands he has in battle (runner.js storyCommandMen, the
  * battles' koreaRowOf, the kit by rank: soldier stands in his file, squadLeader at his squad's back, officer behind the
  * line). `men`: how many men he orders (Infinity: his whole side, as the battles are drawn at a scale). `from`: the first
  * chapter he can reach it in; `merit`: the merit on his books since his last promotion that earns it; `take`: the choice
- * on its promotion card (the 甲长's duty is the ear of a man who falls back: "许甲长割兵耳", 卷三).
+ * on its promotion card (the 甲长's duty is the ear of a man who falls back: "许甲长割兵耳", 卷三); `kit`: his coat (above).
  */
 export const STORY_RANKS = [
   {
-    id: 'bing', scope: 'soldier', men: 0, from: 1, merit: 0,
+    id: 'bing', kit: 'mingGarrison', scope: 'soldier', men: 0, from: 1, merit: 0,
     name: { zh: '兵', en: 'soldier' },
     leads: { zh: '只管自己', en: 'only himself' },
   },
   {
-    id: 'jiazhang', scope: 'soldier', men: 4, from: 1, merit: 4,
+    id: 'jiazhang', kit: 'mingGarrison', scope: 'soldier', men: 4, from: 1, merit: 4,
     name: { zh: '甲长', en: 'file leader (甲长, jiazhang)' },
     leads: { zh: '一甲五人，他在内', en: 'his file (甲) of five, himself among them' },
     take: { zh: '领了这份差事：谁往后退，割谁的耳朵。', en: 'Take the duty: whoever falls back, his ear.' },
   },
   {
-    id: 'duizhang', scope: 'squadLeader', men: 11, from: 2, merit: 4,
+    id: 'duizhang', kit: 'mingBrigandine', scope: 'squadLeader', men: 11, from: 2, merit: 4,
     name: { zh: '队长', en: 'squad leader (队长, duizhang)' },
     leads: { zh: '一队十二人：鸳鸯阵', en: 'a squad (队) of twelve: the mandarin-duck formation' },
     take: { zh: '接过队旗。', en: 'Take the squad\'s flag.' },
   },
   {
-    id: 'shaozhang', scope: 'squadLeader', men: 47, from: 3, merit: 5,
+    id: 'shaozhang', kit: 'mingElite', scope: 'squadLeader', men: 47, from: 3, merit: 5,
     name: { zh: '哨长', en: 'platoon leader (哨长, shaozhang)' },
     leads: { zh: '四队为一哨', en: 'a platoon (哨) of four squads' },
-    take: { zh: '接过哨旗。', en: 'Take the platoon\'s flag.' },
+    take: { zh: '接过哨旗，和哨官库里发下的那件甲。', en: 'Take the platoon\'s flag, and the coat that comes with it from the officer\'s own store.' },
   },
   {
-    id: 'shaoguan', scope: 'officer', men: Infinity, from: 6, merit: 5,
+    id: 'shaoguan', kit: 'mingElite', scope: 'officer', men: Infinity, from: 6, merit: 5,
     name: { zh: '哨官', en: 'company officer (哨官, shaoguan)' },
     leads: { zh: '四哨为一官', en: 'a company (官) of four platoons' },
     take: { zh: '接过官旗。', en: 'Take the company\'s banner.' },
   },
   {
-    id: 'bazong', scope: 'officer', men: Infinity, from: 7, merit: 6,
+    id: 'bazong', kit: 'mingElite', scope: 'officer', men: Infinity, from: 7, merit: 6,
     name: { zh: '把总', en: 'commander (把总, bazong)' },
     leads: { zh: '一总：几个哨官和他们的兵', en: 'a command (总) of companies' },
     take: { zh: '接过令箭。', en: 'Take the arrow of command (令箭).' },
@@ -79,6 +89,9 @@ export const storyRankIndex = (id) => STORY_RANKS.findIndex((rank) => rank.id ==
 
 /** The lowest rank of a command scope ('squadLeader': the 队长), for an effect or an old save that names only the scope. */
 export const storyRankOfScope = (scope) => STORY_RANKS.find((rank) => rank.scope === scope) ?? null;
+
+/** The coat his rank is issued (STORY_RANKS `kit`): by his grade, else by his command's lowest rank. */
+export const storyKitOf = (life) => storyRankOf(storyGradeOf(life))?.kit ?? STORY_RANKS[0].kit;
 
 /** The rank above, or null at the top. */
 export const storyRankAbove = (id) => STORY_RANKS[storyRankIndex(id) + 1] ?? null;

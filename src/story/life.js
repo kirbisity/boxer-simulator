@@ -21,7 +21,7 @@ import { greyedHair } from '../aging.js';
 import { normaliseInputs, PRESETS } from '../body.js';
 import { mingSoldier, varyCharacter } from '../cast.js';
 import { seededRandom } from '../physics.js';
-import { storyBattleMerit, storyGradeOf, storyRankIndex, storyRankOf, storyRankOfScope } from './ranks.js';
+import { storyBattleMerit, storyGradeOf, storyKitOf, storyRankIndex, storyRankOf, storyRankOfScope } from './ranks.js';
 
 export const STORY = {
   // He was born c. 1568 (the spec): nineteen at the suppression of 1587, fifty-three at the Hun River.
@@ -31,7 +31,8 @@ export const STORY = {
   languageKey: 'gladiator.story.lang',
   version: 1,
   languages: ['zh', 'en'],
-  // The kit by rank (outfits.js): the garrison man's padded coat, the brigandine of a squad leader, an officer's elite coat.
+  // The kit by command (outfits.js): the garrison man's padded coat, the brigandine of a squad leader, an officer's elite coat.
+  // The hero's own is his grade's (ranks.js STORY_RANKS `kit`: a 哨长 already in the officer's coat); a comrade's, this.
   kit: { soldier: 'mingGarrison', squadLeader: 'mingBrigandine', officer: 'mingElite' },
   ranks: ['soldier', 'squadLeader', 'officer'],
   // His place in the line: the front rank, the second, the rear (a battle file reads it to stand him there).
@@ -118,13 +119,13 @@ function storySnapshot(life) {
   return snapshot;
 }
 
-/** The hero's fighter inputs in a year: his age then (aging.js reads it into his body), his hair greying with it, his rank's kit. */
+/** The hero's fighter inputs in a year: his age then (aging.js reads it into his body), his hair greying with it, his grade's kit. */
 export function storyHeroInputs(life, year = life.year ?? life.hero.born + 19) {
   const inputs = normaliseInputs(clone(life.hero.inputs));
   inputs.age = ageIn(life.hero.born, year);
   inputs.name = life.hero.name.en;
   if (life.hero.natural && inputs.look) inputs.look.hairColor = greyedHair(life.hero.natural, inputs.age);
-  inputs.outfit = { ...inputs.outfit, kind: STORY.kit[life.rank] ?? STORY.kit.soldier };
+  inputs.outfit = { ...inputs.outfit, kind: storyKitOf(life) };
   return normaliseInputs(inputs);
 }
 
@@ -150,7 +151,7 @@ export function storyEnterChapter(life, chapter, { comrades = [] } = {}) {
   life.withheld ??= 0;
   life.promotions ??= [];
   life.meritThis = 0;
-  life.kit = STORY.kit[life.rank] ?? STORY.kit.soldier;
+  life.kit = storyKitOf(life);
   life.attempts[chapter.n] ??= 1;
   for (const entry of comrades) {
     if ((entry.joins ?? 1) > chapter.n || life.comrades.some((comrade) => comrade.id === entry.id)) continue;
@@ -184,7 +185,7 @@ export function storySetRank(life, id, how = 'given') {
   const was = storyRankIndex(storyGradeOf(life));
   life.grade = rank.id;
   life.rank = rank.scope;
-  life.kit = STORY.kit[rank.scope];
+  life.kit = rank.kit;
   if (storyRankIndex(rank.id) > was) {
     life.promotions = [...(life.promotions ?? []), { chapter: life.chapter, rank: rank.id, how }];
     life.merit = 0;

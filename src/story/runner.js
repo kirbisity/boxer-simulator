@@ -2,6 +2,7 @@
 // the same machine. A chapter goes
 //
 //   before   its before-cards, each as its `when` allows (narration, or a choice whose effects the life takes; a fatal one ends it)
+//   deploy   (a battle with a `deploy` his rank may choose in: src/story/deploy.js) its formation and his place, chosen
 //   battle   the world built from the battle's setup, the hero the player (army orders as his rank allows: storyCommandMen),
 //            watched as it goes (storyWatchStep: has he left his place?) and over by storyBattleOver
 //   judged   the outcome read generically (storyReadOutcome: the hero alive, fallen or fled; how long he was out of his place;
@@ -24,6 +25,7 @@ import { slotAt } from '../formation.js';
 import { advance, createWorld, inFight } from '../physics.js';
 import { storyApplyEffects, storyChoose, storyCreditBattle, storyDie, storyEnterChapter, storyLivedThrough, storyMarkDead, storyPassChapter } from './life.js';
 import { storyGradeOf, storyRankOf } from './ranks.js';
+import { storyDeployOffer, storyDeployResolve } from './deploy.js';
 
 export const STORY_RUN = {
   // Left his place: further than `metres` from where his rank and file put him, for `seconds` together, while the battle is
@@ -111,7 +113,7 @@ function storyWhen(item, life, outcome) {
 /** Begin a chapter for this life: it is entered (its year, his age, who joins him, the checkpoint), its before-cards first. */
 export function createChapterRun(life, chapter, { battles = {}, comrades = [], flashbacks = [] } = {}) {
   storyEnterChapter(life, chapter, { comrades });
-  const run = { life, chapter, battle: battles[chapter.battle] ?? null, phase: 'before', index: 0, outcome: null, setup: null, death: null, queue: [], scene: null, sceneIndex: 0, pending: [], flashbacks, dying: null };
+  const run = { life, chapter, battle: battles[chapter.battle] ?? null, deploy: null, phase: 'before', index: 0, outcome: null, setup: null, death: null, queue: [], scene: null, sceneIndex: 0, pending: [], flashbacks, dying: null };
   // The scenes before any card.
   storyQueueScenes(run, (scene) => scene.at === 'before' && !scene.after);
   return run;
@@ -131,7 +133,7 @@ function storyCardsOf(run, phase) {
 }
 
 /**
- * What the chapter asks for now: { kind: 'card', card } | { kind: 'battle' } | { kind: 'scene', scene } | { kind: 'done' } |
+ * What the chapter asks for now: { kind: 'card', card } | { kind: 'deploy', offer } | { kind: 'battle' } | { kind: 'scene', scene } | { kind: 'done' } |
  * { kind: 'dead', page }. Moves past cards whose `when` says no, and phases with nothing in them.
  */
 export function storyCurrent(run) {
@@ -145,9 +147,16 @@ export function storyCurrent(run) {
       const cards = storyCardsOf(run, run.phase);
       while (run.index < cards.length && !storyWhen(cards[run.index], run.life, run.outcome)) run.index += 1;
       if (run.index < cards.length) return { kind: 'card', card: cards[run.index] };
-      run.phase = { before: 'battle', judged: 'after', after: 'scenes' }[run.phase];
+      run.phase = { before: 'deploy', judged: 'after', after: 'scenes' }[run.phase];
       run.index = 0;
-      if (run.phase === 'battle' && !run.battle) run.phase = 'judged';
+      if (run.phase === 'deploy' && !run.battle) run.phase = 'judged';
+      continue;
+    }
+    // Drawing up his men, where the battle offers it to a man of his rank (deploy.js); else on to the battle.
+    if (run.phase === 'deploy') {
+      const offer = run.deploy ? null : storyDeployOffer(run.battle, run.life);
+      if (offer) return { kind: 'deploy', offer };
+      run.phase = 'battle';
       continue;
     }
     if (run.phase === 'battle') return { kind: 'battle', battle: run.battle };
@@ -194,6 +203,13 @@ export function storyAnswer(run, choice = 0) {
   return storyCurrent(run);
 }
 
+/** His men drawn up (`chosen`: { formation?, post? }; deploy.js gives the defaults for the rest): on to the battle. */
+export function storyDeploy(run, chosen = null) {
+  if (storyCurrent(run).kind !== 'deploy') return storyCurrent(run);
+  run.deploy = storyDeployResolve(run.battle, run.life, chosen);
+  return storyCurrent(run);
+}
+
 /** The scene now is played: on to the next. */
 export function storySceneDone(run) {
   if (run.pending?.length) run.pending.shift();
@@ -236,9 +252,9 @@ export function storyLifeLived(run) {
 
 // ---- The battle -----------------------------------------------------------------------------------------------------------
 
-/** The battle's setup for this life at a seed (the battle file's `setup`), kept on the run. */
-export function storyBattleSetup(run, seed = 1) {
-  run.setup = run.battle.setup(run.life, seed);
+/** The battle's setup for this life at a seed (the battle file's `setup`, with his men as drawn up: `deploy`, else the run's), kept on the run. */
+export function storyBattleSetup(run, seed = 1, deploy = run.deploy) {
+  run.setup = run.battle.setup(run.life, seed, deploy ? { deploy } : {});
   // His family the battle cast (his brother in the column): kept as the battle made them, so later scenes stage the same man.
   for (const [who, index] of Object.entries(run.setup.comrades ?? {})) {
     const member = run.life.family?.[who];
@@ -494,10 +510,11 @@ function storyDetailOf(outcome) {
 
 /**
  * Fight a chapter's battle headless (Node, or a test): the setup's world stepped as tools/levels.js steps a level (every man
- * thinking for himself, the hero too), watched, until storyBattleOver. Returns { world, setup, watch, outcome }.
+ * thinking for himself, the hero too), watched, until storyBattleOver; his men drawn up as `deploy` says, else as the battle's
+ * defaults (deploy.js). Returns { world, setup, watch, outcome }.
  */
-export function storyRunBattle(battle, life, seed = 1, { step = STORY_RUN.step, seconds = battle.seconds } = {}) {
-  const setup = battle.setup(life, seed);
+export function storyRunBattle(battle, life, seed = 1, { step = STORY_RUN.step, seconds = battle.seconds, deploy = null } = {}) {
+  const setup = battle.setup(life, seed, deploy ? { deploy } : {});
   const world = storyBattleWorld(setup, life);
   const watch = storyWatch(setup);
   const limit = { ...battle, seconds };

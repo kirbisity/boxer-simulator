@@ -7,6 +7,7 @@
 
 import { normaliseInputs } from '../../body.js';
 import { greyedHair } from '../../aging.js';
+import { canRide } from '../../horses.js';
 import { koreaKitFor } from './korea.js';
 
 export const NORTH = {
@@ -53,21 +54,36 @@ export function northRole(life) {
 
 const northDistance = (a, b) => Math.hypot(a.at[0] - b.at[0], a.at[1] - b.at[1]);
 
-/** A man put in a place, in the better of his own kit and what that place was issued (korea.js koreaKitFor). */
-const northDressed = (inputs, place) => normaliseInputs({ ...inputs, outfit: { ...inputs.outfit, kind: koreaKitFor(inputs.outfit?.kind, place.inputs?.outfit?.kind) } });
+/**
+ * A man put in a place, in the better of his own kit and what that place was issued (korea.js koreaKitFor); and a place on
+ * horse (a rider's: its man cast `mounted`) is a horse with it: the man put there rides it, the place's horse (its breed,
+ * outfit `horse`), as the man he stands in for did. A coat that is no rider's (the garrison's hemp vest: its kit names no
+ * horse, horses.js canRide) gives way to the place's own, the rider's harness that went with the horse. A place is the
+ * battle's, and so is its horse: never one more for him, nor one fewer.
+ */
+function northDressed(inputs, place) {
+  const outfit = { ...inputs.outfit, kind: koreaKitFor(inputs.outfit?.kind, place.inputs?.outfit?.kind) };
+  if (!place.inputs?.mounted) return normaliseInputs({ ...inputs, outfit });
+  const horse = place.inputs.outfit?.horse ? { horse: place.inputs.outfit.horse } : {};
+  const rides = canRide({ ...inputs, outfit });
+  return normaliseInputs({ ...inputs, mounted: true, outfit: { ...outfit, ...(rides ? {} : { kind: place.inputs.outfit.kind, design: place.inputs.outfit.design }), ...horse } });
+}
 
 /**
  * The hero and his comrades into the Ming's men (`men`: [{ inputs, name, at, role, unit, named? }], changed in place).
- * His place: the nearest to `near` ([x, z]) of the places of his part (northRole); a historical man (`named`) is never
- * displaced. His living comrades, the closest bond first, each in the free place nearest him (his own unit's first, within
- * NORTH.beside). Returns { player, comrades: { id: index }, squad: [indices of his unit], slot: { x, z } }.
+ * His place: the nearest to `near` ([x, z]) of the places of his part (northRole, or the `role` his post gives: the
+ * deploy screen's, src/story/deploy.js), or of any part of one `unit` (a post with a unit of its own: the riders at a
+ * column's head); a historical man (`named`) is never displaced. His living comrades, the closest bond first, each in the
+ * free place nearest him (his own unit's first, within NORTH.beside). Returns { player, comrades: { id: index }, squad:
+ * [indices of his unit], slot: { x, z } }.
  */
-export function northPlace(life, men, near, year) {
-  const role = northRole(life);
+export function northPlace(life, men, near, year, { role: posted = null, unit = null } = {}) {
+  const role = posted ?? northRole(life);
   const free = (index) => !men[index].named;
-  const ofRole = (wanted) => men.map((man, index) => index).filter((index) => free(index) && men[index].role === wanted);
+  const ofRole = (wanted) => men.map((man, index) => index).filter((index) => free(index) && men[index].role === wanted && (!unit || men[index].unit === unit));
+  const ofUnit = unit && !posted ? men.map((man, index) => index).filter((index) => free(index) && men[index].unit === unit) : [];
   // A battle with no officer's place free (its officers history's own men) stands an officer at the head of a unit.
-  const pool = [role, role === 'officer' ? 'lead' : null].filter(Boolean).map(ofRole).find((places) => places.length) ?? men.map((man, index) => index).filter(free);
+  const pool = (ofUnit.length ? ofUnit : null) ?? [role, role === 'officer' ? 'lead' : null].filter(Boolean).map(ofRole).find((places) => places.length) ?? men.map((man, index) => index).filter(free);
   const spot = { at: near };
   const player = pool.reduce((best, index) => (northDistance(men[index], spot) < northDistance(men[best], spot) ? index : best), pool[0]);
   const heroSlot = men[player];
