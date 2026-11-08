@@ -7,7 +7,7 @@
 // recalled because Yang "did not want Chen Yin's merit set above" Li Rumei's; wind and snow; Yang "fled first in
 // disarray", Wu Weizhong and Mao Guoqi holding the rear; the dead "nearly 20,000", reported as "a hundred and some";
 // Ding Yingtai's "28 crimes and 10 disgraces"; Yang dismissed (明史 卷259). Sources in src/story/text/sources.md.
-import { chapAlive, chapDead, chapFallenCard, chapFlag, chapHeroUp, chapJudgementCard, chapLivedCard } from './kit.js';
+import { chapAlive, chapDead, chapFallenCard, chapFlag, chapHeroUp, chapJudgementCard, chapLivedCard, chapPromotionCards } from './kit.js';
 
 export const CHAPTER_ULSAN = {
   id: 'ulsan', n: 5, year: 1598,
@@ -125,6 +125,8 @@ export const CHAPTER_ULSAN = {
         zh: '各营报上来的死亡，将近两万。杨经理大怒，压下不报，只说死了一百多人，还跟总督邢玠一道报了捷。兵部主事丁应泰上疏，列了他“当罪者二十八，可羞者十”。杨镐革职回籍。二十年后，朝廷又想起了他。',
         en: 'The camps\' returns of the dead came to nearly twenty thousand. Commissioner Yang flew into a rage, kept them back, and reported a hundred and some; he and the Supreme Commander Xing Jie sent in news of a victory. Ding Yingtai of the Ministry of War memorialised against him: "twenty-eight crimes, ten disgraces". Yang Hao was dismissed and sent home. Twenty years later the court remembered him again.',
       },
+      // (A defeat reported as a victory has no true list of merit: ranks.js, `merit: 'withhold'`.)
+      effects: { merit: 'withhold' },
       choices: [],
     },
     chapFallenCard('ulsan', 'lou', {
@@ -171,6 +173,14 @@ export const CHAPTER_ULSAN = {
       [
         { text: { zh: '挨着。', en: 'Take them.' }, effects: { flags: { flogged: true } } },
       ]),
+    // The dead "nearly 20,000": the posts of the dead filled from the living who held (as Lou Dayou's, above).
+    ...chapPromotionCards('ulsan', 5, {
+      vacancy: true,
+      vacated: (rank) => ({
+        zh: `撤下来点名，营里一半的旗没有人扛。哨官拿着名册一个一个往下补：谁还站着，谁就往上挪一格。陈二当了${rank.name.zh}，管${rank.leads.zh}。捷报上写的是大捷；补缺的名册上，写的是实话。`,
+        en: `At the roll after the retreat, half the camp\'s flags had nobody left to carry them. The company officer went down the roll filling the gaps: whoever was still standing moved up one. Chen Er was made ${rank.name.en}, over ${rank.leads.en}. The report said victory. The roll of posts to fill told the truth.`,
+      }),
+    }),
   ],
   scenes: [
     // The ninth day on the drill ground (the card before it: Jin Aman bound at the flagpole, watched or turned from). Staged on

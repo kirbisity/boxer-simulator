@@ -4,7 +4,7 @@
 // accounts claim 6,000-10,000); Li blamed the Military Superintendent Song Yingchang; the peace talks that followed,
 // each envoy telling his own court the other side had submitted. The foot's part is not recorded: Chen Er's company
 // coming up the road is his story, kept vague. Sources in src/story/text/sources.md.
-import { chapAlive, chapFallenCard, chapHeroUp, chapJudgementCard, chapLivedCard } from './kit.js';
+import { chapAlive, chapFallenCard, chapHeroUp, chapJudgementCard, chapLivedCard, chapPassedOverCard } from './kit.js';
 
 export const CHAPTER_BYEOKJEGWAN = {
   id: 'byeokjegwan', n: 4, year: 1593,
@@ -107,6 +107,17 @@ export const CHAPTER_BYEOKJEGWAN = {
       },
       [
         { text: { zh: '挨着。', en: 'Take it.' }, effects: { flags: { flogged: true }, place: 'front' } },
+      ]),
+    // Where his merit has earned a post: someone else gets it, with the merit (冒功). The foot lost no leaders the record
+    // counts here (Li's 264 dead were his riders), so no post falls open by a death.
+    chapPassedOverCard('byeokjegwan',
+      {
+        zh: '队里空出一个缺，按功该是陈二的。补上去的是一个参将家丁的表弟，碧蹄馆那天他在后营看马。名册上，那人的名字底下，记着陈二这几仗的功。这叫冒功。营里人人都知道，人人都不说。',
+        en: 'A post fell open in the company, and by his merit it was Chen Er\'s. It went to the cousin of some brigade general\'s household man, who had spent the day of Byeokjegwan minding horses in the rear camp. On the roll, under that man\'s name, stood Chen Er\'s merit from his fights. It is called maogong (冒功), passing off another man\'s merit. Everyone in the camp knew. Nobody said.',
+      },
+      [
+        { text: { zh: '不说。', en: 'Say nothing.' }, effects: { flags: { passedOver: true } } },
+        { text: { zh: '去找哨官说。哨官说：功劳，下一仗再挣。', en: 'Go to the company officer. The officer says: merit? Earn some more next time.' }, effects: { flags: { passedOver: true, complained: true }, place: 'front' } },
       ]),
     {
       id: 'byeokjegwan-back',

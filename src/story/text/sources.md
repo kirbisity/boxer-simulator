@@ -15,6 +15,19 @@ says so or stays vague ("some said", "the histories do not make clear").
   "此临阵第一禁约": shields, spears and wolf-brushes carry no head-cutting knife and do not stop for heads.
   [Wikisource: 纪效新书 卷三](https://zh.wikisource.org/wiki/%E7%B4%80%E6%95%88%E6%96%B0%E6%9B%B8/%E5%8D%B7%E4%B8%89);
   the squad (鸳鸯阵, twelve men) [Wikipedia: Jixiao Xinshu](https://en.wikipedia.org/wiki/Jixiao_Xinshu)
+- The ladder he climbs (src/story/ranks.js). 纪效新书 (18-juan) 卷一 原束伍: the squad of twelve; "四队为一哨，虚其中，
+  哨长居之"; "四哨为一官……哨官居之"; the 哨长 picks his 队长 "于兵内自举". [Wikisource: 纪效新书 卷一](https://zh.wikisource.org/wiki/%E7%B4%80%E6%95%88%E6%96%B0%E6%9B%B8_(%E5%9B%9B%E5%BA%AB%E5%85%A8%E6%9B%B8%E6%9C%AC)/%E5%8D%B701)
+  卷三: the 甲长 under the 队长; "若队长不退而甲下并兵退走，致队长阵亡者……队下甲长俱斩"; "如哨长不走，致被阵亡，
+  而队兵弃之退走者，斩其各队长"; the heads "尽数派与本哨官部内冲锋兵勇，均分报功"; the 把总 over the 哨队长 who cut
+  heads. 练兵实纪 卷一 (the northern manual, 1571): 伍长, 队长 (队总), 旗总, 百总 ("每四宗用百总一员，是为一局"),
+  把总 ("每四局用把总一员，是为一司"), 千总 ("每四司用千总一员，是为一部"); each rank picks the one below and is
+  checked ("令千总选部下把总几员，验中"); "队长必有胆者". [Wikisource: 练兵实纪 卷一](https://zh.wikisource.org/wiki/%E7%B7%B4%E5%85%B5%E5%AF%A6%E7%B4%80/%E5%8D%B7%E4%B8%80)
+  The heads' silver shared across the squad (30 taels a head in one account, the shields, spears and wolf-brushes 20 of
+  it): secondary accounts quoting the manuals, not checked against the text, so the cards give no figure. Li Rusong's
+  report after Pyongyang, the northern and southern troops' quarrel over it, and the eastern campaign's merit not
+  awarded for a year: [Sun Weiguo, cssn.cn](https://www.cssn.cn/lsx/lsx_zgs/202210/t20221024_5552438.shtml). The posts
+  bought in Liaodong, the merit passed off under another man's name (冒功) at Byeokjegwan, and Chen Er's own promotions
+  are his story, kept to the period's commonplaces.
 - The waist tag (腰牌): name, age, county, height, face and beard, marks, strength in jin lifted, issue date (武备志 卷28).
   [Source Library: Wubei Zhi vol. 28](https://sourcelibrary.org/book/wubei-zhi-vol-28/page/6992cdcec8c0c1ab515dcb83)
 - Liaodong's hereditary military households (军户) and colony land (屯田) taken by officers: the general late-Ming

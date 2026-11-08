@@ -9,7 +9,13 @@
 // Qilong; "ten thousand-odd against tens of thousands, and killed thousands"; Liaoyang reached on the 19th and lost
 // two days later, Yuan Yingtai hanging himself with his sword and seal (明史 卷259, 卷271; zh.wikipedia 浑河之战 (1621年)).
 // He falls as a leader: the finale's after-cards read the same whether the simulation killed him or the night did.
-import { chapFallenCard, chapFamily, chapHeroUp, chapLeftPlace } from './kit.js';
+import { chapBelow, chapFallenCard, chapFamily, chapHeroUp, chapLeftPlace } from './kit.js';
+
+// The words every Qi Jin card opens with.
+const HUNRIVER_QIJIN = {
+  zh: '萨尔浒以后，辽事一坏到底，朝廷又想起了浙兵。副将戚金带着浙兵到了辽东。戚金是戚继光的侄子，他的兵还照《纪效新书》操练。营里懂这一套的老兵不多了，陈二算一个。',
+  en: 'After Sarhu, with Liaodong going from bad to worse, the court remembered the Zhejiang troops once more. Brigade General Qi Jin brought Zhejiang men to Liaodong. Qi Jin was Qi Jiguang\'s nephew, and his men still drilled by the Jixiao Xinshu. Few old hands left in the camp knew the drill. Chen Er was one.',
+};
 
 export const CHAPTER_HUNRIVER = {
   id: 'hunriver', n: 8, year: 1621,
@@ -17,15 +23,38 @@ export const CHAPTER_HUNRIVER = {
   battle: 'hunriver',
   finale: true,
   before: [
+    // Qi Jin takes the old hands who know the drill and gives them what posts he has: as an appointment of his own (委),
+    // one up from where the man stands, or a company for a man who never rose.
     {
       id: 'hunriver-qijin',
+      when: (life) => chapBelow(life, 'shaoguan'),
       text: {
-        zh: '萨尔浒以后，辽事一坏到底，朝廷又想起了浙兵。副将戚金带着浙兵到了辽东。戚金是戚继光的侄子，他的兵还照《纪效新书》操练。营里懂这一套的老兵不多了，陈二算一个。戚金让他当了哨官。',
-        en: 'After Sarhu, with Liaodong going from bad to worse, the court remembered the Zhejiang troops once more. Brigade General Qi Jin brought Zhejiang men to Liaodong. Qi Jin was Qi Jiguang\'s nephew, and his men still drilled by the Jixiao Xinshu. Few old hands left in the camp knew the drill. Chen Er was one. Qi Jin made him a company officer.',
+        zh: `${HUNRIVER_QIJIN.zh}戚金让他当了哨官。`,
+        en: `${HUNRIVER_QIJIN.en} Qi Jin made him a company officer.`,
       },
       choices: [
-        { text: { zh: '接过哨旗。', en: 'Take the company flag.' }, effects: { rank: 'officer' } },
+        { text: { zh: '接过官旗。', en: 'Take the company\'s banner.' }, effects: { rank: 'shaoguan', promoted: 'given' } },
       ],
+    },
+    {
+      id: 'hunriver-qijin-bazong',
+      when: (life) => !chapBelow(life, 'shaoguan') && chapBelow(life, 'bazong'),
+      text: {
+        zh: `${HUNRIVER_QIJIN.zh}他在辽东已经是哨官了。戚金委他做了把总，管几个哨官。那几个哨官，有新补的，有花钱买的，懂这一套的只有他。`,
+        en: `${HUNRIVER_QIJIN.en} He was a company officer in Liaodong already. Qi Jin appointed him commander (把总, bazong) over several companies. Of their officers, some were new and some had bought their posts; only he knew the drill.`,
+      },
+      choices: [
+        { text: { zh: '接过令箭。', en: 'Take the arrow of command (令箭).' }, effects: { rank: 'bazong', promoted: 'given' } },
+      ],
+    },
+    {
+      id: 'hunriver-qijin-kept',
+      when: (life) => !chapBelow(life, 'bazong'),
+      text: {
+        zh: `${HUNRIVER_QIJIN.zh}戚金让他还当把总。`,
+        en: `${HUNRIVER_QIJIN.en} Qi Jin kept him on as a commander.`,
+      },
+      choices: [],
     },
     {
       id: 'hunriver-shen',

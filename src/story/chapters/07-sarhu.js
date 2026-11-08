@@ -8,7 +8,7 @@
 // the hilltop, Liu killed (3/4-5); some 3,000 Zhejiang men dead; Gang's surrender; Qiao Yiqi's suicide; the supervisor
 // Kang Yingqian "escaping with his life alone"; 310-odd officers and 45,800-odd soldiers dead; Yang jailed, executed in
 // 1629 (明史 卷259; zh.wikipedia 萨尔浒之战). The muster's empty names (空额) are the period's commonplace, told as his.
-import { chapFallenCard, chapFamily, chapHeroUp, chapJudgementCard, chapLivedCard } from './kit.js';
+import { chapFallenCard, chapFamily, chapHeroUp, chapJudgementCard, chapLivedCard, chapPromotionCards } from './kit.js';
 
 export const CHAPTER_SARHU = {
   id: 'sarhu', n: 7, year: 1619,
@@ -112,6 +112,8 @@ export const CHAPTER_SARHU = {
         zh: '四路兵马，文武将吏死了三百一十多人，军士四万五千八百多人。杨镐下狱，论死。他在牢里又活了十年，崇祯二年才伏法。那四万多人，没有一个多活一天。',
         en: 'Of the four armies, three hundred and ten-odd officers and officials were dead, and forty-five thousand eight hundred-odd soldiers. Yang Hao went to prison under sentence of death. He lived there another ten years, and was executed only in 1629. Of the forty-five thousand, not one got a day more.',
       },
+      // (A rout has no merit: ranks.js, `merit: 'withhold'`.)
+      effects: { merit: 'withhold' },
       choices: [],
     },
     {
@@ -173,6 +175,14 @@ export const CHAPTER_SARHU = {
       [
         { text: { zh: '答到。', en: 'Answer to your name.' }, effects: { flags: { survivedSarhu: true } } },
       ]),
+    // The eastern road's leaders dead (Liu Ting, his officers: 310-odd of the four armies'); the gaps filled from those back.
+    ...chapPromotionCards('sarhu', 7, {
+      vacancy: true,
+      vacated: (rank) => ({
+        zh: `萨尔浒没有功，只有缺。东路回来的人点完了名，管名册的书办把活人的名字一个一个往上挪，挪到死人空出来的地方。陈二成了${rank.name.zh}，管${rank.leads.zh}。他要管的人，多半还在阿布达里冈上。`,
+        en: `Sarhu had no merit, only gaps. When the men back from the eastern road had answered the roll, the clerk who kept it moved the living up one by one into the places of the dead. Chen Er became ${rank.name.en}, over ${rank.leads.en}. Most of the men he was over were still up on Abdali ridge.`,
+      }),
+    }),
   ],
   scenes: [
     {

@@ -1,10 +1,15 @@
 // Story mode: one Ming conscript's life, 1587-1621 (the spec: working-memory/projects/boxer-simulator/specs/2026-11-07-story-mode-conscript.md).
 // This is the life's state and nothing else: pure, no DOM, run in Node by test/story-life.test.js.
 //
-//   life = { hero: { name, born, inputs, natural }, chapter, year, rank, place, kit,
+//   life = { hero: { name, born, inputs, natural }, chapter, year, rank, grade, merit, meritThis, withheld, promotions, place, kit,
 //            comrades: [{ id, name, inputs, born, rank, alive, bond, diedAt: { chapter, year, how } | null }],
 //            family: { [who]: { …, alive, diedAt } }, flags, passed: [chapter numbers lived through],
 //            attempts: { [chapter]: n }, lives, record: [ending pages], checkpoint }
+//
+// His rank is two things: `grade`, his place on the ladder (ranks.js STORY_RANKS: 兵, 甲长, 队长, 哨长, 哨官, 把总), and
+// `rank`, the command it gives him in battle ('soldier' | 'squadLeader' | 'officer': the battles and the kit read this).
+// `merit` is what is on his books since his last promotion (each battle's, storyCreditBattle), `meritThis` this chapter's
+// (what a card may withhold), `withheld` all that was ever kept back from him, `promotions` [{ chapter, rank, how }].
 //
 // Luck is the player's own: a chapter's share is 1 / the attempts it took, and every death at that chapter in any life is an
 // attempt (`attempts[n]` is 1 + the deaths there). A life's luck is the product over the chapters it lived through: "1 in 48
@@ -16,6 +21,7 @@ import { greyedHair } from '../aging.js';
 import { normaliseInputs, PRESETS } from '../body.js';
 import { mingSoldier, varyCharacter } from '../cast.js';
 import { seededRandom } from '../physics.js';
+import { storyBattleMerit, storyGradeOf, storyRankIndex, storyRankOf, storyRankOfScope } from './ranks.js';
 
 export const STORY = {
   // He was born c. 1568 (the spec): nineteen at the suppression of 1587, fifty-three at the Hun River.
@@ -80,6 +86,11 @@ export function storyNewLife(previous = null, { seed = null, family = {}, hero =
     chapter: 0,
     year: null,
     rank: 'soldier',
+    grade: 'bing',
+    merit: 0,
+    meritThis: 0,
+    withheld: 0,
+    promotions: [],
     place: 'front',
     kit: STORY.kit.soldier,
     comrades: [],
@@ -133,6 +144,12 @@ export function storyComradeFighter(comrade, year) {
 export function storyEnterChapter(life, chapter, { comrades = [] } = {}) {
   life.chapter = chapter.n;
   life.year = chapter.year;
+  // (A save from before the ladder: its grade from its rank.)
+  life.grade = storyGradeOf(life);
+  life.merit ??= 0;
+  life.withheld ??= 0;
+  life.promotions ??= [];
+  life.meritThis = 0;
   life.kit = STORY.kit[life.rank] ?? STORY.kit.soldier;
   life.attempts[chapter.n] ??= 1;
   for (const entry of comrades) {
@@ -158,15 +175,53 @@ export function storyPerson(life, id) {
 }
 
 /**
- * Apply a choice's effects (data: { rank?, place?, flags?, bond?: { id: n }, family?: { who: { … } }, comrades?: { id: { … } } }).
- * Unknown keys are left alone (a later chapter's own may be read by its cards through `flags`).
+ * His rank set (a STORY_RANKS id, or a command scope: its lowest rank, unless he already holds that scope), his command and
+ * kit with it. A rise is a promotion (`how`: 'merit' | 'vacancy' | 'bought' | 'given'): written down, his books cleared.
+ */
+export function storySetRank(life, id, how = 'given') {
+  const rank = storyRankOf(id) ?? (STORY.ranks.includes(id) ? (storyRankOf(life.grade)?.scope === id ? storyRankOf(life.grade) : storyRankOfScope(id)) : null);
+  if (!rank) return life;
+  const was = storyRankIndex(storyGradeOf(life));
+  life.grade = rank.id;
+  life.rank = rank.scope;
+  life.kit = STORY.kit[rank.scope];
+  if (storyRankIndex(rank.id) > was) {
+    life.promotions = [...(life.promotions ?? []), { chapter: life.chapter, rank: rank.id, how }];
+    life.merit = 0;
+  }
+  return life;
+}
+
+/** A battle's merit onto his books (ranks.js storyBattleMerit): this chapter's, and the running count since his last promotion. */
+export function storyCreditBattle(life, outcome) {
+  const merit = storyBattleMerit(outcome);
+  life.meritThis = (life.meritThis ?? 0) + merit;
+  life.merit = (life.merit ?? 0) + merit;
+  return merit;
+}
+
+/**
+ * Merit kept back from him (the officials' report): this chapter's off his books, counted as withheld; `all`, everything on
+ * them (a post his merit earned, given to another man with it: 冒功).
+ */
+export function storyWithholdMerit(life, all = false) {
+  const taken = all ? (life.merit ?? 0) : Math.min(life.meritThis ?? 0, life.merit ?? 0);
+  life.merit = (life.merit ?? 0) - taken;
+  life.withheld = (life.withheld ?? 0) + taken;
+  life.meritThis = 0;
+  return taken;
+}
+
+/**
+ * Apply a choice's effects (data: { rank?, promoted?, merit?, place?, flags?, bond?: { id: n }, family?: { who: { … } },
+ * comrades?: { id: { … } } }). `rank` a STORY_RANKS id or a scope, `promoted` how he got it; `merit` a number onto his books,
+ * 'withhold' (this chapter's taken off them) or 'taken' (all of it). Unknown keys are left alone (a later chapter's own may be read through `flags`).
  */
 export function storyApplyEffects(life, effects = {}) {
   if (!isObject(effects)) return life;
-  if (STORY.ranks.includes(effects.rank)) {
-    life.rank = effects.rank;
-    life.kit = STORY.kit[effects.rank];
-  }
+  if (typeof effects.rank === 'string') storySetRank(life, effects.rank, effects.promoted ?? 'given');
+  if (effects.merit === 'withhold' || effects.merit === 'taken') storyWithholdMerit(life, effects.merit === 'taken');
+  else if (Number.isFinite(effects.merit)) life.merit = Math.max(0, (life.merit ?? 0) + effects.merit);
   if (typeof effects.place === 'string') life.place = effects.place;
   if (isObject(effects.flags)) Object.assign(life.flags, clone(effects.flags));
   if (isObject(effects.bond)) {
@@ -271,6 +326,7 @@ export function storyDie(life, death = {}) {
     year: life.year,
     age: life.year ? ageIn(life.hero.born, life.year) : null,
     rank: life.rank,
+    grade: storyGradeOf(life),
     where: clone(death.where) ?? null,
     how: clone(death.how) ?? null,
     text: clone(death.text) ?? null,
@@ -291,7 +347,7 @@ export function storyLivedThrough(life, ending = {}) {
   const luck = storyLuck(life);
   const page = {
     life: life.lives, name: clone(life.hero.name), chapter: life.chapter, year: life.year, age: life.year ? ageIn(life.hero.born, life.year) : null,
-    rank: life.rank, where: clone(ending.where) ?? null, how: null, text: clone(ending.text) ?? null, kind: 'lived',
+    rank: life.rank, grade: storyGradeOf(life), where: clone(ending.where) ?? null, how: null, text: clone(ending.text) ?? null, kind: 'lived',
     outlived: life.comrades.filter((comrade) => comrade.alive).map((comrade) => ({ id: comrade.id, name: clone(comrade.name) })),
     fallen: life.comrades.filter((comrade) => !comrade.alive).map((comrade) => ({ id: comrade.id, name: clone(comrade.name), diedAt: clone(comrade.diedAt) })),
     family: clone(life.family), luck: { odds: luck.odds, percent: luck.percent, never: luck.never }, passed: [...life.passed],
@@ -322,7 +378,7 @@ export function storyValidLife(life) {
   return isObject(life) && life.version === STORY.version && isObject(life.hero) && isObject(life.hero.inputs) && isObject(life.hero.name)
     && Number.isFinite(life.chapter) && Array.isArray(life.comrades) && life.comrades.every((comrade) => isObject(comrade) && typeof comrade.id === 'string')
     && isObject(life.family) && isObject(life.flags) && isObject(life.attempts) && Array.isArray(life.record) && Array.isArray(life.passed)
-    && STORY.ranks.includes(life.rank) && Number.isFinite(life.lives);
+    && STORY.ranks.includes(life.rank) && (life.grade === undefined || storyRankOf(life.grade)?.scope === life.rank) && Number.isFinite(life.lives);
 }
 
 /** The life saved in `storage` (localStorage or anything with getItem), or null: none, unreadable, or not a life. Never throws. */

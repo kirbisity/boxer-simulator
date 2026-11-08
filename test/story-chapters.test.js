@@ -5,11 +5,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from '../src/story/chapters/index.js';
 import { PRESETS } from '../src/body.js';
+import { STORY_RANKS } from '../src/story/ranks.js';
 
 const COMRADE_IDS = new Set(COMRADES.map((each) => each.id));
 // Speakers in scene scripts who are not named comrades: roles the engine casts generically.
 const ROLES = new Set(['hero', 'narrator', 'squadLeader', 'officer', 'official', 'northTrooper', 'wife', 'daughter', 'son']);
-const EFFECT_KEYS = new Set(['rank', 'place', 'flags', 'bond', 'family', 'dies']);
+const EFFECT_KEYS = new Set(['rank', 'promoted', 'merit', 'place', 'flags', 'bond', 'family', 'dies']);
+const RANK_IDS = new Set([...STORY_RANKS.map((rank) => rank.id), 'soldier', 'squadLeader', 'officer']);
 
 // Every {zh, en} pair anywhere in a value, with where it was found.
 function texts(value, path = 'root', found = []) {
@@ -82,11 +84,25 @@ test('every choice\'s effects are plain data, with known keys', () => {
         assert.ok(choice.effects && typeof choice.effects === 'object', `${card.id}: no effects`);
         assert.ok(plain(choice.effects), `${card.id}: effects not plain data`);
         for (const key of Object.keys(choice.effects)) assert.ok(EFFECT_KEYS.has(key), `${card.id}: unknown effect ${key}`);
-        if (choice.effects.rank) assert.ok(['soldier', 'squadLeader', 'officer'].includes(choice.effects.rank), card.id);
+        if (choice.effects.rank) assert.ok(RANK_IDS.has(choice.effects.rank), card.id);
+        if (choice.effects.merit !== undefined) assert.ok(['withhold', 'taken'].includes(choice.effects.merit) || Number.isFinite(choice.effects.merit), card.id);
         if (choice.fatal) assert.ok(plain(choice.fatal) && choice.fatal.how && choice.fatal.text, `${card.id}: fatal`);
       }
     }
   }
+});
+
+test('a narration card\'s own effects (merit kept back) are plain data, with known keys', () => {
+  let withheld = 0;
+  for (const chapter of CHAPTERS) {
+    for (const card of cards(chapter)) {
+      if (!card.effects) continue;
+      assert.ok(plain(card.effects), `${card.id}: effects not plain data`);
+      for (const key of Object.keys(card.effects)) assert.ok(EFFECT_KEYS.has(key), `${card.id}: unknown effect ${key}`);
+      if (card.effects.merit === 'withhold') withheld += 1;
+    }
+  }
+  assert.ok(withheld >= 3, 'the officials keep merit back in a few chapters');
 });
 
 test('every comrade named exists, and every comrade is built from a real preset', () => {

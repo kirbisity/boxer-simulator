@@ -10,6 +10,7 @@
 // Names here are prefixed `chap` because the bundle is one shared scope (tools/bundle.js).
 
 import { COMRADES } from './comrades.js';
+import { STORY_RANKS, storyGradeOf, storyPromotionDue, storyRankIndex } from '../ranks.js';
 
 // A named man in the life, or null if he is not in it (yet): a man whose chapter has not come is not there, even if the
 // engine lists every comrade from the start.
@@ -58,6 +59,53 @@ export function chapFamily(life, key) {
 
 export function chapRank(life) {
   return life?.rank ?? 'soldier';
+}
+
+// His place on the ladder (ranks.js STORY_RANKS id: 'bing', 'jiazhang', 'duizhang', 'shaozhang', 'shaoguan', 'bazong').
+export function chapGrade(life) {
+  return storyGradeOf(life);
+}
+
+// Below a rank on the ladder (`id` a STORY_RANKS id).
+export function chapBelow(life, id) {
+  return storyRankIndex(storyGradeOf(life)) < storyRankIndex(id);
+}
+
+/**
+ * The promotion cards of a chapter, one for each rank he could rise to in it (`n`, the chapter: no rank before its `from`)
+ * and each way he could get it: `vacated(rank)` the text when the man over him is dead (the chapter's `vacancy`, the record's
+ * losses among its leaders, or the battle's own `superiorFell`), `merit(rank)` when his merit has earned it; each a {zh, en}
+ * from the rank (its `name`, `leads`). Shown after the chapter's other after-cards that may withhold his merit. A card for a
+ * way the chapter cannot give (no `vacated`, no `merit`) is not made.
+ */
+export function chapPromotionCards(chapterId, n, { vacancy = false, vacated = null, merit = null } = {}) {
+  const cards = [];
+  for (const rank of STORY_RANKS.slice(1).filter((each) => each.from <= n)) {
+    for (const [how, text] of [['vacancy', vacated], ['merit', merit]]) {
+      if (!text) continue;
+      cards.push({
+        id: `${chapterId}-promoted-${rank.id}-${how}`,
+        when: (life, outcome) => {
+          const due = storyPromotionDue(life, outcome, { vacancy });
+          return due?.rank === rank.id && due.how === how;
+        },
+        text: text(rank),
+        choices: [{ text: { ...rank.take }, effects: { rank: rank.id, promoted: how } }],
+      });
+    }
+  }
+  return cards;
+}
+
+// A card for the promotion his merit earned and someone else got (冒功: his merit under another man's name); shown instead
+// of the promotion, its choices taking all the merit on his books with the post (`merit: 'taken'`).
+export function chapPassedOverCard(chapterId, text, choices) {
+  return {
+    id: `${chapterId}-passed-over`,
+    when: (life, outcome) => storyPromotionDue(life, outcome)?.how === 'merit',
+    text,
+    choices: choices.map((choice) => ({ ...choice, effects: { ...choice.effects, merit: 'taken' } })),
+  };
 }
 
 export function chapLeftPlace(outcome) {

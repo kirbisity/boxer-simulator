@@ -22,7 +22,8 @@ import { thinkAll } from '../ai.js';
 import { judgeBattle } from '../battleend.js';
 import { slotAt } from '../formation.js';
 import { advance, createWorld, inFight } from '../physics.js';
-import { storyChoose, storyDie, storyEnterChapter, storyLivedThrough, storyMarkDead, storyPassChapter } from './life.js';
+import { storyApplyEffects, storyChoose, storyCreditBattle, storyDie, storyEnterChapter, storyLivedThrough, storyMarkDead, storyPassChapter } from './life.js';
+import { storyGradeOf, storyRankOf } from './ranks.js';
 
 export const STORY_RUN = {
   // Left his place: further than `metres` from where his rank and file put him, for `seconds` together, while the battle is
@@ -181,6 +182,8 @@ export function storyScenesBefore(run) {
 export function storyAnswer(run, choice = 0) {
   const current = storyCurrent(run);
   if (current.kind !== 'card') return current;
+  // (A narration card may carry effects of its own: the merit a report keeps back from him.)
+  if (current.card.effects) storyApplyEffects(run.life, current.card.effects);
   const { fatal } = current.card.choices?.length ? storyChoose(run.life, current.card, choice) : { fatal: null };
   run.index += 1;
   if (fatal) {
@@ -255,22 +258,24 @@ export function storyBattleWorld(setup, life) {
 }
 
 /**
- * Whom he commands (command.js `world.commandMen`): a private soldier nobody (he cannot order the army); a squad leader his
- * squad (the setup's `squad`, else the nearest eleven of his side: a mandarin-duck squad of twelve with him); an officer his side.
+ * Whom he commands (command.js `world.commandMen`), as his rank says (ranks.js STORY_RANKS `men`): a private soldier nobody
+ * (he cannot order the army); a 甲长 his file's four, a 队长 his squad's eleven (the setup's `squad` where it has that many,
+ * else the nearest of his side), a 哨长 his platoon's forty-seven; a 哨官 and above his whole side.
  */
 export function storyCommandMen(world, setup, life) {
   const hero = world.fighters[setup.player];
   if (!hero) return null;
   world.commandMen ??= {};
-  if (life.rank === 'officer') {
+  const men = storyRankOf(storyGradeOf(life))?.men ?? 0;
+  if (men === Infinity) {
     delete world.commandMen[hero.corner];
     return null;
   }
-  if (life.rank === 'squadLeader') {
+  if (men > 0) {
     const near = world.fighters.filter((fighter) => fighter.corner === hero.corner && fighter !== hero)
       .sort((a, b) => Math.hypot(...storyAt(a).map((v, i) => v - storyAt(hero)[i])) - Math.hypot(...storyAt(b).map((v, i) => v - storyAt(hero)[i])))
-      .slice(0, 11).map((fighter) => fighter.id);
-    world.commandMen[hero.corner] = setup.squad?.length ? [...setup.squad] : near;
+      .slice(0, men).map((fighter) => fighter.id);
+    world.commandMen[hero.corner] = setup.squad?.length >= men ? setup.squad.slice(0, men) : near;
   } else world.commandMen[hero.corner] = [];
   return world.commandMen[hero.corner];
 }
@@ -413,6 +418,8 @@ export function storyReadOutcome(world, setup, watch) {
     hero: detail.hero.fled ? 'fled' : detail.hero.fell ? 'out' : 'alive',
     leftPlace: Boolean(detail.hero.leftPlace),
     won: detail.won,
+    // The man over him (the setup's `superior`) fell: his place is open.
+    superiorFell: Boolean(detail.superior?.fell),
     comrades: Object.fromEntries(Object.entries(detail.comrades).map(([id, fate]) => [id, state(fate)])),
     detail,
   };
@@ -432,6 +439,7 @@ function storyReadDetail(world, setup, watch) {
   return {
     hero: { ...fate, kills: killed, leftPlace: watch?.leftPlace ? { ...watch.leftPlace } : null },
     comrades,
+    superior: Number.isInteger(setup.superior) ? storyFateOf(world, setup, setup.superior) : null,
     won: verdict ? verdict.winner === hero.corner : null,
     verdict: verdict ? { winner: verdict.winner, how: verdict.how } : null,
     time: world.time,
@@ -455,6 +463,8 @@ export function storyBattleDone(run, outcome) {
     } else storyEnd(run, death);
     return storyCurrent(run);
   }
+  // What the battle puts on his books (ranks.js storyBattleMerit): the promotion cards read it, a report may keep it back.
+  storyCreditBattle(run.life, outcome);
   const judgement = { ...STORY_JUDGEMENT, ...(run.chapter.judgement ?? {}) };
   // A chapter that judges a man out of his place among its own after-cards (an id ending '-judgement': kit.js
   // chapJudgementCard) is not judged twice; fleeing the field is always the army's to judge.
@@ -471,9 +481,10 @@ export function storyBattleDone(run, outcome) {
 function storyDetailOf(outcome) {
   const fate = (word) => ({ fell: word === 'out' || word === 'dead', fled: word === 'fled', alive: word === 'alive' || word === 'fled', how: word === 'dead' ? { kind: 'killed', text: { ...STORY_FALLS.killed } } : word === 'out' ? { kind: 'fell', text: { ...STORY_FALLS.fell } } : null });
   return {
-    hero: { ...fate(outcome.hero), kills: 0, leftPlace: outcome.leftPlace ? { way: outcome.leftWay ?? 'back', seconds: 0, metres: 0 } : null },
+    hero: { ...fate(outcome.hero), kills: outcome.kills ?? 0, leftPlace: outcome.leftPlace ? { way: outcome.leftWay ?? 'back', seconds: 0, metres: 0 } : null },
     comrades: Object.fromEntries(Object.entries(outcome.comrades ?? {}).map(([id, word]) => [id, fate(word)])),
     won: outcome.won ?? null,
+    superior: outcome.superiorFell ? fate('dead') : null,
   };
 }
 

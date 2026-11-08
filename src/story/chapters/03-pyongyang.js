@@ -4,7 +4,7 @@
 // another); Konishi Yukinaga's escape over the Daedong; Li's report putting the northern general Zhang Shijue first,
 // heads being the measure of merit; the censors' charge that half the heads were Korean villagers (never settled); the
 // Korean court's praise of the southern troops (宣祖实录). Sources in src/story/text/sources.md.
-import { chapAlive, chapFallenCard, chapHeroUp, chapJudgementCard, chapLeftPlace, chapLivedCard, chapRank } from './kit.js';
+import { chapAlive, chapFallenCard, chapHeroUp, chapJudgementCard, chapLivedCard, chapPromotionCards } from './kit.js';
 
 export const CHAPTER_PYONGYANG = {
   id: 'pyongyang', n: 3, year: 1593,
@@ -82,6 +82,8 @@ export const CHAPTER_PYONGYANG = {
         zh: '提督的奏捷疏里，首功给了北将张世爵：北兵在前，南兵在后。论功按首级，北兵马快刀快，头割得多；南兵在城墙上放铳爬梯，顾不上。朝鲜国王和大臣都替南兵说话，没有用。后来有御史上本，说北兵献上的首级，一半是朝鲜百姓剃了头充数的。朝廷派人去查。查清了没有，史书上也没说清。',
         en: 'In the commander\'s report of victory the first merit went to the northern general Zhang Shijue: northern troops first, southern second. Merit went by heads, and the northern men had fast horses and fast blades; the southern men had been busy on the wall with guns and ladders. The Korean king and his ministers spoke up for the southerners. It changed nothing. Later a censor memorialised that half the heads the northern troops had handed in were Korean villagers, shaved to pass. The court sent someone to look into it. Whether he found anything, the histories do not make clear.',
       },
+      // (His share of the wall goes into the northern books: ranks.js, `merit: 'withhold'`.)
+      effects: { merit: 'withhold' },
       choices: [],
     },
     {
@@ -122,17 +124,15 @@ export const CHAPTER_PYONGYANG = {
       },
       choices: [],
     },
-    {
-      id: 'pyongyang-flag',
-      when: (life, outcome) => chapHeroUp(outcome) && !chapLeftPlace(outcome) && chapRank(life) === 'soldier',
-      text: {
-        zh: '攻城那天，队里的队长死在了梯子上。照书上的规矩，从同队的人里挑一个站得住的接旗。挑的是陈二。',
-        en: 'On the day of the wall the squad\'s leader died on the ladder. By the book, the squad\'s flag goes to a man of the same squad who stood his ground. They picked Chen Er.',
-      },
-      choices: [
-        { text: { zh: '接过队旗。', en: 'Take the squad\'s flag.' }, effects: { rank: 'squadLeader' } },
-      ],
-    },
+    // The record's losses on the wall (the southern foot first up it, Wu Weizhong shot): the man over him dead on a ladder.
+    // The post is filled from the men who stood; the merit was the north's (the credit card above keeps it back).
+    ...chapPromotionCards('pyongyang', 3, {
+      vacancy: true,
+      vacated: (rank) => ({
+        zh: `攻城那天，他头上的那个人死在了梯子上。照书上的规矩，从同队站住了的人里挑一个接旗。挑的是陈二。他当了${rank.name.zh}，管${rank.leads.zh}。功劳记在北兵的册子上；缺，是南兵自己拿命补的。`,
+        en: `On the day of the wall the man over him died on a ladder. By the book, the flag goes to a man of the same unit who stood his ground. They picked Chen Er. He was made ${rank.name.en}, over ${rank.leads.en}. The merit went into the northern troops' books. The gaps the southern men filled themselves, with their lives.`,
+      }),
+    }),
     chapFallenCard('pyongyang', 'jin', {
       zh: '金阿满死在牡丹峰的土窟前面。他上山之前还在说笑，说朝鲜的雪比义乌的白。',
       en: 'Jin Aman died in front of a dugout on Moranbong. On the way up the hill he had still been joking: Korean snow, he said, was whiter than Yiwu\'s.',
