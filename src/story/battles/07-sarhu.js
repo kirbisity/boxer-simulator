@@ -30,6 +30,7 @@
 import { bannerman, mingHorseman, mingSoldier } from '../../cast.js';
 import { seededRandom } from '../../physics.js';
 import { northBlock, northName, northPlace, northSides, northStyles } from './north.js';
+import { storyDeployResolve } from '../deploy.js';
 
 export const SARHU1619 = {
   year: 1619,
@@ -37,6 +38,11 @@ export const SARHU1619 = {
   files: [-4, -2.4],
   pitch: 2.4,
   head: 12,
+  // The column closed up (the deploy screen's `closed`: a 把总's to order, src/story/deploy.js): its foot four files abreast
+  // across the valley floor (between the hillside's foot at -8 and the ridge's at +2, below: a file every 1.6 m, as the two
+  // files' spacing), half as long, its tail within call of its head. Liu Ting pushed on strung out in file through the
+  // defile (above); a column that long cannot turn to a flank as one, and its head is lost before its tail knows.
+  closedFiles: [-5.6, -4, -2.4, -0.8],
   // Its companies of foot, head to tail: [people's kit, styles in file order, name]. Each company two files abreast.
   companies: [
     { unit: 'zhejiang', rank: 'brigandine', people: 'mingSouth', styles: ['spear', 'matchlock', 'swordShield'] },
@@ -80,12 +86,14 @@ function sarhu1619Works() {
   return { ditches: [bank(ridge.from, ridge.top, ridge.height, arena.halfX + 2), bank(hillside.from, hillside.top, hillside.height, -arena.halfX - 2)] };
 }
 
-/** The column: its riders at the head, then each company two abreast, head to tail; each man's part in it. */
-function sarhu1619Column(random) {
-  const { files, pitch, head, companies, household, riderGap } = SARHU1619;
+/** The column: its riders at the head, then each company two abreast (or, `closed`, four), head to tail; each man's part in it. */
+function sarhu1619Column(random, formation = 'file') {
+  const { files: riderFiles, pitch, head, companies, household, riderGap } = SARHU1619;
+  const files = formation === 'closed' ? SARHU1619.closedFiles : riderFiles;
+  const abreast = files.length;
   const men = household.map((style, index) => {
     const inputs = mingHorseman(random, style);
-    const at = [files[index % 2], head + riderGap + Math.floor(index / 2) * riderGap];
+    const at = [riderFiles[index % 2], head + riderGap + Math.floor(index / 2) * riderGap];
     if (index === 0) return { inputs: { ...inputs, name: 'Liu Ting' }, name: { zh: '刘綎', en: 'Liu Ting' }, at, role: 'officer', unit: 'household', named: true };
     return { inputs, name: northName(inputs), at, role: 'rear', unit: 'household' };
   });
@@ -93,13 +101,14 @@ function sarhu1619Column(random) {
   for (const company of companies) {
     company.styles.forEach((style, index) => {
       const inputs = mingSoldier(random, style, company.rank, { people: company.people });
-      const row = rank + Math.floor(index / 2);
-      // His part: the company's first man leads it; the right file (toward the ridge) is its front, the left its second; its last rank its rear.
-      const last = Math.floor((company.styles.length - 1) / 2);
-      const role = index === 0 ? 'lead' : Math.floor(index / 2) === last ? 'rear' : index % 2 === 1 ? 'front' : 'second';
-      men.push({ inputs, name: northName(inputs), at: [files[(index + 1) % 2], head - row * pitch], role, unit: company.unit });
+      const row = rank + Math.floor(index / abreast);
+      // His part: the company's first man leads it; the first file its front, the others its second; its last rank its rear.
+      const last = Math.floor((company.styles.length - 1) / abreast);
+      const file = (index + 1) % abreast;
+      const role = index === 0 ? 'lead' : Math.floor(index / abreast) === last ? 'rear' : file === 0 ? 'front' : 'second';
+      men.push({ inputs, name: northName(inputs), at: [files[file], head - row * pitch], role, unit: company.unit });
     });
-    rank += Math.ceil(company.styles.length / 2);
+    rank += Math.ceil(company.styles.length / abreast);
   }
   // A junior officer of the column walks with his company's head: its lead's place serves an officer too (northPlace falls back).
   return men;
@@ -131,16 +140,43 @@ export const BATTLE_SARHU = {
   year: SARHU1619.year,
   title: { zh: '萨尔浒·阿布达里冈', en: 'Sarhu: the Ridge of Abdali' },
   seconds: SARHU1619.seconds,
-  /** Liu Ting's column in file in the valley (the hero in it by his rank, his comrades beside him) and the Jin above it. */
-  setup(life, seed = 1) {
+  // The deploy screen (src/story/deploy.js). The column's order of march is its commander's: a 把总 (the column's foot is
+  // his command as the game draws it) may close it up; below him it marches in file as Liu Ting had it. Where he goes in it
+  // is an officer's to choose: at its head on horse, in the place of one of Liu Ting's riders (an officer of the column rode
+  // where it could see him: the household's horse is the place's, north.js northDressed; our assumption, as the record does
+  // not say where the column's junior officers were), with its middle company, or with its tail.
+  deploy: {
+    formations: {
+      from: 'bazong',
+      default: 'file',
+      options: [
+        { id: 'file', name: { zh: '两列行军', en: 'In file' }, note: { zh: '两人一排沿谷底走，如刘綎催着全军走的那样：队伍拉得很长。', en: 'Two abreast along the valley floor, as Liu Ting pushed the column on: strung out long.' } },
+        { id: 'closed', name: { zh: '四列收拢', en: 'Closed up' }, note: { zh: '四人一排，长度减半，队尾听得见队首。', en: 'Four abreast, half as long: its tail within call of its head.' } },
+      ],
+    },
+    posts: {
+      from: 'shaoguan',
+      default: 'middle',
+      options: [
+        { id: 'head', name: { zh: '骑马在前', en: 'At the head, mounted' }, note: { zh: '骑着马跟刘綎的家丁在队首。', en: 'On horse at the column\'s head with Liu Ting\'s household riders.' } },
+        { id: 'middle', name: { zh: '中间一部', en: 'The middle company' }, note: { zh: '在南兵正兵当中，队伍的中段。', en: 'Among the southern regulars, the column\'s middle.' } },
+        { id: 'tail', name: { zh: '队尾', en: 'The tail' }, note: { zh: '和最后一部在一起。', en: 'With the last company.' } },
+      ],
+    },
+  },
+  /** Liu Ting's column in file in the valley (the hero in it by his rank or at his post, his comrades beside him) and the Jin above it. */
+  setup(life, seed = 1, options = {}) {
     const random = seededRandom(seed);
     const year = life.year ?? SARHU1619.year;
-    const red = sarhu1619Column(random);
+    const { formation, post } = storyDeployResolve(BATTLE_SARHU, life, options.deploy);
+    const red = sarhu1619Column(random, formation);
     const blue = sarhu1619Jin(random);
-    // A junior man of the column: in its middle company, the southern regulars'.
-    const middle = red.filter((man) => man.unit === 'south1');
-    const near = middle[Math.floor(middle.length / 2)].at;
-    const placed = northPlace(life, red, near, year);
+    // A junior man of the column: in its middle company, the southern regulars'; at a post he chose, that post's unit (the
+    // riders nearest Liu Ting; the last company's head).
+    const unit = { head: 'household', middle: 'south1', tail: 'south2' }[post] ?? 'south1';
+    const ofUnit = red.filter((man) => man.unit === unit);
+    const near = post === 'head' ? red[0].at : post === 'tail' ? ofUnit[0].at : ofUnit[Math.floor(ofUnit.length / 2)].at;
+    const placed = northPlace(life, red, near, year, post === 'head' ? { unit } : post === 'tail' ? { unit, role: 'lead' } : {});
     const { fighters, names, layouts } = northSides(red, blue);
     return {
       fighters,
@@ -155,6 +191,7 @@ export const BATTLE_SARHU = {
         climate: 'abdali1619',
       },
       view: SARHU1619.view,
+      deploy: { formation, post },
       ...placed,
       names,
     };

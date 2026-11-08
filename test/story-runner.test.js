@@ -10,7 +10,7 @@ import { advance, knockOut, placeFighter } from '../src/physics.js';
 import { thinkAll } from '../src/ai.js';
 import { canCommand, giveOrder } from '../src/command.js';
 import { storyNewLife } from '../src/story/life.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCommandMen, storyCurrent, storyIsStorm, storyNextChapter, storyPlaceOf, storyRunBattle, storySceneDone, storyWatch, storyWatchStep, STORY_JUDGEMENT, STORY_RUN } from '../src/story/runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCommandMen, storyCurrent, storyDeploy, storyIsStorm, storyNextChapter, storyPlaceOf, storyRunBattle, storySceneDone, storyWatch, storyWatchStep, STORY_JUDGEMENT, STORY_RUN } from '../src/story/runner.js';
 import { pyongyangBattle } from '../src/story/battles/03-pyongyang.js';
 import { ulsanBattle } from '../src/story/battles/05-ulsan.js';
 import { bodyAxes, createScenePlay, sceneLook, sceneThink, stepScene, STORY_SCENE } from '../src/story/scenes/stage.js';
@@ -333,6 +333,7 @@ test('the whole life, every chapter there is, played headless: each battle\'s se
     for (let guard = 0; guard < 200; guard += 1) {
       const now = storyCurrent(run);
       if (now.kind === 'card') storyAnswer(run, Math.max(0, (now.card.choices?.length ?? 1) - 1));
+      else if (now.kind === 'deploy') storyDeploy(run);
       else if (now.kind === 'battle') {
         const setup = now.battle.setup(run.life, 5);
         assert.ok(setup.fighters[setup.player], `${chapter.id}: the hero is in the battle`);

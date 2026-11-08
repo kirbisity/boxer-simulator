@@ -24,6 +24,7 @@ import { bannerman, mingSoldier } from '../../cast.js';
 import { seededRandom } from '../../physics.js';
 import { MANDARIN_DUCK } from '../../scenarios.js';
 import { northBlock, northName, northPlace, northSides, northStyles } from './north.js';
+import { storyDeployResolve } from '../deploy.js';
 
 export const LIAODONG = {
   year: 1618,
@@ -44,6 +45,22 @@ export const LIAODONG = {
   // The patrol forms its squads to receive them and holds (formation.js DRILL: the squads fight each man near his place, the
   // guns hold their fire until close), as Qi's drill had it.
   drill: { advance: false, squad: true, holdFire: true },
+  // How the four squads may stand (the deploy screen's, src/story/deploy.js: the 哨长's choice, who leads the patrol; below
+  // him it stands as the first). Each squad stands as Qi drew it up (MANDARIN_DUCK); what changes is where the squads are.
+  //  - line: the four abreast, the whole patrol's front to the raiders (Qi's squads in the open field, side by side; the
+  //    patrol as it stood before this screen).
+  //  - support: two squads forward and two `supportGap` m behind them, in the same files: depth for width. A squad's wounded
+  //    and blown men are relieved by the first fresh man behind them in their file (formation.js DRILL woundedAt, spentBelow),
+  //    so the second line feeds the first fresh men; the front is half as wide, and the raiders' riders can lap round it.
+  //    The gap: room for the forward squads' guns to fall back through them and stand DRILL.retireBehind (1 m) behind their
+  //    rearmost man, and for a man going back past one coming up: a rank's pitch (2.4 m, as a column's: 07-sarhu.js).
+  //  - square: the four squads back to back, each facing out (left, front, right, rear), the 哨长 in the middle: no flank
+  //    to ride round, as the north's camps stood against horse (Qi's northern manual, 练兵实纪, draws its cart camp facing all
+  //    four ways), at the cost of a quarter of the patrol to each face. `squareInside`: m from the middle to each squad's
+  //    rearmost man (its leader), room for the 哨长 there and no squad's corner men in another's places (their outer brushes
+  //    2.1 m out from their middles: a squad's back corner and the next squad's 1.9 m in are a full pace apart).
+  supportGap: 2.4,
+  squareInside: 1.9,
   // The ground: a rise (`ridge`: m in x where it starts and where it tops out, its height) and a stream at its foot (`stream`:
   // x from-to; shin-deep, its gravel bed firm under a little silt: soft ground as physics/fieldworks.js meets it).
   ridge: { from: 7, top: 15, height: 2.2 },
@@ -66,22 +83,52 @@ function liaodongWorks() {
   return { ditches, soft: [{ ...stream, z: [-arena.halfZ - 1, arena.halfZ + 1] }] };
 }
 
-/** The patrol, man by man: each squad as Qi drew it up, facing +x; its 哨长 behind. */
-function liaodongPatrol(random) {
-  const { squads, squadWidth, front, chief, design, people } = LIAODONG;
+// A squad's depth (m): its leader's place behind its shields (MANDARIN_DUCK).
+const LIAODONG_DEPTH = Math.max(...MANDARIN_DUCK.map(([, back]) => back));
+
+/**
+ * Where each squad stands in a formation (LIAODONG's line, support, square): its shields' middle `[x, z]` and the way it
+ * faces (`face`: a unit [x, z], the raiders' way +x), and the 哨长's place. The squads are numbered from the line's left
+ * (-z) to its right (+z): facing +x a man's right hand is +z (forward × up, as runner.js reads a line's right).
+ */
+export function liaodongSquads(formation = 'line') {
+  const { squads, squadWidth, front, chief, supportGap, squareInside } = LIAODONG;
+  const across = (k, count) => (k - (count - 1) / 2) * squadWidth;
+  if (formation === 'support') {
+    const behind = LIAODONG_DEPTH + supportGap;
+    const placed = Array.from({ length: squads }, (_, k) => ({ at: [k < 2 ? front : front - behind, across(k % 2, 2)], face: [1, 0] }));
+    return { squads: placed, chief: [front - behind - chief, 0] };
+  }
+  if (formation === 'square') {
+    const half = LIAODONG_DEPTH + squareInside;
+    const middle = [front - half, 0];
+    // Left (-z), front (+x), right (+z), rear (-x): squad k's face.
+    const faces = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+    return { squads: faces.map((face) => ({ at: [middle[0] + face[0] * half, middle[1] + face[1] * half], face })), chief: middle };
+  }
+  return { squads: Array.from({ length: squads }, (_, k) => ({ at: [front, across(k, squads)], face: [1, 0] })), chief: [front - chief, 0] };
+}
+
+/** The patrol, man by man: each squad as Qi drew it up, where its formation stands it (liaodongSquads); its 哨长. */
+function liaodongPatrol(random, formation = 'line') {
+  const { squads, design, people } = LIAODONG;
+  const plan = liaodongSquads(formation);
   const men = [];
   for (let squad = 0; squad < squads; squad += 1) {
-    const middle = (squad - (squads - 1) / 2) * squadWidth;
+    const { at: [x, z], face } = plan.squads[squad];
+    // The squad's right hand (forward × up): +z facing +x.
+    const right = [-face[1], face[0]];
     for (const [style, back, across] of MANDARIN_DUCK) {
       const inputs = mingSoldier(random, style, 'brigandine', { people, design });
       // His part: the shields and brushes in front, the spears and guns behind them, the rear pair, the leader at the back.
       const role = style === 'dao' ? 'lead' : back < 0.5 ? 'front' : back < 1.5 ? 'second' : 'rear';
-      // Red faces +x from -x: a man `back` behind the front stands further toward -x; `across` is to the squad's right (-z facing +x).
-      men.push({ inputs, name: northName(inputs), at: [front - back, middle - across], role, unit: squad });
+      // A man `back` behind the shields stands that far against the squad's face, `across` to its left: the patrol as first
+      // drawn stood MANDARIN_DUCK mirrored (its + across toward -z), and so it still does (a squad is near enough symmetric).
+      men.push({ inputs, name: northName(inputs), at: [x - face[0] * back - right[0] * across, z - face[1] * back - right[1] * across], role, unit: squad });
     }
   }
   const head = mingSoldier(random, 'dao', 'brigandine', { people, design });
-  men.push({ inputs: head, name: northName(head), at: [front - chief, 0], role: 'officer', unit: 'chief', leads: Array.from({ length: squads }, (_, squad) => squad) });
+  men.push({ inputs: head, name: northName(head), at: plan.chief, role: 'officer', unit: 'chief', leads: Array.from({ length: squads }, (_, squad) => squad) });
   return men;
 }
 
@@ -105,15 +152,44 @@ export const BATTLE_LIAODONG = {
   year: LIAODONG.year,
   title: { zh: '辽东边哨', en: 'A Patrol on the Liaodong Frontier' },
   seconds: LIAODONG.seconds,
-  /** The patrol (the hero in it by his rank, his living comrades beside him) and the raiders, at a seed. */
-  setup(life, seed = 1) {
+  // The deploy screen (src/story/deploy.js): the patrol's formation and his place in it, a 哨长's to choose (he leads it).
+  deploy: {
+    formations: {
+      from: 'shaozhang',
+      default: 'line',
+      options: [
+        { id: 'line', name: { zh: '四队并列', en: 'Four abreast' }, note: { zh: '四个鸳鸯阵并排，全哨的正面对着他们。', en: 'The four mandarin-duck squads side by side: the whole patrol\'s front to the raiders.' } },
+        { id: 'support', name: { zh: '两前两后', en: 'Two up, two back' }, note: { zh: '两队在前，两队在后同一列上接替伤者和力竭的人；正面窄了一半，骑兵能绕过来。', en: 'Two squads forward, two behind in the same files to relieve the hurt and the blown; half the front, and their riders can go round it.' } },
+        { id: 'square', name: { zh: '四面方阵', en: 'Square' }, note: { zh: '四队背靠背各朝一面，哨长居中：没有可绕的侧翼，每面只有一队。', en: 'The squads back to back, one to each face, the platoon leader in the middle: no flank to ride round, one squad to a face.' } },
+      ],
+    },
+    posts: {
+      from: 'shaozhang',
+      default: 'chief',
+      options: [
+        { id: 'chief', name: { zh: '阵后居中', en: 'Behind the middle' }, note: { zh: '哨长的位置：看得见全哨，全哨也看得见他。', en: 'The platoon leader\'s place: he sees the whole patrol, and it sees him.' } },
+        { id: 'right', name: { zh: '右队队首', en: 'Right squad' }, note: { zh: '站在右边一队的队长位置上，带着它打。', en: 'In the right-hand squad\'s leader\'s place, fighting with it.' } },
+        { id: 'left', name: { zh: '左队队首', en: 'Left squad' }, note: { zh: '站在左边一队的队长位置上，带着它打。', en: 'In the left-hand squad\'s leader\'s place, fighting with it.' } },
+        { id: 'second', formations: ['support'], name: { zh: '后队', en: 'Second line' }, note: { zh: '和后面两队在一起，看准了再把他们送上去。', en: 'With the two squads behind, to send them up where the front needs them.' } },
+      ],
+    },
+  },
+  /** The patrol (the hero in it by his rank, or at the post he chose; his living comrades beside him) and the raiders, at a seed. */
+  setup(life, seed = 1, options = {}) {
     const random = seededRandom(seed);
     const year = life.year ?? LIAODONG.year;
-    const red = liaodongPatrol(random);
+    const { formation, post } = storyDeployResolve(BATTLE_LIAODONG, life, options.deploy);
+    const red = liaodongPatrol(random, formation);
     const blue = liaodongRaiders(random);
-    // His squad: the second from the right of the line as it faces them (any squad would do; the middle ones are flanked by friends).
-    const near = [LIAODONG.front, -(1 - (LIAODONG.squads - 1) / 2) * LIAODONG.squadWidth];
-    const placed = northPlace(life, red, near, year);
+    // His squad: the second from the right of the line as it faces them (any squad would do; the middle ones are flanked by
+    // friends); at a post he chose, the 哨长's place, or the leader's place of that post's squad (liaodongSquads' numbering:
+    // the right the line's last squad, the square's right face, the support's forward right; the left squad 0; the second
+    // line's left squad).
+    const postSquad = { right: formation === 'square' ? 2 : formation === 'support' ? 1 : LIAODONG.squads - 1, left: 0, second: 2 }[post];
+    const near = post === 'chief' ? liaodongSquads(formation).chief
+      : postSquad !== undefined ? red.find((man) => man.unit === postSquad && man.role === 'lead').at
+        : [LIAODONG.front, -(1 - (LIAODONG.squads - 1) / 2) * LIAODONG.squadWidth];
+    const placed = northPlace(life, red, near, year, post ? { role: post === 'chief' ? 'officer' : 'lead' } : {});
     const { fighters, names, layouts } = northSides(red, blue);
     return {
       fighters,
@@ -128,6 +204,7 @@ export const BATTLE_LIAODONG = {
         climate: 'liaodong1618',
       },
       view: LIAODONG.view,
+      deploy: { formation, post },
       ...placed,
       names,
     };

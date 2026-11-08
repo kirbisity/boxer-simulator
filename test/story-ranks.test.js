@@ -6,7 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STORY_MERIT, STORY_RANKS, STORY_SCOPES, storyBattleMerit, storyGradeOf, storyPromotionDue, storyRankOf } from '../src/story/ranks.js';
 import { storyApplyEffects, storyEnterChapter, storyNewLife, storyValidLife } from '../src/story/life.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCurrent, storyReadOutcome, storySceneDone, storyWatch } from '../src/story/runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCurrent, storyDeploy, storyReadOutcome, storySceneDone, storyWatch } from '../src/story/runner.js';
 import { CHAPTERS, COMRADES, STORY_FAMILY, STORY_HERO } from '../src/story/chapters/index.js';
 import { STORY_BATTLES } from '../src/story/battles/index.js';
 
@@ -30,7 +30,8 @@ function play(life, n, battle = {}, picks = {}) {
     if (current.kind === 'card') {
       shown.push(current.card.id);
       storyAnswer(run, choose(current.card, picks));
-    } else if (current.kind === 'battle') storyBattleDone(run, fought(life, battle));
+    } else if (current.kind === 'deploy') storyDeploy(run);
+    else if (current.kind === 'battle') storyBattleDone(run, fought(life, battle));
     else if (current.kind === 'scene') storySceneDone(run);
     else break;
   }

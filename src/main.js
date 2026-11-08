@@ -2915,6 +2915,8 @@ const story = installStory({
   },
   home: () => goHome(),
   closeMenus: () => menus.close(),
+  // The horse button's (or `/`): down from his horse or up onto a loose one beside him (the story HUD's loose-horse control).
+  horse: () => fightControls.horse?.(),
 });
 
 // ---- The tutorial: the training yard ----------------------------------------------
