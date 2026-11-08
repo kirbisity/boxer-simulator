@@ -720,7 +720,8 @@ function thinkEach(world, dt, playerIds) {
     fighter.unperceived = !seen;
     // (A rider thinks every step, whatever his detail: a step his AI sets no goal for his horse, it goes by his footwork,
     // physics/mounted.js goalFromFootwork.)
-    const exchanging = fighter.detail === 'full' || fighter.detail === undefined;
+    // (An exchange the player does not perceive, 'unseen' in the physics, is an exchange all the same: physics.js chooseDetail.)
+    const exchanging = fighter.detail === 'full' || fighter.detail === 'unseen' || fighter.detail === undefined;
     const every = !staggered || fighter.mount || exchanging ? 0 : seen ? AI.idleThinkEvery : AI.perceive.idleEvery;
     if (every === 0) {
       // Cleared, so that once he is staggered he takes up his own beat.

@@ -1007,6 +1007,20 @@ export const WORLD = {
     riderLead: 0.3,
     // range: a lance's length past a horse's (~6 m from its centre to a foe's) and room to turn; lead: a second at its pace.
     horse: { range: 8, lead: 1 },
+    // `unseen`: in a big fight (tier 3 or 4) played as one man, an exchange the player does not perceive (ai.js AI.perceive:
+    // beyond 8 m and out of his view, or past 25 m), no man within reach of it perceived (a shooter at a man he sees is
+    // not at hand: physics.js markSeenExchanges), steps on one substep in `stride`, that
+    // much further: 240 Hz, not 480. Detail from the player outward: the exchanges he sees are stepped in full, the ones he
+    // cannot are still the same physics (the same bodies, muscles, contacts and blows, in the same order) at half the
+    // rate. 2, not the coarse stride's 4: a cut's point goes some 15-25 m/s, a punch's fist ~10, and the contacts are
+    // tested where the parts are, not swept, so a substep must not carry a point far past a blade or a forearm it meets
+    // (a blade's radius ~1.2 cm, a forearm's ~4: a pair 2.5-8 cm). At 240 Hz a 20 m/s point goes 8 cm a substep, about
+    // the depth of a forearm and the blade meeting it; at 120 Hz 17 cm, past either. Stride 2 halves what the pair costs
+    // where a big battle's step goes (integrate, constraints, joint limits, the ground, the contacts: most of it to the
+    // men in exchanges, the coarse and the poses costing little). Not unseen: a man held, holding or picking something up
+    // (the holds pull every substep: physics/grappling.js), on a horse (his seat goes with the horse's), or the player's
+    // own (world.keepFull).
+    unseen: { stride: 2 },
   },
   // m each side of the centre the sides start: a few steps apart, room to come on (further when someone carries a gun).
   startApart: 1.6,
