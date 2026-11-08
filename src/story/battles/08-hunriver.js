@@ -41,6 +41,7 @@ import { BATTLE_END } from '../../battleend.js';
 import { DRILL } from '../../formation.js';
 import { seededRandom } from '../../physics.js';
 import { northName, northPlace, northSides, northStyles } from './north.js';
+import { storyDeployResolve } from '../deploy.js';
 
 // m from the camp's middle the Jin form up (above): inside the folangji's canister reach (some 100 m), and a minute and a
 // quarter's walk at the drill's pace.
@@ -74,6 +75,27 @@ export const HUNRIVER = {
   // of ~3,100 men and 128 carts: one gun to ~12 men; the camp's 18 here, two guns). Each in a cart's interval (the palisade's gap)
   // on the main face and the rear, its crew of two the Zhejiang and household men there (`crew`: their places in `camp`),
   // loading canister for the Jin come within its reach. The camp's charges, `rounds` a gun, are an estimate (none is given).
+  // How the camp's men may stand (the deploy screen's `formation`, src/story/deploy.js), each the places it changes in `camp`
+  // (its index: [x, z, part]); the cart lines, the guns and their crews, the commanders and the officer's place stay. As the
+  // camp stood (`carts`, the default): its weight on the main face toward the river the Jin crossed by, the open sides and
+  // the rear lightly held. `square`: every face held, as the Jin were round it "several rings deep" (数匝) and came on from
+  // all sides; Qi Jiguang's cart camp (车营, 练兵实纪 杂集), in which Qi Jin's men were raised, was a square of carts for
+  // that reason. The main face's long-brush and shield men go to the open sides, a third man to each; its two spears, its gun
+  // and its carts hold it. `reserve`: four men held in the middle, as that cart camp kept its killing men (杀手) inside the
+  // carts while the guns fired, to go out where the enemy closed: the main face's long-brush and shield men, and the two
+  // Sichuan men who had come in from a camp already lost. A block of four abreast 1.8 m apart (no closer than the guns'
+  // crews stand, 1.6 m) 1.6 m in front of the camp's middle, no closer to the commanders than that either.
+  formations: {
+    carts: {},
+    square: { 1: [0, -6.6, 'front'], 2: [3, 6.6, 'front'] },
+    reserve: { 1: [1.6, -0.9, 'second'], 2: [1.6, 0.9, 'second'], 16: [1.6, -2.7, 'second'], 17: [1.6, 2.7, 'second'] },
+  },
+  // Where an officer stands (the deploy screen's `post`): the officer's place in `camp` (index `officer`), behind the face he
+  // holds. `main` as the camp had it, behind the main face by the gun, where Qi Jin stood; `rear` and `side` the same place
+  // turned to that face (the rear's cart line and gun, held by the household men; the open +z side, no carts before it);
+  // `reserve`, with the four in the middle (the reserve formation's only), behind their left, to send them where a face gives.
+  officer: 10,
+  posts: { main: [3.4, 1.6], rear: [-3.4, -1.6], side: [-1.6, 3.4], reserve: [0, -2.7] },
   artillery: [
     { kind: 'folangji', at: [7, 0], facing: [1, 0], arc: 1.1, crew: [4, 5] },
     { kind: 'folangji', at: [-7, 0], facing: [-1, 0], arc: 1.1, crew: [11, 12] },
@@ -118,10 +140,13 @@ function hunriverWorks() {
   return { walls: [line(half), line(-half)] };
 }
 
-/** The camp's men, each in his place. */
-function hunriverCamp(random) {
-  const { camp, named, people, design } = HUNRIVER;
-  return camp.map(([unit, rank, style, x, z, part]) => {
+/** The camp's men, each in his place: as the camp stood, or drawn up as `formation` says, the officer's place at `post`. */
+function hunriverCamp(random, formation = 'carts', post = 'main') {
+  const { camp, named, people, design, formations, officer, posts } = HUNRIVER;
+  const moved = formations[formation] ?? {};
+  return camp.map((entry, index) => {
+    const [unit, rank, style] = entry;
+    const [x, z, part] = index === officer ? [...posts[post] ?? posts.main, entry[5]] : moved[index] ?? entry.slice(3);
     const inputs = mingSoldier(random, style, rank, { people: people[unit], design: design[rank] });
     if (part.startsWith('named:')) {
       const name = named[part.slice(6)];
@@ -161,14 +186,40 @@ export const BATTLE_HUNRIVER = {
   year: HUNRIVER.year,
   title: { zh: '浑河血战', en: 'The Hun River' },
   seconds: HUNRIVER.seconds,
-  /** The Zhejiang camp (the hero among its leaders by his rank, his comrades beside him) and the Jin round it. */
+  // The deploy screen (src/story/deploy.js). How the camp's men stand is its commander's: a 把总 (the camp's few, scaled, are
+  // a command as the game draws it); below him it stands as it did, behind the carts. Which face he holds is an officer's
+  // (a 哨官's): Qi Jin's main face, the rear, an open side, or (in the reserve) the middle. The camp's men, its guns and the
+  // Jin round it are the battle's in every one (HUNRIVER.formations, posts).
+  deploy: {
+    formations: {
+      from: 'bazong',
+      default: 'carts',
+      options: [
+        { id: 'carts', name: { zh: '依车而守', en: 'Behind the carts' }, note: { zh: '如营中原样：多数人守着朝河的正面车阵，两侧和后面人少。', en: 'As the camp stood: most men on the main face toward the river, the sides and the rear thinly held.' } },
+        { id: 'square', name: { zh: '四面皆守', en: 'Hollow square' }, note: { zh: '金兵围了数匝，四面都会来：正面的狼筅手和藤牌手调去两侧没有车的地方。', en: 'The Jin are round it several rings deep and will come on every face: the brush and shield men go from the main face to the open sides.' } },
+        { id: 'reserve', name: { zh: '中留预备', en: 'A reserve in the middle' }, note: { zh: '如戚继光车营把杀手留在车内：四个人站在营中，哪面顶不住就往哪面去。', en: 'As Qi Jiguang\'s cart camp kept its killing men inside the carts: four held in the middle, for whichever face gives.' } },
+      ],
+    },
+    posts: {
+      from: 'shaoguan',
+      default: 'main',
+      options: [
+        { id: 'main', name: { zh: '正面', en: 'The main face' }, note: { zh: '朝河的正面，炮旁，戚金站的地方。', en: 'The face toward the river, by the gun, where Qi Jin stood.' } },
+        { id: 'rear', name: { zh: '后面车阵', en: 'The rear' }, note: { zh: '后面那道车阵和它的炮，家丁守着。', en: 'The rear cart line and its gun, the household men\'s.' } },
+        { id: 'side', name: { zh: '侧面', en: 'An open side' }, note: { zh: '没有车挡着的一面：营里最薄的地方。', en: 'A face with no carts before it: the camp\'s thinnest.' } },
+        { id: 'reserve', formations: ['reserve'], name: { zh: '带预备队', en: 'With the reserve' }, note: { zh: '和营中的四个人在一起，看哪面要人。', en: 'With the four in the middle, to see which face needs them.' } },
+      ],
+    },
+  },
+  /** The Zhejiang camp (the hero among its leaders by his rank, or at the face he chose; his comrades beside him) and the Jin round it. */
   setup(life, seed = 1, options = {}) {
     const random = seededRandom(seed);
     const year = life.year ?? HUNRIVER.year;
-    const red = hunriverCamp(random);
+    const { formation, post } = storyDeployResolve(BATTLE_HUNRIVER, life, options.deploy);
+    const red = hunriverCamp(random, formation, post ?? 'main');
     const blue = hunriverJin(random);
-    // His place: on the main face, where Qi Jin stood.
-    const placed = northPlace(life, red, [4.4, 0], year);
+    // His place: on the main face, where Qi Jin stood; at a post he chose, the officer's place behind that face.
+    const placed = post ? northPlace(life, red, HUNRIVER.posts[post], year, { role: 'officer' }) : northPlace(life, red, [4.4, 0], year);
     const { fighters, names, layouts } = northSides(red, blue);
     return {
       fighters,
@@ -187,6 +238,7 @@ export const BATTLE_HUNRIVER = {
         artillery: options.artillery === false ? [] : HUNRIVER.artillery,
       },
       view: HUNRIVER.view,
+      deploy: { formation, post },
       ...placed,
       names,
     };
