@@ -18,8 +18,10 @@
 // foot (`ladderPost`, ai.js) and raise it. Then it is climbed: a man at its foot, with the enemy on the walk above, gets on
 // it and goes up it as up a steep stair (`climb`), his stance carried by it (the ladder, not the ground's relief, holds his
 // feet: a wall's face is no slope to walk up, physics/fieldworks.js FIELDWORKS.face). It is two men wide (`lanes`): two go
-// up it abreast, each in his lane one to every `spacing` m of it, each waiting on the man above him in it. His hands are on
-// its rails: he strikes nothing (physics.js throwPunch) until he is at its head, his arms over the walk's edge. At its head
+// up it abreast, each in his lane one to every `spacing` m of it, each waiting on the man above him in it. He goes up only
+// from over its foot (not from where he stood beside it or under it), his feet on its rungs one by turns and his hands on
+// rungs above them (`climb`, ladderLimbs: his own steps given up while he is on it), his trunk along it: he strikes nothing
+// (physics.js throwPunch) until he is at its head, his arms over the walk's edge. At its head
 // he steps onto the walk if no enemy stands where he would; else he fights from there. Struck down, knocked off its line,
 // or thrown with it, he falls from where he was on it, as any body falls.
 //
@@ -27,7 +29,8 @@
 // pressing at the wall, holds his rung while he does not, and climbs back down (and off at its foot) when he pulls away.
 
 import { P } from '../body.js';
-import { fall, point } from '../physics.js';
+import { fall, point, toLocal } from '../physics.js';
+import { POSE, yawRotate } from '../pose.js';
 import { WORLD } from './config.js';
 import { reliefAt, worksOf, worksStateOf } from './fieldworks.js';
 
@@ -76,6 +79,14 @@ export const LADDERS = {
   raisers: 2,
   raiseWithin: 2.2,
   raiseSeconds: 8,
+  // m along the rails from rung to rung (and from its foot to the first): a ladder's rungs are 10-14 in (0.25-0.36 m) apart
+  // (OSHA 29 CFR 1910.23(b)(2)), a stair's rise up it; 0.3 m along at 65° is 0.27 m up. The drawing's rungs are these
+  // (story/ground/wallview.js), and his hands and feet go on them (`climb`).
+  rung: 0.3,
+  // m along the rails they stand up past the walk's edge: a ladder set to be stepped off at its head (and held there by the
+  // hands), not climbed over; OSHA 29 CFR 1910.23(c)(11) has a ladder's rails 3 ft (0.9 m) past what it is got off onto, a
+  // scaling ladder cut to the wall's height a little less.
+  over: 0.6,
   // A ladder's width (m): its gap's piece of the face when it is down (story/ground/walls.js STORY_WALL.ladder): its two
   // lanes and a rail's room either side.
   width: 1.6,
@@ -102,14 +113,41 @@ export const LADDERS = {
     // within `enemyWithin` m of its head: half its width, so the men at its foot go up it from where they stand.
     mount: 0.8,
     enemyWithin: 14,
-    // m/s his stance is carried to his lane's line as he gets on it (a step or two).
+    // m/s his stance is carried to his lane's line as he gets on it (a step or two); he goes up only once it is within
+    // `onPlace` m of his place on it (his feet on its bottom rungs, not on the ground a stride off: there he would be climbing
+    // the air beside it).
     board: 1.5,
+    onPlace: 0.15,
     // m: his hips knocked this far off his place on the ladder (by a blow, a shove, the press), his hold is gone: he falls.
     slip: 0.5,
     // His balance against a knock (physics.js: the speed a shove must give him to put him over) on a ladder: his hands on
     // its rails as well as his feet on a rung, so a shove has to tear his grip loose too (a man braced with both hands takes
     // about twice what he takes on his feet alone). A blow that knocks his hips off his place still takes him off (`slip`).
     hold: 2,
+    // His hands and feet on its rungs (ladderLimbs). A foot to every other rung, the two by turns: the one stands on its rung
+    // while the other comes up past it onto the next (the reciprocal gait of men up a ladder as up a stair: Bloswick & Chaffin
+    // 1990 above), so he has a foot on a rung, and both hands on others, at every moment ("three points of contact").
+    // The ball of his foot on the rung: his ankle `heel` m out behind it (a man's ankle is some 0.1-0.12 m behind the ball of
+    // his foot, nearly half the foot's length, itself 0.152 of his stature: Drillis & Contini 1966), his feet `feetApart` m
+    // apart along it (his hips' width); and his stance (root) over them.
+    heel: 0.1,
+    feetApart: 0.22,
+    // m the rising foot is drawn out from the rungs at the middle of its swing, the toes clear of the rung it passes.
+    clearance: 0.08,
+    // His stance (the height his hips are set from) this share of a rung under the rung his foot has just come onto: his knee
+    // bent the most as it lands (a stair's rise more than a guard's crouch), near straight (the guard's) as he rises to it and
+    // the other foot reaches for the next.
+    stand: 0.75,
+    // His hands on the rungs at about his shoulders' height over the rung his (other) foot is on, `grip` of his height (the
+    // shoulder, the acromion, is 0.82 of a man's stature: Drillis & Contini 1966; less his bent knees and his lean), each going
+    // up with the other side's foot (the diagonal gait: right hand and left foot together), `handsApart` m apart (his
+    // shoulders' width). Each hand's fist is on its rung, the weapon in it pointed up along the rails (a two-handed haft in
+    // the one hand: the other is on the ladder).
+    grip: 0.75,
+    handsApart: 0.4,
+    // His trunk leaned toward the ladder, a share of its own lean from the upright: along its rails, his weight kept in over
+    // the rungs and his shoulders in his hands' reach, as a man's up a steep stair-ladder.
+    trunk: 1,
     // The player's way: the share of his stick (or his steps' way) pointed at the wall that puts him on it at its foot and
     // takes him up it; pointed away from it as much, he climbs down. Less either way, he holds his rung.
     wish: 0.5,
@@ -203,6 +241,102 @@ export function ladderPlace(ladder, up, lane = 0) {
   ];
 }
 
+/** m up a ladder from rung to rung. */
+const ladderRise = () => LADDERS.rung * Math.cos(LADDERS.lean);
+
+/**
+ * A point on a ladder's rails `h` m up it (over its foot; past its head they go on up the same line, to their tops), `across`
+ * m to the side of lane `lane`'s line and `out` m out from its rungs (on the level, away from the wall): [x, y, z].
+ */
+function ladderRailPoint(ladder, h, lane, across = 0, out = 0) {
+  const share = h / ladder.height;
+  const side = ladderLaneSide(lane) + across;
+  return [
+    ladder.foot[0] + (ladder.head[0] - ladder.foot[0]) * share + ladder.u[0] * side + ladder.out[0] * out,
+    ladder.base + h,
+    ladder.foot[1] + (ladder.head[2] - ladder.foot[1]) * share + ladder.u[1] * side + ladder.out[1] * out,
+  ];
+}
+
+/**
+ * Where a hand or a foot that goes on every other rung (those of parity `parity`) is, the climber `n` rungs up: on the last of
+ * its rungs he has come to (`from`, and `to` the same), or on its way from it to the next (`t` of the way, 0-1), in the rung
+ * after its own, while the other side's stands. Down the ladder, the same backwards.
+ */
+function ladderRungOf(n, parity) {
+  const from = parity + 2 * Math.floor((n - parity) / 2);
+  const t = n - from - 1;
+  return t > 0 ? { from, to: from + 2, t } : { from, to: from, t: 0 };
+}
+
+/**
+ * A climber's hands and feet on his ladder now ({ l: { foot, hand }, r: ... }, each [x, y, z]; LADDERS.climb): his left foot
+ * on the even rungs, his right on the odd, each hand going up with the other side's foot `grip` of his height above it, on
+ * the rungs to the rails' tops. A rung past the ladder's head is the walk: a foot stepping in onto it (ladderPlace).
+ */
+export function ladderLimbs(ladder, fighter) {
+  const spec = LADDERS.climb;
+  const rise = ladderRise();
+  const lane = fighter.climbing.lane ?? 0;
+  const n = fighter.climbing.up / rise + spec.stand;
+  const grip = Math.round((spec.grip * fighter.body.heightM) / rise);
+  const railTop = ladder.height + LADDERS.over * Math.cos(LADDERS.lean);
+  // His left along the rungs (facing the wall, as he climbs): which way of its line (u) that is.
+  const leftWay = yawRotate([0, 0, 1], Math.atan2(ladder.out[1], -ladder.out[0]));
+  const left = Math.sign(leftWay[0] * ladder.u[0] + leftWay[2] * ladder.u[1]) || 1;
+  const footAt = (rung, across) => {
+    const h = Math.max(0, rung * rise);
+    if (h <= ladder.height) return ladderRailPoint(ladder, h, lane, across, spec.heel);
+    const [x, z] = ladderPlace(ladder, h, lane);
+    return [x + ladder.u[0] * across, ladder.base + ladder.height, z + ladder.u[1] * across];
+  };
+  const handAt = (rung, across) => ladderRailPoint(ladder, Math.min(railTop, Math.max(0, rung * rise)), lane, across, 0);
+  /** On its rung, or on its way to the next: drawn out from the rungs at the middle of the move, clear of them. */
+  const moving = (at, { from, to, t }, across) => {
+    const a = at(from, across);
+    const b = at(to, across);
+    const ease = t * t * (3 - 2 * t);
+    const clear = spec.clearance * Math.sin(Math.PI * t);
+    return [0, 1, 2].map((k) => a[k] + (b[k] - a[k]) * ease + (k === 1 ? 0 : ladder.out[k === 0 ? 0 : 1] * clear));
+  };
+  const limbs = {};
+  for (const [side, parity, sign] of [['l', 0, left], ['r', 1, -left]]) {
+    const feet = ladderRungOf(n, parity);
+    // (His other hand goes with this foot: the rungs of this foot's parity, `grip` up.)
+    const hand = ladderRungOf(n, 1 - parity);
+    limbs[side] = {
+      foot: moving(footAt, feet, (sign * spec.feetApart) / 2),
+      hand: moving(handAt, { from: hand.from + grip, to: hand.to + grip, t: hand.t }, (sign * spec.handsApart) / 2),
+    };
+  }
+  return limbs;
+}
+
+/**
+ * A climber's pose on his ladder (physics.js updateIntent, after the rest of it): square to it, his trunk along its rails,
+ * his hands on its rungs (ladderLimbs) with his weapon in his fist pointed up it; at its head a blow or a block of his own
+ * takes his hands off it. (His feet are its: climbLadder.)
+ */
+export function ladderPose(world, fighter, intent) {
+  const ladder = world.siegeLadders?.[fighter.climbing?.ladder];
+  if (!ladder) return;
+  intent.twist = 0;
+  intent.hipYaw = 0;
+  intent.lean = LADDERS.lean * LADDERS.climb.trunk - (intent.stance?.lean ?? POSE.forwardLean);
+  if (fighter.punch || fighter.defence) return;
+  const limbs = ladderLimbs(ladder, fighter);
+  intent.lHand = toLocal(fighter, limbs.l.hand);
+  intent.rHand = toLocal(fighter, limbs.r.hand);
+  intent.twoHanded = false;
+  intent.weaponArms = null;
+  intent.guardTight = false;
+  // Up along its rails, in his frame.
+  const length = Math.hypot(ladder.head[0] - ladder.foot[0], ladder.height, ladder.head[2] - ladder.foot[1]);
+  const up = yawRotate([(ladder.head[0] - ladder.foot[0]) / length, ladder.height / length, (ladder.head[2] - ladder.foot[1]) / length], -fighter.yaw);
+  if (intent.bladeDir) intent.bladeDir = up;
+  if (intent.offBladeDir) intent.offBladeDir = up;
+}
+
 /** The men on a ladder now (on their feet; in one lane of it, if given), the highest first. */
 const ladderClimbers = (world, ladder, lane = null) => world.fighters.filter((fighter) => fighter.climbing?.ladder === ladder.index && fighter.state === 'up' && (lane === null || fighter.climbing.lane === lane)).sort((a, b) => b.climbing.up - a.climbing.up);
 
@@ -260,7 +394,10 @@ export function climbLadder(world, fighter, dt) {
   const wish = ladderWish(fighter, ladder);
   const lane = climbing.lane ?? 0;
   const down = fighter.panicked || fighter.fled || (wish !== null && wish <= -spec.wish);
-  const going = down ? -1 : wish === null || wish >= spec.wish ? 1 : 0;
+  // Not yet over his rung (getting on from where he stood at its foot, or under it): he steps to it before he climbs.
+  const was = ladderPlace(ladder, climbing.up, lane);
+  const off = Math.hypot(was[0] + ladder.out[0] * spec.heel - fighter.root[0], was[1] + ladder.out[1] * spec.heel - fighter.root[1]);
+  const going = down ? -1 : (wish === null || wish >= spec.wish) && off <= spec.onPlace ? 1 : 0;
   let up = climbing.up + going * rate * dt;
   for (const other of ladderClimbers(world, ladder, lane)) {
     if (other !== fighter && other.climbing.up > climbing.up) up = Math.min(up, other.climbing.up - spec.spacing / along);
@@ -274,18 +411,25 @@ export function climbLadder(world, fighter, dt) {
   climbing.up = Math.max(climbing.up - rate * dt, up);
   climbing.top = climbing.up >= ladder.height - spec.top;
   const place = ladderPlace(ladder, climbing.up, lane);
-  // His stance carried to his place on its line (as he gets on it: a step or two), and held there.
-  const dx = place[0] - fighter.root[0];
-  const dz = place[1] - fighter.root[1];
+  // His stance carried to his place on its line (as he gets on it: a step or two), and held there: over the balls of his feet
+  // on the rungs, his ankles `heel` out behind them.
+  const dx = place[0] + ladder.out[0] * spec.heel - fighter.root[0];
+  const dz = place[1] + ladder.out[1] * spec.heel - fighter.root[1];
   const apart = Math.hypot(dx, dz);
   const most = spec.board * dt + spec.pace * dt;
   const moved = apart > most ? most / apart : 1;
   fighter.rootVelocity = [(dx * moved) / Math.max(dt, 1e-9), (dz * moved) / Math.max(dt, 1e-9)];
   fighter.root = [fighter.root[0] + dx * moved, fighter.root[1] + dz * moved];
   fighter.lift = ladder.base + Math.min(climbing.up, ladder.height);
-  for (const foot of [fighter.feet.l, fighter.feet.r]) {
-    foot.floor = fighter.lift;
-    if (foot.step) foot.step.floorFrom = foot.step.floorTo = fighter.lift;
+  // His feet on its rungs (ladderLimbs): set there each step, his own steps given up while he is on it (physics.js updateFeet).
+  const limbs = ladderLimbs(ladder, fighter);
+  for (const side of ['l', 'r']) {
+    const foot = fighter.feet[side];
+    const at = limbs[side].foot;
+    foot.step = null;
+    foot.lifted = false;
+    foot.planted = [at[0], fighter.desired?.[foot.index]?.[1] ?? 0, at[2]];
+    foot.floor = at[1];
   }
   // Facing the wall.
   const wallYaw = Math.atan2(ladder.out[1], -ladder.out[0]);

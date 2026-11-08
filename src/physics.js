@@ -19,7 +19,7 @@ import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pi
 import { flyNets } from './physics/net.js';
 import { carriedThrowable, flyThrown, stepThrow, throwPose } from './physics/throwable.js';
 import { createArtillery, stepArtillery } from './physics/artillery.js';
-import { climbLadder, createLadders, LADDERS, stepLadders } from './physics/ladders.js';
+import { climbLadder, createLadders, LADDERS, ladderPose, stepLadders } from './physics/ladders.js';
 import { brushKeepsOff, brushTouch, caughtBlade, holdBrushes, pinnedByBrush, tangled } from './physics/brush.js';
 import { artTurn, beakMix, coiledTwist, hiltCrush, hiltKnob, hiltMix, hookPull, rangeDrive, rangeOff, retreatDrive, strikeSpan, turningMass, turnsWithBlow } from './physics/arts.js';
 import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
@@ -2651,6 +2651,8 @@ function updateIntent(world, fighter, dt) {
   // His blade caught in a wolf-brush: his weapon hand dragged to where it is held (physics/brush.js).
   if (fighter.caught) pinnedByBrush(world, fighter, intent);
   runCarry(world, fighter, intent, dt);
+  // On a scaling ladder: square to it, leaned along it, his hands on its rungs (physics/ladders.js).
+  if (fighter.climbing) ladderPose(world, fighter, intent);
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
     for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * 0.2 * H];
@@ -3075,8 +3077,8 @@ export function plantFeet(fighter) {
 
 /** Feet stay planted while the stance drifts, then step to catch up, one at a time. */
 function updateFeet(world, fighter, dt) {
-  // In the stirrups: no steps.
-  if (fighter.mount) return;
+  // In the stirrups: no steps. On a scaling ladder, its rungs take his feet (physics/ladders.js climbLadder).
+  if (fighter.mount || fighter.climbing) return;
   if (fighter.state !== 'up' && fighter.state !== 'rising') {
     plantFeet(fighter);
     return;
@@ -3889,7 +3891,7 @@ export function step(world, dt) {
     // A jump under way holds the stance itself (crouch, flight, landing); otherwise, on terrain, the floor does.
     if (fighter.jump) jumpStance(world, fighter, span);
     if (fighter.arena.terrain) {
-      if (!fighter.jump) groundStance(fighter, span);
+      if (!fighter.jump && !fighter.climbing) groundStance(fighter, span);
       trackAir(fighter, world.time);
     }
   }
