@@ -41,8 +41,8 @@ function walkAndTurn(cam, seconds, { look = null, speed = 2.5, stopAt = Infinity
 }
 
 test('look ahead: turning with the stick swings the view into the turn ahead of the plain follow, smoothly, and it settles when he stops', () => {
-  const plain = walkAndTurn(createFollowCam({ ...FOLLOW_CAM, ahead: { ...FOLLOW_CAM.ahead, most: 0 } }), 6, { stopAt: 3 });
-  const leading = walkAndTurn(createFollowCam(), 6, { stopAt: 3 });
+  const plain = walkAndTurn(createFollowCam({ ...FOLLOW_CAM, ahead: { ...FOLLOW_CAM.ahead, most: 0 } }), 8, { stopAt: 3 });
+  const leading = walkAndTurn(createFollowCam(), 8, { stopAt: 3 });
   const goal = behindYaw(Math.PI / 2);
   const at = (views, time) => views.find((entry) => entry.time >= time - 1e-9).view.yaw;
   // Half a second into the turn the leading view has come round further towards behind his new way.
@@ -55,14 +55,15 @@ test('look ahead: turning with the stick swings the view into the turn ahead of 
     assert.ok(Math.abs(leading[i].ahead) <= FOLLOW_CAM.ahead.most + 1e-9);
   }
   assert.ok(Math.max(...leading.map((entry) => Math.abs(entry.ahead))) > 0.15, 'it does lead');
-  // Stopped (at 3 s) and standing: it settles back to none.
+  // Stopped (at 3 s) and standing: it settles back to none (in 5 s: the lead eases out over FOLLOW_CAM.ahead.seconds, its swing slowed by `accel`).
   assert.ok(Math.abs(leading.at(-1).ahead) < 1e-3, `settled (${leading.at(-1).ahead})`);
 });
 
 test('look ahead: the player\'s own drag takes the view at once without a jump, and the lead comes back only after a pause', () => {
   const cam = createFollowCam();
-  const views = walkAndTurn(cam, 4, { look: { at: 1.3, yaw: 0 } });
-  const index = views.findIndex((entry) => entry.time >= 1.3 - 1e-9);
+  // (Taken 0.6 s into the turn: the lead gathers slowly, FOLLOW_CAM.ahead.accel.)
+  const views = walkAndTurn(cam, 4, { look: { at: 1.6, yaw: 0 } });
+  const index = views.findIndex((entry) => entry.time >= 1.6 - 1e-9);
   const before = views[index - 1];
   assert.ok(Math.abs(before.ahead) > 0.05, 'leading when he takes hold');
   assert.ok(Math.abs(wrap(views[index].view.yaw - before.view.yaw)) < 0.05, 'no jump as the drag takes it');

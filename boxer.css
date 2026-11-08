@@ -1515,3 +1515,12 @@ html:lang(zh) h1, html:lang(zh) h2, html:lang(zh) .banner p, html:lang(zh) .card
 html:lang(zh) :is(em, i, .set-blurb, .story-line.story-tale, .lg-hero-words small, .tw-line, #art-name) { font-style: normal; }
 /* A phone's footer has no room for it beside the fight's own buttons (it wraps a second row): there the language is in Settings (Menu → ⚙). */
 @media (max-width: 560px) { .lang-switch { display: none; } }
+
+/* The sandbox's camera feel panel (src/camtuner.js): one dial a row, across the sandbox panel. */
+.camtune { flex: 1 1 100%; display: grid; gap: 6px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); }
+.camtune-note { margin: 0; font-size: 12px; opacity: 0.75; }
+.camtune-row { display: grid; grid-template-columns: minmax(0, 11em) minmax(0, 1fr) 4em; gap: 8px; align-items: center; font-size: 13px; }
+.camtune-row output { font-variant-numeric: tabular-nums; text-align: right; }
+.camtune-row output.changed { color: #f2c14e; }
+.camtune-code { width: 100%; box-sizing: border-box; font: 12px ui-monospace, monospace; resize: vertical; }
+.camtune-actions { display: flex; gap: 8px; flex-wrap: wrap; }

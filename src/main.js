@@ -92,6 +92,7 @@ import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks,
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { installStory } from './story/storyview.js';
 import { createStoryPlaceMark } from './story/placemark.js';
+import { mountCameraTuner } from './camtuner.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -1727,6 +1728,13 @@ function enterSandboxLevel(mode) {
   syncGhostBar();
 }
 $('#ghost-walk').addEventListener('click', () => enterSandboxLevel('ghost'));
+// The camera feel panel (camtuner.js): built at once, so that dials kept in this browser are on the camera from the first frame.
+mountCameraTuner($('#camera-tuner'));
+$('#camera-feel').addEventListener('click', (event) => {
+  const tuner = $('#camera-tuner');
+  tuner.hidden = !tuner.hidden;
+  event.currentTarget.setAttribute('aria-expanded', String(!tuner.hidden));
+});
 $('#real-walk').addEventListener('click', () => enterSandboxLevel('real'));
 
 // An in-page question (no alert/confirm: a sandboxed page may not have them): `yes` runs when it is said yes to.

@@ -36,19 +36,20 @@ export const FOLLOW_CAM = {
   pitchRate: 3.5,
   // rad/s: how fast the view comes round behind him standing, walking free, and locked on.
   turnRate: 2.4,
-  walkTurnRate: 0.9,
+  // (Walking, the view comes round slowly: it is a head that follows the body, not the stick. Was 0.9, which the player found turned too soon.)
+  walkTurnRate: 0.6,
   lockTurnRate: 3,
   // rad/s: the fastest the view comes round by itself (the player's own drag of it is his).
-  turnMost: 2.2,
+  turnMost: 1.8,
   // s: the low-pass on the way he faces; rad: a turn smaller than this leaves the view where it is.
-  facingSeconds: 0.35,
-  deadBand: 0.3,
+  facingSeconds: 0.7,
+  deadBand: 0.4,
   // Running (run mode, free of a lock): the view eases round behind the way he runs, with no dead band. `rate` rad/s of spring
-  // frequency at a standstill, plus `perSpeed` for each m/s he runs (4.2 m/s: 3.7; a 90 degree turn is 90% followed in 0.7 s); a heading that points back at the
+  // frequency at a standstill, plus `perSpeed` for each m/s he runs (4.2 m/s: 2.7; a 90 degree turn is 90% followed in about 1 s); a heading that points back at the
   // camera does not swing it round (it fades out between `towardFrom` and `towardTo` rad off the view's own behind-him line, so a man
   // running at the camera is not chased round, and a hairpin is not a spin). The player's own look pauses the following for `pause` s
   // after the last of it (the usual `holdSeconds` is for walking), then it resumes from where he left the view.
-  run: { rate: 1.6, perSpeed: 0.5, towardFrom: 2.1, towardTo: 2.75, pause: 1.5 },
+  run: { rate: 1.2, perSpeed: 0.35, towardFrom: 2.1, towardTo: 2.75, pause: 1.5 },
   // Locked on: the view aimed `lockAt` of the way to his man, `lockAngle` rad off the line between them, `lockBack` m further back for every m apart.
   lockAt: 0.45,
   lockAngle: 0.55,
@@ -94,7 +95,9 @@ export const FOLLOW_CAM = {
   // changes no faster than `rate` rad/s: a swing, never a whip. The player's own drag of the view stops it at once; it comes back only
   // `pause` s after the last of his drag, from nothing. A visitor who asks for less motion (prefers-reduced-motion) gets `reduced` of it.
   // Its swing gathers and dies away no faster than `accel` rad/s² (a head turning, never a snap at the start or the end of a turn).
-  ahead: { turn: 0.55, intent: 0.4, intentFrom: 1.4, intentTo: 2.2, most: 0.5, headingSeconds: 0.25, still: 0.5, brisk: 2.2, seconds: 0.45, rate: 0.7, accel: 2, pause: 1, reduced: 0.4 },
+  // (Kept small: the player found the view turning ahead of where he was going. The stick's own ask leads it little (`intent`): a sidestep
+  // is not a turn.)
+  ahead: { turn: 0.3, intent: 0.1, intentFrom: 1.4, intentTo: 2.2, most: 0.3, headingSeconds: 0.25, still: 0.5, brisk: 2.2, seconds: 0.8, rate: 0.4, accel: 1, pause: 1, reduced: 0.4 },
   fov: 40,
 };
 

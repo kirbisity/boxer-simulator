@@ -215,7 +215,8 @@ const turnOff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)))
 
 test('camera: a turn in run mode brings the view round behind the new heading, quicker the faster he runs', () => {
   const quarter = Math.PI / 2;
-  const running = chase(0, quarter, 1.6);
+  // (In 2.4 s: the run's follow is heavier than it was, FOLLOW_CAM.run, so that the view does not turn ahead of him.)
+  const running = chase(0, quarter, 2.4);
   assert.ok(turnOff(running.log.at(-1), behindYaw(quarter)) < 0.08, `settled behind the new heading (${turnOff(running.log.at(-1), behindYaw(quarter)).toFixed(3)} rad off)`);
   const walking = chase(0, quarter, 1.2, { running: false });
   assert.ok(turnOff(walking.log.at(-1), behindYaw(quarter)) > 0.5, 'the same turn walking leaves the view well behind (the lazy follow)');
