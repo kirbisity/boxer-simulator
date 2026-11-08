@@ -54,7 +54,8 @@ test('a crossbow looses one bolt, a short heavy one that flies and drops like an
     advance(world, 2);
     const bolt = world.arrows.find((arrow) => arrow.bolt);
     assert.ok(bolt, `${preset.name} loosed a bolt`);
-    assert.equal(bolt.energy, spec.energy);
+    // Loosed with its own energy, less what the air's drag has taken of it on its way (physics/ballistics.js).
+    assert.ok(bolt.energy <= spec.energy && bolt.energy > 0.95 * spec.energy, `${bolt.energy} of ${spec.energy}`);
     assert.ok(bolt.length < 0.5, 'a bolt, not an arrow');
     assert.ok(!world.events.some((event) => event.kind === 'shot'), 'no bullet');
     assert.equal(shooter.weapon.loaded, false);

@@ -31,18 +31,18 @@ import { ARROW, bulletRegion, GUN, MATCHLOCK } from '../weapons.js';
 import { bulletHit, horseOnPath, missileInHorse } from './ranged.js';
 import { screenOnPath } from './cover.js';
 import { reliefAt, worksOf } from './fieldworks.js';
+import { BALLISTICS, flightStep, holdover } from './ballistics.js';
 
 /** The Ming jin (斤) in kg (~590 g in the Wanli years). */
 const MING_JIN = 0.59;
 
 export const ARTILLERY = {
-  gravity: 9.81,
+  gravity: BALLISTICS.gravity,
   // Tissue's drag on a ball (above): soft tissue's density (kg/m³, ICRP reference man ~1,060) and a sphere's drag
   // coefficient at a ball's speeds in water (~0.47, the textbook sphere's).
   tissue: { density: 1060, drag: 0.47 },
-  // The air's on a ball in flight (kg/m³ at a spring day's ~10 °C; the same sphere's drag coefficient): a 14 g canister
-  // ball loses a tenth of its speed in 30 m, a 5 kg round shot almost nothing.
-  air: { density: 1.25, drag: 0.47 },
+  // (The air's drag on a ball in flight is every missile's: physics/ballistics.js, the sphere's drag by its Mach number: a
+  // 14 g canister ball at 300 m/s loses a seventh of its speed in 30 m, a 5 kg round shot almost nothing.)
   // Iron's density (kg/m³), for a ball's size from its weight (a lead-cased iron ball, as the folangji's, a little smaller).
   iron: 7870,
   // A matchlock's ball, the wound table's own (weapons.js MATCHLOCK: ~1 kJ): ~25 g of lead (a Ming bird gun's three qian is
@@ -332,10 +332,9 @@ function gunServe(world, piece, dt) {
   const turn = Math.atan2(Math.sin(wanted - piece.bearing), Math.cos(wanted - piece.bearing));
   const rate = spec.traverse * Math.min(1, men.length / Math.max(1, spec.crew - 1));
   piece.bearing += Math.sign(turn) * Math.min(Math.abs(turn), rate * dt);
-  // Elevation: on the mark, with its drop over the flight (the quoin is quick).
+  // Elevation: on the mark, with its ball's drop over the flight (the quoin is quick; ballistics.js holdover, the drag's included).
   const flat = Math.hypot(piece.mark[0] - muzzle[0], piece.mark[2] - muzzle[2]);
-  const time = flat / spec.velocity;
-  piece.elevation = Math.atan2(piece.mark[1] - muzzle[1] + 0.5 * ARTILLERY.gravity * time * time, flat);
+  piece.elevation = Math.atan2(piece.mark[1] - muzzle[1], flat) + holdover(gunProjectile(piece, 'ball'), flat);
   if (!piece.seated || Math.abs(turn) > ARTILLERY.laid) return;
   firePiece(world, piece, men[0]);
 }
@@ -354,9 +353,10 @@ export function firePiece(world, piece, gunner, load = null) {
   const balls = kind === 'canister' ? spec.canister.pellets : 1;
   const kg = kind === 'canister' ? spec.canister.pelletKg : spec.ballKg;
   const shape = ballShape(kg);
+  const projectile = gunProjectile(piece, kind);
   for (let k = 0; k < balls; k += 1) {
     const dir = kind === 'canister' ? aim(bearing + gauss() * spec.canister.cone, elevation + gauss() * spec.canister.cone) : aim(bearing, elevation);
-    world.artillery.balls.push({ x: [...muzzle], v: vec.scale(dir, spec.velocity), kg, radius: shape.radius, area: shape.area, piece: piece.index, gunner: gunner.id, kind, passed: new Set(), done: false, age: 0 });
+    world.artillery.balls.push({ x: [...muzzle], v: vec.scale(dir, spec.velocity), kg, radius: shape.radius, area: shape.area, projectile, piece: piece.index, gunner: gunner.id, kind, passed: new Set(), done: false, age: 0 });
   }
   piece.seated = false;
   piece.spent += 1;
@@ -367,6 +367,14 @@ export function firePiece(world, piece, gunner, load = null) {
   if (world.ear) soundEvent(world, 'shot', { at: muzzle, kind: 'matchlock', weapon: piece.kind, who: gunner.id });
 }
 
+/** What a piece's ball or canister ball flies as (physics/ballistics.js): an iron sphere of its weight, at its velocity. */
+function gunProjectile(piece, kind) {
+  const spec = piece.spec;
+  const kg = kind === 'canister' ? spec.canister.pelletKg : spec.ballKg;
+  return GUN_PROJECTILES[`${piece.kind}:${kind}`] ??= { kg, area: ballShape(kg).area, velocity: spec.velocity, curve: 'sphere' };
+}
+const GUN_PROJECTILES = {};
+
 /** Every ball in the air: drag and gravity, then what it meets on this step's way, nearest first, until it is spent. */
 function gunFlyBalls(world, dt) {
   const spec = ARTILLERY;
@@ -374,11 +382,8 @@ function gunFlyBalls(world, dt) {
   for (const ball of world.artillery.balls) {
     if (ball.done) continue;
     ball.age += dt;
-    const speed = vec.length(ball.v);
-    // The air's drag: dv = −(ρ Cd A / 2m) v² dt.
-    const drag = (spec.air.density * spec.air.drag * ball.area) / (2 * ball.kg);
-    ball.v = vec.scale(ball.v, 1 / (1 + drag * speed * dt));
-    ball.v[1] -= spec.gravity * dt;
+    // The air's drag (dv = −(ρ Cd A / 2m) v² dt, Cd the sphere's at its Mach number) and gravity: physics/ballistics.js.
+    flightStep(ball.projectile, ball.v, dt);
     let from = ball.x;
     let to = vec.add(ball.x, vec.scale(ball.v, dt));
     // What it meets on the way, one thing at a time (a man, then the man behind him, all in this step's flight).

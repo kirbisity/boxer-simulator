@@ -16,6 +16,7 @@ import { BARDING } from '../horses.js';
 import { gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
 import { flamePulse } from './flame.js';
 import { missileOf, screenOnPath } from './cover.js';
+import { atRange, BALLISTICS, dragRate, flatFall, flightStep, holdover, judgedShare, traceFlight } from './ballistics.js';
 
 /**
  * The gun arm for a shot: up from the guard and out along the line from the
@@ -386,7 +387,10 @@ export function loose(world, fighter, bolt = null) {
   const grip = point(fighter.x, P[`${weapon.main}Hand`]);
   const mark = punch.aim ? toWorld(fighter, punch.aim) : vec.add(grip, yawRotate([1, 0, 0], fighter.yaw));
   const spread = missileSpread(fighter, bolt);
-  const laid = laidArrow(world, fighter, grip, mark, bolt, spread);
+  const random = world.random;
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
+  // The distance to his mark as he judges it (ballistics.js judgedShare): his arc is laid for that.
+  const laid = laidArrow(world, fighter, grip, mark, bolt, spread, judgedShare(fighter.body.skill, gauss()));
   // An arrow with no arc over his own men's heads (overHeads), or whose path (the drawn shaft from his cheek to the bow
   // hand, then its arc) goes through one of them, is not let go: he holds at the draw, as a gun's ball is held
   // (comradeInLine), the arrow kept (arcFouled).
@@ -395,8 +399,6 @@ export function loose(world, fighter, bolt = null) {
   fighter.loosed = (fighter.loosed ?? 0) + 1;
   const speed = laid.speed;
   let dir = laid.dir;
-  const random = world.random;
-  const gauss = () => Math.sqrt(-2 * Math.log(1 - random() * 0.999999)) * Math.cos(2 * Math.PI * random());
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
   const upward = vec.cross(across, dir);
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
@@ -406,7 +408,7 @@ export function loose(world, fighter, bolt = null) {
   if (!bolt) spendMissile(world, fighter, weapon);
   // The arrow leaves the bow with the bow's own way over the ground (a horse's gallop, a man's step) as well as its cast.
   const carried = overGround(fighter);
-  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
+  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, projectile: laid.projectile, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
   // Heard: the string let go (a bow's, or a crossbow's heavier snap).
   if (world.ear) soundEvent(world, 'shot', { at: grip, kind: bolt ? 'crossbow' : 'bow', who: fighter.id });
@@ -477,17 +479,43 @@ function missileSpread(fighter, bolt = null) {
  * own men goes up over their heads, on the arc that comes down on the mark (overHeads): `over`, the comrade it cannot
  * be got over (the shot is held), else null.
  */
-function laidArrow(world, fighter, grip, mark, bolt = null, spread = ARROW.spread) {
+function laidArrow(world, fighter, grip, mark, bolt = null, spread = ARROW.spread, judged = judgedShare(fighter.body.skill)) {
   const weapon = fighter.weapon;
   const line = vec.sub(mark, grip);
   const distance = vec.length(line);
   const flat = vec.normalize(line);
   const speed = (bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed) * (bolt ? 1 : (weapon.handling?.draw ?? 1));
-  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * distance) / speed ** 2)));
+  // What it flies as (its mass by its energy at its full cast; its drag, ARROW.flight), and the drop it is laid above the
+  // mark for: at the distance he judges (`judged` of the true), the flat-fire fall with the air's drag (ballistics.js
+  // flatFall), the drop the vacuum's parabola gives over an effective distance 2F(d)/d (d itself without drag).
+  const projectile = arrowProjectile(weapon, bolt);
+  const k = dragRate(projectile, speed);
+  const reckoned = distance * judged;
+  const effective = (2 * flatFall(k, 0, reckoned).fall) / Math.max(1e-6, reckoned);
+  const lift = Math.min(0.3, 0.5 * Math.asin(Math.min(1, (ARROW.gravity * effective) / speed ** 2)));
   const dir = vec.normalize(vec.add(flat, [0, Math.tan(lift), 0]));
-  if (bolt) return { speed, distance, dir, over: null };
-  return { distance, ...overHeads(world, fighter, mark, dir, speed, spread) };
+  if (bolt) return { speed, distance, dir, projectile, over: null };
+  // A lob over his own men's heads is cast for the mark where he judges it (its distance his judgement), over the heads he sees.
+  return { distance, projectile, ...overHeads(world, fighter, mark, dir, speed, spread, k, judged) };
 }
+
+/**
+ * What an arrow (or a bolt) from `weapon` flies as (ballistics.js): its mass that of its energy at its full cast (a long
+ * bow's war arrow ARROW.joules at ARROW.speed, ~66 g; a bow's `arrowEnergy` of that at its `arrowSpeed`; a bolt's
+ * `energy` at its `speed`), its drag on its shaft's section (ARROW.flight).
+ */
+export function arrowProjectile(weapon, bolt = null) {
+  const speed = bolt?.speed ?? weapon?.spec.arrowSpeed ?? ARROW.speed;
+  const joules = bolt ? bolt.energy * ARROW.joules : (speed / ARROW.speed) ** 2 * (weapon?.spec.arrowEnergy ?? 1) * ARROW.joules;
+  const key = `${speed}:${joules}:${Boolean(bolt)}`;
+  let projectile = ARROW_PROJECTILES.get(key);
+  if (!projectile) {
+    projectile = { kg: (2 * joules) / (speed * speed), velocity: speed, curve: ARROW.flight.cd, calibre: bolt ? ARROW.flight.boltShaft : ARROW.flight.shaft };
+    ARROW_PROJECTILES.set(key, projectile);
+  }
+  return projectile;
+}
+const ARROW_PROJECTILES = new Map();
 
 /**
  * The arc an arrow takes to come down on `mark` over the heads of his own men standing in its way (on foot, short of the
@@ -498,7 +526,7 @@ function laidArrow(world, fighter, grip, mark, bolt = null, spread = ARROW.sprea
  * head. Returns { dir, speed, over }: `over` the comrade (as comradeInLane gives him) none of them gets over (the shot
  * to be held; dir and speed then the flat shot's), else null.
  */
-function overHeads(world, fighter, mark, dir, speed, spread) {
+function overHeads(world, fighter, mark, dir, speed, spread, k = 0, judged = 1) {
   const spec = ARROW.over;
   const g = ARROW.gravity;
   const lengths = fighter.body.lengths;
@@ -528,19 +556,22 @@ function overHeads(world, fighter, mark, dir, speed, spread) {
   const clears = (angle, cast) => heads.every(({ along, across, radius, above }) => {
     const ahead = along - reach * Math.cos(angle);
     if (ahead <= 0) return false;
+    // (Its fall with the air's drag on it: ballistics.js flatFall; without drag, ahead²/2 and its slope ahead.)
     const fall = g / (cast * cast * Math.cos(angle) ** 2);
-    const height = reach * Math.sin(angle) + ahead * Math.tan(angle) - 0.5 * fall * ahead * ahead;
-    return (height - above) * Math.cos(Math.atan(Math.tan(angle) - fall * ahead)) >= room(radius, across, reach + ahead / Math.cos(angle));
+    const flown = flatFall(k, angle, ahead);
+    const height = reach * Math.sin(angle) + ahead * Math.tan(angle) - fall * flown.fall;
+    return (height - above) * Math.cos(Math.atan(Math.tan(angle) - fall * flown.slope)) >= room(radius, across, reach + ahead / Math.cos(angle));
   });
   const low = Math.atan2(dir[1], Math.hypot(dir[0], dir[2]));
   if (clears(low, speed)) return { dir, speed, over: null };
   for (let angle = low + spec.step; angle <= spec.most; angle += spec.step) {
     // The cast that lands it on the mark from the bow hand at this elevation (range R, the mark `rise` above the hand):
-    // v² = gR² / 2cos²θ(R tanθ − rise).
-    const out = range - reach * Math.cos(angle);
+    // v² = g·F(R) / cos²θ(R tanθ − rise), F the fall with the drag on it (ballistics.js flatFall; R²/2 without).
+    // (`judged`: the share of the true range he reckons it, laidArrow's; the heads in the way are where they are.)
+    const out = range * judged - reach * Math.cos(angle);
     const lofted = out * Math.tan(angle) - (mark[1] - shoulder[1] - reach * Math.sin(angle));
     if (out <= 0 || lofted <= 0) continue;
-    const cast = Math.sqrt(g * out * out / (2 * Math.cos(angle) ** 2 * lofted));
+    const cast = Math.sqrt(g * flatFall(k, angle, out).fall / (Math.cos(angle) ** 2 * lofted));
     if (cast > speed || !clears(angle, cast)) continue;
     return { dir: [way[0] * Math.cos(angle), Math.sin(angle), way[1] * Math.cos(angle)], speed: cast, over: null };
   }
@@ -563,7 +594,7 @@ export const ARROW_PATH = { step: 0.02 };
  * `grip` (`laid`: laidArrow's dir, speed, and distance to the mark), of `spread` rad (missileSpread), or null when its
  * way is clear (ARROW_PATH).
  */
-export function arcFouled(world, fighter, nock, grip, { dir, speed, distance }, spread) {
+export function arcFouled(world, fighter, nock, grip, { dir, speed, distance, projectile }, spread) {
   const shaft = comradeInLane(world, fighter, nock, grip, spread);
   if (shaft) return shaft;
   const step = ARROW_PATH.step;
@@ -579,7 +610,9 @@ export function arcFouled(world, fighter, nock, grip, { dir, speed, distance }, 
     if (mate) return mate;
     flown += vec.length(vec.sub(next, at));
     after += step;
-    v = [v[0], v[1] - ARROW.gravity * step, v[2]];
+    // (Drag and gravity, as it flies: flyArrows.)
+    if (projectile) flightStep(projectile, v, step);
+    else v = [v[0], v[1] - ARROW.gravity * step, v[2]];
     at = next;
   }
   return null;
@@ -608,7 +641,12 @@ export function flyArrows(world, dt) {
       if (arrow.age > ARROW.stays) arrow.done = true;
       continue;
     }
-    arrow.v[1] -= ARROW.gravity * dt;
+    // Gravity and the air's drag (ballistics.js): what the drag takes of its speed it takes of its energy, squared (gravity
+    // only trades its height for speed and back, which over a shot at a man's height comes to nothing).
+    if (arrow.projectile) {
+      const kept = flightStep(arrow.projectile, arrow.v, dt);
+      if (arrow.energy !== undefined) arrow.energy *= kept * kept;
+    } else arrow.v[1] -= ARROW.gravity * dt;
     const to = vec.add(arrow.x, vec.scale(arrow.v, dt));
     const hit = firstHit(world, world.fighters[arrow.owner], arrow.x, to);
     // A horse nearer on its path than any man takes it (the riders' horses were what the archers hit most).
@@ -917,16 +955,42 @@ export function comradeInLine(world, fighter, weapon = fighter.weapon, aimedAt =
   const muzzleAt = weapon.spec.muzzle ?? GUN.muzzle;
   const from = vec.add(point(fighter.x, P[`${weapon.main}Hand`]), vec.scale(weapon.dir, muzzleAt[0]));
   const mark = aimedAt ?? (fighter.punch?.aim ? toWorld(fighter, fighter.punch.aim) : vec.add(from, weapon.dir));
-  const dir = slerpDir(vec.normalize(vec.sub(mark, from)), weapon.dir, GUN.barrelShare);
+  const projectile = weapon.spec.shot?.projectile ?? GUN.projectile;
+  // Laid as fire() lays it: held over for the drop at the distance he judges (without the judgement's chance error).
+  const dir = slerpDir(heldOver(vec.normalize(vec.sub(mark, from)), projectile, vec.length(vec.sub(mark, from)) * judgedShare(fighter.body.skill)), weapon.dir, GUN.barrelShare);
   // The gun itself, cheek (or shoulder) to muzzle, past the head of the man before him: a muzzle at his ear or through
   // the gap at his neck is a ball fired into him, however clear the lane beyond.
   if (comradeInLane(world, fighter, sightFrom(fighter, weapon), from, 0)) return true;
-  const hit = firstHit(world, fighter, from, vec.add(from, vec.scale(dir, GUN.range)));
+  // The first man on the ball's whole flight (ballistics.js traceFlight), wherever it comes down.
+  let hit = null;
+  for (const chord of gunFlight(world, projectile, from, dir)) {
+    hit = firstHit(world, fighter, chord.from, chord.to);
+    if (hit) break;
+  }
   if (hit && hit.fighter.corner === fighter.corner && hit.fighter.state !== 'out') return true;
-  // The ball wanders: a comrade's body close beside its path, short of the mark, is at risk too (FIRE_LANE): between
-  // the files of the men before him, clear of their shoulders, it goes.
-  const reach = hit ? vec.length(vec.sub(hit.point, from)) : GUN.range;
+  // The ball wanders: a comrade's body close beside its path, short of the mark and FIRE_LANE.beyond past it, is at
+  // risk too (FIRE_LANE): between the files of the men before him, clear of their shoulders, it goes.
+  const reach = hit ? vec.length(vec.sub(hit.point, from)) : vec.length(vec.sub(mark, from)) + FIRE_LANE.beyond;
   return Boolean(comradeInLane(world, fighter, from, vec.add(from, vec.scale(dir, reach + 0.5)), weapon.spec.shot?.spread ?? GUN.spread));
+}
+
+/** The line `sighted` (unit) raised by the holdover (ballistics.js) for the drop of `projectile` over `distance` m. */
+export function heldOver(sighted, projectile, distance) {
+  const up = vec.sub([0, 1, 0], vec.scale(sighted, sighted[1]));
+  const length = vec.length(up);
+  if (length < 1e-6) return sighted;
+  return vec.normalize(vec.add(sighted, vec.scale(up, Math.tan(holdover(projectile, distance)) / length)));
+}
+
+/**
+ * A round's flight from the muzzle `from` along `dir` at its muzzle velocity (ballistics.js traceFlight): its chords,
+ * to where it comes down on the ground (the floor at 0), leaves the field (BALLISTICS.cutoff.beyond past its edge) or is spent.
+ */
+export function gunFlight(world, projectile, from, dir) {
+  const arena = world.arena;
+  const beyond = BALLISTICS.cutoff.beyond;
+  const within = arena?.halfX ? { halfX: arena.halfX + beyond, halfZ: (arena.halfZ ?? arena.halfX) + beyond } : null;
+  return traceFlight(projectile, from, vec.scale(dir, projectile.velocity), { within });
 }
 
 /**
@@ -1002,39 +1066,16 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
   // Aimed through the sights at the mark: off by the aim's error, and by
   // part of however far the barrel itself is off that line.
   const mark = aimedAt ?? (punch?.aim ? toWorld(fighter, punch.aim) : vec.add(muzzle, barrel));
-  const sighted = vec.normalize(vec.sub(mark, muzzle));
+  // Held over the mark for the drop at the distance he judges it (ballistics.js holdover, judgedShare: a trained eye within
+  // a tenth, a novice's short and wild): at duel range nothing, at a hundred metres a matchlock's ball falls most of a metre.
+  const projectile = shot?.projectile ?? GUN.projectile;
+  const sighted = heldOver(vec.normalize(vec.sub(mark, muzzle)), projectile, vec.length(vec.sub(mark, muzzle)) * judgedShare(fighter.body.skill, gauss()));
   const aimed = turret ? barrel : slerpDir(sighted, barrel, GUN.barrelShare);
   const dir = vec.normalize(vec.add(aimed, vec.add(vec.scale(up, gauss() * spread), vec.scale(across, gauss() * spread))));
   // A shotgun's pellets (`pellets`) open out round the aimed line (`pellet` rad); anything else is one round.
   for (let pellet = 0; pellet < (shot?.pellets ?? 1); pellet += 1) {
     const flight = shot?.pellets ? vec.normalize(vec.add(dir, vec.add(vec.scale(up, gauss() * shot.pellet), vec.scale(across, gauss() * shot.pellet)))) : dir;
-    const end = vec.add(muzzle, vec.scale(flight, GUN.range));
-    const manHit = firstHit(world, fighter, muzzle, end);
-    // A horse nearer on the ball's line than any man takes it.
-    const horseHit = horseOnPath(world, fighter, muzzle, end);
-    // A screen of the works before either (physics/cover.js): the ball stops in it, or comes out with what it did not take
-    // (its wound then that of the energy it has left: the round's figures are for its whole energy).
-    const energy = (shot?.energy ?? GUN.energy) / (shot?.pellets ?? 1);
-    const screen = screenOnPath(world, muzzle, end, missileOf(weapon.spec, energy));
-    if (screen && (!manHit || screen.s < manHit.s) && (!horseHit || screen.s < horseHit.s)) {
-      if (screen.stops) {
-        world.events.push({ time: world.time, kind: 'shot', attacker: fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: screen.point, target: 'works', point: screen.point, normal: vec.scale(flight, -1), harm: 0, effects: ['into the wall'] });
-        world.screened += 1;
-        continue;
-      }
-    }
-    const through = screen && screen.left < energy && shot ? screenedShot(shot, screen.left / energy) : shot;
-    if (horseHit && (!manHit || horseHit.s < manHit.s)) {
-      world.events.push({ time: world.time, kind: 'shot', attacker: fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: horseHit.point, target: 'horse', point: horseHit.point, normal: vec.scale(flight, -1), harm: 0, effects: ['into a horse'] });
-      missileInHorse(world, fighter, horseHit, flight, (shot?.energy ?? GUN.energy) / (shot?.pellets ?? 1), { arrow: false });
-      continue;
-    }
-    const hit = manHit;
-    const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: hit?.fighter.id, weapon: weapon.kind, aimedAt: aimedId ?? punch?.target, from: muzzle, to: hit?.point ?? end, target: hit?.target ?? null, point: hit?.point ?? end, normal: vec.scale(flight, -1), harm: 0, effects: [] };
-    world.events.push(event);
-    if (hit?.target === 'shield') event.effects.push('stopped by the shield');
-    else if (hit) bulletHit(world, fighter, hit, flight, event, through);
-    else event.effects.push('missed');
+    gunRound(world, fighter, weapon, shot, projectile, muzzle, flight, aimedId ?? punch?.target);
   }
   // A turret's kick climbs its muzzle on the cradle and goes on through its mount into the robot (physics/mounted.js turretRecoil).
   if (turret) {
@@ -1067,9 +1108,60 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
   }
 }
 
-/** A shot come through a screen with `share` of its energy: its wound and its knock that share of the round's. */
-function screenedShot(shot, share) {
-  const scaled = (table) => Object.fromEntries(Object.entries(table).map(([region, value]) => [region, value * share]));
+/**
+ * One round (or one pellet) on its way from `muzzle` along `flight` (unit): its flight traced (gunFlight), and on each
+ * chord of it the first thing it meets, a man, a horse or a screen of the works, nearest first. What it does there is by
+ * the energy it still has (½mv² at that point of its flight, less what a screen it came through took): the armour it
+ * meets by that energy (bulletProof), its wound (`shot`'s lethal, bleed and knock, which are for a hit at GUN.woundAt)
+ * by that energy against the energy it has there.
+ */
+function gunRound(world, fighter, weapon, shot, projectile, muzzle, flight, aimedAt) {
+  const energy = (shot?.energy ?? GUN.energy) / (shot?.pellets ?? 1);
+  const woundAt = (atRange(projectile, GUN.woundAt)?.speed ?? projectile.velocity) ** 2 / projectile.velocity ** 2;
+  const shotEvent = (fields) => world.events.push({ time: world.time, kind: 'shot', attacker: fighter.id, weapon: weapon.kind, aimedAt, from: muzzle, normal: vec.scale(flight, -1), harm: 0, ...fields });
+  // The share of its muzzle energy a screen it has come through left it.
+  let screened = 1;
+  let end = muzzle;
+  for (const chord of gunFlight(world, projectile, muzzle, flight)) {
+    end = chord.to;
+    // The share of its muzzle energy it has `s` of the way along this chord (its speed there, squared).
+    const kept = (s) => ((chord.speeds[0] + (chord.speeds[1] - chord.speeds[0]) * s) / projectile.velocity) ** 2 * screened;
+    const manHit = firstHit(world, fighter, chord.from, chord.to);
+    // A horse nearer on the ball's line than any man takes it.
+    const horseHit = horseOnPath(world, fighter, chord.from, chord.to);
+    // A screen of the works before either (physics/cover.js): the ball stops in it, or comes out with what it did not take.
+    const screen = screenOnPath(world, chord.from, chord.to, missileOf(weapon.spec, energy * kept(0)));
+    if (screen && (!manHit || screen.s < manHit.s) && (!horseHit || screen.s < horseHit.s)) {
+      if (screen.stops) {
+        shotEvent({ to: screen.point, target: 'works', point: screen.point, effects: ['into the wall'] });
+        world.screened += 1;
+        return;
+      }
+      const before = energy * kept(screen.s);
+      if (screen.left < before) screened *= screen.left / before;
+    }
+    if (horseHit && (!manHit || horseHit.s < manHit.s)) {
+      shotEvent({ to: horseHit.point, target: 'horse', point: horseHit.point, effects: ['into a horse'] });
+      missileInHorse(world, fighter, horseHit, flight, energy * kept(horseHit.s), { arrow: false });
+      return;
+    }
+    if (!manHit) continue;
+    const share = Math.min(1, kept(manHit.s));
+    const event = { time: world.time, kind: 'shot', attacker: fighter.id, defender: manHit.fighter.id, weapon: weapon.kind, aimedAt, from: muzzle, to: manHit.point, target: manHit.target, point: manHit.point, normal: vec.scale(flight, -1), harm: 0, effects: [], energy: energy * share };
+    world.events.push(event);
+    if (manHit.target === 'shield') event.effects.push('stopped by the shield');
+    else bulletHit(world, fighter, manHit, flight, event, shot ? spentShot(shot, share, share / woundAt) : null, share / woundAt);
+    return;
+  }
+  shotEvent({ to: end, target: null, point: end, effects: ['missed'] });
+}
+
+/**
+ * A shot that strikes with `share` of its muzzle energy (its flight's drag, a screen): its `energy` that, its wound (lethal,
+ * bleed) `wound` × its table's (what it has against what it has at GUN.woundAt, the tables' distance), its knock as its momentum.
+ */
+function spentShot(shot, share, wound) {
+  const scaled = (table) => Object.fromEntries(Object.entries(table).map(([region, value]) => [region, value * wound]));
   return { ...shot, energy: shot.energy * share, lethal: scaled(shot.lethal ?? GUN.lethal), bleed: scaled(shot.bleed ?? GUN.bleed), impulse: (shot.impulse ?? GUN.impulse) * Math.sqrt(share) };
 }
 
@@ -1078,7 +1170,7 @@ function screenedShot(shot, share) {
  * the part's weight and how hurt it already is) towards what kills; it
  * bleeds; to the head or body it staggers him at once; enough and he dies.
  */
-export function bulletHit(world, shooter, hit, dir, event, shot = null) {
+export function bulletHit(world, shooter, hit, dir, event, shot = null, share = 1) {
   const victim = hit.fighter;
   const key = hit.capsule.key;
   const region = hit.throat ? 'head' : bulletRegion(key);
@@ -1102,11 +1194,14 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
   const hurt = 1 + GUN.hurtShare * (victim.damage[key] ?? 0);
-  const harm = (shot?.lethal ?? GUN.lethal)[region] * (1 - armour) * scale * hurt;
+  // (`share`: of a pistol round's own figures, GUN's, the share of them it carries when it strikes, GUN.woundAt's energy its
+  // whole; a `shot` comes scaled already, spentShot.)
+  const spent = shot ? 1 : share;
+  const harm = (shot?.lethal ?? GUN.lethal)[region] * spent * (1 - armour) * scale * hurt;
   victim.gunshot = (victim.gunshot ?? 0) + harm;
   victim.damage[key] = Math.min(1, (victim.damage[key] ?? 0) + harm);
   victim.damageVersion += 1;
-  victim.bleed = (victim.bleed ?? 0) + (shot?.bleed ?? GUN.bleed)[region] * (1 - armour) * scale;
+  victim.bleed = (victim.bleed ?? 0) + (shot?.bleed ?? GUN.bleed)[region] * spent * (1 - armour) * scale;
   // Hard armour over the part takes the round on its surface: no wound to see.
   // A heavy ball mostly goes through: seen to strike the surface only where the armour held most of it.
   Object.assign(event, { harm, armour, region, plate: armour > 0 && OUTFITS[kind].plated && (!shot || armour >= GUN.platedHolds) ? kind : null });
@@ -1114,7 +1209,7 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null) {
   // Heard: the round's wound, as bad as its share of what kills.
   if (world.ear && harm > 0) soundWound(world, victim, 'stab', Math.min(1, harm), hit.point);
   shooter.stats.landed += 1;
-  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: shot?.impulse ?? GUN.impulse });
+  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: shot?.impulse ?? GUN.impulse * Math.sqrt(Math.min(1, spent)) });
   // A heavy ball in an arm or a leg shatters the bone, most of the time.
   const joint = region === 'limb' ? BULLET_JOINT[key.slice(1)] : null;
   if (shot && joint && victim.state !== 'out' && !victim.broken.has(`${key[0]}${joint}`) && world.random() < shot.limbBreak * (1 - armour)) {

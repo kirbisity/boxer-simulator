@@ -13,6 +13,7 @@
 // along the blade into the target pierces; an edge moving across it cuts.
 
 import { vec } from './pose.js';
+import { muzzleEnergy } from './physics/ballistics.js';
 
 // Crossbows: spanned once and loaded like a gun (`shot`, one at a time, no
 // misfire), they loose a bolt that flies as an arrow does (`bolt`), shorter
@@ -48,8 +49,12 @@ export const NU = { ...CROSSBOW, speed: 48, energy: 1.6, length: 0.42, bounce: 0
 // shot. Its five fired, every chamber is loaded again from the muzzle (powder
 // or a combustible cartridge, the ball rammed home, a new cap on each
 // nipple): ~40 s.
+// Its ball (`projectile`: physics/ballistics.js, what it flies as; `energy`, its muzzle energy, from it): ~14 g of lead at
+// ~200 m/s (a short barrel's charge, a black-powder revolver's chronographed range, 180-230).
+const ADAMS_BALL = { kg: 0.014, velocity: 200, curve: 'sphere' };
 export const ADAMS = {
-  energy: 280,
+  projectile: ADAMS_BALL,
+  energy: muzzleEnergy(ADAMS_BALL),
   lethal: { head: 1, torso: 1.05, limb: 0.32 },
   bleed: { head: 0.0024, torso: 0.0028, limb: 0.0014 },
   limbBreak: 0.55,
@@ -97,8 +102,14 @@ export const WHIP = {
   home: { from: 0.06, crack: 30, through: 0.05, taut: 0.97, step: { gain: 3, most: 1, margin: 0.92, ahead: 0.08 } },
 };
 
+// Its ball (`projectile`; physics/ballistics.js): ~13 g of lead (~13 mm, between the ashigaru's 3-monme gun, 11 g, and
+// the 6-monme, 23 g) at ~390 m/s (the Graz armoury's trials of its 16th-17th c. long guns, Krenn, Kalaus & Hall 1995:
+// 400-500 m/s for longer barrels and heavier charges; an arquebus's 300-400): ~1 kJ at the muzzle, falling as it flies
+// (the round ball's drag: ~700 J at 30 m, ~340 at 120).
+const MATCHLOCK_BALL = { kg: 0.013, velocity: 392, curve: 'sphere' };
 export const MATCHLOCK = {
-  energy: 1000,
+  projectile: MATCHLOCK_BALL,
+  energy: muzzleEnergy(MATCHLOCK_BALL),
   // A body hit: past the line that drops a man (1) unless armour proofed against
   // it (tōsei, plate, a SWAT vest) held a good share.
   lethal: { head: 1, torso: 1.35, limb: 0.45 },
@@ -116,7 +127,11 @@ export const MATCHLOCK = {
 };
 // (The Japanese teppō is this gun as listed: well made in the Sakai and Kunitomo workshops, its ball through layered damp
 // felt at 80 paces (Song Yingchang's trial, 1593, as quoted secondhand: why the Ming put iron inside their cotton coats).
-// Its fire drilled in volleys is the drill's (formation.js), not the gun's.)
+// Two soaked blankets through at 80 paces, three or four at 50 (经略复国要编, as given by Great Ming Military, "Random
+// mythbusting", 2016): at ~120 m (a Ming pace ~1.5 m) this ball still has ~340 J at ~230 m/s, at ~75 m ~470 J (the
+// flight, physics/ballistics.js): two thirds of a 9 mm pistol round's muzzle energy in a ball half as wide again, and
+// more layers at the nearer distance for its more energy there (2 against 3-4 layers; 340 against 470 J, ×1.4: the
+// layers' ×1.5-2 a little steeper: the paces and the blankets are both loose measures). Its fire drilled in volleys is the drill's (formation.js), not the gun's.)
 
 /**
  * The Ming bird gun (鸟铳, niaochong): the same gun, copied from the Japanese and Portuguese matchlocks taken at Shuangyu
@@ -141,10 +156,15 @@ export const NIAOCHONG = { ...MATCHLOCK, spread: 0.018, misfire: 0.12 };
  * of the northern troops' fast guns, 快枪, in 《练兵实纪》, as quoted secondhand), a wide `spread` (0.05, the matchlock's
  * 0.014); its iron touch-holes lit by hand from a slow match, so one in eight fails (`misfire`).
  */
+const THREE_EYED_BALL = { kg: 0.012, velocity: 183, curve: 'sphere' };
 export const THREE_EYED = {
   // Its barrels are short (~30 cm, a hand cannon's): the charge burns out of the muzzle before it has driven the ball far, ~200 J
   // (it was 350): proof plate holds it (a plated kit rated past it: physics/ranged.js bulletHit), it bruises and stuns.
-  energy: 200,
+  // Its ball (`projectile`): ~12 g of lead (a ~13 mm bore: an estimate, the surviving pieces' bores 12-20 mm) at ~180 m/s
+  // (the speed that gives the ~200 J; replica hand cannons of its barrel length chronograph ~150-250 m/s): slow, it keeps
+  // its speed better than a matchlock's supersonic ball, but has little to keep (~150 J at 50 m).
+  projectile: THREE_EYED_BALL,
+  energy: muzzleEnergy(THREE_EYED_BALL),
   lethal: { head: 0.95, torso: 0.6, limb: 0.25 },
   bleed: { head: 0.0016, torso: 0.0024, limb: 0.001 },
   limbBreak: 0.25,
@@ -168,8 +188,12 @@ export const THREE_EYED = {
  * moment (`recoilSeconds`). Thirty rounds a magazine (`rounds`), changed in
  * a couple of seconds.
  */
+const M855 = { kg: 0.004, velocity: 935, curve: 'g7', bc: 0.151, calibre: 0.0057 };
 export const RIFLE = {
-  energy: 1750,
+  // Its bullet (`projectile`): the M855's 62 gr (4.0 g) steel-tipped spitzer at ~935 m/s from a carbine's barrel, its
+  // ballistic coefficient 0.151 on the G7 curve (the published figure): it keeps most of its energy to 300 m (~800 J).
+  projectile: M855,
+  energy: muzzleEnergy(M855),
   lethal: { head: 1.2, torso: 1.7, limb: 0.6 },
   bleed: { head: 0.0032, torso: 0.0048, limb: 0.0024 },
   limbBreak: 0.65,
@@ -197,8 +221,11 @@ export const RIFLE = {
  * kick into the shoulder (`recoil`, N·s) that a light, weak shooter cannot
  * hold. Five shells, each pumped; reloaded one by one.
  */
+const BUCKSHOT = { kg: 0.0035, velocity: 400, curve: 'sphere' };
 export const SHOTGUN = {
-  energy: 280,
+  // Each pellet (`projectile`): a 00 buckshot ball, 3.5 g of lead (8.4 mm) at ~400 m/s: `energy` is a pellet's.
+  projectile: BUCKSHOT,
+  energy: muzzleEnergy(BUCKSHOT),
   pellets: 9,
   pellet: 0.016,
   lethal: { head: 0.55, torso: 0.26, limb: 0.1 },
@@ -254,9 +281,13 @@ export function cartridgeRecoil({ bulletKg, muzzle, chargeKg, gasSpeed = 1.7, ga
 // AR-15's 1.75) on ~41 gr (2.66 g) of powder, through its suppressor (~3/4 of the gas's push gets out): ~10 N·s of recoil
 // (the AR-15's 5.56 ~5). Fired from a rigid, motor-laid mount with a magnified optic, it is more precise than a carbine
 // from the shoulder: its round goes ~25% tighter.
+const CREEDMOOR = { kg: 0.00907, velocity: 813, curve: 'g7', bc: 0.305, calibre: 0.0067 };
 export const TURRET_RIFLE = {
-  ...RIFLE, energy: 3000, automatic: undefined, rounds: Infinity, ammo: Infinity,
-  recoil: cartridgeRecoil({ bulletKg: 0.00907, muzzle: 813, chargeKg: 0.00266, gasShare: 0.75 }),
+  ...RIFLE, automatic: undefined,
+  // Its bullet: the 140 gr match bullet (9.07 g, 6.7 mm), G7 0.305 (the makers' 0.30-0.33).
+  projectile: CREEDMOOR,
+  energy: muzzleEnergy(CREEDMOOR), rounds: Infinity, ammo: Infinity,
+  recoil: cartridgeRecoil({ bulletKg: CREEDMOOR.kg, muzzle: CREEDMOOR.velocity, chargeKg: 0.00266, gasShare: 0.75 }),
   spread: 0.0037, movingSpread: 0.015,
 };
 
@@ -1619,19 +1650,28 @@ export function bleedToLose(left, seconds) {
  * the aim's error (rad, standard deviation) standing still, more moving or
  * reeling; `range` (m); `recoil` (N·s on the hand).
  */
+const NINE_MM = { kg: 0.008, velocity: 360, curve: 'g1', bc: 0.15, calibre: 0.009 };
 export const GUN = {
   referenceKg: 80,
   lethal: { head: 1, torso: 0.5, limb: 0.2 },
   hurtShare: 0.5,
   bleed: { head: 0.0008, torso: 0.002, limb: 0.0006 },
   muzzle: [0.17, 0.045],
+  // The 9 mm round (`projectile`, physics/ballistics.js): a 124 gr (8.0 g) full-metal-jacket round nose at ~360 m/s, G1
+  // 0.15 (Speer's figure for it): `energy` its muzzle energy.
+  projectile: NINE_MM,
   spread: 0.022,
   barrelShare: 0.15, // of the barrel's own misalignment that goes into the shot
   settled: 0.08, // rad: the barrel this near the line to the mark, he fires (else at the end of the aim)
   steadyBelow: 0.35, // m/s: a shouldered gun moving less than this against the shoulder (stopped on the mark)
   movingSpread: 0.02, // more per m/s the shooter moves
   reelingSpread: 2.5, // times, staggered
-  range: 30,
+  // (No range: a round flies until it comes down or is spent, physics/ballistics.js traceFlight and its cutoff.)
+  // The distance (m) every round's wound figures (`lethal`, `bleed`: GUN's and each shot's) are for: a hit at a handgun
+  // fight's distance and a bout's (most police shootings within ~7 m, the FBI's LEOKA counts; the shot's tables were set
+  // against hits there). Nearer it carries a little more energy, further less, and its wound scales by that energy (as
+  // through a screen): a matchlock's ball at 120 m does about two fifths of what it does at 7.
+  woundAt: 7,
   // Recoil (N·s) into the hands, arms and shoulders: the same kick moves a
   // light arm further, and a shot fired before the gun has settled again
   // goes wider by `unsettled` rad per m/s the hand is still moving.
@@ -1644,7 +1684,7 @@ export const GUN = {
   // .44 Magnum) stops a matchlock ball as well; proofed plate stops about
   // two thirds as much; the bullet-tested tōsei dō, nine tenths; anything
   // else, only what it would of a pistol round's worth.
-  energy: 520,
+  energy: muzzleEnergy(NINE_MM),
   // A heavy ball is seen to strike the armour (and not to enter) only where it stopped this much.
   platedHolds: 0.45,
   // A ball the plate is proof against (physics/ranged.js bulletHit): it stuns for `stun` s on the helmet and staggers by `stagger`,
@@ -1695,6 +1735,12 @@ export const ARROW = {
     deep: 0.4, chestFrom: 0.45, deepFrom: 0.3,
   },
   impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,
+  // Its flight through the air (physics/ballistics.js): the drag on its shaft's section, Cd `cd` (Park 2011's 1.5-2.6 for
+  // a fletched arrow, the turbulent figure for a war arrow's big feathers and rough shaft), on a shaft of `shaft` m (the Mary
+  // Rose's arrows, ~10-13 mm at the middle, tapering) or a bolt's of `boltShaft` (a crossbow's stubby bolt, ~14-17 mm
+  // behind its head); its mass that of its energy at its speed (a long bow's war arrow ~66 g, a lighter arrow less, which the
+  // same drag slows the faster: a 40 g arrow sheds its speed over a distance ~1.7 times as fast as a 66 g one).
+  flight: { cd: 2, shaft: 0.0115, boltShaft: 0.015 },
   // What a long bow's war arrow carries (J; energy 1): a ~70 g shaft at ~55 m/s, ~100 J (a heavy war bow's bodkin, more:
   // the longbow's `arrowEnergy`). In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
   joules: 100,

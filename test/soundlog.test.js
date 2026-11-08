@@ -166,7 +166,8 @@ test('sound log: a battle (Rhodes, 1522): on the sand, the bows and the matchloc
   assert.ok(ofType(world, 'step').every((step) => step.surface === 'sand'), 'the beach before the fort');
   const shots = ofType(world, 'shot');
   assert.ok(shots.some((shot) => shot.kind === 'bow') && shots.some((shot) => shot.kind === 'matchlock' && shot.weapon));
-  for (const arrow of ofType(world, 'arrowhit')) assert.ok(arrow.speed > 20 && arrow.speed < 120, `${arrow.speed} m/s`);
+  // (An arrow lobbed over the man before him at a mark a few metres past him is cast soft, ~8-14 m/s: physics/ranged.js overHeads.)
+  for (const arrow of ofType(world, 'arrowhit')) assert.ok(arrow.speed > 5 && arrow.speed < 120, `${arrow.speed} m/s`);
   for (const wound of ofType(world, 'wound')) assert.ok(['cut', 'stab', 'bone', 'crush'].includes(wound.kind) && wound.severity > 0 && wound.severity <= 1);
   for (const fall of ofType(world, 'fall')) assert.ok(fall.speed > 0.8 && fall.speed < 15 && fall.mass > 40);
   assert.ok(ofType(world, 'voice').some((voice) => voice.kind === 'death'), 'a man dies aloud');
