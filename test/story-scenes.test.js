@@ -13,7 +13,7 @@ import { thinkAll } from '../src/ai.js';
 import { storyEnterChapter, storyMarkDead, storyNewLife, storyApplyEffects } from '../src/story/life.js';
 import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from '../src/story/chapters/index.js';
 import { STORY_BATTLES } from '../src/story/battles/index.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyCurrent, storyFinaleDone, storySceneDone } from '../src/story/runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyCurrent, storyDeploy, storyFinaleDone, storySceneDone } from '../src/story/runner.js';
 import { createScenePlay, poseSetFigures, sceneHeld, sceneLook, sceneThink, sceneWords, stageSetFigures, stepScene } from '../src/story/scenes/stage.js';
 import { storySetSetup, STORY_SET, STORY_SETS } from '../src/story/scenes/sets.js';
 import { createFinalePlay, finaleFlashbacks, finaleLook, finaleSeconds, finaleShots, stepFinale, STORY_FINALE } from '../src/story/scenes/finale.js';
@@ -163,6 +163,8 @@ test('the runner: a scene after its card, a fatal choice\'s scene before its pag
   for (const fell of [true, false]) {
     const last = createChapterRun(lifeAt(7, {}), hun, { battles: STORY_BATTLES, comrades: COMRADES, flashbacks: FLASHBACKS });
     while (storyCurrent(last).kind === 'card') storyAnswer(last, 0);
+    // (An officer by now: the camp's deploy screen first, taken as it stands.)
+    if (storyCurrent(last).kind === 'deploy') storyDeploy(last);
     assert.equal(storyCurrent(last).kind, 'battle');
     storyBattleDone(last, { hero: fell ? 'out' : 'alive', leftPlace: false, won: false, comrades: {} });
     for (let guard = 0; guard < 40 && storyCurrent(last).kind !== 'finale'; guard += 1) {
