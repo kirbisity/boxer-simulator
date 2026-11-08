@@ -8,14 +8,15 @@
 import { LADDERS, ladderStance } from '../../physics/ladders.js';
 
 export const LADDER_VIEW = {
-  // The rails' and rungs' radius (m), a rung every `every` m up the rails (a stair's rise: ~0.3 m), the rails as far apart
-  // as its two lanes and a hand's room outside each man (physics/ladders.js LADDERS.lanes, laneApart).
+  // The rails' and rungs' radius (m), a rung every `every` m up the rails (the rungs the climbers' hands and feet go on:
+  // physics/ladders.js LADDERS.rung), the rails as far apart as its two lanes and a hand's room outside each man (LADDERS.lanes,
+  // laneApart).
   rail: 0.05,
   rung: 0.028,
-  every: 0.3,
+  every: LADDERS.rung,
   apart: LADDERS.lanes * LADDERS.laneApart,
-  // How far (m) the rails stand up over the walk's edge: a ladder set to be stepped off, not climbed over.
-  over: 0.6,
+  // How far (m) the rails stand up over the walk's edge (LADDERS.over): a ladder set to be stepped off, not climbed over.
+  over: LADDERS.over,
   wood: 0x8a7550,
 };
 

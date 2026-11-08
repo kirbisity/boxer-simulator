@@ -2,7 +2,9 @@
 // never throws him up it; a story wall's ladders lie at its foot until men raise them; men go up a ladder two abreast at a
 // stair's pace, one to every spacing of each lane, onto the walk at its head; the player gets on only by walking at the wall,
 // and climbs back down when he pulls away; knocked off it, a man falls from his rung's height and is hurt; a ladder with a man
-// low on it is shoved off by a defender at its head, the man going over with it; one with a man near its top takes two.
+// low on it is shoved off by a defender at its head, the man going over with it; one with a man near its top takes two. On
+// it his feet and hands are on its rungs, a foot on one at every moment, the two by turns; he goes up only from over its
+// bottom rung, never climbing the air beside it from where he stood under it.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +12,7 @@ import { P } from '../src/body.js';
 import { mingSoldier, sengokuWarrior } from '../src/cast.js';
 import { advance, createWorld, fall, placeOnFloor, point, seededRandom } from '../src/physics.js';
 import { reliefAt, worksOf, worksStateOf } from '../src/physics/fieldworks.js';
-import { boardLadder, LADDERS, ladderLoad, ladderPlace, ladderPushSeconds, standLadder } from '../src/physics/ladders.js';
+import { boardLadder, LADDERS, ladderLimbs, ladderLoad, ladderPlace, ladderPushSeconds, standLadder } from '../src/physics/ladders.js';
 import { wallWorks } from '../src/story/ground/walls.js';
 
 /** A wall along z at x = 1 (its walk on +x), one ladder at z = 0; a Japanese defender and Ming attackers. */
@@ -108,6 +110,79 @@ test('men climb a ladder two abreast at a stair\'s pace, one to every spacing of
   const onto = world.events.filter((event) => event.kind === 'ladder' && event.onto).map((event) => event.fighters[0]);
   assert.equal(new Set(onto).size, men.length, `all up onto the walk (${onto.length})`);
   assert.ok(Math.abs((first.lift ?? 0) - 4.5) < 0.05, 'standing on the walk');
+});
+
+/** How far (m) a point is from the nearest of a ladder's rungs (each a bar across it, LADDERS.rung apart along its rails). */
+function offRung(ladder, at) {
+  const length = Math.hypot(ladder.head[0] - ladder.foot[0], ladder.height, ladder.head[2] - ladder.foot[1]);
+  const along = [(ladder.head[0] - ladder.foot[0]) / length, ladder.height / length, (ladder.head[2] - ladder.foot[1]) / length];
+  const r = [at[0] - ladder.foot[0], at[1] - ladder.base, at[2] - ladder.foot[1]];
+  const s = r[0] * along[0] + r[1] * along[1] + r[2] * along[2];
+  const across = r[0] * ladder.u[0] + r[2] * ladder.u[1];
+  const off = Math.hypot(r[0] - along[0] * s - ladder.u[0] * across, r[1] - along[1] * s, r[2] - along[2] * s - ladder.u[1] * across);
+  const rung = Math.max(1, Math.round(s / LADDERS.rung)) * LADDERS.rung;
+  return Math.hypot(s - rung, off);
+}
+
+test('on a ladder his feet and hands are on its rungs, a foot standing on one while the other comes up; he climbs from over its foot', () => {
+  const { world } = wallWorld({ attackers: 2 });
+  const ladder = world.siegeLadders[0];
+  standLadder(world, ladder);
+  // The second man starts under the ladder, by the wall: he gets on from there.
+  const [first, under] = world.fighters.slice(1);
+  placeOnFloor(under, 0.6, -0.4, 0, 0);
+  const spec = LADDERS.climb;
+  const feet = [];
+  const hands = [];
+  let footless = 0;
+  let samples = 0;
+  let worstOff = 0;
+  const switched = { l: 0, r: 0 };
+  const last = {};
+  for (let t = 0; t < 30; t += 0.05) {
+    advance(world, 0.05, toTheWall);
+    for (const man of [first, under]) {
+      const climbing = man.climbing;
+      if (!climbing || man.state !== 'up') continue;
+      // Never up off the ground beside it: his stance on his place on its line (over the balls of his feet) once he climbs.
+      if (climbing.up > 0.05) {
+        const [x, z] = ladderPlace(ladder, climbing.up, climbing.lane);
+        worstOff = Math.max(worstOff, Math.hypot(x + ladder.out[0] * spec.heel - man.root[0], z + ladder.out[1] * spec.heel - man.root[1]));
+      }
+      if (climbing.up < 0.5 || climbing.up > ladder.height - 0.5) continue;
+      samples += 1;
+      const limbs = ladderLimbs(ladder, man);
+      let standing = 0;
+      for (const side of ['l', 'r']) {
+        // The place it is set (its ankle, `heel` out from the rung and its ankle's height over it) and where it is.
+        const foot = point(man.x, P[`${side}Foot`]);
+        feet.push(offRung(ladder, foot));
+        hands.push(offRung(ladder, point(man.x, P[`${side}Hand`])));
+        const set = limbs[side].foot;
+        // (Set on a rung, not on its way between two: the ball of the foot, `heel` in from its ankle, on it.)
+        if (offRung(ladder, [set[0] - ladder.out[0] * spec.heel, set[1], set[2] - ladder.out[1] * spec.heel]) < 0.01) standing += 1;
+        const rung = Math.round((set[1] - ladder.base) / (LADDERS.rung * Math.cos(LADDERS.lean)));
+        if (man === first && last[side] !== undefined && rung !== last[side]) switched[side] += 1;
+        if (man === first) last[side] = rung;
+        assert.ok(foot[1] > ladder.base - 0.2, 'no foot through the ground');
+      }
+      if (standing === 0) footless += 1;
+    }
+  }
+  const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  const share = (values, within) => values.filter((value) => value < within).length / values.length;
+  assert.ok(samples > 50, `watched on it (${samples})`);
+  // A foot on its rung: its ankle the ball-to-ankle and the ankle's height from the rung (~0.13 m); before, a guard's stance
+  // stood on the air at the stance's height, half the feet more than 0.2 m off any rung (median 0.21 m).
+  assert.ok(median(feet) < 0.16, `feet on the rungs (median ${median(feet).toFixed(2)} m off one)`);
+  assert.ok(share(feet, 0.2) > 0.75, `most of the time (${(share(feet, 0.2) * 100).toFixed(0)}% within 0.2 m)`);
+  // His hands gripping rungs (before: a guard held before him, 7% of the time near a rung).
+  assert.ok(median(hands) < 0.12, `hands on the rungs (median ${median(hands).toFixed(2)} m off one)`);
+  assert.equal(footless, 0, 'a foot on a rung at every moment');
+  assert.ok(switched.l > 2 && switched.r > 2, `each foot goes up rung by rung, by turns (${switched.l}, ${switched.r})`);
+  // (Before he waited to be over its foot, the man from under it went up the air by the wall 1.2 m off his place.)
+  assert.ok(worstOff < 0.3, `never climbing beside it (${worstOff.toFixed(2)} m off his place)`);
+  assert.ok(world.events.some((event) => event.kind === 'ladder' && event.onto && event.fighters[0] === under.id), 'the man from under it up it and onto the walk');
 });
 
 test('the player is not put on a ladder as he passes its foot: he gets on walking at the wall, holds, and climbs back down', () => {
