@@ -92,6 +92,8 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .fields { display: grid; gap: 4px; }
 .field { display: grid; grid-template-columns: 74px 1fr 76px; gap: 8px; align-items: center; font-size: 13px; }
 .field.wide { grid-template-columns: 74px 1fr; }
+.field.pair-row { grid-template-columns: 74px minmax(0, 1fr) auto minmax(0, 1fr); }
+.field.pair-row output { display: none; }
 .field span { color: var(--muted); }
 .field select, .field input:not([type=range]) { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; min-width: 0; }
 .field .mount-line { display: flex; align-items: center; gap: 8px; color: var(--fg); }
@@ -478,6 +480,7 @@ body:not([data-game="sandbox"]) .controls button { padding: 9px 16px; font-size:
   .fields { gap: 6px; }
   .field { grid-template-columns: 70px minmax(0, 1fr) 64px; font-size: 14px; }
   .field.wide { grid-template-columns: 70px minmax(0, 1fr); }
+  .field.pair-row { grid-template-columns: 70px minmax(0, 1fr) auto minmax(0, 1fr); }
   .field select, .field input:not([type=range]) { padding: 8px; font-size: 16px; }
   .field input[type=range] { height: 28px; }
   .looks { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }

@@ -2144,13 +2144,15 @@ function regreyHair(inputs) {
 
 const FIELDS = [
   { key: 'sex', label: 'Sex', type: 'select', options: ['male', 'female'], optionKey: 'builder.o' },
+  // (On the sex's row, `inline`: two short choices on one line.)
+  { key: 'frame', label: 'Frame', type: 'select', options: ['small', 'medium', 'large'], optionKey: 'builder.o', inline: true },
   { key: 'heightCm', label: 'Height', type: 'range', min: 150, max: 210, step: 1, unit: 'cm' },
-  { key: 'frame', label: 'Frame', type: 'select', options: ['small', 'medium', 'large'], optionKey: 'builder.o' },
   { key: 'age', label: 'Age', type: 'range', min: 18, max: 100, step: 1, format: (value) => t('builder.unit.yr', { n: value }) },
   { key: 'exercise', label: 'Exercise', type: 'range', min: 0, max: 1, step: 0.01, format: (value) => t('builder.unit.hoursWeek', { n: Math.round(exerciseHours(value)) }) },
-  // Body fat is not set but settles from what goes in and what is burnt; the
-  // slider spans the intakes that settle between BMI 10 and BMI 100.
-  { key: 'calories', label: 'Calories', type: 'range', step: 10, range: (inputs) => calorieRange(inputs, (FRAMES[inputs.frame] ?? FRAMES.medium).lean), format: (value) => `${Math.round(value).toLocaleString('en')} kcal` },
+  // Body fat is not set but settles from what goes in and what is burnt. The slider's span is fixed, so moving height or
+  // exercise never moves it: the body itself stops at BMI 10 and BMI 100 (physiology.js settleComposition). 600 kcal is a
+  // starvation ration; 12,000 is past any athlete's intake (a Tour de France stage, about 8,000; the roster's most, 7,400).
+  { key: 'calories', label: 'Calories', type: 'range', min: 600, max: 12000, step: 10, format: (value) => `${Math.round(value).toLocaleString('en')} kcal` },
   // How precisely he places his blows, apart from his body (WORLD.skill).
   { key: 'skill', label: 'Skill', type: 'range', min: 0, max: 1, step: 0.05, format: (value) => `${Math.round((value ?? 0.5) * 100)}%` },
 ];
@@ -2328,6 +2330,15 @@ function buildCornerForm(corner) {
     });
     return row;
   }));
+  // An `inline` field joins the row before it (its label, its choice; the two values' outputs stay, empty and hidden).
+  for (const [index, field] of FIELDS.entries()) {
+    if (!field.inline) continue;
+    const row = fields.children[index];
+    const before = row.previousElementSibling;
+    before.classList.add('pair-row');
+    before.append(...row.childNodes);
+    row.remove();
+  }
   const looks = form.querySelector('.looks');
   looks.replaceChildren(...LOOK_FIELDS.map((field) => {
     const row = document.createElement('label');
@@ -2567,12 +2578,7 @@ function fillCornerForm(corner) {
   labelKeyed(form.querySelector('.copy'), 'builder.copyCode');
   for (const field of FIELDS) {
     const input = form.querySelector(`[data-key="${field.key}"]`);
-    if (field.range) {
-      // The span moves with height, sex, frame and exercise; keep the intake inside it.
-      const [low, high] = field.range(inputs);
-      Object.assign(input, { min: Math.floor(low / 10) * 10, max: Math.ceil(high / 10) * 10 });
-      inputs[field.key] = Math.min(Number(input.max), Math.max(Number(input.min), inputs[field.key]));
-    }
+    if (field.type === 'range') inputs[field.key] = Math.min(field.max, Math.max(field.min, inputs[field.key]));
     input.value = inputs[field.key];
     input.nextElementSibling.textContent = field.format ? field.format(inputs[field.key]) : field.unit ? `${inputs[field.key]} ${field.unit}` : '';
   }
