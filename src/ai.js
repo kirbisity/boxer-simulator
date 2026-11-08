@@ -18,6 +18,7 @@ import { expectedGap, gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
+import { nearestWalk, WALKFIELD } from './physics/walkfield.js';
 import { atGun, serveGun } from './physics/artillery.js';
 import { raiseLadder } from './physics/ladders.js';
 import { exposureOf } from './physics/cover.js';
@@ -34,6 +35,30 @@ export const AI = {
   tieBackPerSecond: 3,
   // In a big fight, how often (s) a fighter with nothing happening near him thinks.
   idleThinkEvery: 0.1,
+  // Perception: in a big fight (WORLD.tiers: three or more), played as one man (`world.perceiver`: the man played, and
+  // `world.view`, the camera that shows him, where there is one), the men the player can see deciding are thought for in
+  // full; the rest, still in the physics as ever, decide at a slower beat and read the field round them less often. What
+  // nobody perceives closely needs no more fidelity than its effect on what is seen. (No man played: everyone in full.)
+  // A man is perceived:
+  // - within `close` m of the man played, wherever he looks: near enough to be heard and felt, a few strides from being on
+  //   him (the edge of Hall's "public distance", 7.6 m: Hall, The Hidden Dimension, 1966);
+  // - within `sharp` m and in the view: the camera's frame (its horizontal field of view, `frameSlack` rad wider, for a man
+  //   half in it as it turns), or, with no camera (headless), his own eyes' `side` rad either side of his facing (the edge of
+  //   mid-peripheral vision, ~60°, where a body's form is still told: Strasburger, Rentschler & Jüttner, J. Vision 2011).
+  //   25 m: how far an expert reads another man's movement for what he is about to do (a tennis receiver reads the server's
+  //   arm and racket across the 23.8 m court: Abernethy & Russell, J. Sport Psychology 1987);
+  // - within `sharp` m and fighting him (behind him too): his man, or a man after him or striking at him.
+  // A man not perceived:
+  // - in an exchange (WORLD.tiers' 'full'), still thinks every step: his answer to a blow and the next blow of a combination
+  //   go by the step. (Thought for every other step, the far fights at Pyongyang's ladders went measurably slower: the
+  //   battle decided 20-35 s later over three seeds. What is decided blow by blow is not thinned.)
+  // - otherwise (coming on, holding his place, waiting his turn) thinks every `idleEvery` s: a choice among several takes a
+  //   man 0.2-0.5 s (Hick, Q. J. Exp. Psychology 1952; Hyman, J. Exp. Psychology 1953), so a fifth of a second loses nothing
+  //   he would have done;
+  // - reads the field round him (fearTarget's: his side's state, the men round him, the strength before him, his general,
+  //   the shock of a charge) every `appraiseEvery` s, not at every think: a look round. His fear settles toward it over
+  //   AI.panic.settle (2 s) as ever.
+  perceive: { close: 8, sharp: 25, side: Math.PI / 3, frameSlack: 0.15, idleEvery: 0.2, appraiseEvery: 0.3 },
   // Cohesion in a group fight (a side of WORLD.standard.minSide or more):
   // each fighter, deciding for himself as ever, leans slightly towards his
   // side's standard (see keepLeaders). Within `radius` m, plus `radiusPerSqrt`
@@ -650,11 +675,14 @@ export function thinkAll(world, dt, playerIds = new Set()) {
 const nearGrid = floorGrid();
 const sightGrid = floorGrid();
 let fieldSeen = null;
+// The corners of the men in it (a side's walk field is asked for by its corner).
+let fieldCorners = [];
 
 /** Run `think` with the field as it is now held in the grids (thinkAll's think; a test's). */
 export function seeingField(world, think) {
   try {
     fieldSeen = world;
+    fieldCorners = [...new Set(world.fighters.map((fighter) => fighter.corner))];
     fillGrid(nearGrid, world.fighters, AI.standing.group + AI.standing.groupFade);
     fillGrid(sightGrid, world.fighters, AI.standing.sight);
     return think();
@@ -679,17 +707,22 @@ function thinkEach(world, dt, playerIds) {
   // The player's orders to his side (command.js).
   keepOrders(world);
   // In a big fight, a fighter with nothing happening near him thinks ten
-  // times a second (each on his own beat) rather than every step.
+  // times a second (each on his own beat) rather than every step; and one the player cannot see deciding, less (AI.perceive).
   const staggered = fightTier(world) >= 3;
+  const view = staggered ? perceptionOf(world) : null;
   for (const fighter of world.fighters) {
     if (playerIds.has(fighter.id)) continue;
     // Level mode: a dormant man (his section is not active) is not thought for; nor is a neutral one (corner 'grey': civilians, prisoners), nor one levelmode drives itself (`driven`: unaware, searching, following; levelmode/awareness.js).
     if (fighter.dormant || fighter.corner === 'grey' || fighter.driven) continue;
     // A man lying in ambush waits where he is, unseen, for the signal (springAmbush).
     if (fighter.hidden) continue;
+    const seen = perceivedBy(view, fighter);
+    fighter.unperceived = !seen;
     // (A rider thinks every step, whatever his detail: a step his AI sets no goal for his horse, it goes by his footwork,
     // physics/mounted.js goalFromFootwork.)
-    if (!staggered || fighter.detail === 'full' || fighter.detail === undefined || fighter.mount) {
+    const exchanging = fighter.detail === 'full' || fighter.detail === undefined;
+    const every = !staggered || fighter.mount || exchanging ? 0 : seen ? AI.idleThinkEvery : AI.perceive.idleEvery;
+    if (every === 0) {
       // Cleared, so that once he is staggered he takes up his own beat.
       fighter.aiOwed = undefined;
       think(world, fighter, dt);
@@ -697,12 +730,52 @@ function thinkEach(world, dt, playerIds) {
       continue;
     }
     // Each on his own beat (offset by his id), so the thinking is spread over the steps.
-    fighter.aiOwed = (fighter.aiOwed ?? (fighter.id % 6) * dt) + dt;
-    if (fighter.aiOwed < AI.idleThinkEvery - 1e-9) continue;
+    fighter.aiOwed = (fighter.aiOwed ?? (fighter.id % Math.max(1, Math.round(every / dt))) * dt) + dt;
+    if (fighter.aiOwed < every - 1e-9) continue;
     think(world, fighter, fighter.aiOwed);
     keepPlace(world, fighter);
     fighter.aiOwed = 0;
   }
+}
+
+/**
+ * What the player perceives this think (AI.perceive): the man played (`world.perceiver`) where he stands, the view (the
+ * camera's, `world.view` { eye: [x, z], ahead: [x, z], half: rad }, or his own eyes'), and the men he is fighting. Null
+ * with nobody played, or him out of it: then every man is thought for in full.
+ */
+function perceptionOf(world) {
+  const id = world.perceiver;
+  const man = id === undefined || id === null ? null : world.fighters[id];
+  if (!man || man.state === 'out' || man.fled) return null;
+  const spec = AI.perceive;
+  const at = [man.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2]];
+  const facing = yawRotate([1, 0, 0], man.yaw);
+  const camera = world.view;
+  const eye = camera ? camera.eye : at;
+  const ahead = camera ? camera.ahead : [facing[0], facing[2]];
+  const half = camera ? camera.half + spec.frameSlack : spec.side;
+  // Fighting him: his man and whom he strikes at, and whoever is after him or striking at him.
+  const engaged = new Set();
+  if (man.focus !== undefined) engaged.add(man.focus);
+  if (man.punch) engaged.add(man.punch.target);
+  for (const other of world.fighters) if (other.focus === man.id || other.punch?.target === man.id) engaged.add(other.id);
+  return { id: man.id, at, eye, ahead, cos: Math.cos(Math.min(Math.PI, half)), engaged };
+}
+
+/** Whether the player perceives this man deciding (AI.perceive); every man, with no perception (perceptionOf null). */
+function perceivedBy(view, fighter) {
+  if (!view || fighter.id === view.id) return true;
+  const spec = AI.perceive;
+  const x = fighter.x[P.pelvis * 3];
+  const z = fighter.x[P.pelvis * 3 + 2];
+  const apart = (x - view.at[0]) ** 2 + (z - view.at[1]) ** 2;
+  if (apart <= spec.close * spec.close) return true;
+  // (A man across the field who has picked him out is not yet fighting him.)
+  if (apart > spec.sharp * spec.sharp) return false;
+  if (view.engaged.has(fighter.id)) return true;
+  const dx = x - view.eye[0];
+  const dz = z - view.eye[1];
+  return dx * view.ahead[0] + dz * view.ahead[1] >= view.cos * Math.hypot(dx, dz);
 }
 
 /**
@@ -2433,8 +2506,9 @@ export function outnumberedFear(world, fighter) {
  */
 export function standingFear(world, fighter) {
   const spec = AI.standing;
-  // Within a think, on open ground: the same weighing, among the men the grids hold near him (standingFearNear).
-  if (fieldSeen === world && !world.arena.works) return standingFearNear(world, fighter);
+  // Within a think: the same weighing, among the men the grids hold near him, the nearest enemy over the works read off
+  // their side's walk field (standingFearNear).
+  if (fieldSeen === world) return standingFearNear(world, fighter);
   const where = (other) => [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]];
   const at = where(fighter);
   const enemies = world.fighters.filter((other) => hostile(other, fighter) && !other.dormant && !other.hidden && inFight(other));
@@ -2471,9 +2545,11 @@ export function standingFear(world, fighter) {
 }
 
 /**
- * standingFear on open ground within a think: the nearest enemy looked for among the men within his sight's cells, each
- * knot's strength among the men within its reach's cells. Every man left out is one standingFear would find no nearer
- * than `sight` or weigh at nothing (beyond group + groupFade m), and the rest are taken in the same order: the same sums.
+ * standingFear within a think: the nearest enemy looked for among the men within his sight's cells, each knot's strength
+ * among the men within its reach's cells. Every man left out is one standingFear would find no nearer than `sight` or weigh
+ * at nothing (beyond group + groupFade m), and the rest are taken in the same order: on open ground, the same sums. Over
+ * works, the nearest is the one with the shortest walk to him, read off the enemy side's walk field (physics/walkfield.js:
+ * to within a cell of fieldworks.js walkingDistance), not every enemy's walk worked out in turn.
  */
 function standingFearNear(world, fighter) {
   const spec = AI.standing;
@@ -2484,7 +2560,18 @@ function standingFearNear(world, fighter) {
   let nearest = null;
   let nearestIndex = -1;
   let nearestApart = Infinity;
-  const seen = menAround(world, sightGrid, x, z, spec.sight, false);
+  const works = Boolean(world.arena.works);
+  let walked = false;
+  if (works) {
+    for (const corner of fieldCorners) {
+      if (corner === fighter.corner || corner === 'grey') continue;
+      const walk = nearestWalk(world, corner, x, z);
+      if (!walk) continue;
+      walked = true;
+      if (walk.walk < nearestApart && knotEnemy(fighters[walk.who], fighter)) [nearest, nearestApart] = [fighters[walk.who], walk.walk];
+    }
+  }
+  const seen = walked ? [] : menAround(world, sightGrid, x, z, spec.sight, false);
   for (let k = 0; k < seen.length; k += 1) {
     const enemy = fighters[seen[k]];
     if (!knotEnemy(enemy, fighter)) continue;
@@ -2511,6 +2598,8 @@ function standingFearNear(world, fighter) {
     const enemy = fighters[knot[k]];
     if (knotEnemy(enemy, fighter)) theirs += knotWeight(enemy, middleX, middleZ) * strengthNow(enemy);
   }
+  // (As much of theirs as can get at him where he stands, on the works: physics/cover.js exposureOf.)
+  if (works) theirs *= exposureOf(world, fighter, strengthNow);
   if (!theirs || !ours) return 0;
   const gap = Math.log(theirs / ours);
   const past = (value) => Math.max(0, Math.min(1, (value - spec.parity) / spec.span));
@@ -2816,7 +2905,10 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const legs = (legGone(fighter, 'l') ? 1 : 0) + (legGone(fighter, 'r') ? 1 : 0);
   // A limb broken or cut off: fear while it lasts, and the shock of losing it (maiming.js), fading.
   const broken = brokenArms(fighter) * spec.brokenArm + legs * spec.brokenLeg + maimFear(fighter, world.time);
-  const felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken + routFear(world, fighter) + companyFear(world, fighter) + standingFear(world, fighter) + outnumberedFear(world, fighter) + generalFear(world, fighter) + shockFear(world, fighter);
+  // (The field round him read afresh, or, by a man the player does not see deciding, as he last looked round: AI.perceive.)
+  const field = fieldFelt(world, fighter);
+  let felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken;
+  for (let k = 0; k < field.length; k += 1) felt += field[k];
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
   const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);
@@ -2826,6 +2918,19 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const ranks = fighter.slot && world.formations?.[fighter.formation] ? spec.drilled : 1;
   const discipline = 1 - AI.morale.discipline * disciplineOf(world, fighter);
   return Math.max(0, Math.min(1, spec.felt * felt * (1 + spec.mismatch * mismatch) * (1 - fighter.body.gear.courage) * (1 - rush * (fighter.adrenaline ?? 0)) * ring * ranks * discipline));
+}
+
+/**
+ * The fear he reads off the field round him (fearTarget's terms: his side's state, the men round him, the strength before
+ * him, the general, a charge's shock), kept in `fighter.fieldFear`; a man not perceived (AI.perceive) reads it again only
+ * every `appraiseEvery` s.
+ */
+function fieldFelt(world, fighter) {
+  const kept = fighter.fieldFear;
+  if (fighter.unperceived && kept && world.time >= kept.at && world.time - kept.at < AI.perceive.appraiseEvery) return kept.terms;
+  const terms = [routFear(world, fighter), companyFear(world, fighter), standingFear(world, fighter), outnumberedFear(world, fighter), generalFear(world, fighter), shockFear(world, fighter)];
+  fighter.fieldFear = { at: world.time, terms };
+  return terms;
 }
 
 /** A relentless man (`inputs.relentless`: a boss): AI.relentless. */
@@ -3135,8 +3240,15 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
     // (Behind a palisade, how far the enemy would have to walk round it: physics/fieldworks.js walkingDistance.)
     const me = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
     // (Only whether one is within reloadSafe counts, and a walk is never shorter than the straight line: a man further than
-    // that in a straight line is not walked round the works for, every step of every gunner reloading.)
-    const foes = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up');
+    // that in a straight line is not walked round the works for, every step of every gunner reloading. Nor any, when the
+    // enemy's walk field has none of them within reloadSafe of him, with room for the grid's error and for how far they may
+    // have come since it was made: physics/walkfield.js.)
+    const clear = world.arena.works && fieldSeen === world && fieldCorners.every((corner) => {
+      if (corner === fighter.corner || corner === 'grey') return true;
+      const walk = nearestWalk(world, corner, me[0], me[1]);
+      return walk !== null && walk.walk - WALKFIELD.cell * Math.SQRT2 - WALKFIELD.sprint * walk.age > gun.reloadSafe;
+    });
+    const foes = clear ? [] : world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up');
     const walkable = world.arena.works ? foes.filter((other) => Math.hypot(other.x[P.pelvis * 3] - me[0], other.x[P.pelvis * 3 + 2] - me[1]) <= gun.reloadSafe) : foes;
     const nearest = Math.min(...walkable.map((other) => (world.arena.works ? walkingDistance(world, [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]], me) : vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis))))));
     if (nearest > gun.reloadSafe) {

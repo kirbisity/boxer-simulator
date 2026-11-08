@@ -615,8 +615,11 @@ function thinkForBout(world, dt) {
   // The intro's legends stand in their guard: nobody to fight.
   if (state.game === 'intro') return;
   const players = state.mode === 'play' && player() ? new Set([player().id]) : new Set();
-  // The one you play is simulated in full however big the fight.
+  // The one you play is simulated in full however big the fight; the men you can see deciding are thought for in full
+  // (ai.js AI.perceive: him and the camera's view).
   world.keepFull = new Set(players);
+  world.perceiver = players.size ? [...players][0] : undefined;
+  world.view = players.size ? cameraView() : null;
   // The man played has the stamina overdraft (physics/overdraft.js); an AI fighter never does.
   for (const fighter of world.fighters) if (Boolean(fighter.player) !== players.has(fighter.id)) fighter.player = players.has(fighter.id);
   // Standing still: no thinking at all; he stays where he is, guard down, and takes what comes.
@@ -673,6 +676,13 @@ function thinkForBout(world, dt) {
     if (state.orders.keyStick) tutorial.signal('move', 1);
     directFighter(world, player(), state.orders, dt);
   }
+}
+
+/** What the camera takes in on the floor (ai.js AI.perceive): where it stands, the way it looks, half its width (rad). */
+function cameraView() {
+  const camera = scene.camera;
+  const half = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect);
+  return { eye: [camera.position.x, camera.position.z], ahead: floorAxes().ahead, half };
 }
 
 /** The camera's own axes on the floor: the way it looks, and its right. */

@@ -250,9 +250,13 @@ export function storyBattleSetup(run, seed = 1) {
   return run.setup;
 }
 
-/** The world for a setup (createWorld), the orders his rank lets him give set on it. */
+/**
+ * The world for a setup (createWorld), the orders his rank lets him give set on it; the battle seen through him (ai.js
+ * AI.perceive: the men he cannot see deciding decide at a slower beat), headless as when played.
+ */
 export function storyBattleWorld(setup, life) {
   const world = createWorld(setup.fighters, setup.options);
+  world.perceiver = setup.player;
   storyCommandMen(world, setup, life);
   return world;
 }

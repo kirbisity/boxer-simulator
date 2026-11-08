@@ -26,6 +26,8 @@ export function storyNorthLife(battle, { rank = 'squadLeader', place = 'front' }
 export function storyNorthBattle(battle, life, { seed = 1, seconds = 240, step = 0.1, setupOptions = {} } = {}) {
   const setup = battle.setup(life, seed, setupOptions);
   const world = createWorld(setup.fighters.map(({ inputs, corner }) => ({ inputs: normaliseInputs(structuredClone(inputs)), corner })), setup.options);
+  // (Seen through the hero, as the game plays it: ai.js AI.perceive.)
+  world.perceiver = setup.player;
   let time = 0;
   let decided = null;
   while (time < seconds && !(decided !== null && time > decided + CHASE)) {

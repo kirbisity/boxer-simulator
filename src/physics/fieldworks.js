@@ -681,7 +681,7 @@ export function walkingDistance(world, from, to) {
  * profile, each `span` m of that lengthened as its slope slows a man (FIELDWORKS.climb). Only the stretch over a ditch is
  * sampled: a line that does not cross one costs no more than its length.
  */
-function climbedDistance(works, from, to) {
+export function climbedDistance(works, from, to) {
   const spec = FIELDWORKS.climb;
   const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
   let total = length;
