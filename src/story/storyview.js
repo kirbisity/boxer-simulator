@@ -79,6 +79,12 @@ export const STORY_WORDS = {
 // at real time again: its lines are timed to be read.
 const STORY_PACE = { speeds: [1, 3], hudAway: 0.5 };
 
+// The camera over the deploy screen (deployView): looking down at `pitch` (rad) on the middle of his side from `perMetre`
+// times the side's spread from its middle (its furthest man), never nearer than `least` m nor further than `most`; aimed
+// `toward` × that distance short of the side's middle, toward the camera, so the men stand in the screen's upper half above
+// the card (the middle that far beyond the aim is ~0.23 rad above it at this pitch: a quarter of a ~50° high view).
+const STORY_DEPLOY_VIEW = { pitch: 0.9, perMetre: 2.6, least: 14, most: 60, toward: 0.3 };
+
 const STORY_STYLE = `
 #story-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; font-family: 'Noto Serif SC', 'Songti SC', Georgia, serif; color: #efe6d2; }
 #story-layer > * { pointer-events: auto; }
@@ -360,6 +366,28 @@ export function installStory(hooks) {
     hooks.stage(setup, { paused: true });
     storyCommandMen(hooks.world(), setup, life);
     fight = { setup, watch: storyWatch(setup), last: null, done: false };
+  }
+
+  /**
+   * The camera over the deploy screen: above his side as it stands (STORY_DEPLOY_VIEW), from the battle's own bearing, the
+   * whole of it in view over the card, so a pick is seen on the field.
+   */
+  function deployView() {
+    const world = hooks.world();
+    const hero = fight && world?.fighters[fight.setup.player];
+    if (!hero) return;
+    const men = world.fighters.filter((fighter) => fighter.corner === hero.corner).map((fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
+    const middle = [0, 1].map((k) => men.reduce((sum, at) => sum + at[k], 0) / men.length);
+    const spread = Math.max(...men.map((at) => Math.hypot(at[0] - middle[0], at[1] - middle[1])));
+    const { pitch, perMetre, least, most, toward } = STORY_DEPLOY_VIEW;
+    const orbit = hooks.orbit();
+    // (A screen taller than wide sees less across: further off by the square root of its aspect.)
+    const aspect = Math.min(1, globalThis.innerWidth / globalThis.innerHeight || 1);
+    const distance = Math.min(most, Math.max(least, (spread * perMetre) / Math.sqrt(aspect)));
+    const yaw = fight.setup.view?.camera?.yaw ?? orbit.yaw;
+    // (The orbit's camera stands off its target at [cos yaw, sin yaw] on the ground: main.js.)
+    orbit.target.set(middle[0] + Math.cos(yaw) * toward * distance, 0, middle[1] + Math.sin(yaw) * toward * distance);
+    Object.assign(orbit, { yaw, pitch, distance });
   }
 
   /** His men drawn up as picked (or, `chosen` null, as the battle's defaults): on to the battle. */
@@ -666,6 +694,7 @@ export function installStory(hooks) {
   /** After the follow camera: in a scene, the camera eased onto the shot. */
   function steer(dt) {
     if (finale) finaleFrame(dt);
+    if (view === 'deploy') return deployView();
     const focus = scene ? sceneFocus(scene.play) : finale ? finaleFocus() : null;
     if (!focus) return;
     const orbit = hooks.orbit();
