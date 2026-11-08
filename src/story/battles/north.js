@@ -7,6 +7,7 @@
 
 import { normaliseInputs } from '../../body.js';
 import { greyedHair } from '../../aging.js';
+import { koreaKitFor } from './korea.js';
 
 export const NORTH = {
   // The kit by rank, as the life gives it (src/story/life.js STORY.kit): the garrison man's padded coat, a squad leader's
@@ -52,6 +53,9 @@ export function northRole(life) {
 
 const northDistance = (a, b) => Math.hypot(a.at[0] - b.at[0], a.at[1] - b.at[1]);
 
+/** A man put in a place, in the better of his own kit and what that place was issued (korea.js koreaKitFor). */
+const northDressed = (inputs, place) => normaliseInputs({ ...inputs, outfit: { ...inputs.outfit, kind: koreaKitFor(inputs.outfit?.kind, place.inputs?.outfit?.kind) } });
+
 /**
  * The hero and his comrades into the Ming's men (`men`: [{ inputs, name, at, role, unit, named? }], changed in place).
  * His place: the nearest to `near` ([x, z]) of the places of his part (northRole); a historical man (`named`) is never
@@ -67,7 +71,7 @@ export function northPlace(life, men, near, year) {
   const spot = { at: near };
   const player = pool.reduce((best, index) => (northDistance(men[index], spot) < northDistance(men[best], spot) ? index : best), pool[0]);
   const heroSlot = men[player];
-  men[player] = { ...heroSlot, inputs: northHeroInputs(life, year), name: northClone(life.hero.name), hero: true };
+  men[player] = { ...heroSlot, inputs: northDressed(northHeroInputs(life, year), heroSlot), name: northClone(life.hero.name), hero: true };
   const comrades = {};
   const taken = new Set([player]);
   const living = (life.comrades ?? []).filter((comrade) => comrade.alive).sort((a, b) => (b.bond ?? 0) - (a.bond ?? 0));
@@ -78,7 +82,7 @@ export function northPlace(life, men, near, year) {
     if (!options.length) break;
     const index = options.reduce((best, each) => (nearness(each) < nearness(best) ? each : best), options[0]);
     taken.add(index);
-    men[index] = { ...men[index], inputs: northComradeInputs(comrade, year), name: northClone(comrade.name), comrade: comrade.id };
+    men[index] = { ...men[index], inputs: northDressed(northComradeInputs(comrade, year), men[index]), name: northClone(comrade.name), comrade: comrade.id };
     comrades[comrade.id] = index;
   }
   // The men he would command: his own unit's, or those his place leads (`leads`: an officer's place over several units).

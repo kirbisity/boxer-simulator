@@ -25,7 +25,7 @@
 import { roninWarrior, wokouRaider } from '../../cast.js';
 import { seededRandom } from '../../physics.js';
 import { qiJiguangLevel, WEATHER_MIST } from '../../scenarios.js';
-import { koreaAssemble, koreaHeroKit, KOREA_KIT, koreaFighter, koreaComrades, koreaStandIn } from './korea.js';
+import { koreaAssemble, koreaHeroKit, KOREA_KIT, koreaFighter, koreaComrades, koreaKitFor, koreaStandIn } from './korea.js';
 
 export const WOKOU_1588 = {
   year: 1588,
@@ -91,14 +91,14 @@ export const wokouBattle = {
       places.push([spec.front + squad[11][1] + spec.officerBack, 0]);
     } else heroIndex = first + (spec.slot[life.rank === 'squadLeader' ? 'squadLeader' : life.place] ?? spec.slot.front);
     const heroStyle = life.rank === 'officer' ? 'dao' : squad[heroIndex - first][0];
-    men[heroIndex] = koreaFighter(life.hero, { year: spec.year, kit, style: heroStyle, design: spec.design });
+    men[heroIndex] = koreaFighter(life.hero, { year: spec.year, kit: koreaKitFor(kit, men[heroIndex]?.outfit?.kind), style: heroStyle, design: spec.design });
     // His comrades in the places of his squad nearest his.
     const at = places[heroIndex];
     const near = Array.from({ length: 12 }, (_, k) => first + k).filter((index) => index !== heroIndex).sort((a, b) => Math.hypot(places[a][0] - at[0], places[a][1] - at[1]) - Math.hypot(places[b][0] - at[0], places[b][1] - at[1]));
     const comrades = {};
     for (const [k, comrade] of koreaComrades(life).slice(0, near.length).entries()) {
       const index = near[k];
-      men[index] = koreaFighter(comrade, { year: spec.year, kit: KOREA_KIT[comrade.rank] ?? 'mingGarrison', style: squad[index - first][0], design: spec.design });
+      men[index] = koreaFighter(comrade, { year: spec.year, kit: koreaKitFor(KOREA_KIT[comrade.rank] ?? 'mingGarrison', men[index].outfit?.kind), style: squad[index - first][0], design: spec.design });
       comrades[comrade.id] = index;
     }
     const built = koreaAssemble({ red: { men: [...japanese, ...chinese], places: [] }, blue: { men, places }, heroCorner: 'blue', hero: heroIndex, comrades });

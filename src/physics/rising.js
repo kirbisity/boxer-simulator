@@ -363,7 +363,9 @@ function drawFootIn(fighter, foot) {
   const at = foot.planted;
   const height = hip[1] - (fighter.lift ?? 0) - fighter.desired[foot.index][1];
   const across = Math.hypot(at[0] - hip[0], at[2] - hip[2]);
-  if (height >= reach || across < 1e-6) return;
+  // (Out of the leg's reach either way, it is left where it is: a foot planted a step below his floor (off the edge of a
+  // wall's walk, as he kneels at it) is further below the hip than any leg reaches, and has no reach across to draw in to.)
+  if (Math.abs(height) >= reach || across < 1e-6) return;
   const most = Math.sqrt(reach * reach - height * height);
   if (across <= most) return;
   const share = most / across;

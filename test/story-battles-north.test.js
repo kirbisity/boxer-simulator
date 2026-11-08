@@ -40,7 +40,9 @@ test('the hero stands where his rank puts him, his living comrades beside him, a
       const hero = setup.fighters[setup.player];
       assert.equal(hero.corner, 'red');
       assert.equal(hero.inputs.name, 'Wu Er');
-      assert.equal(hero.inputs.outfit.kind, life.kit, `${battle.id} ${rank}: his rank's kit`);
+      // His rank's kit, or the better one his place in the line was issued (korea.js koreaKitFor).
+      const kits = ['mingGarrison', 'mingBrigandine', 'mingElite'];
+      assert.ok(kits.indexOf(hero.inputs.outfit.kind) >= kits.indexOf(life.kit), `${battle.id} ${rank}: at least his rank's kit`);
       assert.equal(hero.inputs.age, battle.year - 1568, 'his age that year');
       assert.deepEqual(Object.keys(setup.comrades).sort(), ['a', 'b'], 'the living two placed, the dead one not');
       for (const [id, index] of Object.entries(setup.comrades)) {

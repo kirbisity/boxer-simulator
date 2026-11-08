@@ -44,6 +44,18 @@ export function koreaComrades(life) {
 /** The hero's own kit: the life's, else his rank's. */
 export const koreaHeroKit = (life) => life.kit ?? KOREA_KIT[life.rank] ?? 'mingGarrison';
 
+// The Ming kits from least to most protection (outfits.js): the hemp vest, the brigandine, the elite's.
+const KOREA_KIT_ORDER = ['mingGarrison', 'mingBrigandine', 'mingElite'];
+/**
+ * What a man wears in the place he is given: what that place in the line was issued (the column's armour, where the army
+ * armoured it), or his rank's kit where that is better. A soldier put in a brigandine column wears the brigandine too.
+ */
+export function koreaKitFor(rankKit, placeKit) {
+  const rank = KOREA_KIT_ORDER.indexOf(rankKit);
+  const place = KOREA_KIT_ORDER.indexOf(placeKit);
+  return place > rank ? placeKit : rankKit;
+}
+
 /** A side's layout from world places ([x, z] each, in the side's cast order). */
 export function koreaLayout(corner, places) {
   const sign = corner === 'red' ? -1 : 1;
@@ -100,12 +112,12 @@ export function koreaSeat(life, side, { at, year, design = {} }) {
   const indices = side.men.map((_, index) => index).filter(onFoot);
   const hero = indices.reduce((best, index) => (distance(index, at) < distance(best, at) ? index : best), indices[0]);
   const seat = side.places[hero];
-  side.men[hero] = koreaFighter(life.hero, { year, kit: koreaHeroKit(life), style: side.men[hero].style, design });
+  side.men[hero] = koreaFighter(life.hero, { year, kit: koreaKitFor(koreaHeroKit(life), side.men[hero].outfit?.kind), style: side.men[hero].style, design });
   const near = indices.filter((index) => index !== hero).sort((a, b) => distance(a, seat) - distance(b, seat));
   const comrades = {};
   for (const [k, comrade] of koreaComrades(life).slice(0, near.length).entries()) {
     const index = near[k];
-    side.men[index] = koreaFighter(comrade, { year, kit: KOREA_KIT[comrade.rank] ?? 'mingGarrison', style: side.men[index].style, design });
+    side.men[index] = koreaFighter(comrade, { year, kit: koreaKitFor(KOREA_KIT[comrade.rank] ?? 'mingGarrison', side.men[index].outfit?.kind), style: side.men[index].style, design });
     comrades[comrade.id] = index;
   }
   return { hero, comrades };
