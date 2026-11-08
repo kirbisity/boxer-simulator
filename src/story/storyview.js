@@ -6,7 +6,8 @@
 //
 // main.js gives `installStory` its hooks: closeMenus(), storage(), stage(setup, { paused }) (build and show a story world, the hero played),
 // world(), pause(on), orbit() (the camera's orbit, to steer in a scene), watch(on) (the hero left to his own mind: the test bed's
-// autoplay), home() (back to the menu). It calls back each frame: tick(world) after the world's steps, think(world) inside each
+// autoplay), speed(n) (the world's pace, a multiple of real time: the frame's, never the physics step), home() (back to the menu).
+// It reads placeMark() each frame (his place on the field, for placemark.js). It calls back each frame: tick(world) after the world's steps, think(world) inside each
 // step (a scene's posing), steer(dt) after the follow camera is placed; holding() says the hero is the scene's, not the player's.
 // Test hooks: window.boxer.story (main.js puts `hooks` there).
 
@@ -14,7 +15,7 @@ import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from './chap
 import { STORY_BATTLES } from './battles/index.js';
 import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
 import { storyGetLang, storyOnLang, storySetLang } from './language.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyFinaleDone, storyLifeLived, storyNextChapter, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyFinaleDone, storyLifeLived, storyNextChapter, storyPlaceOf, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
 import { P } from '../body.js';
 import { createScenePlay, layDead, poseSetFigures, sceneFocus, sceneHeld, sceneClearYaw, sceneLook, sceneThink, setFocus, skipSceneLine, stageSetFigures, stepScene } from './scenes/stage.js';
@@ -52,6 +53,10 @@ export const STORY_WORDS = {
   holdSquad: { zh: '守住位置。你只能指挥你的一队人。', en: 'Hold your place. You command your squad alone.' },
   holdOfficer: { zh: '你指挥这一部人马。', en: 'You command the company.' },
   away: { zh: (s) => `你离开了自己的位置（${s} 秒）`, en: (s) => `You are out of your place in the line (${s} s)` },
+  // Out of his place, still in time: which way it is (in his line's terms) and how long before it counts against him.
+  backTo: { zh: (way, s) => `回到你的位置（${way}）：还有 ${s} 秒，否则记你擅离队伍`, en: (way, s) => `Back to your place (${way}): ${s} s before you are charged` },
+  ways: { ahead: { zh: '在前面', en: 'ahead' }, behind: { zh: '在后面', en: 'behind you' }, left: { zh: '在左边', en: 'to your left' }, right: { zh: '在右边', en: 'to your right' } },
+  speed: { zh: (n) => `速度 ${n}×`, en: (n) => `Speed ${n}×` },
   luckSoFar: { zh: '至今的运气', en: 'Luck so far' },
   noChapters: { zh: '还没有章节。', en: 'No chapters yet.' },
   skip: { zh: '点击继续', en: 'Tap to go on' },
@@ -61,6 +66,11 @@ export const STORY_WORDS = {
   kinds: { executed: { zh: '被斩首', en: 'beheaded' } },
   cleanRun: { zh: '在这之前，每一仗他都是第一次就活了下来。', en: 'Every battle before this one, he came through at the first try.' },
 };
+
+// The battle's pace (the speed button): real time, or `fast` times it (the march up to the walls in under a minute, the fight
+// still followable; the sandbox's own 4× outruns a big battle's frame budget, main.js SIM_BUDGET_MS). Each scene is played
+// at real time again: its lines are timed to be read.
+const STORY_PACE = { speeds: [1, 3], hudAway: 0.5 };
 
 const STORY_STYLE = `
 #story-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; font-family: 'Noto Serif SC', 'Songti SC', Georgia, serif; color: #efe6d2; }
@@ -83,6 +93,8 @@ const STORY_STYLE = `
 #story-layer .sv-hud { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); background: rgba(12,10,8,0.62); border-radius: 6px; padding: 7px 14px; font-size: 14px; color: #ddd2bb; max-width: calc(100% - 180px); text-align: center; pointer-events: none; }
 #story-layer .sv-hud b { display: block; font-size: 12px; letter-spacing: 0.12em; color: #a89c84; font-weight: 400; }
 #story-layer .sv-hud .sv-away { color: #ff9b7a; display: block; margin-top: 3px; }
+#story-layer .sv-hud button.sv-speed { pointer-events: auto; display: block; margin: 5px auto 0; background: rgba(239,230,210,0.1); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 12px; padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+#story-layer .sv-hud button.sv-speed.on { background: #efe6d2; color: #1b1712; }
 #story-layer .sv-scene { position: absolute; inset: 0; pointer-events: auto; }
 #story-layer .sv-black { position: absolute; inset: 0; background: #000; opacity: 0; }
 #story-layer .sv-bar { position: absolute; left: 0; right: 0; height: 14vh; background: #000; transform: scaleY(0); }
@@ -197,6 +209,8 @@ export function installStory(hooks) {
 
   function close() {
     if (finale) endFinale();
+    // (A battle left at 3×: the game it goes back to at its own pace.)
+    if (fight && !fight.done && fight.speed !== STORY_PACE.speeds[0]) hooks.speed?.(STORY_PACE.speeds[0]);
     scene = null;
     fight = null;
     run = null;
@@ -276,10 +290,31 @@ export function installStory(hooks) {
     fight = { setup, watch: storyWatch(setup), last: null, done: false };
     storyCommandMen(hooks.world(), fight.setup, life);
     fight.last = hooks.world().time;
+    fight.speed = STORY_PACE.speeds[0];
+    hooks.speed?.(fight.speed);
     hooks.watch(autoplay);
     hooks.pause(false);
     redraw = drawHud;
     drawHud();
+  }
+
+  /** The speed button: the next of STORY_PACE.speeds (1×, 3×). */
+  function toggleSpeed() {
+    if (!fight || fight.done) return null;
+    const { speeds } = STORY_PACE;
+    fight.speed = speeds[(speeds.indexOf(fight.speed ?? speeds[0]) + 1) % speeds.length];
+    hooks.speed?.(fight.speed);
+    if (fight.speedNode) {
+      fight.speedNode.textContent = word('speed', fight.speed);
+      fight.speedNode.classList.toggle('on', fight.speed !== speeds[0]);
+    }
+    return fight.speed;
+  }
+
+  /** Which way his place is from him, in words (the larger of ahead and aside). */
+  function wayWord(toPlace) {
+    const key = !toPlace ? 'ahead' : Math.abs(toPlace.ahead) >= Math.abs(toPlace.right) ? (toPlace.ahead >= 0 ? 'ahead' : 'behind') : toPlace.right >= 0 ? 'right' : 'left';
+    return say(STORY_WORDS.ways[key]);
   }
 
   function drawHud() {
@@ -287,7 +322,9 @@ export function installStory(hooks) {
     const away = svEl('span', { className: 'sv-away' });
     away.hidden = true;
     fight.awayNode = away;
-    show('battle', svEl('div', { className: 'sv-hud' }, svEl('b', { textContent: say(run.chapter.title) }), orders, away));
+    const speed = svEl('button', { type: 'button', className: `sv-speed${(fight.speed ?? 1) !== STORY_PACE.speeds[0] ? ' on' : ''}`, textContent: word('speed', fight.speed ?? STORY_PACE.speeds[0]), onclick: toggleSpeed });
+    fight.speedNode = speed;
+    show('battle', svEl('div', { className: 'sv-hud' }, svEl('b', { textContent: say(run.chapter.title) }), orders, away, speed));
     layer.querySelector('.sv-lang').style.pointerEvents = 'auto';
   }
 
@@ -300,9 +337,12 @@ export function installStory(hooks) {
     fight.last = world.time;
     if (dt > 0) storyWatchStep(fight.watch, world, fight.setup, dt);
     if (fight.awayNode) {
-      const out = fight.watch.away > 0.5;
+      const { watch } = fight;
+      const out = watch.away > STORY_PACE.hudAway;
       fight.awayNode.hidden = !out;
-      if (out) fight.awayNode.textContent = word('away', fight.watch.away.toFixed(0));
+      // Still in time: which way and how long he has; past it (it counts against him now), how long he has been out.
+      const left = Math.ceil(STORY_RUN.leftPlace.seconds - watch.away);
+      if (out) fight.awayNode.textContent = watch.leftPlace ? word('away', watch.away.toFixed(0)) : word('backTo', wayWord(watch.toPlace), Math.max(1, left));
     }
     if (!storyBattleOver(world, fight.setup, fight.watch, run.battle)) return null;
     return endBattle(world);
@@ -312,10 +352,21 @@ export function installStory(hooks) {
     if (!fight || fight.done) return null;
     fight.done = true;
     hooks.pause(true);
+    hooks.speed?.(STORY_PACE.speeds[0]);
     const outcome = storyReadOutcome(world, fight.setup, fight.watch);
     storyBattleDone(run, outcome);
     save();
     return flow();
+  }
+
+  /** His place on the field now ({ place: [x, z], hero, corner, away }), while he is up in the battle; else null. */
+  function placeMark() {
+    if (!fight || fight.done || !run || view !== 'battle' || scene || finale || storyCurrent(run).kind !== 'battle') return null;
+    const world = hooks.world();
+    const hero = world?.fighters[fight.setup.player];
+    if (!hero || hero.state === 'out' || hero.fled) return null;
+    const place = storyPlaceOf(world, hero, fight.watch);
+    return place ? { place, hero, corner: hero.corner, away: fight.watch.away > STORY_PACE.hudAway } : null;
   }
 
   // ---- A scene -------------------------------------------------------------------------------------------------------------
@@ -610,6 +661,8 @@ export function installStory(hooks) {
       run.pending = [];
       return { chapter: chapter.id, comrades: life.comrades.map((comrade) => `${comrade.id}${comrade.alive ? '' : ' (dead)'}`) };
     },
+    // On to what the chapter asks for now (after `stand`: its battle, fought as the player would).
+    go: () => flow(),
     // Play one of the stand-in chapter's scenes now (by id): a set's on its own world; a body's on the battle's field, held
     // still, its subject (the chapter's family in it, and the comrades named in `fell`) struck down first.
     playScene: (id, options = {}) => {
@@ -680,6 +733,9 @@ export function installStory(hooks) {
     life: () => life,
     words: STORY_WORDS,
     config: STORY_RUN,
+    // The speed button pressed (returns the pace now), and the place mark as the field draws it.
+    speed: toggleSpeed,
+    placeMark: () => placeMark(),
   };
 
   return {
@@ -691,6 +747,7 @@ export function installStory(hooks) {
     held: () => (scene ? sceneHeld(scene.play) : finale?.figures ? finale.figures.map((figure) => finale.world.fighters[figure.index]?.id).filter((id) => id !== undefined) : []),
     /** The world's pace (a share): slowed while he lies dying on the field. */
     pace: () => (finale ? finaleLook(finale.play).pace : 1),
+    placeMark,
     /** A scene's camera is on. */
     get filming() { return Boolean(scene || finale); },
     /** The game has left story mode (main.js setGame): take everything down. */

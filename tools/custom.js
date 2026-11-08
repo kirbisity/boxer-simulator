@@ -54,7 +54,13 @@ export const CUSTOM_STUBS = {
   // Story mode (src/story/): not here; the page's hooks into it inert.
   'story/storyview': `
 export function installStory() {
-  return { open() { throw new Error('story mode: not in the custom build (tools/custom.js)'); }, tick() {}, think() {}, steer() {}, close() {}, leave() {}, holding: () => false, held: () => [], pace: () => 1, filming: false, active: false, hooks: {} };
+  return { open() { throw new Error('story mode: not in the custom build (tools/custom.js)'); }, tick() {}, think() {}, steer() {}, close() {}, leave() {}, holding: () => false, held: () => [], pace: () => 1, placeMark: () => null, filming: false, active: false, hooks: {} };
+}
+`,
+  // His place's mark (story mode's): nothing to mark.
+  'story/placemark': `
+export function createStoryPlaceMark() {
+  return { update() {} };
 }
 `,
   // The home screen: there is none; "the menu" is the sandbox (entered at once, and kept as it is from inside it).

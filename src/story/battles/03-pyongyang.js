@@ -18,11 +18,13 @@
 //
 // The approach: the columns form up out of the walls' shot and cross the open ground to them under it, as the storming
 // columns did (the Japanese held the walls with their matchlocks; Li Rusong put their guns' reach at "a few hundred paces"
-// against his cannon's five or six li: Swope, "Turning the Tide", War & Society 21:2, 2003). Here they form up 300 m from the
-// wall's foot (`approach.formUp`: a few hundred metres, beyond a matchlock's aimed fire of ~100 m and at the edge of where
-// its ball still flies), and the stretch's two guns are laid 200 m from it (`approach.guns`: inside a folangji's reach of the
-// walk, ARTILLERY's 300 m, out of the walk's aimed shot). The march across is at the drill's pace (formation.js DRILL), the
-// last of it at a run; the battle's time is that and the storm's.
+// against his cannon's five or six li: Swope, "Turning the Tide", War & Society 21:2, 2003). Here they form up 120 m from the
+// wall's foot (`approach.formUp`: just beyond a matchlock's aimed fire of ~100 m, so the whole of the crossing under the
+// walls' shot is kept; the ground further out, where a ball only drops spent, is walking and nothing else, and is left out),
+// and the stretch's two guns are laid 10 m behind the form-up line (`approach.guns`, 130 m: behind the columns' last rank and
+// their fowling pieces, so the columns set off ahead of the guns; out of the walk's aimed shot, well inside a folangji's reach
+// of it, ARTILLERY's 300 m). The march across is at the drill's pace (formation.js DRILL), the last of it at a run; the
+// battle's time is that and the storm's.
 //
 // Numbers: one stretch of wall. The southern troops at three ladders, against the stretch's defenders: 60 Ming
 // (three ladder columns of 17 - shields, spears, dao, wolf-brushes as Qi armed his squads -, eight fowling pieces behind,
@@ -42,7 +44,7 @@ import { wallWorks } from '../ground/walls.js';
 import { koreaAssemble, koreaRowOf, koreaRows, koreaSeat, koreaStyles } from './korea.js';
 
 // m from the wall's foot (above): where the columns form up, and where the stretch's guns are laid.
-const PYONGYANG_APPROACH = { formUp: 300, guns: 200 };
+const PYONGYANG_APPROACH = { formUp: 120, guns: 130 };
 // s: the march across it at the drill's pace.
 const PYONGYANG_MARCH = Math.round(PYONGYANG_APPROACH.formUp / DRILL.pace);
 // (The wall's foot: x = 1, the attackers' side -x; the columns' first row at the form-up line.)
@@ -153,6 +155,8 @@ export const pyongyangBattle = {
       player: built.player,
       comrades: built.comrades,
       slot: { x: slot[0], z: slot[1] },
+      // A storm (runner.js storyWatchStep): forward to his column's ladder, up it, onto the walk is his duty, not out of his place.
+      storm: true,
     };
   },
 };

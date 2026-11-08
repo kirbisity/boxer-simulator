@@ -91,6 +91,7 @@ import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { installStory } from './story/storyview.js';
+import { createStoryPlaceMark } from './story/placemark.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -212,6 +213,8 @@ const cameraRig = createCameraRig();
 const fightMarks = createFightUiMarks(scene);
 // The crown over each side's general in a battle (generalmark.js; ai.js AI.general).
 const generalMarks = createGeneralMarks(scene);
+// His place in the line in a story battle (story/placemark.js): a ring at his slot, an arrow to it while he is out of it.
+const storyPlaceMark = createStoryPlaceMark(scene);
 let fightMarksClock = 0;
 
 // The player's stamina overdraft fade over the picture (overdraftview.js).
@@ -1323,6 +1326,7 @@ function drawWorld(dt, drawIt = true) {
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
   // (Not over a story scene's figures: nobody there leads a side.)
   generalMarks.update(story.filming ? null : world);
+  storyPlaceMark.update(world, state.game === 'story' ? story.placeMark() : null);
   // A cut-off piece's program (its man's material, unskinned) built while he is new, not on the frame of the cut (render.js warmSevered).
   warmSevered(scene, state.views);
   if (drawIt) render(scene);
@@ -2872,6 +2876,14 @@ const story = installStory({
     $('#pause').textContent = state.paused ? 'Play' : 'Pause';
   },
   orbit: () => scene.orbit,
+  // The battle's pace (its speed button): the frame's multiple of real time, as the speeds bar sets it (the physics step is
+  // never changed: the same fight, sooner). The bar shows it where it has the value.
+  speed: (value) => {
+    state.speed = Number(value) || 1;
+    for (const button of document.querySelectorAll('#speeds button[data-value]')) button.classList.toggle('on', Number(button.dataset.value) === state.speed);
+    syncGhostBar();
+    return state.speed;
+  },
   // Autoplay (tests, shots): the hero left to his own mind, the camera watching; off, he is played again.
   watch: (on) => {
     if (on) $('#modes button[data-value="watch"]').click();
