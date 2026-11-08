@@ -4573,7 +4573,8 @@ function chooseDetail(world) {
         || targeted.has(fighter.id) || lastHit > world.time - WORLD.tiers.hitMemory || fighter.state === 'rising';
       // (A rider whose horse is going down or is in the air is in full: he may be thrown.)
       const unsteady = fighter.mount && (fighter.mount.state !== 'up' || fighter.mount.air);
-      // An exchange at hand neither man of which the player perceives is stepped at the coarser rate (WORLD.tiers.unseen).
+      // An exchange at hand neither man of which the player perceives, or perceives within WORLD.tiers.unseen.far of him, is
+      // stepped at the coarser rate (WORLD.tiers.unseen).
       if (exchanging || unsteady) fighter.detail = played && !unsteady && unseenExchange(world, fighter) ? 'unseen' : 'full';
       // A man standing in the ranks behind the front (formation.js) is only a pose, enemy near or not.
       else if (fighter.slot && !fighter.inFront && fighter.state === 'up' && world.formations?.[fighter.formation]) fighter.detail = 'proxy';
@@ -4601,9 +4602,24 @@ function chooseDetail(world) {
 // The men who must be stepped in full for whom they are in an exchange with (markSeenExchanges): kept from step to step.
 const seenExchanges = new Set();
 
+// The player's hips (x, z) as markSeenExchanges last found them: a man WORLD.tiers.unseen.far or more from there is far.
+let watchX = 0;
+let watchZ = 0;
+let watchFar = Infinity;
+
 /**
- * Who must be stepped in full for the man he is in an exchange with: whom a man the player perceives (ai.js AI.perceive:
- * `unperceived` unset, as the player's own and a man not thought for, counts as perceived) strikes at or has picked out
+ * Whether the player watches a man close to: perceives him (ai.js AI.perceive: `unperceived` unset, as the player's own and
+ * a man not thought for, counts as perceived) and he is within WORLD.tiers.unseen.far of him (markSeenExchanges).
+ */
+function watched(fighter) {
+  if (fighter.unperceived === true) return false;
+  const pelvis = P.pelvis * 3;
+  return (fighter.x[pelvis] - watchX) ** 2 + (fighter.x[pelvis + 2] - watchZ) ** 2 < watchFar * watchFar;
+}
+
+/**
+ * Who must be stepped in full for the man he is in an exchange with: whom a man the player watches close to (watched:
+ * perceived and within WORLD.tiers.unseen.far of him) strikes at or has picked out
  * within reach of him, and a man within reach striking at or picking out one perceived; and any man held (a hold pulls him
  * every substep: physics/grappling.js). An exchange at hand is seen or unseen as a whole: the player who sees one man of it
  * sees the blows go both ways, and how the other man takes them. One beyond reach is not: of a shot at a man he sees, or a
@@ -4614,6 +4630,12 @@ const seenExchanges = new Set();
 function markSeenExchanges(world) {
   seenExchanges.clear();
   const fighters = world.fighters;
+  const player = fighters[world.perceiver];
+  watchFar = player ? WORLD.tiers.unseen.far : Infinity;
+  if (player) {
+    watchX = player.x[P.pelvis * 3];
+    watchZ = player.x[P.pelvis * 3 + 2];
+  }
   for (const fighter of fighters) {
     if (fighter.punch) markExchange(fighters, fighter, fighter.punch.target);
     markExchange(fighters, fighter, fighter.focus);
@@ -4623,7 +4645,7 @@ function markSeenExchanges(world) {
 }
 
 /**
- * One pair in an exchange (markSeenExchanges): within reach of each other, each in full if the other is perceived. Within
+ * One pair in an exchange (markSeenExchanges): within reach of each other, each in full if the other is watched. Within
  * reach as the contacts have it (collideCrowd): hips within WORLD.contactRange, more what a weapon reaches past a body, more
  * WORLD.contactMargin (what two men close in a step, as the contacts' grid allows for).
  */
@@ -4633,17 +4655,17 @@ function markExchange(fighters, fighter, other) {
   const reach = WORLD.contactRange + WORLD.contactMargin + beyondBody(fighter) + beyondBody(them);
   const pelvis = P.pelvis * 3;
   if ((fighter.x[pelvis] - them.x[pelvis]) ** 2 + (fighter.x[pelvis + 2] - them.x[pelvis + 2]) ** 2 > reach * reach) return;
-  if (fighter.unperceived !== true) seenExchanges.add(other);
-  if (fighters[other].unperceived !== true) seenExchanges.add(fighter.id);
+  if (watched(fighter)) seenExchanges.add(other);
+  if (watched(them)) seenExchanges.add(fighter.id);
 }
 
 /**
- * Whether a man in an exchange is in one the player does not perceive (WORLD.tiers.unseen): not perceived himself, nor any
- * man he is in it with (markSeenExchanges), and stepping as an unseen man can: on his feet or getting up, not on a horse,
- * not holding or picking something up, not the player's own.
+ * Whether a man in an exchange is in one the player does not perceive, or perceives only far off (WORLD.tiers.unseen): not
+ * watched close to himself (watched), nor any man he is in it with (markSeenExchanges), and stepping as an unseen man can:
+ * on his feet or getting up, not on a horse, not holding or picking something up, not the player's own.
  */
 function unseenExchange(world, fighter) {
-  return fighter.unperceived === true && (fighter.state === 'up' || fighter.state === 'rising') && !fighter.mount && !fighter.clinch
+  return !watched(fighter) && (fighter.state === 'up' || fighter.state === 'rising') && !fighter.mount && !fighter.clinch
     && !fighter.pin && !fighter.pickup && !world.keepFull?.has(fighter.id) && !seenExchanges.has(fighter.id);
 }
 

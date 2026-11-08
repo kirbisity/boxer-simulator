@@ -1020,7 +1020,13 @@ export const WORLD = {
     // men in exchanges, the coarse and the poses costing little). Not unseen: a man held, holding or picking something up
     // (the holds pull every substep: physics/grappling.js), on a horse (his seat goes with the horse's), or the player's
     // own (world.keepFull).
-    unseen: { stride: 2 },
+    // `far` (m): an exchange he perceives but whose men are both this far from him or further (hips to his hips) steps so
+    // too; his own and any within it stay in full. The camera follows him from ~30 m (the story battles' views) with a 40°
+    // field (render.js), so a man 15 m off is 30-45 m from it, where a frame 22-33 m high puts the 8 cm a point goes in a
+    // 240 Hz substep at 2-4 px of a phone's 800 px: a blade meeting a forearm a substep late is not to be told from one
+    // meeting it on time. Within it is the fight he is in and the ones next to it (AI.perceive.close's 8 m and a man's
+    // run on), the blows he watches land and may walk into: those in full.
+    unseen: { stride: 2, far: 15 },
   },
   // m each side of the centre the sides start: a few steps apart, room to come on (further when someone carries a gun).
   startApart: 1.6,

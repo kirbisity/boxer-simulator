@@ -49,8 +49,9 @@ fighters coarsely (`WORLD.tiers`); the AI of idle fighters thinks on a beat.
 Played as one man (`world.perceiver`: the man played, and `world.view`, the camera; story mode headless too), the
 men the player cannot see deciding (beyond `AI.perceive.close` of him and out of the view, or past `sharp`) think at
 a slower beat and read the field round them less often (ai.js `AI.perceive`). An exchange at hand neither man of which he
-perceives is stepped 'unseen' (physics.js `chooseDetail`, `WORLD.tiers.unseen`): the same physics on one substep in two,
-twice as long; the exchanges he perceives, and a man held or mounted, in full.
+perceives, or perceives only `WORLD.tiers.unseen.far` (15 m) or more from him, is stepped 'unseen' (physics.js
+`chooseDetail`, `WORLD.tiers.unseen`): the same physics on one substep in two, twice as long; his own exchange and the
+ones he perceives within that distance, and a man held or mounted, in full.
 
 **Group fights.** A side of `WORLD.standard.minSide` or more has a leader,
 the man nearest its middle at the start (`raiseStandards`). Where his faction
