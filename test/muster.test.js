@@ -54,7 +54,7 @@ test('the counts of each unit in a level\'s own side add up to its men', () => {
   const cast = level.cast(seededRandom(2));
   const counts = countUnits(unitsOf(level, 'blue'), cast.blue);
   assert.equal(counts['coast.garrison.spear'], 17);
-  assert.equal(counts['coast.garrison.bow'], 4);
+  assert.equal(counts['coast.garrison.mingBow'], 4);
   assert.equal(counts['coast.brigandine.swordShield'], 1);
   assert.equal(Object.values(counts).reduce((sum, count) => sum + count, 0), cast.blue.length);
   assert.equal(counts.other, undefined);

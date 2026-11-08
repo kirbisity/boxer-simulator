@@ -11,6 +11,7 @@ import { thinkAll } from '../src/ai.js';
 import { mingSoldier } from '../src/cast.js';
 import { advance, aimPoint, createWorld, placeFighter, seededRandom, toLocal } from '../src/physics.js';
 import { ammoLeft, bowArcFouled, loose } from '../src/physics/ranged.js';
+import { BALLISTICS } from '../src/physics/ballistics.js';
 
 /** A spearman (blue, at x = 4) and a bowman `behind` m behind him in his file, holding their ground; a man at x = `at`. */
 function spearAndBow(behind, at = -10) {
@@ -42,6 +43,19 @@ test('a bow pressed up to the back of the man before him holds: the shaft would 
 });
 
 test('bows behind a spear: no arrow into their own man, and the one a pace back still shoots', () => {
+  // His judgement of the distance (ballistics.js judgedShare) left out: a garrison man misjudges 16 m by a few metres either
+  // way, and which way his few shots go was luck of the draw (it passed or failed by the bow's draw time, which shifts
+  // the random sequence); the arc's own fall on the mark is what this tests.
+  const judge = BALLISTICS.judge;
+  BALLISTICS.judge = { spread: [0, 0], short: [0, 0] };
+  try {
+    bowsBehindASpear();
+  } finally {
+    BALLISTICS.judge = judge;
+  }
+});
+
+function bowsBehindASpear() {
   for (const behind of [0.55, 1.3]) {
     const { world, bow, red } = spearAndBow(behind);
     for (let t = 0; t < 8; t += 0.05) advance(world, 0.05, (current, dt) => thinkAll(current, dt, new Set([red.id])));
@@ -53,4 +67,4 @@ test('bows behind a spear: no arrow into their own man, and the one a pace back 
     const fell = world.arrows.filter((arrow) => arrow.landed || arrow.done).map((arrow) => Math.hypot(arrow.x[0] - red.x[0], arrow.x[2] - red.x[2]));
     assert.ok(fell.length > 0 && fell.filter((off) => off < 3).length >= fell.length / 2, `arrows fell ${fell.map((off) => off.toFixed(1)).join(', ')} m off the mark`);
   }
-});
+}

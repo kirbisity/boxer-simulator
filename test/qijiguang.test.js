@@ -28,8 +28,8 @@ test('the wokou raiders are mostly Japanese and charge with swords: rōnin and s
   assert.ok(red.slice(-6).every((man) => ['dao', 'spear'].includes(man.style)), 'the Chinese at the back');
   assert.ok(red.every((man) => !STYLES[man.style].ranged), 'no shooter among the raiders');
   assert.ok(red.every((man) => man.charging > 1), 'they come on at a run');
-  assert.ok(blue.every((man) => !STYLES[man.style].ranged || man.style === 'bow'), 'no gun in the garrison');
-  assert.equal(blue.filter((man) => man.style === 'bow').length, 4);
+  assert.ok(blue.every((man) => !STYLES[man.style].ranged || man.style === 'mingBow'), 'no gun in the garrison');
+  assert.equal(blue.filter((man) => man.style === 'mingBow').length, 4, 'four with the Ming bow');
   assert.equal(blue.length, 34);
   assert.ok(blue.length > red.length, 'the garrison outnumbers the raiders');
   for (const kind of ['mingGarrison', 'mingBrigandine']) assert.equal(new Set(blue.filter((man) => man.outfit.kind === kind).map((man) => man.outfit.design)).size, 1, `${kind}: one design`);

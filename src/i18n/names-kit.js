@@ -516,6 +516,8 @@ export const NAMES_KIT = {
   'Composite bow': '复合弓',
   'Yumi': '和弓',
   'Manchu bow': '满洲大弓',
+  'Ming bow': '明弓',
+  'Yumi archer': '和弓弓手',
   'Longbow': '长弓',
   'Pike': '长矛',
   'Dagger': '短匕',

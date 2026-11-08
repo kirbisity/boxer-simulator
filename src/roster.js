@@ -226,7 +226,7 @@ export const WARRIORS = [
   warrior('arquebus', 'Hans Brenner', PRESETS.contender, { name: 'Hans Brenner', calories: 4050, exercise: 0.75, sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] }),
   warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', calories: 4050, exercise: 0.75, sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
   warrior('ashigaruSpear', 'Gonbei', PRESETS.yari),
-  warrior('ashigaruBow', 'Sakuzaemon', PRESETS.spear, { name: 'Sakuzaemon', heightCm: 157, calories: 2500, style: 'bow', outfit: { kind: 'ashigaru', design: 1 }, accessories: [] }),
+  warrior('ashigaruBow', 'Sakuzaemon', PRESETS.spear, { name: 'Sakuzaemon', heightCm: 157, calories: 2500, style: 'archerYumi', outfit: { kind: 'ashigaru', design: 1 }, accessories: [] }),
   warrior('hoplomachus', 'Priscus', PRESETS.hoplomachus),
   warrior('murmillo', 'Verus', PRESETS.murmillo),
   warrior('secutor', 'Flamma', PRESETS.secutor),
@@ -297,7 +297,8 @@ const geometricMean = (values) => Math.exp(values.reduce((sum, value) => sum + M
 
 /** A fighter's rating by his type (style and armour), else his style's; null if neither was rated. */
 export function ratingOf(inputs) {
-  const style = inputs.style;
+  // (A style not yet in the generated table is rated as the one it stands for until the ratings are next made: `ratedAs`.)
+  const style = STYLES[inputs.style]?.ratedAs ?? inputs.style;
   const exact = RATINGS.types[`${style}|${inputs.outfit?.kind ?? 'boxing'}`];
   if (exact) return exact;
   const same = Object.entries(RATINGS.types).filter(([type]) => type.startsWith(`${style}|`)).map(([, value]) => value);

@@ -40,8 +40,8 @@ export const SARHU1619 = {
   // Its companies of foot, head to tail: [people's kit, styles in file order, name]. Each company two files abreast.
   companies: [
     { unit: 'zhejiang', rank: 'brigandine', people: 'mingSouth', styles: ['spear', 'matchlock', 'swordShield'] },
-    { unit: 'south1', rank: 'brigandine', people: 'mingSouth', styles: ['spear', 'swordShield', 'spear', 'dao', 'swordShield', 'bow', 'spear'] },
-    { unit: 'south2', rank: 'garrison', people: 'mingSouth', styles: ['spear', 'dao', 'spear', 'bow', 'spear', 'dao', 'spear', 'bow'] },
+    { unit: 'south1', rank: 'brigandine', people: 'mingSouth', styles: ['spear', 'swordShield', 'spear', 'dao', 'swordShield', 'mingBow', 'spear'] },
+    { unit: 'south2', rank: 'garrison', people: 'mingSouth', styles: ['spear', 'dao', 'spear', 'mingBow', 'spear', 'dao', 'spear', 'mingBow'] },
   ],
   // Liu Ting and two of his household on horse, at the column's head.
   household: ['dao', 'spear', 'dao'],

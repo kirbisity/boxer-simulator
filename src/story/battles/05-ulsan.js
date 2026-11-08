@@ -50,7 +50,7 @@ export const ULSAN_1598 = {
   guns: { count: 8, x: -14, from: -7, to: 7 },
   officers: [[-15, -2], [-15, 2]],
   defenders: {
-    front: [['yari', -5.6], ['yari', -4.4], ['yari', -0.6], ['yari', 0.6], ['matchlock', 4.4], ['matchlock', 5.6], ['matchlock', -8], ['matchlock', -2.5], ['bow', -2], ['matchlock', 2.5], ['bow', 2], ['matchlock', 8], ['matchlock', -7]],
+    front: [['yari', -5.6], ['yari', -4.4], ['yari', -0.6], ['yari', 0.6], ['matchlock', 4.4], ['matchlock', 5.6], ['matchlock', -8], ['matchlock', -2.5], ['archerYumi', -2], ['matchlock', 2.5], ['archerYumi', 2], ['matchlock', 8], ['matchlock', -7]],
     back: [['katana', -5], ['naginata', 0], ['katana', 5]],
     frontAt: 0.4,
     backAt: 1.7,

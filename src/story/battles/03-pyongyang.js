@@ -76,7 +76,7 @@ export const PYONGYANG_1593 = {
   // The garrison on this stretch of the walk: shooters along the parapet between the ladders, yari at each ladder's
   // head, samurai behind them.
   defenders: {
-    front: [['yari', -6.6], ['yari', -5.4], ['yari', -0.6], ['yari', 0.6], ['yari', 5.4], ['yari', 6.6], ['matchlock', -8.2], ['bow', -3.8], ['matchlock', -3], ['bow', -2.2], ['matchlock', 2.2], ['bow', 3], ['matchlock', 3.8], ['matchlock', 8.2]],
+    front: [['yari', -6.6], ['yari', -5.4], ['yari', -0.6], ['yari', 0.6], ['yari', 5.4], ['yari', 6.6], ['matchlock', -8.2], ['archerYumi', -3.8], ['matchlock', -3], ['archerYumi', -2.2], ['matchlock', 2.2], ['archerYumi', 3], ['matchlock', 3.8], ['matchlock', 8.2]],
     back: [['katana', -6], ['naginata', -1], ['katana', 1], ['spear', 6]],
     // m behind the walk's outer edge.
     frontAt: 0.45,

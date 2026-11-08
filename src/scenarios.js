@@ -61,12 +61,12 @@ const WEATHER_SEA_FOG = { fog: WEATHER_MIST.port, colour: 0x3c362e, sky: 0.85, h
 // the lines close (`wings` below). Blades and polearms first (the front ranks), the bows and guns last.
 const SEKIGAHARA_SIDE = {
   east: {
-    samurai: { katana: 3, naginata: 2, spear: 2, bow: 1 },
-    ashigaru: { spear: 8, bow: 3, matchlock: 5, katana: 3, naginata: 1 },
+    samurai: { katana: 3, naginata: 2, spear: 2, archerYumi: 1 },
+    ashigaru: { spear: 8, archerYumi: 3, matchlock: 5, katana: 3, naginata: 1 },
   },
   west: {
-    samurai: { katana: 3, naginata: 2, spear: 2, bow: 2 },
-    ashigaru: { spear: 8, bow: 3, matchlock: 5, katana: 3, naginata: 1 },
+    samurai: { katana: 3, naginata: 2, spear: 2, archerYumi: 2 },
+    ashigaru: { spear: 8, archerYumi: 3, matchlock: 5, katana: 3, naginata: 1 },
   },
 };
 
@@ -74,7 +74,7 @@ const SEKIGAHARA_SIDE = {
 const SEKIGAHARA_EAST = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
 const SEKIGAHARA_WEST = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
 // A side's mounted samurai: spears (the yari from the saddle), a sword and the bow.
-const SEKIGAHARA_HORSE = { spear: 3, katana: 1, bow: 2 };
+const SEKIGAHARA_HORSE = { spear: 3, katana: 1, archerYumi: 2 };
 
 function sekigaharaSide(random, army, colours) {
   const warriors = [];
@@ -99,7 +99,7 @@ const PYONGYANG_MING = {
 };
 const PYONGYANG_JAPANESE = {
   samurai: { katana: 6, naginata: 2, spear: 4 },
-  ashigaru: { spear: 14, matchlock: 11, bow: 7 },
+  ashigaru: { spear: 14, matchlock: 11, archerYumi: 7 },
 };
 // The Ming horse: northern heavy cavalry, sabres and spears with a few three-eyed guns; the Japanese had none in the field.
 const PYONGYANG_HORSE = { dao: 4, spear: 5, threeEyed: 2 };
@@ -284,7 +284,7 @@ const WOKOU = {
   raid: { ronin: { ronin: 6 }, samurai: { katana: 4, yari: 2 }, japanese: { katana: 4, odachi: 3, naginata: 1 }, chinese: { dao: 4, spear: 2 } },
   // A coast garrison of the 1550s: mostly spears and swords, a few bows, no
   // firearms; the weisuo levy in its hemp vests, and a pair of regulars in brigandine.
-  garrison: { garrison: { spear: 17, dao: 11, bow: 4 }, brigandine: { swordShield: 1, spear: 1 } },
+  garrison: { garrison: { spear: 17, dao: 11, mingBow: 4 }, brigandine: { swordShield: 1, spear: 1 } },
   // One colour to a kind, the dynasty's red, so the two sides read apart
   // across the square (OUTFITS designs: the garrison's red coat, the
   // brigandine's red cloth); the raiders are in what they have.
@@ -624,9 +624,9 @@ const mingRank = (rank, people, design = null) => (random, style) => mingSoldier
 const bannerRank = (rank, mounted = false) => (random, style) => bannerman(random, style, rank, { mounted });
 const sengokuArmy = (side) => ({
   ranks: {
-    samurai: { label: 'Samurai', kinds: ['samurai', 'samuraiTosei'], styles: ['katana', 'naginata', 'yari', 'bow'], make: (random, style) => sengokuWarrior(random, side, style, 'samurai') },
-    ashigaru: { label: 'Ashigaru', kinds: ['ashigaru'], styles: ['yari', 'bow', 'matchlock', 'katana', 'naginata'], make: (random, style) => sengokuWarrior(random, side, style, 'ashigaru') },
-    horse: { label: 'Mounted samurai', kinds: ['samurai', 'samuraiTosei'], mounted: true, styles: ['yari', 'katana', 'bow'], make: (random, style) => samuraiHorseman(random, side, style) },
+    samurai: { label: 'Samurai', kinds: ['samurai', 'samuraiTosei'], styles: ['katana', 'naginata', 'yari', 'archerYumi'], make: (random, style) => sengokuWarrior(random, side, style, 'samurai') },
+    ashigaru: { label: 'Ashigaru', kinds: ['ashigaru'], styles: ['yari', 'archerYumi', 'matchlock', 'katana', 'naginata'], make: (random, style) => sengokuWarrior(random, side, style, 'ashigaru') },
+    horse: { label: 'Mounted samurai', kinds: ['samurai', 'samuraiTosei'], mounted: true, styles: ['yari', 'katana', 'archerYumi'], make: (random, style) => samuraiHorseman(random, side, style) },
   },
 });
 // A sea raider wears whatever he has (cast.js WOKOU_KIT): any of these.
@@ -736,15 +736,15 @@ export const ARMIES = {
     ranks: {
       ronin: { label: 'Rōnin', kinds: ['ronin'], styles: ['ronin'], make: (random, style) => roninWarrior(random, style) },
       samurai: { label: 'Samurai', kinds: ['samurai', 'samuraiTosei'], styles: ['katana', 'yari', 'naginata'], make: (random, style) => wokouSamurai(random, style) },
-      japanese: { label: 'Japanese raider', kinds: RAIDER_KINDS, styles: ['katana', 'odachi', 'naginata', 'bow'], make: (random, style) => wokouRaider(random, style, 'japanese') },
+      japanese: { label: 'Japanese raider', kinds: RAIDER_KINDS, styles: ['katana', 'odachi', 'naginata', 'archerYumi'], make: (random, style) => wokouRaider(random, style, 'japanese') },
       chinese: { label: 'Chinese raider', kinds: RAIDER_KINDS, styles: ['dao', 'spear', 'matchlock'], make: (random, style) => wokouRaider(random, style, 'chinese') },
     },
   },
   coast: {
     label: 'The coast garrison',
     ranks: {
-      garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'bow'], make: mingRank('garrison', MING_PEOPLE.coast, WOKOU.design.garrison) },
-      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'bow'], make: mingRank('brigandine', MING_PEOPLE.coast, WOKOU.design.brigandine) },
+      garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'mingBow'], make: mingRank('garrison', MING_PEOPLE.coast, WOKOU.design.garrison) },
+      brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'mingBow'], make: mingRank('brigandine', MING_PEOPLE.coast, WOKOU.design.brigandine) },
     },
   },
   qi: {

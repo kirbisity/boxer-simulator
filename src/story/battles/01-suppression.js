@@ -33,7 +33,7 @@ export const SUPPRESSION = {
   ranks: [
     [9, ['spear']],
     [8, ['spear']],
-    [8, ['dao', 'bow', 'dao', 'bow']],
+    [8, ['dao', 'mingBow', 'dao', 'mingBow']],
   ],
   // The commander and two of his household on horse (a southern garrison's few horses).
   riders: ['dao', 'spear', 'spear'],

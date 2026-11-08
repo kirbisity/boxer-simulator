@@ -274,7 +274,7 @@ export function knight(random = Math.random, index = 0) {
  * or an ashigaru (by default, one with a spear or a bow), with any of the
  * side's weapons, lacquered in its colours with its banner on his back.
  */
-export function sengokuWarrior(random = Math.random, side, style, rank = style === 'spear' || style === 'bow' ? 'ashigaru' : 'samurai') {
+export function sengokuWarrior(random = Math.random, side, style, rank = style === 'spear' || style === 'bow' || style === 'archerYumi' ? 'ashigaru' : 'samurai') {
   const ashigaru = rank === 'ashigaru';
   // A Japanese spear is a yari.
   if (style === 'spear') style = 'yari';

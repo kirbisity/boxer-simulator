@@ -9,11 +9,12 @@ import { ARMOR_KINDS } from '../src/loftbody.js';
 import { STYLES } from '../src/moves.js';
 import { factionOf, gearTraits, OUTFITS } from '../src/outfits.js';
 import { ARMIES, battleOf, SCENARIOS, scenarioWorld } from '../src/scenarios.js';
-import { ARROW, WEAPONS } from '../src/weapons.js';
+import { ARROW, bowCast, WEAPONS } from '../src/weapons.js';
 import { seededRandom } from '../src/physics.js';
 import { WARRIORS } from '../src/roster.js';
 
-const energyOf = (bow) => ((bow.arrowSpeed ?? ARROW.speed) / ARROW.speed) ** 2 * (bow.arrowEnergy ?? 1);
+// A bow's arrow's energy against the reference war arrow's (weapons.js bowCast; was its hand-set arrowSpeed and arrowEnergy).
+const energyOf = (bow) => bowCast(bow).joules / ARROW.joules;
 
 test('the banner coat guards near the Ming elite\'s, above the regular brigandine, in the eight banners\' colours', () => {
   const banner = OUTFITS.bannerArmour;
@@ -104,8 +105,9 @@ test('the Manchu bow: a heavy draw, a slower arrow than the steppe bow\'s carryi
   const manchu = WEAPONS.manchuBow;
   const steppe = WEAPONS.compositeBow;
   assert.ok(manchu.bow && manchu.drawN > steppe.drawN);
-  assert.ok(manchu.arrowSpeed < steppe.arrowSpeed);
+  assert.ok(bowCast(manchu).speed < bowCast(steppe).speed);
   assert.ok(energyOf(manchu) > energyOf(steppe) && energyOf(manchu) > energyOf(WEAPONS.longbow));
+  // (~140 J from its build, as the hand-set 1.4 had it.)
   assert.ok(Math.abs(energyOf(manchu) - 1.4) < 0.05, `${energyOf(manchu).toFixed(2)} of a war arrow's energy`);
   // Shot close: the banner archer walks in to ~35 m and holds his ground.
   assert.equal(STYLES.manchuBow.weapon, 'manchuBow');

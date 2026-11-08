@@ -340,6 +340,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
     case 'longbow':
     case 'yumi':
     case 'manchuBow':
+    case 'chineseBow':
     case 'compositeBow': {
       // A recurved stave bowed towards the mark (+z), bound at the grip; the
       // string runs tip to tip behind it, drawn to the hand as the shot comes.

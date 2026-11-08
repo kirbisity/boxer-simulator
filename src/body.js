@@ -184,6 +184,13 @@ export const PRESETS = {
     outfit: { kind: 'samurai', design: 2 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' },
   },
+  // An ashigaru archer: the yumi (WEAPONS.yumi) from the line, his short sword when closed with (STYLES.archerYumi). Not
+  // dealt at random (`undealt`): the casts and battles stay as they were.
+  archerYumi: {
+    name: 'Sakuzaemon', style: 'archerYumi', sex: 'male', heightCm: 157, frame: 'medium', age: 30, exercise: 0.5, calories: 2500, undealt: true,
+    outfit: { kind: 'ashigaru', design: 1 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
+  },
   // An English archer of Agincourt: the war bow of yew (WEAPONS.longbow, ~60 kg of draw), the padded jack and
   // kettle hat, a falchion at his belt; a boyhood at the butts in his shoulders.
   longbow: {
@@ -209,6 +216,12 @@ export const PRESETS = {
   // brigandine gunner; Liu Ting, the general famed for his heavy blade.
   mingSpear: {
     name: 'Wang Er', style: 'spear', sex: 'male', heightCm: PEOPLES.ming.heightCm + 2, frame: 'medium', age: 26, exercise: PEOPLES.ming.exercise, calories: PEOPLES.ming.calories,
+    outfit: { kind: 'mingGarrison', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
+  },
+  // A Ming garrison archer with the Ming composite bow (WEAPONS.chineseBow, STYLES.mingBow). Not dealt at random (`undealt`).
+  mingBow: {
+    name: 'Wang Wu', style: 'mingBow', sex: 'male', heightCm: PEOPLES.ming.heightCm + 2, frame: 'medium', age: 27, exercise: PEOPLES.ming.exercise + 0.05, calories: PEOPLES.ming.calories + 100, undealt: true,
     outfit: { kind: 'mingGarrison', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },

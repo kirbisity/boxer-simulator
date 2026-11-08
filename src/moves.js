@@ -1096,6 +1096,12 @@ export const STYLES = {
   bow: SHOOTING_STYLES.bow,
   // The steppe archer's composite bow: the same loose, a faster arrow.
   steppeBow: { ...SHOOTING_STYLES.bow, label: 'Composite bow', weapon: 'compositeBow' },
+  // The Ming soldier's bow (the standard Chinese composite): the same loose, a heavier arrow than the steppe bow's.
+  mingBow: { ...SHOOTING_STYLES.bow, label: 'Ming bow', weapon: 'chineseBow' },
+  // The foot archer's yumi (an ashigaru's, a samurai's on foot or in the saddle): the same loose as any bow, keeping off and
+  // dropping it for his sidearm once a man is on him (the great archer's way, STYLES.yumi, stands and draws the ōdachi).
+  // (`ratedAs`: rated as the bow it replaced, roster.js ratingOf, until tools/ratings.js is next run and rates it as itself.)
+  archerYumi: { ...SHOOTING_STYLES.bow, label: 'Yumi archer', weapon: 'yumi', ratedAs: 'bow' },
   // The English archer: the war bow from as far as it carries; with a man on him, the bow let fall for
   // what hangs at his belt (his kit's sidearm: a falchion, a mallet, a dagger). He stands and shoots behind
   // his stake (`holdGround`), as the archers at Agincourt did until the French were among them.

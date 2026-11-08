@@ -27,8 +27,27 @@ import { muzzleEnergy } from './physics/ballistics.js';
 // counted; physics/ranged.js ammoLeft): a crossbowman's quiver held ~18-20 bolts (the Genoese at Crécy, the
 // inventories of the Italian communes' companies). The Han nu-men's sheaves were bigger, ~50 (Li Ling's five
 // thousand loosed half a million bolts in a day, ~100 a man, the rest from the carts: SUPPLY).
-export const CROSSBOW = { bolt: true, speed: 50, energy: 2, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8, ammo: 30 };
-export const NU = { ...CROSSBOW, speed: 48, energy: 1.6, length: 0.42, bounce: 0.78, reloadSeconds: 6, ammo: 75 };
+// Its power is the prod's, not the man's: spanned at all, the string sits in the nut at full draw and the bolt goes at the
+// crossbow's own `speed` and `energy` whoever looses it. His strength decides only whether he can span it and how long the
+// spanning takes (`span`, handling.js crossbowSpan): the string drawn to the nut against the prod's `drawN` (N, at the nut)
+// through the spanning aid's mechanical `advantage`, by what his back and arms pull (handling.js's bow pull) times `lift`
+// (what a method that straightens the legs and back brings to bear against an arm-and-back pull: a deadlift against a
+// row, ~2 for an untrained man by common strength norms: an estimate). The spanning is `share` of `reloadSeconds` for
+// a man who pulls HANDLING.referencePullN; a stronger man spans the quicker (to HANDLING.spanQuickest of it: the hands
+// and the lever still have to travel), a weaker the slower; one who cannot bring `drawN` to bear cannot span it at all.
+// - The crossbow: a 15th-century composite or steel prod spanned with a goat's foot lever (Payne-Gallwey, The Crossbow,
+//   1903, on the lever's use for the lighter war crossbows): ~400 lbf at the nut (an estimate: the goat's foot served
+//   bows of a few hundred pounds, the windlass the heavier), the lever's advantage ~4 (the long arm over the short
+//   one, an estimate from Payne-Gallwey's drawings); the arms and back on the lever (`lift` 1). Spanning is about half
+//   its ~8 s shot (the rest: a bolt from the quiver, laid in the groove, the bow raised and laid on the mark).
+// - The nu: spanned with the waist (the Ming's yao zhang: a hook at the belt, the feet in the bow, the legs and back
+//   straightened) or the feet (the Han's jue zhang): no aid (`advantage` 1) but the legs and back (`lift` 2). Han nu
+//   were rated in shi (the Juyan slips list 3-, 4-, 5- and 6-shi bows; a Han shi ~120 jin of ~0.25 kg, ~30 kgf):
+//   ~3.5 shi, ~1000 N, a common waist-spanned bow (an estimate within that range).
+export const CROSSBOW = { bolt: true, speed: 50, energy: 2, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8, ammo: 30,
+  span: { by: "goat's foot", drawN: 1800, advantage: 4, lift: 1, share: 0.5 } };
+export const NU = { ...CROSSBOW, speed: 48, energy: 1.6, length: 0.42, bounce: 0.78, reloadSeconds: 6, ammo: 75,
+  span: { by: 'waist', drawN: 1000, advantage: 1, lift: 2, share: 0.5 } };
 
 /**
  * A matchlock's shot, for its realism. A lead ball of ~13 g leaves the
@@ -290,6 +309,36 @@ export const TURRET_RIFLE = {
   recoil: cartridgeRecoil({ bulletKg: CREEDMOOR.kg, muzzle: CREEDMOOR.velocity, chargeKg: 0.00266, gasShare: 0.75 }),
   spread: 0.0037, movingSpread: 0.015,
 };
+
+/**
+ * A bow's cast, from its build (`spec.cast`) and its draw weight (`spec.drawN`, N at full draw), as Klopsteg (1943,
+ * "Physics of bows and arrows", Am. J. Phys. 11) and Kooi (1983, On the Mechanics of the Bow and Arrow, Groningen;
+ * 1991) treat it:
+ * - its power stroke: the draw length less the brace height (`drawLength` − `brace`, m), the way the string pushes the arrow;
+ * - what it stores at full draw: `fullness` × drawN × the stroke (the area under the force-draw curve over the rectangle
+ *   it fills: ~0.5 for a straight limb whose force rises in line with the draw, ~0.4-0.45 for a wooden self bow that
+ *   stacks a little late, more for a reflexed composite whose force comes up early and whose siyahs ease it at the end);
+ * - what reaches the arrow: `kept` (what the limbs' internal friction, their hysteresis, leaves: Baugh's and Kooi's
+ *   models both miss measured speeds without it) × m/(m + `virtualKg`): the limbs and string must be moved too, and
+ *   their effective (virtual) mass takes its share of the energy (Kooi's virtual mass). A heavy-limbed bow wastes the
+ *   more on a light arrow, so it was shot with a heavy one;
+ * - the arrow's speed: v = √(2E/m), of `arrowKg`.
+ * `share`: of the full draw's energy (a man too weak to draw it full: handling.js drawEnergy); `arrowKg`: another arrow.
+ * Returns { stroke, stored, efficiency, joules, kg, speed }.
+ */
+export function bowCast(spec, share = 1, arrowKg = spec?.cast?.arrowKg) {
+  const cast = spec?.cast;
+  if (!cast) {
+    // A bow with no build given: the reference war arrow (ARROW) at its speed, by the share of the draw.
+    const kg = (2 * ARROW.joules) / ARROW.speed ** 2;
+    return { stroke: 0, stored: ARROW.joules, efficiency: 1, joules: ARROW.joules * share, kg, speed: ARROW.speed * Math.sqrt(share) };
+  }
+  const stroke = cast.drawLength - cast.brace;
+  const stored = cast.fullness * spec.drawN * stroke;
+  const efficiency = (cast.kept * arrowKg) / (arrowKg + cast.virtualKg);
+  const joules = stored * efficiency * share;
+  return { stroke, stored, efficiency, joules, kg: arrowKg, speed: Math.sqrt((2 * joules) / arrowKg) };
+}
 
 // `art`: the weapon art (moves.js, weaponarts.js) its family is made for, the move the player can make with it once his
 // blood is up: the katana's and ōdachi's draw-cut (iai), the long sword's pommel strike, the jian's, dao's and kilij's drawing cut,
@@ -742,71 +791,119 @@ export const WEAPONS = {
   },
   // A bow (`bow`): held in the left hand (`hand`), the stave running
   // `length` up and `handle` down from the grip. It looses arrows (ARROW);
-  // there is no edge to strike with.
+  // there is no edge to strike with. What it casts is its build's (`cast`, bowCast): the draw length and the brace
+  // height (m: the power stroke between them), the draw curve's `fullness`, the share the limbs' hysteresis leaves
+  // (`kept`), the limbs' and string's virtual mass and the arrow's (kg). Values marked "estimate" are judgements
+  // within the period's range where no measurement was found.
+  //
+  // The plain wooden war bow: a self bow of elm, ash or yew of a common man (the levy's, the townsman's, the Scots'
+  // and the rebels' of 1381), ~80 lbf (360 N) at a 28 in (0.71 m) draw, braced at ~6 in (0.15 m): lighter than a
+  // picked longbowman's and drawn shorter. A straight limb that stacks a little late (`fullness` 0.45, Klopsteg's
+  // self bows ~0.4-0.5); a wooden limb's hysteresis as the longbow's (`kept` 0.85, below); lighter limbs (`virtualKg`
+  // ~15 g: an estimate; self bows of ~70 lb are put at ~13 g by bowyers' chronograph work) and a ~60 g arrow (an
+  // estimate). It stores ~91 J and gives ~62 J to the arrow at ~45 m/s (~149 fps).
   bow: {
     label: 'Bow', hands: 'one', hand: 'l', length: 0.95, strikeFrom: 0.95, handle: 0.85, mass: 0.6, balance: 0, radius: 0.014,
     harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.5, grip: 0.4, ranged: true, bow: true,
-    // A war bow's draw weight (a yumi of ~26 kgf).
-    drawN: 260,
+    drawN: 360,
+    cast: { drawLength: 0.71, brace: 0.15, fullness: 0.45, kept: 0.85, virtualKg: 0.015, arrowKg: 0.06 },
     // The arrows a foot archer carries (`ammo`, a kit's `quiver` before it): a sheaf of 24 and a second in the belt, 36.
     ammo: 36,
   },
-  // The steppe composite bow (Mongol, Turkish): short and sharply recurved,
-  // horn, wood and sinew, a heavy draw; it casts the same arrow faster than
-  // a long wooden bow (`arrowSpeed`, m/s; ARROW.speed otherwise), and the
-  // arrow strikes with its kinetic energy.
+  // The steppe composite bow (Mongol, Xiongnu, Hun, Parthian, Cuman; the Ottoman war bow too, below): short and sharply
+  // reflexed, horn on the belly, sinew on the back, light working limbs with short stiff ears. 80-130 lbf; here ~90 lbf
+  // (400 N), a common horse archer's (the game's men who shoot it pull more: handling.js), drawn with the thumb ring to
+  // the ear, ~30 in (0.76 m), braced ~6.3 in (0.16 m). The reflex brings its force up early and the ears ease it at the
+  // end: the fullest draw curve of these (`fullness` 0.6, an estimate from Klopsteg's force-draw curves of Turkish
+  // bows, 1934, Turkish Archery and the Composite Bow); horn and sinew lose little (`kept` 0.9, an estimate); light
+  // limbs (`virtualKg` ~10 g: an estimate between a flight bow's ~5 g and a self bow's) on a medium ~65 g arrow. It
+  // stores ~144 J and gives ~112 J at ~59 m/s (~193 fps; the 170-200+ fps the steppe bow is credited with).
+  // The Ottoman war bow is kept on this bow: Klopsteg's measured Turkish bows are flight bows (a sport's, light, for
+  // distance), and no draw weights of the Janissaries' and azaps' war bows were found to give one of its own; a war
+  // bow was heavier than a flight bow and about this steppe bow's build, so it shoots as this one.
   compositeBow: {
     label: 'Composite bow', hands: 'one', hand: 'l', length: 0.62, strikeFrom: 0.62, handle: 0.55, mass: 0.7, balance: 0, radius: 0.016,
     harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
-    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.6, grip: 0.4, ranged: true, bow: true, arrowSpeed: 62,
-    // The steppe bow's heavier draw (~34 kgf, ~75 lb).
-    drawN: 330,
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.6, grip: 0.4, ranged: true, bow: true,
+    drawN: 400,
+    cast: { drawLength: 0.76, brace: 0.16, fullness: 0.6, kept: 0.9, virtualKg: 0.01, arrowKg: 0.065 },
     // The steppe quiver: thirty to forty arrows (the Strategikon's; a horse archer's kit says its own, outfits.js `quiver`).
     ammo: 54,
   },
-  // The yumi: the Japanese war bow, over two metres of laminated bamboo
-  // and wood bound in rattan, gripped a third of the way up (`handle` the
-  // short lower limb, `length` the long upper). A great archer's heavy draw
-  // (~35 kgf): drawn full only by a strong back (handling.js).
+  // The Ming bow: the standard Chinese composite of horn, bamboo and sinew, longer than the steppe bow, with medium
+  // siyahs: between the light steppe bow and the heavy Manchu bow that grew out of it (the Manchu bow is this bow made
+  // longer and heavier-eared). ~100 lbf (450 N; the Ming soldier's bow of the military manuals, Qi Jiguang's and the
+  // Wubei zhi's, ran ~70-120 lbf: an estimate, no measured Ming war bow was found), drawn with the thumb ring to the ear
+  // and a little past, ~31.5 in (0.8 m), braced ~0.16 m; `fullness` 0.57 and `kept` 0.88 (between the two: estimates);
+  // `virtualKg` ~25 g (medium ears: an estimate) on a ~90 g war arrow (an estimate). It stores ~164 J and gives ~113 J
+  // at ~50 m/s (~165 fps). The Ming soldier's bow (STYLES.mingBow).
+  chineseBow: {
+    label: 'Ming bow', hands: 'one', hand: 'l', length: 0.8, strikeFrom: 0.8, handle: 0.72, mass: 0.8, balance: 0, radius: 0.016,
+    harm: { swing: { blunt: 0.32 }, thrust: { blunt: 0.22 } },
+    contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 14, zeta: 0.9 }, threat: 3.7, grip: 0.4, ranged: true, bow: true,
+    drawN: 450,
+    cast: { drawLength: 0.8, brace: 0.16, fullness: 0.57, kept: 0.88, virtualKg: 0.025, arrowKg: 0.09 },
+    // A soldier's quiver: ~30 arrows, a second bundle with the company's carts (SUPPLY).
+    ammo: 36,
+  },
+  // The yumi: the Japanese war bow, over two metres of laminated bamboo and wood bound in rattan, gripped a third of
+  // the way up (`handle` the short lower limb, `length` the long upper; why so low is argued: for the horse's neck,
+  // for shooting kneeling, or at the node where the long bow's vibration is least). Japan has its own yew (Taxus
+  // cuspidata); what it lacked for a composite was horn, and bamboo laminates gave the yumi its cast instead. A war
+  // bow of ~100 lbf (450 N; up to 100-120 lbf for the strongest: an estimate), drawn long, past the ear, ~0.88 m (the
+  // yazuka of a man ~1.6 m tall), braced ~0.16 m: the longest stroke of these. Its long straight limbs draw near
+  // linearly (`fullness` 0.5), bamboo damps a little (`kept` 0.85, as wood: an estimate), the long limbs move a fair
+  // mass (`virtualKg` ~30 g, an estimate) on a ~90 g war arrow (an estimate). It stores ~162 J and gives ~103 J at
+  // ~48 m/s (~157 fps; the 130-160 fps a yumi is credited with). Drawn full by a strong back (handling.js).
   yumi: {
     label: 'Yumi', hands: 'one', hand: 'l', length: 1.45, strikeFrom: 1.45, handle: 0.75, mass: 0.75, balance: 0.2, radius: 0.014,
     harm: { swing: { blunt: 0.3 }, thrust: { blunt: 0.2 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
-    drawN: 340,
+    drawN: 450,
+    cast: { drawLength: 0.88, brace: 0.16, fullness: 0.5, kept: 0.85, virtualKg: 0.03, arrowKg: 0.09 },
     // The ebira (the quiver on the back) held ~24 arrows.
     ammo: 36,
   },
   // The Manchu bow of the Jurchen banners (Nurhaci's men at Sarhu, 1619; the Qing army's after 1636): a long
-  // composite of horn, bamboo and sinew, ~1.6-1.8 m strung, with long stiff ear-pieces (siyah) and string bridges,
-  // drawn to the ear at ~70-100 lb, more for a strong man (the Qing military exams tested bows of 8-12 li, ~100-160 lb).
-  // Its heavy limbs cast slowly: it shot long arrows (~1 m) of ~130-150 g with broad, heavy heads (the Qing war
-  // arrow's head up to a hand across) at close range, ~20-40 m, from the saddle or on foot. Against the steppe bow it
-  // throws its arrow slower (`arrowSpeed` ~45 m/s, the steppe bow's 62), but an arrow about twice the weight of
-  // ARROW's ~70 g war arrow (`arrowEnergy`, the shaft's weight against that one's: ~2.1), so it strikes with
-  // (45/55)² × 2.1 ≈ 1.4 times that arrow's ~100 J (~140 J, the steppe bow's ~1.27, the longbow's ~1.16): more
-  // energy behind a broader head, the more of it through a coat of plates. Drawn full only by a strong man
-  // (handling.js); its shots are slower than the light bow's, and the archer comes in close to make them (STYLES.manchuBow).
+  // composite of horn, bamboo and sinew, ~1.6-1.8 m strung, with long heavy rigid ears (siyah) and string bridges.
+  // The Qing regulations (Huangchao liqi tushi, 1766) graded the military examination bows at 8, 10 and 12 li, about
+  // 107, 133 and 160 lbf, and strength bows to 18 li (~240 lbf): here 130 lbf (580 N), a banner man's war bow. Drawn
+  // past the ear, ~34 in (0.86 m), high-braced on its bridges (~0.2 m: an estimate), `fullness` 0.55 (the long ears
+  // ease the end of the draw: an estimate), `kept` 0.88 (an estimate). The heavy ears are a great virtual mass
+  // (`virtualKg` ~45 g: an estimate), which is why it shot long arrows (~1 m) of ~130-150 g with broad heads (Qing
+  // war arrows; Selby, Chinese Archery, 2000): ~140 g here. It stores ~211 J and gives ~140 J at ~45 m/s (~147 fps; the
+  // 130-150 fps it is credited with); with a steppe arrow of 65 g it would give only ~109 J, 52% of what it stores against
+  // 67% (test/bowcast.test.js). A broad head needs more energy at the point to go through a coat (the
+  // armour's physics: ARROW.proofJoules, rigidProof), and the heavy arrow's momentum knocks a man the harder (arrowHit).
+  // Drawn full only by a strong man (handling.js); the archer comes in close to make his shots (STYLES.manchuBow).
   manchuBow: {
     label: 'Manchu bow', hands: 'one', hand: 'l', length: 0.92, strikeFrom: 0.92, handle: 0.82, mass: 0.9, balance: 0, radius: 0.017,
     harm: { swing: { blunt: 0.35 }, thrust: { blunt: 0.25 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
-    drawN: 400, arrowSpeed: 45, arrowEnergy: 2.1,
+    drawN: 580,
+    cast: { drawLength: 0.86, brace: 0.2, fullness: 0.55, kept: 0.88, virtualKg: 0.045, arrowKg: 0.14 },
     // The quiver of a banner man: ~30 arrows (the Qing regulations' 30 to a quiver).
     ammo: 30,
   },
   // ---- Agincourt, Cerignola (the battle maps of 1415 and 1503) ----
-  // The English war bow (the longbow of the Mary Rose's ~140 staves): a self bow of yew about 1.9 m long,
-  // drawn to the ear at 100–185 lbf (most near 150, ~670 N; here 600 N, a common archer's), shooting a war
-  // arrow of 60–100 g with a needle bodkin or a broadhead. A heavier arrow a little slower than the light
-  // bow's (`arrowSpeed`), carrying more (`arrowEnergy`: against ARROW's long bow arrow, ~115 J for ~100).
+  // The English war bow (the longbow of the Mary Rose's ~140 staves): a self bow of yew about 1.9 m long (the staves
+  // mostly imported, from the Alps and the Baltic trade, England's own yew too knotty), drawn to the ear at 100-185 lbf
+  // (the Mary Rose bows put by Hardy at 150-160 lbf, 670-710 N, at 30 in; here 600 N, a common archer's), a 30 in
+  // (0.76 m) draw braced at ~6.5 in (0.165 m). A straight wooden limb (`fullness` 0.45), its war arrow ~95 g (the
+  // heavy arrow of the replica tests; the Mary Rose's arrows were mostly of poplar, with ash and others).
+  // `kept` 0.85 and `virtualKg` 20 g are set by the replica tests in Strickland & Hardy, The Great Warbow (2005): a
+  // 150 lbf bow cast a 57.8 g arrow at 62.25 m/s (112 J) and Stretton's 144 lbf bow a 102 g arrow at 47.2 m/s (114 J):
+  // at 600 N that is ~101 J and ~107 J, and this bow gives ~102 J and ~114 J to those arrows. It stores ~161 J and
+  // gives ~113 J to its own at ~49 m/s (~160 fps; the 140-160 fps it is credited with).
   // Drawn only by a man trained to it from boyhood (handling.js: a weak man draws it part way and slowly).
   // Against plate it is the armour's physics that decides (ARROW.bounce, gapHarm), not the bow.
   longbow: {
     label: 'Longbow', hands: 'one', hand: 'l', length: 1.0, strikeFrom: 1.0, handle: 0.9, mass: 0.8, balance: 0, radius: 0.016,
     harm: { swing: { blunt: 0.35 }, thrust: { blunt: 0.25 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.9 }, threat: 3.8, grip: 0.4, ranged: true, bow: true,
-    drawN: 600, arrowSpeed: 52, arrowEnergy: 1.3,
+    drawN: 600,
+    cast: { drawLength: 0.76, brace: 0.165, fullness: 0.45, kept: 0.85, virtualKg: 0.02, arrowKg: 0.095 },
     // Two sheaves of 24 (a sheaf at the belt and one stuck in the ground before him), the more brought up to the line by
     // the boys of the baggage (SUPPLY).
     ammo: 72,
@@ -1734,6 +1831,10 @@ export const ARROW = {
     seconds: { artery: 90, abdomen: 75, chest: 45 },
     deep: 0.4, chestFrom: 0.45, deepFrom: 0.3,
   },
+  // The knock (`impulse`, N·s) is the reference war arrow's (`joules` at `speed`: ~66 g at 55 m/s, its momentum 2·joules/speed,
+  // ARROW_MOMENTUM); another arrow or a bolt knocks by its own momentum against that one's (physics/ranged.js arrowHit): a
+  // heavy Manchu arrow staggers a man more than a light steppe one of the same energy. What goes through armour is the
+  // energy at the point; what knocks him is the momentum.
   impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,
   // Its flight through the air (physics/ballistics.js): the drag on its shaft's section, Cd `cd` (Park 2011's 1.5-2.6 for
   // a fletched arrow, the turbulent figure for a war arrow's big feathers and rough shaft), on a shaft of `shaft` m (the Mary
@@ -1741,8 +1842,8 @@ export const ARROW = {
   // behind its head); its mass that of its energy at its speed (a long bow's war arrow ~66 g, a lighter arrow less, which the
   // same drag slows the faster: a 40 g arrow sheds its speed over a distance ~1.7 times as fast as a 66 g one).
   flight: { cd: 2, shaft: 0.0115, boltShaft: 0.015 },
-  // What a long bow's war arrow carries (J; energy 1): a ~70 g shaft at ~55 m/s, ~100 J (a heavy war bow's bodkin, more:
-  // the longbow's `arrowEnergy`). In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
+  // The reference war arrow's energy (J; an arrow's `energy` 1): a ~66 g shaft at ~55 m/s, ~100 J. Each bow's own arrow carries
+  // what its build gives it (bowCast), counted against this. In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
   joules: 100,
   // Armour short of plate is proof (its `pierce` share stopped) against an arrow of up to this many joules; past it, it stops that
   // share × proofJoules / the arrow's (physics/ranged.js arrowHit): mail and its padding hold a ~100 J war arrow to a shallow
@@ -1763,6 +1864,9 @@ export const ARROW = {
   // little it has left): a quarter, taken over the wound channel.
   horseShare: 0.25,
 };
+
+/** The reference war arrow's momentum (N·s): ARROW.joules at ARROW.speed, ~66 g × 55 m/s. */
+export const ARROW_MOMENTUM = (2 * ARROW.joules) / ARROW.speed;
 
 /** What a bullet hit is to: head, torso (the trunk) or limb. */
 export function bulletRegion(capsuleKey) {

@@ -68,7 +68,7 @@ export const WEAPON_FAMILIES = {
   polearm: ['guandao', 'qinglong', 'naginata'],
   blade: ['longsword', 'armingSword', 'katana', 'odachi', 'espada', 'gladius', 'sica', 'saber', 'sayf', 'dao', 'yatagan', 'jian', 'rapier', 'macuahuitl', 'knife'],
   blunt: ['warhammer', 'flangedMace', 'kanabo', 'langya', 'clava', 'baton', 'bat', 'staff', 'whip'],
-  bow: ['bow', 'yumi', 'compositeBow', 'manchuBow'],
+  bow: ['bow', 'yumi', 'compositeBow', 'chineseBow', 'manchuBow'],
   crossbow: ['crossbow', 'nu'],
   gun: ['matchlock', 'threeEyed', 'rifle', 'armRifle', 'shotgun', 'pistol', 'adams', 'turretRifle', 'flamethrower'],
 };

@@ -12,10 +12,16 @@
 // it slows the turn of the blade and the stroke's clock, so a weak man's
 // heavy blade comes slowly and lands with little of its energy.
 //
-// Bows: a bow's draw weight (`drawN`) against what his back and arm can
-// pull. Short of it he draws it only part way (a slower arrow), and if not
-// even half way, not usefully at all; the heavier the bow for him, the
-// slower he draws it.
+// Bows: a bow's draw weight (`drawN`, at full draw) against what his back and
+// arm can pull. Short of it he draws it only as far as the bow's force comes
+// up to his pull, along its draw curve, and the arrow gets the energy the bow
+// stores at that draw (drawShares); if not even half way, not usefully at
+// all; the heavier the bow for him, the slower he draws it. A man who pulls
+// its full weight draws it full and gets all of its power.
+//
+// Crossbows: the prod's power is the crossbow's whatever his strength (the
+// string is in the nut, spanned at full draw); his strength decides whether
+// he can span it at all and how long the spanning takes (crossbowSpan).
 
 import { P } from './body.js';
 
@@ -33,12 +39,22 @@ export const HANDLING = {
   minSpeed: 0.25,
   maxSpeed: 1.35,
   // Drawing a bow: mostly the back (the lats and rhomboids), with both arms: this many times one arm's push; below `minDraw` of a full draw, it is no use.
+  // Against what archers pull: Pukhov & Tarnakov (2023, recurve archers, 37 men and women) found an elite male archer's
+  // draw (~24 kgf, an Olympic bow) a third of his maximal force (~70 kgf); the Mary Rose's bows of 150-160 lbf (Hardy)
+  // were drawn by men who pulled ~70 kgf and more. With this factor a trained archer (the longbowman, exercise ~0.86)
+  // pulls ~90 kgf, a trained banner archer ~110, an average untrained man ~62 and a weak levy ~53 (the untrained
+  // figures likely high: a modern untrained man struggles past ~60-70 lbf, 27-32 kgf, though that is a bow shot again
+  // and again, not one pull at his limit; left as it is, flagged).
   drawPerArmN: 2.9,
   minDraw: 0.5,
   // The draw's pace: as long as the bow's weight against `drawEase` of what he can pull, within these bounds.
   drawEase: 0.8,
   drawSlowest: 2.5,
   drawQuickest: 0.7,
+  // The pull the crossbows' `reloadSeconds` are for (a trained arm's, referenceArmN × drawPerArmN, ~59 kgf), and the least
+  // share of the spanning a stronger man can bring it to (the lever, the hook and the hands still travel their way).
+  referencePullN: 200 * 2.9,
+  spanQuickest: 0.7,
 };
 
 const STANDARD_GRAVITY = 9.81;
@@ -66,9 +82,9 @@ export function handling(body, spec) {
   const force = armForce(body);
   if (spec.drawN) {
     const pull = force * HANDLING.drawPerArmN;
-    const draw = Math.min(1, pull / spec.drawN);
+    const { draw, drawEnergy } = drawShares(spec, pull);
     const drawTime = Math.max(HANDLING.drawQuickest, Math.min(HANDLING.drawSlowest, spec.drawN / (pull * HANDLING.drawEase)));
-    return { canHold: draw >= HANDLING.minDraw, holdLoad: spec.drawN / pull, speed: 1 / drawTime, draw, drawTime };
+    return { canHold: draw >= HANDLING.minDraw, holdLoad: spec.drawN / pull, speed: 1 / drawTime, draw, drawEnergy, drawTime };
   }
   const grip = hands(spec);
   const holding = spec.mass * STANDARD_GRAVITY * (HANDLING.holdLever + spec.balance);
@@ -77,5 +93,38 @@ export function handling(body, spec) {
   // The demand: inertia against the arms' torque; his against the reference arm's on the same weapon.
   const demand = (armN) => inertia(spec, reach) / (armN * grip * reach);
   const speed = (1 + HANDLING.inertiaWeight * demand(HANDLING.referenceArmN)) / (1 + HANDLING.inertiaWeight * demand(force));
-  return { canHold: holdLoad < 1, holdLoad, speed: Math.max(HANDLING.minSpeed, Math.min(HANDLING.maxSpeed, speed)), draw: 1, drawTime: 1 };
+  const handled = { canHold: holdLoad < 1, holdLoad, speed: Math.max(HANDLING.minSpeed, Math.min(HANDLING.maxSpeed, speed)), draw: 1, drawTime: 1 };
+  const span = spec.shot?.span;
+  if (!span) return handled;
+  const spanned = crossbowSpan(spec.shot, force * HANDLING.drawPerArmN);
+  return { ...handled, canHold: handled.canHold && spanned.canSpan, ...spanned };
+}
+
+/**
+ * How far a man who pulls `pull` N draws a bow (`draw`, the share of its power stroke) and the share of its full
+ * draw's energy he stores (`drawEnergy`). Its force-draw curve is taken as F(s) = drawN·s^p over the share s of the
+ * stroke, p = 1/fullness − 1 (the curve whose area is the bow's `fullness` of the rectangle: a straight line for 0.5,
+ * rising early for a fuller reflexed bow); he draws until the bow's force meets his pull, s = (pull/drawN)^(1/p), and
+ * stores s^(p+1) of the full energy (for a linear draw: the share of the force, squared).
+ */
+export function drawShares(spec, pull) {
+  const ratio = Math.min(1, pull / spec.drawN);
+  if (ratio >= 1) return { draw: 1, drawEnergy: 1 };
+  const p = 1 / (spec.cast?.fullness ?? 0.5) - 1;
+  const draw = ratio ** (1 / p);
+  return { draw, drawEnergy: draw ** (p + 1) };
+}
+
+/**
+ * Spanning a crossbow (`shot.span`) by a man who pulls `pull` N (the bow pull): whether he can bring the prod's
+ * draw to the nut at all (`canSpan`: his pull × the method's `lift` × its `advantage` at least its `drawN`), and the
+ * seconds his reload takes (`reloadSeconds`): the spanning, `share` of the shot's for a man of HANDLING.referencePullN,
+ * by that against his own force on it (no quicker than spanQuickest of it), and the rest (the bolt laid, the bow
+ * raised) as it is. The bolt's speed and energy are the crossbow's whatever he pulls.
+ */
+export function crossbowSpan(shot, pull) {
+  const span = shot.span;
+  // (The method's lift and advantage are the same for him and the reference man: the pace is their pulls'.)
+  const pace = Math.max(HANDLING.spanQuickest, HANDLING.referencePullN / Math.max(1e-6, pull));
+  return { canSpan: pull * span.lift * span.advantage >= span.drawN, reloadSeconds: shot.reloadSeconds * (1 - span.share + span.share * pace) };
 }

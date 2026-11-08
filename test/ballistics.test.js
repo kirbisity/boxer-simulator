@@ -74,13 +74,18 @@ test('a matchlock at 60 m: held over, a steady master hits the man, with less of
   }
 });
 
-test('arrows lose energy to the air as they fly, a light arrow faster than a heavy one; a bolt least', () => {
+test('arrows lose energy to the air as they fly, a light arrow faster than a heavy one; a bolt and a heavy war arrow least', () => {
   const war = arrowProjectile({ spec: WEAPONS.longbow });
-  const light = arrowProjectile({ spec: { arrowSpeed: 60, arrowEnergy: 0.6 } });
+  // (A light arrow: the steppe bow's 65 g; was a hand-set { arrowSpeed: 60, arrowEnergy: 0.6 }, before bows cast by their build.)
+  const light = arrowProjectile({ spec: WEAPONS.compositeBow });
   const bolt = arrowProjectile(null, CROSSBOW);
   assert.ok(war.kg > 0.06 && war.kg < 0.1, `war arrow ${Math.round(war.kg * 1000)} g`);
+  assert.ok(light.kg < war.kg, 'the steppe arrow is the lighter');
   const share = (projectile, d) => Math.exp(-2 * dragRate(projectile, projectile.velocity) * d);
-  assert.ok(share(light, 60) < share(war, 60) && share(war, 60) < share(bolt, 60));
+  // (The longbow's 95 g arrow, its own now, keeps its energy about as well as the 160 g bolt on its thicker shaft; against
+  // the old 66 g reference arrow the bolt kept more.)
+  assert.ok(share(light, 60) < share(war, 60) && share(light, 60) < share(bolt, 60));
+  assert.ok(Math.abs(share(war, 60) - share(bolt, 60)) < 0.02);
   assert.ok(share(war, 60) > 0.7 && share(war, 60) < 0.92, `a war arrow keeps ${share(war, 60).toFixed(2)} of its energy over 60 m`);
 });
 
@@ -102,7 +107,8 @@ test('an arrow lobbed over a man before him at a mark 30 m off comes down on it,
     assert.ok(fell.length > 0, 'he shot');
     const off = fell.map((arrow) => Math.hypot(arrow.x[0] - red.x[0], arrow.x[2] - red.x[2]));
     assert.ok(off.filter((d) => d < 2).length >= fell.length / 2, `arrows fell ${off.map((d) => d.toFixed(1)).join(', ')} m off the mark`);
-    assert.ok(fell.every((arrow) => arrow.energy < (arrow.speed / ARROW.speed) ** 2 * (bow.weapon.spec.arrowEnergy ?? 1)), 'each lost energy on the way');
+    // (Against its energy as it was cast: its mass at the speed it left the bow.)
+    assert.ok(fell.every((arrow) => arrow.energy < (0.5 * arrow.kg * arrow.speed ** 2) / ARROW.joules), 'each lost energy on the way');
   } finally {
     ARROW.spread = spread;
     BALLISTICS.judge = judge;

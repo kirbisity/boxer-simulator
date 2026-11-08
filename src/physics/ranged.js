@@ -10,7 +10,7 @@ import { OUTFITS, outfitOf } from '../outfits.js';
 import { aimPoint, BLOCKING, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
-import { ARROW, BLADES, bleedToLose, bulletProof, bulletRegion, GUN, slerpDir, SUPPLY } from '../weapons.js';
+import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRegion, GUN, slerpDir, SUPPLY } from '../weapons.js';
 import { WORLD } from './config.js';
 import { BARDING } from '../horses.js';
 import { gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
@@ -68,7 +68,7 @@ export function leadFor(fighter, target, mark) {
   const weapon = fighter.weapon;
   const bolt = weapon?.spec.shot?.bolt ? weapon.spec.shot : null;
   if (!weapon?.held || (!weapon.spec.bow && !bolt)) return mark;
-  const speed = bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed;
+  const speed = bolt?.speed ?? drawnCast(weapon).speed;
   const relative = vec.sub(overGround(target), overGround(fighter));
   const from = point(fighter.x, P[`${weapon.main}Hand`]);
   let led = mark;
@@ -402,13 +402,14 @@ export function loose(world, fighter, bolt = null) {
   const across = vec.normalize(vec.cross(dir, [0, 1, 0]));
   const upward = vec.cross(across, dir);
   dir = vec.normalize(vec.add(dir, vec.add(vec.scale(across, gauss() * spread), vec.scale(upward, gauss() * spread))));
-  // Its energy against a long bow's arrow: by its speed (and a war bow's heavier shaft, `arrowEnergy`), or a bolt's own weight.
-  const energy = bolt ? bolt.energy : (speed / ARROW.speed) ** 2 * (weapon.spec.arrowEnergy ?? 1);
+  // Its energy against the reference war arrow's (ARROW.joules): a bolt's the crossbow's own; an arrow's its kinetic energy at
+  // the speed it is cast (the bow's, by how far he draws it and how much less for a lob over his men: laidArrow).
+  const energy = bolt ? bolt.energy : (0.5 * laid.projectile.kg * speed * speed) / ARROW.joules;
   // One arrow fewer from his quiver (ammoLeft); the last gone, the bow is spent until he is given more.
   if (!bolt) spendMissile(world, fighter, weapon);
   // The arrow leaves the bow with the bow's own way over the ground (a horse's gallop, a man's step) as well as its cast.
   const carried = overGround(fighter);
-  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, projectile: laid.projectile, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
+  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, kg: laid.projectile.kg, projectile: laid.projectile, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
   // Heard: the string let go (a bow's, or a crossbow's heavier snap).
   if (world.ear) soundEvent(world, 'shot', { at: grip, kind: bolt ? 'crossbow' : 'bow', who: fighter.id });
@@ -484,7 +485,8 @@ function laidArrow(world, fighter, grip, mark, bolt = null, spread = ARROW.sprea
   const line = vec.sub(mark, grip);
   const distance = vec.length(line);
   const flat = vec.normalize(line);
-  const speed = (bolt?.speed ?? weapon.spec.arrowSpeed ?? ARROW.speed) * (bolt ? 1 : (weapon.handling?.draw ?? 1));
+  // A bolt goes at the crossbow's speed whoever looses it (handling.js crossbowSpan); an arrow at the bow's as he draws it.
+  const speed = bolt ? bolt.speed : drawnCast(weapon).speed;
   // What it flies as (its mass by its energy at its full cast; its drag, ARROW.flight), and the drop it is laid above the
   // mark for: at the distance he judges (`judged` of the true), the flat-fire fall with the air's drag (ballistics.js
   // flatFall), the drop the vacuum's parabola gives over an effective distance 2F(d)/d (d itself without drag).
@@ -499,18 +501,23 @@ function laidArrow(world, fighter, grip, mark, bolt = null, spread = ARROW.sprea
   return { distance, projectile, ...overHeads(world, fighter, mark, dir, speed, spread, k, judged) };
 }
 
+/** A bow's cast as this man draws it (weapons.js bowCast; handling.js drawEnergy: the share of its full draw's energy he stores). */
+export function drawnCast(weapon) {
+  return bowCast(weapon?.spec, weapon?.handling?.drawEnergy ?? 1);
+}
+
 /**
- * What an arrow (or a bolt) from `weapon` flies as (ballistics.js): its mass that of its energy at its full cast (a long
- * bow's war arrow ARROW.joules at ARROW.speed, ~66 g; a bow's `arrowEnergy` of that at its `arrowSpeed`; a bolt's
- * `energy` at its `speed`), its drag on its shaft's section (ARROW.flight).
+ * What an arrow (or a bolt) from `weapon` flies as (ballistics.js): an arrow its bow's own (bowCast: its mass, its speed at
+ * full draw); a bolt of the mass of its `energy` (× ARROW.joules) at its `speed`; its drag on its shaft's section (ARROW.flight).
  */
 export function arrowProjectile(weapon, bolt = null) {
-  const speed = bolt?.speed ?? weapon?.spec.arrowSpeed ?? ARROW.speed;
-  const joules = bolt ? bolt.energy * ARROW.joules : (speed / ARROW.speed) ** 2 * (weapon?.spec.arrowEnergy ?? 1) * ARROW.joules;
-  const key = `${speed}:${joules}:${Boolean(bolt)}`;
+  const full = bolt ? null : bowCast(weapon?.spec);
+  const speed = bolt ? bolt.speed : full.speed;
+  const kg = bolt ? (2 * bolt.energy * ARROW.joules) / (speed * speed) : full.kg;
+  const key = `${speed}:${kg}:${Boolean(bolt)}`;
   let projectile = ARROW_PROJECTILES.get(key);
   if (!projectile) {
-    projectile = { kg: (2 * joules) / (speed * speed), velocity: speed, curve: ARROW.flight.cd, calibre: bolt ? ARROW.flight.boltShaft : ARROW.flight.shaft };
+    projectile = { kg, velocity: speed, curve: ARROW.flight.cd, calibre: bolt ? ARROW.flight.boltShaft : ARROW.flight.shaft };
     ARROW_PROJECTILES.set(key, projectile);
   }
   return projectile;
@@ -677,7 +684,7 @@ export function flyArrows(world, dt) {
     if (hit) {
       // Heard: the arrow going in, at the speed it flew, on what it met.
       if (world.ear) soundEvent(world, 'arrowhit', { at: hit.point, speed: vec.length(arrow.v), covering: hit.target === 'shield' ? shieldCovering(hit.fighter.shield) : coveringAt(hit.fighter, hit.capsule.key), who: hit.fighter.id });
-      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v), arrow.energy ?? ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2, arrow.bounce ?? ARROW.bounce);
+      arrowHit(world, world.fighters[arrow.owner], hit, vec.normalize(arrow.v), arrow.energy ?? ((arrow.speed ?? ARROW.speed) / ARROW.speed) ** 2, arrow.bounce ?? ARROW.bounce, arrow.kg ? arrow.kg * vec.length(arrow.v) : ARROW_MOMENTUM);
       arrow.done = true;
       arrow.x = hit.point;
       continue;
@@ -735,7 +742,7 @@ function rigidProofOf(victim) {
  * protection), scaled to the part's weight and hurt, bleeding, with a
  * small knock; enough and he dies.
  */
-export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bounce) {
+export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bounce, momentum = ARROW_MOMENTUM) {
   const victim = hit.fighter;
   const event = { time: world.time, kind: 'arrow', attacker: shooter.id, defender: victim.id, point: hit.point, normal: vec.scale(dir, -1), target: hit.target, harm: 0, effects: [] };
   world.events.push(event);
@@ -746,7 +753,8 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   }
   const gear = victim.body.gear;
   const key = hit.capsule.key;
-  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: ARROW.impulse });
+  // The knock: the reference war arrow's, by this one's momentum (its mass × its speed as it strikes) against that one's.
+  world.pendingImpulses.push({ fighter: victim, shares: [[hit.capsule.a, 0.5], [hit.capsule.b, 0.5]], direction: dir, impulse: ARROW.impulse * (momentum / ARROW_MOMENTUM) });
   // A curved helmet or breastplate turns an arrow that does not meet it square: mostly glancing, it skids off; else it goes in with what is left.
   const curve = hit.throat ? 0 : surfaceCurve(victim, key);
   if (curve > 0) {
@@ -866,7 +874,8 @@ export function reload(world, fighter, dt) {
   // Loading takes both hands and a standing man: walking on, it waits.
   if (Math.hypot(...(fighter.rootVelocity ?? [0, 0])) > WORLD.reloadMaxSpeed) return;
   weapon.reloaded = (weapon.reloaded ?? 0) + dt;
-  if (weapon.reloaded < weapon.spec.shot.reloadSeconds) return;
+  // (A crossbow's, by his strength at the spanning: handling.js crossbowSpan.)
+  if (weapon.reloaded < (weapon.handling?.reloadSeconds ?? weapon.spec.shot.reloadSeconds)) return;
   weapon.loaded = true;
   weapon.charges = Math.min(weapon.spec.shot.rounds ?? weapon.spec.shot.barrels ?? 1, ammoLeft(fighter, weapon));
   fighter.reloading = false;

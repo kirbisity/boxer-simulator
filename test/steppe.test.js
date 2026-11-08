@@ -5,7 +5,7 @@ import { seededRandom } from '../src/physics.js';
 import { PRESETS } from '../src/body.js';
 import { factionOf } from '../src/outfits.js';
 import { STYLES } from '../src/moves.js';
-import { SHIELDS, WEAPONS } from '../src/weapons.js';
+import { bowCast, SHIELDS, WEAPONS } from '../src/weapons.js';
 
 const of = (key) => factionOf(PRESETS[key]);
 
@@ -58,7 +58,9 @@ test('the one-handed maces: blunt with a pierce, about as hard-hitting as the ka
 });
 
 test('the composite bow casts a faster arrow than the long bow', () => {
-  assert.ok(WEAPONS.compositeBow.arrowSpeed > 55 && WEAPONS.bow.arrowSpeed === undefined);
+  // (Was the hand-set arrowSpeed 62 against none; now each bow's cast from its build: weapons.js bowCast.)
+  assert.ok(bowCast(WEAPONS.compositeBow).speed > 55 && bowCast(WEAPONS.compositeBow).speed > bowCast(WEAPONS.longbow).speed);
+  assert.ok(bowCast(WEAPONS.compositeBow).speed > bowCast(WEAPONS.bow).speed);
 });
 
 test('Rhodes 1522: the Order in plate and mail against Janissaries, azaps and heavy men', async () => {
