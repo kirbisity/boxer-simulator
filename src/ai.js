@@ -2443,7 +2443,12 @@ export function standingFear(world, fighter) {
   // (Behind a palisade or a ditch, an enemy is as far as he would have to walk to get at him: physics/fieldworks.js walkingDistance.)
   const works = Boolean(world.arena.works);
   for (const enemy of enemies) {
-    const apart = works ? walkingDistance(world, where(enemy), at) : Math.hypot(where(enemy)[0] - at[0], where(enemy)[1] - at[1]);
+    const straight = Math.hypot(where(enemy)[0] - at[0], where(enemy)[1] - at[1]);
+    // (The walk is never shorter than the straight line, so a man as far as the nearest yet, or past sight, cannot be the
+    // nearest that counts: his walk over the works, sampled along every ditch it crosses, is not worked out. The same man is
+    // found: only the walks that could not have won are skipped, in the same order.)
+    if (works && (straight >= nearestApart || straight >= spec.sight)) continue;
+    const apart = works ? walkingDistance(world, where(enemy), at) : straight;
     if (apart < nearestApart) [nearest, nearestApart] = [enemy, apart];
   }
   if (!nearest || nearestApart >= spec.sight) return 0;
@@ -3129,7 +3134,11 @@ function gunfight(world, fighter, opponent, distance, gun, dt) {
     fighter.aimAt = undefined;
     // (Behind a palisade, how far the enemy would have to walk round it: physics/fieldworks.js walkingDistance.)
     const me = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
-    const nearest = Math.min(...world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up').map((other) => (world.arena.works ? walkingDistance(world, [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]], me) : vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis))))));
+    // (Only whether one is within reloadSafe counts, and a walk is never shorter than the straight line: a man further than
+    // that in a straight line is not walked round the works for, every step of every gunner reloading.)
+    const foes = world.fighters.filter((other) => foeOf(fighter, other) && other.state === 'up');
+    const walkable = world.arena.works ? foes.filter((other) => Math.hypot(other.x[P.pelvis * 3] - me[0], other.x[P.pelvis * 3 + 2] - me[1]) <= gun.reloadSafe) : foes;
+    const nearest = Math.min(...walkable.map((other) => (world.arena.works ? walkingDistance(world, [other.x[P.pelvis * 3], other.x[P.pelvis * 3 + 2]], me) : vec.length(vec.sub(point(other.x, P.pelvis), point(fighter.x, P.pelvis))))));
     if (nearest > gun.reloadSafe) {
       fighter.reloading = true;
       fighter.goTo = null;

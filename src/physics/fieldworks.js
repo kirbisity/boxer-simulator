@@ -337,7 +337,13 @@ function compileDitch(ditch) {
  * line) and the profile's scales there (`deep`, `wide`), or null beyond the line's ends.
  */
 function onDitch(ditch, x, z) {
-  let best = null;
+  // (The nearest piece kept in plain numbers, not an object a piece: this is asked for every sample of every walk the AI
+  // weighs over the works, and every part's footing, many thousand times a step.)
+  let bestOff = Infinity;
+  let bestSide = 0;
+  let bestK = -1;
+  let bestAlong = 0;
+  let bestClamped = 0;
   for (let k = 0; k < ditch.pieces.length; k += 1) {
     const piece = ditch.pieces[k];
     const rx = x - piece.a[0];
@@ -346,15 +352,19 @@ function onDitch(ditch, x, z) {
     const clamped = Math.max(0, Math.min(piece.length, along));
     const side = rx * piece.left[0] + rz * piece.left[1];
     const off = Math.hypot(rx - piece.u[0] * clamped, rz - piece.u[1] * clamped);
-    if (best && off >= best.off) continue;
-    best = { off, side, k, along, clamped };
+    if (bestK >= 0 && off >= bestOff) continue;
+    bestOff = off;
+    bestSide = side;
+    bestK = k;
+    bestAlong = along;
+    bestClamped = clamped;
   }
-  const first = best.k === 0 && best.along < 0;
-  const last = best.k === ditch.pieces.length - 1 && best.along > ditch.pieces[best.k].length;
+  const first = bestK === 0 && bestAlong < 0;
+  const last = bestK === ditch.pieces.length - 1 && bestAlong > ditch.pieces[bestK].length;
   if (first || last) return null;
-  const share = best.clamped / ditch.pieces[best.k].length;
-  const ease = (values) => values[best.k] + (values[best.k + 1] - values[best.k]) * share;
-  return { across: best.side < 0 ? -best.off : best.off, deep: ease(ditch.deep), wide: ease(ditch.wide) };
+  const share = bestClamped / ditch.pieces[bestK].length;
+  const ease = (values) => values[bestK] + (values[bestK + 1] - values[bestK]) * share;
+  return { across: bestSide < 0 ? -bestOff : bestOff, deep: ease(ditch.deep), wide: ease(ditch.wide) };
 }
 
 /** The world's own state of its works: which stakes are broken, which stretches a battle has closed (physics/ladders.js). */
