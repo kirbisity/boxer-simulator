@@ -104,6 +104,9 @@ kbd { font: 10px var(--mono); color: var(--muted); margin-left: 4px; }
 .look-field { display: grid; grid-template-columns: 44px 1fr; gap: 6px; align-items: center; font-size: 12px; }
 .look-field span { color: var(--muted); }
 .look-field select { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; min-width: 0; font-size: 12px; }
+.look-field.style-pick { grid-column: 1 / -1; }
+.pick-pair { display: flex; gap: 6px; min-width: 0; }
+.pick-pair select { flex: 1 1 0; min-width: 0; }
 .look-field input[type=range] { width: 100%; min-width: 0; margin: 0; height: 26px; }
 .derived { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px 12px; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .derived div { display: flex; justify-content: space-between; font-size: 12px; }

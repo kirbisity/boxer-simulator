@@ -15,6 +15,7 @@ import { activateLook, activateLookNow, activeLook, DEFAULT_LOOK_ID, OFFICIAL_LO
 import { installLooksBench } from './looksbench.js';
 import { randomCharacter, randomGladiator, varyCharacter } from './cast.js';
 import { ratingOf, WARRIORS } from './roster.js';
+import { builderCharacters, WEAPON_KINDS, weaponCategoryOf } from './pickgroups.js';
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
@@ -2272,32 +2273,43 @@ function buildCornerForm(corner) {
     state.editing[corner] = Number(changed.target.value);
     fillCornerForm(corner);
   });
+  // A faction first, then a character of it (pickgroups.js: the presets and the roster's warriors); the level character
+  // also has the Dunnottar cast, the Forger first.
   const presetSelect = form.querySelector('.preset');
-  // The characters under their factions.
-  presetSelect.replaceChildren(...FACTION_KEYS.map((faction) => {
-    const group = nameOption(FACTIONS[faction].label, '', { prefix: `${FACTIONS[faction].glyph} `, group: true });
-    group.append(...Object.entries(PRESETS).filter(([, preset]) => factionOf(preset) === faction).map(([key, preset]) => nameOption(preset.name, key)));
-    return group;
-  }).filter((group) => group.children.length));
-  // (The level character also has the Dunnottar cast, the Forger first.)
-  if (corner === 'hero') {
-    const group = Object.assign(document.createElement('optgroup'), { label: t('builder.dunnottarCast') });
-    group.dataset.i18nGroup = 'builder.dunnottarCast';
-    onLangChange(() => { group.label = t('builder.dunnottarCast'); });
-    group.append(...Object.entries(LEVEL_PRESETS).map(([key, preset]) => nameOption(preset.name, `level:${key}`)));
-    presetSelect.prepend(group);
-  }
-  const presetOf = (inputs) => Object.keys(PRESETS).find((key) => PRESETS[key].name === inputs.name) ?? (Object.keys(LEVEL_PRESETS).find((key) => LEVEL_PRESETS[key].name === inputs.name) ? `level:${Object.keys(LEVEL_PRESETS).find((key) => LEVEL_PRESETS[key].name === inputs.name)}` : null);
-  presetSelect.value = presetOf(current(corner)) ?? 'heavy';
-  presetSelect.addEventListener('change', () => {
-    const level = presetSelect.value.startsWith('level:');
-    const chosen = level ? levelPreset(presetSelect.value.slice(6)) : normaliseInputs(structuredClone(PRESETS[presetSelect.value]));
+  const groupSelect = form.querySelector('.preset-group');
+  const characters = builderCharacters();
+  const levelGroup = corner === 'hero' ? [{ group: 'level', option: keyedOption('builder.dunnottarCast', 'level') }] : [];
+  groupSelect.replaceChildren(...levelGroup.map((each) => each.option), ...FACTION_KEYS.filter((faction) => characters.some((character) => character.faction === faction))
+    .map((faction) => nameOption(FACTIONS[faction].label, faction, { prefix: `${FACTIONS[faction].glyph} ` })));
+  const membersOf = (group) => (group === 'level'
+    ? Object.entries(LEVEL_PRESETS).map(([key, preset]) => ({ key: `level:${key}`, name: preset.name }))
+    : characters.filter((character) => character.faction === group));
+  const fillPresets = (group) => presetSelect.replaceChildren(...membersOf(group).map((character) => nameOption(character.name, character.key)));
+  const presetOf = (inputs) => {
+    const levelKey = corner === 'hero' ? Object.keys(LEVEL_PRESETS).find((key) => LEVEL_PRESETS[key].name === inputs.name) : null;
+    return levelKey ? `level:${levelKey}` : characters.find((character) => character.name === inputs.name)?.key ?? null;
+  };
+  const groupOf = (key) => (key.startsWith('level:') ? 'level' : characters.find((character) => character.key === key).faction);
+  const applyPreset = (key) => {
+    const level = key.startsWith('level:');
+    const chosen = level ? levelPreset(key.slice(6)) : normaliseInputs(structuredClone(characters.find((character) => character.key === key).inputs));
     if (!level) shuffleColors(chosen);
     // The slot keeps its choice to ride (if the new man's kit rides).
     if (corner !== 'hero' && current(corner).mounted) chosen.mounted = true;
     setCurrent(corner, chosen);
     fillCornerForm(corner);
-  });
+  };
+  // Shown as the fighter is (also after a fighter code is loaded); one of his own making keeps the faction last shown.
+  form.syncPreset = (inputs) => {
+    const key = presetOf(inputs);
+    const group = key ? groupOf(key) : groupSelect.value || groupSelect.options[0]?.value;
+    groupSelect.value = group;
+    fillPresets(group);
+    if (!key) presetSelect.prepend(keyedOption('builder.ownPick', ''));
+    presetSelect.value = key ?? '';
+  };
+  groupSelect.addEventListener('change', () => applyPreset(membersOf(groupSelect.value)[0].key));
+  presetSelect.addEventListener('change', () => { if (presetSelect.value) applyPreset(presetSelect.value); });
   const fields = form.querySelector('.fields');
   fields.replaceChildren(...FIELDS.map((field) => {
     const row = document.createElement('label');
@@ -2324,6 +2336,30 @@ function buildCornerForm(corner) {
     const select = document.createElement('select');
     select.append(...field.options.map((option) => fieldOption(field, option)));
     select.dataset.look = field.key;
+    // The style under its kind of weapon (pickgroups.js): the kind picked first, then the style; a new kind takes its first.
+    if (field.key === 'style') {
+      row.classList.add('style-pick');
+      const kindSelect = document.createElement('select');
+      kindSelect.ariaLabel = t('builder.weaponKind');
+      kindSelect.dataset.i18nAria = 'builder.weaponKind';
+      kindSelect.append(...WEAPON_KINDS.filter((kind) => field.options.some((key) => weaponCategoryOf(key) === kind.key))
+        .map((kind) => keyedOption(`builder.kind.${kind.key}`, kind.key)));
+      const fillStyles = (kind) => select.replaceChildren(...field.options.filter((key) => weaponCategoryOf(key) === kind).map((key) => fieldOption(field, key)));
+      form.syncStyle = (style) => {
+        kindSelect.value = weaponCategoryOf(style);
+        fillStyles(kindSelect.value);
+      };
+      kindSelect.addEventListener('change', () => {
+        fillStyles(kindSelect.value);
+        select.value = select.options[0].value;
+        select.dispatchEvent(new Event('change'));
+        fillCornerForm(corner);
+      });
+      const pair = document.createElement('span');
+      pair.className = 'pick-pair';
+      pair.append(kindSelect, select);
+      row.append(pair);
+    }
     select.addEventListener('change', () => {
       if (field.onInputs) current(corner)[field.key] = select.value;
       // A style worn on the back (`packed`: the flamethrower's tanks) puts its load on him, and takes it off when he changes style.
@@ -2335,7 +2371,7 @@ function buildCornerForm(corner) {
         regreyHair(current(corner));
       }
     });
-    row.append(select);
+    if (!select.parentElement) row.append(select);
     return row;
   }));
   // Where he is from and his skin, after his style: the character creator's choices (menu.js), in the grid's own rows.
@@ -2482,6 +2518,8 @@ function fillCornerForm(corner) {
   fillMemberPicker(corner);
   // A level's fighters are tuned, not swapped for a preset.
   form.querySelector('.preset').closest('label').hidden = corner !== 'hero' && Boolean(state.scenario);
+  form.syncPreset?.(inputs);
+  form.syncStyle?.(inputs.style ?? 'boxing');
   const outfit = form.querySelector('.outfit');
   // The design names follow the outfit chosen.
   const kind = outfitOf(inputs).kind;
