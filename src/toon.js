@@ -122,6 +122,22 @@ function hiddenOutline(mesh) {
 }
 
 /**
+ * Free every texture a material holds: in its own slots (map, normalMap, …), and in the uniforms a shader patch keeps on
+ * it (`userData.<name>.<uniform>.value`, `uniforms.<uniform>.value`: a painted ground's layout, a land's macro tint). Not
+ * a reflection map (`envMap`): one is shared by every piece of steel, and it is a render target's, not to be re-uploaded.
+ */
+export function disposeMaterialTextures(material) {
+  const free = (value) => {
+    if (value?.isTexture) value.dispose();
+    else if (value?.value?.isTexture) value.value.dispose();
+  };
+  for (const [slot, value] of Object.entries(material)) if (slot !== 'envMap') free(value);
+  for (const group of [material.uniforms, ...Object.values(material.userData ?? {})]) {
+    if (group && typeof group === 'object' && !group.isTexture) for (const value of Object.values(group)) free(value);
+  }
+}
+
+/**
  * Free what an object and its children hold on the GPU: geometries,
  * skeletons' bone textures, and textures drawn for them (a banner's canvas).
  * Anything marked `userData.shared` (a crowd template, a merged weapon) is left.

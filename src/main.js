@@ -51,6 +51,7 @@ import { DETAIL_MAPS } from './detailmaps.js';
 import { setHelmStyle } from './helmstyle.js';
 import { bareCrowdHead, BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray, warmSevered } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
+import { releaseSkinTextures } from './skintex.js';
 import { placeMounted } from './physics/mounted.js';
 import { boltedOn, breedOf, canRide, isMounted, mountAll, mountedTeams, mountOf } from './horses.js';
 import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awareness.js';
@@ -482,6 +483,7 @@ function rebuildViews({ progressive = false } = {}) {
   for (const view of state.views) disposeFighterView(scene, view);
   // The horses (physics/mounted.js), one model each.
   for (const view of state.horseViews ?? []) disposeHorseView(scene, view);
+  releaseSkinTextures();
   const crowded = (state.world.horses?.length ?? 0) > 4;
   state.horseViews = (state.world.horses ?? []).map((horse) => buildHorseView(scene, horse, { detail: crowded ? 'low' : 'full' }));
   if ((scene.crowdTemplates?.size ?? 0) > CROWD_TEMPLATE_CAP) clearCrowdTemplates(scene);

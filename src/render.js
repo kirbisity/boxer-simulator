@@ -39,7 +39,7 @@ import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
 import { buildRobotBody } from './robotview.js';
 import { buildExoFrame } from './exoview.js';
-import { disposeObject, doubleSided, outlineFor, surface, unskinnedCopy } from './toon.js';
+import { disposeMaterialTextures, disposeObject, doubleSided, outlineFor, surface, unskinnedCopy } from './toon.js';
 import { townSquare } from './props/town.js';
 import { JIANGNAN_PLAN, jiangnanTown } from './props/jiangnan.js';
 import { cajamarcaTown } from './props/cajamarca.js';
@@ -151,6 +151,7 @@ export function setPlace(view, place, arena, weather = null) {
   if (view.place === 'dunnottar' && place !== 'dunnottar') stormRelease(view);
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
   view.place = place;
+  releaseOldPlaces(view, place);
   // A level's own weather (scenarios.js `weather`): the same place is clear for the sandbox and for other levels.
   view.weather = weather;
   lightPlace(view, place);
@@ -161,6 +162,41 @@ export function setPlace(view, place, arena, weather = null) {
 
 // A floor this many times the place's own width gets a copy of the place built for it.
 const WIDE_FLOOR = 1.5;
+
+// The places kept built while hidden (besides the one shown and the ring), the most lately shown first. Each is a whole
+// field's scenery and ground: its painted and living ground alone is some 50 to 150 MB of textures on the GPU (measured
+// over the story's eight battles: 6 living-grass decals came to 134 MB). Story mode moves through a dozen places (each
+// battle's, the scenes' sets, the finale's), and keeping every one hidden in the scene grew the page past 600 MB of
+// textures in two passes through it: a phone's browser kills the page at that and reloads it. One kept: a scene played
+// on its battle's field, or a retry, goes back to the place just left without building it again.
+const PLACES_KEPT = 1;
+
+/** Free the hidden places beyond PLACES_KEPT (the longest unseen first): their geometry, materials and textures. */
+function releaseOldPlaces(view, shown) {
+  view.placeSeen ??= new Map();
+  view.placeClock = (view.placeClock ?? 0) + 1;
+  view.placeSeen.set(shown, view.placeClock);
+  const hidden = Object.keys(view.places).filter((key) => view.places[key] && key !== shown && key !== 'ring');
+  // (A copy parked by swapFloor, `place@floor`, was last seen when its place was.)
+  const seen = (key) => view.placeSeen.get(key) ?? view.placeSeen.get(key.split('@')[0]) ?? 0;
+  hidden.sort((a, b) => seen(b) - seen(a));
+  for (const key of hidden.slice(PLACES_KEPT)) {
+    disposePlace(view, view.places[key]);
+    view.places[key] = null;
+    if (!key.includes('@') && view.floors) delete view.floors[key];
+  }
+}
+
+/** Take a place out of the scene and free what it holds on the GPU: its geometry and textures. */
+function disposePlace(view, group) {
+  view.scene.remove(group);
+  group.traverse((object) => {
+    if (object.userData.shared) return;
+    object.geometry?.dispose?.();
+    // (Its materials are kept: their compiled programs are shared, toon.js disposeObject.)
+    for (const material of [].concat(object.material ?? [])) disposeMaterialTextures(material);
+  });
+}
 
 /**
  * Show `place` on `floor` (null: its own): the copy built for that floor takes the place's
@@ -190,7 +226,7 @@ export function forgetPlaces(view) {
     view.scene.remove(group);
     group.traverse((object) => {
       object.geometry?.dispose?.();
-      for (const material of [].concat(object.material ?? [])) material.map?.dispose?.();
+      for (const material of [].concat(object.material ?? [])) disposeMaterialTextures(material);
     });
     view.places[key] = null;
   }

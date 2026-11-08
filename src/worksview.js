@@ -13,6 +13,7 @@ import { kwtCreate } from './levelmode/kitwater.js';
 import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
 import { storyLadders } from './story/ground/wallview.js';
 import { storyProps, storyPropsTick } from './story/ground/props.js';
+import { disposeMaterialTextures } from './toon.js';
 
 export const WORKS_VIEW = {
   // A daubed screen's mud (a palisade with `cover`): grey-brown dried clay.
@@ -72,7 +73,7 @@ export function showWorks(view, arena) {
     view.works.group.traverse((object) => {
       object.geometry?.dispose?.();
       for (const material of [].concat(object.material ?? [])) {
-        material.map?.dispose?.();
+        disposeMaterialTextures(material);
         material.dispose?.();
       }
     });

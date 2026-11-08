@@ -79,7 +79,7 @@ test('the parts of the line: a soldier in the front of a file, a squad leader at
   assert.ok(Math.abs(camp.slot.x) < 7.5 && Math.abs(camp.slot.z) < 7.5 && camp.slot.x > 0);
 });
 
-test('the ground: the rise and stream on the frontier, the valley under Abdali, the camp\'s palisade and trench', () => {
+test('the ground: the rise and stream on the frontier, the valley under Abdali, the camp\'s two cart lines', () => {
   const works = (battle) => worksOf(battle.setup(storyNorthLife(battle), 1).options.arena);
   const frontier = works(liaodong);
   assert.ok(reliefAt(frontier, 20, 0) > 2 && reliefAt(frontier, -10, 0) === 0, 'the raiders on the rise, the patrol on the flat');
@@ -87,8 +87,9 @@ test('the ground: the rise and stream on the frontier, the valley under Abdali, 
   const valley = works(sarhu);
   assert.ok(reliefAt(valley, 15, 0) > 4 && reliefAt(valley, -20, 0) > 3 && reliefAt(valley, -3, 0) === 0, 'the column on the valley floor between the heights');
   const camp = works(hunriver);
-  assert.equal(camp.walls.length, 8, 'a palisade on four sides, each with a gap');
-  assert.ok(reliefAt(camp, 9.3, 0) < -0.5 && reliefAt(camp, 0, 0) === 0, 'the trench outside it');
+  assert.equal(camp.walls.length, 4, 'a cart line on the main face and the rear, each with its gun\'s gap');
+  assert.equal(camp.ditches.length, 0, 'no trench: a plain field');
+  assert.ok(reliefAt(camp, 9.3, 0) === 0 && reliefAt(camp, 0, 0) === 0, 'level ground');
 });
 
 test('each north battle runs 20 s headless with the hero AI-driven, nobody lost off the floor', () => {

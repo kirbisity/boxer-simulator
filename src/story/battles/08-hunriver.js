@@ -28,11 +28,13 @@
 // and the Jin's own cannon (turned on the Sichuan camp, not this one). The river is five li from the camp, off this field.
 // The approach: the camp stood five li (~2.9 km) from the river (浙兵布阵于浑河五里之外: zh.wikipedia 渾河之戰, after 明史 卷271);
 // the Jin crossed it and came on across the open plain, surrounding the camp, and its guns fired on them "until the powder
-// was gone". Here they form up `formUp` m out from the camp all round (a few hundred metres: at the reach the camp's folangji
-// are laid out to, ARTILLERY's 300 m, beyond which their shot is spent on nothing) and close on it across the open ground
-// under its fire; the battle's time is that walk and the fight.
-// The ground: the camp a square palisade with a gap in each side (the carts' intervals), a trench outside it. The hero is one of
-// the camp's leaders, where his rank stands him. Whether he dies is the battle's: nothing here is tuned to an outcome.
+// was gone". Here the battle opens with the Jin already round it, `formUp` m out (the walk across the plain under the guns'
+// long fire is left out: at the drill's pace from the guns' 300 m reach it was six minutes of men walking), and they close
+// on it under the guns' canister range; the battle's time is that short walk and the fight.
+// The ground: the camp's two cart lines, on the main face and the rear, each with the gap the guns stand in; its sides
+// open (the trench, the palisade's other faces and its daub are left out: a plain field fights faster, and its open sides
+// make it the surrounded hand-to-hand fight the sources tell of). The hero is one of the camp's leaders, where his rank stands
+// him. Whether he dies is the battle's: nothing here is tuned to an outcome.
 
 import { bannerman, mingSoldier } from '../../cast.js';
 import { BATTLE_END } from '../../battleend.js';
@@ -40,8 +42,9 @@ import { DRILL } from '../../formation.js';
 import { seededRandom } from '../../physics.js';
 import { northName, northPlace, northSides, northStyles } from './north.js';
 
-// m from the camp's middle the Jin form up (above).
-const HUNRIVER_FORM_UP = 300;
+// m from the camp's middle the Jin form up (above): inside the folangji's canister reach (some 100 m), and a minute and a
+// quarter's walk at the drill's pace.
+const HUNRIVER_FORM_UP = 60;
 // s: the walk in from there at a drilled line's steady pace (formation.js DRILL).
 const HUNRIVER_MARCH = Math.round(HUNRIVER_FORM_UP / DRILL.pace);
 
@@ -92,12 +95,9 @@ export const HUNRIVER = {
   inner: 30,
   bayara: { bayaraLance: 6, bayaraBow: 6 },
   horseRing: HUNRIVER_FORM_UP + 6.5,
-  // The camp's works: its palisade (half the square's side, m; the stalks' height; a gap in each side, m wide) and its trench
-  // (its line's half side, and its profile across: some 0.8 m deep and 2.4 m wide, its spoil thrown into the palisade's foot).
-  // Its stalks plastered with mud (外涂泥巴): a screen of daub (physics/cover.js earth) some 0.1 m thick, which stops an arrow and
-  // only slows a ball (its thickness not given: an estimate).
-  palisade: { half: 7.5, height: 1.5, gap: 2, cover: { material: 'earth', thick: 0.1 } },
-  trench: { half: 9.3, profile: [[-1.2, 0], [-0.6, -0.8], [0.6, -0.8], [1.2, 0]] },
+  // The camp's works: its two cart lines (half the camp's side, m, from its middle: each line that long both ways across the
+  // face; the carts' height; the gap in its middle the gun stands in, m wide).
+  carts: { half: 7.5, height: 1.5, gap: 2 },
   // The plain round the camp out past the horse's ring.
   arena: { halfX: HUNRIVER_FORM_UP + 15, halfZ: HUNRIVER_FORM_UP + 15 },
   // The walk in from the form-up line, and the fight's five minutes.
@@ -110,18 +110,12 @@ export const HUNRIVER = {
   },
 };
 
-/** A square line round the camp's middle, half side `half`, as points (closed): corner, corner, … back to the first. */
-const hunriverSquare = (half) => [[half, -half], [half, half], [-half, half], [-half, -half], [half, -half]];
-
-/** The palisade (a gap in the middle of each side) and the trench outside it. */
+/** The two cart lines (on the main face, +x, and the rear), each with its gun's gap in the middle. */
 function hunriverWorks() {
-  const { palisade, trench } = HUNRIVER;
-  const side = palisade.half * 2;
-  const gaps = [0, 1, 2, 3].map((k) => [k * side + side / 2 - palisade.gap / 2, k * side + side / 2 + palisade.gap / 2]);
-  return {
-    walls: [{ points: hunriverSquare(palisade.half), height: palisade.height, kind: 'palisade', gaps, cover: palisade.cover }],
-    ditches: [{ points: hunriverSquare(trench.half).map(([x, z]) => [x, z, 1, 1]), profile: trench.profile }],
-  };
+  const { half, height, gap } = HUNRIVER.carts;
+  const gaps = [[half - gap / 2, half + gap / 2]];
+  const line = (x) => ({ points: [[x, -half], [x, half]], height, kind: 'palisade', gaps });
+  return { walls: [line(half), line(-half)] };
 }
 
 /** The camp's men, each in his place. */

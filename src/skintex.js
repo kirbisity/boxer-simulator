@@ -665,7 +665,23 @@ export async function runSkinTexturesAsync(steps, sliceMs = SKINTEX.sliceMs) {
 
 // ---- The renderer's side -----------------------------------------------------------------------------
 
-const GPU = new WeakMap();
+// (Held strongly, and freed by releaseSkinTextures: a set dropped from CACHE keeps its textures on the GPU until disposed.)
+const GPU = new Map();
+
+/**
+ * Free on the GPU the maps of every set no longer in the cache (between battles, once the old men's views are gone: main.js
+ * rebuildViews). Each set is four maps of some 2.8 MB; the cache keeps SKINTEX.cacheLimit sets, but the GPU kept every set ever
+ * made, some 90 MB more for each pass through the story's eight battles, until a phone's browser killed the page. A set still
+ * drawn is uploaded again when next drawn (three keeps its data), so freeing one in use costs only that.
+ */
+export function releaseSkinTextures() {
+  const kept = new Set(CACHE.values());
+  for (const [textures, made] of GPU) {
+    if (kept.has(textures)) continue;
+    for (const texture of Object.values(made)) texture?.dispose();
+    GPU.delete(textures);
+  }
+}
 
 /** The maps as three textures, made once for a set of maps. */
 function gpuTextures(textures) {
