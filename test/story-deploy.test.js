@@ -153,25 +153,25 @@ test('the Hun River: the camp\'s order a 把总\'s, the face an officer\'s; the 
   assert.equal(storyDeployOffer(hunriver, graded(hunriver, 'shaozhang')), null);
   const officer = storyDeployOffer(hunriver, graded(hunriver, 'shaoguan'));
   assert.equal(officer.formations, null);
-  assert.equal(officer.ordered.id, 'carts');
+  assert.equal(officer.ordered.id, 'stood');
   assert.deepEqual(officer.posts.map((option) => option.id), ['main', 'rear', 'side', 'reserve']);
   const commander = storyDeployOffer(hunriver, graded(hunriver, 'bazong'));
-  assert.deepEqual(commander.formations.map((option) => option.id), ['carts', 'square', 'reserve']);
-  assert.deepEqual(commander.defaults, { formation: 'carts', post: 'main' });
+  assert.deepEqual(commander.formations.map((option) => option.id), ['stood', 'square', 'reserve']);
+  assert.deepEqual(commander.defaults, { formation: 'stood', post: 'main' });
   for (const option of [...hunriver.deploy.formations.options, ...hunriver.deploy.posts.options]) assert.ok(option.name.zh && option.name.en && option.note.zh && option.note.en, option.id);
   // The reserve's post only with a reserve.
   assert.deepEqual(storyDeployResolve(hunriver, graded(hunriver, 'bazong'), { formation: 'square', post: 'reserve' }), { formation: 'square', post: 'main' });
-  assert.deepEqual(storyDeployResolve(hunriver, graded(hunriver, 'shaoguan'), { formation: 'reserve', post: 'rear' }), { formation: 'carts', post: 'rear' });
+  assert.deepEqual(storyDeployResolve(hunriver, graded(hunriver, 'shaoguan'), { formation: 'reserve', post: 'rear' }), { formation: 'stood', post: 'rear' });
 
   // The defaults, chosen or not, build the camp exactly as it stood before there was a choice (every rank's).
   const strip = ({ deploy, ...setup }) => setup;
   for (const rank of ['soldier', 'squadLeader', 'officer']) {
     const plain = hunriver.setup(storyNorthLife(hunriver, { rank }), 3);
-    assert.deepEqual(strip(hunriver.setup(storyNorthLife(hunriver, { rank }), 3, { deploy: { formation: 'carts', post: 'main' } })), strip(plain), rank);
+    assert.deepEqual(strip(hunriver.setup(storyNorthLife(hunriver, { rank }), 3, { deploy: { formation: 'stood', post: 'main' } })), strip(plain), rank);
   }
   const life = graded(hunriver, 'bazong');
   const plain = hunriver.setup(life, 3);
-  assert.deepEqual(strip(hunriver.setup(life, 3, { deploy: { formation: 'carts', post: 'main' } })), strip(plain));
+  assert.deepEqual(strip(hunriver.setup(life, 3, { deploy: { formation: 'stood', post: 'main' } })), strip(plain));
   assert.deepEqual(plain.options.formation.red.layout.slice(0, HUNRIVER.camp.length), HUNRIVER.camp.map(([, , , x, z]) => [-x, -z]), 'the camp\'s own places');
 
   // Every order and face: the same 18 men and the Jin as ever, no man nearer another than the camp already stands them, built.
@@ -189,17 +189,17 @@ test('the Hun River: the camp\'s order a 把总\'s, the face an officer\'s; the 
     }
   }
   // His face: the officer's place behind the face he holds; the commanders where they stood.
-  const slot = (post, formation = 'carts') => hunriver.setup(life, 3, { deploy: { formation, post } }).slot;
+  const slot = (post, formation = 'stood') => hunriver.setup(life, 3, { deploy: { formation, post } }).slot;
   assert.ok(slot('main').x > 0 && slot('rear').x < 0 && slot('side').z > 3 && Math.abs(slot('side').x) < 2);
   assert.ok(Math.hypot(slot('reserve', 'reserve').x, slot('reserve', 'reserve').z) < 3, 'the reserve\'s in the middle');
   const named = (setup) => setup.fighters.map((entry, index) => [entry.inputs.name, setup.options.formation.red.layout[index]]).filter(([name]) => ['Qi Jin', 'Tong Zhongkui', 'Chen Ce'].includes(name));
   assert.deepEqual(named(hunriver.setup(life, 3, { deploy: { formation: 'reserve', post: 'side' } })), named(plain));
-  // The square: a third man on each open side; the reserve: four inside the cart lines, off every face.
+  // The square: a third man on each side; the reserve: four in the middle, off every face.
   const red = (formation) => hunriver.setup(life, 3, { deploy: { formation } }).options.formation.red.layout.slice(0, 18).map(([x, z]) => [-x, -z]);
   const onSide = (places, sign) => places.filter(([x, z]) => z * sign > 6).length;
-  for (const sign of [1, -1]) assert.equal(onSide(red('square'), sign), onSide(red('carts'), sign) + 1);
+  for (const sign of [1, -1]) assert.equal(onSide(red('square'), sign), onSide(red('stood'), sign) + 1);
   const inside = (places) => places.filter(([x, z]) => Math.abs(x) < 2 && Math.abs(z) < 3).length;
-  assert.equal(inside(red('reserve')) - inside(red('carts')), 4);
+  assert.equal(inside(red('reserve')) - inside(red('stood')), 4);
 });
 
 test('his coat by his grade: hemp in the file, the brigandine with a squad, the officer\'s coat from the 哨长 up', () => {

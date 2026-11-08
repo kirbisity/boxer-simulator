@@ -23,18 +23,19 @@
 //   game's spear stands for it).
 // - The Jin round the camp: 56 banner men on foot (the spears, sabres and guandao before, the archers behind) and 12 on horse
 //   further out (the Bayara's kit, the game's one mounted Jurchen kit), all the colours.
-// The camp's guns: two folangji in its carts' intervals, served by the Zhejiang and household men there (HUNRIVER.artillery),
-// their charges running out as the day's powder did. What the game cannot show: the war carts (their line is the palisade's),
-// and the Jin's own cannon (turned on the Sichuan camp, not this one). The river is five li from the camp, off this field.
+// The camp's guns: two folangji on its main face and its rear, served by the Zhejiang and household men there
+// (HUNRIVER.artillery), their charges running out as the day's powder did. What the game leaves out: the war carts, the
+// trench and the palisade (below), and the Jin's own cannon (turned on the Sichuan camp, not this one). The river is five
+// li from the camp, off this field.
 // The approach: the camp stood five li (~2.9 km) from the river (浙兵布阵于浑河五里之外: zh.wikipedia 渾河之戰, after 明史 卷271);
 // the Jin crossed it and came on across the open plain, surrounding the camp, and its guns fired on them "until the powder
 // was gone". Here the battle opens with the Jin already round it, `formUp` m out (the walk across the plain under the guns'
 // long fire is left out: at the drill's pace from the guns' 300 m reach it was six minutes of men walking), and they close
 // on it under the guns' canister range; the battle's time is that short walk and the fight.
-// The ground: the camp's two cart lines, on the main face and the rear, each with the gap the guns stand in; its sides
-// open (the trench, the palisade's other faces and its daub are left out: a plain field fights faster, and its open sides
-// make it the surrounded hand-to-hand fight the sources tell of). The hero is one of the camp's leaders, where his rank stands
-// him. Whether he dies is the battle's: nothing here is tuned to an outcome.
+// The ground: a plain field, the camp's works left out (its carts, trench and daubed palisade: as lines on the field they
+// caught its own men and the Jin alike, more trouble to the fight than a help to it, and without them it is the surrounded
+// hand-to-hand fight the sources tell of once the powder was gone); its guns stand where the carts' intervals would be.
+// The hero is one of the camp's leaders, where his rank stands him. Whether he dies is the battle's: nothing here is tuned to an outcome.
 
 import { bannerman, mingSoldier } from '../../cast.js';
 import { BATTLE_END } from '../../battleend.js';
@@ -54,7 +55,7 @@ export const HUNRIVER = {
   formUp: HUNRIVER_FORM_UP,
   // The camp's men, each [unit, kit rank, style, x, z, part]: x toward the Jin's main side (+x, the river's), z across.
   camp: [
-    // The Zhejiang men: four at the palisade on the main face, a folangji's crew of two behind them, the squad's leader; the side faces.
+    // The Zhejiang men: four on the main face, a folangji's crew of two behind them, the squad's leader; the side faces.
     ['zhejiang', 'brigandine', 'spear', 6.6, -4.5, 'front'], ['zhejiang', 'brigandine', 'langxian', 6.6, -1.5, 'front'],
     ['zhejiang', 'brigandine', 'swordShield', 6.6, 1.5, 'front'], ['zhejiang', 'brigandine', 'spear', 6.6, 4.5, 'front'],
     ['zhejiang', 'brigandine', 'dao', 6.1, -0.8, 'second'], ['zhejiang', 'brigandine', 'dao', 6.1, 0.8, 'second'],
@@ -72,27 +73,27 @@ export const HUNRIVER = {
   // The camp's guns (physics/artillery.js): "列置战车枪炮" (it set out war carts and guns), and "明军以火器射击，杀伤相枕" (its
   // guns' dead and wounded lay piled) until the powder was spent (zh.wikipedia 渾河之戰, after 明史 卷271 and 明熹宗实录). Qi
   // Jiguang's cart camp, in which Qi Jin's men were raised, carried two folangji on each war cart (练兵实纪 杂集, its cart camp
-  // of ~3,100 men and 128 carts: one gun to ~12 men; the camp's 18 here, two guns). Each in a cart's interval (the palisade's gap)
-  // on the main face and the rear, its crew of two the Zhejiang and household men there (`crew`: their places in `camp`),
+  // of ~3,100 men and 128 carts: one gun to ~12 men; the camp's 18 here, two guns). Each on the main face or the rear (where a
+  // cart's interval would be), its crew of two the Zhejiang and household men there (`crew`: their places in `camp`),
   // loading canister for the Jin come within its reach. The camp's charges, `rounds` a gun, are an estimate (none is given).
   // How the camp's men may stand (the deploy screen's `formation`, src/story/deploy.js), each the places it changes in `camp`
-  // (its index: [x, z, part]); the cart lines, the guns and their crews, the commanders and the officer's place stay. As the
-  // camp stood (`carts`, the default): its weight on the main face toward the river the Jin crossed by, the open sides and
-  // the rear lightly held. `square`: every face held, as the Jin were round it "several rings deep" (数匝) and came on from
+  // (its index: [x, z, part]); the guns and their crews, the commanders and the officer's place stay. As the camp stood
+  // (`stood`, the default): its weight on the main face toward the river the Jin crossed by, the sides (no gun
+  // on them) and the rear lightly held. `square`: every face held, as the Jin were round it "several rings deep" (数匝) and came on from
   // all sides; Qi Jiguang's cart camp (车营, 练兵实纪 杂集), in which Qi Jin's men were raised, was a square of carts for
-  // that reason. The main face's long-brush and shield men go to the open sides, a third man to each; its two spears, its gun
-  // and its carts hold it. `reserve`: four men held in the middle, as that cart camp kept its killing men (杀手) inside the
-  // carts while the guns fired, to go out where the enemy closed: the main face's long-brush and shield men, and the two
+  // that reason. The main face's long-brush and shield men go to the sides, a third man to each; its two spears and its gun
+  // hold it. `reserve`: four men held in the middle, as that camp kept its killing men (杀手) back while the
+  // guns fired, to go out where the enemy closed: the main face's long-brush and shield men, and the two
   // Sichuan men who had come in from a camp already lost. A block of four abreast 1.8 m apart (no closer than the guns'
   // crews stand, 1.6 m) 1.6 m in front of the camp's middle, no closer to the commanders than that either.
   formations: {
-    carts: {},
+    stood: {},
     square: { 1: [0, -6.6, 'front'], 2: [3, 6.6, 'front'] },
     reserve: { 1: [1.6, -0.9, 'second'], 2: [1.6, 0.9, 'second'], 16: [1.6, -2.7, 'second'], 17: [1.6, 2.7, 'second'] },
   },
   // Where an officer stands (the deploy screen's `post`): the officer's place in `camp` (index `officer`), behind the face he
   // holds. `main` as the camp had it, behind the main face by the gun, where Qi Jin stood; `rear` and `side` the same place
-  // turned to that face (the rear's cart line and gun, held by the household men; the open +z side, no carts before it);
+  // turned to that face (the rear and its gun, held by the household men; the +z side, no gun on it);
   // `reserve`, with the four in the middle (the reserve formation's only), behind their left, to send them where a face gives.
   officer: 10,
   posts: { main: [3.4, 1.6], rear: [-3.4, -1.6], side: [-1.6, 3.4], reserve: [0, -2.7] },
@@ -117,9 +118,6 @@ export const HUNRIVER = {
   inner: 30,
   bayara: { bayaraLance: 6, bayaraBow: 6 },
   horseRing: HUNRIVER_FORM_UP + 6.5,
-  // The camp's works: its two cart lines (half the camp's side, m, from its middle: each line that long both ways across the
-  // face; the carts' height; the gap in its middle the gun stands in, m wide).
-  carts: { half: 7.5, height: 1.5, gap: 2 },
   // The plain round the camp out past the horse's ring.
   arena: { halfX: HUNRIVER_FORM_UP + 15, halfZ: HUNRIVER_FORM_UP + 15 },
   // The walk in from the form-up line, and the fight's five minutes.
@@ -132,16 +130,8 @@ export const HUNRIVER = {
   },
 };
 
-/** The two cart lines (on the main face, +x, and the rear), each with its gun's gap in the middle. */
-function hunriverWorks() {
-  const { half, height, gap } = HUNRIVER.carts;
-  const gaps = [[half - gap / 2, half + gap / 2]];
-  const line = (x) => ({ points: [[x, -half], [x, half]], height, kind: 'palisade', gaps });
-  return { walls: [line(half), line(-half)] };
-}
-
 /** The camp's men, each in his place: as the camp stood, or drawn up as `formation` says, the officer's place at `post`. */
-function hunriverCamp(random, formation = 'carts', post = 'main') {
+function hunriverCamp(random, formation = 'stood', post = 'main') {
   const { camp, named, people, design, formations, officer, posts } = HUNRIVER;
   const moved = formations[formation] ?? {};
   return camp.map((entry, index) => {
@@ -187,17 +177,17 @@ export const BATTLE_HUNRIVER = {
   title: { zh: '浑河血战', en: 'The Hun River' },
   seconds: HUNRIVER.seconds,
   // The deploy screen (src/story/deploy.js). How the camp's men stand is its commander's: a 把总 (the camp's few, scaled, are
-  // a command as the game draws it); below him it stands as it did, behind the carts. Which face he holds is an officer's
-  // (a 哨官's): Qi Jin's main face, the rear, an open side, or (in the reserve) the middle. The camp's men, its guns and the
+  // a command as the game draws it); below him it stands as it did. Which face he holds is an officer's
+  // (a 哨官's): Qi Jin's main face, the rear, a side, or (in the reserve) the middle. The camp's men, its guns and the
   // Jin round it are the battle's in every one (HUNRIVER.formations, posts).
   deploy: {
     formations: {
       from: 'bazong',
-      default: 'carts',
+      default: 'stood',
       options: [
-        { id: 'carts', name: { zh: '依车而守', en: 'Behind the carts' }, note: { zh: '如营中原样：多数人守着朝河的正面车阵，两侧和后面人少。', en: 'As the camp stood: most men on the main face toward the river, the sides and the rear thinly held.' } },
-        { id: 'square', name: { zh: '四面皆守', en: 'Hollow square' }, note: { zh: '金兵围了数匝，四面都会来：正面的狼筅手和藤牌手调去两侧没有车的地方。', en: 'The Jin are round it several rings deep and will come on every face: the brush and shield men go from the main face to the open sides.' } },
-        { id: 'reserve', name: { zh: '中留预备', en: 'A reserve in the middle' }, note: { zh: '如戚继光车营把杀手留在车内：四个人站在营中，哪面顶不住就往哪面去。', en: 'As Qi Jiguang\'s cart camp kept its killing men inside the carts: four held in the middle, for whichever face gives.' } },
+        { id: 'stood', name: { zh: '照原样', en: 'As the camp stood' }, note: { zh: '如营中原样：多数人守着朝河的正面，两侧和后面人少。', en: 'As the camp stood: most men on the main face toward the river, the sides and the rear thinly held.' } },
+        { id: 'square', name: { zh: '四面皆守', en: 'Hollow square' }, note: { zh: '金兵围了数匝，四面都会来：正面的狼筅手和藤牌手调去两侧。', en: 'The Jin are round it several rings deep and will come on every face: the brush and shield men go from the main face to the sides.' } },
+        { id: 'reserve', name: { zh: '中留预备', en: 'A reserve in the middle' }, note: { zh: '如戚继光车营在炮响时把杀手留在后面：四个人站在营中，哪面顶不住就往哪面去。', en: 'As Qi Jiguang\'s camp held its killing men back while the guns fired: four in the middle, for whichever face gives.' } },
       ],
     },
     posts: {
@@ -205,8 +195,8 @@ export const BATTLE_HUNRIVER = {
       default: 'main',
       options: [
         { id: 'main', name: { zh: '正面', en: 'The main face' }, note: { zh: '朝河的正面，炮旁，戚金站的地方。', en: 'The face toward the river, by the gun, where Qi Jin stood.' } },
-        { id: 'rear', name: { zh: '后面车阵', en: 'The rear' }, note: { zh: '后面那道车阵和它的炮，家丁守着。', en: 'The rear cart line and its gun, the household men\'s.' } },
-        { id: 'side', name: { zh: '侧面', en: 'An open side' }, note: { zh: '没有车挡着的一面：营里最薄的地方。', en: 'A face with no carts before it: the camp\'s thinnest.' } },
+        { id: 'rear', name: { zh: '后面', en: 'The rear' }, note: { zh: '后面那一面和它的炮，家丁守着。', en: 'The rear face and its gun, the household men\'s.' } },
+        { id: 'side', name: { zh: '侧面', en: 'A side' }, note: { zh: '没有炮的一面：营里人最少的地方。', en: 'A face with no gun: the camp\'s thinnest.' } },
         { id: 'reserve', formations: ['reserve'], name: { zh: '带预备队', en: 'With the reserve' }, note: { zh: '和营中的四个人在一起，看哪面要人。', en: 'With the four in the middle, to see which face needs them.' } },
       ],
     },
@@ -225,7 +215,7 @@ export const BATTLE_HUNRIVER = {
       fighters,
       options: {
         seed,
-        arena: { ...HUNRIVER.arena, works: hunriverWorks() },
+        arena: HUNRIVER.arena,
         formation: {
           red: { front: 0, layout: layouts.red, loose: 0.1, drill: HUNRIVER.drill, discipline: HUNRIVER.discipline },
           blue: { front: 0, layout: layouts.blue, loose: 0.5 },
