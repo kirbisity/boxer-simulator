@@ -90,8 +90,9 @@ export function updateArtillery(view, world) {
       const mesh = drawn.children[index];
       if (!mesh) return;
       mesh.userData.lean ??= mesh.rotation.z;
-      // From its lean against the wall to lying out from it (a quarter turn past the upright, its foot where it stood).
-      const lying = Math.sign(-ladder.out[0] || 1) * (Math.PI / 2 - 0.04);
+      // From its lean against the wall to lying out from it (a quarter turn past the upright, its foot where it stood: the
+      // mesh is turned to face its wall, its local +x toward it, story/ground/wallview.js).
+      const lying = Math.PI / 2 - 0.04;
       mesh.rotation.z = mesh.userData.lean + (lying - mesh.userData.lean) * ladder.tilt;
     });
   }

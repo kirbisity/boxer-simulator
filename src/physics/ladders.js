@@ -8,20 +8,23 @@
 // its head (lever arm: its height) must turn it about its foot against the weight on it (each load's lever arm: how far
 // in from the foot toward the wall it is, which grows with its height up the ladder):
 //     push × height ≥ g × (ladder's mass × run / 2 + Σ climber's mass × run × his height / height)
-// At the ~14° of a ladder set by the four-to-one rule the run is a quarter of the height, so the weight on it counts for
-// little: one man shoves off a ladder with a man or two on it, two shove off one with three. What stops him is an attacker
-// at its head (on its top rungs or come up onto the walk), whose hands on the parapet and the ladder hold it: then there is
-// nobody's push to spare, and the ladder stands. A ladder raised again takes its men's time: two men at its foot lift it
-// and walk it up to the wall.
+// Set at a stair's slope (`lean`: 65° from the ground, its foot out nearly half its height) the weight on it counts: two
+// men shove off a ladder with a man near its top where one alone no longer can; and its head has further to go to pass the
+// upright (`pushSpeed`). What stops them outright is an attacker at its head (on its top rungs or come up onto the walk),
+// whose hands on the parapet and the ladder hold it: then there is nobody's push to spare, and the ladder stands. A ladder
+// raised again takes its men's time: two men at its foot lift it and walk it up to the wall.
 //
 // The ladders begin the battle lying at the wall's foot, as they were carried up: the attackers nearest each are sent to its
 // foot (`ladderPost`, ai.js) and raise it. Then it is climbed: a man at its foot, with the enemy on the walk above, gets on
-// it and goes up its rungs at a climbing pace (`climb`), his stance carried by it (the ladder, not the ground's relief,
-// holds his feet: a wall's face is no slope to walk up, physics/fieldworks.js FIELDWORKS.face), one man to every `spacing` m
-// of it, each waiting on the man above. His hands are on the rungs: he strikes nothing (physics.js throwPunch) until he is
-// at its head, his arms over the walk's edge. At its head he steps onto the walk if no enemy stands where he would; else he
-// fights from there. Struck down, knocked off its line, or thrown with it, he falls from where he was on it, as any body
-// falls.
+// it and goes up it as up a steep stair (`climb`), his stance carried by it (the ladder, not the ground's relief, holds his
+// feet: a wall's face is no slope to walk up, physics/fieldworks.js FIELDWORKS.face). It is two men wide (`lanes`): two go
+// up it abreast, each in his lane one to every `spacing` m of it, each waiting on the man above him in it. His hands are on
+// its rails: he strikes nothing (physics.js throwPunch) until he is at its head, his arms over the walk's edge. At its head
+// he steps onto the walk if no enemy stands where he would; else he fights from there. Struck down, knocked off its line,
+// or thrown with it, he falls from where he was on it, as any body falls.
+//
+// The player is not put on it: he gets on by walking at the wall from its foot (`climb.wish`), goes up while he keeps
+// pressing at the wall, holds his rung while he does not, and climbs back down (and off at its foot) when he pulls away.
 
 import { P } from '../body.js';
 import { fall, point } from '../physics.js';
@@ -29,15 +32,25 @@ import { WORLD } from './config.js';
 import { reliefAt, worksOf, worksStateOf } from './fieldworks.js';
 
 export const LADDERS = {
-  // rad from the upright: the four-to-one rule (its foot out a quarter of its height, ~14°), as ladders have been set to stand.
-  lean: Math.atan(0.25),
-  // kg: a scaling ladder for a 4-6 m wall, two bamboo or pine poles and lashed rungs (an estimate: a wooden extension
-  // ladder of that length weighs ~20-30 kg).
-  kg: 25,
+  // rad from the upright: set at 65° from the ground, a ship stair's slope (OSHA 29 CFR 1910.25: ship stairs 50-70°,
+  // ladders 60-90°), its foot out 0.47 of its height. Steep enough to stand on the wall's top and be raised by two men;
+  // shallow enough to be gone up facing the wall as up a steep stair, the weight on the feet, one hand on a rail and the
+  // weapon in the other; and the shallower a ladder stands the more its load holds it to the wall against a push (the
+  // statics above: the four-to-one rule's 76° is set for a ladder nobody is trying to throw down).
+  lean: (25 * Math.PI) / 180,
+  // Two abreast (`lanes`), `laneApart` m between the two men's lines: a man's shoulders are ~0.45-0.5 m across, and the
+  // two need room for their elbows and a shield. The width is an estimate: the Wujing Zongyao's (1044) cloud ladders were
+  // built broad on wheeled carriages; the widths of the scaling ladders carried at Pyongyang and Ulsan are not given in the
+  // sources checked.
+  lanes: 2,
+  laneApart: 0.7,
+  // kg: a two-abreast scaling ladder for a 4.5-7 m wall: two pine or bamboo rails ~6.5 m long and some twenty rungs 1.4 m
+  // wide (an estimate: rails 10 × 5 cm of pine, ~14 kg each; rungs ~0.7 kg each).
+  kg: 40,
   // N: what a man pushes with both hands at shoulder height, short of all he has (men's maximal initial push forces in the
   // ergonomic tables, Snook & Ciriello 1991, run ~300-450 N), over a parapet.
   push: 350,
-  // How many push at once: a ladder's head is a man's width; two at it, one each side.
+  // How many push at once: one at each rail's head.
   pushers: 2,
   // m: a defender this near its head (on the walk, his arms over the parapet) can get his hands on it.
   reach: 1.1,
@@ -45,9 +58,9 @@ export const LADDERS = {
   // his hands on the parapet, or come up onto the walk. While one is, it is held.
   held: 1.5,
   heldBelow: 1.4,
-  // s: the shove itself, from the hands on it to past the upright (a ladder leaning 14° goes over once its head is out some
-  // 1.2 m: a few strides of a push).
-  pushSeconds: 1.5,
+  // m/s: how fast the men at its head walk it out from the wall to past the upright (its head goes out height × sin(lean)):
+  // a few strides of a push; 0.75 m/s takes a 4.5 m ladder at 25° (1.9 m out) 2.5 s.
+  pushSpeed: 0.75,
   // s it takes to go over and lie (a rigid pole falling from near the upright: some 1-2 s), for the drawing.
   fallSeconds: 1.4,
   // A man on it whose weight counts against the push: his footing `climber` m or more above its foot.
@@ -58,40 +71,88 @@ export const LADDERS = {
   thrownOut: 0.5,
   // m: a man sent to raise it fights instead with an enemy this near him (a spear's length and a step).
   defendWithin: 2.6,
-  // To raise it again: `raisers` attackers on their feet within `raiseWithin` m of its foot, for `raiseSeconds` s (two men
+  // To raise it again: `raisers` attackers on their feet within `raiseWithin` m of it, for `raiseSeconds` s (two men
   // lift a ladder off the ground and walk it up to the wall in the time of a few steps each, under the wall's shot).
   raisers: 2,
   raiseWithin: 2.2,
   raiseSeconds: 8,
-  // A ladder's width (m): its gap's piece of the face when it is down (story/ground/walls.js STORY_WALL.ladder).
-  width: 1.1,
+  // A ladder's width (m): its gap's piece of the face when it is down (story/ground/walls.js STORY_WALL.ladder): its two
+  // lanes and a rail's room either side.
+  width: 1.6,
   // The sent: the `raisers` attackers nearest a lying ladder's foot, within `call` m of it, are sent to raise it (the men
-  // of its column told off to carry and raise it); their places `postOut` m out from its foot, `postSide` m either side.
+  // of its column told off to carry and raise it); their places `postOut` m out from the wall's foot, `postSide` m either side.
   call: 10,
   postOut: 1,
   postSide: 0.6,
   climb: {
-    // m/s up the ladder: a man laden with his armour and his weapon, his hands on the rungs (firefighters in full kit climb
-    // an aerial ladder at ~0.3-0.5 m/s; unladen and quick, ~0.6-0.8).
-    pace: 0.4,
-    // m of ladder to each man on it: one to a man's height and his reach (a man's feet clear of the hands of the man below;
-    // a 4.6 m ladder takes three or four).
+    // m/s along it: up a stair-steep ladder facing it, laden with armour and a weapon. Men climbing ladders of several
+    // slants in the laboratory went at 0.3-0.5 m/s (Bloswick & Chaffin, "An ergonomic analysis of the ladder climbing
+    // activity", Int. J. Industrial Ergonomics 6, 1990: 12 and 20 in/s); a man hurrying up a stair goes ~1 m/s along it.
+    // 0.6 m/s along at 65° is 0.54 m/s up: a 4.5 m wall in some 8 s.
+    pace: 0.6,
+    // m of ladder to each man in a lane: one to a man's height and his reach (a man's feet clear of the hands of the man
+    // below; a 5 m ladder takes four to a lane).
     spacing: 1.2,
     // m under the walk from which his head and arms are over its edge: he can strike from the ladder's head.
     top: 1.2,
     // m in from the face's top he steps to on the walk; an enemy standing within `clear` m of there keeps him on the ladder.
     onto: 0.5,
     clear: 0.7,
-    // m from its foot (or from under it, between its foot and the wall) an attacker gets on it, with an enemy on the walk
-    // within `enemyWithin` m of its head.
+    // m from its line (anywhere from its foot to under it, at the wall) an attacker gets on it, with an enemy on the walk
+    // within `enemyWithin` m of its head: half its width, so the men at its foot go up it from where they stand.
     mount: 0.8,
     enemyWithin: 14,
-    // m/s his stance is carried to the ladder's line as he gets on it (a step or two).
+    // m/s his stance is carried to his lane's line as he gets on it (a step or two).
     board: 1.5,
     // m: his hips knocked this far off his place on the ladder (by a blow, a shove, the press), his hold is gone: he falls.
     slip: 0.5,
+    // His balance against a knock (physics.js: the speed a shove must give him to put him over) on a ladder: his hands on
+    // its rails as well as his feet on a rung, so a shove has to tear his grip loose too (a man braced with both hands takes
+    // about twice what he takes on his feet alone). A blow that knocks his hips off his place still takes him off (`slip`).
+    hold: 2,
+    // The player's way: the share of his stick (or his steps' way) pointed at the wall that puts him on it at its foot and
+    // takes him up it; pointed away from it as much, he climbs down. Less either way, he holds his rung.
+    wish: 0.5,
   },
 };
+
+/** s: the push at a ladder's head, from the hands on it to past the upright (its head carried out by its lean). */
+export const ladderPushSeconds = (ladder) => (ladder.height * Math.sin(LADDERS.lean)) / LADDERS.pushSpeed;
+
+/** m along its line (u) of lane `lane`'s middle, from the ladder's middle. */
+const ladderLaneSide = (lane) => (lane - (LADDERS.lanes - 1) / 2) * LADDERS.laneApart;
+
+/**
+ * Where a ladder of a wall's works (`works`: fieldworks.js worksOf) stands: the wall it leans on (its line `u`, the way `out`
+ * from it to the attackers' ground), its foot out on the ground by its lean from its head at the walk's edge (`base` the
+ * ground there; `height` its rise from there to the walk's top). On a hill's slope the ground at its foot is below the wall's
+ * foot, so it rises the more and stands the further out: a few rounds of that settle it. (The physics and the drawing alike.)
+ */
+export function ladderStance(works, ladder) {
+  // The wall the ladder stands against, its line and height (the face's stretch nearest its gap).
+  const wall = works.walls.reduce((best, each) => {
+    const off = Math.min(Math.hypot(each.a[0] - ladder.x, each.a[1] - ladder.z), Math.hypot(each.b[0] - ladder.x, each.b[1] - ladder.z));
+    return !best || off < best.off ? { off, each } : best;
+  }, null)?.each;
+  const u = wall?.u ?? [0, 1];
+  // Outward: from the wall to the ladder's foot, the side away from the rampart (the lower ground a metre off its line).
+  const normal = [-u[1], u[0]];
+  const out = reliefAt(works, ladder.x + normal[0], ladder.z + normal[1]) > reliefAt(works, ladder.x - normal[0], ladder.z - normal[1]) ? [-normal[0], -normal[1]] : normal;
+  const run = ladder.run ?? 0.3;
+  const top = (ladder.base ?? 0) + ladder.height;
+  let base = ladder.base ?? 0;
+  let footOut = 0;
+  for (let round = 0; round < 4; round += 1) {
+    footOut = Math.max(0, (top - base) * Math.tan(LADDERS.lean) - run);
+    base = reliefAt(works, ladder.x + out[0] * footOut, ladder.z + out[1] * footOut);
+  }
+  return {
+    wall, u, out, run, top, base, height: top - base, footOut,
+    foot: [ladder.x + out[0] * footOut, ladder.z + out[1] * footOut],
+    // The head: at the walk's edge, its top.
+    head: [ladder.x - out[0] * run, top, ladder.z - out[1] * run],
+  };
+}
 
 /** The ladders of an arena's works as things in this world (null for works without ladders). Attackers: the side out at their feet. */
 export function createLadders(world, arena) {
@@ -100,28 +161,16 @@ export function createLadders(world, arena) {
   if (!ladders?.length) return null;
   const spec = LADDERS;
   return ladders.map((ladder, index) => {
-    // The wall the ladder stands against, its line and height (the face's stretch nearest its gap).
-    const wall = works.walls.reduce((best, each) => {
-      const off = Math.min(Math.hypot(each.a[0] - ladder.x, each.a[1] - ladder.z), Math.hypot(each.b[0] - ladder.x, each.b[1] - ladder.z));
-      return !best || off < best.off ? { off, each } : best;
-    }, null)?.each;
-    const u = wall?.u ?? [0, 1];
-    // Outward: from the wall to the ladder's foot, the side away from the rampart (the lower ground a metre off its line).
-    const normal = [-u[1], u[0]];
-    const out = reliefAt(works, ladder.x + normal[0], ladder.z + normal[1]) > reliefAt(works, ladder.x - normal[0], ladder.z - normal[1]) ? [-normal[0], -normal[1]] : normal;
+    const { wall, u, out, run, top, base, height, footOut, foot, head } = ladderStance(works, ladder);
     const reds = world.fighters.filter((fighter) => fighter.corner === 'red' && (fighter.root[0] - ladder.x) * out[0] + (fighter.root[1] - ladder.z) * out[1] > 0).length;
     const blues = world.fighters.filter((fighter) => fighter.corner === 'blue' && (fighter.root[0] - ladder.x) * out[0] + (fighter.root[1] - ladder.z) * out[1] > 0).length;
     const half = spec.width / 2;
-    // Its foot out from the wall's foot by the lean (the four-to-one rule's quarter of its height).
-    const footOut = ladder.height * Math.tan(spec.lean);
     const made = {
-      index, x: ladder.x, z: ladder.z, base: ladder.base ?? 0, height: ladder.height, run: ladder.run ?? 0.3, u, out,
+      // (base: the ground at its foot; height: its rise from there to the walk.)
+      index, x: ladder.x, z: ladder.z, base, height, run, u, out, head, foot, footOut,
       attackers: reds >= blues ? 'red' : 'blue',
-      // The head: at the walk's edge, its top.
-      head: [ladder.x - out[0] * (ladder.run ?? 0.3), (ladder.base ?? 0) + ladder.height, ladder.z - out[1] * (ladder.run ?? 0.3)],
-      foot: [ladder.x + out[0] * footOut, ladder.z + out[1] * footOut], footOut,
       // Its gap's piece of the face, closed while it is down (fieldworks.js wallsOf).
-      piece: { a: [ladder.x - u[0] * half, ladder.z - u[1] * half], b: [ladder.x + u[0] * half, ladder.z + u[1] * half], u, length: spec.width, height: wall?.height ?? (ladder.base ?? 0) + ladder.height + 1.1, kind: wall?.kind ?? 'stone', cover: null },
+      piece: { a: [ladder.x - u[0] * half, ladder.z - u[1] * half], b: [ladder.x + u[0] * half, ladder.z + u[1] * half], u, length: spec.width, height: wall?.height ?? top + 1.1, kind: wall?.kind ?? 'stone', cover: null },
       // Lying at the wall's foot, as it was carried up: its gap closed until it is raised.
       up: false, push: 0, raise: 0, tilt: 1, pushedOff: 0, pushedLoaded: 0, raised: 0, thrown: 0, climbed: 0, fell: 0,
     };
@@ -143,28 +192,59 @@ export function standLadder(world, ladder) {
   state.version += 1;
 }
 
-/** The place on the floor ([x, z]) of a man `up` m up the ladder (past its height: stepping in onto the walk). */
-export function ladderPlace(ladder, up) {
+/** The place on the floor ([x, z]) of a man `up` m up the ladder in lane `lane` (past its height: stepping in onto the walk). */
+export function ladderPlace(ladder, up, lane = 0) {
   const share = Math.min(1, Math.max(0, up / ladder.height));
   const over = Math.max(0, up - ladder.height);
-  return [ladder.foot[0] + (ladder.head[0] - ladder.foot[0]) * share - ladder.out[0] * over, ladder.foot[1] + (ladder.head[2] - ladder.foot[1]) * share - ladder.out[1] * over];
+  const side = ladderLaneSide(lane);
+  return [
+    ladder.foot[0] + (ladder.head[0] - ladder.foot[0]) * share - ladder.out[0] * over + ladder.u[0] * side,
+    ladder.foot[1] + (ladder.head[2] - ladder.foot[1]) * share - ladder.out[1] * over + ladder.u[1] * side,
+  ];
 }
 
-/** The men on a ladder now (on their feet), the highest first. */
-const ladderClimbers = (world, ladder) => world.fighters.filter((fighter) => fighter.climbing?.ladder === ladder.index && fighter.state === 'up').sort((a, b) => b.climbing.up - a.climbing.up);
+/** The men on a ladder now (on their feet; in one lane of it, if given), the highest first. */
+const ladderClimbers = (world, ladder, lane = null) => world.fighters.filter((fighter) => fighter.climbing?.ladder === ladder.index && fighter.state === 'up' && (lane === null || fighter.climbing.lane === lane)).sort((a, b) => b.climbing.up - a.climbing.up);
 
-/** Put a man on a ladder `up` m up it (he gets on at its foot; the tests' way to set one higher). */
-export function boardLadder(world, fighter, ladder, up = 0) {
-  fighter.climbing = { ladder: ladder.index, up, top: up >= ladder.height - LADDERS.climb.top };
+/** The lane of a ladder nearest a man standing at (x, z). */
+const ladderLaneNear = (ladder, x, z) => {
+  const across = (x - ladder.x) * ladder.u[0] + (z - ladder.z) * ladder.u[1];
+  let best = 0;
+  for (let lane = 1; lane < LADDERS.lanes; lane += 1) if (Math.abs(across - ladderLaneSide(lane)) < Math.abs(across - ladderLaneSide(best))) best = lane;
+  return best;
+};
+
+/** Put a man on a ladder `up` m up it, in a lane (by default the one nearest him; he gets on at its foot; the tests' way to set one higher). */
+export function boardLadder(world, fighter, ladder, up = 0, lane = ladderLaneNear(ladder, fighter.root[0], fighter.root[1])) {
+  fighter.climbing = { ladder: ladder.index, lane, up, top: up >= ladder.height - LADDERS.climb.top };
   fighter.ladderPost = null;
   fighter.goTo = null;
   fighter.punch = null;
 }
 
 /**
- * A man on a ladder, each step (physics.js moveRoot, in place of his own steps): up it at its pace (down, broken), no nearer
- * the man above than its spacing, onto the walk at its head when nobody stands there; his stance on its line, at his rung's
- * height, facing the wall. Returns false when it is gone from under him (his own steps again).
+ * The player's way with a ladder (null for any other man): the share of his steps' way (control.js: where he is going, or
+ * in and out from his man when locked on) that points at its wall, -1 to 1; 0 standing still.
+ */
+export function ladderWish(fighter, ladder) {
+  if (!fighter.player) return null;
+  const move = fighter.move ?? 0;
+  if (fighter.goTo && move > 0.05) {
+    const dx = fighter.goTo[0] - fighter.root[0];
+    const dz = fighter.goTo[2] - fighter.root[1];
+    const apart = Math.hypot(dx, dz);
+    return apart > 1e-6 ? -(dx * ladder.out[0] + dz * ladder.out[1]) / apart : 0;
+  }
+  if (Math.abs(move) <= 0.05) return 0;
+  // Locked on: his forward (yaw) in or out, as his move says.
+  const forward = [Math.cos(fighter.yaw), -Math.sin(fighter.yaw)];
+  return -Math.sign(move) * (forward[0] * ladder.out[0] + forward[1] * ladder.out[1]);
+}
+
+/**
+ * A man on a ladder, each step (physics.js moveRoot, in place of his own steps): up his lane at its pace (down, broken; the
+ * player as he presses), no nearer the man above than its spacing, onto the walk at its head when nobody stands there; his
+ * stance on his lane's line, at his rung's height, facing the wall. Returns false when it is gone from under him.
  */
 export function climbLadder(world, fighter, dt) {
   const climbing = fighter.climbing;
@@ -175,25 +255,30 @@ export function climbLadder(world, fighter, dt) {
   }
   const spec = LADDERS.climb;
   const along = 1 / Math.cos(LADDERS.lean);
-  const down = fighter.panicked || fighter.fled;
-  let up = climbing.up + (down ? -1 : 1) * spec.pace * dt;
-  for (const other of ladderClimbers(world, ladder)) {
+  // m/s up: his pace along it, as its slope rises.
+  const rate = spec.pace / along;
+  const wish = ladderWish(fighter, ladder);
+  const lane = climbing.lane ?? 0;
+  const down = fighter.panicked || fighter.fled || (wish !== null && wish <= -spec.wish);
+  const going = down ? -1 : wish === null || wish >= spec.wish ? 1 : 0;
+  let up = climbing.up + going * rate * dt;
+  for (const other of ladderClimbers(world, ladder, lane)) {
     if (other !== fighter && other.climbing.up > climbing.up) up = Math.min(up, other.climbing.up - spec.spacing / along);
   }
   // At its head: in onto the walk only if no enemy stands where he would step.
   if (up > ladder.height) {
-    const landing = ladderPlace(ladder, ladder.height + spec.onto);
+    const landing = ladderPlace(ladder, ladder.height + spec.onto, lane);
     const barred = world.fighters.some((other) => other.corner !== fighter.corner && other.corner !== 'grey' && other.state === 'up' && Math.hypot(other.root[0] - landing[0], other.root[1] - landing[1]) < spec.clear);
     if (barred) up = Math.max(climbing.up, Math.min(up, ladder.height));
   }
-  climbing.up = Math.max(climbing.up - spec.pace * dt, up);
+  climbing.up = Math.max(climbing.up - rate * dt, up);
   climbing.top = climbing.up >= ladder.height - spec.top;
-  const place = ladderPlace(ladder, climbing.up);
+  const place = ladderPlace(ladder, climbing.up, lane);
   // His stance carried to his place on its line (as he gets on it: a step or two), and held there.
   const dx = place[0] - fighter.root[0];
   const dz = place[1] - fighter.root[1];
   const apart = Math.hypot(dx, dz);
-  const most = spec.board * dt + spec.pace * dt * along;
+  const most = spec.board * dt + spec.pace * dt;
   const moved = apart > most ? most / apart : 1;
   fighter.rootVelocity = [(dx * moved) / Math.max(dt, 1e-9), (dz * moved) / Math.max(dt, 1e-9)];
   fighter.root = [fighter.root[0] + dx * moved, fighter.root[1] + dz * moved];
@@ -214,7 +299,7 @@ export function climbLadder(world, fighter, dt) {
     fall(world, fighter, 'knocked off the ladder');
     return true;
   }
-  // Off it: at its foot again, or in on the walk.
+  // Off it: at its foot again (stepped off it onto the ground), or in on the walk.
   if (climbing.up <= 0 && down) fighter.climbing = null;
   if (climbing.up >= ladder.height + spec.onto) {
     fighter.climbing = null;
@@ -279,7 +364,7 @@ export function stepLadders(world, dt) {
         continue;
       }
       ladder.push += dt;
-      if (ladder.push < spec.pushSeconds) continue;
+      if (ladder.push < ladderPushSeconds(ladder)) continue;
       ladderPushOff(world, ladder, pushers, load.climbers);
       continue;
     }
@@ -331,25 +416,33 @@ export function raiseLadder(world, fighter) {
   return true;
 }
 
-/** A man at a standing ladder's foot gets on it: the enemy holds the walk above, and the man before him is a spacing up it. */
+/**
+ * Men at a standing ladder's foot get on it, a man to each lane whose last man is a spacing up it, while the enemy holds the
+ * walk above: the nearest to that lane's line. The player only by walking at the wall (ladderWish), never as he passes.
+ */
 function ladderBoard(world, ladder, works) {
   const spec = LADDERS.climb;
-  const climbers = ladderClimbers(world, ladder);
-  const lowest = climbers.length ? climbers[climbers.length - 1].climbing.up : Infinity;
-  if (lowest < spec.spacing * Math.cos(LADDERS.lean)) return;
   const held = world.fighters.some((other) => other.corner !== ladder.attackers && other.corner !== 'grey' && other.state === 'up' && !other.fled && Math.hypot(other.root[0] - ladder.head[0], other.root[1] - ladder.head[2]) < spec.enemyWithin && reliefAt(works, other.root[0], other.root[1]) > ladder.base + ladder.height / 2);
   if (!held) return;
-  let best = null;
-  for (const fighter of world.fighters) {
-    if (fighter.corner !== ladder.attackers || !ladderStanding(fighter) || fighter.climbing || fighter.gunCrew !== undefined) continue;
-    // (Anywhere at its foot or under it, between its foot and the wall, on the ground there.)
-    const out = (fighter.root[0] - ladder.x) * ladder.out[0] + (fighter.root[1] - ladder.z) * ladder.out[1];
-    if (out < -0.05 || ladderFootingUp(works, ladder, fighter) > LADDERS.climber) continue;
-    const outward = Math.min(ladder.footOut, Math.max(0, out));
-    const apart = Math.hypot(fighter.root[0] - ladder.x - ladder.out[0] * outward, fighter.root[1] - ladder.z - ladder.out[1] * outward);
-    if (apart < spec.mount && (!best || apart < best.apart)) best = { fighter, apart };
+  for (let lane = 0; lane < LADDERS.lanes; lane += 1) {
+    const climbers = ladderClimbers(world, ladder, lane);
+    const lowest = climbers.length ? climbers[climbers.length - 1].climbing.up : Infinity;
+    if (lowest < spec.spacing * Math.cos(LADDERS.lean)) continue;
+    const side = ladderLaneSide(lane);
+    let best = null;
+    for (const fighter of world.fighters) {
+      if (fighter.corner !== ladder.attackers || !ladderStanding(fighter) || fighter.climbing || fighter.gunCrew !== undefined) continue;
+      const wish = ladderWish(fighter, ladder);
+      if (wish !== null && wish < spec.wish) continue;
+      // (Anywhere at its foot or under it, between its foot and the wall, on the ground there.)
+      const out = (fighter.root[0] - ladder.x) * ladder.out[0] + (fighter.root[1] - ladder.z) * ladder.out[1];
+      if (out < -0.05 || ladderFootingUp(works, ladder, fighter) > LADDERS.climber) continue;
+      const across = (fighter.root[0] - ladder.x) * ladder.u[0] + (fighter.root[1] - ladder.z) * ladder.u[1] - side;
+      const apart = Math.hypot(across, Math.max(0, out - ladder.footOut));
+      if (apart < spec.mount && (!best || apart < best.apart)) best = { fighter, apart };
+    }
+    if (best) boardLadder(world, best.fighter, ladder, 0, lane);
   }
-  if (best) boardLadder(world, best.fighter, ladder, 0);
 }
 
 /** Over it goes: the gap closed, the men on it thrown out from the face and falling from where they stood on it. */
