@@ -11,7 +11,10 @@ import { climateOf } from '../src/physics/heat.js';
 import { reliefAt, worksOf } from '../src/physics/fieldworks.js';
 import { wallWorks } from '../src/story/ground/walls.js';
 import { wokouBattle as wokou } from '../src/story/battles/02-wokou.js';
-import { pyongyangBattle as pyongyang } from '../src/story/battles/03-pyongyang.js';
+import { pyongyangBattle as pyongyang, PYONGYANG_1593 } from '../src/story/battles/03-pyongyang.js';
+import { ARTILLERY } from '../src/physics/artillery.js';
+import { BATTLE_END } from '../src/battleend.js';
+import { DRILL } from '../src/formation.js';
 import { byeokjegwanBattle as byeokjegwan } from '../src/story/battles/04-byeokjegwan.js';
 import { ulsanBattle as ulsan } from '../src/story/battles/05-ulsan.js';
 
@@ -106,4 +109,26 @@ test('men at the foot of a ladder climb it to the walk', () => {
     const [x, z] = at(fighter);
     assert.ok(x < 0.05 || Math.abs(z) < 0.9 || x > walk[0] - 0.1, `red ${fighter.id} at (${x.toFixed(2)}, ${z.toFixed(2)})`);
   }
+});
+
+test('pyongyang: the columns form up just out of the walls\' aimed shot, the guns behind them in reach, the time the march\'s and the storm\'s', () => {
+  const { approach, wall } = PYONGYANG_1593;
+  // Just beyond a matchlock's ~100 m aimed fire, and no further than the crossing under it needs.
+  assert.ok(approach.formUp > 100 && approach.formUp <= 150, `${approach.formUp} m`);
+  const setup = pyongyang.setup(lifeOf(3), 3);
+  const fromWall = (x) => wall.x - x;
+  // Red's men's x (its layout is [-x, -z]: koreaLayout), the guns' crews apart (they stand at their guns).
+  const crews = new Set(setup.options.artillery.flatMap((gun) => gun.crew));
+  const xs = setup.options.formation.red.layout.map((at) => -at[0]).filter((_, index) => !crews.has(index));
+  // The first row at the form-up line.
+  assert.ok(Math.abs(fromWall(Math.max(...xs)) - approach.formUp) < 1e-9, `the front at ${fromWall(Math.max(...xs))} m`);
+  // The guns behind every man of the columns and their fowling pieces, within their pieces' reach of the walk, out of its aimed shot.
+  for (const gun of setup.options.artillery) {
+    assert.ok(gun.at[0] < Math.min(...xs), `${gun.kind} behind the columns (${gun.at[0]} vs ${Math.min(...xs)})`);
+    assert.ok(fromWall(gun.at[0]) > 100 && fromWall(gun.at[0]) < ARTILLERY.pieces[gun.kind].range, `${gun.kind} at ${fromWall(gun.at[0])} m`);
+  }
+  const march = Math.round(approach.formUp / DRILL.pace);
+  assert.equal(pyongyang.seconds, 180 + march);
+  assert.equal(setup.options.timeLimit, BATTLE_END.timeLimit + march);
+  assert.equal(setup.storm, true);
 });

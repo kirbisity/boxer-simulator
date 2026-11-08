@@ -118,6 +118,8 @@ export const ulsanBattle = {
       player: built.player,
       comrades: built.comrades,
       slot: { x: slot[0], z: slot[1] },
+      // A storm (runner.js storyWatchStep): forward to his column's ladder, up it, onto the walk is his duty, not out of his place.
+      storm: true,
     };
   },
 };

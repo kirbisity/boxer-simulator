@@ -26,12 +26,16 @@ import { storyChoose, storyDie, storyEnterChapter, storyLivedThrough, storyMarkD
 
 export const STORY_RUN = {
   // Left his place: further than `metres` from where his rank and file put him, for `seconds` together, while the battle is
-  // undecided. 5 m is four ranks' depth (1.3 m a rank) or four files across (1.1 m): no step after a blow or stumble in a press
-  // goes that far (formation.js DRILL.leash keeps a front-rank man within 0.9 m), only a man who has gone (forward after a
-  // runner, or back out of the line). 5 s: longer than a pursuit of a man who turned or a fall and a scramble back.
-  leftPlace: { metres: 5, seconds: 5 },
+  // undecided. 8 m: a column's whole depth and a rank more (the ladder columns' five ranks at 1.6 m are 6.4 m deep), as far as
+  // a man is carried when his column bunches up at a ladder's foot or a press pushes it about; past it he has gone (forward
+  // after a runner, or back out of the line). 10 s: time to walk those 8 m back at the drill's pace (formation.js DRILL.pace,
+  // 0.8 m/s), so a man knocked or pushed out of his place who makes his way back is never counted as having left it.
+  leftPlace: { metres: 8, seconds: 10 },
   // Ahead or back of his place: the share of the offset along the line's front (toward the enemy) that makes it one or the other.
   ahead: 0.3,
+  // His place where his side has no formation (storyPlaceOf): carried with the men nearest it at the start, this many (two ranks
+  // of a column four abreast: his own and the next; enough that one man running ahead or falling moves it little).
+  placeMates: 8,
   // When a battle is over for the story: the hero down this long (s: the fall seen, the camera on him); the battle decided
   // (battleend.js) this long (the field seen as it ends); or the battle's own `seconds`.
   heroDownSeconds: 3,
@@ -273,14 +277,36 @@ export function storyCommandMen(world, setup, life) {
 
 /** Watching where he stands, step by step: how long together he has been out of his place, and which way. */
 export function storyWatch(setup) {
-  return { away: 0, longest: 0, farthest: 0, way: null, leftPlace: null, decidedAt: null, downAt: null, place: setup.slot ? [setup.slot.x, setup.slot.z] : null };
+  return { away: 0, longest: 0, farthest: 0, way: null, toPlace: null, mates: null, carried: null, leftPlace: null, decidedAt: null, downAt: null, place: setup.slot ? [setup.slot.x, setup.slot.z] : null };
 }
 
-/** His place now: his slot in his side's formation where it has one (it moves as the line moves), else where the setup stood him. */
+/**
+ * His place now: his slot in his side's formation where it has one (it moves as the line moves); else where the setup stood
+ * him, carried as far as the men round him there have gone (a side with no drill, as the Korea battles' columns: they cross
+ * the ground and go up the ladders each on his own, and his place is in among them, not on the form-up line). The men round
+ * him (STORY_RUN.placeMates) are picked the first time it is asked, as they stand then; those down or fled no longer count.
+ */
 export function storyPlaceOf(world, hero, watch) {
   const formation = hero.slot ? world.formations?.[hero.formation] : null;
-  return formation ? slotAt(formation, hero.slot) : watch.place;
+  if (formation) return slotAt(formation, hero.slot);
+  if (!watch.place) return null;
+  watch.mates ??= world.fighters
+    .filter((fighter) => fighter !== hero && fighter.corner === hero.corner && fighter.state !== 'out' && !fighter.mount)
+    .map((fighter) => ({ id: fighter.id, from: storyAt(fighter) }))
+    .sort((a, b) => Math.hypot(a.from[0] - watch.place[0], a.from[1] - watch.place[1]) - Math.hypot(b.from[0] - watch.place[0], b.from[1] - watch.place[1]))
+    .slice(0, STORY_RUN.placeMates);
+  const going = watch.mates.filter((mate) => world.fighters[mate.id]?.state !== 'out' && !world.fighters[mate.id]?.fled);
+  if (!going.length) return watch.carried ?? watch.place;
+  const moved = [0, 1].map((k) => going.reduce((sum, mate) => sum + storyAt(world.fighters[mate.id])[k] - mate.from[k], 0) / going.length);
+  watch.carried = [watch.place[0] + moved[0], watch.place[1] + moved[1]];
+  return watch.carried;
 }
+
+// A storm of walls: the column's duty is forward, to its ladder's foot, up it and onto the walk, so being ahead of his slot is
+// not being out of it there; only falling back counts, or going aside further than STORY_RUN.leftPlace.metres (along the wall
+// past the next ladder: the stories' ladders stand 5-6 m apart).
+/** Whether a setup is a storm of walls: its own `storm`, else ladders among its field's works. */
+export const storyIsStorm = (setup) => setup.storm ?? Boolean(setup.options?.arena?.works?.ladders?.length);
 
 /** One step of watching (`dt` s): his distance from his place, counted while he is up and the battle undecided. */
 export function storyWatchStep(watch, world, setup, dt) {
@@ -297,17 +323,25 @@ export function storyWatchStep(watch, world, setup, dt) {
   const at = storyAt(hero);
   const offset = [at[0] - place[0], at[1] - place[1]];
   const distance = Math.hypot(offset[0], offset[1]);
+  // His line's front (toward the enemy) and its right hand (forward × up, x and z), to say which way his place is.
+  const formation = hero.slot ? world.formations?.[hero.formation] : null;
+  const forward = formation?.forward ?? [hero.corner === 'red' ? 1 : -1, 0];
+  const right = [-forward[1], forward[0]];
+  const ahead = offset[0] * forward[0] + offset[1] * forward[1];
+  const aside = offset[0] * right[0] + offset[1] * right[1];
+  // (In a storm, how far ahead he is does not count: only how far back or aside.)
+  const counted = storyIsStorm(setup) && ahead > 0 ? Math.abs(aside) : distance;
   watch.distance = distance;
-  if (distance <= STORY_RUN.leftPlace.metres) {
+  // Where his place is from him, in his line's terms (m ahead of him, m to his right): the page says so.
+  watch.toPlace = { ahead: -ahead, right: -aside };
+  if (counted <= STORY_RUN.leftPlace.metres) {
     watch.away = 0;
     return watch;
   }
   watch.away += dt;
   watch.farthest = Math.max(watch.farthest, distance);
   // Which way: along his line's front (toward the enemy), or back from it.
-  const formation = hero.slot ? world.formations?.[hero.formation] : null;
-  const forward = formation?.forward ?? [hero.corner === 'red' ? 1 : -1, 0];
-  const along = (offset[0] * forward[0] + offset[1] * forward[1]) / distance;
+  const along = ahead / distance;
   const way = along > STORY_RUN.ahead ? 'ahead' : along < -STORY_RUN.ahead ? 'back' : 'aside';
   watch.way = way;
   if (watch.away > watch.longest) watch.longest = watch.away;

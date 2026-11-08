@@ -10,7 +10,9 @@ import { advance, knockOut, placeFighter } from '../src/physics.js';
 import { thinkAll } from '../src/ai.js';
 import { canCommand, giveOrder } from '../src/command.js';
 import { storyNewLife } from '../src/story/life.js';
-import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCommandMen, storyCurrent, storyNextChapter, storyRunBattle, storySceneDone, storyWatch, storyWatchStep, STORY_JUDGEMENT, STORY_RUN } from '../src/story/runner.js';
+import { createChapterRun, storyAnswer, storyBattleDone, storyBattleWorld, storyCommandMen, storyCurrent, storyIsStorm, storyNextChapter, storyPlaceOf, storyRunBattle, storySceneDone, storyWatch, storyWatchStep, STORY_JUDGEMENT, STORY_RUN } from '../src/story/runner.js';
+import { pyongyangBattle } from '../src/story/battles/03-pyongyang.js';
+import { ulsanBattle } from '../src/story/battles/05-ulsan.js';
 import { bodyAxes, createScenePlay, sceneLook, sceneThink, stepScene, STORY_SCENE } from '../src/story/scenes/stage.js';
 import { CHAPTERS, COMRADES as STORY_PEOPLE, STORY_FAMILY, STORY_HERO } from '../src/story/chapters/index.js';
 import { STORY_BATTLES } from '../src/story/battles/index.js';
@@ -163,6 +165,100 @@ test('the watch: out of his place past the named distance for the named time is 
   assert.equal(watch.leftPlace, null, 'not yet');
   for (let t = 0; t < 1; t += 0.1) storyWatchStep(watch, world, setup, 0.1);
   assert.equal(watch.leftPlace.way, 'back');
+});
+
+test('the watch\'s tolerance: a man pushed or carried a column\'s depth off his place, for longer than the old 5 s, has not left it', () => {
+  const { setup, world } = levelOne();
+  const hero = world.fighters[setup.player];
+  const watch = storyWatch(setup);
+  // Within the named distance (a column's depth and a rank more, 8 m): never away, however long.
+  assert.ok(STORY_RUN.leftPlace.metres >= 8 && STORY_RUN.leftPlace.seconds >= 10);
+  placeFighter(hero, hero.x[P.pelvis * 3] - (STORY_RUN.leftPlace.metres - 1), hero.x[P.pelvis * 3 + 2]);
+  for (let t = 0; t < 30; t += 0.1) storyWatchStep(watch, world, setup, 0.1);
+  assert.equal(watch.away, 0);
+  assert.equal(watch.leftPlace, null);
+  // Out past it and back within the named time: not counted, and the countdown starts again.
+  placeFighter(hero, hero.x[P.pelvis * 3] - 4, hero.x[P.pelvis * 3 + 2]);
+  for (let t = 0; t < STORY_RUN.leftPlace.seconds - 1; t += 0.1) storyWatchStep(watch, world, setup, 0.1);
+  assert.ok(watch.away > 0 && watch.toPlace.ahead > 0, 'away, his place ahead of him');
+  placeFighter(hero, hero.x[P.pelvis * 3] + 4, hero.x[P.pelvis * 3 + 2]);
+  storyWatchStep(watch, world, setup, 0.1);
+  assert.equal(watch.away, 0);
+  assert.equal(watch.leftPlace, null);
+});
+
+/** A Korea battle's world for a soldier in the front (the hero in the middle ladder's column), unstepped: his slot stays put. */
+function stormOf(battle) {
+  const chapter = CHAPTERS.find((each) => each.battle === battle.id);
+  const run = createChapterRun(storyNewLife(null, { seed: 11, family: STORY_FAMILY, hero: STORY_HERO }), chapter, { battles: STORY_BATTLES, comrades: STORY_PEOPLE });
+  run.life.rank = 'soldier';
+  run.life.place = 'front';
+  const setup = battle.setup(run.life, 3);
+  return { setup, world: storyBattleWorld(setup, run.life) };
+}
+const stepFor = (watch, world, setup, seconds) => {
+  for (let t = 0; t < seconds; t += 0.1) storyWatchStep(watch, world, setup, 0.1);
+};
+
+for (const battle of [pyongyangBattle, ulsanBattle]) {
+  test(`${battle.id}: a storm: forward to the ladder and up it is his duty; falling back, or going far aside, is still leaving his place`, () => {
+    const { setup, world } = stormOf(battle);
+    assert.equal(storyIsStorm(setup), true);
+    const hero = world.fighters[setup.player];
+    const [x, z] = [hero.x[P.pelvis * 3], hero.x[P.pelvis * 3 + 2]];
+    const past = STORY_RUN.leftPlace.seconds + 1;
+    // Well ahead of his slot toward the wall (red faces +x), a little aside (his column's ladder): not away.
+    let watch = storyWatch(setup);
+    placeFighter(hero, x + 3 * STORY_RUN.leftPlace.metres, z + 2);
+    stepFor(watch, world, setup, past);
+    assert.equal(watch.away, 0);
+    assert.equal(watch.leftPlace, null);
+    // Back from it: counted as ever.
+    watch = storyWatch(setup);
+    placeFighter(hero, x - (STORY_RUN.leftPlace.metres + 2), z);
+    stepFor(watch, world, setup, past);
+    assert.equal(watch.leftPlace?.way, 'back');
+    // Ahead but far along the wall (past the next ladder and more): counted.
+    watch = storyWatch(setup);
+    placeFighter(hero, x + 3, z + STORY_RUN.leftPlace.metres + 2);
+    stepFor(watch, world, setup, past);
+    assert.ok(watch.leftPlace, 'far aside counts');
+  });
+}
+
+test('a side with no formation (Pyongyang\'s columns): his place goes with the men round him, so keeping up with the column is keeping it', () => {
+  const run = (still) => {
+    const { setup, world } = stormOf(pyongyangBattle);
+    const hero = world.fighters[setup.player];
+    const watch = storyWatch(setup);
+    assert.equal(world.formations?.[hero.corner], undefined, 'no drill: the columns go each man on his own');
+    // The hero standing still (the player doing nothing), or going as every man goes (the AI's mind).
+    const held = new Set(still ? [hero.id] : []);
+    for (let t = 0; t < 20; t += 0.1) {
+      advance(world, 0.1, (current, dt) => thinkAll(current, dt, held));
+      storyWatchStep(watch, world, setup, 0.1);
+    }
+    const place = storyPlaceOf(world, hero, watch);
+    return { watch, moved: place[0] - setup.slot.x };
+  };
+  const going = run(false);
+  assert.ok(going.moved > STORY_RUN.leftPlace.metres, `his place went forward with the column (${going.moved.toFixed(1)} m)`);
+  assert.equal(going.watch.leftPlace, null, 'he went with it: in his place');
+  const still = run(true);
+  assert.equal(still.watch.leftPlace?.way, 'back', 'left standing on the form-up line: fallen back');
+});
+
+test('a storm is the setup\'s word, else ladders in its works; a battle in the open is not one', () => {
+  assert.equal(storyIsStorm({ storm: false, options: { arena: { works: { ladders: [{}] } } } }), false);
+  assert.equal(storyIsStorm({ options: { arena: { works: { ladders: [{ x: 0, z: 0 }] } } } }), true);
+  assert.equal(storyIsStorm(levelOne().setup), false);
+  // Out of a storm, ahead of his place is leaving it (forward after a runner).
+  const { setup, world } = levelOne();
+  const hero = world.fighters[setup.player];
+  const watch = storyWatch(setup);
+  placeFighter(hero, hero.x[P.pelvis * 3] + STORY_RUN.leftPlace.metres + 2, hero.x[P.pelvis * 3 + 2]);
+  stepFor(watch, world, setup, STORY_RUN.leftPlace.seconds + 1);
+  assert.equal(watch.leftPlace?.way, 'ahead');
 });
 
 test('Level 1\'s scene staged on its field: the body laid face down, turned face up with the spear, the hero kneeling by it', () => {

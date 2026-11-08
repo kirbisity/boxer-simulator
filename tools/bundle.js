@@ -19,7 +19,7 @@ const MODULES = ['i18n/ui-common', 'i18n/ui-menu', 'i18n/ui-fight', 'i18n/ui-bui
   'story/battles/01-suppression', 'story/battles/north', 'story/battles/06-liaodong', 'story/battles/07-sarhu', 'story/battles/08-hunriver',
   'story/ground/walls', 'story/ground/wallview', 'story/ground/props', 'story/battles/korea', 'story/battles/02-wokou', 'story/battles/03-pyongyang', 'story/battles/04-byeokjegwan', 'story/battles/05-ulsan', 'story/battles/korea-battles',
   'story/battles/index',
-  'story/runner', 'story/scenes/sets', 'story/scenes/finale', 'story/scenes/stage', 'story/storyview',
+  'story/runner', 'story/scenes/sets', 'story/scenes/finale', 'story/scenes/stage', 'story/storyview', 'story/placemark',
   'main'];
 const args = process.argv.slice(2);
 const minify = !args.includes('--no-minify');
