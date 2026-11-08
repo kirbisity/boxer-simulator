@@ -8,7 +8,7 @@
 // surrender in 1618 (Nurhaci's Seven Grievances). The fort fight that is this chapter's battle is Chen Er's own, kept
 // vague: the summer of 1618 on the border. Marriage, children, the price of a post are his private life, kept to what
 // the place allowed. Sources in src/story/text/sources.md.
-import { chapAlive, chapFallenCard, chapFamily, chapFlag, chapHeroUp, chapJudgementCard, chapLivedCard, chapRank } from './kit.js';
+import { chapAlive, chapBelow, chapFallenCard, chapFamily, chapFlag, chapHeroUp, chapJudgementCard, chapLivedCard, chapPromotionCards } from './kit.js';
 
 export const CHAPTER_LIAODONG = {
   id: 'liaodong', n: 6, year: 1618,
@@ -44,13 +44,14 @@ export const CHAPTER_LIAODONG = {
     },
     {
       id: 'liaodong-post',
-      when: (life) => chapRank(life) !== 'officer',
+      // (Any man below a company officer may buy it, whatever he was: the price decides, not the ladder.)
+      when: (life) => chapBelow(life, 'shaoguan'),
       text: {
         zh: '营里空出一个哨官的缺。价钱营里人人知道，只有兵部不知道。',
         en: 'A company officer\'s post fell vacant. Everyone in the camp knew the price. Only the Ministry of War did not.',
       },
       choices: [
-        { text: { zh: '拿出全部积蓄，买下这个缺。', en: 'Pay your savings for the post.' }, effects: { rank: 'officer', flags: { boughtRank: true } } },
+        { text: { zh: '拿出全部积蓄，买下这个缺。', en: 'Pay your savings for the post.' }, effects: { rank: 'shaoguan', promoted: 'bought', flags: { boughtRank: true } } },
         { text: { zh: '不买。', en: 'Don\'t.' }, effects: { flags: { refusedToBuy: true } } },
       ],
     },
@@ -229,6 +230,13 @@ export const CHAPTER_LIAODONG = {
       [
         { text: { zh: '挨着。', en: 'Take them.' }, effects: { flags: { flogged: true } } },
       ]),
+    // Merit: the fort's heads went up as a victory, and the posts of Liaodong's dead wanted filling.
+    ...chapPromotionCards('liaodong', 6, {
+      merit: (rank) => ({
+        zh: `边堡那一仗报上去的首级，监军的文官验过，一颗不少，也一颗不多。陈二当了${rank.name.zh}，管${rank.leads.zh}。辽东的缺向来是要花钱的；这一回没有人来收钱。营里的人说，是因为这几年辽东死的人太多，缺比钱多。`,
+        en: `The heads from the fort went up the chain, and the civil official who checked merit passed them: not one fewer, not one more. Chen Er was made ${rank.name.en}, over ${rank.leads.en}. A post in Liaodong had always cost money. This time nobody came to collect. Men in the camp said it was because so many had died in Liaodong those years that there were more posts than silver.`,
+      }),
+    }),
   ],
   scenes: [
     {

@@ -116,6 +116,10 @@ export const wokouBattle = {
       player: built.player,
       comrades: built.comrades,
       slot: { x: at[0], z: at[1] },
+      // The men of his squad, nearest him first (a file leader orders the nearest four, a squad leader all eleven), and the
+      // man over him: his squad's leader, while he is under one (the runner reads his fall as a place opened).
+      squad: near.map((index) => built.fighters.length - men.length + index),
+      ...(life.rank === 'soldier' ? { superior: built.fighters.length - men.length + first + spec.slot.squadLeader } : {}),
     };
   },
 };

@@ -3,7 +3,7 @@
 // (no county named); its frame is the record: the Wanli drought-famine of 1586-88 that spread from the north to the
 // Yangtze by the end of 1587, Ming soldiers' waist tags (腰牌, fields as in 武备志 卷28), Qi Jiguang's drill manual and
 // his dismissal in 1583 (src/story/text/sources.md).
-import { chapAlive, chapFallenCard, chapFlag, chapHeroUp, chapJudgementCard } from './kit.js';
+import { chapAlive, chapFallenCard, chapFlag, chapHeroUp, chapJudgementCard, chapPromotionCards } from './kit.js';
 
 export const CHAPTER_SUPPRESSION = {
   id: 'suppression', n: 1, year: 1587,
@@ -152,9 +152,11 @@ export const CHAPTER_SUPPRESSION = {
       id: 'suppression-carried',
       when: (life) => chapFlag(life, 'buriedBrother') && !chapFlag(life, 'buriedOnFlats'),
       text: {
-        zh: '背着一个“贼”回营，队长没有拦他，只是记住了他的脸。下一仗，头排就是他的。头排是留给队长舍得的人的。',
-        en: 'The squad leader did not stop him carrying a "bandit" back to camp. He only remembered his face. In the next fight the front rank was his: the front rank is for the men a squad leader can spare.',
+        zh: '背着一个“贼”回营，队长没有拦他，只是记住了他的脸。那天的功，没有记在他名下。下一仗，头排就是他的。头排是留给队长舍得的人的。',
+        en: 'The squad leader did not stop him carrying a "bandit" back to camp. He only remembered his face. That day\'s merit was not set down to his name. In the next fight the front rank was his: the front rank is for the men a squad leader can spare.',
       },
+      // (His share of the day's heads is struck off: ranks.js, `merit: 'withhold'`.)
+      effects: { merit: 'withhold' },
       choices: [],
     },
     chapJudgementCard('suppression',
@@ -176,6 +178,13 @@ export const CHAPTER_SUPPRESSION = {
       },
       choices: [],
     },
+    // Merit only: no leader of his fell on the flats. Heads were merit; the heads on the flats were a hundred and thirty-seven.
+    ...chapPromotionCards('suppression', 1, {
+      merit: (rank) => ({
+        zh: `收兵点名的时候，队长念到了陈二。一百三十七颗头，按书上的规矩归全哨均分，他那一甲也分到了几颗。队长说：站得住，手不软。他当了${rank.name.zh}，管${rank.leads.zh}。书上写着${rank.name.zh}的差事：临阵退缩的，许${rank.name.zh}割他的耳朵。`,
+        en: `At the roll after, the squad leader read out Chen Er's name. The hundred and thirty-seven heads were shared out across the company, as the book says, and a few were set down to his file. Stood his ground, said the squad leader, and his hand didn't shake. He was made ${rank.name.en}, over ${rank.leads.en}. The book gives the file leader his duty: when a man falls back in battle, the file leader may cut off his ear.`,
+      }),
+    }),
   ],
   scenes: [
     {

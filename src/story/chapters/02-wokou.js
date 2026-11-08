@@ -2,7 +2,7 @@
 // Wanli-era raids, no named one here); its frame is the record: Qi Jiguang's death in poverty (17 January 1588, Wanli
 // 15/12), the collapse of the raids after the Jiajing reign (601 recorded under Jiajing, 15 in all of Wanli), Hideyoshi's
 // ban on piracy of 1588, issued with the sword hunt, and the manual's "first prohibition" on heads (纪效新书 卷三).
-import { chapAlive, chapFallenCard, chapFlag, chapHeroUp, chapJudgementCard, chapWasThere } from './kit.js';
+import { chapAlive, chapFallenCard, chapFlag, chapHeroUp, chapJudgementCard, chapPromotionCards, chapWasThere } from './kit.js';
 
 export const CHAPTER_WOKOU = {
   id: 'wokou', n: 2, year: 1588,
@@ -128,6 +128,18 @@ export const CHAPTER_WOKOU = {
       },
       choices: [],
     },
+    // His squad leader killed on the beach (the battle's `superior`), or his merit: the platoon leader picks the squad's
+    // leaders from among its men (纪效新书 原束伍: "于兵内自举抽出队长"; 练兵实纪: "队长必有胆者").
+    ...chapPromotionCards('wokou', 2, {
+      vacated: (rank) => ({
+        zh: `队长死在了沙滩上。书上写着：队长不退而队兵退走、致队长阵亡的，队下甲长俱斩。这一队没有退。哨长从站住了的人里挑人补缺，一个往上挪一格。陈二当了${rank.name.zh}，管${rank.leads.zh}。`,
+        en: `The squad leader died on the sand. The book says: when a squad leader stands and his men fall back and let him die, every file leader under him is beheaded. This squad had not fallen back. The platoon leader filled the gaps from the men who had stood, each moved up one. Chen Er was made ${rank.name.en}, over ${rank.leads.en}.`,
+      }),
+      merit: (rank) => ({
+        zh: `书上说，带兵的要从兵里挑，挑有胆的。哨长翻着那句“奋勇当先”，又看了看陈二。这一仗他站住了，一回也没往后看。陈二当了${rank.name.zh}，管${rank.leads.zh}。那一钱银子还是一钱。`,
+        en: `The book says the men who lead are picked from among the men, and the ones picked are the ones with nerve. The platoon leader looked at the mention, "brave, and first into the enemy", and then at Chen Er. He had stood his ground that day, and never once looked back. Chen Er was made ${rank.name.en}, over ${rank.leads.en}. The qian of silver stayed one qian.`,
+      }),
+    }),
   ],
   scenes: [],
   ending: {
