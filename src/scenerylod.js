@@ -190,7 +190,13 @@ function spreadOf(points, sizes) {
     x += point[0] / points.length;
     z += point[1] / points.length;
   }
-  return Math.max(...points.map((point, index) => Math.hypot(point[0] - x, point[1] - z) + sizes[index]));
+  // (A loop, not Math.max over a spread list: the living grass of a field as wide as the Hun River's camp ground, 630 m across,
+  // is millions of copies, past what a call's arguments can hold.)
+  let reach = -Infinity;
+  points.forEach((point, index) => {
+    reach = Math.max(reach, Math.hypot(point[0] - x, point[1] - z) + sizes[index]);
+  });
+  return reach;
 }
 
 const shapeRadii = new WeakMap();
