@@ -20,7 +20,7 @@ import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
 import { nearestWalk, WALKFIELD } from './physics/walkfield.js';
 import { atGun, serveGun } from './physics/artillery.js';
-import { raiseLadder } from './physics/ladders.js';
+import { ladderApproach, raiseLadder } from './physics/ladders.js';
 import { exposureOf } from './physics/cover.js';
 import { heatStrain } from './physics/heat.js';
 import { ammoLeft, bowArcFouled, comradeInLane, emptied, sightFrom } from './physics/ranged.js';
@@ -3610,6 +3610,10 @@ function decide(world, fighter, dt) {
   // The player's order (command.js): to him, a charge, a hold; over his place in the ranks.
   const order = obeyOrder(world, fighter, opponent, style, dt);
   if (order === 'obeyed') return;
+  // Come up to a wall his man stands on (physics/ladders.js ladderApproach): to his place in a ladder's order at its foot,
+  // not at the stone. A shooter shoots up at the walk instead.
+  const shoots = Boolean(style.ranged && fighter.weapon?.held && !fighter.weapon.spent);
+  if (ladderApproach(world, fighter, opponent, { shoots })) return;
   // In the ranks: his place first.
   if (order !== 'fight' && holdRank(world, fighter, opponent, style, dt)) return;
   const bold = AI.confidence;

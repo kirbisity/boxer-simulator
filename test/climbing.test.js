@@ -4,7 +4,10 @@
 // and climbs back down when he pulls away; knocked off it, a man falls from his rung's height and is hurt; a ladder with a man
 // low on it is shoved off by a defender at its head, the man going over with it; one with a man near its top takes two. On
 // it his feet and hands are on its rungs, a foot on one at every moment, the two by turns; he goes up only from over its
-// bottom rung, never climbing the air beside it from where he stood under it.
+// bottom rung, never climbing the air beside it from where he stood under it. Men bound for the wall wait their turn in a
+// file behind each lane at its foot (not pressed against the face), the rest held back behind them, shields up, and the head
+// of a file steps onto it from its foot, his stance not snapped; a shooter, or a man with an enemy at his own height, is not
+// put in its order.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,15 +15,15 @@ import { P } from '../src/body.js';
 import { mingSoldier, sengokuWarrior } from '../src/cast.js';
 import { advance, createWorld, fall, placeOnFloor, point, seededRandom } from '../src/physics.js';
 import { reliefAt, worksOf, worksStateOf } from '../src/physics/fieldworks.js';
-import { boardLadder, LADDERS, ladderLimbs, ladderLoad, ladderPlace, ladderPushSeconds, standLadder } from '../src/physics/ladders.js';
+import { boardLadder, LADDERS, ladderApproach, ladderLimbs, ladderLoad, ladderPlace, ladderPushSeconds, ladderQueuePlace, raiseLadder, standLadder } from '../src/physics/ladders.js';
 import { wallWorks } from '../src/story/ground/walls.js';
 
 /** A wall along z at x = 1 (its walk on +x), one ladder at z = 0; a Japanese defender and Ming attackers. */
-function wallWorld({ attackers = 1, bare = false, seed = 3 } = {}) {
+function wallWorld({ attackers = 1, bare = false, seed = 3, style = 'dao' } = {}) {
   const { works, walk } = wallWorks({ x: 1, z: [-9, 9], height: 4.5, ladders: [0] });
   const random = seededRandom(seed);
   const men = [{ inputs: sengokuWarrior(random, { tint: {} }, 'yari', 'ashigaru'), corner: 'blue' }];
-  for (let k = 0; k < attackers; k += 1) men.push({ inputs: mingSoldier(random, 'dao'), corner: 'red' });
+  for (let k = 0; k < attackers; k += 1) men.push({ inputs: mingSoldier(random, typeof style === 'function' ? style(k) : style), corner: 'red' });
   // (Bare: the rampart's sheer face alone, no wall line, no ladder: nothing but the relief to stop him.)
   const world = createWorld(men, { seed, arena: { halfX: 15, halfZ: 9, works: bare ? { ditches: works.ditches } : works } });
   const at = (fighter, x, z) => placeOnFloor(fighter, x, z, reliefAt(worksOf(world.arena), x, z), fighter.yaw);
@@ -31,10 +34,15 @@ function wallWorld({ attackers = 1, bare = false, seed = 3 } = {}) {
   return { world, walk, at };
 }
 
-/** Each man walks for the wall's far side (as a man goes for the enemy on it), or to his post at the ladder's foot. */
+/**
+ * Each man goes for the enemy on the wall as the AI has him (ai.js): to his post at a lying ladder's foot to raise it, else to
+ * his place in its order (ladderApproach); come up onto the walk, on along it.
+ */
 const toTheWall = (world) => {
+  const enemy = world.fighters[0];
   for (const man of world.fighters.slice(1)) {
-    man.goTo = man.ladderPost ? [man.ladderPost.at[0], 0, man.ladderPost.at[1]] : [4, 0, 0];
+    if (man.climbing || (man.ladderPost && raiseLadder(world, man)) || ladderApproach(world, man, enemy)) continue;
+    man.goTo = [4, 0, 0];
     man.move = 1;
   }
 };
@@ -128,7 +136,7 @@ test('on a ladder his feet and hands are on its rungs, a foot standing on one wh
   const { world } = wallWorld({ attackers: 2 });
   const ladder = world.siegeLadders[0];
   standLadder(world, ladder);
-  // The second man starts under the ladder, by the wall: he gets on from there.
+  // The second man starts under the ladder, by the wall: he goes out to its foot and gets on there.
   const [first, under] = world.fighters.slice(1);
   placeOnFloor(under, 0.6, -0.4, 0, 0);
   const spec = LADDERS.climb;
@@ -271,4 +279,95 @@ test('at its stair\'s slope a ladder is harder to push off: one man cannot shove
   const steep = Math.tan(Math.atan(0.25)) / Math.tan(LADDERS.lean);
   assert.ok(torque * steep < LADDERS.push * ladder.height, 'at 14° one man could');
   assert.ok(ladderPushSeconds(ladder) > 2, `the push takes its head out past the upright (${ladderPushSeconds(ladder).toFixed(1)} s)`);
+});
+
+test('men bound for the wall wait their turn in a file behind each lane at its foot, clear of the face, and step onto it from there', () => {
+  const count = 14;
+  const { world, at } = wallWorld({ attackers: count, style: (k) => (k % 2 ? 'swordShield' : 'dao') });
+  const ladder = world.siegeLadders[0];
+  const men = world.fighters.slice(1);
+  // Spread over the field before it as they come up, not filed.
+  men.forEach((man, k) => at(man, -6 - 1.6 * (k % 5), -4 + 2.4 * Math.floor(k / 5)));
+  const spec = LADDERS.climb;
+  const out = (man) => (man.root[0] - ladder.x) * ladder.out[0] + (man.root[1] - ladder.z) * ladder.out[1];
+  const placeOff = (man, lane, depth, up = false) => {
+    const [x, z] = ladderQueuePlace(ladder, lane, depth, up);
+    return Math.hypot(man.root[0] - x, man.root[1] - z);
+  };
+  const dt = 0.05;
+  let pressed = 0;
+  let settledPairs = 0;
+  let inversions = 0;
+  let worstGap = 0;
+  let roofs = 0;
+  let coveredClimbing = 0;
+  let worstStep = 0;
+  let worstLift = 0;
+  let farthestBoard = 0;
+  let heldBack = 0;
+  const last = new Map();
+  for (let t = 0; t < 80; t += dt) {
+    advance(world, dt, toTheWall);
+    for (const man of men) {
+      if (man.state !== 'up') continue;
+      const before = last.get(man);
+      const since = man.climbing ? (before?.climbing ? before.since : t) : null;
+      last.set(man, { root: [...man.root], lift: man.lift ?? 0, climbing: Boolean(man.climbing), since });
+      if (man.climbing) {
+        if (man.shieldPose) coveredClimbing += 1;
+        if (!before) continue;
+        // On at its foot, from where his walk brought him; neither his stance nor its height jumping as he gets on.
+        if (!before.climbing) farthestBoard = Math.max(farthestBoard, Math.hypot(before.root[0] - ladderQueuePlace(ladder, man.climbing.lane, 0, true)[0], before.root[1] - ladderQueuePlace(ladder, man.climbing.lane, 0, true)[1]));
+        if (t - since < 1.5) {
+          worstStep = Math.max(worstStep, Math.hypot(man.root[0] - before.root[0], man.root[1] - before.root[1]));
+          worstLift = Math.max(worstLift, Math.abs((man.lift ?? 0) - before.lift));
+        }
+        continue;
+      }
+      // On the ground before the wall (not come up onto the walk), within half a metre of its face.
+      if ((man.lift ?? 0) < 1 && out(man) < 0.5) pressed += 1;
+      if (man.ladderQueue?.cover === 'roof' && man.shieldPose === 'roof') roofs += 1;
+      // (Held back: past the last place of the files.)
+      if (man.ladderQueue && man.ladderQueue.lane === null && out(man) > out({ root: ladderQueuePlace(ladder, 0, 3) })) heldBack += 1;
+    }
+    // Each file, of the men come to their places: one behind another, `apart` m apart, outward from the foot.
+    for (const [lane, file] of ladder.queue.entries()) {
+      for (let k = 1; k < file.length; k += 1) {
+        const [a, b] = [world.fighters[file[k - 1]], world.fighters[file[k]]];
+        if (!a.ladderQueue || !b.ladderQueue || placeOff(a, lane, k - 1) > 0.3 || placeOff(b, lane, k) > 0.3) continue;
+        settledPairs += 1;
+        if (out(b) <= out(a)) inversions += 1;
+        worstGap = Math.max(worstGap, Math.abs(out(b) - out(a) - LADDERS.queue.apart));
+      }
+    }
+  }
+  assert.ok(ladder.raised >= 1, 'raised by the heads of its files');
+  assert.equal(pressed, 0, 'nobody pressed against the face');
+  assert.ok(settledPairs > 200, `files formed (${settledPairs} pairs watched)`);
+  assert.equal(inversions, 0, 'each file in its order');
+  assert.ok(worstGap < 0.6, `a man to every ${LADDERS.queue.apart} m of a file (off by ${worstGap.toFixed(2)} m at worst)`);
+  assert.ok(heldBack > 0, 'the men with no place in its order held back behind it');
+  assert.ok(roofs > 0, 'shields up over the heads waiting under the wall');
+  assert.equal(coveredClimbing, 0, 'down on the ladder');
+  assert.ok(farthestBoard < spec.from + 0.15, `on from its foot (a step of his walk before) (${farthestBoard.toFixed(2)} m from his place on it)`);
+  assert.ok(worstStep < (spec.board + spec.pace) * dt + 0.01, `no snap as he gets on (${worstStep.toFixed(3)} m in a step)`);
+  assert.ok(worstLift < spec.pace * dt + 0.01, `nor a jump (${worstLift.toFixed(3)} m up in a step)`);
+  const onto = new Set(world.events.filter((event) => event.kind === 'ladder' && event.onto).map((event) => event.fighters[0]));
+  assert.equal(onto.size, count, `every man up it and onto the walk (${onto.size})`);
+});
+
+test('a shooter is not put in a ladder\'s order, nor a man with an enemy on his own ground at him: the order is for the wall', () => {
+  const { world, at } = wallWorld({ attackers: 1 });
+  const ladder = world.siegeLadders[0];
+  standLadder(world, ladder);
+  const [enemy, man] = world.fighters;
+  at(man, -6, 0);
+  assert.equal(ladderApproach(world, man, enemy, { shoots: true }), false, 'he shoots up at the walk');
+  assert.equal(man.ladderQueue ?? null, null);
+  assert.equal(ladderApproach(world, man, enemy), true, 'bound for the wall');
+  assert.ok(man.ladderQueue && man.ladderQueue.lane !== null, 'in a file');
+  // An enemy on his own ground (come down off the wall), at him: he fights, out of the order.
+  at(enemy, -5, 0.5);
+  assert.equal(ladderApproach(world, man, enemy), false, 'a man at his own height is fought, not climbed to');
+  assert.equal(man.ladderQueue, null);
 });

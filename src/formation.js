@@ -264,8 +264,9 @@ export function moveFormations(world, dt, hurt = () => 0) {
     for (const fighter of members) {
       // A square's front rank is its outer ring, facing out every way.
       fighter.inFront = holding(fighter) && (middle ? ringOf(formation, fighter.slot) >= middle.ring - DRILL.frontDepth : fighter.slot.ahead >= front - DRILL.frontDepth);
-      // In the testudo: the front rank's shields a wall, the rest a roof.
-      fighter.shieldPose = formation.testudo && fighter.shield ? (fighter.inFront ? 'wall' : 'roof') : null;
+      // In the testudo: the front rank's shields a wall, the rest a roof. (Else his own: held up waiting at a wall's ladder,
+      // physics/ladders.js ladderCover.)
+      fighter.shieldPose = formation.testudo && fighter.shield ? (fighter.inFront ? 'wall' : 'roof') : fighter.ladderQueue?.cover ?? null;
     }
     formation.review -= dt;
     if (formation.review > 0) continue;

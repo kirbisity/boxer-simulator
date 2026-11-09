@@ -27,6 +27,12 @@
 //
 // The player is not put on it: he gets on by walking at the wall from its foot (`climb.wish`), goes up while he keeps
 // pressing at the wall, holds his rung while he does not, and climbs back down (and off at its foot) when he pulls away.
+//
+// The men bound for the wall do not walk at its stone (where the face would only turn them along it, into the press of
+// the others at it): each goes to a ladder and takes his place in its order (`queue`), a file behind each lane at its foot,
+// facing it, his shield up against the walk's shot. The first of a file steps up to the foot when the lane above it is free
+// and gets on from there (`climb.from`), and the file closes up behind him. Those with no place in an order hold back
+// behind it, out of the press, until one comes free. (A shooter shoots up at the walk instead, as ever: ai.js gunfight.)
 
 import { P } from '../body.js';
 import { fall, point, toLocal } from '../physics.js';
@@ -109,8 +115,9 @@ export const LADDERS = {
     // m in from the face's top he steps to on the walk; an enemy standing within `clear` m of there keeps him on the ladder.
     onto: 0.5,
     clear: 0.7,
-    // m from its line (anywhere from its foot to under it, at the wall) an attacker gets on it, with an enemy on the walk
-    // within `enemyWithin` m of its head: half its width, so the men at its foot go up it from where they stand.
+    // m from its line (anywhere from its foot to under it, at the wall) the player gets on it, with an enemy on the walk
+    // within `enemyWithin` m of its head: half its width, so he goes up it from where he stands at it. (Every other man gets
+    // on from its order, at its foot: `from`.)
     mount: 0.8,
     enemyWithin: 14,
     // m/s his stance is carried to his lane's line as he gets on it (a step or two); he goes up only once it is within
@@ -151,6 +158,41 @@ export const LADDERS = {
     // The player's way: the share of his stick (or his steps' way) pointed at the wall that puts him on it at its foot and
     // takes him up it; pointed away from it as much, he climbs down. Less either way, he holds his rung.
     wish: 0.5,
+    // m: a man waiting his turn in its order (LADDERS.queue) gets on once he has walked to within this of his lane's foot:
+    // the short step onto its bottom rung, his own walk having brought him there (so his stance is carried no further than
+    // that onto it, never across the ground beside it).
+    from: 0.3,
+  },
+  // The order at its foot (ladderApproach, ladderQueues). A man bound for the wall (his enemy up on the walk, out of reach
+  // from the ground) goes to a ladder, not at the stone: a ladder takes its men one at a time to a lane, one every
+  // `climb.spacing` m of it gone up, so the rest wait their turn. They wait as men in a file do: one behind another
+  // behind each lane, the first `back` m behind the man stepping on, each `apart` m behind the next, facing it, as many to a
+  // lane as the ladder holds (its length over `climb.spacing`: the next load of it). The rest of the men bound for the wall
+  // hold back behind that, `apart` past its last place, out of the press at its foot, their shields up against the shot
+  // from the walk (ladderCover). He takes the ladder he will be up soonest at: the walk to it and the wait in its order.
+  queue: {
+    // m out from the lane's foot to the first waiting man: clear of the climber's heels and his weapon, a stride.
+    back: 1,
+    // m between waiting men one behind the other: a man's depth with his shield on his arm (~0.3-0.5 m) and room to step
+    // (drill's close order put a pace, ~0.7 m, from a man's chest to the back before him; a shield and a weapon want more).
+    apart: 1,
+    // m: his enemy's footing this far above his own is out of a blow's reach from the ground (a man's arms are over the
+    // walk's edge only from `climb.top` under it): only a ladder gets at him.
+    above: 1.2,
+    // m/s: a man's walk (the preferred walking speed of men, ~1.3-1.4 m/s: Bohannon 1997), to weigh the way to each
+    // ladder against the wait in its order.
+    walk: 1.4,
+    // s: a man who has not looked to his place for this long (the slowest thinks, AI.perceive idleEvery, are 0.2 s apart)
+    // has gone to other business: his place is given up.
+    stale: 1,
+    // m from his place he stands at (no step for less: a man shuffling on the spot), and from which he runs to it.
+    arrive: 0.25,
+    runFrom: 4,
+    // Places past the hold-back line a man already in an order may be pushed or drift and keep it (no taking him and
+    // letting him go each step at the line).
+    keep: 3,
+    // s he is held facing it after each think: past the slowest think's 0.2 s, so he does not turn away between them.
+    face: 0.5,
   },
 };
 
@@ -209,6 +251,8 @@ export function createLadders(world, arena) {
       attackers: reds >= blues ? 'red' : 'blue',
       // Its gap's piece of the face, closed while it is down (fieldworks.js wallsOf).
       piece: { a: [ladder.x - u[0] * half, ladder.z - u[1] * half], b: [ladder.x + u[0] * half, ladder.z + u[1] * half], u, length: spec.width, height: wall?.height ?? top + 1.1, kind: wall?.kind ?? 'stone', cover: null },
+      // Its order at its foot (ladderQueues): a file of fighter ids to each lane, the first of each the next up it.
+      queue: Array.from({ length: spec.lanes }, () => []),
       // Lying at the wall's foot, as it was carried up: its gap closed until it is raised.
       up: false, push: 0, raise: 0, tilt: 1, pushedOff: 0, pushedLoaded: 0, raised: 0, thrown: 0, climbed: 0, fell: 0,
     };
@@ -351,6 +395,7 @@ const ladderLaneNear = (ladder, x, z) => {
 /** Put a man on a ladder `up` m up it, in a lane (by default the one nearest him; he gets on at its foot; the tests' way to set one higher). */
 export function boardLadder(world, fighter, ladder, up = 0, lane = ladderLaneNear(ladder, fighter.root[0], fighter.root[1])) {
   fighter.climbing = { ladder: ladder.index, lane, up, top: up >= ladder.height - LADDERS.climb.top };
+  ladderLeave(fighter);
   fighter.ladderPost = null;
   fighter.goTo = null;
   fighter.punch = null;
@@ -420,7 +465,10 @@ export function climbLadder(world, fighter, dt) {
   const moved = apart > most ? most / apart : 1;
   fighter.rootVelocity = [(dx * moved) / Math.max(dt, 1e-9), (dz * moved) / Math.max(dt, 1e-9)];
   fighter.root = [fighter.root[0] + dx * moved, fighter.root[1] + dz * moved];
-  fighter.lift = ladder.base + Math.min(climbing.up, ladder.height);
+  // (Still stepping to it at its foot, his feet are on the ground he crosses: his stance on its relief, not set at once to
+  // the foot's height from wherever he got on.)
+  const stepping = climbing.up <= 0 && apart * (1 - moved) > spec.onPlace;
+  fighter.lift = stepping ? reliefAt(worksOf(world.arena), fighter.root[0], fighter.root[1]) : ladder.base + Math.min(climbing.up, ladder.height);
   // His feet on its rungs (ladderLimbs): set there each step, his own steps given up while he is on it (physics.js updateFeet).
   const limbs = ladderLimbs(ladder, fighter);
   for (const side of ['l', 'r']) {
@@ -489,6 +537,7 @@ export function stepLadders(world, dt) {
   // A man come off his ladder (struck down, thrown) is off it.
   for (const fighter of world.fighters) if (fighter.climbing && fighter.state !== 'up') fighter.climbing = null;
   ladderPosts(world, ladders);
+  ladderQueues(world, ladders);
   for (const ladder of ladders) {
     if (ladder.up) ladderBoard(world, ladder, works);
     if (ladder.up) {
@@ -522,7 +571,10 @@ export function stepLadders(world, dt) {
   }
 }
 
-/** The men sent to raise each lying ladder: its `raisers` nearest attackers on their feet within `call` m of its foot. */
+/**
+ * The men sent to raise each lying ladder: its `raisers` nearest attackers on their feet within `call` m of its foot, those
+ * sent already kept to it while they are within that.
+ */
 function ladderPosts(world, ladders) {
   const spec = LADDERS;
   for (const fighter of world.fighters) if (fighter.ladderPost && ladders[fighter.ladderPost.ladder].up) fighter.ladderPost = null;
@@ -532,7 +584,9 @@ function ladderPosts(world, ladders) {
       .filter((fighter) => fighter.corner === ladder.attackers && ladderStanding(fighter) && !fighter.climbing && !fighter.player && fighter.gunCrew === undefined && (!fighter.ladderPost || fighter.ladderPost.ladder === ladder.index) && (fighter.root[0] - ladder.x) * ladder.out[0] + (fighter.root[1] - ladder.z) * ladder.out[1] > 0)
       .map((fighter) => ({ fighter, apart: Math.hypot(fighter.root[0] - ladder.foot[0], fighter.root[1] - ladder.foot[1]) }))
       .filter(({ apart }) => apart < spec.call)
-      .sort((a, b) => a.apart - b.apart);
+      // (Those sent already first: told off to it, a man keeps at it, not handed back and forth with each man who comes nearer
+      // its foot than he is as he walks in past it to his post.)
+      .sort((a, b) => (b.fighter.ladderPost ? 1 : 0) - (a.fighter.ladderPost ? 1 : 0) || a.apart - b.apart);
     const sent = near.slice(0, spec.raisers).map(({ fighter }) => fighter);
     for (const { fighter } of near) if (!sent.includes(fighter) && fighter.ladderPost?.ladder === ladder.index) fighter.ladderPost = null;
     sent.forEach((fighter, k) => {
@@ -543,6 +597,15 @@ function ladderPosts(world, ladders) {
 }
 
 /**
+ * Whether an enemy on his feet is on a man (within `defendWithin` m) on his own ground: not one up on the walk over him,
+ * out of a blow's reach from it (`queue.above`), whose spear is no reason to leave a ladder's work.
+ */
+function ladderFoeNear(world, fighter, works) {
+  const ground = reliefAt(works, fighter.root[0], fighter.root[1]);
+  return world.fighters.some((other) => other.corner !== fighter.corner && other.corner !== 'grey' && other.state === 'up' && Math.hypot(other.root[0] - fighter.root[0], other.root[1] - fighter.root[1]) < LADDERS.defendWithin && Math.abs(reliefAt(works, other.root[0], other.root[1]) - ground) < LADDERS.queue.above);
+}
+
+/**
  * A man sent to raise a ladder (ai.js, before his fighting): he goes to his place at its foot and puts his hands to it.
  * Returns whether he did (his think is done), or false (an enemy within a spear's reach of him: he fights).
  */
@@ -550,34 +613,45 @@ export function raiseLadder(world, fighter) {
   const post = fighter.ladderPost;
   const ladder = world.siegeLadders?.[post?.ladder];
   if (!ladder || ladder.up) return false;
-  if (world.fighters.some((other) => other.corner !== fighter.corner && other.corner !== 'grey' && other.state === 'up' && Math.hypot(other.root[0] - fighter.root[0], other.root[1] - fighter.root[1]) < LADDERS.defendWithin)) return false;
+  if (ladderFoeNear(world, fighter, worksOf(world.arena))) return false;
   const apart = Math.hypot(post.at[0] - fighter.root[0], post.at[1] - fighter.root[1]);
+  const spec = LADDERS.queue;
+  const moving = apart > spec.arrive;
   fighter.punch = null;
-  fighter.goTo = apart > 0.3 ? [post.at[0], 0, post.at[1]] : null;
-  fighter.move = apart > 0.3 ? 1 : 0;
-  fighter.running = apart > 4;
-  fighter.faceAt = { at: [ladder.x, 1, ladder.z], until: world.time + 0.5 };
+  fighter.goTo = moving ? [post.at[0], 0, post.at[1]] : null;
+  fighter.move = moving ? 1 : 0;
+  fighter.running = apart > spec.runFrom;
+  // (His steps go the way he faces, physics.js moveRoot: to his post facing it, not the wall's stone past it; there, to the
+  // ladder. Facing it all the way, he walked on past his post into the face.)
+  fighter.faceAt = moving ? null : { at: [ladder.x, 1, ladder.z], until: world.time + spec.face };
   return true;
 }
 
 /**
  * Men at a standing ladder's foot get on it, a man to each lane whose last man is a spacing up it, while the enemy holds the
- * walk above: the nearest to that lane's line. The player only by walking at the wall (ladderWish), never as he passes.
+ * walk above: the head of that lane's file in its order, come to its foot (`climb.from`), and no one else (a man going by
+ * it after an enemy at the wall's foot is not put on it). The player only by walking at the wall (ladderWish), never as he
+ * passes: from where he is at its foot or under it, the nearest to that lane's line.
  */
 function ladderBoard(world, ladder, works) {
   const spec = LADDERS.climb;
   const held = world.fighters.some((other) => other.corner !== ladder.attackers && other.corner !== 'grey' && other.state === 'up' && !other.fled && Math.hypot(other.root[0] - ladder.head[0], other.root[1] - ladder.head[2]) < spec.enemyWithin && reliefAt(works, other.root[0], other.root[1]) > ladder.base + ladder.height / 2);
   if (!held) return;
   for (let lane = 0; lane < LADDERS.lanes; lane += 1) {
-    const climbers = ladderClimbers(world, ladder, lane);
-    const lowest = climbers.length ? climbers[climbers.length - 1].climbing.up : Infinity;
-    if (lowest < spec.spacing * Math.cos(LADDERS.lean)) continue;
+    if (!ladderLaneOpen(world, ladder, lane)) continue;
     const side = ladderLaneSide(lane);
     let best = null;
     for (const fighter of world.fighters) {
       if (fighter.corner !== ladder.attackers || !ladderStanding(fighter) || fighter.climbing || fighter.gunCrew !== undefined) continue;
-      const wish = ladderWish(fighter, ladder);
-      if (wish !== null && wish < spec.wish) continue;
+      if (!fighter.player) {
+        const queued = fighter.ladderQueue;
+        if (queued?.ladder !== ladder.index || queued.lane !== lane || ladder.queue[lane][0] !== fighter.id) continue;
+        const [x, z] = ladderQueuePlace(ladder, lane, 0, true);
+        const apart = Math.hypot(fighter.root[0] - x, fighter.root[1] - z);
+        if (apart < spec.from && (!best || apart < best.apart)) best = { fighter, apart };
+        continue;
+      }
+      if (ladderWish(fighter, ladder) < spec.wish) continue;
       // (Anywhere at its foot or under it, between its foot and the wall, on the ground there.)
       const out = (fighter.root[0] - ladder.x) * ladder.out[0] + (fighter.root[1] - ladder.z) * ladder.out[1];
       if (out < -0.05 || ladderFootingUp(works, ladder, fighter) > LADDERS.climber) continue;
@@ -587,6 +661,199 @@ function ladderBoard(world, ladder, works) {
     }
     if (best) boardLadder(world, best.fighter, ladder, 0, lane);
   }
+}
+
+/** Whether a lane of a ladder takes a man at its foot now: its last man a spacing up it, or nobody on it. */
+function ladderLaneOpen(world, ladder, lane) {
+  const climbers = ladderClimbers(world, ladder, lane);
+  const lowest = climbers.length ? climbers[climbers.length - 1].climbing.up : Infinity;
+  return lowest >= LADDERS.climb.spacing * Math.cos(LADDERS.lean);
+}
+
+/** How many wait in each lane's file at a ladder's foot: as many as it holds in a lane (the next load of it). */
+const ladderDepth = (ladder) => Math.max(1, Math.floor(ladder.height / Math.cos(LADDERS.lean) / LADDERS.climb.spacing));
+
+/** m out from a ladder's gap in the wall to the line its men with no place in its order hold at: `apart` past its last place. */
+const ladderStandOff = (ladder) => ladder.footOut + LADDERS.climb.heel + LADDERS.queue.back + ladderDepth(ladder) * LADDERS.queue.apart;
+
+/**
+ * The place ([x, z]) of the man `depth` back in lane `lane`'s file at a ladder's foot; stepping up (`up`), his place on its
+ * bottom rung (as climbLadder holds him there: over the balls of his feet, his ankles `heel` out behind them).
+ */
+export function ladderQueuePlace(ladder, lane, depth, up = false) {
+  const [x, z] = ladderPlace(ladder, 0, lane);
+  const back = LADDERS.climb.heel + (up ? 0 : LADDERS.queue.back + depth * LADDERS.queue.apart);
+  return [x + ladder.out[0] * back, z + ladder.out[1] * back];
+}
+
+/** Out of a ladder's order (gone up it, or to other business): his shield down from the cover it held. */
+export function ladderLeave(fighter) {
+  const queued = fighter.ladderQueue;
+  if (!queued) return;
+  if (queued.cover && fighter.shieldPose === queued.cover) fighter.shieldPose = null;
+  fighter.ladderQueue = null;
+}
+
+/**
+ * s until a man who joined a ladder's order now would be at its foot with his lane free: his walk there, or (if longer)
+ * its raising (lying) and the files before him going up it, a man to a lane every `climb.spacing` of it climbed.
+ */
+function ladderWaitFor(ladder, fighter) {
+  const walk = Math.hypot(fighter.root[0] - ladder.foot[0], fighter.root[1] - ladder.foot[1]) / LADDERS.queue.walk;
+  const ahead = Math.min(...ladder.queue.map((file) => file.length));
+  const raising = ladder.up ? 0 : LADDERS.raiseSeconds - ladder.raise;
+  return Math.max(walk, raising + (ahead * LADDERS.climb.spacing) / LADDERS.climb.pace);
+}
+
+/**
+ * Whether a ladder's order has a place free. (Lying, it has its order too: the files stand ready behind its raisers, the
+ * nearest of them the heads of its files, sent forward to raise it: ladderPosts.)
+ */
+const ladderRoom = (ladder) => ladder.queue.some((file) => file.length < ladderDepth(ladder));
+
+/**
+ * A man bound for the wall takes a ladder: of his side's, one with room in its order, the one he would be up soonest at
+ * (ladderWaitFor), at the back of its shorter file (of two as long, the nearer); no room at any, he holds back by the one
+ * he would be up soonest at, for a place to come free.
+ */
+function ladderJoin(world, fighter) {
+  const queued = fighter.ladderQueue;
+  let best = null;
+  for (const ladder of world.siegeLadders) {
+    if (ladder.attackers !== fighter.corner) continue;
+    const wait = ladderWaitFor(ladder, fighter);
+    const room = ladderRoom(ladder);
+    if (!best || (room && !best.room) || (room === best.room && wait < best.wait)) best = { ladder, wait, room };
+  }
+  if (!best) return;
+  queued.ladder = best.ladder.index;
+  queued.lane = null;
+  if (!best.room) return;
+  const files = best.ladder.queue;
+  const from = (lane) => {
+    const [x, z] = ladderQueuePlace(best.ladder, lane, files[lane].length);
+    return Math.hypot(fighter.root[0] - x, fighter.root[1] - z);
+  };
+  let lane = 0;
+  for (let each = 1; each < files.length; each += 1) {
+    if (files[each].length < files[lane].length || (files[each].length === files[lane].length && from(each) < from(lane))) lane = each;
+  }
+  files[lane].push(fighter.id);
+  queued.lane = lane;
+}
+
+/**
+ * Each step, the orders at the ladders' feet: a man gone up, down, sent to raise a ladder, or not looking to his place
+ * (`queue.stale`) is out of his; the files close up behind him (a man's place is his order in his file); and the men
+ * holding back, the nearest their ladders first, take the places come free.
+ */
+function ladderQueues(world, ladders) {
+  for (const fighter of world.fighters) {
+    if (fighter.ladderQueue && (world.time - fighter.ladderQueue.seen > LADDERS.queue.stale || !ladderStanding(fighter) || fighter.climbing || fighter.ladderPost)) ladderLeave(fighter);
+  }
+  const kept = (ladder, lane) => (id) => world.fighters[id].ladderQueue?.ladder === ladder.index && world.fighters[id].ladderQueue.lane === lane;
+  let room = false;
+  for (const ladder of ladders) {
+    for (let lane = 0; lane < ladder.queue.length; lane += 1) {
+      const keep = kept(ladder, lane);
+      if (!ladder.queue[lane].every(keep)) ladder.queue[lane] = ladder.queue[lane].filter(keep);
+    }
+    room ||= ladderRoom(ladder);
+  }
+  if (!room) return;
+  const holding = world.fighters.filter((fighter) => fighter.ladderQueue && fighter.ladderQueue.lane === null);
+  const apart = (fighter) => {
+    const foot = ladders[fighter.ladderQueue.ladder]?.foot ?? fighter.root;
+    return Math.hypot(fighter.root[0] - foot[0], fighter.root[1] - foot[1]);
+  };
+  holding.sort((a, b) => apart(a) - apart(b));
+  for (const fighter of holding) ladderJoin(world, fighter);
+}
+
+/**
+ * How a man waiting at the wall holds his shield (WORLD.shield's two testudo holds, physics.js weaponIntent): square to the
+ * shot of the nearest enemy up on the walk, overhead (`roof`, its face turned up and forward) when it comes down at him
+ * more steeply than halfway between the two holds' faces, before him (`wall`) when flatter. None without a shield.
+ */
+function ladderCover(world, fighter, ladder, works) {
+  if (!fighter.shield) return null;
+  const walk = ladder.base + ladder.height / 2;
+  let nearest = null;
+  for (const other of world.fighters) {
+    if (other.corner === fighter.corner || other.corner === 'grey' || other.state !== 'up') continue;
+    const footing = reliefAt(works, other.root[0], other.root[1]);
+    if (footing < walk) continue;
+    const apart = Math.hypot(other.root[0] - fighter.root[0], other.root[1] - fighter.root[1]);
+    if (!nearest || apart < nearest.apart) nearest = { apart, rise: footing - reliefAt(works, fighter.root[0], fighter.root[1]) };
+  }
+  if (!nearest) return null;
+  const roof = Math.PI / 2 - Math.atan(WORLD.shield.roofTilt);
+  return Math.atan2(nearest.rise, nearest.apart) > roof / 2 ? 'roof' : 'wall';
+}
+
+/**
+ * A man bound for the wall (ai.js, where he would go at his man): his man up on the walk, out of reach from the ground
+ * (`queue.above`), and he on the ground before it. He goes to his place in a ladder's order (ladderJoin) and waits there
+ * facing it, his shield up against the walk's shot (ladderCover); at the head of his file with the lane above it free, he
+ * steps up to its foot and is put on it from there (ladderBoard). With no place in an order, he holds back behind them,
+ * where he is along the wall. Returns whether he did (his think is done); false, out of any order, if he is not bound for
+ * the wall, has an enemy on his own ground near him (he fights), or shoots (`shoots`: up at the walk, ai.js gunfight).
+ * He is taken only once he has come up to the wall, as far as the line its men hold back on (and kept while he is
+ * within `keep` places of it): further out, he comes on as he did (his ranks, the march, the field's own way).
+ */
+export function ladderApproach(world, fighter, opponent, { shoots = false } = {}) {
+  const ladders = world.siegeLadders;
+  // (A man sent to raise a ladder is at that: raiseLadder.)
+  if (!ladders?.length || !opponent || fighter.climbing || fighter.ladderPost || fighter.player || fighter.mount || fighter.gunCrew !== undefined) return false;
+  const spec = LADDERS.queue;
+  const works = worksOf(world.arena);
+  // (The nearest of his side's ladders: its side of the wall is the ground before it.)
+  let gap = null;
+  for (const ladder of ladders) {
+    if (ladder.attackers === fighter.corner && (!gap || Math.hypot(fighter.root[0] - ladder.x, fighter.root[1] - ladder.z) < Math.hypot(fighter.root[0] - gap.x, fighter.root[1] - gap.z))) gap = ladder;
+  }
+  if (!gap) return false;
+  const out = (fighter.root[0] - gap.x) * gap.out[0] + (fighter.root[1] - gap.z) * gap.out[1];
+  if (out > ladderStandOff(gap) + spec.apart * (fighter.ladderQueue ? spec.keep : 1)) return false;
+  const ground = reliefAt(works, fighter.root[0], fighter.root[1]);
+  // (On the ground before the walk: out from its edge, `run` in from the face's foot, and below it.)
+  const bound = out > -gap.run && ground < gap.base + gap.height / 2 && reliefAt(works, opponent.root[0], opponent.root[1]) - ground > spec.above;
+  if (!bound || shoots || ladderFoeNear(world, fighter, works)) {
+    ladderLeave(fighter);
+    return false;
+  }
+  fighter.ladderQueue ??= { ladder: null, lane: null, seen: world.time, cover: null };
+  const queued = fighter.ladderQueue;
+  queued.seen = world.time;
+  if (queued.ladder === null || (queued.lane !== null && !ladders[queued.ladder].queue[queued.lane].includes(fighter.id))) ladderJoin(world, fighter);
+  const ladder = ladders[queued.ladder];
+  if (!ladder) return false;
+  let target;
+  let stepping = false;
+  if (queued.lane !== null) {
+    const depth = ladder.queue[queued.lane].indexOf(fighter.id);
+    stepping = depth === 0 && ladder.up && ladderLaneOpen(world, ladder, queued.lane);
+    target = ladderQueuePlace(ladder, queued.lane, depth, stepping);
+  } else {
+    // Holding back: where he is along the wall, a place behind its orders out from it.
+    const across = (fighter.root[0] - ladder.x) * ladder.u[0] + (fighter.root[1] - ladder.z) * ladder.u[1];
+    const off = ladderStandOff(ladder) + spec.apart;
+    target = [ladder.x + ladder.u[0] * across + ladder.out[0] * off, ladder.z + ladder.u[1] * across + ladder.out[1] * off];
+  }
+  const apart = Math.hypot(target[0] - fighter.root[0], target[1] - fighter.root[1]);
+  const moving = apart > spec.arrive;
+  fighter.goTo = moving ? [target[0], 0, target[1]] : null;
+  fighter.move = moving ? 1 : 0;
+  fighter.strafe = 0;
+  fighter.running = apart > spec.runFrom;
+  // (His steps go the way he faces, physics.js moveRoot: to his place facing it, and there he turns to the ladder.)
+  fighter.faceAt = moving ? null : { at: [ladder.x, 1, ladder.z], until: world.time + spec.face };
+  // His shield up while he waits; down to his guard as he steps up to climb.
+  const cover = stepping ? null : ladderCover(world, fighter, ladder, works);
+  if (queued.cover && fighter.shieldPose === queued.cover && cover !== queued.cover) fighter.shieldPose = null;
+  queued.cover = cover;
+  if (cover) fighter.shieldPose = cover;
+  return true;
 }
 
 /** Over it goes: the gap closed, the men on it thrown out from the face and falling from where they stood on it. */
