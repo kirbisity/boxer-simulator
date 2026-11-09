@@ -17,7 +17,7 @@ test('the Cuman is of the steppe, rides a steppe horse, and carries the long, de
   assert.equal(factionOf(PRESETS.cuman), 'steppe');
   assert.equal(kit.horse, 'steppe');
   assert.equal(kit.sidearm, 'kilij');
-  assert.ok(kit.arrowproof);
+  assert.ok(kit.protection.pierce >= 0.85, 'mail and plate');
   // The bow first, then the sabre at his belt (his kit's sidearm), not the kheshig's mace.
   assert.equal(STYLES.cumanBow.weapon, STYLES.kheshigBow.weapon);
   assert.notEqual(STYLES.cumanBow.fallback, 'mace');

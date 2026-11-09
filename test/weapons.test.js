@@ -20,7 +20,7 @@ test('armour stops each kind of harm by its own share, and adds its weight', asy
   assert.ok(wearing('specialForces').protection.cut < wearing('knight').protection.cut && wearing('specialForces').protection.regions.limb.cut < 0.2);
   // (The head as his set's helmet guards it: design 0, the sallet and bevor: outfitsets.js.)
   assert.deepEqual(wearing('knight').protection, { blunt: 0.6, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 }, regions: { head: { blunt: 0.62, cut: 1, pierce: 0.94, deflects: true } } });
-  assert.deepEqual(wearing('samurai').protection, { blunt: 0.65, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 } });
+  assert.deepEqual(wearing('samurai').protection, { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 } });
   // A gladiator: the chest bare, the helmet, the arm and the legs covered, each its own way.
   const { protectionAt } = await import('../src/physics.js');
   const hoplomachus = wearing('hoplomachus');
@@ -225,9 +225,10 @@ test('a shield on arm straps is harder to tear away than one held in the fist', 
   assert.ok(lost('buckler') >= 1);
 });
 
-test('a knife stab through lamellar hurts the trunk and opens nothing that bleeds; enough bleeding still collapses a man', () => {
-  // Through lamellar: the point gets a little way in — an injury, not a bleed.
-  const { hit, world } = strikeAt('knife', 'stab', 'body', 1.2, { outfit: 'samurai' });
+test('a knife stab through a thin quilted jack hurts the trunk and opens nothing that bleeds; enough bleeding still collapses a man', () => {
+  // Through a garrison's thin jack: the point gets a little way in — an injury, not a bleed. (Lamellar stops a knife's
+  // ~75 J outright: weapons.js PUNCTURE.)
+  const { hit, world } = strikeAt('knife', 'stab', 'body', 1.2, { outfit: 'levy' });
   assert.ok(hit.pierce > 0, 'the stab went in');
   assert.equal(hit.bleeds, false);
   const victim = world.fighters[1];

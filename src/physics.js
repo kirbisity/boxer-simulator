@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
-import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
+import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
@@ -8170,9 +8170,6 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
   const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
   const blocked = BLOCKING.has(capsule.key);
-  // A heavy hard head drives part of its blow through armour (`crush`).
-  // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)
-  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
   // A brittle edge (obsidian) cuts only as well as it is still sharp.
   const sharp = weapon.edge ?? 1;
   // A point on plate bites only if it meets it near square (BLADES.bite: the cosine of the steepest
@@ -8188,12 +8185,6 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     mix.cut = 0;
     mix.pierce = 0;
   }
-  // A point thrust by hand that bites square on plate (`deflects`) and finds no gap stops on it: no sword, spear or dagger
-  // carries what it takes to punch a point through 1.5-2 mm of steel (Williams, The Knight and the Blast Furnace, 2003), and
-  // a man in plate was stabbed only through its gaps, the half-sword's whole art. The blow is a shove (its blunt share, as the
-  // plate spreads it); the plate's `pierce` share is for what lies short of plate. (A couched lance, `shatters`, and a beak
-  // swung in keep their own rules; a finisher's point, its own.)
-  if (Boolean(protection.deflects) && spec.mode === 'thrust' && !beak && !wspec.shatters && !punch.finisher && !intoGap) mix.pierce = 0;
   // A point thrust home loads its shaft along its length (a beak swung in loads the haft across, not along): stopped
   // harder than the shaft carries (in flesh over a hand's depth; on plate it cannot go into, within a few cm), the shaft
   // snaps there and drives in only what it bore (physics/wear.js driveShaft; a lance's own rule is `shatters`, below).
@@ -8203,7 +8194,16 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const slice = mix.cut > 0 && !haft ? sliceGain(wspec, relative, weapon.dir, distance, protection) : 1;
   const cut = goes * mix.cut * (1 - (protection.cut ?? 0)) * sharp * slice;
   // A finisher's point is leaned on as it goes in (finisherPress): the work of that push, as well as the blow's.
-  const pierce = (goes * mix.pierce + (punch.finisher && mix.pierce > 0 ? finisherPress(attacker, weapon, punch.finisher) : 0)) * (1 - (protection.pierce ?? 0)) * sharp;
+  // The point goes through only what it brings past the armour's puncture (weapons.js PUNCTURE, pointThrough): a hand thrust
+  // stops on a breastplate, a lance at the gallop goes through it. Stopped, it lands only as its blow (its blunt share, spread
+  // as the armour spreads any blow, and its impulse): the shove of a thrust on plate, the jolt of a lance that unhorses.
+  const press = punch.finisher && mix.pierce > 0 ? finisherPress(attacker, weapon, punch.finisher) : 0;
+  const pointJoules = mix.pierce > 0 ? goes + press : 0;
+  const pointGoes = pointThrough(pointJoules, protection.pierce, world.random(), pointWidthOf(wspec));
+  const pierce = (goes * mix.pierce + press) * sharp * pointGoes;
+  // A heavy hard head drives part of its blow through armour (`crush`).
+  // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)
+  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
   // (An edge always glances off plate; a point that bites square does not.)
   const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(pointLed && mix.pierce > 0)));
   // Glass on steel or hard armour chips.
@@ -8222,7 +8222,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id, weapon: weapon.kind, mode: spec.mode,
     off: weapon === attacker.offWeapon || undefined, riposte: attacker.punch?.riposte || undefined,
     punch: punch.type, target: capsule.key, speed: closing, impulse, force: peakForce, headDeltaV: 0, effects: [],
-    point: contactPoint, normal, harm: bluntShare, cut, pierce, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt, slice: slice === 1 ? undefined : slice,
+    point: contactPoint, normal, harm: bluntShare, cut, pierce, pointJoules, pointGoes, energy, along, at: closest.s, strikeMass, bluntMix: mix.blunt, slice: slice === 1 ? undefined : slice,
     edgeShare: (mix.cut + mix.pierce) / Math.max(1e-6, mix.blunt + mix.cut + mix.pierce), haft: haft || undefined,
     gapZone: gapZone ?? undefined,
   };

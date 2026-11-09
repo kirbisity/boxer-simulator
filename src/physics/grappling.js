@@ -8,6 +8,7 @@ import { addDamage, boneShare, dropWeapon, fall, opponentFor, point, protectionA
 import { riseForces } from './rising.js';
 import { vec, yawRotate } from '../pose.js';
 import { WORLD } from './config.js';
+import { pointThrough } from '../weapons.js';
 
 /**
  * The clinch: each hand is held to the back of the opponent's neck by a
@@ -125,7 +126,9 @@ function bite(world, fighter, target, spec) {
   // A bite torn out (`slash`, m: the monkeys'): the canines go in to their depth (the puncture) and are
   // dragged through him as the head is wrenched back (the tear, the jaw's force over the length of the gash).
   const motor = Math.max(0.3, fighter.motorScale ?? 1);
-  const pierce = (spec.slash ? spec.forceN * spec.depth * motor : energy * spec.pierceShare) * (1 - (covered.pierce ?? 0));
+  // (Teeth through armour only past its puncture: weapons.js pointThrough.)
+  const bite = spec.slash ? spec.forceN * spec.depth * motor : energy * spec.pierceShare;
+  const pierce = bite * pointThrough(bite, covered.pierce, world.random());
   const cut = (spec.slash ? spec.forceN * spec.slash * motor : energy * (1 - spec.pierceShare)) * (1 - (covered.cut ?? 0));
   // (A bite torn out of a limb, `slash`, is a tear in its flesh: canines of a few cm reach no bone under a man's
   // thigh or arm; it bleeds and it hurts the muscle, it breaks nothing. At the neck it is the throat, as any bite there.)

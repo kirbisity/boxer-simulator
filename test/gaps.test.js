@@ -164,8 +164,7 @@ test('a skilled point put to the middle of a knight\'s breastplate never goes in
 });
 
 test('in a fight the katana seldom finds the knight\'s gaps and does not run him through the breastplate; a hammer still fells him', () => {
-  // (8 bouts, under 0.2: since a point stops on plate outside a gap (physics.js), a thrust there does nothing he can feel, and he
-  // lands fewer of them (60 to 23 in 8 bouts); the gaps found stay as few (1 to 4), the share of them up.)
+  // (8 bouts, under 0.2: a sword's point stops on plate outside a gap, short of its puncture (weapons.js PUNCTURE).)
   const katana = pairing('tosei', 'plate', 8);
   assert.ok(katana.thrust.rigid >= 8, `thrusts landed on plate: ${katana.thrust.rigid}`);
   assert.ok(katana.thrust.gaps / katana.thrust.rigid < 0.2, `into a gap ${katana.thrust.gaps} of ${katana.thrust.rigid} (was ~0.35 when a gap was anywhere)`);

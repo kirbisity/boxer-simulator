@@ -374,9 +374,10 @@ export const WEAPONS = {
   },
   // The hoplomachus's hasta: held near its balance in one hand, long ahead
   // of the hand and a good way behind it; made to thrust.
+  // (`pointWidth` 0.04: a leaf-shaped head ~4 cm across; PUNCTURE.)
   spear: {
     art: 'artSpear',
-    pointFrom: 0, label: 'Spear', hands: 'one', length: 1.3, strikeFrom: 0.9, handle: 0.6, mass: 1.6, balance: 0.18, radius: 0.016,
+    pointFrom: 0, label: 'Spear', hands: 'one', length: 1.3, strikeFrom: 0.9, handle: 0.6, mass: 1.6, balance: 0.18, radius: 0.016, pointWidth: 0.04,
     harm: { thrust: { pierce: 1.3, cut: 0.1, blunt: 0.2 }, swing: { cut: 0.2, blunt: 0.6 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.5,
   },
@@ -384,8 +385,9 @@ export const WEAPONS = {
   // blunt armour a hard, heavy head drives straight through (the hammer's
   // blow is felt through plate); `grip`: how firmly the weapon is held
   // against blows (a long spear, levered from the hands, is easiest lost).
+  // (`pointWidth` 0.015: the top spike, ~1.5 cm; PUNCTURE.)
   warhammer: {
-    label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 3.4, balance: 0.85, radius: 0.04,
+    label: 'War hammer', hands: 'two', length: 1.45, strikeFrom: 1.15, handle: 0.55, spacing: 0.42, leadAhead: true, mass: 3.4, balance: 0.85, radius: 0.04, pointWidth: 0.015,
     // (Its haft: ~3.5 cm of ash under the langets, not the head's 8 cm: what snaps, physics/wear.js.) The langets: the steel
     // straps riveted down the haft from the head (`langets`, m), ~30-50 cm on surviving 15th-c. pollaxes, bec de corbins
     // and Lucerne hammers, there to keep an edge off the wood below the head; they also stiffen it, so a thrust bows only
@@ -414,8 +416,9 @@ export const WEAPONS = {
   },
   // The war spear: a stout ash shaft and a long socketed iron head, ~2.3 kg;
   // its weight behind a narrow point drives the thrust deep.
+  // (`pointWidth` 0.04: a leaf-shaped head ~4 cm across; PUNCTURE.)
   longSpear: {
-    pointFrom: 0, label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
+    pointFrom: 0, label: 'Spear', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018, pointWidth: 0.04,
     harm: { thrust: { pierce: 1.5, blunt: 0.3, cut: 0.15 }, swing: { blunt: 0.65, cut: 0.2 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.8, art: 'artSpear', grip: 0.5,
   },
@@ -434,9 +437,10 @@ export const WEAPONS = {
   // behind it is in the blow's mass, not here, so not counted twice); its narrow head has next to
   // no edge; swung, the heavy shaft clubs (`swing` blunt). Slow to turn (`wrist`). The swell and the burr behind the grip
   // hold it in the hand against a blow on the long shaft (`grip`) better than a spear.
+  // (`pointWidth` 0.025: a war lance's narrow socketed head, ~2.5 cm; PUNCTURE.)
   lance: {
     art: 'artSpear',
-    pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, vamplate: 0.13,
+    pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, pointWidth: 0.025, vamplate: 0.13,
     harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
     contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 7, zeta: 0.9 }, threat: 4, grip: 0.8,
     // The ash shaft breaks only on heavy armour (physics.js shattersOn): its point met by armour proof against it to `pierce`
@@ -462,8 +466,9 @@ export const WEAPONS = {
   // by bending, and snaps only on armour a point cannot go into at all (plate, `pierce` 0.85 and over: not on the heaviest
   // lamellar, 0.72-0.8, or on mail) and only under a full charge's blow (`joules` 500: a gallop's couched point, 500-2,000
   // J, not a trot's or anything on foot). A foot spear never breaks.
+  // (`pointWidth` 0.03: a narrow leaf head ~3 cm; PUNCTURE.)
   manchuLance: {
-    pointFrom: 0, label: 'Heavy spear', hands: 'two', length: 2.05, strikeFrom: 1.6, handle: 0.85, spacing: 0.45, mass: 3.4, balance: 0.5, radius: 0.021,
+    pointFrom: 0, label: 'Heavy spear', hands: 'two', length: 2.05, strikeFrom: 1.6, handle: 0.85, spacing: 0.45, mass: 3.4, balance: 0.5, radius: 0.021, pointWidth: 0.03,
     harm: { thrust: { pierce: 1.6, blunt: 0.3, cut: 0.15 }, swing: { blunt: 0.75, cut: 0.25 } },
     contactSeconds: 0.005, rotation: 0.45, wrist: { omega: 10, zeta: 0.88 }, threat: 4, art: 'artSpear', grip: 0.7,
     // The iron head's length along the shaft (m), as drawn (weaponview.js) and struck: `strikeFrom` to the tip.
@@ -475,8 +480,9 @@ export const WEAPONS = {
   // The yari, as the ashigaru carried it: the war spear's long straight head
   // with a cross blade (jūmonji) below the point. The side blades cut and
   // hook a little better; the slimmer head knocks a man about a little less.
+  // (`pointWidth` 0.022: the sankaku yari's narrow three-sided head, ~2 cm; PUNCTURE.)
   yari: {
-    pointFrom: 0, label: 'Yari', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018,
+    pointFrom: 0, label: 'Yari', hands: 'two', length: 1.75, strikeFrom: 1.45, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 2.3, balance: 0.6, radius: 0.018, pointWidth: 0.022,
     harm: { thrust: { pierce: 1.5, blunt: 0.22, cut: 0.3 }, swing: { blunt: 0.5, cut: 0.4 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.9, art: 'artSpear', grip: 0.5,
   },
@@ -490,9 +496,10 @@ export const WEAPONS = {
   // not the man behind it, and he cannot step through it to the bearer;
   // swept across, it lashes (`swing`, little harm); the iron head is
   // driven at the face (`thrust`, the last fifth: `pointFrom`).
+  // (`pointWidth` 0.03: its spear tip among the branches, ~3 cm; PUNCTURE.)
   langxian: {
     art: 'artSpear',
-    pointFrom: 0.8, label: 'Langxian', hands: 'two', length: 3.3, strikeFrom: 1.3, handle: 1.4, spacing: 0.55, mass: 4, balance: 0.9, radius: 0.15,
+    pointFrom: 0.8, label: 'Langxian', hands: 'two', length: 3.3, strikeFrom: 1.3, handle: 1.4, spacing: 0.55, mass: 4, balance: 0.9, radius: 0.15, pointWidth: 0.03,
     harm: { thrust: { pierce: 1, blunt: 0.35, cut: 0.05 }, swing: { blunt: 0.45, cut: 0.05 } },
     contactSeconds: 0.008, rotation: 0.45, wrist: { omega: 6, zeta: 0.9 }, threat: 3.4, grip: 0.6,
     // Where its branches are, m out from the front hand: from a little past the hands to just short of the iron head.
@@ -504,9 +511,10 @@ export const WEAPONS = {
   // A hay fork taken up by a rebel: two long wooden-shafted iron tines, not
   // made to fight. Blunt tines that pierce poorly and knock a man about;
   // a farm tool held loosely, easily knocked from the hands.
+  // (`pointWidth` 0.012: a tine; PUNCTURE.)
   pitchfork: {
     art: 'artSpear',
-    pointFrom: 0, label: 'Pitchfork', hands: 'two', length: 1.6, strikeFrom: 1.3, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.017,
+    pointFrom: 0, label: 'Pitchfork', hands: 'two', length: 1.6, strikeFrom: 1.3, handle: 0.5, spacing: 0.45, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.017, pointWidth: 0.012,
     harm: { thrust: { pierce: 0.85, blunt: 0.45, cut: 0.03 }, swing: { blunt: 0.7, cut: 0.05 } },
     contactSeconds: 0.006, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3, grip: 0.3,
   },
@@ -620,8 +628,9 @@ export const WEAPONS = {
   // twice a sword's weight that cuts deeper. The left: a shotgun's barrel
   // (ARM_SHOTGUN) in a thick steel housing, its flanged muzzle a mace's
   // head, as the emptied three-eyed gun is swung (its blunt harm and crush).
+  // (`pointWidth` 0.025: the blade's point, ~2.5 cm; PUNCTURE.)
   armRifle: {
-    label: 'Arm rifle and blade', hands: 'one', hand: 'r', mounted: true, length: 0.55, strikeFrom: 0.18, handle: 0.02, mass: 2.6, balance: 0.22, radius: 0.026,
+    label: 'Arm rifle and blade', hands: 'one', hand: 'r', mounted: true, length: 0.55, strikeFrom: 0.18, handle: 0.02, mass: 2.6, balance: 0.22, radius: 0.026, pointWidth: 0.025,
     harm: { swing: { cut: 1.25, blunt: 0.5 }, thrust: { pierce: 1.05, cut: 0.2, blunt: 0.25 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 18, zeta: 0.8 }, threat: 7, ranged: true,
     muzzle: [0.34, 0.03],
@@ -698,9 +707,10 @@ export const WEAPONS = {
   // The tepoztopilli: a broad wooden head edged with obsidian flakes on a
   // short shaft, more a thrusting club than a steel spear: the flakes cut
   // shallow and the wooden point goes in less than iron.
+  // (`pointWidth` 0.08: a broad wooden head edged in obsidian, ~8 cm; PUNCTURE.)
   tepoztopilli: {
     art: 'artSpear',
-    pointFrom: 0, label: 'Tepoztopilli', hands: 'two', length: 1.3, strikeFrom: 0.98, handle: 0.38, spacing: 0.4, leadAhead: true, mass: 1.7, balance: 0.58, radius: 0.02, brittle: 0.55, cleave: 0.4,
+    pointFrom: 0, label: 'Tepoztopilli', hands: 'two', length: 1.3, strikeFrom: 0.98, handle: 0.38, spacing: 0.4, leadAhead: true, mass: 1.7, balance: 0.58, radius: 0.02, pointWidth: 0.08, brittle: 0.55, cleave: 0.4,
     harm: { thrust: { pierce: 0.65, cut: 0.3, blunt: 0.15 }, swing: { cut: 0.7, blunt: 0.3 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 14, zeta: 0.85 }, threat: 3.4, grip: 0.5,
   },
@@ -724,8 +734,9 @@ export const WEAPONS = {
   // the kanabo). The Jurchen "wolf-tooth" mace (langya bang) is studded with
   // iron teeth that bite as it crushes; the flanged mace (Mongol, Ottoman
   // shestopyor and bozdoğan) drives its blow into a flange's narrow edge.
+  // (`pointWidth` 0.012: an iron tooth; PUNCTURE.)
   langya: {
-    label: 'Wolf-tooth mace', hands: 'one', length: 0.72, strikeFrom: 0.46, handle: 0.13, mass: 2.0, balance: 0.68, radius: 0.042,
+    label: 'Wolf-tooth mace', hands: 'one', length: 0.72, strikeFrom: 0.46, handle: 0.13, mass: 2.0, balance: 0.68, radius: 0.042, pointWidth: 0.012,
     harm: { swing: { blunt: 1.45, pierce: 0.3 }, thrust: { blunt: 0.4, pierce: 0.15 } },
     contactSeconds: 0.004, rotation: 1.0, wrist: { omega: 12, zeta: 0.85 }, threat: 4, art: 'artCrushOne', crush: 0.45,
     // Its short haft bound in iron: no bare wood to snap.
@@ -879,7 +890,7 @@ export const WEAPONS = {
   // war arrows; Selby, Chinese Archery, 2000): ~140 g here. It stores ~211 J and gives ~140 J at ~45 m/s (~147 fps; the
   // 130-150 fps it is credited with); with a steppe arrow of 65 g it would give only ~109 J, 52% of what it stores against
   // 67% (test/bowcast.test.js). A broad head needs more energy at the point to go through a coat (the
-  // armour's physics: ARROW.proofJoules, rigidProof), and the heavy arrow's momentum knocks a man the harder (arrowHit).
+  // armour's physics: PUNCTURE), and the heavy arrow's momentum knocks a man the harder (arrowHit).
   // Drawn full only by a strong man (handling.js); the archer comes in close to make his shots (STYLES.manchuBow).
   manchuBow: {
     label: 'Manchu bow', hands: 'one', hand: 'l', length: 0.92, strikeFrom: 0.92, handle: 0.82, mass: 0.9, balance: 0, radius: 0.017,
@@ -901,7 +912,7 @@ export const WEAPONS = {
   // at 600 N that is ~101 J and ~107 J, and this bow gives ~102 J and ~114 J to those arrows. It stores ~161 J and
   // gives ~113 J to its own at ~49 m/s (~160 fps; the 140-160 fps it is credited with).
   // Drawn only by a man trained to it from boyhood (handling.js: a weak man draws it part way and slowly).
-  // Against plate it is the armour's physics that decides (ARROW.bounce, gapHarm), not the bow.
+  // Against plate it is the armour's physics that decides (ARROW.bounce, its gaps), not the bow.
   longbow: {
     label: 'Longbow', hands: 'one', hand: 'l', length: 1.0, strikeFrom: 1.0, handle: 0.9, mass: 0.8, balance: 0, radius: 0.016,
     harm: { swing: { blunt: 0.35 }, thrust: { blunt: 0.25 } },
@@ -918,9 +929,10 @@ export const WEAPONS = {
   // and pushed (the "push of pike"), not swung. Its weight far out before the hands makes it slow to bring
   // round (`wrist`), and a blow on its long shaft levers it from the hands easily (`grip`). Set against a
   // horse's charge with the butt to the ground, the man's weight is behind its point (WORLD.mount.brace).
+  // (`pointWidth` 0.025: a pike's small narrow head, ~2.5 cm; PUNCTURE.)
   pike: {
     art: 'artSpear',
-    pointFrom: 0, label: 'Pike', hands: 'two', length: 3.4, strikeFrom: 3.1, handle: 1.6, spacing: 0.6, leadAhead: true, mass: 3.5, balance: 0.7, radius: 0.017,
+    pointFrom: 0, label: 'Pike', hands: 'two', length: 3.4, strikeFrom: 3.1, handle: 1.6, spacing: 0.6, leadAhead: true, mass: 3.5, balance: 0.7, radius: 0.017, pointWidth: 0.025,
     harm: { thrust: { pierce: 1.5, blunt: 0.25, cut: 0.1 }, swing: { blunt: 0.6, cut: 0.1 } },
     contactSeconds: 0.005, rotation: 0.4, wrist: { omega: 8, zeta: 0.9 }, threat: 4, grip: 0.45,
   },
@@ -1046,9 +1058,10 @@ export const WEAPONS = {
   // The retiarius's trident (fuscina): ~1.7 m of ash with three iron prongs.
   // One hand while the other holds the net; both once it is thrown. The
   // prongs are short and spread: they wound wide rather than deep.
+  // (`pointWidth` 0.012: a prong; PUNCTURE.)
   trident: {
     art: 'artSpear',
-    label: 'Trident', hands: 'hybrid', length: 1.15, strikeFrom: 0.95, handle: 0.55, spacing: 0.4, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.016, tines: 3,
+    label: 'Trident', hands: 'hybrid', length: 1.15, strikeFrom: 0.95, handle: 0.55, spacing: 0.4, leadAhead: true, mass: 1.8, balance: 0.5, radius: 0.016, pointWidth: 0.012, tines: 3,
     harm: { thrust: { pierce: 0.85, cut: 0.2, blunt: 0.3 }, swing: { blunt: 0.55 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 14, zeta: 0.85 }, threat: 3.8, grip: 0.5,
   },
@@ -1072,9 +1085,10 @@ export const WEAPONS = {
   // and no rest, a long ash or cornel shaft with a heavy socketed point. Longer
   // and a little heavier than the knight's war lance (`lance`), as much of it
   // behind the grip; its grip a two-handed one, firmer than a spear's.
+  // (`pointWidth` 0.03: a narrow head ~3 cm; PUNCTURE.)
   kontos: {
     art: 'artSpear',
-    pointFrom: 0.78, label: 'Kontos', hands: 'two', length: 2.65, strikeFrom: 1.5, handle: 1.05, spacing: 0.55, mass: 5.6, balance: 0.2, radius: 0.025,
+    pointFrom: 0.78, label: 'Kontos', hands: 'two', length: 2.65, strikeFrom: 1.5, handle: 1.05, spacing: 0.55, mass: 5.6, balance: 0.2, radius: 0.025, pointWidth: 0.03,
     harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
     contactSeconds: 0.005, rotation: 0.38, wrist: { omega: 6.5, zeta: 0.9 }, threat: 4, grip: 0.75,
   },
@@ -1102,6 +1116,8 @@ export const WEAPONS = {
     ['vexillum', 'Vexillum', 'romans'],
   ].map(([kind, label, flag]) => [kind, {
     label, flag, hands: 'two', length: 1.75, strikeFrom: -0.6, handle: 0.85, spacing: 0.45, leadAhead: true, mass: 3.5, balance: 0.75, radius: 0.018,
+    // (`pointWidth`: a finial's spear point, ~4 cm across; PUNCTURE.)
+    pointWidth: 0.04,
     harm: { swing: { blunt: 1 }, thrust: { blunt: 0.7, pierce: 0.3 } },
     contactSeconds: 0.008, rotation: 1.4, wrist: { omega: 10, zeta: 0.9 }, threat: 2, grip: 0.5,
     // Its finial driven in as a spear's point is.
@@ -1570,8 +1586,8 @@ export const BLADES = {
     under: { blunt: 0.25, cut: 0.3, pierce: 0.2 },
     // What else may be under a gap (a kit's `mail`: the zones, or 'all', where it has mail under them; a zone's `under`):
     // riveted mail over the arming doublet (voiders, gussets, a standard, a mail skirt), which turns an edge and a point
-    // less (as the kits' own mail: Templar 0.88/0.5, gazi hauberk 0.9/0.45); bare skin.
-    layers: { mail: { blunt: 0.3, cut: 0.85, pierce: 0.55 }, bare: { blunt: 0, cut: 0, pierce: 0 } },
+    // less (as the kits' own mail over its padding: cut ~0.88, pierce 0.65); bare skin.
+    layers: { mail: { blunt: 0.3, cut: 0.85, pierce: 0.65 }, bare: { blunt: 0, cut: 0, pierce: 0 } },
     // A zone counts as one when the normal of the struck surface faces this far (cosine) towards where it opens (`faces`).
     facing: 0.3,
     // Each zone on the parts it lies on, measured on the man's own body: on the trunk, `height` the share of the way from
@@ -1803,8 +1819,9 @@ export function bulletProof(bulletRating, energy = GUN.energy) {
  * Arrows: loosed at `speed` (m/s), falling under gravity, aimed a little
  * high for the drop. Mostly a piercing wound (`lethal`, as for GUN, of what
  * kills an 80 kg man, cut by the armour's pierce protection) with a small
- * knock (`impulse`, N·s). Off good plate and lamellar (`arrowproof`) an
- * arrow glances `bounce` of the time; one that finds a gap does `gapHarm`. Mail it goes into, shallow (`mailStops`).
+ * knock (`impulse`, N·s). It meets what a blade's point meets there (the
+ * part's armour, or a gap and what is under it): off plate (`deflects`) it
+ * glances `bounce` of the time; else the armour's `pierce` holds it.
  * A spent arrow lies `stays` s.
  */
 export const ARROW = {
@@ -1839,7 +1856,7 @@ export const ARROW = {
   // ARROW_MOMENTUM); another arrow or a bolt knocks by its own momentum against that one's (physics/ranged.js arrowHit): a
   // heavy Manchu arrow staggers a man more than a light steppe one of the same energy. What goes through armour is the
   // energy at the point; what knocks him is the momentum.
-  impulse: 1.4, bounce: 0.9, gapHarm: 0.5, stays: 6,
+  impulse: 1.4, bounce: 0.9, stays: 6,
   // Its flight through the air (physics/ballistics.js): the drag on its shaft's section, Cd `cd` (Park 2011's 1.5-2.6 for
   // a fletched arrow, the turbulent figure for a war arrow's big feathers and rough shaft), on a shaft of `shaft` m (the Mary
   // Rose's arrows, ~10-13 mm at the middle, tapering) or a bolt's of `boltShaft` (a crossbow's stubby bolt, ~14-17 mm
@@ -1849,22 +1866,6 @@ export const ARROW = {
   // The reference war arrow's energy (J; an arrow's `energy` 1): a ~66 g shaft at ~55 m/s, ~100 J. Each bow's own arrow carries
   // what its build gives it (bowCast), counted against this. In a horse (physics/ranged.js missileInHorse) it is a point of that many joules.
   joules: 100,
-  // Armour short of plate is proof (its `pierce` share stopped) against an arrow of up to this many joules; past it, it stops that
-  // share × proofJoules / the arrow's (physics/ranged.js arrowHit): mail and its padding hold a ~100 J war arrow to a shallow
-  // wound, a heavy war bow's ~130 J bodkin a little less so, a crossbow's ~170 J bolt drives on through a good deal deeper.
-  proofJoules: 100,
-  // Rigid armour (plate, lamellar: `arrowproof`) a missile glances from or finds a gap in, unless it carries more than the armour
-  // is proof against: `rigidProof` J, plate's by its thickness (`plated`; a kit rated against balls, bulletRating, at `plateShare`
-  // of that when it is more) and lamellar's; past it, a share (joules − proof) / proof of the strikes that would glance goes
-  // through, spending proof / joules of itself on the armour. A war arrow (100-130 J) never does; a crossbow's 200 J bolt goes
-  // through lamellar a quarter of the time and thin plate a tenth; a harness proofed against shot, not at all.
-  rigidProof: { plate: 180, lamellar: 160, plateShare: 0.3 },
-  // Mail where a kit's rigid armour is only some of it (a kit's `arrowproof` a list of the regions, bulletRegion, that are
-  // plate: the great helm over a hauberk, the krug's plates in their mail): an arrow does not glance from rings, it parts
-  // a few and is held by them and the quilting under them, `mailStops` of a war arrow (ARROW.joules) stopped there and less
-  // of a heavier one (by proofJoules, as for any armour short of plate). A shallow wound: Bahā' al-Dīn saw the Frankish
-  // foot on the march to Arsuf (1191) with up to ten arrows standing in their mail and gambesons, marching on.
-  mailStops: 0.85,
   // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (physics/ranged.js
   // overHeads), on the arc that comes down on the mark, the bow drawn the less the higher it goes; tried from the flat
   // shot upward `step` rad at a time (~0.6 deg, finer than an archer lays his bow) to `most` rad (43 deg: about the
@@ -2009,6 +2010,53 @@ export function harmMix(spec, mode, along, at) {
     mix.pierce = 0;
   }
   return mix;
+}
+
+/**
+ * A point (an arrow's, a bolt's, a spear's, a lance's, a dagger's, a tooth's) against armour: the armour is proof against so
+ * many joules at the point (its puncture: punctureOf, from its `pierce` and the point's width), and stops all of a point that
+ * brings less; a man under it feels the blow, not the point. A point that brings more goes through: the armour spends its
+ * puncture on it, and the hole's edges and the padding behind still hold `after` × pierce of what is left. So harm is nearly
+ * nothing below the puncture and rises steeply past it, as an arrow stands in mail that a heavy bolt goes through, and a hand
+ * thrust stops on a breastplate that a lance at the gallop goes through. Each strike `spread` either way of the armour's
+ * puncture: where on a plate or a ring it lands, the point's own set (`roll` 0..1, the strike's own draw).
+ * The puncture is in proportion to the point's width (a weapon's `pointWidth`, else its blade's own, twice its `radius`)
+ * against a war arrow's bodkin, `width` (~10 mm, the Mary Rose's and the Tower's square bodkins): the armour must open a hole
+ * that wide, parting as many more rings, lamellae or as much more plate (the perforating energy of a thin plate goes with the
+ * point's perimeter); a narrow bodkin or a rondel goes where a broad blade or a leaf-bladed spear stops. And it rises with
+ * the armour's odds against a point (pierce / (1 − pierce)), to a `power` of them, fitted to two points for the bodkin and
+ * nothing else: mail on its padding (pierce 0.65) at `joules`, ~95 J, a war arrow's ~100 J just at it (the Frankish foot on
+ * the march to Arsuf, 1191, with arrows standing in their mail), a crossbow's ~170 J bolt well past it; and a breastplate
+ * (0.95) at ~300 J, past any hand bow (Williams, The Knight and the Blast Furnace, 2003: good plate needs some hundreds of
+ * joules at a bodkin, more than a war bow gives). For the rest it follows: for a bodkin, a padded coat (0.3) ~45 J, iron
+ * lamellar (0.85) ~165 J, a brigandine (0.9) ~205 J, a jousting harness's thick plate (0.985) ~550 J; for a sword's ~24 mm
+ * point, plate ~720 J, past the hardest lunge with the body behind it (~600 J at the point, tools/gaps.js); for a lance's
+ * narrow ~25 mm head, plate ~750 J, under the lance couched at the full gallop and met square (~900-1000 J,
+ * tools/couched.js), which did go through a harness, and a jousting harness ~1400 J, past it (the lance lands as the jolt).
+ */
+export const PUNCTURE = { joules: 95, at: 0.65, power: 0.5, width: 0.01, after: 0.3, spread: 0.3, most: 0.995 };
+
+const punctureOdds = (share) => share / (1 - share);
+
+/** The joules a point `width` m across must bring to go through armour of this `pierce` (PUNCTURE). */
+export function punctureOf(pierce, width = PUNCTURE.width) {
+  const share = Math.min(PUNCTURE.most, Math.max(0, pierce ?? 0));
+  return PUNCTURE.joules * (punctureOdds(share) / punctureOdds(PUNCTURE.at)) ** PUNCTURE.power * (width / PUNCTURE.width);
+}
+
+/** How wide a weapon's point is as it goes in (m): its own `pointWidth` (a head on a shaft, a spike), else its blade's, twice its `radius`. */
+export const pointWidthOf = (spec) => spec.pointWidth ?? 2 * (spec.radius ?? PUNCTURE.width / 2);
+
+/**
+ * The share of a point bringing `joules` (physical, at the point), `width` m across, that gets through armour of this
+ * `pierce` (PUNCTURE), the strike's draw `roll` (0..1).
+ */
+export function pointThrough(joules, pierce, roll = 0.5, width = PUNCTURE.width) {
+  const share = Math.min(PUNCTURE.most, Math.max(0, pierce ?? 0));
+  if (!(joules > 0)) return 0;
+  if (share <= 0) return 1;
+  const proof = punctureOf(share, width) * (1 + PUNCTURE.spread * (2 * roll - 1));
+  return joules <= proof ? 0 : ((joules - proof) / joules) * (1 - PUNCTURE.after * share);
 }
 
 /**

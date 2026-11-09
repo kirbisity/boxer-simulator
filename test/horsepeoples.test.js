@@ -13,6 +13,7 @@ import { leadFor, loose } from '../src/physics/ranged.js';
 import { RIDING } from '../src/riding.js';
 import { battleOf, SCENARIOS } from '../src/scenarios.js';
 import { vec } from '../src/pose.js';
+import { ARROW, punctureOf } from '../src/weapons.js';
 
 const LEVELS = ['mobei', 'carrhae', 'catalaunian'];
 const at = (fighter) => (fighter.mount ? [fighter.mount.at[0], fighter.mount.at[1]] : [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]]);
@@ -38,9 +39,9 @@ test('the new kit: each people\'s, the horse peoples ride, the horse archers car
   assert.equal(gearTraits(men.lateRoman).quiver, null);
   for (const head of ['montefortino', 'ridgeHelm', 'spangenhelm']) assert.ok(HELMETS[head].mass > 1, head);
   assert.equal(outfitOf(men.republicanLegionary).look.head.kind, 'montefortino');
-  // Iron lamellar turns arrows; the Republic's mail does not (Carrhae's arrows went through it).
-  assert.ok(gearTraits(normaliseInputs({ outfit: { kind: 'hanSoldier' } })).arrowproof);
-  assert.ok(!gearTraits(men.republicanLegionary).arrowproof);
+  // Iron lamellar stops a war arrow; the Republic's mail is parted by the heavier ones (Carrhae's arrows went through it).
+  assert.ok(punctureOf(gearTraits(normaliseInputs({ outfit: { kind: 'hanSoldier' } })).protection.pierce) > 1.5 * ARROW.joules);
+  assert.ok(punctureOf(gearTraits(men.republicanLegionary).protection.pierce) < 1.2 * ARROW.joules);
 });
 
 test('the three levels: their peoples, no side over the setup screen\'s cap, the history\'s arms', () => {

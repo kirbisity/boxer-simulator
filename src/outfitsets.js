@@ -70,7 +70,7 @@ export const OUTFIT_SETS = {
     {
       key: 'mail', designs: [2], name: 'Mail shirt and kettle hat',
       blurb: { en: 'Shirt of iron rings over a padded jacket, every ring riveted by hand. Romans, Vikings and crusaders wore it. A thousand years of armour, handed down at last to those who could not afford plate.\nBy the 1400s new arrowheads went through rings like a needle through lace, and the lords had moved on to plate.\nThe poor got the old shirts, patched with rings from a dozen dead men.\nThe shirt will pass to one more man yet.', zh: '锁子衫与棉甲。铁环一枚枚手工铆合。罗马人穿过，维京人穿过，十字军也穿过。千年的甲，最后传给了买不起板甲的人。\n到十五世纪，新式箭头穿过铁环，如针穿花边。领主们早已换上板甲。\n旧衫落到穷人手中，破处用十几个死人身上拆下的铁环补缀。\n这件衫子，还会再传给下一个人。' },
-      patch: { extraMass: 0.105, protection: { blunt: 0.35, cut: 0.88, pierce: 0.5 }, gaps: null },
+      patch: { extraMass: 0.105, protection: { blunt: 0.35, cut: 0.88, pierce: 0.65 }, gaps: null },
     },
     {
       key: 'breastplate', designs: [3], name: 'Breastplate and sallet',
@@ -78,7 +78,8 @@ export const OUTFIT_SETS = {
       patch: {
         extraMass: 0.14, breastplate: 0.6,
         helmet: { mass: 2.2, padding: 0.45, curve: 0.75, hold: 'half' },
-        protection: { blunt: 0.5, cut: 0.9, pierce: 0.8, regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 } } },
+        // The breast a solid plate: pierce 0.95 and turns a blade or an arrow (`deflects`), as a harness's (knight).
+        protection: { blunt: 0.5, cut: 0.9, pierce: 0.95, regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 }, torso: { blunt: 0.5, cut: 0.9, pierce: 0.95, deflects: true } } },
       },
     },
   ],
@@ -263,12 +264,12 @@ export const OUTFIT_SETS = {
     {
       key: 'jaguar', designs: [0, 2, 4], name: 'Jaguar warrior',
       blurb: { en: 'Suit of the Aztec jaguar warrior. Spotted hide over quilted cotton, the face looking out between carved wooden jaws. Only a man who had taken four captives for sacrifice could wear it.\nIn 1520, during a festival in the Aztec capital, Spanish soldiers locked the temple gates and cut down the dancing warriors in their finery.\nThey kept on until the drums stopped.', zh: '阿兹特克美洲豹武士的战衣。斑纹披在棉甲之外，脸从木雕的豹口中探出。唯有为祭坛活捉过四名俘虏的人，才能穿上。\n一五二〇年，阿兹特克都城祭神的节日里，西班牙兵锁上神庙大门，砍向盛装起舞的武士。\n一直砍到鼓声停了。' },
-      patch: { protection: { blunt: 0.22, cut: 0.22, pierce: 0.2 } },
+      patch: { protection: { blunt: 0.22, cut: 0.22, pierce: 0.3 } },
     },
     {
       key: 'eagle', designs: [1, 3], name: 'Eagle warrior',
       blurb: { en: 'Suit of the Aztec eagle warrior, the other elite order. Feathers over quilted cotton; an eagle’s open beak for a helmet. Sworn to feed the sun with human hearts, so that it would keep rising.\nCuauhtémoc, the last Aztec emperor, held the capital through the siege of 1521, until hunger and smallpox emptied it.\nCortés burned his feet with oil to learn where the gold was. Then he hanged him anyway.', zh: '阿兹特克雄鹰武士的羽衣，另一支精锐。羽毛覆于棉甲之上，头盔是一张张开的鹰喙。他们立誓以人心供奉太阳，好让太阳继续升起。\n末代皇帝夸乌特莫克守住都城，熬过一五二一年的围城，直到饥饿与天花将城掏空。\n科尔特斯以热油烧他的脚，逼问黄金的下落。问完，仍将他吊死。' },
-      patch: { extraMass: 0.06, protection: { blunt: 0.18, cut: 0.18, pierce: 0.2 } },
+      patch: { extraMass: 0.06, protection: { blunt: 0.18, cut: 0.18, pierce: 0.3 } },
     },
   ],
   mingBrigandine: [
@@ -285,12 +286,12 @@ export const OUTFIT_SETS = {
     {
       key: 'lamellar', designs: [3, 4], name: 'Ming iron lamellar — pointed helmet',
       blurb: { en: 'Iron plates laced in rows, and a plain pointed helmet. A design older than the dynasty, every plate on the outside where anyone could check it. A border soldier might wear his grandfather’s.\nWith nothing hidden to steal, the quartermaster saved on the laces. Cheap cord rotted in the rainy season.\nKorea, 1593. Ming soldiers met Japanese swordsmen in the spring mud, and the sodden laces gave way.', zh: '明军的札甲与素面尖盔。铁甲片成排编缀，形制比大明还老，片片露在外头，谁都查得到。边军身上的，兴许是祖父那一副。\n无物可偷，管库的便省在绳子上。廉价的绳，到雨季就烂。\n一五九三年，朝鲜。明军在春泥中迎上日本刀手，泡软的甲绳一扯便断。' },
-      patch: { extraMass: 0.15, protection: { blunt: 0.6, cut: 0.83, pierce: 0.5, regions: { head: { blunt: 0.54, cut: 0.86, pierce: 0.6 }, UpperArm: { blunt: 0.6, cut: 0.83, pierce: 0.5 }, Forearm: { blunt: 0.6, cut: 0.83, pierce: 0.5 } } } },
+      patch: { extraMass: 0.15, protection: { blunt: 0.6, cut: 0.83, pierce: 0.85, regions: { head: { blunt: 0.54, cut: 0.86, pierce: 0.6 }, UpperArm: { blunt: 0.6, cut: 0.83, pierce: 0.85 }, Forearm: { blunt: 0.6, cut: 0.83, pierce: 0.85 } } } },
     },
     {
       key: 'scale', designs: [5], name: 'Ming iron scale coat',
       blurb: { en: 'Coat of overlapping iron scales under the bell helmet, running down the chest like a fish’s flank. A blade slides off it as a fish slips from the hand.\nA starving garrison sells its costliest coat first.\nSarhu, 1619. The Ming sent four separate columns against the Manchus, who destroyed them one at a time, stripped the scales from the dead and wore them home.', zh: '明军的鳞甲与钟形盔。铁鳞层层相叠，顺胸而下，如鱼的侧身。刀砍上去会滑开，如鱼从手中溜走。\n卫所饿着肚子时，最先卖掉的就是最贵的甲。\n一六一九年，萨尔浒。明军分兵四路进攻后金，被逐路击破。八旗兵从死人身上剥下鳞甲，穿着回了家。' },
-      patch: { extraMass: 0.15, protection: { blunt: 0.58, cut: 0.84, pierce: 0.44, regions: { head: { blunt: 0.55, cut: 0.85, pierce: 0.55 }, UpperArm: { blunt: 0.58, cut: 0.84, pierce: 0.44 }, Forearm: { blunt: 0.58, cut: 0.84, pierce: 0.44 } } } },
+      patch: { extraMass: 0.15, protection: { blunt: 0.58, cut: 0.84, pierce: 0.85, regions: { head: { blunt: 0.55, cut: 0.85, pierce: 0.55 }, UpperArm: { blunt: 0.58, cut: 0.84, pierce: 0.85 }, Forearm: { blunt: 0.58, cut: 0.84, pierce: 0.85 } } } },
     },
   ],
   mingElite: [
@@ -307,17 +308,17 @@ export const OUTFIT_SETS = {
     {
       key: 'scale', designs: [3], name: 'Ming elite — scale armour, open helm',
       blurb: { en: 'Long coat of steel scales, polished and gilded at the edges, under a plumed helmet. On parade it shimmered like a goldfish: exactly as expensive as it looked, and about as useful.\nThe Wanli Emperor did not hold court for some twenty-five years. His guards stood gleaming before an empty hall.\nThe silver meant for the border troops went on gilt and parades.', zh: '明军侍卫的长鳞甲与缨盔。钢鳞磨亮，边缘鎏金。阅兵时闪如金鱼。华贵如其外表，也仅止于外表。\n万历皇帝二十余年不上朝。他的侍卫立在空荡的大殿前，金光闪闪。\n本该发给边军的饷银，化作了金箔与仪仗。' },
-      patch: { extraMass: 0.28, protection: { blunt: 0.6, cut: 0.96, pierce: 0.7 } },
+      patch: { extraMass: 0.28, protection: { blunt: 0.6, cut: 0.96, pierce: 0.85 } },
     },
     {
       key: 'scaleMasked', designs: [4], name: 'Ming elite — scale armour, masked helm',
       blurb: { en: 'Steel scales and the snarling beast mask: the full harness of a warlord’s chosen few, heavy as duty and as hard to take off. Not an inch of the man shows. A walking statue of his master’s importance.\nIn 1644 rebels marched into Beijing. The last Ming emperor hanged himself behind his palace.\nThe masked guards found there was no one left to guard.', zh: '家丁的鳞甲与兽面盔。将门亲信的全副披挂，重如差事，也如差事一般脱不下来。浑身不露一寸。一尊会走的雕像，雕的是主子的分量。\n一六四四年，闯军入北京。崇祯皇帝自缢于宫后煤山。\n戴面具的侍卫这才发现，已无人可守。' },
-      patch: { extraMass: 0.285, protection: { blunt: 0.6, cut: 0.96, pierce: 0.7, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
+      patch: { extraMass: 0.285, protection: { blunt: 0.6, cut: 0.96, pierce: 0.85, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
     },
     {
       key: 'lamellar', designs: [5], name: 'Ming elite — iron lamellar',
       blurb: { en: 'Iron plates laced with crimson cord and polished bright, the red marking the wearer as one of the elite. A uniform that mostly says ‘look at me’.\nIn 1449 the emperor’s favourite eunuch led the army against the Mongols, and halted to wait for his own baggage carts. At Tumu the thirsty army was destroyed.\nThe emperor was captured. His guards were not so lucky.', zh: '亲军的朱绳札甲。铁甲片以朱红绳编缀，磨得锃亮，那一抹红便是精锐的记号。这身军装，多半只为让人看见。\n一四四九年，皇帝宠信的太监王振统军北征瓦剌，途中停下等候自家的辎重车。土木堡，干渴的大军全军覆没。\n皇帝被俘。侍卫们没有这份运气。' },
-      patch: { protection: { blunt: 0.62, cut: 0.94, pierce: 0.74 } },
+      patch: { protection: { blunt: 0.62, cut: 0.94, pierce: 0.85 } },
     },
   ],
 };

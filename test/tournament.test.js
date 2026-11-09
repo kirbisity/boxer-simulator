@@ -50,7 +50,7 @@ test('the Stechzeug: cut-proof, better against a point than plate, proofed, slow
   const max = buildBody(PRESETS.maximilian);
   assert.equal(spec.faction, 'knights');
   assert.equal(spec.family, undefined, 'never dealt at random');
-  assert.ok(max.gear.cutProof && max.gear.deflects && max.gear.arrowproof && spec.plated);
+  assert.ok(max.gear.cutProof && max.gear.deflects && spec.plated);
   assert.equal(spec.protection.cut, 1);
   assert.ok(spec.protection.pierce > OUTFITS.knight.protection.pierce);
   assert.ok(spec.bulletRating > OUTFITS.knight.bulletRating);
@@ -129,7 +129,8 @@ const norm = (a) => a.map((value) => value / Math.hypot(...a));
 
 /** Maximilian's first blow with the lance at a man standing still (a boxer's style: no weapon of his own): the contact, or null. */
 function lanceAt(move, seed) {
-  const world = createWorld([{ ...PRESETS.maximilian }, { ...PRESETS.samurai, style: 'boxing' }], { seed });
+  // (At a man unarmoured: on foot the lance brings ~100 J, short of any iron armour's puncture, weapons.js PUNCTURE.)
+  const world = createWorld([{ ...PRESETS.maximilian }, { ...PRESETS.heavy, style: 'boxing' }], { seed });
   const [knight, man] = world.fighters;
   const reach = moveRange(MOVES[move], knight.body, knight.weapon.spec) + man.body.lengths.headRadius;
   let thrown = false;
@@ -197,12 +198,14 @@ function chargeOffCentre(target, across) {
   return world.events.find((event) => event.attacker === 0 && event.kind === 'landed') ?? null;
 }
 
-test('plate turns a point that meets it aslant: it skids off the curve of the breastplate, where it runs an unarmoured man through', () => {
+test('plate turns a point that meets it aslant: it skids off the curve of the breastplate, where it runs an unarmoured man through; square on, on foot, it stops on it', () => {
   const square = chargeOffCentre('knight', 0);
   const aslant = chargeOffCentre('knight', 0.1);
   const bare = chargeOffCentre('heavy', 0.1);
   assert.ok(square && aslant && bare);
-  assert.ok(square.pierce > 0 && !square.effects.includes('glanced off the plate'), 'square on, the point bites (what the plate lets through)');
+  // (Square on it bites, not skids, but a lance run in on foot brings far less than plate's puncture: weapons.js PUNCTURE.)
+  assert.ok(!square.effects.includes('glanced off the plate'), 'square on, the point bites');
+  assert.equal(square.pierce, 0, 'and stops on the plate');
   assert.equal(aslant.pierce, 0);
   assert.ok(aslant.effects.includes('glanced off the plate'));
   assert.ok(bare.pierce > 60, `the same line into a bare chest: ${bare.pierce.toFixed(0)} J`);

@@ -393,6 +393,21 @@ function incaDesign(label, weave, field, second, { cord = '#1c1c20', cord2 = '#b
   };
 }
 
+// PIERCE_SCALE: an armour's `pierce` is the armour itself, what its material keeps out of a point where it is worn: the joules it
+// stops a point at (its puncture, weapons.js PUNCTURE: an arrow, a thrust, a lance) and what it still holds of one past it. What it does not cover is its own region (`regions`: a vest's bare
+// arms) and where it opens is its gaps (`gaps`: the armpit, the lacing; physics/gaps.js), never a lower figure for the whole.
+// Only plate (`deflects`) turns a point or an arrow aside.
+// - a padded coat, quilted cotton (gambeson, jack, the Mexica ichcahuipilli): 0.3;
+// - mail over its padding: 0.65 (Bahā' al-Dīn saw the Frankish foot march on to Arsuf, 1191, with arrows standing in it);
+//   two layers (the kazaghand) 0.75; with plates over the vitals (mirrors, the krug) 0.7-0.85;
+// - lamellae of iron and rawhide (Japanese, laced): 0.8;
+// - iron lamellar or scale, lapped two or three deep over a padded coat (Han, Ming, steppe): 0.85; two layers, 0.9;
+// - a brigandine (1-2 mm plates riveted inside cloth, lapped; Ming and European alike), a solid munition shell (the
+//   okegawa-dō 0.85), solid lames (the tōsei dō): 0.9;
+// - solid plate, a breastplate or a harness: 0.95.
+// (The user's figures, 2026-11-09, for mail, the padded coat, quilted cotton, the Hun's mail, the brigandine and the
+// breastplate, the ashigaru's shell; the rest set to them.)
+
 // A gladiator's five looks: his metal, his loincloth, his plume.
 // The arena's armour, part by part: gladiators fought with the chest bare
 // and the limbs most exposed in their stance covered, each kind differently
@@ -405,7 +420,7 @@ const ARENA = {
   // The manica: overlapping metal or hardened leather lames over padding.
   manica: { blunt: 0.45, cut: 0.85, pierce: 0.7, deflects: true },
   // A quilted manica or legging: thick linen, no metal.
-  quilt: { blunt: 0.35, cut: 0.55, pierce: 0.35 },
+  quilt: { blunt: 0.35, cut: 0.55, pierce: 0.3 },
   // A bronze greave (ocrea) from instep to knee.
   greave: { blunt: 0.55, cut: 0.95, pierce: 0.85, deflects: true },
   // The thraex's greaves run up over the quilted thigh.
@@ -415,7 +430,7 @@ const ARENA = {
   // Wrappings (fasciae) round a shin: little.
   wrap: { blunt: 0.15, cut: 0.25, pierce: 0.15 },
   // The scissor's scale shirt over the trunk, and the steel tube over his left arm.
-  scale: { blunt: 0.4, cut: 0.85, pierce: 0.6 },
+  scale: { blunt: 0.4, cut: 0.85, pierce: 0.85 },
   tube: { blunt: 0.7, cut: 1, pierce: 0.95, deflects: true },
   bare: { blunt: 0, cut: 0, pierce: 0 },
 };
@@ -497,9 +512,9 @@ export function heelFooting(heels) {
  * spaulder, a rerebrace of three pieces, a couter and a vambrace of three (as quoted in the Great Ming Military's 'Plate
  * Armour of the Ming Dynasty', 2015). Solid plate, not plates in a coat: no seams for a point to find, an edge turned
  * aside as off a knight's vambrace (the knight's harness: cut 1, pierce 0.95), a little short of the European harness's
- * hardened steel; a blow spread as plate spreads it, over the quilted sleeve under it.
+ * hardened steel (pierce 0.93, under plate's 0.95: PIERCE_SCALE); a blow spread as plate spreads it, over the quilted sleeve under it.
  */
-const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.9, deflects: true };
+const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
 
 export const OUTFITS = {
   boxing: {
@@ -769,7 +784,6 @@ export const OUTFITS = {
     // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
     breastplate: 0.8,
     // Arrows glance off it.
-    arrowproof: true,
     sidearm: 'dagger',
     defaultHeadgear: 'plume', movement: 'limited', fists: 'gauntlet',
     headgear: ['plume', 'ostrich', 'harpy'],
@@ -814,7 +828,7 @@ export const OUTFITS = {
     // Rides (full plate: the great horse in a steel bard).
     horse: 'destrier', barding: 'plate',
     faction: 'knights', bulletRating: 650, plated: true,
-    label: 'Joan of Arc — white harness', arrowproof: true, sidearm: 'dagger', movement: 'limited', fists: 'gauntlet',
+    label: 'Joan of Arc — white harness', sidearm: 'dagger', movement: 'limited', fists: 'gauntlet',
     finishes: PLATE_FINISHES,
     // The breastplate is curved (the globose breast of the 15th c., the peascod of the 16th): a blow or an arrow not square on it glances.
     breastplate: 0.8,
@@ -860,7 +874,6 @@ export const OUTFITS = {
     // Any helm in any steel: the bright steel of the first designs, blued, blackened, the russet of the Gothic helm's.
     finishes: PLATE_FINISHES,
     breastplate: 0.85,
-    arrowproof: true,
     sidearm: 'longsword',
     movement: 'slow', fists: 'gauntlet',
     // A knight's field plate is ~0.275 of his weight; the Stechzeug is ~1.6 times as heavy.
@@ -877,11 +890,12 @@ export const OUTFITS = {
     // under them the thick quilted jousting doublet (field plate's arming coat 0.25/0.3/0.2), and mail at the armpits (under
     // the laminated pauldrons) and the groin; the helm bolted to the breast leaves no throat between them (`closed`).
     gaps: { thrust: 0.2, under: { blunt: 0.35, cut: 0.5, pierce: 0.4 }, mail: ['armpit', 'groin'], closed: ['neck'] },
-    // Blunt 0.75 (was 0.65): the thick reinforced breast over the quilted doublet spreads a blow; pierce 0.97 (was 0.95)
-    // against a point; the helm by the same ratios (blunt 0.7 → 0.81, pierce 0.95 → 0.97).
+    // Blunt 0.75 (was 0.65): the thick reinforced breast over the quilted doublet spreads a blow; pierce 0.985 (was 0.97):
+    // the jousting breast and helm 3-5 mm of steel against a field harness's 1.5-2 mm, a lance at the full gallop short of
+    // its puncture (weapons.js PUNCTURE: ~2300 J), the blow landing as the jolt that unhorses; the helm the same.
     protection: {
-      blunt: 0.75, cut: 1, pierce: 0.97, bullet: { head: 0.75, torso: 0.85, limb: 0.35 },
-      regions: { head: { blunt: 0.81, cut: 1, pierce: 0.97, deflects: true } },
+      blunt: 0.75, cut: 1, pierce: 0.985, bullet: { head: 0.75, torso: 0.85, limb: 0.35 },
+      regions: { head: { blunt: 0.81, cut: 1, pierce: 0.985, deflects: true } },
     },
     cutProof: true,
     courage: 0.55,
@@ -913,15 +927,13 @@ export const OUTFITS = {
     faction: 'knights',
     // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
     label: 'Knights Templar — mail, surcoat and great helm', movement: 'limited', fists: 'gauntlet',
-    // Arrows glance only off its plate: the great helm is plate; the hauberk, coif and chausses mail (ARROW.mailStops).
-    arrowproof: ['head'],
     sidearm: 'dagger',
     // Armour at 0.55 of its old weight (was 0.4): hauberk, chausses, gambeson and great helm: ~19 kg on an 85 kg man (real ~20–25 kg).
     extraMass: 0.22,
     // The great helm: another man's head stays outside it in a clinch.
     headBulk: 1.45,
     protection: {
-      blunt: 0.3, cut: 0.88, pierce: 0.5, bullet: { head: 0.35, torso: 0.05, limb: 0 },
+      blunt: 0.3, cut: 0.88, pierce: 0.65, bullet: { head: 0.35, torso: 0.05, limb: 0 },
       regions: {
         head: { blunt: 0.7, cut: 0.97, pierce: 0.85, deflects: true },
         Shank: { blunt: 0.45, cut: 0.95, pierce: 0.7 },
@@ -947,11 +959,11 @@ export const OUTFITS = {
     sidearm: 'shortSword',
     // Armour at 0.55 of its old weight (was 0.22): ~9 kg on a 75 kg man, against a brigandine's 8–15 kg or a mail shirt's ~10 kg.
     extraMass: 0.12,
-    // The torso in a breastplate or brigandine: cut 0.85 (was 0.75), pierce 0.65 and blunt 0.45 (were 0.6 and 0.4).
+    // The torso in a brigandine: cut 0.85 (was 0.75), blunt 0.45 (was 0.4); pierce 0.9, a brigandine's (PIERCE_SCALE; the breastplate set's 0.95).
     // The kettle hat, steel over an arming cap: better against an edge and a blow (was as the body: 0.4/0.75/0.6).
     // The arms in mail sleeves or light guards, the legs in hose: less than the trunk (were all as the body).
     protection: {
-      blunt: 0.45, cut: 0.85, pierce: 0.65, bullet: { head: 0.35, torso: 0.35, limb: 0 },
+      blunt: 0.45, cut: 0.85, pierce: 0.9, bullet: { head: 0.35, torso: 0.35, limb: 0 },
       regions: {
         head: { blunt: 0.55, cut: 0.92, pierce: 0.65 },
         UpperArm: { blunt: 0.25, cut: 0.6, pierce: 0.35 },
@@ -981,7 +993,6 @@ export const OUTFITS = {
     faction: 'japanese', plated: true,
     label: 'Samurai — ō-yoroi', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
-    arrowproof: true,
     sidearm: 'wakizashi',
     picked: [0, 1, 2, 3],
     headgear: ['crest', ...KABUTO_CRESTS],
@@ -990,10 +1001,14 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.4): ~17 kg on a 77 kg man, against an ō-yoroi's ~20–25 kg.
     extraMass: 0.22,
     // Blunt 0.65 (was 0.7): laced lamellae give with a blow more than a solid shell.
-    protection: { blunt: 0.65, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 } },
+    // Pierce 0.8, lamellae of iron and rawhide (PIERCE_SCALE).
+    protection: { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
-    courage: 0.4,
+    // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
+    // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
+    // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
+    courage: 0.85,
     designs: [
       { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743', panel: true, leather: '#5a3a22', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25, panel: true, leather: '#3a2a3a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'kuwagata', mask: 'red', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
@@ -1022,7 +1037,6 @@ export const OUTFITS = {
     faction: 'japanese', plated: true,
     // No `family`: never dealt to a samurai at random (it is the flagship's own, too detailed for a crowd).
     label: 'Ō-yoroi (great armour)', movement: 'good', fists: 'bare',
-    arrowproof: true,
     sidearm: 'wakizashi',
     headgear: ['crest', ...KABUTO_CRESTS],
     defaultHeadgear: 'crest',
@@ -1030,7 +1044,7 @@ export const OUTFITS = {
     extraMass: 0.23,
     // Blunt 0.65 (was 0.7): laced lamellae give with a blow more than a solid shell; every part's blunt by the same ratio.
     protection: {
-      blunt: 0.65, cut: 0.9, pierce: 0.6, bullet: { head: 0.3, torso: 0.4, limb: 0 },
+      blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 },
       regions: {
         head: { blunt: 0.58, cut: 0.88, pierce: 0.55 },
         // The sode over the upper arms: a board hung beside the arm, not round it.
@@ -1044,7 +1058,10 @@ export const OUTFITS = {
     // More openings than later armour: a quarter more chance in a gap (BLADES.gaps), and the laced box parts at its lacing
     // and the waidate's seam more than most laced armour (`lacing`).
     gaps: { thrust: 0.5, swing: 0.15, lacing: 0.15 },
-    courage: 0.45,
+    // Courage 0.85 (was 0.45): a samurai seldom turned from the man who answered his challenge
+    // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
+    // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
+    courage: 0.85,
     designs: [
       oyoroiDesign('Scarlet laced (aka-ito)', { lacquer: '#16141a', lace: '#c0281e', gold: '#d6a743', leather: '#5a4430', stencil: '#d8c08a', robe: '#b83a1c', hakama: '#8e2a16', crest: 'kuwagataTall' }),
       oyoroiDesign('Gold and orange', { lacquer: '#3a2210', lace: '#d9822b', gold: '#e3b34c', leather: '#7a5636', stencil: '#e8c890', robe: '#5a2414', hakama: '#4a1c10', crest: 'kuwagataTall' }),
@@ -1062,7 +1079,6 @@ export const OUTFITS = {
     faction: 'japanese', bulletRating: 900, plated: true,
     label: 'Samurai — tōsei gusoku', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
-    arrowproof: true,
     sidearm: 'wakizashi',
     headgear: ['crest', ...KABUTO_CRESTS],
     defaultHeadgear: 'crest',
@@ -1070,12 +1086,16 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.45): ~19 kg on a 77 kg man, against a tōsei gusoku's ~15–20 kg.
     extraMass: 0.25,
     // Blunt 0.7 (was 0.75): Japanese armour, lacquered lames and laced sleeves, takes a blow a little less than a European shell.
-    protection: { blunt: 0.7, cut: 0.95, pierce: 0.7, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
+    // Pierce 0.9, solid lames (PIERCE_SCALE).
+    protection: { blunt: 0.7, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
     // Under its gaps, kusari (mail) where the later armour has it: the wakibiki under the arms, the kote's mail sleeves at
     // the bend of the elbow, the haidate's mail over the groin and thighs, the yodarekake and nodowa at the throat
     // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). The cuirass is solid lames.
     gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'] },
-    courage: 0.4,
+    // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
+    // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
+    // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
+    courage: 0.85,
     designs: [
       toseiDesign('Iron', '#3b3e44', '#1d2a4f', 'crescent', 'black', '#1c1d26'),
       toseiDesign('Russet', '#6b4a32', '#2a1a10', 'kuwagata', 'red', '#2a1f18'),
@@ -1105,11 +1125,11 @@ export const OUTFITS = {
     picked: [0, 1, 2],
     // Armour at 0.55 of its old weight (was 0.2): ~8 kg on a 70 kg man, against an okegawa-dō and jingasa's ~8–10 kg.
     extraMass: 0.11,
-    // The okegawa-dō, a solid riveted shell: the torso cut 0.8 and pierce 0.6 (were 0.7 and 0.5); its blunt kept at 0.5
+    // The okegawa-dō, a solid riveted shell of munition iron: the torso cut 0.8 (was 0.7) and pierce 0.85 (PIERCE_SCALE); its blunt kept at 0.5
     // (Japanese armour a little down, a solid dō a little up). The jingasa a lighter hat than a helmet: a little weaker
     // (was as the body). Cloth sleeves with light kote, shin guards: the limbs less than the trunk (were all as the body).
     protection: {
-      blunt: 0.5, cut: 0.8, pierce: 0.6, bullet: { head: 0.2, torso: 0.25, limb: 0.05 },
+      blunt: 0.5, cut: 0.8, pierce: 0.85, bullet: { head: 0.2, torso: 0.25, limb: 0.05 },
       regions: {
         head: { blunt: 0.42, cut: 0.6, pierce: 0.42 },
         limb: { blunt: 0.2, cut: 0.45, pierce: 0.25 },
@@ -1293,11 +1313,11 @@ export const OUTFITS = {
     // ~10 kg on an 81 kg man: the vest without the shoulder guards and bracers (a brigandine's 8–15 kg).
     extraMass: 0.125,
     // Cut 0.8 and blunt 0.63 (were 0.7 and 0.6; under the elite's 0.65): plates riveted inside a padded coat turn an edge and spread a blow; pierce
-    // 0.47 (was 0.5): a point finds the rivet lines. Over the trunk and the skirt; the vest has no sleeves, so the arms have only the quilted
+    // 0.9, a brigandine's (PIERCE_SCALE; was 0.47, lowered for the arms it leaves bare, which are their own region). Over the trunk and the skirt; the vest has no sleeves, so the arms have only the quilted
     // cotton of the coat under it (a padded jack's sleeve: some of a blow spread, an edge slowed, a point little). The lamellar and the scale
     // (outfitsets.js) keep their arm guards and their arms' protection.
     protection: {
-      blunt: 0.63, cut: 0.8, pierce: 0.47, bullet: { head: 0.3, torso: 0.5, limb: 0 },
+      blunt: 0.63, cut: 0.8, pierce: 0.9, bullet: { head: 0.3, torso: 0.5, limb: 0 },
       regions: { UpperArm: { blunt: 0.25, cut: 0.3, pierce: 0.15 }, Forearm: { blunt: 0.25, cut: 0.3, pierce: 0.15 } },
     },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
@@ -1332,7 +1352,6 @@ export const OUTFITS = {
     sidearm: 'dao',
     spare: 'dagger',
     deflects: true,
-    arrowproof: true,
     // Long reinforced brigandine, arm guards, helmet: ~20 kg on a 73 kg man (real ~15–20 kg; the Wubei yaolue's ideal full
     // iron armour 30 jin, ~18 kg, as quoted in the Great Ming Military, 2015): its plates heavier than a Japanese armour's
     // (was 0.25, ~18 kg, the tōsei gusoku's own share), ~1.5 kg more iron in the coat.
@@ -1342,9 +1361,8 @@ export const OUTFITS = {
     // (素白精铁, 《天野源右卫门觉书》, as quoted secondhand), a sword turned off a Ming soldier's armour three times (《户川记》),
     // armour of steel reaching the feet on horseback (Frois). So proof against a ball at least as the bullet-tested tōsei dō
     // is (`bulletRating` 900, was 650; the trunk's share 0.55, was 0.5, as the tōsei's), and a blow spread at least as its
-    // solid lames spread it (blunt 0.7, was 0.65). Pierce 0.75: a point finds the plates' seams in the coat more than in a
-    // solid shell. The arms in the steel arm guards (MING_ARM_GUARD).
-    protection: { blunt: 0.7, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
+    // solid lames spread it (blunt 0.7, was 0.65). Pierce 0.92, over a soldier's brigandine's 0.9 (PIERCE_SCALE) for the coat two plates deep; its seams are its lacing (`gaps`). The arms in the steel arm guards (MING_ARM_GUARD).
+    protection: { blunt: 0.7, cut: 0.95, pierce: 0.92, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the brigandine coat's plates a little anywhere but the solid plates.
     // (No mail under its gaps: a Ming elite's voiders are not documented as the European ones are; the coat's padding.)
     gaps: { lacing: 0.1 },
@@ -1378,13 +1396,13 @@ export const OUTFITS = {
     sidearm: 'dao',
     spare: 'dagger',
     deflects: true,
-    arrowproof: true,
     // Near the Ming elite's weight and guard (~17 kg on a 79 kg man), the limbs a little less covered (studded
     // cloth sleeves, not the elite's steel arm guards).
     extraMass: 0.22,
     // Blunt above the Ming elite's: mianjia is cotton armour, the plates set in thick quilted cotton many layers deep
     // that spreads a club's or a mace's blow over the body as a thin coat of plates does not.
-    protection: { blunt: 0.72, cut: 0.93, pierce: 0.72, bullet: { head: 0.4, torso: 0.5, limb: 0.15 } },
+    // Pierce 0.9, a brigandine's (PIERCE_SCALE).
+    protection: { blunt: 0.72, cut: 0.93, pierce: 0.9, bullet: { head: 0.4, torso: 0.5, limb: 0.15 } },
     gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [
@@ -1413,14 +1431,14 @@ export const OUTFITS = {
     sidearm: 'dao',
     spare: 'dagger',
     deflects: true,
-    arrowproof: true,
     // The Ming elite's coat (~17 kg on an 89 kg man) and a mail shirt under it (the 'three coats' of the Qing accounts: what
     // is true of it is the mail under the brigandine; `under`, UNDER_ARMOUR.mail, its ~9 kg added): ~26 kg in all.
     extraMass: 0.19,
     under: 'mail',
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
     // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
-    protection: { blunt: 0.72, cut: 0.95, pierce: 0.75, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    // Pierce 0.9, a brigandine's (PIERCE_SCALE).
+    protection: { blunt: 0.72, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
     // The coat's lacing parts as the banner coat's does; between the plates and wherever they part, the mail under it (UNDER_ARMOUR.mail `zones`).
     gaps: { lacing: 0.1 },
     courage: 0.45,
@@ -1452,7 +1470,6 @@ export const OUTFITS = {
     sidearm: 'langya',
     spare: 'dagger',
     deflects: true,
-    arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.6): iron lamellar to below the knee: ~33 kg on a 100 kg man (real heavy lamellar ~25–30 kg).
     extraMass: 0.33,
     // A little better than it was (blunt 0.69, was 0.66; cut 0.96, was 0.95; pierce 0.88, was 0.85; the user's call,
@@ -1460,8 +1477,8 @@ export const OUTFITS = {
     // Song shi's life of Yue Fei, of Yancheng, 1140) and, at Shunchang the same year, under "a double iron helmet, long
     // lames hung all round it" (被两重铁兜鍪，周匝皆缀长檐: Yang Ruyi's account of the victory there), layered iron the Song
     // bows could not get through; the second layer takes a little more of a blow's spread and a point's bite.
-    // Pierce still under plate's: a point finds the lacing between the lamellae.
-    protection: { blunt: 0.69, cut: 0.96, pierce: 0.88, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
+    // Pierce 0.9: two layers of iron lamellar (PIERCE_SCALE: one 0.85), under plate's; the lacing is its gaps.
+    protection: { blunt: 0.69, cut: 0.96, pierce: 0.9, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid
     // plates; 0.08, was 0.1: the double layer's rows overlap the lacing of the one beneath.
     gaps: { lacing: 0.08 },
@@ -1485,11 +1502,10 @@ export const OUTFITS = {
     label: 'Guan Yu — green robe over gilt scale', movement: 'good', fists: 'bare',
     sidearm: 'dao',
     deflects: true,
-    arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.42): gilt scale: ~20 kg on an 86 kg man.
     extraMass: 0.23,
-    // Pierce 0.73 (was 0.78): a point finds the scales' lacing; the cloth cap as it was.
-    protection: { blunt: 0.62, cut: 0.92, pierce: 0.73, bullet: { head: 0.05, torso: 0.4, limb: 0.15 }, regions: { head: { blunt: 0.08, cut: 0.15, pierce: 0.05 } } },
+    // Pierce 0.85, iron scale (PIERCE_SCALE); the cloth cap as it was.
+    protection: { blunt: 0.62, cut: 0.92, pierce: 0.85, bullet: { head: 0.05, torso: 0.4, limb: 0.15 }, regions: { head: { blunt: 0.08, cut: 0.15, pierce: 0.05 } } },
     courage: 0.6,
     designs: [
       { label: 'Green robe, gilt scale', special: true, top: { kind: 'longsleeve', color: '#2a5636' }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'guanYu', color: '#a8853e', cloth: '#2f6a3e', cloth2: '#1f4a2c', lace: '#4a3418', gold: '#d6a743' }, head: { kind: 'guanYuCap', color: '#2f6a3e', gold: '#d6a743' }, feet: { kind: 'compactBoot', color: '#141416' } },
@@ -1506,17 +1522,15 @@ export const OUTFITS = {
     // Han crossbowmen stood in ranks and shot, the ranks relieving each other; they held their ground.
     drill: { advance: false },
     sidearm: 'jian',
-    // Iron lamellae turn an arrow that does not find a gap, as any rigid iron does (`arrowproof`; ranged.js arrowHit):
     // Chao Cuo's memorial (169 BC) has the Xiongnu's leather and their arrows no match for Han iron. The arms and legs, cloth.
-    arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.18): iron lamellar vest and helmet: ~8 kg on an 80 kg man (Han lamellar finds ~8–10 kg).
     extraMass: 0.1,
     // The head: an iron lamellar helmet over a padded cap (the Linzi helmet):
     // iron plates turn an edge almost as the coat does; a point finds the
     // lacing a little more often, and a blow is felt through the small
     // plates more than through a one-piece bowl. The face is open.
-    // Pierce 0.58 (was 0.62): a point finds the lacing; the helmet by the same ratio (0.5 → 0.47).
-    protection: { blunt: 0.4, cut: 0.82, pierce: 0.58, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.47 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    // Pierce 0.85, iron lamellar (PIERCE_SCALE); the helmet's small plates 0.8, its lacing found a little more often.
+    protection: { blunt: 0.4, cut: 0.82, pierce: 0.85, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.8 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.3,
@@ -1534,11 +1548,10 @@ export const OUTFITS = {
     faction: 'chinese',
     label: 'Han cavalry — iron lamellar', movement: 'good', fists: 'bare',
     sidearm: 'jian',
-    arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.18): iron lamellar vest and helmet: ~8 kg on an 80 kg man (Han lamellar finds ~8–10 kg).
     extraMass: 0.1,
-    // Pierce 0.58 (was 0.62): a point finds the lacing; the helmet by the same ratio (0.5 → 0.47).
-    protection: { blunt: 0.4, cut: 0.82, pierce: 0.58, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.47 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    // Pierce 0.85, iron lamellar (PIERCE_SCALE); the helmet's small plates 0.8, its lacing found a little more often.
+    protection: { blunt: 0.4, cut: 0.82, pierce: 0.85, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.8 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.3,
@@ -1574,7 +1587,8 @@ export const OUTFITS = {
     deflects: true,
     // Armour at 0.55 of its old weight (was 0.28): segmentata and helmet: ~12 kg on a 75 kg man (real ~9 kg and ~2 kg).
     extraMass: 0.154,
-    protection: { blunt: 0.55, cut: 0.95, pierce: 0.8, bullet: { head: 0.3, torso: 0.3, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.45, cut: 0.85, pierce: 0.6 } } },
+    // Pierce 0.9: the segmentata's iron bands, thinner than a harness's plate (PIERCE_SCALE: plate 0.95).
+    protection: { blunt: 0.55, cut: 0.95, pierce: 0.9, bullet: { head: 0.3, torso: 0.3, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.45, cut: 0.85, pierce: 0.6 } } },
     courage: 0.4,
     designs: [
       { label: 'Segmentata, red tunic', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'loincloth', color: '#8a2a22' }, armor: { kind: 'segmentata', color: '#a7adb6', gold: '#b98a3e', lace: '#3a2416' }, head: { kind: 'galea', color: '#a7adb6', gold: '#b98a3e' }, feet: { kind: 'sandal', color: '#3a2416' } },
@@ -1592,7 +1606,8 @@ export const OUTFITS = {
     sidearm: 'dagger',
     // Armour at 0.55 of its old weight (was 0.3): mail, greaves, helmet: ~13 kg on a 78 kg man (a mail shirt ~10 kg).
     extraMass: 0.165,
-    protection: { blunt: 0.4, cut: 0.92, pierce: 0.55, bullet: { head: 0.3, torso: 0.2, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 }, Shank: { blunt: 0.5, cut: 0.95, pierce: 0.8, deflects: true } } },
+    // Pierce 0.65, mail over its padding (PIERCE_SCALE).
+    protection: { blunt: 0.4, cut: 0.92, pierce: 0.65, bullet: { head: 0.3, torso: 0.2, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.95, pierce: 0.8, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 }, Shank: { blunt: 0.5, cut: 0.95, pierce: 0.8, deflects: true } } },
     courage: 0.55,
     designs: [
       { label: 'Mail, phalerae, transverse crest', top: { kind: 'tunic', color: '#7a1a1e' }, bottom: { kind: 'loincloth', color: '#7a1a1e' }, armor: { kind: 'centurion', color: '#a7adb6', mail: '#8d9097', gold: '#c9a24a', lace: '#3a2416' }, head: { kind: 'galea', color: '#b8bec6', gold: '#c9a24a', crest: 'transverse', plume: '#b3161b' }, feet: { kind: 'sandal', color: '#3a2416' } },
@@ -1614,7 +1629,8 @@ export const OUTFITS = {
     sidearm: 'dagger',
     // Armour at 0.55 of its old weight (was 0.26): mail and helmet: ~11 kg on a 78 kg man (a mail shirt ~10 kg).
     extraMass: 0.143,
-    protection: { blunt: 0.35, cut: 0.9, pierce: 0.5, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.95, pierce: 0.75, deflects: true }, limb: { blunt: 0.03, cut: 0.1, pierce: 0.03 } } },
+    // Pierce 0.65, mail over its padding (PIERCE_SCALE).
+    protection: { blunt: 0.35, cut: 0.9, pierce: 0.65, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.95, pierce: 0.75, deflects: true }, limb: { blunt: 0.03, cut: 0.1, pierce: 0.03 } } },
     courage: 0.45,
     designs: [
       { label: 'Mail, red tunic, bracae', top: { kind: 'tunic', color: '#7a2a22' }, bottom: { kind: 'pants', color: '#5a4c36' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'galea', color: '#b8bec6', gold: '#9a7a3a' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
@@ -1670,13 +1686,12 @@ export const OUTFITS = {
     faction: 'chinese',
     label: 'Ming — iron lamellar cavalry', movement: 'good', fists: 'bare',
     sidearm: 'saber',
-    arrowproof: true,
     // Iron lamellar to the knee and helmet: ~14 kg on an 80 kg man; and the steel arm guards (MING_ARM_GUARD, a pair ~1.5 kg:
     // the Ming horseman's, was 0.176 without them).
     extraMass: 0.195,
-    // Pierce 0.7 (was 0.72): a point finds the lacing between the lamellae; still heavy enough that a lance breaks on it (weapons.js `shatters`).
+    // Pierce 0.85, iron lamellar (PIERCE_SCALE; the lacing is its gaps); heavy enough that a lance breaks on it (weapons.js `shatters`).
     // The arms in polished steel guards (MING_ARM_GUARD: the Ming horse at Byeokjegwan; the limbs' share of a ball 0.2, was 0.15, as the elite's).
-    protection: { blunt: 0.5, cut: 0.88, pierce: 0.7, bullet: { head: 0.3, torso: 0.35, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
+    protection: { blunt: 0.5, cut: 0.88, pierce: 0.85, bullet: { head: 0.3, torso: 0.35, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.3,
@@ -1697,11 +1712,11 @@ export const OUTFITS = {
     faction: 'steppe',
     label: 'Kheshig — the Khan\'s guard', movement: 'good', fists: 'bare',
     sidearm: 'mace',
-    arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.38): iron scale and masked helmet: ~15–19 kg on a 70–90 kg man.
     extraMass: 0.21,
     // Blunt 0.65 (was 0.55): iron scale on a padded coat over the thick deel spreads a blow.
-    protection: { blunt: 0.65, cut: 0.92, pierce: 0.8, bullet: { head: 0.4, torso: 0.4, limb: 0.2 } },
+    // Pierce 0.85, iron scale (PIERCE_SCALE).
+    protection: { blunt: 0.65, cut: 0.92, pierce: 0.85, bullet: { head: 0.4, torso: 0.4, limb: 0.2 } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the scales a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.4,
@@ -1731,18 +1746,16 @@ export const OUTFITS = {
     label: 'Cuman — mail and plates, masked helmet', movement: 'good', fists: 'gauntlet',
     // The long, deep-curved sabre of the Kipchak kurgans (WEAPONS.kilij: the kılıç's forerunner), not the Mongol's gentler one.
     sidearm: 'kilij',
-    // Arrows glance only off its plate: the helmet, mask and the plates over the trunk; the sleeves mail (ARROW.mailStops).
-    arrowproof: ['head', 'torso'],
     // Mail-and-plate shirt ~11 kg, vambraces ~1 kg, mail mittens ~0.5 kg, helmet, aventail and mask ~2.5 kg: ~15 kg on a
     // 75 kg man.
     extraMass: 0.24,
     // Better than the bekhter's (ottomanHeavy's, OUTFIT_SETS `bekhter`: 0.42 / 0.98 / 0.72): a khan's retainer's harness,
     // the plates heavier and closer, the mail over a thick quilted coat (the Cuman kurgans' finds are of the best armour
-    // of the steppe), so a blow is spread far better and a point meets plate, mail and padding: blunt 0.58, pierce 0.8.
+    // of the steppe), so a blow is spread far better and a point meets plate, mail and padding: blunt 0.58, pierce 0.85 (PIERCE_SCALE: mail and plate).
     // The head: the chichak's bowl over a quilted cap, the steel mask closing the face (a point meets plate there, not
     // mail). The shins only in boot leather (Saladin's).
     protection: {
-      blunt: 0.58, cut: 0.98, pierce: 0.8, bullet: { head: 0.4, torso: 0.5, limb: 0.25 },
+      blunt: 0.58, cut: 0.98, pierce: 0.85, bullet: { head: 0.4, torso: 0.5, limb: 0.25 },
       regions: {
         head: { blunt: 0.6, cut: 0.97, pierce: 0.75, deflects: true },
         Shank: { blunt: 0.09, cut: 0.37, pierce: 0.15 },
@@ -1827,7 +1840,8 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.2): mail and spangenhelm: ~9 kg on an 80 kg man (a mail shirt ~10 kg).
     extraMass: 0.11,
     // Blunt 0.42 (was 0.35): the steppe's thick padding under the mail; helmet and limbs by the same ratio (0.5 → 0.6, 0.04 → 0.05).
-    protection: { blunt: 0.42, cut: 0.85, pierce: 0.48, bullet: { head: 0.2, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.92, pierce: 0.7, deflects: true }, limb: { blunt: 0.05, cut: 0.1, pierce: 0.04 } } },
+    // Pierce 0.7: mail over the steppe's thick padding, a little over mail's 0.65 (PIERCE_SCALE).
+    protection: { blunt: 0.42, cut: 0.85, pierce: 0.7, bullet: { head: 0.2, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.6, cut: 0.92, pierce: 0.7, deflects: true }, limb: { blunt: 0.05, cut: 0.1, pierce: 0.04 } } },
     courage: 0.4,
     designs: [
       steppeDesign('Mail, red caftan', { kind: 'hauberk', color: '#8d9097' }, '#7a2a1e', '#d6a743', { kind: 'spangenhelm', color: '#7d8088', gold: '#b98a3e' }),
@@ -1850,7 +1864,8 @@ export const OUTFITS = {
     sidearm: 'spatha',
     // Armour at 0.55 of its old weight (was 0.24): mail and ridge helmet: ~10 kg on a 78 kg man (a mail shirt ~10 kg).
     extraMass: 0.132,
-    protection: { blunt: 0.35, cut: 0.88, pierce: 0.5, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.95, pierce: 0.75, deflects: true }, limb: { blunt: 0.03, cut: 0.08, pierce: 0.03 }, UpperArm: { blunt: 0.3, cut: 0.82, pierce: 0.45 } } },
+    // Pierce 0.65, mail over its padding (PIERCE_SCALE).
+    protection: { blunt: 0.35, cut: 0.88, pierce: 0.65, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.95, pierce: 0.75, deflects: true }, limb: { blunt: 0.03, cut: 0.08, pierce: 0.03 }, UpperArm: { blunt: 0.3, cut: 0.82, pierce: 0.45 } } },
     courage: 0.4,
     designs: [
       { label: 'Mail, white tunic, red shield', top: { kind: 'longsleeve', color: '#d8cfb8' }, bottom: { kind: 'pants', color: '#4a4036' }, armor: { kind: 'haubergeon', color: '#8d9097', cloth: '#b3161b' }, head: { kind: 'ridgeHelm', color: '#8d9097', gold: '#b98a3e' }, feet: { kind: 'compactBoot', color: '#2a1e16' } },
@@ -1885,7 +1900,8 @@ export const OUTFITS = {
     sidearm: 'spatha',
     // Armour at 0.55 of its old weight (was 0.22): mail and spangenhelm: ~10 kg on an 80 kg man (a mail shirt ~10 kg).
     extraMass: 0.121,
-    protection: { blunt: 0.35, cut: 0.88, pierce: 0.5, bullet: { head: 0.2, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.5, cut: 0.92, pierce: 0.7, deflects: true }, limb: { blunt: 0.04, cut: 0.1, pierce: 0.04 } } },
+    // Pierce 0.65, mail over its padding (PIERCE_SCALE).
+    protection: { blunt: 0.35, cut: 0.88, pierce: 0.65, bullet: { head: 0.2, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.5, cut: 0.92, pierce: 0.7, deflects: true }, limb: { blunt: 0.04, cut: 0.1, pierce: 0.04 } } },
     courage: 0.5,
     designs: [
       { label: 'Mail, red cloak', top: { kind: 'longsleeve', color: '#8a2a22' }, bottom: { kind: 'pants', color: '#4a3e30' }, armor: { kind: 'hauberk', color: '#8d9097', cloth: '#8a2a22' }, head: { kind: 'spangenhelm', color: '#8d9097', gold: '#b98a3e' }, feet: { kind: 'compactBoot', color: '#2a1e16' } },
@@ -1908,7 +1924,8 @@ export const OUTFITS = {
     sidearm: 'dagger',
     // Armour at 0.55 of its old weight (was 0.25): mail and Montefortino: ~11 kg on a 78 kg man (a mail shirt ~10 kg).
     extraMass: 0.138,
-    protection: { blunt: 0.35, cut: 0.9, pierce: 0.5, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.92, pierce: 0.72, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 } } },
+    // Pierce 0.65, mail over its padding (PIERCE_SCALE).
+    protection: { blunt: 0.35, cut: 0.9, pierce: 0.65, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.92, pierce: 0.72, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 } } },
     courage: 0.4,
     designs: [
       { label: 'Mail, red tunic, bronze helmet', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'loincloth', color: '#8a2a22' }, armor: { kind: 'hamata', color: '#8d9097', gold: '#b98a3e', lace: '#3a2416' }, head: { kind: 'montefortino', color: '#b98a3e', plume: '#1a1a1d' }, feet: { kind: 'sandal', color: '#3a2416' } },
@@ -1929,10 +1946,10 @@ export const OUTFITS = {
     skill: 0.65,
     label: 'Parthian cataphract — scale and kontos', movement: 'limited', fists: 'gauntlet',
     sidearm: 'spatha',
-    arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.4): iron scale and laminated limbs: ~18 kg on an 80 kg man (real ~20–30 kg).
     extraMass: 0.22,
-    protection: { blunt: 0.55, cut: 0.94, pierce: 0.82, bullet: { head: 0.4, torso: 0.4, limb: 0.3 } },
+    // Pierce 0.85, iron scale (PIERCE_SCALE).
+    protection: { blunt: 0.55, cut: 0.94, pierce: 0.85, bullet: { head: 0.4, torso: 0.4, limb: 0.3 } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the scales a little anywhere but the solid plates.
     // The mail hood over the face and neck: behind the helmet's sights and at the throat, mail.
     gaps: { lacing: 0.1, mail: ['visor', 'neck'] },
@@ -2022,14 +2039,12 @@ export const OUTFITS = {
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
     // The sipahi's kılıç at the saddle (WEAPONS.kilij), drawn when the mace is lost.
     sidearm: 'kilij',
-    // Arrows glance only off its plate: the chichak and the krug's plates over the trunk; the sleeves mail (ARROW.mailStops).
-    arrowproof: ['head', 'torso'],
     // Armour at 0.55 of its old weight (was 0.3): krug and chichak: ~12 kg on a 74 kg man (a mail-and-plate shirt ~10–12 kg).
     extraMass: 0.165,
-    // Mail-and-plate: cut 0.98, the rings and plates proof against most edges; pierce 0.72 (was 0.5): the plates over the
-    // vitals stop a point and the mail between them turns an edge, so a point must find a ring between plates; blunt 0.42
+    // Mail-and-plate: cut 0.98, the rings and plates proof against most edges; pierce 0.8 (PIERCE_SCALE: mail and plate, the
+    // rings between the plates wider than the Cuman's): the plates over the vitals stop a point and the mail between them holds it as mail does; blunt 0.42
     // (was 0.5): mail and its padding spread a blow poorly, the mail moving with it. The chichak (uniform) the same.
-    protection: { blunt: 0.42, cut: 0.98, pierce: 0.72, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
+    protection: { blunt: 0.42, cut: 0.98, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0.2 } },
     // Mail-and-plate (krug): between the plates and wherever they part, the mail they are set in.
     gaps: { mail: 'all' },
     courage: 0.3,
@@ -2064,10 +2079,10 @@ export const OUTFITS = {
     sidearm: 'kilij',
     // Armour at 0.55 of its old weight (was 0.28): hauberk and helmet: ~11 kg on a 74 kg man (a mail hauberk ~10–12 kg).
     extraMass: 0.154,
-    // A mail hauberk with mirror plates over the breast and back (`mailMirror`): cut 0.94 (was 0.9) and pierce 0.65 (was 0.45):
+    // A mail hauberk with mirror plates over the breast and back (`mailMirror`): cut 0.94 (was 0.9) and pierce 0.7 (PIERCE_SCALE: mail 0.65, the mirrors a little over it):
     // the plates over the vitals stop a point, the mail between and round them turns an edge; blunt 0.38 (was 0.45): mail and
     // its padding spread a blow poorly, moving with it. The helmet (uniform) the same.
-    protection: { blunt: 0.38, cut: 0.94, pierce: 0.65, bullet: { head: 0.3, torso: 0.25, limb: 0.2 } },
+    protection: { blunt: 0.38, cut: 0.94, pierce: 0.7, bullet: { head: 0.3, torso: 0.25, limb: 0.2 } },
     // A mail hauberk and aventail: a gap meets mail.
     gaps: { mail: 'all' },
     courage: 0.35,
@@ -2097,8 +2112,6 @@ export const OUTFITS = {
     faction: 'ottomans',
     // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
     label: 'Saladin — kazaghand over mail, turban helmet', movement: 'good', fists: 'bare',
-    // Arrows glance only off its plate: the helmet is steel; the hauberk and kazaghand mail (ARROW.mailStops).
-    arrowproof: ['head'],
     // The horseman's mace (dabbus) at the saddle, the Ayyubid emir's second weapon.
     sidearm: 'mace',
     // Hauberk ~10 kg, kazaghand ~7 kg, helmet and aventail ~2.5 kg: ~0.3 of a 67 kg man.
@@ -2106,12 +2119,12 @@ export const OUTFITS = {
     extraMass: 0.165,
     // The turban wound round the helmet: another man's head stays outside it in a clinch.
     headBulk: 1.25,
-    // Two layers of mail: cut 0.94 (was 0.9), blunt 0.35 (was 0.4); pierce 0.6 on the trunk (was 0.45): the second layer of
+    // Two layers of mail: cut 0.94 (was 0.9), blunt 0.35 (was 0.4); pierce 0.75 on the trunk (PIERCE_SCALE: one mail 0.65): the second layer of
     // rings and the quilting between them hold a point the first parts to, though mail and padding spread a blow poorly.
     // The steel helmet is not mail: only the sultanates' cut up and blunt down (0.6 → 0.53, 0.92 → 0.95); the boots'
     // leather by the same.
     protection: {
-      blunt: 0.35, cut: 0.94, pierce: 0.6, bullet: { head: 0.3, torso: 0.3, limb: 0.15 },
+      blunt: 0.35, cut: 0.94, pierce: 0.75, bullet: { head: 0.3, torso: 0.3, limb: 0.15 },
       regions: {
         head: { blunt: 0.53, cut: 0.95, pierce: 0.75, deflects: true },
         Shank: { blunt: 0.09, cut: 0.37, pierce: 0.15 },
@@ -2182,14 +2195,15 @@ export const OUTFITS = {
     spare: 'dagger',
     // Armour at 0.55 of its old weight (was 0.3): breastplate, mail sleeves and morion: ~13 kg on a 78–90 kg man (real ~10–14 kg).
     extraMass: 0.165,
-    // A breastplate over the torso: blunt 0.55, cut 0.92, pierce 0.85 (were 0.5, 0.9, 0.8); the morion as it was; the arms
-    // in mail sleeves, the legs in breeches and boots, less than the trunk (were all as the body).
+    // A breastplate over the torso: blunt 0.55, cut 0.92 (were 0.5, 0.9), pierce 0.95 and turning a blade or an arrow
+    // (`deflects`), plate's (PIERCE_SCALE); the morion as it was; the arms in mail sleeves (pierce 0.65, mail's), the legs in breeches and boots, less than the trunk (were all as the body).
     protection: {
-      blunt: 0.55, cut: 0.92, pierce: 0.85, bullet: { head: 0.4, torso: 0.55, limb: 0 },
+      blunt: 0.55, cut: 0.92, pierce: 0.95, bullet: { head: 0.4, torso: 0.55, limb: 0 },
       regions: {
         head: { blunt: 0.5, cut: 0.9, pierce: 0.8 },
-        UpperArm: { blunt: 0.25, cut: 0.8, pierce: 0.45 },
-        Forearm: { blunt: 0.25, cut: 0.8, pierce: 0.45 },
+        torso: { blunt: 0.55, cut: 0.92, pierce: 0.95, deflects: true },
+        UpperArm: { blunt: 0.25, cut: 0.8, pierce: 0.65 },
+        Forearm: { blunt: 0.25, cut: 0.8, pierce: 0.65 },
         Thigh: { blunt: 0.1, cut: 0.25, pierce: 0.1 },
         Shank: { blunt: 0.1, cut: 0.25, pierce: 0.1 },
       },
@@ -2262,7 +2276,8 @@ export const OUTFITS = {
     sidearm: 'dagger',
     // Armour at 0.55 of its old weight (was 0.1): a gambeson: ~4 kg.
     extraMass: 0.055,
-    protection: { blunt: 0.2, cut: 0.4, pierce: 0.25, bullet: { head: 0, torso: 0.05, limb: 0 } },
+    // Pierce 0.3, a padded coat's (PIERCE_SCALE).
+    protection: { blunt: 0.2, cut: 0.4, pierce: 0.3, bullet: { head: 0, torso: 0.05, limb: 0 } },
     courage: 0.4,
     designs: [
       { label: 'Storm-grey gambeson', top: { kind: 'longsleeve', color: '#2f3438' }, bottom: { kind: 'pants', color: '#26282a' }, armor: { kind: 'escaupil', color: '#6a6446', cloth: '#6a6446', cloth2: '#4a452f' }, head: null, feet: { kind: 'compactBoot', color: '#2a1d14' } },
@@ -2297,7 +2312,8 @@ export const OUTFITS = {
     sidearm: 'macuahuitl',
     // Armour at 0.55 of its old weight (was 0.08): the ichcahuipilli: ~3 kg on a 75 kg man.
     extraMass: 0.044,
-    protection: { blunt: 0.2, cut: 0.2, pierce: 0.15, bullet: { head: 0, torso: 0.05, limb: 0 } },
+    // Pierce 0.3, quilted cotton (PIERCE_SCALE).
+    protection: { blunt: 0.2, cut: 0.2, pierce: 0.3, bullet: { head: 0, torso: 0.05, limb: 0 } },
     courage: 0.3,
     designs: [
       mexicaDesign('Ichcahuipilli, quetzal band', '#ece4d0', '#1f8a5a'),
@@ -2318,7 +2334,8 @@ export const OUTFITS = {
     sidearm: 'macuahuitl',
     // Armour at 0.55 of its old weight (was 0.12): the tlahuiztli, cotton armour and wooden helmet: ~4.5 kg on a 69 kg man.
     extraMass: 0.066,
-    protection: { blunt: 0.2, cut: 0.2, pierce: 0.2, bullet: { head: 0.1, torso: 0.05, limb: 0 } },
+    // Pierce 0.3, quilted cotton (PIERCE_SCALE).
+    protection: { blunt: 0.2, cut: 0.2, pierce: 0.3, bullet: { head: 0.1, torso: 0.05, limb: 0 } },
     courage: 0.45,
     designs: [
       { label: 'Jaguar warrior', top: { kind: 'longsleeve', color: '#c8902e' }, bottom: { kind: 'pants', color: '#c8902e' }, armor: { kind: 'jaguarSuit', color: '#c8902e', cloth: '#c8902e', cloth2: '#2a1d14' }, head: { kind: 'jaguarHelm', color: '#c8902e' }, feet: { kind: 'sandal', color: '#5a3a22' } },
@@ -2392,10 +2409,14 @@ export const OUTFITS = {
     extraMass: 0.11,
     protection: {
       // Blunt 0.56 (was 0.6), Japanese armour; the haidate by the same ratio (0.35 → 0.33).
-      blunt: 0.56, cut: 0.9, pierce: 0.65, bullet: { head: 0, torso: 0.5, limb: 0.05 },
+      // Pierce 0.9, the tōsei cuirass's solid lames (PIERCE_SCALE).
+      blunt: 0.56, cut: 0.9, pierce: 0.9, bullet: { head: 0, torso: 0.5, limb: 0.05 },
       regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Thigh: { blunt: 0.33, cut: 0.75, pierce: 0.45 } },
     },
-    courage: 0.4,
+    // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
+    // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
+    // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
+    courage: 0.85,
     designs: [
       roninDesign('Brown cloak, white kosode', { kosode: '#e4dfd2', hakama: '#4a3e34', cloak: '#4a3020', steel: '#2a2a2e', lace: '#2a3a6a', sash: '#e8e2d2', band: '#c9a23a', gaiters: '#5a6270' }),
       roninDesign('Grey cloak, indigo kosode', { kosode: '#2a3550', hakama: '#3a3a40', cloak: '#55534e', steel: '#3b3e44', lace: '#b3161b', sash: '#e8e2d2', band: '#b3161b', gaiters: '#2a2c30' }),
@@ -2410,13 +2431,13 @@ export const OUTFITS = {
     skill: 0.95,
     faction: 'japanese', plated: true,
     label: 'Sōhei — warrior monk', movement: 'good', fists: 'bare',
-    arrowproof: true,
     sidearm: 'katana',
     // Armour at 0.55 of its old weight (was 0.3): a dō, sleeves and greaves: ~17 kg on a 100 kg man.
     extraMass: 0.165,
     protection: {
       // Blunt 0.6 (was 0.65), Japanese armour; the cloth hood and light sleeves and greaves as they were.
-      blunt: 0.6, cut: 0.88, pierce: 0.6, bullet: { head: 0, torso: 0.4, limb: 0.05 },
+      // Pierce 0.8, a lamellar dō (PIERCE_SCALE).
+      blunt: 0.6, cut: 0.88, pierce: 0.8, bullet: { head: 0, torso: 0.4, limb: 0.05 },
       regions: { head: { blunt: 0.08, cut: 0.12, pierce: 0.02 }, Forearm: { blunt: 0.1, cut: 0.2, pierce: 0.05 }, Shank: { blunt: 0.1, cut: 0.15, pierce: 0.05 } },
     },
     courage: 0.5,
@@ -2442,7 +2463,8 @@ export const OUTFITS = {
     extraMass: 0.072,
     protection: {
       // Blunt 0.42 (was 0.45): a Japanese dō-maru, laced lamellae.
-      blunt: 0.42, cut: 0.7, pierce: 0.5, bullet: { head: 0, torso: 0.25, limb: 0 },
+      // Pierce 0.8, laced lamellae (PIERCE_SCALE).
+      blunt: 0.42, cut: 0.7, pierce: 0.8, bullet: { head: 0, torso: 0.25, limb: 0 },
       regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 } },
     },
     courage: 0.3,
@@ -2636,9 +2658,9 @@ export const OUTFITS = {
   // AR-15 on the right, a shotgun on the left; never dropped). Dark grey,
   // picked out in #D97757.
   combatBot: {
-    // Its neck in an armoured collar (`arrowproof`: the throat covered as the trunk; an arrow glances off the plate).
+    // Its neck in an armoured collar (`gaps.closed`: the throat covered as the trunk).
     // A machine (`machine`): no morale, no blood, as the humanoid.
-    faction: 'machines', bulletRating: 3500, plated: true, arrowproof: true, machine: true,
+    faction: 'machines', bulletRating: 3500, plated: true, machine: true,
     label: 'Combat bot — armoured', movement: 'limited', fists: 'gauntlet', courage: 1,
     // Armour at 0.55 of its old weight: of the ~55 kg kit, ~40 kg of plate cut to ~22 kg, the ~15 kg battery box kept: ~37 kg on its
     // 115 kg frame (`carriedShare`: the battery is a load, not armour, to its poise).
@@ -2653,6 +2675,7 @@ export const OUTFITS = {
       regions: { head: { blunt: 0.65, cut: 1, pierce: 0.97 }, limb: { blunt: 0.55, cut: 0.95, pierce: 0.92 } },
     },
     deflects: true,
+    gaps: { closed: ['neck'] },
     designs: [
       { label: 'Dark grey', armor: { kind: 'robot', color: '#43464c', mail: '#2a2b2f', cloth: '#d97757', backBox: true, robot: { bulk: 1.3, led: '#ff8a5c' } }, head: { kind: 'robotHead', color: '#383b40', visor: '#0b0c0e', trim: '#d97757', led: '#ff8a5c' }, feet: { kind: 'tacticalBoot', color: '#2a2b2f' } },
     ],
@@ -3172,7 +3195,8 @@ function helmFaceOf(inputs, spec, look) {
 export const UNDER_ARMOUR = {
   mail: {
     label: 'Mail shirt', extraMass: 0.1,
-    guard: { blunt: 0.3, cut: 0.85, pierce: 0.55 }, bullet: 0.1,
+    // (Pierce 0.65, mail on its padding: PIERCE_SCALE.)
+    guard: { blunt: 0.3, cut: 0.85, pierce: 0.65 }, bullet: 0.1,
     covers: ['torso', 'UpperArm', 'Thigh'], zones: ['armpit', 'groin', 'neck', 'elbow', 'lacing'],
     skin: { trunk: 1, limb: 0.35 },
   },
@@ -3284,8 +3308,6 @@ export function gearTraits(inputs) {
     // Bolted to its mount, never thrown (a robot dog's turret or arm: physics/mounted.js keepSeat).
     bolted: Boolean(spec.bolted),
     spare: spec.spare ?? null,
-    // Proof against arrows: true (its rigid armour all plate or lamellar), or the regions (bulletRegion) where it is plate, mail elsewhere (ranged.js arrowHit).
-    arrowproof: Array.isArray(spec.arrowproof) ? spec.arrowproof : Boolean(spec.arrowproof),
     // The arrows he carries for his bow (a kit's `quiver`), or none counted (a foot archer's sheaves are brought up to him in the line).
     quiver: spec.quiver ?? null,
     // His missiles never run out (`inputs.endlessAmmo`: a mode's say, a man holding his own gate with its stores behind
