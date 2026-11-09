@@ -179,7 +179,7 @@ export const WARRIORS = [
   warrior('shaolin', 'Tanzong', PRESETS.staff),
   warrior('taichi', 'Chen Fake', PRESETS.taichi),
   warrior('kanabo', 'Kojima Yatarō', PRESETS.kanabo),
-  { ...warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda), legend: { order: 5, kicker: { en: 'Wanyan Wuzhu', zh: '完颜兀术' }, line: { en: 'The Jin heavy guard: wolf-tooth mace and iron buckler, armoured head to foot.', zh: '金国重甲亲军：狼牙棒配铁盾，从头裹到脚。' } } },
+  { ...warrior('ironPagoda', 'Wanyan Wuzhu', PRESETS.ironPagoda), legend: { order: 5, kicker: { en: 'Wanyan Wuzhu', zh: '完颜兀术' }, line: { en: 'The Jin heavy guard: heavy spear, wolf-tooth mace at the saddle, armoured head to foot.', zh: '金国重甲亲军：手持重枪，鞍挂狼牙棒，从头裹到脚。' } } },
   { ...warrior('guanYu', 'Guan Yu', PRESETS.guanYu), legend: { order: 6, kicker: { en: 'God of War', zh: '武圣' }, line: { en: 'The Green Dragon Crescent Blade: great sweeping cuts from far off.', zh: '青龙偃月刀：隔着老远，大开大合地抡过来。' } } },
   warrior('hanCrossbow', 'Li Ling', PRESETS.hanCrossbow),
   warrior('wuxia', 'Pei Min', PRESETS.wuxia),

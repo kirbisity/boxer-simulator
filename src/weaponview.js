@@ -1035,7 +1035,9 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(cylinder(0.015, 0.016, -spec.handle, spec.strikeFrom, kind === 'langya' ? wood : iron, 10));
       group.add(cylinder(0.018, 0.018, -spec.handle, 0.0, leather, 10));
       if (kind === 'langya') {
-        group.add(cylinder(spec.radius, spec.radius, spec.strikeFrom, spec.length, iron, 10));
+        // (Drawn at its own `drawnRadius`, a little under the radius it strikes with: weapons.js.)
+        const head = spec.drawnRadius ?? spec.radius;
+        group.add(cylinder(head, head, spec.strikeFrom, spec.length, iron, 10));
         const teeth = new THREE.InstancedMesh(new THREE.ConeGeometry(0.008, 0.03, 5), iron, 6 * 5);
         const place = new THREE.Object3D();
         let at = 0;
@@ -1043,7 +1045,7 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
           const y = spec.strikeFrom + 0.03 + ((spec.length - spec.strikeFrom - 0.06) * row) / 4;
           for (let around = 0; around < 6; around += 1) {
             const angle = ((around + (row % 2) * 0.5) / 6) * Math.PI * 2;
-            place.position.set(Math.cos(angle) * (spec.radius + 0.012), y, Math.sin(angle) * (spec.radius + 0.012));
+            place.position.set(Math.cos(angle) * (head + 0.012), y, Math.sin(angle) * (head + 0.012));
             place.rotation.set(0, -angle, -Math.PI / 2);
             place.updateMatrix();
             teeth.setMatrixAt(at, place.matrix);

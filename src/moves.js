@@ -1366,10 +1366,12 @@ export const STYLES = {
     plans: { pressure: 1.4, brawler: 1, outboxer: 0.6, counter: 0.6 },
     pressure: 0.25,
   },
-  // A one-handed mace with a shield: the Iron Pagoda's wolf-tooth mace and
-  // iron buckler; the Mongol and Ottoman heavy man's flanged mace and kalkan.
+  // A one-handed mace with a shield: the wolf-tooth mace and iron buckler (the
+  // Iron Pagoda's until he took up the heavy spear, STYLES.jinLance: kept out
+  // of the pickers, `hidden`, with no character of its own, but built to order,
+  // `custom`); the Mongol and Ottoman heavy man's flanged mace and kalkan.
   langyaShield: {
-    label: 'Wolf-tooth mace and buckler', weapon: 'langya', shield: 'buckler', fallback: 'mix',
+    label: 'Wolf-tooth mace and buckler', hidden: true, custom: true, weapon: 'langya', shield: 'buckler', fallback: 'mix',
     cadence: { work: 1, move: 0.8, burst: 0.5, mobility: 0.35 },
     stance: { blade: 0.45, crouch: 0.06, width: 1.2, lean: 0.12, guardHeight: 0 },
     weaponGuard: { hand: [0.1, 0.66, -0.12], dir: [0.5, 0.85, 0] },
@@ -2081,6 +2083,17 @@ STYLES.bayaraLance = {
   weaponGuard: { hand: [-0.04, 0.6, -0.1], dir: [1, 0.1, 0] },
   couchedCharge: { ...STYLES.lance.couchedCharge, saddleOnly: true },
 };
+
+// The Iron Pagoda (铁浮屠) with his heavy spear: the Jin heavy horseman's first weapon was the spear (枪), couched from the
+// saddle and kept at the point on foot, as the Bayara's (the banners were the Jurchens' heirs, and their heavy spear,
+// WEAPONS.manchuLance, the same long-headed horseman's qiang); the wolf-tooth mace hung at his saddle for when the spear
+// was lost (his kit's sidearm, STYLES.langya below: `fallback` 'mix' so the kit's is drawn, physics.js rearm). Its
+// buckler gone: a two-handed spear leaves no hand for it (the user's call, 2026-11-08).
+// (`ratedAs`: rated as the mace and buckler he fought with, roster.js ratingOf, until tools/ratings.js is next run.)
+STYLES.jinLance = { ...STYLES.bayaraLance, label: 'Jin heavy spear', ratedAs: 'langyaShield' };
+// The wolf-tooth mace alone (his sidearm, drawn once the spear is lost): the mace and buckler's blows, its guard the haft
+// across as the flanged mace's alone (STYLES.mace), no shield to block with.
+STYLES.langya = { ...STYLES.langyaShield, label: 'Wolf-tooth mace', hidden: true, shield: undefined, shieldGuard: undefined, defences: { weaponBlock: 0.45, stepBack: 0.55 } };
 
 // The Bayara (the banners' guard): a few heavy arrows from the Manchu bow at close range, standing his ground, then the
 // bow let fall and straight in with the saber at his belt (his kit's sidearm), as the guard rode into a broken line.
