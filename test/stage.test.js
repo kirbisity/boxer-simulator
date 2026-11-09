@@ -169,6 +169,8 @@ test('the men wake when he enters the portal, fight on, and sleep again as he go
   // (Nobody thinks while he walks back: the guards are stopped where they are, not left running on at where he was, which at a run's
   // pace (physics/gait.js) bowls him over.)
   for (const guard of guards) Object.assign(guard, { move: 0, running: false, goTo: null });
+  // (Knocked down in the fight, as he may be, he gets up before he walks.)
+  for (let waited = 0; waited < 20 && me.state !== 'up'; waited += 0.5) advance(world, 0.5);
   walk(world, me, [[18, 0], [10, 0]], { seconds: 100, within: 0.5 });
   assert.deepEqual(world.stage.active, ['yard']);
   const hallMen = world.fighters.filter((fighter) => fighter.spawn?.section === 'hall');

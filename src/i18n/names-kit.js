@@ -556,6 +556,7 @@ export const NAMES_KIT = {
   'Steel plate barding': '钢板马甲',
   'Steel lamellar barding': '钢札马甲',
   'Brigandine barding': '布面马甲',
+  'Ming front barding': '马面帘与胸甲',
   'Bare horse': '无甲马',
   'Robot shell': '机器人外壳',
   'Unitree Go2': '宇树 Go2',

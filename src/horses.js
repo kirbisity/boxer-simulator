@@ -91,6 +91,13 @@ export const HORSE_LOAD = { easy: 0.2, slows: 0.9, least: 0.6 };
  *   its quilting spread a blow a little less than lamellar's laced rows), no mail under it; the plates smaller and thinner
  *   than the lamellar bard's (~0.7 mm, 48 x 24 mm): ~30 kg over ~4.5 m². Not plate: an edge is not turned aside (no
  *   `deflects`), and proof enough against an edge (cut 0.82) that a slide along it parts nothing (weapons.js sliceGain).
+ * - mingFront, the late Ming elite charger's (the user's description, 2026-11-09): armoured for the charge, from the
+ *   front only. An iron face plate (面帘) with brass fittings and red tassels; a thick quilted neck collar (项铠) lined with
+ *   iron scales; a chest apron (胸墙甲) of dark canvas studded with riveted iron plates (钉甲), hanging past the breast to
+ *   the forearms (`from` 0.4 of the withers, against the plate peytral's 0.6). The flanks, the hindquarters and the legs
+ *   bare under a quilted saddle blanket, the horse kept light for the sprint. The face guarded as a plate shaffron is (a
+ *   plate turns an edge); the collar and the apron as the brigandine bard (plates under cloth). ~12 kg: the face plate
+ *   ~1.5, the collar ~4, the apron ~6.
  * - bare: a saddle and tack only.
  */
 const PLATE_BARD = { blunt: 0.55, cut: 1, pierce: 0.88, deflects: true };
@@ -104,6 +111,7 @@ export const BARDING = {
   lamellar: { label: 'Steel lamellar barding', mass: 38, parts: { head: LAMELLAR_BARD, neck: LAMELLAR_BARD, chest: LAMELLAR_BARD, body: LAMELLAR_BARD, legs: NONE } },
   // (`covering`: what a blow on it sounds like, audio/log.js COVERINGS: the small plates under cloth rattle as scale does.)
   brigandine: { label: 'Brigandine barding', mass: 30, covering: 'scale', parts: { head: BRIGANDINE_BARD, neck: BRIGANDINE_BARD, chest: BRIGANDINE_BARD, body: BRIGANDINE_BARD, legs: NONE } },
+  mingFront: { label: 'Ming front barding', mass: 12, covering: 'scale', parts: { head: PLATE_BARD, neck: BRIGANDINE_BARD, chest: { ...BRIGANDINE_BARD, from: 0.4 }, body: NONE, legs: NONE } },
   bare: { label: 'Bare horse', mass: 0, parts: { head: NONE, neck: NONE, chest: NONE, body: NONE, legs: NONE } },
   // (a robot dog's shell, robotdogs.js.)
   robotShell: ROBOT_SHELL,

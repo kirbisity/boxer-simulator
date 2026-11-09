@@ -1065,7 +1065,10 @@ export function goalFromFootwork(world, fighter, dt) {
  */
 export function keepSeat(world, fighter) {
   const horse = fighter.mount;
-  const knock = Math.hypot(fighter.knock[0], fighter.knock[2]);
+  // (Across the horse's line the pommel and cantle hold nothing: a knock that way counts as 1 / `across` of itself.)
+  const along = vec.dot(fighter.knock, forwardOf(horse.yaw));
+  const across = vec.dot(fighter.knock, leftOf(horse.yaw)) / WORLD.mount.seat.across;
+  const knock = Math.hypot(along, across);
   const decay = Math.exp(-WORLD.balance.absorbPerSecond * world.lastDt);
   fighter.knock = fighter.knock.map((value) => value * decay);
   // (The speed his horse lost to a crash, as he still has it: he is flung with it if he goes.)

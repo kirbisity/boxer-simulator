@@ -45,7 +45,7 @@ export const BYEOKJEGWAN_1593 = {
   // (`firm` ~0.15 m: the frost line of a Korean February); clay's poor grip (as Agincourt's plough), a film of melt-water.
   paddy: { x: [-16, 16], z: [-5.5, 5.5], depth: 0.12, firm: 0.15, viscosity: 2, footing: 0.7, surface: 'mud', edge: 0.6, water: 0.02 },
   // Li Rusong's horse in the bowl: the mounted at its middle, the dismounted round them.
-  cavalry: { mounted: [['spear', 2, -1.5], ['dao', 2, 1.5], ['threeEyed', 4, 0], ['dao', 0.5, 0]], foot: [['guandao', 4.5, -2.5], ['dao', 4.5, 2.5], ['spear', 5.5, -1], ['dao', 5.5, 1], ['guandao', 3, 3.5]] },
+  cavalry: { mounted: [['mingLance', 2, -1.5], ['dao', 2, 1.5], ['threeEyed', 4, 0], ['dao', 0.5, 0]], foot: [['guandao', 4.5, -2.5], ['dao', 4.5, 2.5], ['spear', 5.5, -1], ['dao', 5.5, 1], ['guandao', 3, 3.5]] },
   // The Japanese: Tachibana's ahead on the road, Inoue's and Awaya's on the hills' slopes either side.
   japanese: {
     ahead: { at: [11, 0], counts: { katana: 3, yari: 7, matchlock: 4, bow: 2 }, abreast: 8 },

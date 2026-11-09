@@ -88,6 +88,7 @@ export const NAMES_WORLD = {
   'Kilij and kalkan': '弯刀与藤牌',
   'Bayara: heavy spear': '巴牙喇：重枪',
   'Jin heavy spear': '金国重枪',
+  'Ming cavalry spear': '明军骑兵长枪',
   'Bayara: Manchu bow and saber': '巴牙喇：满洲大弓与马刀',
   'Arming sword and buckler': '佩剑与小盾',
   'Spear and oval shield': '长枪与椭圆盾',

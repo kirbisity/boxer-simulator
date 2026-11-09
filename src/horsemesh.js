@@ -15,7 +15,7 @@
 // (where it is hung, its colour, its triangles) and run by the view.
 
 import { vec } from './pose.js';
-import { buildBard } from './horsebard.js';
+import { BARD_FIT, buildBard } from './horsebard.js';
 import { tileSize } from './detailmaps.js';
 
 const TAU = Math.PI * 2;
@@ -660,7 +660,7 @@ export function buildHorseModel(spec) {
   addNeck('soft', hmLoft(hmRounded(neckStations, { startLength: 0 }), { sides: low ? 8 : 14, color: neckColor, upper: 2.5, lower: 2.1 }));
   colliders.neck = snapshot(acc('neck', 'soft'));
   // A barded horse's crest is under its crinet: no mane is drawn (the standing ridge or the hanging tufts).
-  const barded = spec.barding === 'plate' || spec.barding === 'lamellar' || spec.barding === 'brigandine';
+  const barded = Boolean(BARD_FIT[spec.barding]);
 
   // ---- The head
   const headStations = [];

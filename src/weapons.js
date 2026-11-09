@@ -939,9 +939,12 @@ export const WEAPONS = {
   // Sidearms, drawn when the main weapon is lost (an outfit's `sidearm`):
   // a knight's rondel dagger, made to find the gaps in plate; a man-at-arms'
   // short sword; a samurai's wakizashi, the short companion of the katana.
+  // (`pointWidth` 0.012: the rondel's stiff square-sectioned point, ~1.2 cm a little behind its tip, the bodkin's kind of
+  // point, made to be pressed through mail; was its blade's 2 cm, which stopped a finisher's point in the mail at a man's
+  // throat. PUNCTURE.)
   dagger: {
     art: 'artFleche',
-    label: 'Dagger', hands: 'one', length: 0.3, strikeFrom: 0.06, handle: 0.11, mass: 0.35, balance: 0, radius: 0.01,
+    label: 'Dagger', hands: 'one', length: 0.3, strikeFrom: 0.06, handle: 0.11, mass: 0.35, balance: 0, radius: 0.01, pointWidth: 0.012,
     harm: { thrust: { pierce: 0.8, blunt: 0.3 }, swing: { cut: 0.35, blunt: 0.2 } },
     contactSeconds: 0.005, rotation: 0.6, wrist: { omega: 40, zeta: 0.8 }, threat: 2.5,
   },

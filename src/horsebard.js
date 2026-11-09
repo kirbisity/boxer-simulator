@@ -45,6 +45,7 @@ export const BARD_TILES = {
   plate: { fluted: 'fluted', etched: 'etched', plain: 'plate', edge: 'harnessEdge', mail: 'mail' },
   lamellar: { field: 'lamellae', brow: 'munitionPlate' },
   brigandine: { field: 'brigandine', brow: 'munitionPlate' },
+  mingFront: { field: 'brigandine', brow: 'munitionPlate' },
 };
 
 /**
@@ -66,6 +67,9 @@ export const BARD_FIT = {
 };
 // (The brigandine bard is cut as the lamellar one: the same pieces, down below the belly.)
 BARD_FIT.brigandine = BARD_FIT.lamellar;
+// (The Ming front bard, horses.js BARDING.mingFront: the face, the neck, and the breast's apron hanging to the forearms;
+// `front`: no skirt along the flanks, no crupper.)
+BARD_FIT.mingFront = { ...BARD_FIT.lamellar, peytral: { ...BARD_FIT.lamellar.peytral, hem: [0.42, 0.5] }, front: true };
 
 // ---- Casting over the horse ---------------------------------------------------------------------------------------------
 
@@ -308,7 +312,7 @@ export function buildBard(ctx, kind) {
   const laced = plate ? null : BARD_TILES[kind] ?? BARD_TILES.lamellar;
   const field = plate ? BARD_TILES.plate[style] ?? 'plate' : laced.field;
   // (A brigandine's facing is coloured by its material, the rider's cloth: horseview.js bardMaterial; drawn here white.)
-  const studded = kind === 'brigandine';
+  const studded = kind === 'brigandine' || kind === 'mingFront';
   const steel = plate ? [0.97, 0.98, 1] : studded ? [0.96, 0.96, 0.96] : [0.66, 0.67, 0.7];
   const edgeSteel = [0.9, 0.91, 0.94];
   const leather = [0.16, 0.1, 0.07];
@@ -393,49 +397,52 @@ export function buildBard(ctx, kind) {
     ctx.add('body', 'metal', prims.hmTube(ridge, ridge.map(() => 0.007), { sides: 5, color: edgeSteel }));
   }
 
-  // ---- Flanchards (plate) under the saddle; the lamellar body skirt from the breast to the rump, below the belly.
-  const fl = fit.flanchard;
-  piece = plate ? 'flanchards' : 'skirt';
-  const flCols = count(plate ? 9 : 18);
-  const flRows = count(plate ? 7 : 12);
-  for (const side of [1, -1]) {
-    const ray = (i, j) => {
-      const x = bdMix(fl.x[1], fl.x[0], i / flCols);
-      const y = bdMix(fl.top, fl.hem, j / flRows);
-      return { o: [x, y, 0], d: [0, 0, side], hang: y < 0.78 };
-    };
-    drapedPiece('body', { cols: flCols, rows: flRows, ray, gap: fl.gap, flare: fl.flare, edges: plate ? ['hem'] : ['top', 'hem'], fringe: !plate, trim: !plate });
-  }
-
-  // ---- Crupper: over the croup and round the buttocks, split under the tail; a tail guard over the dock.
-  const cr = fit.crupper;
-  piece = 'crupper';
-  const crCols = count(plate ? 32 : 30);
-  const crRows = count(14);
-  const upper = count(5);
-  const crAround = (s) => Math.PI + (s - 0.5) * cr.spread;
-  // At its front corners its rays start further forward, so its front edge meets the cantle.
-  const crCentre = (s) => cr.centre + 0.14 * bdSmooth((Math.abs(s - 0.5) * 2 - 0.5) / 0.5);
-  const crHem = (s) => bdMix(cr.hem[0], cr.hem[1], bdSmooth((Math.abs(s - 0.5) * cr.spread - 0.8) / 0.5));
-  const plan = bdRoundPlan({ centre: crCentre, axisY: 0.8, around: crAround, top: () => 0.8, hem: crHem, upper, rows: crRows, lift: (s) => bdMix(1.35, 1.1, Math.abs(s - 0.5) * 2) });
-  const tailY = ctx.tailRoot[1];
-  const slot = (i, j, at) => {
-    // The tail's slot: the middle columns, from the dock down.
-    const phi = Math.abs(((i + 0.5) / crCols - 0.5) * cr.spread);
-    const y = (at(i, j)[1] + at(i + 1, j + 1)[1]) / 2;
-    return !(phi < 0.17 && y < tailY + 0.02);
-  };
-  drapedPiece('body', { cols: crCols, rows: crRows, ray: (i, j) => plan(i, j, crCols), gap: cr.gap, flare: cr.flare, keep: slot, edges: ['hem'], fringe: !plate, trim: !plate });
-  if (plate && !low) {
-    // The crupper's ridge along the spine, from behind the cantle to the tail guard.
-    const spine = [];
-    for (let k = 0; k <= 8; k += 1) {
-      const x = bdMix(-0.3, -0.62, k / 8);
-      const top = bodyFn(x, Math.PI / 2, 0);
-      const hit = ctx.cast([x, top[1] - 0.15, 0], [0, 1, 0]);
-      spine.push([x, top[1] - 0.15 + (hit ?? 0.15) + cr.gap + 0.006, 0]);
+  // (A front bard has neither: the flanks and the hindquarters bare.)
+  if (!fit.front) {
+    // ---- Flanchards (plate) under the saddle; the lamellar body skirt from the breast to the rump, below the belly.
+    const fl = fit.flanchard;
+    piece = plate ? 'flanchards' : 'skirt';
+    const flCols = count(plate ? 9 : 18);
+    const flRows = count(plate ? 7 : 12);
+    for (const side of [1, -1]) {
+      const ray = (i, j) => {
+        const x = bdMix(fl.x[1], fl.x[0], i / flCols);
+        const y = bdMix(fl.top, fl.hem, j / flRows);
+        return { o: [x, y, 0], d: [0, 0, side], hang: y < 0.78 };
+      };
+      drapedPiece('body', { cols: flCols, rows: flRows, ray, gap: fl.gap, flare: fl.flare, edges: plate ? ['hem'] : ['top', 'hem'], fringe: !plate, trim: !plate });
     }
-    ctx.add('body', 'metal', prims.hmTube(spine, spine.map(() => 0.008), { sides: 5, color: edgeSteel }));
+
+    // ---- Crupper: over the croup and round the buttocks, split under the tail; a tail guard over the dock.
+    const cr = fit.crupper;
+    piece = 'crupper';
+    const crCols = count(plate ? 32 : 30);
+    const crRows = count(14);
+    const upper = count(5);
+    const crAround = (s) => Math.PI + (s - 0.5) * cr.spread;
+    // At its front corners its rays start further forward, so its front edge meets the cantle.
+    const crCentre = (s) => cr.centre + 0.14 * bdSmooth((Math.abs(s - 0.5) * 2 - 0.5) / 0.5);
+    const crHem = (s) => bdMix(cr.hem[0], cr.hem[1], bdSmooth((Math.abs(s - 0.5) * cr.spread - 0.8) / 0.5));
+    const plan = bdRoundPlan({ centre: crCentre, axisY: 0.8, around: crAround, top: () => 0.8, hem: crHem, upper, rows: crRows, lift: (s) => bdMix(1.35, 1.1, Math.abs(s - 0.5) * 2) });
+    const tailY = ctx.tailRoot[1];
+    const slot = (i, j, at) => {
+      // The tail's slot: the middle columns, from the dock down.
+      const phi = Math.abs(((i + 0.5) / crCols - 0.5) * cr.spread);
+      const y = (at(i, j)[1] + at(i + 1, j + 1)[1]) / 2;
+      return !(phi < 0.17 && y < tailY + 0.02);
+    };
+    drapedPiece('body', { cols: crCols, rows: crRows, ray: (i, j) => plan(i, j, crCols), gap: cr.gap, flare: cr.flare, keep: slot, edges: ['hem'], fringe: !plate, trim: !plate });
+    if (plate && !low) {
+      // The crupper's ridge along the spine, from behind the cantle to the tail guard.
+      const spine = [];
+      for (let k = 0; k <= 8; k += 1) {
+        const x = bdMix(-0.3, -0.62, k / 8);
+        const top = bodyFn(x, Math.PI / 2, 0);
+        const hit = ctx.cast([x, top[1] - 0.15, 0], [0, 1, 0]);
+        spine.push([x, top[1] - 0.15 + (hit ?? 0.15) + cr.gap + 0.006, 0]);
+      }
+      ctx.add('body', 'metal', prims.hmTube(spine, spine.map(() => 0.008), { sides: 5, color: edgeSteel }));
+    }
   }
 
   // ---- Crinet (the neck): plate lames down the crest and upper sides with mail under the throat; or lamellae all round.

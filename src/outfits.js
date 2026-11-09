@@ -1340,8 +1340,9 @@ export const OUTFITS = {
   // face mask. Covered from head to knee: a blade glances off it as off a
   // knight's plate, and so do arrows.
   mingElite: {
-    // Rides (Ming elite cavalry: the generals' household men on the pick of the border army's bought horses, horses.js mingBorder).
-    horse: 'mingBorder',
+    // Rides (Ming elite cavalry: the generals' household men on the pick of the border army's bought horses, horses.js mingBorder),
+    // armoured in front only (horses.js BARDING.mingFront: the face plate, the collar, the chest apron; the flanks bare).
+    horse: 'mingBorder', barding: 'mingFront',
     // Trained: a general's household men (jiading), picked and kept by him, the best the Ming fielded, but drilled to a
     // regular's level more than an elite's: the Ming army of the 1610s was a byword for neglected drill (`skill`).
     skill: 0.55,
@@ -1771,6 +1772,14 @@ export const OUTFITS = {
       cumanDesign('Dark steel, iron face, blue coat', { steel: '#6f737a', coat: '#24365a', sash: '#a83a1e', belt: '#3a2216', mask: 'kipchak' }),
       // A lord's: the gilt half-mask (horde) and a gilt band, brass on his straps.
       cumanDesign('Steel and gilt half-mask, green coat', { steel: '#a4a9b2', coat: '#2f4a32', sash: '#c9a23a', belt: '#5a1a14', mask: 'horde', gold: '#c9a23a' }),
+      // The common Cuman rider (OUTFIT_SETS cumanHeavy `mail`): the mail shirt alone over his quilted coat, no plates; the
+      // pointed bowl and its aventail, his face bare.
+      {
+        label: 'Mail shirt, open helmet, brown coat', top: { kind: 'longsleeve', color: '#5a3a24' }, bottom: { kind: 'pants', color: '#2a2a30' },
+        armor: { kind: 'hauberk', color: '#8d9097', cloth: '#5a3a24', cloth2: '#a83a1e', leather: '#6a3f22' },
+        head: { kind: 'chichak', bowl: 'kipchak', color: '#8d9097', gold: '#8d9097', hinge: '#a8873e', mail: shade('#8d9097', 0.55) },
+        feet: { kind: 'jinBoot', color: '#2a1c14' },
+      },
     ],
   },
   // ---- The horse peoples and the armies that met them (the Battle Mode levels of

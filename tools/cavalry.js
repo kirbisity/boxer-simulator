@@ -4,7 +4,7 @@
 // the man was thrown, who went down, what harm the impact did, and which
 // horses fell and threw their riders.
 // Usage: node tools/cavalry.js [seeds] [case ...]
-//   cases: lone bare plate line pikes head glance angle
+//   cases: lone bare plate line pikes head glance angle tbone tboneLight
 
 import { BODY, P, PRESETS } from '../src/body.js';
 import { think } from '../src/ai.js';
@@ -44,6 +44,8 @@ const CASES = {
   pass55: { label: 'destrier v destrier, passing 0.55 m abreast', riders: [rider('knight'), rider('knight')], mountedBlue: true, offset: 0.55 },
   pass65: { label: 'destrier v destrier, passing 0.65 m abreast (barrels brushing)', riders: [rider('knight'), rider('knight')], mountedBlue: true, offset: 0.65 },
   angle: { label: 'destrier v destrier crossing at 40 degrees', riders: [rider('knight'), rider('knight')], mountedBlue: true, angle: 0.7 },
+  tbone: { label: 'destrier v destrier crossing square (a T-bone)', riders: [rider('knight'), rider('knight')], mountedBlue: true, angle: Math.PI / 2 },
+  tboneLight: { label: 'destrier into a steppe horse crossing square (a T-bone)', riders: [rider('knight'), rider('cuman')], mountedBlue: true, angle: Math.PI / 2 },
   light: { label: 'steppe v steppe horse head-on', riders: [rider('kheshig'), rider('kheshig')], mountedBlue: true },
   mixed: { label: 'steppe horse v destrier head-on', riders: [rider('kheshig'), rider('knight')], mountedBlue: true },
 };

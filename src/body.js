@@ -251,6 +251,14 @@ export const PRESETS = {
     outfit: { kind: 'mingElite', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
+  // Li Rusong (1549–1598), the Liaodong general who led the Ming relief into Korea (1593) and its cavalry at Byeokjegwan,
+  // at 44: a big man of a border family of generals, in his household men's harness on the pick of the border horses,
+  // with the horseman's long spear (STYLES.mingLance).
+  liRusong: {
+    name: 'Li Rusong', style: 'mingLance', sex: 'male', heightCm: PEOPLES.ming.heightCm + 8, frame: 'large', age: 44, exercise: PEOPLES.ming.exercise + 0.15, calories: PEOPLES.ming.calories + 700,
+    outfit: { kind: 'mingElite', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
+  },
   // The Eight Banners of the Later Jin (Sarhu, 1619): a banner archer of the Plain Yellow with the heavy Manchu bow
   // and the saber at his belt; a big man of the Bordered Red with the guandao; Yangguri, the commander of Nurhaci's
   // guard, a Bayara in the heavy coat, with the banners' heavy spear (the bow his to choose). Jurchen hunters and herders fed on meat and grain, at the bow

@@ -1284,6 +1284,11 @@ export const WORLD = {
   //   throws him at the speed his horse lost, less the `grip` share his knees held.
   //   A lance's ~10 ms contact engages only the part of the horse the
   //   saddle's give lets it reach: a tenth, ~50-60 kg.
+  //   The pommel and cantle brace him only fore and aft: a knock across the
+  //   horse's line meets his thighs and stirrups alone, and throws him at
+  //   `across` of `speed` (0.55: about what puts a man on foot over, 2.1 of
+  //   3.8 m/s). A blow from the flank unseats where the same blow head-on
+  //   does not (the user's call, 2026-11-09: a T-bone is hard to sit).
   // - coupling: a blow from the saddle has behind it the rider's body and, through
   //   the saddle and stirrups, a share of the horse: the target presses back along the
   //   line of the blow into the blade, the hand, the arm braced against the shoulder,
@@ -1347,8 +1352,12 @@ export const WORLD = {
   //   his weight on the shaft).
   // - crash: a laden horse's speed change (m/s: impulse over its mass) from
   //   anything it runs into: past `fall` (its speed change along its line plus
-  //   `lateral` of what comes across: a head-on crash is worst, a sidelong one
-  //   mostly shoves; the knocks of the last `shockSeconds` add) it goes down and throws its rider; short of it the rider is
+  //   `lateral` of what comes across; the knocks of the last `shockSeconds` add) it goes down and throws its rider. A
+  //   horse struck in the flank goes over far sooner than one stopped head-on: its feet stand ~0.35 m apart across
+  //   but ~1.4 m fore and aft, and it can drive its legs against its own line but must step to take a shove across it.
+  //   The speed that tips a body over its base goes as the root of the base, so `lateral` 2 (the root of 1.4 / 0.35;
+  //   was 0.5, which had a sidelong crash only shove). Why the polo rules forbid riding into another's line (the
+  //   T-bone): it brings horses down. Short of a fall the rider is
   //   knocked by the speed it lost (WORLD.mount.seat). Horses meeting exchange
   //   momentum by their laden masses; a shove across its
   //   line is `shove`, a velocity of its own that dies away in 1/`shoveDecay` s
@@ -1396,7 +1405,7 @@ export const WORLD = {
     // at `speed` m/s or slower (a walk), set down `beside` m off its side; a riderless horse standing within `reach` m is mounted.
     dismount: { speed: 1.8, beside: 0.9, reach: 1.6 },
     line: { spacing: 3, rankBack: 5, margin: 1.5 },
-    seat: { speed: 3.8, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
+    seat: { speed: 3.8, across: 0.55, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
     reach: { easy: 0.6, most: 0.7, steps: 14, inHz: 3, outHz: 1.2, damping: 1, seat: 0.35 },
     coupling: { forms: { couched: 0.6, twoThrust: 0.35, oneThrust: 0.12, twoSwing: 0.04, oneSwing: 0.03 }, across: 0.4, horse: 0.167 },
     twist: 1.3,
@@ -1419,7 +1428,7 @@ export const WORLD = {
     // not into the horse. It is the war spear shaft's strength for every shaft (physics/wear.js driveShaft, at its own
     // thickness and wood): past it the shaft snaps.
     brace: { length: 1.5, still: 0.5, share: 0.5, shaft: 1000 },
-    crash: { fall: 6, lateral: 0.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
+    crash: { fall: 6, lateral: 2, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     // A horse will not run into another horse if it can help it (a herd animal, and a rider rides his line knee to knee, not
     // into his comrade): each horse looks `ahead` s along its way (at least `nearest` m) at the horses of its own side and, where
     // one will come within `clear` m of it (barrel to barrel: two horses' widths and a knee's room), it swerves off by up to

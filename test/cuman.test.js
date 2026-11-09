@@ -36,7 +36,8 @@ test('his mail and plates guard at least as the bekhter does, better against a b
 });
 
 test('the helmet is the tall Kipchak bowl with a steel face mask, closing the face', () => {
-  for (const design of OUTFITS.cumanHeavy.designs) {
+  const plated = outfitSets('cumanHeavy').find((set) => set.key === 'plates').designs;
+  for (const design of plated.map((index) => OUTFITS.cumanHeavy.designs[index])) {
     assert.equal(design.head.kind, 'chichak');
     assert.equal(design.head.bowl, 'kipchak');
     assert.ok(design.head.mask);
@@ -69,4 +70,13 @@ test('the Cuman is on the roster under his unit name, rated', () => {
   assert.equal(konchak.faction, 'steppe');
   assert.ok(RATINGS.characters.cuman.score > 0);
   assert.ok(RATINGS.types['cumanBow|cumanHeavy'] > 0);
+});
+
+test('the common Cuman rider wears the mail shirt alone, open-faced: guarded as mail, below the retainer', () => {
+  const mail = outfitSets('cumanHeavy').find((set) => set.key === 'mail');
+  const design = OUTFITS.cumanHeavy.designs[mail.designs[0]];
+  assert.equal(design.armor.kind, 'hauberk');
+  assert.ok(!design.head.mask);
+  assert.equal(mail.patch.protection.pierce, 0.65);
+  for (const kind of ['blunt', 'cut', 'pierce']) assert.ok(mail.patch.protection[kind] < OUTFITS.cumanHeavy.protection[kind], kind);
 });

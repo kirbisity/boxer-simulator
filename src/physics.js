@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
-import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
+import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
@@ -8200,7 +8200,10 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const press = punch.finisher && mix.pierce > 0 ? finisherPress(attacker, weapon, punch.finisher) : 0;
   const pointJoules = mix.pierce > 0 ? goes + press : 0;
   const pointGoes = pointThrough(pointJoules, protection.pierce, world.random(), pointWidthOf(wspec));
-  const pierce = (goes * mix.pierce + press) * sharp * pointGoes;
+  // (The press is a push, not a blow: what bursts the rings or the plate is the blow and the push together, but once the
+  // point is through he is still leaning on it, and drives it on with all of the push, only the armour's hold on it taken.)
+  const pressGoes = pointGoes > 0 ? 1 - PUNCTURE.after * Math.min(PUNCTURE.most, protection.pierce ?? 0) : 0;
+  const pierce = (goes * mix.pierce * pointGoes + press * pressGoes) * sharp;
   // A heavy hard head drives part of its blow through armour (`crush`).
   // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)
   const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
