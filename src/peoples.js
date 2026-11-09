@@ -15,9 +15,10 @@ export const PEOPLES = {
   // little meat, often in arrears (`calories`); a garrison man (weisuo) drilled little, his officers' tenant as much as
   // their soldier (`exercise`).
   // The fighting men set a little above that mean by the user's choice (2026-11-07): soldiers were picked, and men of
-  // the records' size read too small to today's eye.
+  // the records' size read too small to today's eye. Brought back down to the records' upper middle on the user's call
+  // (2026-11-08, "slightly tune down"): 164 cm, the weight at his height (65 × (164/166)²).
   ming: {
-    heightCm: 166, weightKg: 65, calories: 3000, exercise: 0.5,
+    heightCm: 164, weightKg: 63, calories: 3000, exercise: 0.5,
     ranks: {
       garrison: {},
       // The regulars in brigandine: paid men, picked a little for size, drilled.
@@ -81,9 +82,10 @@ export const PEOPLES = {
   // them harder than a garrison man (`exercise`).
   // The fighting men set well above that mean by the user's choice (2026-11-07): the companies sent their strongest,
   // the banners were hunters fed on meat, and they must stand up to the Sultanates' men (ottoman); kept close to the
-  // builds first given them (177-182 cm), a few centimetres down.
+  // builds first given them (177-182 cm), a few centimetres down. Down again on the user's call (2026-11-08, "slightly
+  // tune down"): 168 cm, the top of the records' range, the weight at his height (81 × (168/171)²).
   jurchen: {
-    heightCm: 171, weightKg: 81, calories: 4300, exercise: 0.85,
+    heightCm: 168, weightKg: 78, calories: 4300, exercise: 0.85,
     ranks: {
       // The company (niru) sent its able-bodied men to war, not all of them: a little above the people.
       banner: { heightCm: 2, weightKg: 2, exercise: 0.05 },
