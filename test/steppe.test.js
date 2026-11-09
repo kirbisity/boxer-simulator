@@ -57,6 +57,27 @@ test('the one-handed maces: blunt with a pierce, about as hard-hitting as the ka
   assert.ok(SHIELDS.buckler.radius < SHIELDS.roundShield.radius);
 });
 
+test('the Iron Pagoda: the heavy spear first, the wolf-tooth mace his sidearm, drawn a little smaller than it strikes', async () => {
+  const { OUTFITS } = await import('../src/outfits.js');
+  assert.equal(PRESETS.ironPagoda.style, 'jinLance');
+  assert.equal(STYLES.jinLance.weapon, 'manchuLance');
+  assert.equal(STYLES.jinLance.fallback, 'mix', 'the kit\'s sidearm is drawn, not a style fallback');
+  assert.equal(OUTFITS.ironPagoda.sidearm, 'langya');
+  assert.equal(STYLES.langya.weapon, 'langya');
+  assert.equal(STYLES.langya.shield, undefined);
+  assert.ok(WEAPONS.langya.drawnRadius < WEAPONS.langya.radius && WEAPONS.langya.drawnRadius > 0.75 * WEAPONS.langya.radius);
+});
+
+test('the Iron Pagoda draws the wolf-tooth mace when his spear is lost', async () => {
+  const { createWorld, dropWeapon } = await import('../src/physics.js');
+  const world = createWorld([PRESETS.ironPagoda, PRESETS.kanabo], { seed: 3 });
+  const pagoda = world.fighters[0];
+  assert.equal(pagoda.weapon.kind, 'manchuLance');
+  dropWeapon(world, pagoda, 'disarmed');
+  assert.equal(pagoda.weapon?.kind, 'langya');
+  assert.equal(pagoda.style, 'langya');
+});
+
 test('the composite bow casts a faster arrow than the long bow', () => {
   // (Was the hand-set arrowSpeed 62 against none; now each bow's cast from its build: weapons.js bowCast.)
   assert.ok(bowCast(WEAPONS.compositeBow).speed > 55 && bowCast(WEAPONS.compositeBow).speed > bowCast(WEAPONS.longbow).speed);

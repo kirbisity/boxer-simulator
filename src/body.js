@@ -310,10 +310,11 @@ export const PRESETS = {
   },
   // Legends of an earlier age, one to a faction: Wanyan Wuzhu, the Jin prince
   // (squat and massive, ~100 kg on 173 cm, an iron pagoda of a man),
-  // who led the Iron Pagoda (1140); Subutai, Chinggis Khan's general, in the
+  // who led the Iron Pagoda (1140), with the heavy spear and the wolf-tooth mace at his saddle (his kit's sidearm:
+  // outfits.js ironPagoda); Subutai, Chinggis Khan's general, in the
   // kheshig's armour; Turgut Alp, one of Osman's companions (c. 1300).
   ironPagoda: {
-    name: 'Wanyan Wuzhu', style: 'langyaShield', hero: true, sex: 'male', heightCm: 173, frame: 'large', age: 38, exercise: 0.6, calories: 4550, skill: 0.6,
+    name: 'Wanyan Wuzhu', style: 'jinLance', hero: true, sex: 'male', heightCm: 173, frame: 'large', age: 38, exercise: 0.6, calories: 4550, skill: 0.6,
     outfit: { kind: 'ironPagoda', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },

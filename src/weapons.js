@@ -730,6 +730,10 @@ export const WEAPONS = {
     contactSeconds: 0.004, rotation: 1.0, wrist: { omega: 12, zeta: 0.85 }, threat: 4, art: 'artCrushOne', crush: 0.45,
     // Its short haft bound in iron: no bare wood to snap.
     build: { shaft: null },
+    // The iron-clad head as drawn (weaponview.js), m: ~0.035, a sixth under the 0.042 it strikes with (`radius`, which its
+    // teeth stand out to), so the head reads as a sidearm's at the Iron Pagoda's belt and not a club's (the user's call,
+    // 2026-11-08). Drawing only: `radius`, `mass` and `balance` stay as they were, so it hits as it did.
+    drawnRadius: 0.035,
   },
   flangedMace: {
     label: 'Flanged mace', hands: 'one', length: 0.66, strikeFrom: 0.5, handle: 0.12, mass: 1.6, balance: 0.72, radius: 0.036,

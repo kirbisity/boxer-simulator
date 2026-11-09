@@ -1443,23 +1443,32 @@ export const OUTFITS = {
   // reconstructions show it: lamellar of small dotted iron plates from the
   // shoulders to below the knee over a red robe, a tall pointed helmet with
   // a plume, and an aventail rolled up round the face so only the eyes show.
-  // Fought here on foot, with the mace. The flagship of its faction, drawn in full.
+  // Fought with the heavy spear, the wolf-tooth mace its sidearm. The flagship of its faction, drawn in full.
   ironPagoda: {
     // Rides (the Jurchen iron pagoda: men and horses in iron lamellar).
     horse: 'steppe', barding: 'lamellar',
     skill: 0.7,
     faction: 'chinese', plated: true,
     label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
-    sidearm: 'dao',
+    // The wolf-tooth mace (langya bang) at the saddle, drawn once the spear is lost (STYLES.langya; was the dao): the
+    // horseman's spear first, the mace for the press, where it crushes what a point and an edge glance off (the user's
+    // call, 2026-11-08).
+    sidearm: 'langya',
     spare: 'dagger',
     deflects: true,
     arrowproof: true,
     // Armour at 0.55 of its old weight (was 0.6): iron lamellar to below the knee: ~33 kg on a 100 kg man (real heavy lamellar ~25–30 kg).
     extraMass: 0.33,
-    // Pierce 0.75 (was 0.8): a point finds the lacing between the lamellae.
-    protection: { blunt: 0.66, cut: 0.95, pierce: 0.85, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
-    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
-    gaps: { lacing: 0.1 },
+    // A little better than it was (blunt 0.69, was 0.66; cut 0.96, was 0.95; pierce 0.88, was 0.85; the user's call,
+    // 2026-11-08): the Song records of the 铁浮屠 and 拐子马 have the Jin heavy horse "all in heavy armour" (皆重铠: the
+    // Song shi's life of Yue Fei, of Yancheng, 1140) and, at Shunchang the same year, under "a double iron helmet, long
+    // lames hung all round it" (被两重铁兜鍪，周匝皆缀长檐: Yang Ruyi's account of the victory there), layered iron the Song
+    // bows could not get through; the second layer takes a little more of a blow's spread and a point's bite.
+    // Pierce still under plate's: a point finds the lacing between the lamellae.
+    protection: { blunt: 0.69, cut: 0.96, pierce: 0.88, bullet: { head: 0.3, torso: 0.2, limb: 0.1 } },
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid
+    // plates; 0.08, was 0.1: the double layer's rows overlap the lacing of the one beneath.
+    gaps: { lacing: 0.08 },
     courage: 0.4,
     designs: [
       // Lamellar of dotted iron plates over a red robe, brown riding boots; the helmet a tall bowl with a plume or a horsehair tassel.
