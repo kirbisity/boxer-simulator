@@ -962,9 +962,6 @@ export const OUTFITS = {
     },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between a brigandine's plates a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
-    // Arrows glance only off its plate: the kettle hat or sallet is steel; the coat brigandine (ARROW.armour; its sets: mail, a breastplate).
-    arrowproof: ['head'],
-    arrowArmour: 'brigandine',
     courage: 0.25,
     designs: [
       footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { design: 'a', brim: 1.9 }),
@@ -1310,9 +1307,6 @@ export const OUTFITS = {
     },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
-    // Arrows glance only off its plate: the bell or riveted helmet is steel; the vest brigandine (ARROW.armour).
-    arrowproof: ['head'],
-    arrowArmour: 'brigandine',
     courage: 0.2,
     designs: [
       mingBrigandineDesign('Red', '#9a1f1a', '#8f949b', {}, { design: 'yongBell', finish: 'red' }),
@@ -1517,11 +1511,9 @@ export const OUTFITS = {
     // Han crossbowmen stood in ranks and shot, the ranks relieving each other; they held their ground.
     drill: { advance: false },
     sidearm: 'jian',
-    // Iron lamellae turn many an arrow (`arrowproof`, `arrowArmour`; ranged.js arrowHit):
+    // Iron lamellae turn an arrow that does not find a gap, as any rigid iron does (`arrowproof`; ranged.js arrowHit):
     // Chao Cuo's memorial (169 BC) has the Xiongnu's leather and their arrows no match for Han iron. The arms and legs, cloth.
     arrowproof: true,
-    // A soldier's iron lamellar, not a picked man's: about half the arrows turn off it, the rest go in shallow (ARROW.armour lamellar).
-    arrowArmour: 'lamellar',
     // Armour at 0.55 of its old weight (was 0.18): iron lamellar vest and helmet: ~8 kg on an 80 kg man (Han lamellar finds ~8–10 kg).
     extraMass: 0.1,
     // The head: an iron lamellar helmet over a padded cap (the Linzi helmet):
@@ -1548,8 +1540,6 @@ export const OUTFITS = {
     label: 'Han cavalry — iron lamellar', movement: 'good', fists: 'bare',
     sidearm: 'jian',
     arrowproof: true,
-    // A soldier's iron lamellar, not a picked man's: about half the arrows turn off it, the rest go in shallow (ARROW.armour lamellar).
-    arrowArmour: 'lamellar',
     // Armour at 0.55 of its old weight (was 0.18): iron lamellar vest and helmet: ~8 kg on an 80 kg man (Han lamellar finds ~8–10 kg).
     extraMass: 0.1,
     // Pierce 0.58 (was 0.62): a point finds the lacing; the helmet by the same ratio (0.5 → 0.47).
@@ -1686,8 +1676,6 @@ export const OUTFITS = {
     label: 'Ming — iron lamellar cavalry', movement: 'good', fists: 'bare',
     sidearm: 'saber',
     arrowproof: true,
-    // A soldier's iron lamellar, not a picked man's: about half the arrows turn off it, the rest go in shallow (ARROW.armour lamellar).
-    arrowArmour: 'lamellar',
     // Iron lamellar to the knee and helmet: ~14 kg on an 80 kg man; and the steel arm guards (MING_ARM_GUARD, a pair ~1.5 kg:
     // the Ming horseman's, was 0.176 without them).
     extraMass: 0.195,
@@ -3306,8 +3294,6 @@ export function gearTraits(inputs) {
     spare: spec.spare ?? null,
     // Proof against arrows: true (its rigid armour all plate or lamellar), or the regions (bulletRegion) where it is plate, mail elsewhere (ranged.js arrowHit).
     arrowproof: Array.isArray(spec.arrowproof) ? spec.arrowproof : Boolean(spec.arrowproof),
-    // What an arrow meets that is neither plate nor cloth (weapons.js ARROW.armour: 'mail', 'brigandine', 'lamellar'), or null.
-    arrowArmour: spec.arrowArmour ?? null,
     // The arrows he carries for his bow (a kit's `quiver`), or none counted (a foot archer's sheaves are brought up to him in the line).
     quiver: spec.quiver ?? null,
     // His missiles never run out (`inputs.endlessAmmo`: a mode's say, a man holding his own gate with its stores behind

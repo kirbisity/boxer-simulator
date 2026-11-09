@@ -1804,7 +1804,7 @@ export function bulletProof(bulletRating, energy = GUN.energy) {
  * high for the drop. Mostly a piercing wound (`lethal`, as for GUN, of what
  * kills an 80 kg man, cut by the armour's pierce protection) with a small
  * knock (`impulse`, N·s). Off good plate and lamellar (`arrowproof`) an
- * arrow glances `bounce` of the time; one that finds a gap does `gapHarm`. Mail, brigandine and a soldier's lamellar it goes into, shallow (`armour`).
+ * arrow glances `bounce` of the time; one that finds a gap does `gapHarm`. Mail it goes into, shallow (`mailStops`).
  * A spent arrow lies `stays` s.
  */
 export const ARROW = {
@@ -1859,26 +1859,12 @@ export const ARROW = {
   // through, spending proof / joules of itself on the armour. A war arrow (100-130 J) never does; a crossbow's 200 J bolt goes
   // through lamellar a quarter of the time and thin plate a tenth; a harness proofed against shot, not at all.
   rigidProof: { plate: 180, lamellar: 160, plateShare: 0.3 },
-  // Armour an arrow neither glances from as from plate nor goes through as through cloth (a kit's `arrowArmour`, or mail
-  // where its `arrowproof` lists only its plate's regions; physics/ranged.js arrowHit): `glance` of the arrows turn off it,
-  // the rest go in shallow, `stops` of a war arrow (ARROW.joules) held there, less of a heavier one (by proofJoules).
-  // - `mail`: rings do not turn an arrow; it parts a few and is held by them and the quilting under them. Bahā' al-Dīn
-  //   saw the Frankish foot on the march to Arsuf (1191) with up to ten arrows standing in their mail and gambesons.
-  // - `brigandine`: small plates riveted inside cloth, overlapping: the cloth takes the point, so few skid off as off bare
-  //   steel, and behind it a plate nearly everywhere but the rivet lines (the Ming's and Europe's alike: the plates of
-  //   both 1-2 mm iron, ~10-15 kg the coat): held better than mail.
-  // - `lamellar`: laced iron lamellae a mid-tier soldier wore (the Han's, the Ming's horsemen's), bare iron that turns an
-  //   arrow meeting it slanting, as most do (about half: an estimate, a man's lamellae are curved and he is seldom square
-  //   on), where one meeting it square wedges between the lamellae or parts the lacing, held by the overlap (two or three
-  //   thicknesses at any point) and the padded coat under it, though a soldier's lamellae are thin and the lacing parts
-  //   (Chao Cuo, 169 BC, rated Han iron over the Xiongnu's arrows, not proof against them). On a man's trunk, war
-  //   arrows to drop him: mail ~10, brigandine and a soldier's lamellar ~15, plate ~30 (its gaps), a leather coat ~3. The heavy armour of the picked men (plate, the elite's and
-  //   the banner guard's lamellar and scale, `arrowproof` alone) stays proof, glancing ARROW.bounce of them.
-  armour: {
-    mail: { glance: 0, stops: 0.85 },
-    brigandine: { glance: 0.2, stops: 0.88 },
-    lamellar: { glance: 0.5, stops: 0.8 },
-  },
+  // Mail where a kit's rigid armour is only some of it (a kit's `arrowproof` a list of the regions, bulletRegion, that are
+  // plate: the great helm over a hauberk, the krug's plates in their mail): an arrow does not glance from rings, it parts
+  // a few and is held by them and the quilting under them, `mailStops` of a war arrow (ARROW.joules) stopped there and less
+  // of a heavier one (by proofJoules, as for any armour short of plate). A shallow wound: Bahā' al-Dīn saw the Frankish
+  // foot on the march to Arsuf (1191) with up to ten arrows standing in their mail and gambesons, marching on.
+  mailStops: 0.85,
   // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (physics/ranged.js
   // overHeads), on the arc that comes down on the mark, the bow drawn the less the higher it goes; tried from the flat
   // shot upward `step` rad at a time (~0.6 deg, finer than an archer lays his bow) to `most` rad (43 deg: about the
