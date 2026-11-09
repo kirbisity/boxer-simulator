@@ -7,7 +7,7 @@
 //   protection   by kind and by region (head, torso, limb, or a part: UpperArm, Shank...), merged region by region;
 //   extraMass    the kit's weight as a share of the body's (in place of the outfit's);
 //   helmet       what is on the head as a blow meets it (outfits.js HELMETS: mass, padding, curve, face, hold);
-//   gaps, breastplate, movement, courage: as on an outfit.
+//   gaps, breastplate, movement, courage, arrowproof, arrowArmour: as on an outfit.
 // An outfit with no entry here is one set: its own label, with `OUTFIT_BLURBS` for its description.
 // The differences are kept small and historical: the same man in a better helmet, not a different man.
 
@@ -70,13 +70,15 @@ export const OUTFIT_SETS = {
     {
       key: 'mail', designs: [2], name: 'Mail shirt and kettle hat',
       blurb: { en: 'Shirt of iron rings over a padded jacket, every ring riveted by hand. Romans, Vikings and crusaders wore it. A thousand years of armour, handed down at last to those who could not afford plate.\nBy the 1400s new arrowheads went through rings like a needle through lace, and the lords had moved on to plate.\nThe poor got the old shirts, patched with rings from a dozen dead men.\nThe shirt will pass to one more man yet.', zh: '锁子衫与棉甲。铁环一枚枚手工铆合。罗马人穿过，维京人穿过，十字军也穿过。千年的甲，最后传给了买不起板甲的人。\n到十五世纪，新式箭头穿过铁环，如针穿花边。领主们早已换上板甲。\n旧衫落到穷人手中，破处用十几个死人身上拆下的铁环补缀。\n这件衫子，还会再传给下一个人。' },
-      patch: { extraMass: 0.105, protection: { blunt: 0.35, cut: 0.88, pierce: 0.5 }, gaps: null },
+      patch: { extraMass: 0.105, protection: { blunt: 0.35, cut: 0.88, pierce: 0.5 }, gaps: null, arrowArmour: 'mail' },
     },
     {
       key: 'breastplate', designs: [3], name: 'Breastplate and sallet',
       blurb: { en: 'Plain steel breastplate and sallet, stamped out by the hundred for army stores. The lord’s armour was fitted to him; the levy got small, medium and whatever was left.\nBicocca, 1522. The Swiss charged across a sunken road into four ranks of Spanish gunmen. Bullets went through steel and man alike. Three thousand fell in half an hour.\nSteel that stops a pike does not stop lead.', zh: '素面钢胸甲与深盔。军械库中成百地冲压而出。领主的甲量身打造；征召兵的甲，分小号、中号，以及剩下的。\n一五二二年，比科卡。瑞士人越过一条洼路，冲向四排西班牙火枪手。铅弹连甲带人一并打穿，半个时辰，倒下三千。\n挡得住长枪的钢，挡不住铅弹。' },
       patch: {
         extraMass: 0.14, breastplate: 0.6,
+        // The breastplate is plate: an arrow glances off it as off the sallet (ARROW.bounce).
+        arrowproof: ['head', 'torso'], arrowArmour: null,
         helmet: { mass: 2.2, padding: 0.45, curve: 0.75, hold: 'half' },
         protection: { blunt: 0.5, cut: 0.9, pierce: 0.8, regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 } } },
       },
@@ -285,12 +287,12 @@ export const OUTFIT_SETS = {
     {
       key: 'lamellar', designs: [3, 4], name: 'Ming iron lamellar — pointed helmet',
       blurb: { en: 'Iron plates laced in rows, and a plain pointed helmet. A design older than the dynasty, every plate on the outside where anyone could check it. A border soldier might wear his grandfather’s.\nWith nothing hidden to steal, the quartermaster saved on the laces. Cheap cord rotted in the rainy season.\nKorea, 1593. Ming soldiers met Japanese swordsmen in the spring mud, and the sodden laces gave way.', zh: '明军的札甲与素面尖盔。铁甲片成排编缀，形制比大明还老，片片露在外头，谁都查得到。边军身上的，兴许是祖父那一副。\n无物可偷，管库的便省在绳子上。廉价的绳，到雨季就烂。\n一五九三年，朝鲜。明军在春泥中迎上日本刀手，泡软的甲绳一扯便断。' },
-      patch: { extraMass: 0.15, protection: { blunt: 0.6, cut: 0.83, pierce: 0.5, regions: { head: { blunt: 0.54, cut: 0.86, pierce: 0.6 }, UpperArm: { blunt: 0.6, cut: 0.83, pierce: 0.5 }, Forearm: { blunt: 0.6, cut: 0.83, pierce: 0.5 } } } },
+      patch: { extraMass: 0.15, arrowArmour: 'lamellar', protection: { blunt: 0.6, cut: 0.83, pierce: 0.5, regions: { head: { blunt: 0.54, cut: 0.86, pierce: 0.6 }, UpperArm: { blunt: 0.6, cut: 0.83, pierce: 0.5 }, Forearm: { blunt: 0.6, cut: 0.83, pierce: 0.5 } } } },
     },
     {
       key: 'scale', designs: [5], name: 'Ming iron scale coat',
       blurb: { en: 'Coat of overlapping iron scales under the bell helmet, running down the chest like a fish’s flank. A blade slides off it as a fish slips from the hand.\nA starving garrison sells its costliest coat first.\nSarhu, 1619. The Ming sent four separate columns against the Manchus, who destroyed them one at a time, stripped the scales from the dead and wore them home.', zh: '明军的鳞甲与钟形盔。铁鳞层层相叠，顺胸而下，如鱼的侧身。刀砍上去会滑开，如鱼从手中溜走。\n卫所饿着肚子时，最先卖掉的就是最贵的甲。\n一六一九年，萨尔浒。明军分兵四路进攻后金，被逐路击破。八旗兵从死人身上剥下鳞甲，穿着回了家。' },
-      patch: { extraMass: 0.15, protection: { blunt: 0.58, cut: 0.84, pierce: 0.44, regions: { head: { blunt: 0.55, cut: 0.85, pierce: 0.55 }, UpperArm: { blunt: 0.58, cut: 0.84, pierce: 0.44 }, Forearm: { blunt: 0.58, cut: 0.84, pierce: 0.44 } } } },
+      patch: { extraMass: 0.15, arrowArmour: 'lamellar', protection: { blunt: 0.58, cut: 0.84, pierce: 0.44, regions: { head: { blunt: 0.55, cut: 0.85, pierce: 0.55 }, UpperArm: { blunt: 0.58, cut: 0.84, pierce: 0.44 }, Forearm: { blunt: 0.58, cut: 0.84, pierce: 0.44 } } } },
     },
   ],
   mingElite: [
