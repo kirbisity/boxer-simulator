@@ -237,16 +237,9 @@ export const AI = {
   // A man who has broken once breaks the easier: `breakAt` falls by
   // `brokeBefore` each time, to `breakAtLeast`.
   // `felt`: all a man's fear, whatever its cause, × this (set lower on the user's call, 2026-11-05: men a little steadier everywhere).
-  // A samurai's honour (gear.honour, 0..1, outfits.js; honourOf): in single combat (his side under `rout.minSide`) it takes that
-  // share off his being outmatched (size, strength, skill: the hanging back of a man unsure of himself, confidence; the weapon's
-  // dread), and `honourHurt` of that share off the rest (hurt, broken limbs): a man who had called out his name and line
-  // (nanori) did not turn from the man who answered, whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday, Samurai,
-  // Warfare and the State, 2004). In a battle only `honourInBattle` of it: samurai did break in the press (Nagashino, 1575;
-  // the Shimazu's retreat through the enemy at Sekigahara, 1600), less often than the levies round them.
   panic: {
     felt: 0.85, settle: 2, outmatched: 0.5, hurt: 0.9, perKnockdown: 0.22, breakAt: 0.86, rate: 0.42, adrenalineHolds: 0.55, calmAt: 0.4, calmSeconds: 3, standardDown: 0.35, leaderLostFor: 6,
     brokenArm: 0.2, brokenLeg: 0.3, armed: 0.35, lethalSpan: 4, ownWeapon: 0.92, dreadNear: 1.5, dreadFade: 5, dreadAtRange: 0.3, drilled: 0.7, unproven: 0.4, unprovenMismatch: 0.75, proven: 2, mismatch: 0.7, ring: 0.45, brokeBefore: 0.06, breakAtLeast: 0.5,
-    honourHurt: 0.6, honourInBattle: 0.35,
   },
   // Routs. Few battles are fought to the last man: as a side's men fall,
   // crawl off or break, fear runs through the rest. In a side of at least
@@ -1688,20 +1681,7 @@ export function confidence(fighter, opponent, world = null) {
     const standing = (corner) => world.fighters.filter((other) => other.corner === corner && inFight(other)).length;
     nerve += AI.numbersConfidence * Math.log2(Math.max(1, standing(fighter.corner)) / Math.max(1, standing(opponent.corner)));
   }
-  // Honour (honourOf): a samurai sizes up the man he has met as any man does, and does not hang back from him for it.
-  if (world && nerve < 0) nerve *= 1 - honourOf(world, fighter);
   return Math.max(-1, Math.min(1, nerve));
-}
-
-/**
- * The share of his fear of being outmatched his honour takes off (gear.honour, AI.panic): all of it in single combat (his side
- * under AI.rout.minSide), `honourInBattle` of it in a battle.
- */
-export function honourOf(world, fighter) {
-  const honour = fighter.body.gear.honour ?? 0;
-  if (!honour) return 0;
-  const men = world.sides?.[fighter.corner]?.men ?? world.fighters.filter((other) => other.corner === fighter.corner).length;
-  return honour * (men < AI.rout.minSide ? 1 : AI.panic.honourInBattle);
 }
 
 /**
@@ -2928,16 +2908,11 @@ export function fearTarget(world, fighter, nerve, opponent) {
   const broken = brokenArms(fighter) * spec.brokenArm + legs * spec.brokenLeg + maimFear(fighter, world.time);
   // (The field round him read afresh, or, by a man the player does not see deciding, as he last looked round: AI.perceive.)
   const field = fieldFelt(world, fighter);
-  // His honour (honourOf): off the weapon's dread (being outmatched by size and strength is already off `nerve`, confidence), and
-  // `honourHurt` of it off the rest.
-  const honour = honourOf(world, fighter);
-  const steadied = 1 - honour * spec.honourHurt;
-  const dreaded = (1 - honour) * dread;
-  let felt = spec.outmatched * outmatched + spec.armed * dreaded + steadied * (spec.hurt * hurtShare(fighter) + shaken + broken);
-  for (let k = 0; k < field.length; k += 1) felt += steadied * field[k];
+  let felt = spec.outmatched * outmatched + spec.armed * dread + spec.hurt * hurtShare(fighter) + shaken + broken;
+  for (let k = 0; k < field.length; k += 1) felt += field[k];
   // How outmatched he is multiplies the rest, a little less before a blow has landed.
   const blows = Math.min(1, (fighter.aiFelt?.count ?? 0) / spec.proven);
-  const mismatch = Math.min(1, outmatched + dreaded) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);
+  const mismatch = Math.min(1, outmatched + dread) * (spec.unprovenMismatch + (1 - spec.unprovenMismatch) * blows);
   const rush = AI.adrenaline.nerve + (AI.adrenaline.nerveOutmatched - AI.adrenaline.nerve) * mismatch;
   const ring = opponent && ringBout(world, fighter, opponent) ? spec.ring : 1;
   // In his place in a drilled formation (a slot: his kit's drill, or his side's by its level), the ranks hold him.
