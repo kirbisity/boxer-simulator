@@ -1800,7 +1800,7 @@ export function bulletProof(bulletRating, energy = GUN.energy) {
  * high for the drop. Mostly a piercing wound (`lethal`, as for GUN, of what
  * kills an 80 kg man, cut by the armour's pierce protection) with a small
  * knock (`impulse`, N·s). Off good plate and lamellar (`arrowproof`) an
- * arrow glances `bounce` of the time; one that finds a gap does `gapHarm`.
+ * arrow glances `bounce` of the time; one that finds a gap does `gapHarm`. Mail it goes into, shallow (`mailStops`).
  * A spent arrow lies `stays` s.
  */
 export const ARROW = {
@@ -1855,6 +1855,12 @@ export const ARROW = {
   // through, spending proof / joules of itself on the armour. A war arrow (100-130 J) never does; a crossbow's 200 J bolt goes
   // through lamellar a quarter of the time and thin plate a tenth; a harness proofed against shot, not at all.
   rigidProof: { plate: 180, lamellar: 160, plateShare: 0.3 },
+  // Mail where a kit's rigid armour is only some of it (a kit's `arrowproof` a list of the regions, bulletRegion, that are
+  // plate: the great helm over a hauberk, the krug's plates in their mail): an arrow does not glance from rings, it parts
+  // a few and is held by them and the quilting under them, `mailStops` of a war arrow (ARROW.joules) stopped there and less
+  // of a heavier one (by proofJoules, as for any armour short of plate). A shallow wound: Bahā' al-Dīn saw the Frankish
+  // foot on the march to Arsuf (1191) with up to ten arrows standing in their mail and gambesons, marching on.
+  mailStops: 0.85,
   // Shooting from a rank behind his own: the arrow is put up over the heads of the men in front (physics/ranged.js
   // overHeads), on the arc that comes down on the mark, the bow drawn the less the higher it goes; tried from the flat
   // shot upward `step` rad at a time (~0.6 deg, finer than an archer lays his bow) to `most` rad (43 deg: about the

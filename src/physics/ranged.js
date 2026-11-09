@@ -770,8 +770,14 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
     }
     energy *= share;
   }
-  // Proof against arrows only where it is rigid (cut-proof plate or lamellar): an arm or leg left open is not.
-  const proof = gear.arrowproof && (hit.throat || (protectionAt(gear, key).cut ?? 0) >= BLADES.gaps.rigidFrom);
+  // Proof against arrows only where it is rigid (cut-proof plate or lamellar): an arm or leg left open is not. A kit whose
+  // `arrowproof` lists its plate's regions is mail elsewhere it is cut-proof (`mail`: ARROW.mailStops), its throat with it
+  // unless its trunk is plate (the coif and the aventail).
+  const region = hit.throat ? 'head' : bulletRegion(key);
+  const plateAt = Array.isArray(gear.arrowproof) ? (hit.throat ? gear.arrowproof.includes('torso') : gear.arrowproof.includes(region)) : Boolean(gear.arrowproof);
+  const hard = hit.throat || (protectionAt(gear, key).cut ?? 0) >= BLADES.gaps.rigidFrom;
+  const proof = plateAt && hard;
+  const mail = !plateAt && hard && Array.isArray(gear.arrowproof);
   const joules = energy * ARROW.joules;
   let punched = 0;
   if (proof && world.random() < bounce) {
@@ -784,13 +790,13 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
     }
     punched = Math.min(1, rigid / joules);
   }
-  const region = hit.throat ? 'head' : bulletRegion(key);
   // Full armour (plate, lamellar) guards the throat with its gorget or aventail; a vest does not.
   // Short of plate, armour (mail, brigandine, a padded coat) stops its share of a war arrow's point, and of a heavier arrow only
   // as much as it is proof against (ARROW.proofJoules), as against a ball (bulletProof): a heavy bodkin or a crossbow's bolt
   // drives the further through mail. Plate is pierced only by what is heavier than it is proof against (above, `punched`: what
   // the plate took of it); else an arrow finds its gaps.
-  const stopped = punched ? punched : proof ? 1 - ARROW.gapHarm : hit.throat ? 0 : (protectionAt(gear, key).pierce ?? 0) * Math.min(1, ARROW.proofJoules / Math.max(1e-6, joules));
+  const held = Math.min(1, ARROW.proofJoules / Math.max(1e-6, joules));
+  const stopped = punched ? punched : proof ? 1 - ARROW.gapHarm : mail ? ARROW.mailStops * held : hit.throat ? 0 : (protectionAt(gear, key).pierce ?? 0) * held;
   const own = victim.body.segments[key];
   const reference = bulletReference()[key];
   const scale = own && reference ? reference.mass / own.mass : 1;
@@ -806,7 +812,7 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   Object.assign(event, { harm, region, pierce: harm * 60 });
   // Heard: the wound, as bad as its share of what kills.
   if (world.ear && harm > 0) soundWound(world, victim, 'stab', Math.min(1, harm), hit.point);
-  event.effects.push(punched ? `${region}: through the armour` : proof ? `${region}: through a gap` : `${region}`);
+  event.effects.push(punched ? `${region}: through the armour` : proof ? `${region}: through a gap` : mail ? `${region}: into the mail` : `${region}`);
   shooter.stats.landed += 1;
   if (victim.weapon?.held && key.startsWith(victim.weapon.main) && BLOCKING.has(key) && world.random() < 0.3) dropWeapon(world, victim, 'disarmed', dir);
   if (victim.gunshot >= 1 && victim.state !== 'out') knockOut(world, victim, event, region === 'head' ? 'an arrow through the head' : 'shot down by arrows', 'killed');

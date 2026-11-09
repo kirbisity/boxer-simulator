@@ -913,7 +913,8 @@ export const OUTFITS = {
     faction: 'knights',
     // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
     label: 'Knights Templar — mail, surcoat and great helm', movement: 'limited', fists: 'gauntlet',
-    arrowproof: true,
+    // Arrows glance only off its plate: the great helm is plate; the hauberk, coif and chausses mail (ARROW.mailStops).
+    arrowproof: ['head'],
     sidearm: 'dagger',
     // Armour at 0.55 of its old weight (was 0.4): hauberk, chausses, gambeson and great helm: ~19 kg on an 85 kg man (real ~20–25 kg).
     extraMass: 0.22,
@@ -1726,7 +1727,8 @@ export const OUTFITS = {
     label: 'Cuman — mail and plates, masked helmet', movement: 'good', fists: 'gauntlet',
     // The long, deep-curved sabre of the Kipchak kurgans (WEAPONS.kilij: the kılıç's forerunner), not the Mongol's gentler one.
     sidearm: 'kilij',
-    arrowproof: true,
+    // Arrows glance only off its plate: the helmet, mask and the plates over the trunk; the sleeves mail (ARROW.mailStops).
+    arrowproof: ['head', 'torso'],
     // Mail-and-plate shirt ~11 kg, vambraces ~1 kg, mail mittens ~0.5 kg, helmet, aventail and mask ~2.5 kg: ~15 kg on a
     // 75 kg man.
     extraMass: 0.24,
@@ -2016,7 +2018,8 @@ export const OUTFITS = {
     label: 'Ottoman — mail and plate', movement: 'good', fists: 'bare',
     // The sipahi's kılıç at the saddle (WEAPONS.kilij), drawn when the mace is lost.
     sidearm: 'kilij',
-    arrowproof: true,
+    // Arrows glance only off its plate: the chichak and the krug's plates over the trunk; the sleeves mail (ARROW.mailStops).
+    arrowproof: ['head', 'torso'],
     // Armour at 0.55 of its old weight (was 0.3): krug and chichak: ~12 kg on a 74 kg man (a mail-and-plate shirt ~10–12 kg).
     extraMass: 0.165,
     // Mail-and-plate: cut 0.98, the rings and plates proof against most edges; pierce 0.72 (was 0.5): the plates over the
@@ -2090,7 +2093,8 @@ export const OUTFITS = {
     faction: 'ottomans',
     // No `family`: never dealt at random (the flagship's own, too detailed for a crowd).
     label: 'Saladin — kazaghand over mail, turban helmet', movement: 'good', fists: 'bare',
-    arrowproof: true,
+    // Arrows glance only off its plate: the helmet is steel; the hauberk and kazaghand mail (ARROW.mailStops).
+    arrowproof: ['head'],
     // The horseman's mace (dabbus) at the saddle, the Ayyubid emir's second weapon.
     sidearm: 'mace',
     // Hauberk ~10 kg, kazaghand ~7 kg, helmet and aventail ~2.5 kg: ~0.3 of a 67 kg man.
@@ -3279,7 +3283,8 @@ export function gearTraits(inputs) {
     // Bolted to its mount, never thrown (a robot dog's turret or arm: physics/mounted.js keepSeat).
     bolted: Boolean(spec.bolted),
     spare: spec.spare ?? null,
-    arrowproof: Boolean(spec.arrowproof),
+    // Proof against arrows: true (its rigid armour all plate or lamellar), or the regions (bulletRegion) where it is plate, mail elsewhere (ranged.js arrowHit).
+    arrowproof: Array.isArray(spec.arrowproof) ? spec.arrowproof : Boolean(spec.arrowproof),
     // The arrows he carries for his bow (a kit's `quiver`), or none counted (a foot archer's sheaves are brought up to him in the line).
     quiver: spec.quiver ?? null,
     // His missiles never run out (`inputs.endlessAmmo`: a mode's say, a man holding his own gate with its stores behind

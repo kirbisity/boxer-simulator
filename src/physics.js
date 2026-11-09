@@ -8188,6 +8188,12 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     mix.cut = 0;
     mix.pierce = 0;
   }
+  // A point thrust by hand that bites square on plate (`deflects`) and finds no gap stops on it: no sword, spear or dagger
+  // carries what it takes to punch a point through 1.5-2 mm of steel (Williams, The Knight and the Blast Furnace, 2003), and
+  // a man in plate was stabbed only through its gaps, the half-sword's whole art. The blow is a shove (its blunt share, as the
+  // plate spreads it); the plate's `pierce` share is for what lies short of plate. (A couched lance, `shatters`, and a beak
+  // swung in keep their own rules; a finisher's point, its own.)
+  if (Boolean(protection.deflects) && spec.mode === 'thrust' && !beak && !wspec.shatters && !punch.finisher && !intoGap) mix.pierce = 0;
   // A point thrust home loads its shaft along its length (a beak swung in loads the haft across, not along): stopped
   // harder than the shaft carries (in flesh over a hand's depth; on plate it cannot go into, within a few cm), the shaft
   // snaps there and drives in only what it bore (physics/wear.js driveShaft; a lance's own rule is `shatters`, below).
