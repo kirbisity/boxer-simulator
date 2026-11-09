@@ -993,6 +993,9 @@ export const OUTFITS = {
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.4,
+    // Honour (ai.js AI.panic): a samurai does not turn from the man he has met, however he is outmatched (0.9: almost never, on the
+    // user's call, 2026-11-08); he breaks in the press now and then.
+    honour: 0.9,
     designs: [
       { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743', panel: true, leather: '#5a3a22', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25, panel: true, leather: '#3a2a3a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'kuwagata', mask: 'red', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
@@ -1044,6 +1047,7 @@ export const OUTFITS = {
     // and the waidate's seam more than most laced armour (`lacing`).
     gaps: { thrust: 0.5, swing: 0.15, lacing: 0.15 },
     courage: 0.45,
+    honour: 0.9,
     designs: [
       oyoroiDesign('Scarlet laced (aka-ito)', { lacquer: '#16141a', lace: '#c0281e', gold: '#d6a743', leather: '#5a4430', stencil: '#d8c08a', robe: '#b83a1c', hakama: '#8e2a16', crest: 'kuwagataTall' }),
       oyoroiDesign('Gold and orange', { lacquer: '#3a2210', lace: '#d9822b', gold: '#e3b34c', leather: '#7a5636', stencil: '#e8c890', robe: '#5a2414', hakama: '#4a1c10', crest: 'kuwagataTall' }),
@@ -1075,6 +1079,7 @@ export const OUTFITS = {
     // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). The cuirass is solid lames.
     gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'] },
     courage: 0.4,
+    honour: 0.9,
     designs: [
       toseiDesign('Iron', '#3b3e44', '#1d2a4f', 'crescent', 'black', '#1c1d26'),
       toseiDesign('Russet', '#6b4a32', '#2a1a10', 'kuwagata', 'red', '#2a1f18'),
@@ -2383,6 +2388,7 @@ export const OUTFITS = {
       regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Thigh: { blunt: 0.33, cut: 0.75, pierce: 0.45 } },
     },
     courage: 0.4,
+    honour: 0.9,
     designs: [
       roninDesign('Brown cloak, white kosode', { kosode: '#e4dfd2', hakama: '#4a3e34', cloak: '#4a3020', steel: '#2a2a2e', lace: '#2a3a6a', sash: '#e8e2d2', band: '#c9a23a', gaiters: '#5a6270' }),
       roninDesign('Grey cloak, indigo kosode', { kosode: '#2a3550', hakama: '#3a3a40', cloak: '#55534e', steel: '#3b3e44', lace: '#b3161b', sash: '#e8e2d2', band: '#b3161b', gaiters: '#2a2c30' }),
@@ -3234,6 +3240,8 @@ export function gearTraits(inputs) {
     poise: inputs.outfit?.poise ?? spec.poise ?? 0,
     // Courage from good armour: less fear, readier to close (0 to 1); a man's own (`outfit.courage`: one who never breaks) before the kit's.
     courage: inputs.outfit?.courage ?? spec.courage ?? 0,
+    // A samurai's honour (0 to 1): fear of being outmatched taken off in single combat, less in a battle (ai.js AI.panic honour…); a man's own before the kit's.
+    honour: inputs.outfit?.honour ?? spec.honour ?? 0,
     // Frenzied (a berserker, a gazi, a man charging in a rage): no hesitating short of contact, and rage beside a comrade
     // cut down (ai.js AI.hesitation, AI.rage); a man's own (`outfit.frenzy`) before the kit's.
     frenzy: Boolean(inputs.outfit?.frenzy ?? spec.frenzy),
