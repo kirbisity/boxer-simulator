@@ -1058,7 +1058,7 @@ function horseOnStakes(world, horse, works, velocity, hurt) {
       const after = closing - impulse / kg;
       // The work the stake did on the horse, as it slowed from `closing` to `after` against it.
       const energy = 0.5 * kg * (closing * closing - after * after);
-      const barding = bardingAt(horse.barding, capsule.part, tip[1] + (horse.sunk ?? 0), horse.withers);
+      const barding = bardingAt(horse.barding, capsule.part, tip[1] + (horse.sunk ?? 0), horse.withers, { normal: unit.map((value) => -value), yaw: horse.yaw });
       const event = { time: world.time, kind: 'horseHit', attacker: -1, horse: horse.id, rider: horse.rider ?? undefined, weapon: 'stake', target: capsule.key, speed: closing, impulse, energy, point: [tip[0], tip[1], tip[2]], normal: unit, effects: ['runs onto a stake'] };
       hurt.harm(world, horse, capsule, { blunt: energy * spec.blunt * (1 - (barding.blunt ?? 0)), cut: 0, pierce: energy * spec.pierce * pointThrough(energy, barding.pierce, world.random()) }, event);
       hurt.jolt(world, horse, [unit[0] * (impulse / kg), 0, unit[2] * (impulse / kg)], 'brought down on the stakes');

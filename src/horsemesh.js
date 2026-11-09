@@ -83,6 +83,9 @@ export const HORSE_BUILD = {
   japanese: { bulk: 1.1, deep: 0.014, back: 0.96, neck: { bulk: 1.08, arch: 0 }, head: { length: 1.04, dish: 0, size: 1.08 }, legs: 1.08, feather: 0.1, mane: { length: 0.2, upright: 0.3 }, tail: { length: 0.5, carriage: [0.6, 1.05, 1.35, 1.5, 1.55], lift: 0.6 }, saddle: 'kura', headAngle: 0.66 },
 };
 
+// (The Manchurian horse: the steppe horse's build.)
+HORSE_BUILD.manchu = HORSE_BUILD.steppe;
+
 /** Saddles: the height of pommel and cantle above the seat, the length and the half-width of the tree, the flap's drop. */
 const HM_SADDLES = {
   war: { pommel: 0.085, cantle: 0.115, length: 0.34, width: 0.085, flap: 1.1, leather: [0.33, 0.2, 0.12], trim: [0.55, 0.43, 0.2] },
@@ -659,8 +662,10 @@ export function buildHorseModel(spec) {
   const addNeck = (kind, prim) => add('neck', kind, prim);
   addNeck('soft', hmLoft(hmRounded(neckStations, { startLength: 0 }), { sides: low ? 8 : 14, color: neckColor, upper: 2.5, lower: 2.1 }));
   colliders.neck = snapshot(acc('neck', 'soft'));
-  // A barded horse's crest is under its crinet: no mane is drawn (the standing ridge or the hanging tufts).
+  // A barded horse's crest is under its crinet: no mane is drawn (the standing ridge or the hanging tufts), unless its
+  // neck piece is round the throat only (`throat`) and its face open behind the ears (`maned`).
   const barded = Boolean(BARD_FIT[spec.barding]);
+  const maned = !barded || Boolean(BARD_FIT[spec.barding].throat);
 
   // ---- The head
   const headStations = [];
@@ -770,7 +775,7 @@ export function buildHorseModel(spec) {
     color: coat.mane,
   };
   // A short standing ridge down the crest (an upright, roached look) merged into the neck.
-  if (!barded) {
+  if (maned) {
     const ridge = hmAcc();
     for (let k = 0; k < (low ? 8 : 20); k += 1) {
       const t = 0.04 + (0.94 * k) / ((low ? 8 : 20) - 1);
@@ -1007,7 +1012,7 @@ export function buildHorseModel(spec) {
     bit: hmScale3(vec.sub(bitAt, poll), W), saddle: { x: seatX * W, top: (hmBackAt(build, seatX) + 0.045) * W, bar: [(seatX + 0.02) * W, (hmBackAt(build, seatX) - 0.015) * W, 0.115 * W], pommel: [pommelX * W, (hmBackAt(build, pommelX) + 0.045 + sd.pommel) * W], cantle: [cantleX * W, (hmBackAt(build, cantleX) + 0.045 + sd.cantle) * W] },
     hind: HORSE_LEGS_KEYS.map((key) => key), lengths: { upper: LEG.upper * W, cannon: LEG.cannon * W, pastern: LEG.pastern * W, hoof: LEG.hoof * W },
     mane: { ...mane, tufts: mane.tufts.map((t) => ({ ...t, base: hmScale3(t.base, W), length: t.length * W, width: t.width * W, hw: t.hw * W, depth: t.depth * W })), count: mane.count },
-    coat, dyed, trapper, low, maneHidden: barded,
+    coat, dyed, trapper, low, maneHidden: !maned,
     // The bridle's reins start at the bit, the stirrup leathers at the saddle's bars.
     stirrupDrop: 0.4 * W,
   };

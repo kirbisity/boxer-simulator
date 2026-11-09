@@ -13,7 +13,7 @@ import { vec, yawRotate } from '../pose.js';
 import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRegion, GUN, pointThrough, slerpDir, SUPPLY } from '../weapons.js';
 import { WORLD } from './config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './gaps.js';
-import { BARDING } from '../horses.js';
+import { bardingAt } from '../horses.js';
 import { gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
 import { flamePulse } from './flame.js';
 import { missileOf, screenOnPath } from './cover.js';
@@ -315,7 +315,8 @@ export function horseOnPath(world, shooter, from, to) {
  */
 export function missileInHorse(world, shooter, hit, dir, joules, { arrow = true, bounce = ARROW.bounce } = {}) {
   const horse = hit.horse;
-  const barding = BARDING[horse.barding].parts[hit.capsule.part];
+  // (Where it lands: below a piece's reach or on a side it does not cover, the bare horse; the surface met faces back along the shot.)
+  const barding = bardingAt(horse.barding, hit.capsule.part, hit.point[1] + (horse.sunk ?? 0), horse.withers, { normal: vec.scale(dir, -1), yaw: horse.yaw });
   const event = { time: world.time, kind: 'horseHit', attacker: shooter?.id ?? -1, horse: horse.id, rider: horse.rider ?? undefined, weapon: arrow ? 'arrow' : 'ball', target: hit.capsule.key, energy: joules, point: hit.point, normal: vec.scale(dir, -1), effects: [] };
   world.events.push(event);
   if (arrow && barding.deflects && world.random() < bounce) {

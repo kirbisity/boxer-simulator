@@ -1355,9 +1355,9 @@ export const WORLD = {
   //   `lateral` of what comes across; the knocks of the last `shockSeconds` add) it goes down and throws its rider. A
   //   horse struck in the flank goes over far sooner than one stopped head-on: its feet stand ~0.35 m apart across
   //   but ~1.4 m fore and aft, and it can drive its legs against its own line but must step to take a shove across it.
-  //   The speed that tips a body over its base goes as the root of the base, so `lateral` 2 (the root of 1.4 / 0.35;
-  //   was 0.5, which had a sidelong crash only shove). Why the polo rules forbid riding into another's line (the
-  //   T-bone): it brings horses down. Short of a fall the rider is
+  //   `lateral` 1.5 (was 0.5, which had a sidelong crash only shove; 2, the root of 1.4 / 0.35, brought too many
+  //   down in a crowded melee: the user's call, 2026-11-09, a horse steps into a shove). Why the polo rules forbid
+  //   riding into another's line (the T-bone): it brings horses down. Short of a fall the rider is
   //   knocked by the speed it lost (WORLD.mount.seat). Horses meeting exchange
   //   momentum by their laden masses; a shove across its
   //   line is `shove`, a velocity of its own that dies away in 1/`shoveDecay` s
@@ -1428,7 +1428,7 @@ export const WORLD = {
     // not into the horse. It is the war spear shaft's strength for every shaft (physics/wear.js driveShaft, at its own
     // thickness and wood): past it the shaft snaps.
     brace: { length: 1.5, still: 0.5, share: 0.5, shaft: 1000 },
-    crash: { fall: 6, lateral: 2, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
+    crash: { fall: 6, lateral: 1.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     // A horse will not run into another horse if it can help it (a herd animal, and a rider rides his line knee to knee, not
     // into his comrade): each horse looks `ahead` s along its way (at least `nearest` m) at the horses of its own side and, where
     // one will come within `clear` m of it (barrel to barrel: two horses' widths and a knee's room), it swerves off by up to

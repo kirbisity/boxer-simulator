@@ -552,6 +552,7 @@ export const NAMES_KIT = {
   'Turkoman horse': '土库曼马',
   'Steppe horse': '蒙古马',
   'Ming border horse': '明军边马',
+  'Manchurian horse': '满洲马',
   'Japanese horse': '日本马',
   'Steel plate barding': '钢板马甲',
   'Steel lamellar barding': '钢札马甲',

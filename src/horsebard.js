@@ -45,7 +45,8 @@ export const BARD_TILES = {
   plate: { fluted: 'fluted', etched: 'etched', plain: 'plate', edge: 'harnessEdge', mail: 'mail' },
   lamellar: { field: 'lamellae', brow: 'munitionPlate' },
   brigandine: { field: 'brigandine', brow: 'munitionPlate' },
-  mingFront: { field: 'brigandine', brow: 'munitionPlate' },
+  // (The Ming front bard's throat and breast in riveted horizontal iron bands, its face one iron plate.)
+  mingFront: { field: 'segmentata', brow: 'munitionPlate', face: 'munitionPlate' },
 };
 
 /**
@@ -68,8 +69,10 @@ export const BARD_FIT = {
 // (The brigandine bard is cut as the lamellar one: the same pieces, down below the belly.)
 BARD_FIT.brigandine = BARD_FIT.lamellar;
 // (The Ming front bard, horses.js BARDING.mingFront: the face, the neck, and the breast's apron hanging to the forearms;
-// `front`: no skirt along the flanks, no crupper.)
-BARD_FIT.mingFront = { ...BARD_FIT.lamellar, peytral: { ...BARD_FIT.lamellar.peytral, hem: [0.42, 0.5] }, front: true };
+// `front`: no skirt along the flanks, no crupper; `plateFace`: the face one plate with its ear tubes, as the shaffron.)
+// `throat`: the neck's piece only round the throat and the lower sides, ± this (rad) from straight under it (the crest bare,
+// its mane showing); the breast's piece round the front only (`spread`), to the elbow (`hem`), as horses.js BARDING.mingFront.
+BARD_FIT.mingFront = { ...BARD_FIT.lamellar, peytral: { ...BARD_FIT.lamellar.peytral, spread: 1.9, hem: [0.55, 0.57] }, front: true, plateFace: true, throat: 1.25 };
 
 // ---- Casting over the horse ---------------------------------------------------------------------------------------------
 
@@ -312,7 +315,8 @@ export function buildBard(ctx, kind) {
   const laced = plate ? null : BARD_TILES[kind] ?? BARD_TILES.lamellar;
   const field = plate ? BARD_TILES.plate[style] ?? 'plate' : laced.field;
   // (A brigandine's facing is coloured by its material, the rider's cloth: horseview.js bardMaterial; drawn here white.)
-  const studded = kind === 'brigandine' || kind === 'mingFront';
+  const studded = kind === 'brigandine';
+  const plateFace = plate || Boolean(fit.plateFace);
   const steel = plate ? [0.97, 0.98, 1] : studded ? [0.96, 0.96, 0.96] : [0.66, 0.67, 0.7];
   const edgeSteel = [0.9, 0.91, 0.94];
   const leather = [0.16, 0.1, 0.07];
@@ -487,7 +491,7 @@ export function buildBard(ctx, kind) {
     const rows = count(9);
     const shell = bdGridShell(ctx, {
       cols, rows, tile: field, color: shade(steel), inside: (i, j) => neckFn(bdMix(neckSpan[0], neckSpan[1], 1 - j / rows), 0, -0.2),
-      at: (i, j) => neckFn(bdMix(neckSpan[1], neckSpan[0], j / rows), -Math.PI / 2 + (i / cols) * BD_TAU, 0.018 + 0.006 * Math.sin((j / rows) * Math.PI)),
+      at: (i, j) => neckFn(bdMix(neckSpan[1], neckSpan[0], j / rows), fit.throat ? -Math.PI / 2 + (2 * i / cols - 1) * fit.throat : -Math.PI / 2 + (i / cols) * BD_TAU, 0.018 + 0.006 * Math.sin((j / rows) * Math.PI)),
     });
     detail('neck', field, shell.prim);
     if (!low) {
@@ -505,7 +509,7 @@ export function buildBard(ctx, kind) {
   }
 
   // ---- The face: the shaffron (plate), or an iron brow plate over a lamellar face.
-  piece = plate ? 'shaffron' : 'face';
+  piece = plateFace ? 'shaffron' : 'face';
   const eyeT = 0.115;
   const eyeA = 0.62;
   const eyeHole = (x, a) => Math.min(Math.hypot((x - eyeT) / 0.04, (a - eyeA) / 0.42), Math.hypot((x - eyeT) / 0.04, (a - (Math.PI - eyeA)) / 0.42)) > 1;
@@ -522,8 +526,8 @@ export function buildBard(ctx, kind) {
     detail('head', tile, shell.prim);
     return { shell, rows };
   };
-  if (plate) {
-    const face = facePiece(-0.01, 0.325, field, shade(steel), 0.013);
+  if (plateFace) {
+    const face = facePiece(-0.01, 0.325, plate ? field : laced.face, shade(plate ? steel : [0.62, 0.63, 0.66]), 0.013);
     if (!low) {
       // Its edges turned: down each cheek and across the muzzle.
       for (const i of [0, faceCols]) {
@@ -554,8 +558,8 @@ export function buildBard(ctx, kind) {
       } else {
         ctx.add('head', 'metal', prims.hmRing(eye, out, 0.034, 0.005, { color: [0.5, 0.5, 0.53] }));
       }
-      // Ear cups (plate): short tubes round the ears' roots.
-      if (plate) {
+      // Ear cups (a plate face): short tubes round the ears' roots.
+      if (plateFace) {
         piece = 'earCups';
         const base = headFn(0.0, Math.PI / 2, 0.0);
         const root = [base[0] - 0.006, base[1] + 0.012, sign * 0.036];
@@ -573,7 +577,7 @@ export function buildBard(ctx, kind) {
     ctx.add('head', 'metal', prims.hmTube([poll, socket], [0.009, 0.011], { sides: 6, color: edgeSteel }));
     piece = 'plume';
     const plume = { p: [], c: [], n: [], i: [] };
-    const feather = plate ? (ctx.dyed ? bdScale3(ctx.dyed, 0.8) : [0.08, 0.07, 0.07]) : studded ? [0.62, 0.06, 0.07] : [0.45, 0.28, 0.14];
+    const feather = plate ? (ctx.dyed ? bdScale3(ctx.dyed, 0.8) : [0.08, 0.07, 0.07]) : studded || fit.plateFace ? [0.62, 0.06, 0.07] : [0.45, 0.28, 0.14];
     for (let k = 0; k < 5; k += 1) {
       const lean = (k - 2) * 0.28;
       const tip = [socket[0] - 0.09 - 0.03 * Math.abs(k - 2), socket[1] + 0.2 - 0.03 * Math.abs(k - 2), Math.sin(lean) * 0.09];

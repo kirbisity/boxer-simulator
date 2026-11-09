@@ -39,7 +39,7 @@ export const HORSES = {
   // endurance. 145–160 cm, 400–450 kg (the Akhal-Teke's breed figures, Hendricks, *International Encyclopedia of Horse
   // Breeds*, 1995); quick, a little less handy than the smaller Arab.
   turkoman: { label: 'Turkoman horse', mass: 430, withers: 1.53, gallop: 12.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 3.9, lateral: 6.8, spin: 1.6, coats: ['#b08a52', '#6a4a2a', '#3a2a20', '#c8b89a', '#4a3a30'] },
-  // The steppe horse (Mongol, Jurchen and Manchurian): small, hardy, quick to turn. 12–14 hands (122–142 cm), the
+  // The steppe horse (Mongol and Kipchak; the Jurchen picks are HORSES.manchu): small, hardy, quick to turn. 12–14 hands (122–142 cm), the
   // Mongolian horse's mean 127–128 cm (Oklahoma State University, *Breeds of Livestock*), the Chinese Mongolian horse's
   // 1.28 m, 300–360 kg (Hendricks 1995); a little under its old 1.34 m and 320 kg. Its gallop is a long-distance runner's
   // (Mongolian horses race 15–30 km), no faster than a riding horse's over a sprint.
@@ -50,7 +50,14 @@ export const HORSES = {
   // of Asian History* 4, 1970), the Hequ kind among them, larger than the Mongolian (the Hequ horse ~1.32–1.40 m, ~350 kg:
   // Chinese breed surveys, as quoted secondhand). The generals' household cavalry rode the best of it. A little bigger than the Japanese horse: at
   // Byeokjegwan (1593) the Japanese coveted the Ming's big horses (Tachibana house papers, as quoted secondhand).
-  mingBorder: { label: 'Ming border horse', mass: 350, withers: 1.36, gallop: 11, canter: 5.8, trot: 3.5, walk: 1.6, accel: 3.6, lateral: 6.8, spin: 1.7, coats: ['#6a4a2a', '#8a6a42', '#2a2420', '#5a3a22', '#b8a888'] },
+  // The generals' household riders had the pick of it: the top of the Hequ's height and over its weight, a sturdier horse
+  // than the herd's (the user's call, 2026-11-09; was 1.36 m, 350 kg), a little slower away and wider in a turn for it.
+  mingBorder: { label: 'Ming border horse', mass: 380, withers: 1.4, gallop: 11, canter: 5.8, trot: 3.5, walk: 1.6, accel: 3.5, lateral: 6.6, spin: 1.65, coats: ['#6a4a2a', '#8a6a42', '#2a2420', '#5a3a22', '#b8a888'] },
+  // The Manchurian horse of the Jurchen heavy horsemen (the Jin's Iron Pagoda, 1140; the Later Jin's Bayara guard, 1619):
+  // the steppe horse's kind, bred on the grass of the Liao and Sungari valleys and bought from the Khorchin and Khalkha
+  // Mongols, the guard's picked from the herds as the Ming generals' were from theirs: a little over the Mongolian's size
+  // (the user's call, 2026-11-09; they rode HORSES.steppe), under the Ming border army's pick.
+  manchu: { label: 'Manchurian horse', mass: 330, withers: 1.34, gallop: 11, canter: 5.8, trot: 3.4, walk: 1.6, accel: 3.7, lateral: 6.9, spin: 1.75, coats: ['#5a4030', '#8a6a42', '#2a2420', '#6a4a2a', '#b8a888'] },
   // The Japanese horse of the samurai (the Kiso and Misaki kind): small and stocky. The horse bones of medieval Kamakura
   // (the Zaimokuza site, 1333) stand ~109–140 cm, most about 130 (Hayashida Shigeyuki 1957, as quoted secondhand in the
   // surveys of Japan's native breeds); the Kiso horse today ~133 cm, the Misaki ~130 cm: ~1.29 m, ~300 kg (was
@@ -91,27 +98,34 @@ export const HORSE_LOAD = { easy: 0.2, slows: 0.9, least: 0.6 };
  *   its quilting spread a blow a little less than lamellar's laced rows), no mail under it; the plates smaller and thinner
  *   than the lamellar bard's (~0.7 mm, 48 x 24 mm): ~30 kg over ~4.5 m². Not plate: an edge is not turned aside (no
  *   `deflects`), and proof enough against an edge (cut 0.82) that a slide along it parts nothing (weapons.js sliceGain).
- * - mingFront, the late Ming elite charger's (the user's description, 2026-11-09): armoured for the charge, from the
- *   front only. An iron face plate (面帘) with brass fittings and red tassels; a thick quilted neck collar (项铠) lined with
- *   iron scales; a chest apron (胸墙甲) of dark canvas studded with riveted iron plates (钉甲), hanging past the breast to
- *   the forearms (`from` 0.4 of the withers, against the plate peytral's 0.6). The flanks, the hindquarters and the legs
- *   bare under a quilted saddle blanket, the horse kept light for the sprint. The face guarded as a plate shaffron is (a
- *   plate turns an edge); the collar and the apron as the brigandine bard (plates under cloth). ~12 kg: the face plate
- *   ~1.5, the collar ~4, the apron ~6.
+ * - mingFront, the late Ming elite charger's (the user's description and the Ming manual's figure of horse armour, 馬甲散式
+ *   and 馬披甲全式, 2026-11-09): armoured for the charge, from the front only. The face guard (護面), one iron plate over
+ *   the face with tubes over the ears, brass fittings and red tassels; the throat and breast (喉甲, 胸甲) in one bib of
+ *   horizontal iron bands hung by cords: down the front of the neck under the throat (`faces` forward and down, `within`
+ *   ~70 degrees of it: the crest with its mane and the upper sides of the neck bare), then over the breast (`faces`
+ *   forward, within ~55 degrees: the points of the shoulders bare) to the elbow (`from` 0.55 of the withers, near the
+ *   plate peytral's 0.6). The flanks, the hindquarters and the legs bare under the saddle cloth, the horse kept light for
+ *   the sprint. The face guarded as a plate shaffron is (a plate turns an edge); the bands as
+ *   banded iron lames are. ~12 kg: the face plate ~1.5, the throat ~4, the breast ~6.
  * - bare: a saddle and tack only.
  */
-const PLATE_BARD = { blunt: 0.55, cut: 1, pierce: 0.88, deflects: true };
+// (`pierce` by the material, as a man's armour, outfits.js PIERCE_SCALE (the user's figures, 2026-11-09): plate 0.95 (was
+// 0.88), mail with plates over it 0.8 (the crinet; was 0.72), iron lamellar 0.85 (was 0.7), brigandine 0.9 (was 0.55),
+// banded iron lames 0.9 (the tōsei dō's). What it covers is in `parts` and `from`, not here.)
+const PLATE_BARD = { blunt: 0.55, cut: 1, pierce: 0.95, deflects: true };
 // The crinet: lames over the crest and upper sides, mail under the throat (a point goes through the mail's rings; mail spreads little of a blow).
-const CRINET = { blunt: 0.42, cut: 1, pierce: 0.72, deflects: true };
-const LAMELLAR_BARD = { blunt: 0.42, cut: 0.86, pierce: 0.7 };
-const BRIGANDINE_BARD = { blunt: 0.4, cut: 0.82, pierce: 0.55 };
+const CRINET = { blunt: 0.42, cut: 1, pierce: 0.8, deflects: true };
+const LAMELLAR_BARD = { blunt: 0.42, cut: 0.86, pierce: 0.85 };
+const BRIGANDINE_BARD = { blunt: 0.4, cut: 0.82, pierce: 0.9 };
+// Banded iron: horizontal lames riveted to leathers, each lapping the next (the Ming horse's throat and breast, mingFront).
+const BANDED_BARD = { blunt: 0.45, cut: 0.9, pierce: 0.9 };
 const NONE = { blunt: 0, cut: 0, pierce: 0 };
 export const BARDING = {
   plate: { label: 'Steel plate barding', mass: 36, parts: { head: PLATE_BARD, neck: CRINET, chest: { ...PLATE_BARD, from: 0.6 }, body: { ...PLATE_BARD, blunt: 0.45, from: 0.56 }, legs: NONE } },
   lamellar: { label: 'Steel lamellar barding', mass: 38, parts: { head: LAMELLAR_BARD, neck: LAMELLAR_BARD, chest: LAMELLAR_BARD, body: LAMELLAR_BARD, legs: NONE } },
   // (`covering`: what a blow on it sounds like, audio/log.js COVERINGS: the small plates under cloth rattle as scale does.)
   brigandine: { label: 'Brigandine barding', mass: 30, covering: 'scale', parts: { head: BRIGANDINE_BARD, neck: BRIGANDINE_BARD, chest: BRIGANDINE_BARD, body: BRIGANDINE_BARD, legs: NONE } },
-  mingFront: { label: 'Ming front barding', mass: 12, covering: 'scale', parts: { head: PLATE_BARD, neck: BRIGANDINE_BARD, chest: { ...BRIGANDINE_BARD, from: 0.4 }, body: NONE, legs: NONE } },
+  mingFront: { label: 'Ming front barding', mass: 12, covering: 'plate', parts: { head: PLATE_BARD, neck: { ...BANDED_BARD, faces: [0.6, -0.8], within: 1.2 }, chest: { ...BANDED_BARD, faces: [1, 0], within: 0.95, from: 0.55 }, body: NONE, legs: NONE } },
   bare: { label: 'Bare horse', mass: 0, parts: { head: NONE, neck: NONE, chest: NONE, body: NONE, legs: NONE } },
   // (a robot dog's shell, robotdogs.js.)
   robotShell: ROBOT_SHELL,
@@ -121,9 +135,18 @@ export const BARDING = {
  * What a horse's armour keeps out at one of its parts, struck at `height` (m above the ground under it; omitted: anywhere
  * the armour covers): the part's protection, or none below the armour's reach (`from`, of the withers' height).
  */
-export function bardingAt(barding, part, height = Infinity, withers = 1.5) {
+export function bardingAt(barding, part, height = Infinity, withers = 1.5, facing = null) {
   const protection = BARDING[barding]?.parts[part] ?? NONE;
-  return protection.from !== undefined && height < protection.from * withers ? NONE : protection;
+  if (protection.from !== undefined && height < protection.from * withers) return NONE;
+  // (A piece hung on one side of the part, `faces` [forward, up] in the horse's frame, covers within `within` rad of that
+  // way: struck where the part's surface faces further off (`facing`: { normal, yaw }, the struck surface's outward normal
+  // and the horse's heading), the bare horse.)
+  if (protection.faces && facing) {
+    const ahead = facing.normal[0] * Math.cos(facing.yaw) - facing.normal[2] * Math.sin(facing.yaw);
+    const [forward, up] = protection.faces;
+    if ((ahead * forward + facing.normal[1] * up) / Math.hypot(forward, up) < Math.cos(protection.within)) return NONE;
+  }
+  return protection;
 }
 
 /** A mount's breed: a horse, or a robot dog (robotdogs.js). */

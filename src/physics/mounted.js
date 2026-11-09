@@ -1321,7 +1321,7 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   mix.pierce *= drawn;
   // (Where the blow lands: below a part's armour, the bare horse: horses.js bardingAt.)
   const landsAt = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
-  const protection = bardingAt(horse.barding, capsule.part, landsAt[1] + (horse.sunk ?? 0), horse.withers);
+  const protection = bardingAt(horse.barding, capsule.part, landsAt[1] + (horse.sunk ?? 0), horse.withers, { normal, yaw: horse.yaw });
   const sharp = weapon.edge ?? 1;
   // A point on plate barding bites only if it meets it near square (BLADES.bite), as on a man's plate (physics.js): slanting, it
   // skids off the curve of the peytral or the crinet and goes in nowhere: a shove. (An edge never cuts plate: its `cut` is 1.)

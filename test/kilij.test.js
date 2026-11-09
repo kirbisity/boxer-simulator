@@ -142,7 +142,8 @@ test('the Bayara\'s horse is clad in brigandine in its rider\'s colours, studded
   // Every part but the legs; down below the belly as the lamellar skirt is.
   for (const part of ['head', 'neck', 'chest', 'body']) {
     assert.ok(brig.parts[part].cut >= 0.8 && brig.parts[part].cut < BARDING.lamellar.parts[part].cut, part);
-    assert.ok(brig.parts[part].pierce < BARDING.lamellar.parts[part].pierce && !brig.parts[part].deflects, part);
+    // (Against a point, brigandine above iron lamellar: outfits.js PIERCE_SCALE, 0.9 against 0.85.)
+    assert.ok(brig.parts[part].pierce > BARDING.lamellar.parts[part].pierce && !brig.parts[part].deflects, part);
   }
   assert.equal(brig.parts.legs.cut, 0);
   assert.equal(bardingAt('brigandine', 'body', 0.5 * 1.34, 1.34).cut, brig.parts.body.cut);

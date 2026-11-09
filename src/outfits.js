@@ -1422,9 +1422,9 @@ export const OUTFITS = {
   // plates, steel arm guards, steel bands on the skirt, the steel and gilt helmet. Guarded as the Ming elite's
   // household men (jiading) were, no better: the same coat of plates under silk.
   bayara: {
-    // Rides (a Manchurian horse, the steppe's breed), the horse clad in brigandine as he is, in his coat's colours with its
+    // Rides (a Manchurian horse, horses.js manchu: the guard's picked steppe horses), the horse clad in brigandine as he is, in his coat's colours with its
     // gilt studs (horses.js BARDING.brigandine, mountOf `finish`).
-    horse: 'steppe', barding: 'brigandine',
+    horse: 'manchu', barding: 'brigandine',
     // Trained: Nurhaci's guard, picked from the banners' best, a step above the banner man (`skill`).
     skill: 0.55,
     faction: 'manchu', bulletRating: 650, plated: true,
@@ -1461,7 +1461,7 @@ export const OUTFITS = {
   // Fought with the heavy spear, the wolf-tooth mace its sidearm. The flagship of its faction, drawn in full.
   ironPagoda: {
     // Rides (the Jurchen iron pagoda: men and horses in iron lamellar).
-    horse: 'steppe', barding: 'lamellar',
+    horse: 'manchu', barding: 'lamellar',
     skill: 0.7,
     faction: 'chinese', plated: true,
     label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
