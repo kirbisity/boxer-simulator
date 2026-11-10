@@ -798,7 +798,10 @@ export const OUTFITS = {
     // Plate against blunt force spreads it; against an edge it is proof,
     // against a point nearly so, and a blade that meets it glances off.
     // pierce 0.95 (was 0.9): a full harness's plates overlap; a point finds less to bite on.
-    protection: { blunt: 0.6, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } },
+    // blunt 0.8 (was 0.6, under every quilted coat of plates in the game): steel over the arming doublet's quilting and its
+    // mail, as the Bayara's coat is steel over quilting and a mail shirt (0.72, 0.8 over the mail); what the rigid shell adds
+    // is its own (WORLD.shell). A hammer's or a club's head still drives its blow through (`crush`).
+    protection: { blunt: 0.8, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 } },
     // A full harness leaves no gap an edge can find (its gaps are for a point: BLADES.gaps).
     cutProof: true,
     // Under the gaps of a full harness (BLADES.gaps.zones), mail: the arming doublet's gussets of mail under the arms and at
@@ -840,7 +843,8 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.45): ~14 kg on her 55 kg, against a made-to-measure harness's ~20–25 kg.
     extraMass: 0.25,
     // pierce 0.95 (was 0.9): as a knight's harness.
-    protection: { blunt: 0.6, cut: 1, pierce: 0.95, bullet: { head: 0, torso: 0.7, limb: 0.3 }, regions: { head: ARENA.bare } },
+    // (The knight's harness, blunt 0.8 over its arming doublet.)
+    protection: { blunt: 0.8, cut: 1, pierce: 0.95, bullet: { head: 0, torso: 0.7, limb: 0.3 }, regions: { head: ARENA.bare } },
     // A knight's harness and its arming doublet: mail at the armpits, the elbows, the groin and the throat (as `knight`).
     gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'] },
     courage: 0.6,

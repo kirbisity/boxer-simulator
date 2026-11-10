@@ -7634,7 +7634,8 @@ function registerImpact(world, attacker, defender, striker, closest, capsule, no
   // elbows over the general one; bare fists over their own short one.
   const fists = fistsOf(attacker.body);
   const contactSeconds = spec.contactSeconds ?? (spec.limb.endsWith('Hand') ? fists.contactSeconds : WORLD.contactSeconds);
-  const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
+  // (Drawn out by a helmet's padding or a rigid shell's, shellStretch.)
+  const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)) * shellStretch(body.gear, capsule.key, protectionAt(body.gear, capsule.key)));
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   const event = {
     time: world.time, kind: blocked ? 'blocked' : 'landed', attacker: attacker.id, defender: defender.id,
@@ -7801,6 +7802,33 @@ export function bluntHeaded(wspec) {
 export function contactStress(face, reference = WORLD.contactStress.radius) {
   if (!(face > 0)) return 1;
   return Math.min(WORLD.contactStress.most, Math.max(1, Math.sqrt(reference / face)));
+}
+
+/**
+ * A weapon's peak force (N) on what it meets: its knock and the push behind it. Only the weapon is rigid: it knocks over its
+ * own contact (`knockSeconds`, its `contactSeconds` as softened by the flesh and drawn out by armour), with its share of the
+ * blow's `impulse`. The arms, the body leaning into a thrust and the horse under a couched lance (`behind`, the whole
+ * striking mass, kg) join through the wrists, elbows, shoulders and saddle, which give: a mass on a spring
+ * (WORLD.joints.stiffness), whose peak is its speed × √(mass × stiffness), lasting ~0.1 s, not a few ms. A two-handed
+ * spear thrust is a hard shove, a hammer swung (all head, little behind it) a knock.
+ */
+export function blowPeak(impulse, speed, knockSeconds, rigid, behind, struck) {
+  const reduced = (mass) => (mass * struck) / (mass + struck);
+  const all = reduced(behind);
+  const knocked = rigid > 0 ? Math.min(1, reduced(rigid) / all) : 1;
+  const knock = ((Math.PI / 2) * impulse * knocked) / knockSeconds;
+  const push = speed * Math.sqrt(Math.max(0, all - reduced(rigid)) * WORLD.joints.stiffness);
+  return knock + push;
+}
+
+/**
+ * How much longer a blow's contact is drawn out by what it lands on (WORLD.helmet.paddingStretch): on the head the helmet's
+ * padding (HELMETS), on the body a rigid shell's (WORLD.shell, `deflects`) unless the blow is in a gap of it; else 1. The
+ * same momentum over a longer contact: a lower peak force on the bone under it.
+ */
+export function shellStretch(gear, capsuleKey, protection) {
+  if (capsuleKey === 'head') return 1 + WORLD.helmet.paddingStretch * (gear.helmet?.padding ?? 0);
+  return protection.deflects ? 1 + WORLD.helmet.paddingStretch * WORLD.shell.padding : 1;
 }
 
 /**
@@ -8069,7 +8097,9 @@ export function bladeStrike(attacker, weapon, punch, relative, distance, at = nu
   // (A finisher's thrust is driven down with the whole weight of the kneeling man behind the dagger: finisher.js.)
   const share = attacker.body.technique * (punch.heavy ? WORLD.heavy.massFactor : 1) * staggerShare(attacker, WORLD.stagger.harm) * (punch.weak ?? 1) * (punch.beaten ?? 1);
   const armsKg = (spec.mass.arm ?? 0) * arms * share;
-  const bodyKg = (punch.finisher?.body ?? thrustBodyShare(attacker, weapon, spec)) * attacker.body.massKg * share;
+  // (His own body's mass, not what he wears: the arms couple the man to the shaft, and the men the share is measured on
+  // were unarmoured, WORLD.thrustBody; a harness moves with him but is not driven harder by his arms.)
+  const bodyKg = (punch.finisher?.body ?? thrustBodyShare(attacker, weapon, spec)) * (attacker.body.bodyMassKg ?? attacker.body.massKg) * share;
   const speed = vec.length(relative);
   const along = speed > 1e-6 ? Math.abs(vec.dot(relative, weapon.dir)) / speed : 0;
   const armLength = attacker.body.lengths.upperArm + attacker.body.lengths.forearmToFist;
@@ -8082,7 +8112,10 @@ export function bladeStrike(attacker, weapon, punch, relative, distance, at = nu
   const struck = effectiveMassAt(wspec, armsKg + bodyKg, distance, armLength, along, held);
   // (A weapon art turning the whole body through the blow, `turn`: all of it turns about the spine: physics/arts.js.)
   const turned = turnsWithBlow(spec) ? turningMass(wspec, armsKg, bodyKg, distance, armLength, attacker.body.lengths.shoulderSpan / 2, along) : 0;
-  return { strikeMass: Math.max(struck, turned) + carried, along };
+  // What strikes rigidly: the weapon alone; the arms, the body and the horse behind it join through joints that give
+  // (blowPeak).
+  const total = Math.max(struck, turned) + carried;
+  return { strikeMass: total, rigidMass: Math.min(effectiveMassAt(wspec, 0, distance, armLength, along, held), total), along };
 }
 
 /**
@@ -8143,7 +8176,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const goingIn = Math.max(closing, punch.finisher?.drive ?? 0) * glance.share;
 
   const body = defender.body;
-  const { strikeMass, along } = bladeStrike(attacker, weapon, punch, relative, distance, haft ? null : closest.s);
+  const { strikeMass, rigidMass, along } = bladeStrike(attacker, weapon, punch, relative, distance, haft ? null : closest.s);
   // Met across, the weapon is stopped there, head and all, as by any blow; a haft running along its length (a thrust) slides on.
   if (!haft || along < WORLD.haft.slides) punch.landed = true;
   // (A man lying on the floor: it is behind the part, backedMass.)
@@ -8235,7 +8268,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const borne = shattered && !(pointGoes > 0) ? Math.min(1, wspec.shatters.joules / energy) : 1;
   const blowJoules = energy * borne;
   const blowImpulse = impulse * Math.sqrt(borne);
-  const peakForce = ((Math.PI / 2) * blowImpulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
+  // (Drawn out by a helmet's padding or a rigid shell's, shellStretch.)
+  // (The weapon's knock and the push of what is behind it through the joints, blowPeak; drawn out by a helmet's padding
+  // or a rigid shell's, shellStretch.)
+  const knockSeconds = contactSeconds * (1 + 0.6 * (1 - firmness)) * shellStretch(body.gear, capsule.key, protection);
+  const peakForce = blowPeak(blowImpulse, goingIn * Math.sqrt(borne), knockSeconds, rigidMass, strikeMass, struckMass);
   const pierce = (goes * mix.pierce * pointGoes + press * pressGoes) * sharp;
   // A heavy hard head drives part of its blow through armour (`crush`).
   // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)

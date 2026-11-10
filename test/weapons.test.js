@@ -19,7 +19,8 @@ test('armour stops each kind of harm by its own share, and adds its weight', asy
   assert.ok(wearing('specialForces').protection.bullet.torso > wearing('swat').protection.bullet.torso);
   assert.ok(wearing('specialForces').protection.cut < wearing('knight').protection.cut && wearing('specialForces').protection.regions.limb.cut < 0.2);
   // (The head as his set's helmet guards it: design 0, the sallet and bevor: outfitsets.js.)
-  assert.deepEqual(wearing('knight').protection, { blunt: 0.6, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 }, regions: { head: { blunt: 0.62, cut: 1, pierce: 0.94, deflects: true } } });
+  // (blunt 0.8: steel over the arming doublet and its mail, as the Bayara's coat over its mail; 0.6 before 2026-11-10.)
+  assert.deepEqual(wearing('knight').protection, { blunt: 0.8, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 }, regions: { head: { blunt: 0.62, cut: 1, pierce: 0.94, deflects: true } } });
   assert.deepEqual(wearing('samurai').protection, { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 } });
   // A gladiator: the chest bare, the helmet, the arm and the legs covered, each its own way.
   const { protectionAt } = await import('../src/physics.js');

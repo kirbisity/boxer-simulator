@@ -140,6 +140,20 @@ export const WORLD = {
   // to grazing; `slide`: the share of its twist that slides off instead of
   // turning the head. `glancedBelow`: a blow keeping less than this is told as glancing.
   helmet: { paddingStretch: 2.5, glance: 0.9, slide: 0.8, glancedBelow: 0.75 },
+  // A rigid shell over the body (plate that turns a blade: `deflects`) does as a helmet does: a blow on it moves the whole
+  // plate into what is worn under it, and that draws the blow's contact out (helmet.paddingStretch) where flexible armour
+  // (brigandine's small plates, lamellar, mail) gives under the blow where it lands and keeps the weapon's own contact.
+  // `padding`: the arming doublet under a harness, quilted fustian and linen ("How a Man Shall Be Armed", Hastings MS,
+  // c. 1450), taken as a bascinet's arming cap (HELMETS.bascinet 0.65). A spear's 50-100 J jab stopped on a breastplate
+  // then lands at ~2-3 kN spread over the chest, under what breaks a rib, as it did not in plate's surviving fights (the
+  // harnessed man was beaten down or brought to the ground and stabbed in the gaps); a club's or a hammer's 100 J+ and a
+  // couched charge still break them.
+  shell: { padding: 0.65 },
+  // What a blow's arms, body and horse are joined to the weapon by (physics.js blowPeak): the joints, a spring of this
+  // stiffness (N/m). A braced arm's stiffness at the hand is ~0.3-3 kN/m (Mussa-Ivaldi, Hogan & Bizzi 1985; more with the
+  // muscles set). 2.2 kN/m puts a two-handed spear thrust's push (~9 kg of arms and body behind the shaft, at the measured
+  // mean 4.65 m/s) at the measured mean peak, ~0.66 kN (Milks, Champion, Cowper, Pope & Carr 2016: 362-1120 N).
+  joints: { stiffness: 2200 },
   // A helmet knocked off by a blow (physics.js knockHelmetOff). The blow snaps the head along; the helmet, held on only by
   // what fastens it, is carried along with it or goes on alone: it slips with the head's speed change (headDeltaV) times
   // `catch` (where the blow lands on it), and its kinetic energy in that slip, ½·mass·(Δv·catch)² (J), against what its hold
