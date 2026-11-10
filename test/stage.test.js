@@ -154,8 +154,7 @@ test('a dormant man is kept as he is: struck and bleeding, he is the same when h
 });
 
 test('the men wake when he enters the portal, fight on, and sleep again as he goes back (where they were left)', () => {
-  // (A fight he comes out of on his feet: three to one, the hero is knocked out in many (seeds 3, 5, 7, 9), and a man out cold walks nowhere.)
-  const world = createStageWorld(QUIET, hero(), { seed: 8 });
+  const world = yard();
   setMechanism(world, 'gate1', 'open');
   const guards = world.fighters.slice(1, 4);
   const start = guards.map(hipsAt);
@@ -163,7 +162,11 @@ test('the men wake when he enters the portal, fight on, and sleep again as he go
   walk(world, me, [[-5, -3], [21, 0], [27, 0]], { seconds: 150, within: 0.5 });
   assert.equal(guards.every((guard) => guard.dormant === undefined), true, 'awake');
   // Awake, they come for him (the fight AI): after a few seconds they have moved.
-  advance(world, 5, (current, dt) => stageThink(current, dt, thinkAll));
+  // (Their blows held, `cooldown`: three to one the hero is often knocked out, and a man out cold walks nowhere; the fight is not this test's.)
+  advance(world, 5, (current, dt) => {
+    stageThink(current, dt, thinkAll);
+    for (const guard of guards) guard.cooldown = 1;
+  });
   const moved = guards.map((guard, index) => Math.hypot(...hipsAt(guard).map((value, axis) => value - start[index][axis])));
   assert.ok(moved.some((distance) => distance > 1), `moved: ${moved.map((distance) => distance.toFixed(2))}`);
   // Out of the hall's reach again: the hall sleeps at once, those who stayed in it where they stood; those who came after him are of the yard now, and awake.

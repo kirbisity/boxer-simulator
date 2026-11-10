@@ -1617,6 +1617,10 @@ export const BLADES = {
     // one of its zones (measured, tools/gaps.js: on the trunk 12%, the head 33% behind a closed helm (the throat, the
     // sights), 55% behind an open one (its face, the throat); a limb's joints a guess).
     aimed: { trunk: 0.12, limb: 0.1, head: { closed: 0.33, open: 0.55, sealed: 0.2, bare: 0 } },
+    // Where a point at a man in rigid armour is laid for (ai.js aimsForGap, physics.js throwPunch `gap`), by the zone it was
+    // thrown at: the armpit for the body, the throat for the head (Fiore's and the half-sword's marks: the face, the armpit,
+    // the hand, where the plates part; physics.js aimPoint).
+    aimFor: { body: 'armpit', head: 'throat' },
     // Never a gap, not even at the lacing: the middle of the breast, the back, the crown.
     solid: { trunk: [{ height: [0.08, 1.1], round: [0, 50] }, { height: [-1, 1.1], round: [125, 180] }], head: [{ rise: [0.4, 1], round: [0, 180] }] },
   },

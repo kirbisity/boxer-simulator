@@ -335,7 +335,8 @@ function cumanDesign(label, { steel, coat, sash, belt, mask, gold = '#a8873e' })
     feet: { kind: 'jinBoot', color: '#2a1c14' },
   };
 }
-// A rōnin: kosode, hakama, the cloak and his pieces of armour (roninDo: the dō and the kote); his sugegasa is worn loose (HEADGEAR kasa).
+// A rōnin: kosode and hakama over his hidden armour (roninDo: the manchira's mail at the collar, the kote's splints on
+// the forearms), the headband over the hachi-gane; his sugegasa is worn loose (HEADGEAR kasa).
 // A sōhei, a warrior monk of the great temples (Enryakuji, Kōfukuji): the
 // white katō-zukin hood wrapped over the head and across the face to the
 // eyes, a dark monk's robe over a laced dō-maru with its shoulder boards,
@@ -349,12 +350,12 @@ function soheiDesign(label, { hood, robe, hakama, lacquer, lace, beads }) {
     extras: [{ kind: 'mantle', color: robe, length: 1.05 }, { kind: 'juzu', color: beads }],
   };
 }
-function roninDesign(label, { kosode, hakama, cloak, steel, lace, sash, band, gaiters }) {
+function roninDesign(label, { kosode, hakama, steel, lace, sash, band, linen, headband }) {
   return {
     label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama },
-    armor: { kind: 'roninDo', color: steel, lace, gold: band, cloth: gaiters, cloth2: sash },
+    armor: { kind: 'roninDo', color: steel, lace, gold: band, cloth: linen, cloth2: sash },
+    head: { kind: 'hachimaki', color: headband },
     feet: { kind: 'sandal', color: '#5a3a22' },
-    extras: [{ kind: 'mantle', color: cloak, length: 1.0 }],
   };
 }
 // A hex colour darker (or lighter) by a share.
@@ -1065,7 +1066,7 @@ export const OUTFITS = {
     designs: [
       oyoroiDesign('Scarlet laced (aka-ito)', { lacquer: '#16141a', lace: '#c0281e', gold: '#d6a743', leather: '#5a4430', stencil: '#d8c08a', robe: '#b83a1c', hakama: '#8e2a16', crest: 'kuwagataTall' }),
       oyoroiDesign('Gold and orange', { lacquer: '#3a2210', lace: '#d9822b', gold: '#e3b34c', leather: '#7a5636', stencil: '#e8c890', robe: '#5a2414', hakama: '#4a1c10', crest: 'kuwagataTall' }),
-      oyoroiDesign('Red with a white breast', { lacquer: '#8e1c16', lace: '#c42a20', gold: '#d6a743', leather: '#f0ece0', stencil: '#7088b0', robe: '#d0562a', hakama: '#c4502a', sleeve: '#5f9a4a', crest: 'kuwagataTall' }),
+      oyoroiDesign('Red with a white breast', { lacquer: '#8e1c16', lace: '#c42a20', gold: '#d6a743', leather: '#f0ece0', stencil: '#7088b0', robe: '#d0562a', hakama: '#c4502a', crest: 'kuwagataTall' }),
     ],
   },
   // Tōsei gusoku: the later armour, a solid riveted cuirass of horizontal
@@ -2414,31 +2415,32 @@ export const OUTFITS = {
     sidearm: 'wakizashi',
     headgear: ['kasa'],
     defaultHeadgear: 'kasa',
-    // A masterless man on the road: the kosode and the hakama tied at the
-    // knee, a straw kasa low over the eyes, a travelling cloak, sandals; and
-    // what armour he can carry and still run in: a tōsei cuirass with its
-    // short skirt, and kote on both arms (mail sleeves sewn with small iron
-    // plates, shino-gote); no helmet, no haidate, no greaves (the user's
-    // call, 2026-11-09: the thighs given up for the arms, which a swordsman
-    // puts in the way of every cut). The trunk as a samurai's dō; the arms
-    // as the ō-yoroi's kote; head and legs bare (`regions`).
-    // Armour at 0.55 of its old weight: the dō ~5.5 kg and the kote ~1.5 kg (Bottomley and Hopson, Arms and Armour of
-    // the Samurai, 1988: a pair of kote 1-2 kg), ~7 kg on a 60 kg man, as the cuirass and haidate before.
-    extraMass: 0.11,
+    // A rōnin on a private errand: a low-profile traveller outside, a muted indigo or charcoal kosode, the wide hakama,
+    // the straw sugegasa (the kasa), cloth leg wraps (kyahan); and steel hidden under it (the user's call, 2026-11-09):
+    // a tatami-dō sewn into the robe's lining (small black-lacquered iron tiles, karuta, joined by mail), the mail bib
+    // (manchira) high round the neck, a curved forehead plate (hachi-gane) bound in his headband, and kusari-kote (linen
+    // sleeves laced with iron splints and fine mail) over the forearms and the backs of the hands.
+    // Armour at 0.55 of its old weight: the tatami-dō ~3.5 kg, the kote ~1.2 kg, the manchira ~0.6 kg, the hachi-gane
+    // ~0.2 kg (Bottomley and Hopson, Arms and Armour of the Samurai, 1988): ~5.5 kg on a 60 kg man (was ~7 kg in a dō).
+    extraMass: 0.09,
     protection: {
-      // Blunt 0.56 (was 0.6), Japanese armour. Pierce 0.9, the tōsei cuirass's solid lames (PIERCE_SCALE).
-      // The kote as the ō-yoroi's mailed sleeve (lForearm there): plates over mail on cloth, a cut turned more than a blow.
-      blunt: 0.56, cut: 0.9, pierce: 0.9, bullet: { head: 0, torso: 0.5, limb: 0.05 },
-      regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, UpperArm: { blunt: 0.19, cut: 0.6, pierce: 0.3 }, Forearm: { blunt: 0.19, cut: 0.6, pierce: 0.3 } },
+      // The tatami-dō (PIERCE_SCALE): small tiles joined by mail, between mail (0.65) and laced lamellae (0.8): pierce
+      // 0.75; a cut 0.85 (the tiles and the rings); a blow spread little by the thin tiles on cloth, no padding: blunt 0.4
+      // (was 0.56 / 0.9 / 0.9, a solid tōsei dō). Its gaps: the armpit and the groin as any dō's, the throat behind the manchira's mail.
+      blunt: 0.4, cut: 0.85, pierce: 0.75, bullet: { head: 0, torso: 0.3, limb: 0.05 },
+      // The hachi-gane a band of steel across the brow (a share of the head: the rest bare); the kusari-kote splints over
+      // mail on linen, no padding; the upper arms, the legs (hakama, kyahan) cloth.
+      regions: { head: { blunt: 0.12, cut: 0.25, pierce: 0.1 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Forearm: { blunt: 0.12, cut: 0.6, pierce: 0.3 } },
     },
+    gaps: { mail: ['neck'] },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
     courage: 0.85,
     designs: [
-      roninDesign('Brown cloak, white kosode', { kosode: '#e4dfd2', hakama: '#4a3e34', cloak: '#4a3020', steel: '#2a2a2e', lace: '#2a3a6a', sash: '#e8e2d2', band: '#c9a23a', gaiters: '#5a6270' }),
-      roninDesign('Grey cloak, indigo kosode', { kosode: '#2a3550', hakama: '#3a3a40', cloak: '#55534e', steel: '#3b3e44', lace: '#b3161b', sash: '#e8e2d2', band: '#b3161b', gaiters: '#2a2c30' }),
-      roninDesign('Black cloak, grey kosode', { kosode: '#8a8780', hakama: '#2a2622', cloak: '#1c1a18', steel: '#6b4a32', lace: '#c9a23a', sash: '#d8cfb8', band: '#3a2416', gaiters: '#4a4a50' }),
+      roninDesign('Indigo kosode', { kosode: '#26304a', hakama: '#3a3a40', steel: '#2a2a2e', lace: '#1e1e22', sash: '#4a4a50', band: '#3a3a40', linen: '#2a2c32', headband: '#d8d2c2' }),
+      roninDesign('Charcoal kosode', { kosode: '#34343a', hakama: '#2a2622', steel: '#2a2a2e', lace: '#1c1c20', sash: '#5a5650', band: '#2a2622', linen: '#26262a', headband: '#1c1c20' }),
+      roninDesign('Faded indigo kosode', { kosode: '#3e4a62', hakama: '#4a3e34', steel: '#3b3e44', lace: '#22242a', sash: '#d8cfb8', band: '#4a3e34', linen: '#30323a', headband: '#3e4a62' }),
     ],
   },
   // Sōhei, the warrior monks: armoured as a samurai but for the helmet (the

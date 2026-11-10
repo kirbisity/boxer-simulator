@@ -9,7 +9,7 @@ import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { MAIMING, maimFear } from './maiming.js';
 import { aimPoint, armGone, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
-import { GUN, WEAPONS } from './weapons.js';
+import { BLADES, GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { startThrow, throwChoice } from './physics/throwable.js';
@@ -110,6 +110,12 @@ export const AI = {
   // on an unarmoured man every move gets through alike and he fights as his style says. A combination is tried as often
   // as its moves are worth it (the mean of their weights against the best).
   armourSense: { from: 0.3, full: 0.7, power: 3 },
+  // `gapAim`: the share of his thrusts at a man in rigid armour (cut proof from BLADES.gaps.rigidFrom, at that zone) a man
+  // who fully reads armour (armourSense 1) lays for where it parts (BLADES.gaps.aimFor: the armpit, the throat), not the
+  // middle of the plate; the rest at the man, to drive him and open him (the user's call, 2026-11-09: a spear that always
+  // struck the breastplate was no weapon against armour). Laid there, the point finds the opening as any point in a gap
+  // does (physics/gaps.js: the kit's openings, his technique and skill).
+  gapAim: 0.5,
   // Seconds between attacks; pros throw ~40–60 strikes a round, in bursts.
   restMin: 0.9,
   restRange: 2.0,
@@ -3954,7 +3960,7 @@ function decide(world, fighter, dt) {
   }
   const spec = MOVES[move];
   const zone = spec.zones ? aimZone(fighter, opponent, spec, random) : null;
-  if (throwPunch(world, fighter, move, zone, { heavy })) {
+  if (throwPunch(world, fighter, move, zone, { heavy, gap: aimsForGap(fighter, opponent, spec, zone, random) })) {
     plantNearPoint(fighter, opponent);
     fighter.aiCombo = combo;
     fighter.aiComboZone = zone;
@@ -4013,7 +4019,7 @@ function riposte(world, fighter, striker, style, distance) {
   perform(world, fighter, 'weaponBlock', { from: striker.id });
   const spec = MOVES[move];
   const zone = aimZone(fighter, striker, spec, random);
-  if (throwPunch(world, fighter, move, zone, { riposte: true })) {
+  if (throwPunch(world, fighter, move, zone, { riposte: true, gap: aimsForGap(fighter, striker, spec, zone, random) })) {
     fighter.stats.ripostes = (fighter.stats.ripostes ?? 0) + 1;
     fighter.aiCombo = null;
   }
@@ -4088,6 +4094,14 @@ function aimZone(fighter, opponent, spec, random) {
   const low = AI.bodyShotShare * sensed(last);
   const high = (1 - AI.bodyShotShare) * sensed(first);
   return random() < low / Math.max(1e-9, low + high) ? last : first;
+}
+
+/** Whether a thrust at `zone` is laid for where his armour parts there (AI.gapAim): only at rigid armour, as he reads it. */
+function aimsForGap(fighter, opponent, spec, zone, random) {
+  if (spec?.mode !== 'thrust' || !opponent || !BLADES.gaps.aimFor[zone]) return false;
+  const gear = opponent.body.gear;
+  const rigid = (protectionAt(gear, zone === 'head' ? 'head' : 'trunk').cut ?? 0) >= gapsOf(gear).rigidFrom;
+  return rigid && random() < AI.gapAim * armourSense(fighter);
 }
 
 /** Seconds before the next attack: the style's tempo, slower when tired, quicker in the clinch. */

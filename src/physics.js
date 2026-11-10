@@ -2097,7 +2097,7 @@ function couchedNear(world, fighter, punch) {
  * Throw a strike (any attack in MOVES) at the opponent. The zone defaults to
  * the move's first. Returns false if the fighter cannot throw it now.
  */
-export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null, riposte = false, coil = 0 } = {}) {
+export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null, riposte = false, coil = 0, gap = false } = {}) {
   const spec = MOVES[type];
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
   // Thrown at a place (`at`, the player's aim): at whoever stands there, or at the empty air.
@@ -2131,10 +2131,16 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   // (Couched, the body carries it: only `couched.wander` of that, the point bobbing with his stride.)
   const heft = blade?.held ? Math.max(0, blade.spec.mass / WORLD.weapons.heavyFrom - 1) * (spec?.couched ? spec.couched.wander : 1) : 0;
   // His skill: how near the mark his blow goes (a point needs it most; a gun aims by its own spread).
-  const jitter = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft) * (spec?.art ? WORLD.skill.artScatter : 1);
+  const laid = skillScatter(fighter, spec, (STYLES[fighter.style]?.aimJitter ?? 0) + WORLD.weapons.heavyAimJitter * heft) * (spec?.art ? WORLD.skill.artScatter : 1);
+  // A point thrust by hand at a man on his feet goes `fightScatter` of a novice's way off however skilled the hand: he moves
+  // in the instant it travels (a couched lance has its own wander; a man down, or a weapon art laid with care, keeps still).
+  const moving = blade?.held && spec.mode === 'thrust' && !spec.couched && !spec.art && target?.state === 'up' ? WORLD.skill.aimError.point * WORLD.skill.fightScatter : 0;
+  const jitter = Math.max(laid, moving);
   // What of it is the weapon's weight (a point that wanders so finds a gap in armour the less: BLADES.gaps.size).
   const wander = heft > 0 ? skillScatter(fighter, spec, WORLD.weapons.heavyAimJitter * heft) : 0;
-  const mark = at ?? aimPoint(target, aimZone, spec);
+  // (`gap`: a point laid for where his armour parts at that zone, BLADES.gaps.aimFor: the armpit, the throat.)
+  const gapMark = gap && spec.mode === 'thrust' ? BLADES.gaps.aimFor[aimZone] : null;
+  const mark = at ?? aimPoint(target, gapMark ?? aimZone, spec);
   const aimed = jitter > 0 ? vec.add(mark, [0, 1, 2].map(() => (world.random() * 2 - 1) * jitter)) : mark;
   fighter.punch = {
     type, spec, zone: aimZone, t: 0, age: 0, aim: toLocal(fighter, aimed), target: target?.id ?? null, landed: false, peakSpeed: 0, limb: P[spec.limb],

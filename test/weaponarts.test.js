@@ -157,7 +157,8 @@ const FAMILIES = [
   { style: 'wuxia', art: 'artDrawCut', measure: 'cut', distances: [1.2, 1.5, 1.8] },
   { style: 'dao', art: 'artDrawCut', measure: 'cut', distances: [1.2, 1.5, 1.8] },
   { style: 'naginata', art: 'artWheel', measure: 'cut', distances: [1.5, 2.1, 2.4] },
-  { style: 'guandao', art: 'artWheel', measure: 'cut', distances: [1.8, 2.1, 2.4], margin: 1.45 },
+  // (1.4, was 1.45: a plain blow may now break the arm's bone in one (body.js fractureN), and the edge has less to go through.)
+  { style: 'guandao', art: 'artWheel', measure: 'cut', distances: [1.8, 2.1, 2.4], margin: 1.4 },
   { style: 'warhammer', art: 'artCrush', measure: 'blunt', distances: [1.2, 1.5, 1.8] },
   { style: 'kanabo', art: 'artCrushClub', measure: 'blunt', distances: [1.2, 1.5, 1.8] },
   { style: 'maceShield', art: 'artCrushOne', measure: 'blunt', distances: [0.9, 1.1, 1.2, 1.3, 1.5], margin: 1.55 },

@@ -184,7 +184,9 @@ test('a blow on a shield is an impact: the blade rebounds or glances off, never 
     for (let seed = 1; seed <= 3; seed += 1) {
       const { world, longest, deepest } = bladeOnShield(style, move, seed);
       if (!world.events.some((event) => event.target === 'shield')) continue;
-      assert.ok(longest <= 6, `${style} ${move} seed ${seed}: on the shield ${longest} frames`);
+      // (A thrust a little off the middle, as a point now goes however skilled the hand: WORLD.skill.fightScatter, skids along
+      // the face a few frames more before it is off: 8.)
+      assert.ok(longest <= (MOVES[move].mode === 'thrust' ? 8 : 6), `${style} ${move} seed ${seed}: on the shield ${longest} frames`);
       // A thin plate a fast blade may cross within a substep, but it goes back out the way it came.
       assert.ok(deepest < 0.12, `${style} ${move} seed ${seed}: ${deepest.toFixed(3)} m into the shield`);
     }

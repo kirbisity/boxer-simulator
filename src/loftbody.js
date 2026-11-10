@@ -613,14 +613,13 @@ export const ARMOR_KINDS = {
     trunk: [-0.1, 1.02, 1.19, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.5, 0.45, 1.24, LACED], collar: 'steel',
     upperArm: [-0.18, 0.45, 1.62, LACED], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
   },
-  // A rōnin on the road: his odd pieces of tōsei gusoku (the riveted
-  // cuirass and its short laced skirt over the kosode; the kote on both
-  // arms, mail sleeves with an iron plate along the forearm), a sash of two
-  // colours, gaiters (kyahan) over the shins; the hakama bare.
+  // A rōnin on a private errand, his armour hidden under the kosode: only the manchira's mail showing at the collar, the
+  // kusari-kote's dark linen sleeves with an iron splint along each forearm, a sash of two colours, the kyahan's linen
+  // wraps over the shins (the tatami-dō is sewn inside the robe: not drawn).
   roninDo: {
-    trunk: [-0.08, 1.0, 1.18, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.4, 0.36, 1.22, LACED],
+    collar: 'mail',
     belt: [0.02, 0.14, 1.3, { rows: ['cloth2', 'gold', 'cloth2'] }],
-    upperArm: [-0.15, 1.02, 1.16, MAIL], forearm: [[-0.06, -0.02, 1.2, MAIL], [-0.04, 0.3, 1.26, 'steel']],
+    forearm: [[-0.06, -0.02, 1.2, 'cloth'], [0.15, 0.05, 1.26, 'steel']],
     shin: [0.08, 0.88, 1.3, 'cloth'],
   },
   // Ashigaru: a plain lacquered okegawa-do with the lord's mon, a short skirt,

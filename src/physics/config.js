@@ -298,7 +298,11 @@ export const WORLD = {
   // `draw`: a master draws the edge through and drives the point straight,
   // the cut and the stab biting × (1 + draw) at 1, × (1 − draw) at 0.
   // `artScatter`: a weapon art is laid on its mark with care (measured to his distance, made with his blood up): its scatter × this.
-  skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25, artScatter: 0.6 },
+  // `fightScatter`: the share of a novice's error at the point that every man keeps, a master too: his man moves, ducks and
+  // turns in the instant the thrust travels, so no point lands on the very spot it was laid for (0.3: ±3 cm; was none at
+  // skill 1, and every master's thrust found the middle of the breastplate: the user's call, 2026-11-09). An edge or a
+  // head, swung through its arc, is laid as before.
+  skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, fightScatter: 0.3, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25, artScatter: 0.6 },
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
@@ -978,11 +982,11 @@ export const WORLD = {
   // or by bleeding, never by a stove-in chest, is not real): the ribs broken add `fractured` of a part's capacity to the
   // trunk's injury, and as much again for each e-fold of the force past what breaks them (body.fracture.rib: more ribs
   // broken and driven in, the lungs and heart behind them: a flail chest); so a lance's ten times the breaking force adds
-  // a third of what kills (0.83 of trunkFatal's 2.5), a fist's just past it a tenth (0.4 was too much: a lance's thrust on
-  // foot into plate killed in two); a limb's long bone broken
+  // a fifth of what kills (0.5 of trunkFatal's 2.5), a fist's just past it a sixteenth (0.4, then 0.25, were too much: a
+  // lance's thrusts on foot into plate killed Sir Edric in two, then three); a limb's long bone broken
   // by the force of one blow breaks it at once (body.fracture by bone, physics.js bluntConsequences), as its injury piling
   // past `limbBreak` does.
-  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, fractured: 0.25, shockStrength: 0.6, limbWeight: 0.12,
+  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, fractured: 0.15, shockStrength: 0.6, limbWeight: 0.12,
     severed: { base: 0.25, perMass: 2.5, share: { wrist: 0.006, elbow: 0.022, shoulder: 0.05, ankle: 0.0145, knee: 0.061, hip: 0.161 } } },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).

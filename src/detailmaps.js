@@ -130,7 +130,8 @@ export const ARMOUR_TILES = {
   bayaraCoat: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   // Tosei gusoku: the solid do of lacquered horizontal lames; its kusazuri and sleeves in sugake.
   toseiDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
-  roninDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
+  // The rōnin's kusari-kote: a splint of munition iron along each forearm.
+  roninDo: { 'forearm.steel': 'munitionPlate' },
   okegawa: { armor: 'yokohagi', kozane: 'sugake' },
   riot: { armor: 'polymer', pad: 'polymer' },
   heavyRiot: { armor: 'polymer', pad: 'polymer' },
@@ -153,7 +154,7 @@ export const ARMOUR_EDGES = {
 export const ARMOUR_COVERAGE = {
   heavyRiot: ['polymer'], riot: ['polymer'], patrolVest: null, plateCarrier: null,
   plate: ['plate', 'fluted', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['euroBrigandine', 'munitionPlate', 'harnessEdge'], haubergeon: ['mail'], breastplate: ['munitionPlate', 'harnessEdge'],
-  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake'], roninDo: ['yokohagi', 'sugake', 'mail', 'plate'],
+  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake'], roninDo: ['mail', 'munitionPlate'],
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
