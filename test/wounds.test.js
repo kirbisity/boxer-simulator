@@ -81,9 +81,12 @@ test('a blunt head crushes by how its face presses in against the 15 cm pendulum
   assert.ok(Math.abs(contactStress(WEAPONS.kanabo.radius, BLADES.crushFace) - Math.sqrt(0.075 / 0.05)) < 1e-9, 'a kanabo ~1.22');
   assert.equal(contactStress(WEAPONS.flangedMace.face, BLADES.crushFace), WORLD.contactStress.most, 'a flange\'s edge: the limit');
   // The same mace blow at the body (the same seed, the same swing), with its flange's face and with a 15 cm one in its place.
+  // (The crush alone: the ribs' own injury, WORLD.injury.fractured, grows with the face too but by its log, measured apart.)
   const trunkHarm = (face) => {
     const saved = WEAPONS.flangedMace.face;
+    const fractured = WORLD.injury.fractured;
     WEAPONS.flangedMace.face = face;
+    WORLD.injury.fractured = 0;
     try {
       const probe = pair('mace', 1, 1);
       const { world, me, him } = pair('mace', reachOf(probe.me) * 1.05, 1);
@@ -92,6 +95,7 @@ test('a blunt head crushes by how its face presses in against the 15 cm pendulum
       return him.trauma.trunk;
     } finally {
       WEAPONS.flangedMace.face = saved;
+      WORLD.injury.fractured = fractured;
     }
   };
   const ratio = trunkHarm(WEAPONS.flangedMace.face) / trunkHarm(BLADES.crushFace);

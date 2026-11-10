@@ -1625,6 +1625,12 @@ export const BLADES = {
   // helm it skids off and goes in nowhere, as arrows and spear points were
   // seen to on plate: the medial ridge and rounded breast were made so.
   bite: 0.82,
+  // A point the armour stops (it skids off, or comes short of going through: PUNCTURE) is still a blow on it: what of the
+  // point's share did not go in lands as the blow's, `stopped` of it (the rest is the armour's own give: the plate dented,
+  // the lames bent, the shaft's flex), and the armour spreads that as it spreads any blow (its `blunt`). 0.5, as an edge
+  // turned to its flat (WORLD.skill.flatBlunt). So a lance at the gallop that does not go through still stoves a man in:
+  // the user's call, 2026-11-09 (a Bayara on foot took a full charge on his brigandine for under 5% of his health).
+  stopped: 0.5,
   sever: {
     // joint: [J for a typical limb, the segment whose thickness scales it, typical radius m]
     // The limbs' are an eighth below what they were (wrist 34, elbow 60, shoulder 105, ankle 55, knee 94, hip 195): an
@@ -1828,7 +1834,10 @@ export function bulletProof(bulletRating, energy = GUN.energy) {
  * A spent arrow lies `stays` s.
  */
 export const ARROW = {
-  speed: 55, gravity: 9.81, spread: 0.02, length: 0.8,
+  // `spread` 0.025 rad (was 0.02): too true, every arrow found the middle of the breast and its plate; a war archer's
+  // shafts at a man in the fight wander a hand or two at 10-20 m, and find a limb, the face, a gap, as the wounds of
+  // Towton and Visby show (arms, legs, faces as often as trunks): the user's call, 2026-11-09.
+  speed: 55, gravity: 9.81, spread: 0.025, length: 0.8,
   // (Of what takes an 80 kg man out of the fight, as GUN's: a war arrow into a bare head or a bare trunk drops him, one in a limb
   // a quarter of the way; raised 2026-11-03 from 0.85, 0.4, 0.13, at which a peasant took four arrows in the body.)
   lethal: { head: 1.1, torso: 1, limb: 0.25 },

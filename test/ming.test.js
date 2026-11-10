@@ -8,7 +8,8 @@ import { WEAPONS } from '../src/weapons.js';
 
 test('the Ming elite turns blades and arrows nearly as plate does; the brigandine man is better kept than the garrison man', () => {
   const elite = OUTFITS.mingElite;
-  assert.ok(elite.deflects);
+  // (Its coat's plates are inside a cloth face: a point catches and bites; the steel helmet and arm guards turn it.)
+  assert.ok(!elite.deflects && elite.protection.regions.head.deflects && elite.protection.regions.Forearm.deflects);
   assert.ok(elite.protection.cut >= 0.95);
   const brigandine = OUTFITS.mingBrigandine.protection;
   const garrison = OUTFITS.mingGarrison.protection;

@@ -86,7 +86,8 @@ test('a point through the heart takes the chest\'s health, not a bleed timer: a 
   assert.ok(bare.events.some((event) => event.kind === 'killed' && event.effects.includes('died of his injuries')), 'dead of the injury to his chest');
   assert.ok(!bare.events.some((event) => event.kind === 'bledOut'));
   // A knife only just past the mark: a tenth of his chest left, fighting on, bleeding out over most of a minute.
-  const knifed = strikeAt('knife', 'stab', 'body', 0.8);
+  // (0.75 m, was 0.8: at BODY.toughness 0.47 the stab from 0.8 m is past what kills.)
+  const knifed = strikeAt('knife', 'stab', 'body', 0.75);
   const victim = knifed.world.fighters[1];
   assert.ok(knifed.events.some((event) => (event.effects ?? []).includes('stabbed through the chest')));
   assert.notEqual(victim.state, 'out', 'not dead on the spot');

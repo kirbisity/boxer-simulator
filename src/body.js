@@ -56,7 +56,8 @@ export const BODY = {
   // fractures, worn-out tissue, cuts through, blood lost — as a share of the
   // figures below. Lower means fists and weapons alike end fights sooner;
   // nothing in the physics (masses, forces, impulses, knockback) changes.
-  toughness: 0.55,
+  // 0.47 (was 0.55): every blow told too little, blunt, cut and thrust alike (the user's call, 2026-11-09): each a sixth more.
+  toughness: 0.47,
   // Lean mass that is not skeleton or skeletal muscle: organs, skin, blood.
   // A share of lean (so it shrinks in starvation) plus a little per kg of
   // fat (a bigger body needs bigger organs). Leaves ~32 kg of muscle in a
@@ -106,8 +107,13 @@ export const BODY = {
   // Bone fracture forces through a glove and hand wraps for a reference bone
   // density. Bare-bone cadaver figures (zygoma/orbit ~3–4 kN, metacarpals
   // ~2.5–3.5 kN) are raised for padding, so a fracture is a rare event in a
-  // bout, as it is in the sport.
-  fractureN: { face: 5200, hand: 5600, rib: 4800 },
+  // bout, as it is in the sport. The long bones through the flesh over them, against a broad blow (a shin, a fist, a
+  // shaft: physics.js contactStress 1; a hammer's or a mace's narrow face presses harder, × its contactStress): the
+  // forearm's bones near the skin (the parry fracture, ~2.5 kN bare), the humerus and the tibia in more, the femur deep in
+  // the thigh's muscle (~7 kN bare across its shaft, Yoganandan; a car's bumper breaks the tibia at ~4.3 kN, Kerrigan et
+  // al. 2003). Set over a heavyweight's low kick into the thigh (~7 kN, at toughness): a kick or a sword's flat bruises,
+  // a war hammer's or a mace's blow breaks the bone where it lands (the user's call, 2026-11-09).
+  fractureN: { face: 5200, hand: 5600, rib: 4800, Forearm: 7000, UpperArm: 11000, Shank: 14000, Thigh: 18000 },
 };
 
 /** Default inputs, also the shape of a fighter file's `inputs`. */
@@ -1128,6 +1134,7 @@ export function buildBody(rawInputs) {
       // A powered frame's fist takes the blow into its own strut, not his hand inside it (a kit's `fistBones`).
       hand: BODY.fractureN.hand * boneDensity * (build?.bones ?? 1) * (gear.fistBones ?? 1),
       rib: BODY.fractureN.rib * boneDensity * BODY.toughness * (build?.bones ?? 1),
+      ...Object.fromEntries(['Forearm', 'UpperArm', 'Shank', 'Thigh'].map((bone) => [bone, BODY.fractureN[bone] * boneDensity * BODY.toughness * (build?.bones ?? 1)])),
     },
   };
 }

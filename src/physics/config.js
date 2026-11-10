@@ -974,7 +974,15 @@ export const WORLD = {
   // `base` plus `perMass` times the share of his body's mass that went with it, by the joint it came off at (`share`: Dempster's
   // segment masses: a hand 0.6%, forearm and hand 2.2%, the whole arm 5%; a foot 1.45%, shank and foot 6.1%, the whole leg 16.1%):
   // a hand ~0.27, a forearm ~0.31, an arm ~0.38, a foot ~0.29, a shank ~0.4, a leg ~0.65; the blood it loses on top.
-  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, shockStrength: 0.6, limbWeight: 0.12,
+  // `fractured`: a bone broken by a blow is itself an injury (the user's call, 2026-11-09: a man killed only by a limb off
+  // or by bleeding, never by a stove-in chest, is not real): the ribs broken add `fractured` of a part's capacity to the
+  // trunk's injury, and as much again for each e-fold of the force past what breaks them (body.fracture.rib: more ribs
+  // broken and driven in, the lungs and heart behind them: a flail chest); so a lance's ten times the breaking force adds
+  // a third of what kills (0.83 of trunkFatal's 2.5), a fist's just past it a tenth (0.4 was too much: a lance's thrust on
+  // foot into plate killed in two); a limb's long bone broken
+  // by the force of one blow breaks it at once (body.fracture by bone, physics.js bluntConsequences), as its injury piling
+  // past `limbBreak` does.
+  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, fractured: 0.25, shockStrength: 0.6, limbWeight: 0.12,
     severed: { base: 0.25, perMass: 2.5, share: { wrist: 0.006, elbow: 0.022, shoulder: 0.05, ankle: 0.0145, knee: 0.061, hip: 0.161 } } },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).

@@ -7709,6 +7709,11 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
   }
   // (A crash has no attacker to credit when it is a horse with no rider.)
   if (attacker) attacker.stats.landed += 1;
+  // A long bone broken by the blow's force where it lands, pressed in as its striking face presses (body.fracture by bone,
+  // contactStress: a hammer's or a mace's blow breaks it, a kick or a fist does not).
+  const bone = capsule.key.replace(/^[lr](?=[A-Z])/, '');
+  const joint = BREAKS_AT[bone] && `${capsule.key[0]}${BREAKS_AT[bone]}`;
+  if (joint && body.fracture[bone] && peakForce * harm * contactStress(face) > body.fracture[bone] && !defender.broken.has(joint)) breakJoint(world, defender, joint, capsule.key);
   if (capsule.key === 'head') {
     // Rotational strikes turn the head as well as pushing it, and rotation
     // is what knocks people out (Ommaya; Viano 2005).
@@ -7743,7 +7748,14 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     // The wind is knocked out of a belly caught slack; a man who went into the crash ready met it on his shoulder, braced (crashBraced).
     if (!braced) takeWind(defender, ((impulse / (body.massKg * 0.6)) / body.aerobic) * harm, push);
     event.effects.push(braced ? 'braced for it' : push ? 'pushed back' : 'body: wind taken');
-    if (peakForce * harm > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
+    // (Pressed in as its striking face presses, as a long bone is above: contactStress.)
+    const ribLoad = peakForce * harm * contactStress(face);
+    if (ribLoad > body.fracture.rib) {
+      // Ribs broken: an injury to the trunk, more by how far past what breaks them (WORLD.injury.fractured).
+      defender.trauma ??= {};
+      defender.trauma.trunk = (defender.trauma.trunk ?? 0) + WORLD.injury.fractured * (1 + Math.log(ribLoad / body.fracture.rib));
+    }
+    if (ribLoad > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
       defender.injuries.push({ kind: 'rib', time: world.time });
       event.effects.push('rib fracture');
       if (world.ear) soundWound(world, defender, 'bone', Math.min(1, (0.5 * peakForce * harm) / body.fracture.rib), event.point);
@@ -8182,6 +8194,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const facing = beak ? Math.abs(vec.dot(vec.normalize(relative), normal)) : Math.abs(vec.dot(weapon.dir, normal));
   // (A finisher's point is driven square down onto him: it does not skid.)
   const skids = Boolean(protection.deflects) && pointLed && mix.pierce > 0 && facing < BLADES.bite && !punch.finisher;
+  // (The point's share as it came: what of it the armour stops lands as a blow, BLADES.stopped, below.)
+  const pointShare = mix.pierce;
   if (skids) {
     // (The impulse is already only what the point brings square to the plate.)
     mix.cut = 0;
@@ -8208,7 +8222,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const pierce = (goes * mix.pierce * pointGoes + press * pressGoes) * sharp;
   // A heavy hard head drives part of its blow through armour (`crush`).
   // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)
-  const bluntShare = mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
+  // (And the point stopped on the armour, skidding or short of going through: a blow on it, BLADES.stopped.)
+  const pointStopped = pointShare * (1 - pointGoes) * BLADES.stopped;
+  const bluntShare = (mix.blunt + pointStopped) * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
   // (An edge always glances off plate; a point that bites square does not.)
   const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(pointLed && mix.pierce > 0)));
   // Glass on steel or hard armour chips.

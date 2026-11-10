@@ -1352,7 +1352,9 @@ export const OUTFITS = {
     finishes: MING_FINISHES,
     sidearm: 'dao',
     spare: 'dagger',
-    deflects: true,
+    // Its plates riveted inside a cloth face: a point catches in the cloth and the rivet heads and bites, not skids as off a
+    // bare polished plate (BLADES.bite); only the steel helmet turns it (`regions` head). The user's call, 2026-11-09.
+    deflects: false,
     // Long reinforced brigandine, arm guards, helmet: ~20 kg on a 73 kg man (real ~15–20 kg; the Wubei yaolue's ideal full
     // iron armour 30 jin, ~18 kg, as quoted in the Great Ming Military, 2015): its plates heavier than a Japanese armour's
     // (was 0.25, ~18 kg, the tōsei gusoku's own share), ~1.5 kg more iron in the coat.
@@ -1363,7 +1365,7 @@ export const OUTFITS = {
     // armour of steel reaching the feet on horseback (Frois). So proof against a ball at least as the bullet-tested tōsei dō
     // is (`bulletRating` 900, was 650; the trunk's share 0.55, was 0.5, as the tōsei's), and a blow spread at least as its
     // solid lames spread it (blunt 0.7, was 0.65). Pierce 0.92, over a soldier's brigandine's 0.9 (PIERCE_SCALE) for the coat two plates deep; its seams are its lacing (`gaps`). The arms in the steel arm guards (MING_ARM_GUARD).
-    protection: { blunt: 0.7, cut: 0.95, pierce: 0.92, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
+    protection: { blunt: 0.7, cut: 0.95, pierce: 0.92, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { head: { deflects: true }, UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the brigandine coat's plates a little anywhere but the solid plates.
     // (No mail under its gaps: a Ming elite's voiders are not documented as the European ones are; the coat's padding.)
     gaps: { lacing: 0.1 },
@@ -1396,14 +1398,16 @@ export const OUTFITS = {
     // The Manchu saber at his belt (drawn as the dao: a single-edged sabre a little more curved); a knife.
     sidearm: 'dao',
     spare: 'dagger',
-    deflects: true,
+    // Its plates riveted inside a cloth face: a point catches in the cloth and the rivet heads and bites, not skids as off a
+    // bare polished plate (BLADES.bite); only the steel helmet turns it (`regions` head). The user's call, 2026-11-09.
+    deflects: false,
     // Near the Ming elite's weight and guard (~17 kg on a 79 kg man), the limbs a little less covered (studded
     // cloth sleeves, not the elite's steel arm guards).
     extraMass: 0.22,
     // Blunt above the Ming elite's: mianjia is cotton armour, the plates set in thick quilted cotton many layers deep
     // that spreads a club's or a mace's blow over the body as a thin coat of plates does not.
     // Pierce 0.9, a brigandine's (PIERCE_SCALE).
-    protection: { blunt: 0.72, cut: 0.93, pierce: 0.9, bullet: { head: 0.4, torso: 0.5, limb: 0.15 } },
+    protection: { blunt: 0.72, cut: 0.93, pierce: 0.9, bullet: { head: 0.4, torso: 0.5, limb: 0.15 }, regions: { head: { deflects: true } } },
     gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [
@@ -1431,7 +1435,9 @@ export const OUTFITS = {
     label: 'Eight Banners (Later Jin) — Bayara guard', family: 'manchu', movement: 'good', fists: 'bare',
     sidearm: 'dao',
     spare: 'dagger',
-    deflects: true,
+    // Its plates riveted inside a cloth face: a point catches in the cloth and the rivet heads and bites, not skids as off a
+    // bare polished plate (BLADES.bite); only the steel helmet turns it (`regions` head). The user's call, 2026-11-09.
+    deflects: false,
     // The Ming elite's coat (~17 kg on an 89 kg man) and a mail shirt under it (the 'three coats' of the Qing accounts: what
     // is true of it is the mail under the brigandine; `under`, UNDER_ARMOUR.mail, its ~9 kg added): ~26 kg in all.
     extraMass: 0.19,
@@ -1439,7 +1445,7 @@ export const OUTFITS = {
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
     // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
     // Pierce 0.9, a brigandine's (PIERCE_SCALE).
-    protection: { blunt: 0.72, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.5, limb: 0.2 } },
+    protection: { blunt: 0.72, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.5, limb: 0.2 }, regions: { head: { deflects: true } } },
     // The coat's lacing parts as the banner coat's does; between the plates and wherever they part, the mail under it (UNDER_ARMOUR.mail `zones`).
     gaps: { lacing: 0.1 },
     courage: 0.45,
