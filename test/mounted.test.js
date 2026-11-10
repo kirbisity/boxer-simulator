@@ -440,8 +440,8 @@ test('the line of a team of horsemen is spaced for horses: 3 m between them acro
   for (let i = 1; i < zs.length; i += 1) assert.ok(zs[i] - zs[i - 1] >= 2.9, `${zs[i] - zs[i - 1]} m`);
 });
 
-test('a rider is harder to unseat: a knock short of the saddle\'s 3.8 m/s does not throw him, a harder one does; a horse going down slowly does not fling him', () => {
-  assert.ok(WORLD.mount.seat.speed >= 3.6 && WORLD.mount.seat.speed <= 4.2);
+test('a rider is harder to unseat: a knock short of the saddle\'s 4.2 m/s does not throw him, a harder one does; a horse going down slowly does not fling him', () => {
+  assert.ok(WORLD.mount.seat.speed >= 3.6 && WORLD.mount.seat.speed <= 4.6);
   const knocked = (speed) => {
     const w = world(rider('knight'), footman('yari'));
     w.fighters[1].state = 'out';

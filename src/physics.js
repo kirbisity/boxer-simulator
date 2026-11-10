@@ -26,7 +26,7 @@ import { footingOn, lyingLow, partUnder, treadOn } from './physics/footing.js';
 import { armourHardness, bluntEdge, driveShaft, dullEdge, hackShield, partHardness, shieldHardness, stopIn, strainBlade, strikeShaft } from './physics/wear.js';
 import { blockStep, carried, recordContact, setDrive, slopeFall, slopeHold, solvePress } from './physics/press.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
-import { bankOf, cornerPace, cornerShare, cornering, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
+import { bankOf, cornerPace, cornerShare, cornering, footworkQuickness, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
@@ -4175,8 +4175,10 @@ function moveRoot(world, fighter, dt) {
   }
   // Footwork has inertia: the stance accelerates and brakes at what the legs
   // can push, rather than starting and stopping dead.
+  // (And in the fight's footwork as quick as his leg muscle is: gait.js footworkQuickness. Not walking: a walk's pace is
+  // chosen, well inside what any man's legs do.)
   const legRatio = fighter.body.motorForce[P.pelvis] / (fighter.body.massKg * WORLD.gravity);
-  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1));
+  const legs = Math.max(0.5, Math.min(1.3, legRatio / WORLD.legStrengthTypical)) * (WORLD.jointFootwork + (1 - WORLD.jointFootwork) * (fighter.body.joints ?? 1)) * (fighter.walking ? 1 : footworkQuickness(fighter));
   const forward = yawRotate([1, 0, 0], fighter.yaw);
   let drive = fighter.move;
   // A lunge: the legs drive the body in behind the point while it travels.

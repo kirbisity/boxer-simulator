@@ -91,7 +91,9 @@ test('the battles start further apart than the levels\' own lines: the gap half 
       const [x, z] = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
       const who = `${key}: ${fighter.body.inputs.name}`;
       assert.ok(Math.abs(x) < played.arena.halfX && Math.abs(z) < played.arena.halfZ, `${who} on the floor`);
-      assert.ok((fighter.corner === 'red' ? -x : x) > played.formation[fighter.corner].front - 1, `${who} behind his line`);
+      // (Or as far ahead of it as his order's layout puts its vanguard: the wokou's Japanese, WOKOU.lead.)
+      const ahead = Math.max(0, ...(played.formation[fighter.corner].layout ?? []).map(([back]) => -back));
+      assert.ok((fighter.corner === 'red' ? -x : x) > played.formation[fighter.corner].front - ahead - 1, `${who} behind his line`);
     }
   }
   // The two wokou levels: 16 m between the lines become 24.

@@ -241,6 +241,14 @@ export const WORLD = {
   // lags a step in and sways past the stance when it stops.
   footSpeed: 1.2,
   footAcceleration: 8,
+  // - footQuickness: the share of the leg muscle's own speed (gait.js footworkQuickness: fast fibres, bulk, age, the
+  //   armour's hold on the joints) that the footwork takes, beside its strength for the weight. 0.5 (was 0: strength
+  //   alone, so a lean, fast-fibred man stepped as a strong slow one; 1, his whole sprint's share, slowed every armoured
+  //   man by a fifth more): the user's call, 2026-11-09. A step is short, more force than speed; a sprint is speed.
+  //   `quicknessTypical`: the leg's quickness that footSpeed was set for, the median of the cast's presets (0.84), so a
+  //   typical man steps as before and only the quicker and the slower part from him.
+  footQuickness: 0.5,
+  quicknessTypical: 0.84,
   legStrengthTypical: 0.8,
   // An impact's contact lasts about this long through a 10–12 oz glove;
   // peak force ≈ (π/2)·impulse / contact time for a half-sine pulse.
@@ -1283,11 +1291,14 @@ export const WORLD = {
   //   (his speed is `carried` of what it was, he lands as a ragdoll); a faster fall
   //   throws him at the speed his horse lost, less the `grip` share his knees held.
   //   A lance's ~10 ms contact engages only the part of the horse the
-  //   saddle's give lets it reach: a tenth, ~50-60 kg.
+  //   saddle's give lets it reach: a tenth, ~50-60 kg. `speed` 4.2 (was 3.8):
+  //   riders came off too readily in the melee (the user's call, 2026-11-09, "a
+  //   bit" less often): about twice the 2.1 that fells a man afoot, the war saddle's
+  //   pommel and cantle and the long stirrup of the knight's seat that keep him on.
   //   The pommel and cantle brace him only fore and aft: a knock across the
   //   horse's line meets his thighs and stirrups alone, and throws him at
-  //   `across` of `speed` (0.55: about what puts a man on foot over, 2.1 of
-  //   3.8 m/s). A blow from the flank unseats where the same blow head-on
+  //   `across` of `speed` (0.55: about what puts a man on foot over, 2.3 of
+  //   4.2 m/s). A blow from the flank unseats where the same blow head-on
   //   does not (the user's call, 2026-11-09: a T-bone is hard to sit).
   // - coupling: a blow from the saddle has behind it the rider's body and, through
   //   the saddle and stirrups, a share of the horse: the target presses back along the
@@ -1405,7 +1416,7 @@ export const WORLD = {
     // at `speed` m/s or slower (a walk), set down `beside` m off its side; a riderless horse standing within `reach` m is mounted.
     dismount: { speed: 1.8, beside: 0.9, reach: 1.6 },
     line: { spacing: 3, rankBack: 5, margin: 1.5 },
-    seat: { speed: 3.8, across: 0.55, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
+    seat: { speed: 4.2, across: 0.55, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
     reach: { easy: 0.6, most: 0.7, steps: 14, inHz: 3, outHz: 1.2, damping: 1, seat: 0.35 },
     coupling: { forms: { couched: 0.6, twoThrust: 0.35, oneThrust: 0.12, twoSwing: 0.04, oneSwing: 0.03 }, across: 0.4, horse: 0.167 },
     twist: 1.3,

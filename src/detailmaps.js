@@ -153,7 +153,7 @@ export const ARMOUR_EDGES = {
 export const ARMOUR_COVERAGE = {
   heavyRiot: ['polymer'], riot: ['polymer'], patrolVest: null, plateCarrier: null,
   plate: ['plate', 'fluted', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['euroBrigandine', 'munitionPlate', 'harnessEdge'], haubergeon: ['mail'], breastplate: ['munitionPlate', 'harnessEdge'],
-  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake'], roninDo: ['yokohagi', 'sugake'],
+  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake'], roninDo: ['yokohagi', 'sugake', 'mail', 'plate'],
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],

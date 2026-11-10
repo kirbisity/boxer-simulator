@@ -36,17 +36,18 @@ test('Fort Zeelandia: the iron men are all masked and in scale; a few ronin amon
   assert.ok(cast.red.every((fighter) => factionOf(fighter) === 'knights'));
 });
 
-test('Wokou raid: Japanese and Chinese raiders, many barefoot and unarmoured, many in a dō-maru, against a garrison with a pair of brigandine regulars among a levy', async () => {
+test('Wokou raid: Japanese and Chinese raiders, the Chinese many barefoot and unarmoured, many in a dō-maru, against a garrison with a pair of brigandine regulars among a levy', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const { OUTFITS } = await import('../src/outfits.js');
-  // Over a few casts: most of the sea raiders unarmoured, some in a piece, a few in full armour (the rōnin
-  // and the samurai of the class, in their own kit with the crest, apart).
+  // Over a few casts: most of the Chinese raiders unarmoured, some in a piece (the rōnin and the samurai of
+  // the class, in their own kit with the crest, apart).
   const kinds = {};
   for (const seed of [1, 2, 3, 4, 5]) for (const fighter of SCENARIOS.wokou.cast(seededRandom(seed)).red) if (fighter.outfit.kind !== 'ronin' && !fighter.accessories.includes('crest')) kinds[fighter.outfit.kind] = (kinds[fighter.outfit.kind] ?? 0) + 1;
   const total = Object.values(kinds).reduce((sum, count) => sum + count, 0);
   // Better armoured than a mob: under half in nothing at all, but still the largest kind.
   assert.ok(kinds.wokou / total > 0.3 && kinds.wokou / total < 0.6 && kinds.wokouArmoured > 0, JSON.stringify(kinds));
-  assert.ok((kinds.ashigaru ?? 0) + (kinds.samurai ?? 0) > 0, 'a few in full armour');
+  // The rest are the Chinese pirates: a captured piece at most, no ashigaru's or samurai's harness (the Japanese are all of the class).
+  assert.equal((kinds.ashigaru ?? 0) + (kinds.samurai ?? 0), 0, 'no ashigaru');
   assert.ok(OUTFITS.wokou.designs.filter((design) => design.feet.kind === 'bare').length >= OUTFITS.wokou.designs.length - 1, 'barefoot');
   // The dō-maru guards the trunk only.
   assert.ok(OUTFITS.wokouArmoured.protection.cut > 0.5 && OUTFITS.wokouArmoured.protection.regions.limb.cut < 0.1);

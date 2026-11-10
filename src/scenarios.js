@@ -270,18 +270,23 @@ const WOKOU = {
   // as swordsmen first: the long Japanese sword and the great two-handed
   // field sword (the ōdachi) leaping in at a run, the Chinese of the bands
   // with dao and spear. Few guns or bows among them: they came on and cut.
-  // A few of the Japanese are rōnin, masterless swordsmen of the wars at
-  // home (the raids' fighting core, as the Ming saw it): they lead the rush.
+  // The Japanese are rōnin and samurai, masterless swordsmen of the wars at
+  // home (the raids' fighting core, as the Ming saw it), in their own armour:
+  // they lead the rush, well before the rest (`lead`). No ashigaru: the user's
+  // call, 2026-11-09, the men who crossed to raid were the sword class.
   // These are the raiders of Taizhou, 1561 (Qi Jiguang's level): by then the
   // bands were mostly Chinese, the Japanese a stiffening of swordsmen.
-  raiders: { ronin: { ronin: 3 }, japanese: { katana: 6, odachi: 3 }, chinese: { dao: 8, spear: 6 } },
+  raiders: { ronin: { ronin: 4 }, samurai: { katana: 5, odachi: 3 }, chinese: { dao: 8, spear: 6 } },
   // The raid of 1554 (the wokou level) is a Japanese band: rōnin and samurai
   // out of the wars at home (the raids' fighting core, as the Ming saw it),
-  // some in full armour with their own swords and yari, the rest of the
-  // Japanese in what they have; a few Chinese of the coast with them, guides
-  // and pirates of the islands, who keep to the back (`samurai`: men of the
-  // samurai class, armoured, cast.js sengokuWarrior, under no lord's colours).
-  raid: { ronin: { ronin: 6 }, samurai: { katana: 4, yari: 2 }, japanese: { katana: 4, odachi: 3, naginata: 1 }, chinese: { dao: 4, spear: 2 } },
+  // with their own swords, ōdachi and yari; a few Chinese of the coast with
+  // them, guides and pirates of the islands, who keep to the back (`samurai`:
+  // men of the samurai class, armoured, cast.js sengokuWarrior, under no lord's colours).
+  raid: { ronin: { ronin: 8 }, samurai: { katana: 6, odachi: 3, yari: 2, naginata: 1 }, chinese: { dao: 4, spear: 2 } },
+  // How far (m) the Japanese of the band stand out ahead of the line, and of the Chinese behind them: the swordsmen
+  // leap in at a run well ahead (Chouhai tubian: the Japanese in front, the Chinese following on), here about two
+  // ranks' depth of open ground. Ahead rather than the Chinese further back: the square has no more room behind.
+  lead: 3,
   // A coast garrison of the 1550s: mostly spears and swords, a few bows, no
   // firearms; the weisuo levy in its hemp vests, and a pair of regulars in brigandine.
   garrison: { garrison: { spear: 17, dao: 11, mingBow: 4 }, brigandine: { swordShield: 1, spear: 1 } },
@@ -294,7 +299,8 @@ const WOKOU = {
   front: 8,
 };
 
-// The raiders as they come on: a loose crowd, nine abreast; the Japanese in the front rank, the rōnin first among them.
+// The raiders as they come on: a loose crowd, nine abreast; the Japanese in the front ranks `WOKOU.lead` m ahead of the
+// line, the rōnin first among them, the Chinese as far again behind them (raidersOrder).
 const WOKOU_RAIDERS_ORDER = { front: WOKOU.front, spacing: 1.3, rowSpacing: 1.6, perRow: 9, loose: 0.5 };
 // The garrison drawn up across the square in two long ranks, the bows in a row of their own before them to loose as the raiders come
 // on, the spears and dao close behind (the square is too shallow for the usual 4 m: `shootersFront` here 1.5 m).
@@ -302,17 +308,30 @@ const WOKOU_GARRISON_ORDER = { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6
 
 /**
  * The raiders of a wokou level (`mix`: WOKOU.raiders, Qi's Taizhou band, or
- * WOKOU.raid, the 1554 raid): the Japanese first (the front rank, filled from
- * one end to the other; the samurai before the rest), the rōnin spread evenly
- * along it, then the Chinese, in the back rows.
+ * WOKOU.raid, the 1554 raid): the Japanese first (the front ranks, filled from
+ * one end to the other), the rōnin spread evenly along the first, then the
+ * Chinese, in the rows behind (raidersOrder).
  */
 function wokouRaiders(random, mix = WOKOU.raiders) {
   const ronin = company(mix.ronin, (style) => roninWarrior(random, style));
-  const samurai = company(mix.samurai ?? {}, (style) => wokouSamurai(random, style));
-  const japanese = [...samurai, ...company(mix.japanese, (style) => wokouRaider(random, style, 'japanese'))];
+  const japanese = company(mix.samurai, (style) => wokouSamurai(random, style));
   const every = WOKOU_RAIDERS_ORDER.perRow / ronin.length;
   ronin.forEach((man, index) => japanese.splice(Math.min(japanese.length, Math.floor(index * every + every / 2)), 0, man));
   return [...japanese, ...company(mix.chinese, (style) => wokouRaider(random, style, 'chinese'))];
+}
+
+/** The raiders' order for `mix` (wokouRaiders' order of men): the Japanese in rows `WOKOU.lead` m ahead of the line, the Chinese as far behind them. */
+function raidersOrder(mix) {
+  const { spacing, rowSpacing, perRow } = WOKOU_RAIDERS_ORDER;
+  const count = (styles) => Object.values(styles).reduce((sum, men) => sum + men, 0);
+  const rows = (men, back) => Array.from({ length: men }, (_, index) => {
+    const row = Math.floor(index / perRow);
+    const inRow = Math.min(perRow, men - row * perRow);
+    return [back + row * rowSpacing, (index % perRow - (inRow - 1) / 2) * spacing];
+  });
+  const japanese = count(mix.ronin) + count(mix.samurai);
+  const behind = (Math.ceil(japanese / perRow) - 1) * rowSpacing;
+  return { ...WOKOU_RAIDERS_ORDER, layout: [...rows(japanese, -WOKOU.lead), ...rows(count(mix.chinese), behind)] };
 }
 
 // Qi Jiguang's army in the Taizhou campaign, 1561: sea raiders (WOKOU.raiders)
@@ -463,7 +482,7 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true, 
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: { en: `Twenty-six raiders · ${QI.squads} squads of twelve`, zh: `倭寇二十六人 · 鸳鸯阵${QI.squads}队，每队十二人` },
     // Each man where his squad puts him; the squads drilled as a whole (formation.js), under Qi's discipline (ai.js AI.morale).
-    formation: { red: WOKOU_RAIDERS_ORDER, blue: { ...drawnUp, discipline: morale ? QI_DISCIPLINE : 0 } },
+    formation: { red: raidersOrder(WOKOU.raiders), blue: { ...drawnUp, discipline: morale ? QI_DISCIPLINE : 0 } },
     cast: (random) => ({ red: wokouRaiders(random), blue: qiArmy(random, { weapons }).men }),
     // The armies its sides may be set up from (ARMIES; muster.js).
     armies: { red: ['raiders'], blue: ['qi'] },
@@ -735,9 +754,9 @@ export const ARMIES = {
     label: 'The wokou',
     ranks: {
       ronin: { label: 'Rōnin', kinds: ['ronin'], styles: ['ronin'], make: (random, style) => roninWarrior(random, style) },
-      samurai: { label: 'Samurai', kinds: ['samurai', 'samuraiTosei'], styles: ['katana', 'yari', 'naginata'], make: (random, style) => wokouSamurai(random, style) },
+      samurai: { label: 'Samurai', kinds: ['samurai', 'samuraiTosei'], styles: ['katana', 'odachi', 'yari', 'naginata'], make: (random, style) => wokouSamurai(random, style) },
       japanese: { label: 'Japanese raider', kinds: RAIDER_KINDS, styles: ['katana', 'odachi', 'naginata', 'archerYumi'], make: (random, style) => wokouRaider(random, style, 'japanese') },
-      chinese: { label: 'Chinese raider', kinds: RAIDER_KINDS, styles: ['dao', 'spear', 'matchlock'], make: (random, style) => wokouRaider(random, style, 'chinese') },
+      chinese: { label: 'Chinese raider', kinds: ['wokou', 'wokouArmoured'], styles: ['dao', 'spear', 'matchlock'], make: (random, style) => wokouRaider(random, style, 'chinese') },
     },
   },
   coast: {
@@ -1401,13 +1420,13 @@ export const SCENARIOS = {
   wokou: {
     title: 'Wokou raid',
     place: 'A water town, Zhejiang · 1554',
-    blurb: { en: 'Sea raiders come up the canals in the morning mist, a Japanese band: rōnin at their head and samurai in their armour, the rest barefoot, some in pieces of armour, a few Chinese pirates hanging back behind them: long swords and great two-handed swords, yari, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison, more of them than the raiders: old men, thin boys and the underfed in hemp vests, spears and dao and a few bows, no guns, and a pair of brigandine regulars among them.', zh: '晨雾里，一伙海寇顺着河道摸上来，是日本人：浪人打头，披甲的武士跟着，其余光着脚，有的身上挂几片甲，几个中国海盗缩在最后——长刀、野太刀、长枪、腰刀，几乎不见火器。桥边集市上，他们撞上了镇里的守军，人比倭寇多：老头、瘦小子、吃不饱的穷汉，一身麻布坎肩，长枪腰刀，几张弓，没有火器，当中夹着两个穿布面甲的正兵。' },
+    blurb: { en: 'Sea raiders come up the canals in the morning mist, a Japanese band of rōnin and samurai in their own armour, leaping in at a run well ahead of a few Chinese pirates who hang back behind them: long swords and great two-handed swords, yari, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison, more of them than the raiders: old men, thin boys and the underfed in hemp vests, spears and dao and a few bows, no guns, and a pair of brigandine regulars among them.', zh: '晨雾里，一伙海寇顺着河道摸上来，是日本人：浪人和披甲的武士远远冲在前头，几个中国海盗缩在后面——长刀、野太刀、长枪、腰刀，几乎不见火器。桥边集市上，他们撞上了镇里的守军，人比倭寇多：老头、瘦小子、吃不饱的穷汉，一身麻布坎肩，长枪腰刀，几张弓，没有火器，当中夹着两个穿布面甲的正兵。' },
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: { en: 'Twenty-six raiders · thirty-four garrison', zh: '倭寇二十六人 · 守军三十四人' },
-    formation: { red: WOKOU_RAIDERS_ORDER, blue: WOKOU_GARRISON_ORDER },
+    formation: { red: raidersOrder(WOKOU.raid), blue: WOKOU_GARRISON_ORDER },
     cast: (random) => ({
       red: wokouRaiders(random, WOKOU.raid),
       blue: shootersBehind([...company(WOKOU.garrison.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingCoast', design: WOKOU.design.brigandine })), ...company(WOKOU.garrison.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingCoast', design: WOKOU.design.garrison }))]),

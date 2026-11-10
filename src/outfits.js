@@ -335,7 +335,7 @@ function cumanDesign(label, { steel, coat, sash, belt, mask, gold = '#a8873e' })
     feet: { kind: 'jinBoot', color: '#2a1c14' },
   };
 }
-// A rōnin: kosode, hakama, the cloak and his pieces of armour (roninDo); his sugegasa is worn loose (HEADGEAR kasa).
+// A rōnin: kosode, hakama, the cloak and his pieces of armour (roninDo: the dō and the kote); his sugegasa is worn loose (HEADGEAR kasa).
 // A sōhei, a warrior monk of the great temples (Enryakuji, Kōfukuji): the
 // white katō-zukin hood wrapped over the head and across the face to the
 // eyes, a dark monk's robe over a laced dō-maru with its shoulder boards,
@@ -2400,7 +2400,7 @@ export const OUTFITS = {
       incaDesign('Sapa Inca', 'uncuRoyal', '#9a2a1e', '#ece4d0', { cord: '#b3161b', cord2: '#d6a743', earspools: '#d6a743', fringe: '#c41a1a', cloak: '#3a2a5a', special: true }),
     ],
   },
-  // A rōnin: no lord, no armour; a kimono and hakama, a headband.
+  // A rōnin: no lord; a cuirass and kote over the kimono and hakama, the kasa for a helmet.
   ronin: {
     skill: 0.85,
     faction: 'japanese',
@@ -2410,17 +2410,20 @@ export const OUTFITS = {
     defaultHeadgear: 'kasa',
     // A masterless man on the road: the kosode and the hakama tied at the
     // knee, a straw kasa low over the eyes, a travelling cloak, sandals; and
-    // what armour he can carry and still run in, a tōsei cuirass and the
-    // haidate over his thighs, no helmet, no sleeves, no greaves. The trunk
-    // as a samurai's dō; the thighs behind small plates laced on cloth;
-    // head and the rest of the limbs bare (`regions`).
-    // Armour at 0.55 of its old weight (was 0.2): a cuirass and haidate: ~8 kg on a 69 kg man.
+    // what armour he can carry and still run in: a tōsei cuirass with its
+    // short skirt, and kote on both arms (mail sleeves sewn with small iron
+    // plates, shino-gote); no helmet, no haidate, no greaves (the user's
+    // call, 2026-11-09: the thighs given up for the arms, which a swordsman
+    // puts in the way of every cut). The trunk as a samurai's dō; the arms
+    // as the ō-yoroi's kote; head and legs bare (`regions`).
+    // Armour at 0.55 of its old weight: the dō ~5.5 kg and the kote ~1.5 kg (Bottomley and Hopson, Arms and Armour of
+    // the Samurai, 1988: a pair of kote 1-2 kg), ~7 kg on a 60 kg man, as the cuirass and haidate before.
     extraMass: 0.11,
     protection: {
-      // Blunt 0.56 (was 0.6), Japanese armour; the haidate by the same ratio (0.35 → 0.33).
-      // Pierce 0.9, the tōsei cuirass's solid lames (PIERCE_SCALE).
+      // Blunt 0.56 (was 0.6), Japanese armour. Pierce 0.9, the tōsei cuirass's solid lames (PIERCE_SCALE).
+      // The kote as the ō-yoroi's mailed sleeve (lForearm there): plates over mail on cloth, a cut turned more than a blow.
       blunt: 0.56, cut: 0.9, pierce: 0.9, bullet: { head: 0, torso: 0.5, limb: 0.05 },
-      regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Thigh: { blunt: 0.33, cut: 0.75, pierce: 0.45 } },
+      regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, UpperArm: { blunt: 0.19, cut: 0.6, pierce: 0.3 }, Forearm: { blunt: 0.19, cut: 0.6, pierce: 0.3 } },
     },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,

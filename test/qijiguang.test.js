@@ -15,17 +15,23 @@ import { levelBattle } from '../tools/levels.js';
 
 const count = (men, pick) => men.reduce((tally, man) => ({ ...tally, [pick(man)]: (tally[pick(man)] ?? 0) + 1 }), {});
 
-test('the wokou raiders are mostly Japanese and charge with swords: rōnin and samurai in front, a few Chinese at the back, no guns or bows; the garrison has bows but no gun, more men than the raiders, each kind in one colour', () => {
+test('the wokou raiders are mostly Japanese and charge with swords: rōnin and samurai well in front, no ashigaru, a few Chinese at the back, no guns or bows; the garrison has bows but no gun, more men than the raiders, each kind in one colour', () => {
   const { red, blue } = SCENARIOS.wokou.cast(seededRandom(4));
   // (A rōnin may fight with two swords: nitō.)
-  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 6, katana: 8, yari: 2, odachi: 3, naginata: 1, dao: 4, spear: 2 });
+  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 8, katana: 6, yari: 2, odachi: 3, naginata: 1, dao: 4, spear: 2 });
   assert.equal(red.length, 26);
-  // The Japanese in the front rank, the rōnin among them; the samurai in their armour; the Chinese (dao, spear) all in the back rows.
+  // The Japanese in the front ranks, the rōnin in the first; every one a samurai of the class or a rōnin (no ashigaru); the
+  // Chinese (dao, spear) all in the back rows, in no ashigaru's or samurai's harness.
   const front = red.slice(0, SCENARIOS.wokou.formation.red.perRow);
-  assert.ok(front.every((man) => ['katana', 'ronin', 'nito'].includes(man.style)), 'the Japanese swordsmen in front');
-  assert.equal(front.filter((man) => man.outfit.kind === 'ronin').length, 6);
-  assert.equal(red.filter((man) => ['samurai', 'samuraiTosei'].includes(man.outfit.kind) && man.accessories.includes('crest')).length, 6, 'six samurai of the class');
+  assert.ok(front.every((man) => ['katana', 'odachi', 'ronin', 'nito'].includes(man.style)), 'the Japanese swordsmen in front');
+  assert.equal(front.filter((man) => man.outfit.kind === 'ronin').length, 8);
+  const japanese = red.slice(0, -6);
+  assert.ok(japanese.every((man) => man.outfit.kind === 'ronin' || (['samurai', 'samuraiTosei'].includes(man.outfit.kind) && man.accessories.includes('crest'))), 'samurai and rōnin only');
   assert.ok(red.slice(-6).every((man) => ['dao', 'spear'].includes(man.style)), 'the Chinese at the back');
+  assert.ok(red.every((man) => !['ashigaru', 'samurai', 'samuraiTosei'].includes(man.outfit.kind) || japanese.includes(man)), 'no ashigaru');
+  // The Japanese stand well out ahead of the Chinese: open ground between the last of them and the first Chinese.
+  const backs = SCENARIOS.wokou.formation.red.layout.map(([back]) => back);
+  assert.ok(Math.min(...backs.slice(-6)) - Math.max(...backs.slice(0, -6)) >= 3, 'a gap before the Chinese');
   assert.ok(red.every((man) => !STYLES[man.style].ranged), 'no shooter among the raiders');
   assert.ok(red.every((man) => man.charging > 1), 'they come on at a run');
   assert.ok(blue.every((man) => !STYLES[man.style].ranged || man.style === 'mingBow'), 'no gun in the garrison');
@@ -76,10 +82,16 @@ test('the coast garrison is the weaker for its men: some old, some thin and unta
 
 test('Qi Jiguang\'s raiders are the Taizhou band, mostly Chinese; the 1554 raid\'s mostly Japanese; drawn up alike', () => {
   const { red } = SCENARIOS.qiJiguang.cast(seededRandom(1));
-  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 3, katana: 6, odachi: 3, dao: 8, spear: 6 });
+  assert.deepEqual(count(red, (man) => (man.style === 'nito' ? 'ronin' : man.style)), { ronin: 4, katana: 5, odachi: 3, dao: 8, spear: 6 });
+  assert.ok(red.every((man) => ['dao', 'spear'].includes(man.style) || man.outfit.kind === 'ronin' || ['samurai', 'samuraiTosei'].includes(man.outfit.kind)), 'samurai and rōnin only, no ashigaru');
   const chinese = (men) => men.filter((man) => ['dao', 'spear'].includes(man.style)).length;
   assert.ok(chinese(SCENARIOS.wokou.cast(seededRandom(1)).red) < chinese(red) / 2);
-  assert.deepEqual(SCENARIOS.qiJiguang.formation.red, SCENARIOS.wokou.formation.red);
+  // Drawn up alike: the same crowd, the Japanese out ahead the same way (each its own number of men).
+  const { layout: qiLayout, ...qiOrder } = SCENARIOS.qiJiguang.formation.red;
+  const { layout: raidLayout, ...raidOrder } = SCENARIOS.wokou.formation.red;
+  assert.deepEqual(qiOrder, raidOrder);
+  assert.equal(qiLayout[0][0], raidLayout[0][0]);
+  assert.equal(qiLayout.length, red.length);
   assert.equal(SCENARIOS.qiJiguang.scene, SCENARIOS.wokou.scene);
 });
 

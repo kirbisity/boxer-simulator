@@ -72,7 +72,8 @@ test('a man walking into a man set behind his shield does not put him over; runn
     placeFighter(walker, -3, 0);
     placeFighter(wall, 0, 0);
     advance(walk, 0.6);
-    for (let t = 0; t < 3; t += 1 / 60) {
+    // (Four seconds: the bump comes about the third, a little either side of it with his footwork, gait.js footworkQuickness.)
+    for (let t = 0; t < 4; t += 1 / 60) {
       walker.move = 1;
       walker.goTo = [30, 0, 0];
       wall.move = 0;

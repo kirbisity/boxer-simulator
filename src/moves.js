@@ -774,6 +774,10 @@ export const STYLES = {
   // katana in both hands as a rōnin (`single`), or, the katana lost, the
   // wakizashi in his sword hand.
   // Two swords fought to overwhelm: both blades always busy, long runs, little rest, pressing in.
+  // Fought as quick slashing (the user's call, 2026-11-09): each blade cutting in turn, one hand behind each (kataKesa,
+  // wakiKesa: cheaper and quicker than a cut in both hands), about seven in ten of his attacks (was four); the thrusts, the
+  // beat and both blades at once (the dearest moves, ~0.032-0.036) seldom: ~0.023 of stamina a stroke (was ~0.029), and
+  // less rest between them (`tempo` 0.55, was 0.65). Shallow cuts of one arm: the bane of a man in cloth, little to one in a dō.
   nito: {
     label: 'Nitō (two swords)', weapon: 'katana', grip: 'one', offWeapon: 'wakizashi', single: 'ronin',
     cadence: { work: 1.8, move: 0.95, burst: 1.0, mobility: 0.75 },
@@ -781,10 +785,10 @@ export const STYLES = {
     weaponGuard: { hand: [0.2, 0.64, -0.12], dir: [0.7, 0.65, 0.12] },
     offGuard: { hand: [0.22, 0.56, 0.13], dir: [0.85, 0.35, -0.18] },
     idle: { bounce: 0.15, sway: 0.4, rock: 0.25 },
-    attacks: { kataKesa: 0.18, kataGyaku: 0.1, kataShomen: 0.08, kataYoko: 0.06, kataTsuki: 0.1, wakiKesa: 0.06, wakiTsuki: 0.08, wakiBeat: 0.16, kesaTsuki: 0.1, jodanGedan: 0.08, rush: 0.05 },
-    combos: { 'wakiTsuki kataKesa': 0.25, 'kataKesa wakiKesa': 0.2, 'wakiBeat kataGyaku': 0.2, 'kataGyaku kesaTsuki': 0.15, 'wakiKesa kataShomen': 0.2 },
+    attacks: { kataKesa: 0.24, kataGyaku: 0.16, kataYoko: 0.1, wakiKesa: 0.14, kataShomen: 0.06, kataTsuki: 0.05, wakiTsuki: 0.05, wakiBeat: 0.08, kesaTsuki: 0.04, jodanGedan: 0.04, rush: 0.04 },
+    combos: { 'kataKesa wakiKesa': 0.25, 'wakiKesa kataGyaku': 0.2, 'kataKesa wakiKesa kataGyaku': 0.2, 'kataYoko wakiKesa': 0.1, 'wakiBeat kataGyaku': 0.1, 'wakiTsuki kataKesa': 0.15 },
     comboChance: 0.75,
-    tempo: 0.65,
+    tempo: 0.55,
     defences: { weaponBlock: 0.75, stepBack: 0.2, guard: 0.05 },
     defendChance: 0.6,
     riposte: { chance: 0.65, moves: { kataKesa: 0.35, kataTsuki: 0.25, kataGyaku: 0.15, wakiTsuki: 0.25 } },

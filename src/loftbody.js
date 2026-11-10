@@ -614,14 +614,14 @@ export const ARMOR_KINDS = {
     upperArm: [-0.18, 0.45, 1.62, LACED], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
   },
   // A rōnin on the road: his odd pieces of tōsei gusoku (the riveted
-  // cuirass and its short laced skirt over the kosode, the haidate over the
-  // hakama), a sash of two colours, the forearms bound in cloth, gaiters
-  // (kyahan) over the shins.
+  // cuirass and its short laced skirt over the kosode; the kote on both
+  // arms, mail sleeves with an iron plate along the forearm), a sash of two
+  // colours, gaiters (kyahan) over the shins; the hakama bare.
   roninDo: {
     trunk: [-0.08, 1.0, 1.18, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.4, 0.36, 1.22, LACED],
     belt: [0.02, 0.14, 1.3, { rows: ['cloth2', 'gold', 'cloth2'] }],
-    thigh: [0.05, 0.88, 1.5, { rows: ['steel', 'steel', 'lace'], kozane: true }],
-    forearm: [0.3, -0.04, 1.2, 'cloth2'], shin: [0.08, 0.88, 1.3, 'cloth'],
+    upperArm: [-0.15, 1.02, 1.16, MAIL], forearm: [[-0.06, -0.02, 1.2, MAIL], [-0.04, 0.3, 1.26, 'steel']],
+    shin: [0.08, 0.88, 1.3, 'cloth'],
   },
   // Ashigaru: a plain lacquered okegawa-do with the lord's mon, a short skirt,
   // cloth sleeves and simple shin guards.

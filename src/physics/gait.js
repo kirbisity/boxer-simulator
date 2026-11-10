@@ -43,6 +43,8 @@ export function gaitBody(body) {
   const gear = body.gear ?? { foot: 1, accel: 1 };
   return {
     power,
+    // How fast his leg muscle shortens against a fit young man's (1): the footwork's share of it (footworkQuickness).
+    quickness: shortening / spec.speedRef,
     legLength,
     top: spec.top * power * Math.sqrt(legLength / REFERENCE_LEG) * gear.foot,
     accel: spec.accel * WORLD.gravity * power * gear.accel,
@@ -60,6 +62,16 @@ export function gaitOf(fighter) {
     fighter.gaitBody = cache;
   }
   return cache;
+}
+
+/**
+ * How quick his feet are in the fight's footwork (a share of WORLD.footSpeed, beside the legs' strength for his weight that
+ * physics.js already counts): how fast his leg muscle shortens (gaitBody quickness: fast fibres, their bulk, age, armour's
+ * hold on the joints) against a typical man's, at `footQuickness` of its full effect.
+ */
+export function footworkQuickness(fighter) {
+  const share = WORLD.footQuickness;
+  return 1 - share + (share * gaitOf(fighter).quickness) / WORLD.quicknessTypical;
 }
 
 /** How sound and fresh his legs are for a run (0..1): the weaker leg's share (limbShares: damage, fatigue). */

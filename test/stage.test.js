@@ -154,7 +154,8 @@ test('a dormant man is kept as he is: struck and bleeding, he is the same when h
 });
 
 test('the men wake when he enters the portal, fight on, and sleep again as he goes back (where they were left)', () => {
-  const world = yard();
+  // (A fight he comes out of on his feet: three to one, the hero is knocked out in many (seeds 3, 5, 7, 9), and a man out cold walks nowhere.)
+  const world = createStageWorld(QUIET, hero(), { seed: 8 });
   setMechanism(world, 'gate1', 'open');
   const guards = world.fighters.slice(1, 4);
   const start = guards.map(hipsAt);
@@ -321,7 +322,8 @@ test('weapons lying in a section that goes quiet stay where they lie, and fall o
 });
 
 test('a world without a stage is untouched: createWorld with no terrain steps as ever', () => {
-  const world = createWorld([{ inputs: structuredClone(PRESETS.heavy), corner: 'red' }, { inputs: structuredClone(PRESETS.light), corner: 'blue' }], { seed: 5 });
+  // (Seed 2: in seed 5 the light man, quick on his feet (gait.js footworkQuickness), knocks the heavy out inside the two seconds.)
+  const world = createWorld([{ inputs: structuredClone(PRESETS.heavy), corner: 'red' }, { inputs: structuredClone(PRESETS.light), corner: 'blue' }], { seed: 2 });
   advance(world, 2, (current, dt) => thinkAll(current, dt));
   assert.equal(world.arena.terrain, undefined);
   assert.equal(world.awake, undefined);

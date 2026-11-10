@@ -376,10 +376,16 @@ export function soheiMonk(random = Math.random) {
   return builtLike(monk, PERIOD_BUILD.japanese.sohei, random);
 }
 
-// What a sea raider has on (shares, summing to 1): many nothing but a robe
-// or a loincloth; many a piece of armour taken in earlier raids; some the
-// whole of it (the big bands of the 1550s were well equipped from plunder).
-const WOKOU_KIT = { none: 0.45, piece: 0.36, ashigaru: 0.11, samurai: 0.08 };
+// What a sea raider has on, by people (shares, summing to 1): many nothing but
+// a robe or a loincloth; many a piece of armour taken in earlier raids; some of
+// the Japanese the whole of it (the big bands of the 1550s were well equipped
+// from plunder). A Chinese pirate has no ashigaru's or samurai's harness: a
+// captured piece at most (the user's call, 2026-11-09), so the same odds of
+// armour as a Japanese, all of it in pieces.
+const WOKOU_KIT = {
+  japanese: { none: 0.45, piece: 0.36, ashigaru: 0.11, samurai: 0.08 },
+  chinese: { none: 0.45, piece: 0.55, ashigaru: 0, samurai: 0 },
+};
 
 // Raiders come on at a run and throw themselves in: the charge sooner, and more eagerly (AI `charging`).
 const RAIDER_CHARGING = 2;
@@ -411,7 +417,8 @@ export function wokouRaider(random = Math.random, style = 'dao', people = 'chine
     ? `${pickOne(['Miyamoto', 'Sasaki', 'Ito', 'Okada', 'Mori', 'Kato', 'Abe', 'Ueda'], random)} ${pickOne(['Jubei', 'Kojiro', 'Gonbei', 'Sakon', 'Hanzo', 'Tadashi', 'Isamu', 'Genji'], random)}`
     : `${pickOne(['Xu', 'Wang', 'Lin', 'Chen', 'Huang', 'Ye', 'Mao', 'Hong'], random)} ${pickOne(['Hai', 'Zhi', 'Dong', 'Ma', 'San', 'Bao', 'Lang', 'Shan'], random)}`;
   const roll = random();
-  const kind = roll < WOKOU_KIT.none ? 'wokou' : roll < WOKOU_KIT.none + WOKOU_KIT.piece ? 'wokouArmoured' : roll < 1 - WOKOU_KIT.samurai ? 'ashigaru' : 'samurai';
+  const kit = WOKOU_KIT[people];
+  const kind = roll < kit.none ? 'wokou' : roll < kit.none + kit.piece ? 'wokouArmoured' : roll < 1 - kit.samurai ? 'ashigaru' : 'samurai';
   const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: randomDesign(kind, random) }, accessories: [], charging: RAIDER_CHARGING };
   return builtLike(soldier, japanese ? PERIOD_BUILD.japanese.raider : PERIOD_BUILD.mingSouth.raider, random);
 }
