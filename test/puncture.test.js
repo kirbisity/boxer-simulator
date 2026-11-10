@@ -34,7 +34,10 @@ test('arrows: a war arrow stands in mail, a crossbow\'s bolt goes through it; ne
   assert.ok(pointThrough(ARROW.joules, MAIL, hardest) === 0 && pointThrough(ARROW.joules, MAIL, weakest) < 0.3, 'a war arrow: stopped, or shallow');
   assert.ok(pointThrough(170, MAIL) > 0.3, 'a crossbow bolt goes in');
   assert.equal(pointThrough(ARROW.joules, OUTFITS.hanSoldier.protection.pierce, weakest), 0, 'a war arrow on iron lamellar');
-  for (const pierce of [BRIGANDINE, PLATE]) assert.equal(pointThrough(130, pierce, weakest), 0, `a heavy war arrow on ${pierce}`);
+  assert.equal(pointThrough(130, PLATE, weakest), 0, 'a heavy war arrow on plate');
+  // (A brigandine, 0.85, proof against a cut and a war arrow, not a charge: a heavy one finds its weakest plates now and then.)
+  assert.equal(pointThrough(ARROW.joules, BRIGANDINE, weakest), 0, 'a war arrow on a brigandine');
+  assert.equal(pointThrough(130, BRIGANDINE, 0.5), 0, 'a heavy war arrow on a brigandine, as a rule');
   assert.ok(pointThrough(ARROW.joules, OUTFITS.archer.protection.pierce) > 0.4, 'through a padded coat');
 });
 

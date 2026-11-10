@@ -110,13 +110,13 @@ export const HORSE_LOAD = { easy: 0.2, slows: 0.9, least: 0.6 };
  * - bare: a saddle and tack only.
  */
 // (`pierce` by the material, as a man's armour, outfits.js PIERCE_SCALE (the user's figures, 2026-11-09): plate 0.95 (was
-// 0.88), mail with plates over it 0.8 (the crinet; was 0.72), iron lamellar 0.85 (was 0.7), brigandine 0.9 (was 0.55),
+// 0.88), mail with plates over it 0.8 (the crinet; was 0.72), iron lamellar 0.85 (was 0.7), brigandine 0.85 (was 0.9, 0.55),
 // banded iron plates as plate. What it covers is in `parts` and `from`, not here.)
 const PLATE_BARD = { blunt: 0.55, cut: 1, pierce: 0.95, deflects: true };
 // The crinet: lames over the crest and upper sides, mail under the throat (a point goes through the mail's rings; mail spreads little of a blow).
 const CRINET = { blunt: 0.42, cut: 1, pierce: 0.8, deflects: true };
 const LAMELLAR_BARD = { blunt: 0.42, cut: 0.86, pierce: 0.85 };
-const BRIGANDINE_BARD = { blunt: 0.4, cut: 0.82, pierce: 0.9 };
+const BRIGANDINE_BARD = { blunt: 0.4, cut: 0.82, pierce: 0.85 };
 // Banded iron: horizontal plates riveted to leathers, each lapping the next (the Ming horse's throat and breast, mingFront):
 // guarded as plate is (0.95, a slanting point and an edge turned), not as the tōsei dō's lacquered lames (the user's call,
 // 2026-11-09; was 0.9, no glance).
