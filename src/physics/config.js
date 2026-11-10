@@ -985,8 +985,11 @@ export const WORLD = {
   // a fifth of what kills (0.5 of trunkFatal's 2.5), a fist's just past it a sixteenth (0.4, then 0.25, were too much: a
   // lance's thrusts on foot into plate killed Sir Edric in two, then three); a limb's long bone broken
   // by the force of one blow breaks it at once (body.fracture by bone, physics.js bluntConsequences), as its injury piling
-  // past `limbBreak` does.
-  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, fractured: 0.15, shockStrength: 0.6, limbWeight: 0.12,
+  // past `limbBreak` does. `chestJoules`: the ribs' injury is as deep as the chest is driven in, by the energy of the blow
+  // that reached it past the armour, in full from this (× BODY.toughness): Kroell's 23 kg pendulum at 4.3 m/s, ~216 J, the
+  // rib fractures of the chest's tolerance (Kroell et al. 1974); a lance's light jab whose peak force cracks a rib (its
+  // contact short and stiff) drives in a few joules and hurts as little.
+  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, fractured: 0.15, chestJoules: 216, shockStrength: 0.6, limbWeight: 0.12,
     severed: { base: 0.25, perMass: 2.5, share: { wrist: 0.006, elbow: 0.022, shoulder: 0.05, ankle: 0.0145, knee: 0.061, hip: 0.161 } } },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).

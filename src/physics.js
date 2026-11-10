@@ -7696,7 +7696,7 @@ function strikerRecoil(attacker, defender, capsule, limb, closing, strikeMass, s
  * part struck, the head shaken (knockdowns, knockouts), cuts opened, faces
  * and ribs broken, legs worn down; a checked kick hurts the kicker.
  */
-function bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass, peakForce, harm, blocked, checked = false, rotation, cuts = false, cutForce = Infinity, side, push = false, concentration = 1, braced = false, crushing = 0, face = null }) {
+function bluntConsequences(world, attacker, defender, capsule, event, { impulse, joules = Infinity, struckMass, peakForce, harm, blocked, checked = false, rotation, cuts = false, cutForce = Infinity, side, push = false, concentration = 1, braced = false, crushing = 0, face = null }) {
   const body = defender.body;
   const onLeg = /Thigh|Shank/.test(capsule.key);
   // The part's speed change (a guard's forearm takes a share of it), or what a weapon's hard head crushes under it
@@ -7757,9 +7757,11 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
     // (Pressed in as its striking face presses, as a long bone is above: contactStress.)
     const ribLoad = peakForce * harm * contactStress(face);
     if (ribLoad > body.fracture.rib) {
-      // Ribs broken: an injury to the trunk, more by how far past what breaks them (WORLD.injury.fractured).
+      // Ribs broken: an injury to the trunk, more by how far past what breaks them, and as deep as the blow that reached the
+      // chest drove it in (`joules` past the armour, against WORLD.injury.chestJoules; a crash's, its force alone).
       defender.trauma ??= {};
-      defender.trauma.trunk = (defender.trauma.trunk ?? 0) + WORLD.injury.fractured * (1 + Math.log(ribLoad / body.fracture.rib));
+      const driven = Math.min(1, joules / (WORLD.injury.chestJoules * BODY.toughness));
+      defender.trauma.trunk = (defender.trauma.trunk ?? 0) + WORLD.injury.fractured * (1 + Math.log(ribLoad / body.fracture.rib)) * driven;
     }
     if (ribLoad > body.fracture.rib && !defender.injuries.some((injury) => injury.kind === 'rib')) {
       defender.injuries.push({ kind: 'rib', time: world.time });
@@ -8187,8 +8189,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const gapFound = gapZone ? (punch.finisher ? punch.finisher.gap : spec.placed ?? gapChance(body.gear, gapZone, spec.mode)) * placed : 0;
   const intoGap = gapFound > 0 && world.random() < gapFound * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
   const protection = intoGap ? { ...gapUnder(body.gear, gapZone, covered), deflects: false } : covered;
+  // (A shaft that shatters on armour it cannot go into, below.)
+  const shattered = !haft && !intoGap && shattersOn(weapon, spec.mode, protection, energy);
   const firmness = body.segments[capsule.key === 'head' ? 'head' : capsule.key === 'trunk' ? 'trunk' : capsule.key].fleshFirmness;
-  const peakForce = ((Math.PI / 2) * impulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
   const blocked = BLOCKING.has(capsule.key);
   // A brittle edge (obsidian) cuts only as well as it is still sharp.
   const sharp = weapon.edge ?? 1;
@@ -8225,6 +8228,14 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // (The press is a push, not a blow: what bursts the rings or the plate is the blow and the push together, but once the
   // point is through he is still leaning on it, and drives it on with all of the push, only the armour's hold on it taken.)
   const pressGoes = pointGoes > 0 ? 1 - PUNCTURE.after * Math.min(PUNCTURE.most, protection.pierce ?? 0) : 0;
+  // A shaft that shatters (a lance: `shatters`) whose point the armour stopped carries into him as a blow only what it bore
+  // before it broke (`shatters.joules`); the rest of the collision went into breaking it, as a jouster's lance was made to.
+  // A point that goes through is not stopped: the shaft holds while it goes in, and all of it goes (the user's call,
+  // 2026-11-09).
+  const borne = shattered && !(pointGoes > 0) ? Math.min(1, wspec.shatters.joules / energy) : 1;
+  const blowJoules = energy * borne;
+  const blowImpulse = impulse * Math.sqrt(borne);
+  const peakForce = ((Math.PI / 2) * blowImpulse) / (contactSeconds * (1 + 0.6 * (1 - firmness)));
   const pierce = (goes * mix.pierce * pointGoes + press * pressGoes) * sharp;
   // A heavy hard head drives part of its blow through armour (`crush`).
   // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)
@@ -8260,8 +8271,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const face = !haft && mix.blunt >= mix.cut + mix.pierce ? wspec.face ?? wspec.radius : null;
   // What its head crushes under it (BLADES.crushTrauma), by how its face presses in against the pendulum's (BLADES.crushFace):
   // a blunt weapon's head (bluntHeaded: a mace, a club, a hammer, a bat); a blade's flat or a spear's shaft crushes as before.
-  const crushing = energy * bluntShare * BLADES.crushTrauma * (bluntHeaded(wspec) ? contactStress(face, BLADES.crushFace) : 1);
-  bluntConsequences(world, attacker, defender, capsule, event, { impulse, struckMass: partMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration, crushing, face });
+  const crushing = blowJoules * bluntShare * BLADES.crushTrauma * (bluntHeaded(wspec) ? contactStress(face, BLADES.crushFace) : 1);
+  bluntConsequences(world, attacker, defender, capsule, event, { impulse: blowImpulse, joules: blowJoules * bluntShare, struckMass: partMass, peakForce, harm: bluntShare, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration, crushing, face });
   if (glanced) {
     // Off the plate: the blade is turned along it.
     const across = vec.sub(relative, vec.scale(normal, vec.dot(relative, normal)));
@@ -8337,12 +8348,11 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   if (BLOCKING.has(capsule.key)) for (const held of heldBlades(defender)) if (capsule.key.startsWith(held.main)) strainGrip(world, defender, impulse * BLADES.armHitShare, vec.scale(normal, -1), held);
   // A shaft that shatters (a lance: `shatters`) breaks on heavy armour it cannot go into (not into a gap) and is
   // kept otherwise; any other weapon is jarred by what it hit (least when it cut straight through).
-  const shattered = !haft && !intoGap && shattersOn(weapon, spec.mode, protection, energy);
   if (shattered) event.effects.push(`the ${wspec.label.toLowerCase()} shattered`);
   else if (!wspec.shatters && !broke) strainGrip(world, attacker, impulse * (through ? 0.05 : glanced ? 0.3 : 0.15), [0, 0, 0], weapon);
   const recoil = [[main, 1], [P[`${weapon.main}Elbow`], 0.7], [P[`${weapon.main}Shoulder`], 0.35]];
   if (weapon.twoHanded) recoil.push([P[`${weapon.off}Hand`], 0.8]);
-  pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, impulse, bluntShare, blocked, spec, recoil, time, event, through ? 0.4 : 1);
+  pushBack(world, attacker, defender, capsule, closest, contactPoint, normal, blowImpulse, bluntShare, blocked, spec, recoil, time, event, through ? 0.4 : 1);
   // A weapon art's hook or reap (`hook`) caught on his leg: drawn on with the arms (physics/arts.js hookPull).
   if (spec.hook && (!haft || spec.hook === 'reap') && /Thigh|Shank/.test(capsule.key)) hookLeg(world, attacker, defender, capsule.key[0], spec.hook === 'reap' ? relative : null, event);
   if (broke) event.effects.push(`the ${wspec.label.toLowerCase()}'s ${broke.part} ${broke.reason}`);
