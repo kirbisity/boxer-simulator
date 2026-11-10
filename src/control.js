@@ -7,12 +7,13 @@
 import { P } from './body.js';
 import { AI, chooseDefence } from './ai.js';
 import { blowSide, DEFENCES, MOVES, pointRoomOf, STYLES, moveRange, tapAttacks } from './moves.js';
-import { aimPoint, BLOCKS, dropWeapon, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
+import { aimPoint, BLOCKS, dropWeapon, protectionAt, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
 import { dismount, dismountReady, horseToMount, mountHorse } from './physics/mounted.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
-import { WEAPONS } from './weapons.js';
+import { BLADES, WEAPONS } from './weapons.js';
+import { gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { RUN_STEER, runSteer } from './runsteer.js';
 import { jogSpeed, runSpeed } from './physics/gait.js';
@@ -96,6 +97,15 @@ export const CONTROL = {
   lungeBeyond: 0.35,
   highFrom: 0.9,
   lowBelow: 0.75,
+  // A tap off the man (Body controls; the user's call, 2026-11-09): `tapWide` m or more to one side of his middle (past
+  // his shoulder, ~0.2 m), or `tapOver` m above the top of his head, is a cut from there at him (a swing whose blow comes
+  // from that side, moves.js blowSide; from above, one straight down), not a blow into the air there. A tap on him is a
+  // blow at that place, and a point goes where it was tapped; tapped within `gapSnap` m (a hand's breadth) of where his
+  // rigid armour parts (BLADES.gaps.aimFor: the armpit, the throat), it is laid there. The AI's blows have their own
+  // scatter and their own reading of armour (ai.js aimsForGap); the player's tap is his own aim.
+  tapWide: 0.35,
+  tapOver: 0.15,
+  gapSnap: 0.12,
   // A press held on a man down within this (m) of where it points: he goes to hold him down.
   pinFrom: 1.6,
   pinSeconds: 2.5,
@@ -622,9 +632,27 @@ function limbLost(fighter, spec) {
  * has, with his weapon, his limbs and from where he stands. Returns
  * { move, zone, heavy, combo, reaches } or null when he has none.
  */
-export function chooseAttack(world, fighter, opponent, line, strength = 'quick', at = null) {
+export function chooseAttack(world, fighter, opponent, line, strength = 'quick', at = null, tap = null) {
   const style = STYLES[fighter.style];
   if (!style || (!opponent && !at)) return null;
+  // Tapped off him (tapAround): a cut from that side, or from above, among all he can make (his blows from the other side
+  // too: moves.js tapAttacks, each as often as the blow it is made from); none there, as any tap.
+  if (tap?.off) {
+    const swings = tapAttacks(fighter.style).filter((name) => {
+      const spec = MOVES[name];
+      return spec?.kind === 'strike' && spec.mode !== 'thrust' && spec.path !== 'aim' && blowSide(spec) === tap.side && !(spec.reach === 'weapon' && !fighter.weapon?.held) && !limbLost(fighter, spec);
+    });
+    if (swings.length) {
+      const weight = (name) => style.attacks[name] ?? style.attacks[MOVES[name].mirrorOf] ?? 0.1;
+      const zone = tap.over ? 'head' : LINE_ZONE[line] ?? 'body';
+      const scored = swings.map((name) => ({ name, score: Math.sqrt(weight(name)) * (MOVES[name].zones.includes(zone) ? 1 : 0.35) }));
+      const best = Math.max(...scored.map((entry) => entry.score));
+      const near = scored.filter((entry) => entry.score >= best * 0.85);
+      const name = near[Math.floor(world.random() * near.length)].name;
+      const spec = MOVES[name];
+      return { move: name, zone: spec.zones.includes(zone) ? zone : spec.zones[0], heavy: strength === 'heavy', combo: strength === 'combo' ? comboAfter(style, name, []) : null, reaches: true };
+    }
+  }
   const held = fighter.weapon?.held ? fighter.weapon.spec : null;
   const hips = point(fighter.x, P.pelvis);
   const mark = opponent ? point(opponent.x, P.pelvis) : at;
@@ -687,6 +715,36 @@ export function lineFor(fighter, at, man) {
   if (at[1] >= shoulder * CONTROL.highFrom) return 'high';
   if (at[1] < hips[1] * CONTROL.lowBelow) return 'low';
   return 'mid';
+}
+
+/**
+ * Where a tap (a place `aim`) lies about the man `man` struck at, in the striker's frame (CONTROL.tapWide, tapOver): `side`
+ * −1, 0 or +1 (his −z, the middle, his +z: moves.js blowSide's), `over` above his head; `off` either way.
+ */
+export function tapAround(fighter, aim, man) {
+  const across = yawRotate([0, 0, 1], fighter.yaw);
+  const middle = point(man.x, P.pelvis);
+  const offset = (aim[0] - middle[0]) * across[0] + (aim[2] - middle[2]) * across[2];
+  const side = Math.abs(offset) >= CONTROL.tapWide ? Math.sign(offset) : 0;
+  const over = aim[1] > man.x[P.head * 3 + 1] + man.body.lengths.headRadius + CONTROL.tapOver;
+  return { side, over, off: side !== 0 || over };
+}
+
+/** Where a point tapped at `aim` on `man` goes: there, or into the gap of his rigid armour it was tapped beside (CONTROL.gapSnap). */
+export function pointAt(man, aim) {
+  const gear = man.body.gear;
+  let best = aim;
+  let nearest = CONTROL.gapSnap;
+  for (const [zone, gap] of Object.entries(BLADES.gaps.aimFor)) {
+    if ((protectionAt(gear, zone === 'head' ? 'head' : 'trunk').cut ?? 0) < gapsOf(gear).rigidFrom) continue;
+    const mark = aimPoint(man, gap);
+    const distance = vec.length(vec.sub(mark, aim));
+    if (distance < nearest) {
+      nearest = distance;
+      best = mark;
+    }
+  }
+  return best;
 }
 
 /** A place in the air before the fighter, at a zone's height, `share` of his reach out: where a blow goes with nobody there. */
@@ -833,13 +891,17 @@ function attack(world, fighter, orders, opponent) {
   const aim = request.point ?? (opponent ? null : airAhead(fighter, request.line === 'low' ? 'legs' : request.line === 'high' ? 'head' : 'body', 1));
   const man = aim ? manNear(world, fighter, aim, WORLD.aimedAtWithin) : opponent;
   const line = aim ? lineFor(fighter, aim, man) : request.line;
-  const chosen = chooseAttack(world, fighter, man, line, request.strength, aim);
+  const tap = aim && man ? tapAround(fighter, aim, man) : null;
+  const chosen = chooseAttack(world, fighter, man, line, request.strength, aim, tap);
   requests.shift();
   if (!chosen || chargeOrder(world, fighter, orders, man, chosen.move, chosen.zone)) return;
   if (aim) fighter.faceAt = { at: aim, until: world.time + CONTROL.faceSeconds };
   // A rush or a clinch goes at the man; a strike at the place.
   // (A man who is no enemy is struck at as the place he is: throwPunch's own man is an enemy.)
-  const at = aim ?? (man && !hostile(man, fighter) ? aimPoint(man, chosen.zone) : null);
+  // (Tapped off him: the cut is at him, at its zone; a point tapped on him goes there, or into the gap it was tapped beside.)
+  const spec = MOVES[chosen.move];
+  const tapped = tap?.off ? aimPoint(man, chosen.zone) : aim && man && spec?.mode === 'thrust' ? pointAt(man, aim) : aim;
+  const at = tapped ?? (man && !hostile(man, fighter) ? aimPoint(man, chosen.zone) : null);
   const thrown = MOVES[chosen.move].kind === 'strike' ? throwPunch(world, fighter, chosen.move, chosen.zone, { heavy: chosen.heavy, at }) : throwPunch(world, fighter, chosen.move);
   if (thrown) {
     fighter.orderCombo = chosen.combo;
