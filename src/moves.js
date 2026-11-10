@@ -2093,8 +2093,7 @@ STYLES.bayaraLance = {
 // WEAPONS.manchuLance, the same long-headed horseman's qiang); the wolf-tooth mace hung at his saddle for when the spear
 // was lost (his kit's sidearm, STYLES.langya below: `fallback` 'mix' so the kit's is drawn, physics.js rearm). Its
 // buckler gone: a two-handed spear leaves no hand for it (the user's call, 2026-11-08).
-// (`ratedAs`: rated as the mace and buckler he fought with, roster.js ratingOf, until tools/ratings.js is next run.)
-STYLES.jinLance = { ...STYLES.bayaraLance, label: 'Jin heavy spear', ratedAs: 'langyaShield' };
+STYLES.jinLance = { ...STYLES.bayaraLance, label: 'Jin heavy spear' };
 // The Ming border horseman with his cavalry spear (骑兵长枪): the horseman's qiang of the same family as the banners'
 // (WEAPONS.manchuLance), long-headed, its shaft thick for the saddle; Qi Jiguang's northern cavalry (Lianbing shiji, 1571)
 // carried long spears among its hand arms beside the bows, the three-eyed guns and the cudgels. Couched at the gallop as
