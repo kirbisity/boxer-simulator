@@ -1611,7 +1611,10 @@ export const BLADES = {
       elbow: { UpperArm: { along: [0.8, 1], faces: 'crease' }, Forearm: { along: [0, 0.2], faces: 'crease' }, edge: true },
       knee: { Thigh: { along: [0.8, 1], faces: 'crease' }, Shank: { along: [0, 0.2], faces: 'crease' }, edge: true },
       visor: { head: { rise: [-0.05, 0.4], round: [0, 35] }, helm: 'closed', under: 'bare' },
-      face: { head: { rise: [-0.5, 0.35], round: [0, 55] }, helm: 'open', under: 'bare', edge: true },
+      // An open helmet's face is not an opening to be found but the face itself: a blow landing there meets bare skin as
+      // often as the face is bare (`open`, the helmet's own `faceOpen`: outfits.js HELMETS), a point or an edge alike, whatever
+      // the striker's art (was the kit's `thrust` 0.4 and `swing` 0.1, × his technique and skill, as a slot is found).
+      face: { head: { rise: [-0.5, 0.35], round: [0, 55] }, helm: 'open', under: 'bare', edge: true, open: 0.8 },
     },
     // For a man weighing his blows (ai.js harmThrough): the share of the points that land on a part aimed at that falls in
     // one of its zones (measured, tools/gaps.js: on the trunk 12%, the head 33% behind a closed helm (the throat, the

@@ -113,6 +113,8 @@ export function gapChance(gear, zone, mode) {
   if (!zone) return 0;
   const gaps = gapsOf(gear);
   if (zone === 'lacing') return mode === 'thrust' ? gaps.thrust * gaps.lacing : 0;
+  // (An open face: bare as much of it as the helmet leaves bare, not found.)
+  if (BLADES.gaps.zones[zone].open) return gear.helmet?.faceOpen ?? BLADES.gaps.zones[zone].open;
   if (mode === 'thrust') return gaps.thrust;
   return BLADES.gaps.zones[zone].edge && !gear.cutProof ? gaps.swing : 0;
 }
@@ -149,6 +151,7 @@ export function expectedGap(gear, key, mode, covered) {
   const share = part === 'head' ? aimed.head[face] ?? 0 : aimed[part];
   const zone = part === 'head' ? (face === 'open' ? 'face' : 'neck') : part === 'trunk' ? 'armpit' : 'elbow';
   if (gapsOf(gear).closed?.includes(zone)) return { found: 0, under: covered };
-  return { found: share * gapChance(gear, zone, mode), under: gapUnder(gear, zone, covered) };
+  // (`met`: an open face, met as often as it is bare, not found by the striker's art.)
+  return { found: share * gapChance(gear, zone, mode), under: gapUnder(gear, zone, covered), met: Boolean(BLADES.gaps.zones[zone].open) };
 }
 

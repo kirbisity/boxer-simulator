@@ -13,7 +13,8 @@ import { leastProtected, startFinisher } from '../src/finisher.js';
 import { advance, createWorld, placeFighter, point, protectionAt } from '../src/physics.js';
 import { vec } from '../src/pose.js';
 import { BLADES } from '../src/weapons.js';
-import { gapChance, gapUnder, gapZoneAt, gapTrunkFrame } from '../src/physics/gaps.js';
+import { gapChance, gapsOf, gapUnder, gapZoneAt, gapTrunkFrame } from '../src/physics/gaps.js';
+import { HELMETS, OUTFITS } from '../src/outfits.js';
 import { strikeAt } from '../tools/weapon-strikes.js';
 import { pairing } from '../tools/gaps.js';
 
@@ -199,4 +200,19 @@ test('the finisher\'s dagger looks for a gap in a knight on the floor (the throa
       else assert.ok(struck.some((event) => event.gapZone && event.effects.includes('into a gap in the armour')), `seed ${seed}: in at a gap`);
     }
   }
+});
+
+test('an open face is met, not found: a point or an edge alike, as often as the helmet leaves it bare; a slot is still found', () => {
+  assert.equal(gapChance({}, 'face', 'thrust'), BLADES.gaps.zones.face.open);
+  assert.equal(gapChance({}, 'face', 'swing'), BLADES.gaps.zones.face.open);
+  // Broad cheek pieces (the galea, the Montefortino) and a nasal (the chichak) leave less of it bare.
+  assert.ok(HELMETS.galea.faceOpen < HELMETS.chichak.faceOpen && HELMETS.chichak.faceOpen < BLADES.gaps.zones.face.open);
+  assert.equal(gapChance({ helmet: HELMETS.galea }, 'face', 'swing'), HELMETS.galea.faceOpen);
+  assert.equal(gapChance({}, 'visor', 'thrust'), BLADES.gaps.thrust);
+});
+
+test('Japanese armour leaves more of each zone open than a harness: the ō-yoroi most, then the laced and the tōsei samurai', () => {
+  const open = (kind) => gapsOf(OUTFITS[kind]).thrust;
+  assert.ok(open('oyoroi') > open('samuraiTosei') && open('samuraiTosei') > BLADES.gaps.thrust && open('samurai') > BLADES.gaps.thrust);
+  assert.ok(gapsOf(OUTFITS.oyoroi).lacing > gapsOf(OUTFITS.samuraiTosei).lacing && gapsOf(OUTFITS.samuraiTosei).lacing > 0);
 });

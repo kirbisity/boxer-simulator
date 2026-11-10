@@ -4058,7 +4058,7 @@ export function harmThrough(attacker, defender, spec, zone = 'body') {
   const covered = protectionAt(gear, part);
   const rigid = (covered.cut ?? 0) >= gapsOf(gear).rigidFrom && cut + pierce > 0.2;
   const gap = rigid ? expectedGap(gear, part, spec.mode, covered) : { found: 0, under: covered };
-  const found = Math.min(1, gap.found * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5)));
+  const found = Math.min(1, gap.met ? gap.found : gap.found * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5)));
   const edge = (on) => cut * (1 - (on.cut ?? 0)) + pierce * (1 - (on.pierce ?? 0));
   const felt = blunt * (1 - (covered.blunt ?? 0) * (1 - (wspec?.crush ?? 0)));
   return (felt + (1 - found) * edge(covered) + found * edge(gap.under)) / total;

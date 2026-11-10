@@ -8219,8 +8219,10 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // the gap `finisher.gap` of the time; put to the middle of the breast, where plate is plate, never.)
   // (A point laid in by a hand on the blade or on the man, `placed`: a weapon art's half-sword or its stab from the hold, as a
   // finisher's is: so often, where a gap is.)
-  const gapFound = gapZone ? (punch.finisher ? punch.finisher.gap : spec.placed ?? gapChance(body.gear, gapZone, spec.mode)) * placed : 0;
-  const intoGap = gapFound > 0 && world.random() < gapFound * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5));
+  // (An open face is not found but met: as often as it is bare, whoever strikes it: BLADES.gaps.zones `open`.)
+  const bareFace = Boolean(gapZone && BLADES.gaps.zones[gapZone]?.open);
+  const gapFound = !gapZone ? 0 : bareFace ? gapChance(body.gear, gapZone, spec.mode) : (punch.finisher ? punch.finisher.gap : spec.placed ?? gapChance(body.gear, gapZone, spec.mode)) * placed;
+  const intoGap = gapFound > 0 && world.random() < (bareFace ? gapFound : gapFound * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5)));
   const protection = intoGap ? { ...gapUnder(body.gear, gapZone, covered), deflects: false } : covered;
   // (A shaft that shatters on armour it cannot go into, below.)
   const shattered = !haft && !intoGap && shattersOn(weapon, spec.mode, protection, energy);

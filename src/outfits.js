@@ -1025,7 +1025,9 @@ export const OUTFITS = {
     // The limbs in kote, haidate and suneate (`kote`: were the dō's own figures): against a cut, not a blow or a point.
     protection: { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 }, regions: { limb: kote({ blunt: 0.65, cut: 0.9, pierce: 0.8 }) } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
-    gaps: { lacing: 0.1 },
+    // More of each zone open than in a European harness (`thrust` 0.5, was the default 0.4): no plate closes the armpit
+    // (the sode hang beside it), the skirt's panels part at the thigh, the kote leave the inside of the elbow in cloth.
+    gaps: { thrust: 0.5, lacing: 0.1 },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
@@ -1076,9 +1078,11 @@ export const OUTFITS = {
         Shank: kote({ blunt: 0.37, cut: 0.75, pierce: 0.4 }),
       },
     },
-    // More openings than later armour: a quarter more chance in a gap (BLADES.gaps), and the laced box parts at its lacing
-    // and the waidate's seam more than most laced armour (`lacing`).
-    gaps: { thrust: 0.5, swing: 0.15, lacing: 0.15 },
+    // More openings than later armour (BLADES.gaps: `thrust` 0.6, `swing` 0.18, were 0.5 and 0.15): a box made for the
+    // saddle, the armpits under hanging plates (the sendan and kyūbi no ita) not closed, the right side a separate plate
+    // tied on (the waidate), the thighs open under four broad skirt panels; and the laced box parts at its lacing and the
+    // waidate's seam more than most laced armour (`lacing` 0.2, was 0.15).
+    gaps: { thrust: 0.6, swing: 0.18, lacing: 0.2 },
     // Courage 0.85 (was 0.45): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
@@ -1112,8 +1116,10 @@ export const OUTFITS = {
     protection: { blunt: 0.7, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.55, limb: 0.15 }, regions: { limb: kote({ blunt: 0.7, cut: 0.95, pierce: 0.9 }) } },
     // Under its gaps, kusari (mail) where the later armour has it: the wakibiki under the arms, the kote's mail sleeves at
     // the bend of the elbow, the haidate's mail over the groin and thighs, the yodarekake and nodowa at the throat
-    // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). The cuirass is solid lames.
-    gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'] },
+    // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). The cuirass is solid lames,
+    // but no plate closes the armpit (mail only), the dō opens on its hinged side seam, and the skirt (kusazuri), sode and
+    // the kabuto's neck guard are laced lames that part (`thrust` 0.5, was the default 0.4; `lacing` 0.1, was none).
+    gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'], thrust: 0.5, lacing: 0.1 },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
@@ -3119,6 +3125,8 @@ export const HELMETS = {
   // `face`: how the face is kept (physics/gaps.js, BLADES.gaps.zones): 'closed' behind a visor, a grille or a mask, a point
   // finding only the sights; 'sealed' behind a whole clear visor; else open (the face itself a gap in the helmet). A mask
   // worn with an open helmet (`mask` on its look: a menpo, a Ming or a Kipchak face) closes it.
+  // `faceOpen`: of an open helmet's face (BLADES.gaps.zones.face), the share left bare: by default `open` there (0.8, the
+  // brim and the bowl's edge the rest); less behind broad cheek pieces (0.5) or a nasal bar (0.65).
   headguard: { mass: 0.45, padding: 0.9, curve: 0.3 },
   // Modern: a riot helmet (thick liner, smooth shell); a combat helmet (pads, rounded aramid shell).
   riotHelmet: { mass: 1.5, padding: 0.85, curve: 0.75, face: 'sealed', hold: 'enclosed' },
@@ -3137,7 +3145,7 @@ export const HELMETS = {
   arenaHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed', hold: 'enclosed' },
   gladiatorHelm: { mass: 3.0, padding: 0.5, curve: 0.55, face: 'closed', hold: 'enclosed' },
   secutorHelm: { mass: 3.2, padding: 0.5, curve: 0.95, face: 'closed', hold: 'enclosed' },
-  galea: { mass: 1.6, padding: 0.4, curve: 0.7, hold: 'open' },
+  galea: { mass: 1.6, padding: 0.4, curve: 0.7, hold: 'open', faceOpen: 0.5 },
   // Sixteenth-century infantry: the combed morion, the almond cabasset, the pot helmet, the kettle hat.
   morion: { mass: 2.0, padding: 0.4, curve: 0.75, hold: 'open' },
   cabasset: { mass: 1.8, padding: 0.4, curve: 0.8, hold: 'open' },
@@ -3153,7 +3161,7 @@ export const HELMETS = {
   pagodaHelm: { mass: 4.0, padding: 0.6, curve: 0.8, face: 'closed', hold: 'enclosed' },
   // Steppe and Ottoman pointed bowls (the chichak with its brim and nasal).
   steppeHelm: { mass: 1.8, padding: 0.45, curve: 0.85, hold: 'open' },
-  chichak: { mass: 2.0, padding: 0.45, curve: 0.85, hold: 'open' },
+  chichak: { mass: 2.0, padding: 0.45, curve: 0.85, hold: 'open', faceOpen: 0.65 },
   // The Ayyubid helmet: a pointed bowl of riveted segments (~1.6 kg) and its mail aventail (~0.8 kg) on a
   // quilted cap, the turban's wraps round its foot padding it further; steel above the turban, cloth over the rest.
   ayyubidHelm: { mass: 2.6, padding: 0.65, curve: 0.75, hold: 'half' },
@@ -3166,9 +3174,9 @@ export const HELMETS = {
   // The Republic's bronze Montefortino (1–1.5 kg, a cast knob, a short brim) on a felt cap; the late Roman
   // ridge helmet (two iron halves on a ridge, broad cheek pieces, ~1.5 kg) on a padded lining; the Germanic and
   // Hunnic spangenhelm, a pointed bowl of riveted plates.
-  montefortino: { mass: 1.3, padding: 0.35, curve: 0.85, hold: 'open' },
-  ridgeHelm: { mass: 1.5, padding: 0.4, curve: 0.75, hold: 'open' },
-  spangenhelm: { mass: 1.6, padding: 0.4, curve: 0.85, hold: 'open' },
+  montefortino: { mass: 1.3, padding: 0.35, curve: 0.85, hold: 'open', faceOpen: 0.5 },
+  ridgeHelm: { mass: 1.5, padding: 0.4, curve: 0.75, hold: 'open', faceOpen: 0.5 },
+  spangenhelm: { mass: 1.6, padding: 0.4, curve: 0.85, hold: 'open', faceOpen: 0.65 },
   // Mexica war helmets: carved wood and quilted cotton, animal-headed (flat planes, little curve).
   jaguarHelm: { mass: 1.0, padding: 0.45, curve: 0.35, hold: 'open' },
   eagleHelm: { mass: 1.0, padding: 0.45, curve: 0.35, hold: 'open' },
