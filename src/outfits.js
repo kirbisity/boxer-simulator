@@ -520,6 +520,18 @@ export function heelFooting(heels) {
  */
 const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
 
+/**
+ * Japanese limb armour: the kote's sleeves, the haidate's apron over the thighs, the suneate's shin guards. Iron splints
+ * (ikada) and small plates sewn or laced onto cloth, joined by fine butted mail (kusari), with no padding under them
+ * (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). Made to stop an edge drawn
+ * across the arm: each kit's cut kept as it was. A blow meets thin iron on a sleeve with nothing to spread it (blunt
+ * × 0.7); a point slips between the splints and opens the butted rings, as it would not riveted mail over its padding
+ * (pierce × 0.7; × 0.4 and × 0.5 cut too deep, the user's call the same day). Each kit keeps its own figures, scaled (`kote`). The user's call, 2026-11-10: mostly against a cut,
+ * little against a point or a blow.
+ */
+const KOTE = { blunt: 0.7, pierce: 0.7 };
+const kote = ({ blunt, cut, pierce }) => ({ blunt: Math.round(blunt * KOTE.blunt * 100) / 100, cut, pierce: Math.round(pierce * KOTE.pierce * 100) / 100 });
+
 export const OUTFITS = {
   boxing: {
     faction: 'ring',
@@ -1010,7 +1022,8 @@ export const OUTFITS = {
     extraMass: 0.22,
     // Blunt 0.65 (was 0.7): laced lamellae give with a blow more than a solid shell.
     // Pierce 0.8, lamellae of iron and rawhide (PIERCE_SCALE).
-    protection: { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 } },
+    // The limbs in kote, haidate and suneate (`kote`: were the dō's own figures): against a cut, not a blow or a point.
+    protection: { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 }, regions: { limb: kote({ blunt: 0.65, cut: 0.9, pierce: 0.8 }) } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
@@ -1055,12 +1068,12 @@ export const OUTFITS = {
       blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 },
       regions: {
         head: { blunt: 0.58, cut: 0.88, pierce: 0.55 },
-        // The sode over the upper arms: a board hung beside the arm, not round it.
-        UpperArm: { blunt: 0.28, cut: 0.45, pierce: 0.25 },
-        lForearm: { blunt: 0.19, cut: 0.6, pierce: 0.3 },
+        // The sode over the upper arms: a board hung beside the arm, not round it. The bow arm's kote and the suneate.
+        UpperArm: kote({ blunt: 0.28, cut: 0.45, pierce: 0.25 }),
+        lForearm: kote({ blunt: 0.19, cut: 0.6, pierce: 0.3 }),
         rForearm: { blunt: 0.05, cut: 0.08, pierce: 0.04 },
         Thigh: { blunt: 0.05, cut: 0.08, pierce: 0.04 },
-        Shank: { blunt: 0.37, cut: 0.75, pierce: 0.4 },
+        Shank: kote({ blunt: 0.37, cut: 0.75, pierce: 0.4 }),
       },
     },
     // More openings than later armour: a quarter more chance in a gap (BLADES.gaps), and the laced box parts at its lacing
@@ -1095,7 +1108,8 @@ export const OUTFITS = {
     extraMass: 0.25,
     // Blunt 0.7 (was 0.75): Japanese armour, lacquered lames and laced sleeves, takes a blow a little less than a European shell.
     // Pierce 0.9, solid lames (PIERCE_SCALE).
-    protection: { blunt: 0.7, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.55, limb: 0.15 } },
+    // The limbs in kote, haidate and suneate (`kote`: were the dō's own figures): against a cut, not a blow or a point.
+    protection: { blunt: 0.7, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.55, limb: 0.15 }, regions: { limb: kote({ blunt: 0.7, cut: 0.95, pierce: 0.9 }) } },
     // Under its gaps, kusari (mail) where the later armour has it: the wakibiki under the arms, the kote's mail sleeves at
     // the bend of the elbow, the haidate's mail over the groin and thighs, the yodarekake and nodowa at the throat
     // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). The cuirass is solid lames.
@@ -1140,7 +1154,8 @@ export const OUTFITS = {
       blunt: 0.5, cut: 0.8, pierce: 0.85, bullet: { head: 0.2, torso: 0.25, limb: 0.05 },
       regions: {
         head: { blunt: 0.42, cut: 0.6, pierce: 0.42 },
-        limb: { blunt: 0.2, cut: 0.45, pierce: 0.25 },
+        // Light kote and suneate, fewer splints than a samurai's (`kote`).
+        limb: kote({ blunt: 0.2, cut: 0.45, pierce: 0.25 }),
       },
     },
     courage: 0.2,
@@ -2436,8 +2451,8 @@ export const OUTFITS = {
       // (was 0.56 / 0.9 / 0.9, a solid tōsei dō). Its gaps: the armpit and the groin as any dō's, the throat behind the manchira's mail.
       blunt: 0.4, cut: 0.85, pierce: 0.75, bullet: { head: 0, torso: 0.3, limb: 0.05 },
       // The hachi-gane a band of steel across the brow (a share of the head: the rest bare); the kusari-kote splints over
-      // mail on linen, no padding; the upper arms, the legs (hakama, kyahan) cloth.
-      regions: { head: { blunt: 0.12, cut: 0.25, pierce: 0.1 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Forearm: { blunt: 0.12, cut: 0.6, pierce: 0.3 } },
+      // mail on linen, no padding (`kote`); the upper arms, the legs (hakama, kyahan) cloth.
+      regions: { head: { blunt: 0.12, cut: 0.25, pierce: 0.1 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Forearm: kote({ blunt: 0.12, cut: 0.6, pierce: 0.3 }) },
     },
     gaps: { mail: ['neck'] },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
@@ -2465,7 +2480,8 @@ export const OUTFITS = {
       // Blunt 0.6 (was 0.65), Japanese armour; the cloth hood and light sleeves and greaves as they were.
       // Pierce 0.8, a lamellar dō (PIERCE_SCALE).
       blunt: 0.6, cut: 0.88, pierce: 0.8, bullet: { head: 0, torso: 0.4, limb: 0.05 },
-      regions: { head: { blunt: 0.08, cut: 0.12, pierce: 0.02 }, Forearm: { blunt: 0.1, cut: 0.2, pierce: 0.05 }, Shank: { blunt: 0.1, cut: 0.15, pierce: 0.05 } },
+      // The light sleeves and greaves as Japanese limb armour (`kote`).
+      regions: { head: { blunt: 0.08, cut: 0.12, pierce: 0.02 }, Forearm: kote({ blunt: 0.1, cut: 0.2, pierce: 0.05 }), Shank: kote({ blunt: 0.1, cut: 0.15, pierce: 0.05 }) },
     },
     courage: 0.5,
     designs: [
