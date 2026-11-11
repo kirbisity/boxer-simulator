@@ -337,3 +337,8 @@ under the 99th percentile of the rest's. The one-shots are cut as the takes abov
 
 The thunder takes are 32 kb/s (each under the 25 KB a take may be). The synth under thunder is gone (sfx/sampled.js); the synth beds and
 one-shots stay only until their recordings decode.
+
+A ringing in the ears (2026-11-10, ScreenRecording_11-10-2026_19-17-27_1.mov, a steady ~4 kHz tone with its beating partials):
+`loop-ring.mp3` (11880 bytes), 0.25-2.30 s, a 1.8 s period, its tail crossfaded into its head at
+equal power over 0.25 s (its partials beat: the ends are not in phase), 40 kb/s. samples.js `RING_LOOP`; engine.js plays it faint
+under a blast's deafening (DEAFEN) and when the man played is dazed or staggered (STUN), the mix thick under it.

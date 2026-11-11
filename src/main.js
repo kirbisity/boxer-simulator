@@ -182,7 +182,7 @@ const hitFeelStorage = (() => {
   }
 })();
 const hitFeel = createHitFeel(hitFeelFromHash(loadHitFeel(hitFeelStorage), location.hash));
-const hitFeelView = createHitFeelView(scene, { layer: $('#hit-vignette'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
+const hitFeelView = createHitFeelView(scene, { layer: $('#hit-vignette'), dimLayer: $('#hit-dim'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
 // The player's weapon arts made an event of (artdrama.js): toned down for a visitor who asks for less motion.
 const artDrama = createArtDrama({ reduced: Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches) });
 const artDramaView = createArtDramaView(scene, { flash: $('#art-flash'), caption: $('#art-name'), audio, vibrate: (ms) => navigator.vibrate?.(ms) });
@@ -1362,6 +1362,11 @@ function consumeEvents() {
     if ((event.kind === 'landed' || event.kind === 'blocked') && event.target !== 'shield') showImpact(scene, state.views, event);
     // A blow the player's man lands, takes or has blocked: felt (hitfeel.js). Only while he is played (not the fight behind the menus, the intro).
     if (feltBy !== null) hitFeelView.felt(hitFeel.hear(event, feltBy, realSeconds()));
+    // Dazed or staggered by a blow, near a knockout: his ears ring and the world goes thick (audio engine `stun`), by how long it holds.
+    if (feltBy !== null && event.fighter === feltBy && (event.kind === 'dazed' || event.kind === 'staggered')) {
+      const most = event.kind === 'dazed' ? WORLD.daze.maxSeconds : WORLD.stagger.maxSeconds;
+      audio.stun?.(0.4 + 0.6 * Math.min(1, event.seconds / most), event.seconds);
+    }
     // His weapon art's start and its first contact (artdrama.js).
     if (feltBy !== null) artDramaView.felt(artDrama.hear(event, feltBy, realSeconds()), state.world);
     // A machine struck (gear.machine: a robot) does not bleed: an edge, a point, an arrow or a ball throws sparks off it instead.

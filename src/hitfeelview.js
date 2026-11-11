@@ -13,6 +13,7 @@ const HITFEEL_WORDS = {
   hitStop: { label: { en: 'Hit-stop', zh: '顿帧' }, note: { en: 'A heavy blow holds the moment', zh: '重击落下，时间顿住一瞬' } },
   puff: { label: { en: 'Impact mist', zh: '击打尘雾' }, note: { en: 'Sweat and dust off the struck place', zh: '挨打处溅起汗水和尘土' } },
   vignette: { label: { en: 'Dark edges', zh: '暗角' }, note: { en: 'The edges dim on a heavy blow', zh: '重击时画面四周一暗' } },
+  dim: { label: { en: 'Dim on a hard hit', zh: '受创变暗' }, note: { en: 'The screen darkens by the harm taken', zh: '受伤越重，画面暗得越多' } },
   haptic: { label: { en: 'Vibration', zh: '振动' }, note: { en: 'A buzz on phones that have it', zh: '支持的手机会震一下' } },
   thump: { label: { en: 'Body thump', zh: '闷响' }, note: { en: 'A low thud under the blow', zh: '这一击底下一声低沉的闷响' } },
   fov: { label: { en: 'Focus punch', zh: '视野收缩' }, note: { en: 'The view narrows for an instant', zh: '视野一瞬间收窄' } },
@@ -49,7 +50,7 @@ export function hitFeelMistTexture() {
  * The view of the feel in `view` (render.js's scene), its dark edges on `layer` (an element over the stage, or null).
  * apply(feel, now, dt) each frame after the camera is placed; felt(result) with what hear() returned; reset().
  */
-export function createHitFeelView(view, { layer = null, audio = null, vibrate = null } = {}) {
+export function createHitFeelView(view, { layer = null, dimLayer = null, audio = null, vibrate = null } = {}) {
   let texture = null;
   const mists = [];
   const jolt = [0, 0, 0];
@@ -104,6 +105,12 @@ export function createHitFeelView(view, { layer = null, audio = null, vibrate = 
       const shown = dark > 0.003 ? dark.toFixed(3) : '0';
       if (layer.style.opacity !== shown) layer.style.opacity = shown;
     }
+    // The whole screen dimmed by the harm he took (one plain dark layer under the edges').
+    if (dimLayer) {
+      const dimmed = feel.dim(now);
+      const shown = dimmed > 0.003 ? dimmed.toFixed(3) : '0';
+      if (dimLayer.style.opacity !== shown) dimLayer.style.opacity = shown;
+    }
     for (const mist of mists) {
       if (!mist.sprite.visible) continue;
       mist.age += dt;
@@ -128,6 +135,7 @@ export function createHitFeelView(view, { layer = null, audio = null, vibrate = 
       view.camera.updateProjectionMatrix();
     }
     if (layer) layer.style.opacity = '0';
+    if (dimLayer) dimLayer.style.opacity = '0';
   }
 
   return { felt, apply, reset, spec: HITFEEL };

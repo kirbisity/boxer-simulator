@@ -38,7 +38,7 @@ test('each loop is a small mono 32 kHz MP3 long enough for its period and the le
   }
   // (Ten beds since 2026-11-10: every place's sound recorded.)
   assert.ok(total <= 700 * 1024, `${total} bytes in all`);
-  assert.deepEqual(LOOP_FILES.sort(), ['loop-crowd', 'loop-din', 'loop-fire', 'loop-hum', 'loop-market', 'loop-rain', 'loop-roof', 'loop-sewer', 'loop-stream', 'loop-surf', 'loop-wind']);
+  assert.deepEqual(LOOP_FILES.sort(), ['loop-crowd', 'loop-din', 'loop-fire', 'loop-hum', 'loop-market', 'loop-rain', 'loop-ring', 'loop-roof', 'loop-sewer', 'loop-stream', 'loop-surf', 'loop-wind']);
   const readme = readFileSync(`${DIR}/README.md`, 'utf8');
   for (const name of LOOP_FILES) assert.ok(readme.includes(`${name}.mp3`), `README lists ${name}`);
 });

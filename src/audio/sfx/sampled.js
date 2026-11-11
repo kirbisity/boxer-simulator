@@ -393,10 +393,10 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
 
 /**
  * The recorded breath (engine.js breathe): heard only when he is all but spent (`from`: his exertion, 0 rested .. 1 at empty, past 1 in the
- * overdraft: the stamina's last tenth), silent before; each breath a take of his sex's, drawn in or let out, at his voice's pitch (cryRate),
+ * overdraft: the stamina's last fifth, a warning that he is tiring (was the last tenth, the user's call, 2026-11-10)), silent before; each breath a take of his sex's, drawn in or let out, at his voice's pitch (cryRate),
  * cut to the breath's own length (`length` of it: the cadence is breathParams's) with a fade. Exhaled louder than drawn in (as recorded).
  */
-export const BREATH_TAKES = { from: 0.9, trim: 1, inTrim: 1, length: 1.05, fade: { in: 0.08, out: 0.12 } };
+export const BREATH_TAKES = { from: 0.8, trim: 1, inTrim: 1, length: 1.05, fade: { in: 0.08, out: 0.12 } };
 
 /** Is a breath at this exertion heard at all. */
 export const breathHeard = (exertion) => exertion >= BREATH_TAKES.from;

@@ -43,6 +43,14 @@ import { artDrawParams, artImpactParams, playArtDraw, playArtImpact } from './sf
  */
 export const DEAFEN = { open: 20000, muffled: 500, duck: 0.6, seconds: [1.5, 7], ring: 3800, ringLevel: 0.06 };
 
+/**
+ * The man played dazed or staggered by a blow (physics daze, stagger: near a knockout), `strength` 0..1 by how long it holds: his ears
+ * ring, faint but heard (the recorded ring, samples.js RING_LOOP, at `ringLevel` × strength), and the mix goes thick, low-passed toward
+ * `muffled` and ducked by `duck` × strength, each easing in over `fadeIn` s and out over the last `fadeOut` s of it. Gentler than a
+ * blast's deafening (DEAFEN): the head swims, it is not struck deaf. The user's call, 2026-11-10.
+ */
+export const STUN = { muffled: 900, duck: 0.3, ringLevel: 0.035, fadeIn: 0.4, fadeOut: 1.5 };
+
 export const AUDIO_SETTINGS = { key: 'gladiator-audio', defaults: { master: 0.8, effects: 1, ambience: 0.8, music: 0.6, voices: 1, speakers: null, muted: false } };
 
 /** The settings kept in `storage` (localStorage, or null where it is denied), over the defaults. */
@@ -681,18 +689,66 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     gain.cancelScheduledValues(now);
     gain.setValueAtTime(Math.min(gain.value, 1 - DEAFEN.duck * k), now);
     gain.linearRampToValueAtTime(1, now + seconds);
-    // The ringing: a pure high tone, a little unsteady, fading out with the muffling.
-    const tone = ctx.createOscillator();
-    tone.type = 'sine';
-    tone.frequency.value = DEAFEN.ring * (0.95 + Math.random() * 0.1);
+    // The ringing, fading out with the muffling.
+    ring(now, DEAFEN.ringLevel * k, 0.05, seconds, 0);
+  }
+
+  /**
+   * The ears ringing from `now`: up to `peak` over `fadeIn` s, held, and gone by `seconds` (fading from `seconds - fadeOut`, or all the
+   * way when `fadeOut` is 0). The recorded ring once decoded (samples.js RING_LOOP), else a pure high tone, a little unsteady.
+   */
+  function ring(now, peak, fadeIn, seconds, fadeOut) {
+    const ctx = state.ctx;
     const level = ctx.createGain();
+    const top = Math.max(0.0002, peak * settings.master);
     level.gain.setValueAtTime(0.0001, now);
-    level.gain.exponentialRampToValueAtTime(Math.max(0.0002, DEAFEN.ringLevel * k * settings.master), now + 0.05);
+    level.gain.exponentialRampToValueAtTime(top, now + fadeIn);
+    if (fadeOut > 0) level.gain.setValueAtTime(top, now + Math.max(fadeIn, seconds - fadeOut));
     level.gain.exponentialRampToValueAtTime(0.0001, now + seconds);
-    tone.connect(level);
     level.connect(state.compressor);
-    tone.start(now);
-    tone.stop(now + seconds + 0.05);
+    const loop = state.samples?.loop?.('ring');
+    let source;
+    if (loop) {
+      source = ctx.createBufferSource();
+      source.buffer = loop.buffer;
+      source.loop = true;
+      source.loopStart = loop.loopStart;
+      source.loopEnd = loop.loopEnd;
+      source.playbackRate.value = 0.95 + Math.random() * 0.1;
+      source.start(now, loop.loopStart + Math.random() * (loop.loopEnd - loop.loopStart));
+    } else {
+      source = ctx.createOscillator();
+      source.type = 'sine';
+      source.frequency.value = DEAFEN.ring * (0.95 + Math.random() * 0.1);
+      source.start(now);
+    }
+    source.connect(level);
+    source.stop(now + seconds + 0.05);
+    source.onended = () => level.disconnect();
+  }
+
+  /** The man played dazed or staggered (STUN): the mix thick and his ears ringing for `seconds`, by `strength` (0..1). */
+  function stun(strength, seconds) {
+    if (!state.ctx || state.ctx.state !== 'running' || !state.deafFilter || !(strength > 0) || !(seconds > 0)) return;
+    const now = state.ctx.currentTime;
+    const k = Math.min(1, strength);
+    const fadeIn = Math.min(STUN.fadeIn, seconds / 3);
+    const fadeOut = Math.min(STUN.fadeOut, seconds / 2);
+    const hold = now + Math.max(fadeIn, seconds - fadeOut);
+    const low = DEAFEN.open * (STUN.muffled / DEAFEN.open) ** k;
+    const frequency = state.deafFilter.frequency;
+    frequency.cancelScheduledValues(now);
+    frequency.setValueAtTime(frequency.value, now);
+    frequency.exponentialRampToValueAtTime(Math.min(frequency.value, low), now + fadeIn);
+    frequency.setValueAtTime(Math.min(frequency.value, low), hold);
+    frequency.exponentialRampToValueAtTime(DEAFEN.open, now + seconds);
+    const gain = state.deafGain.gain;
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(gain.value, now);
+    gain.linearRampToValueAtTime(Math.min(gain.value, 1 - STUN.duck * k), now + fadeIn);
+    gain.setValueAtTime(Math.min(gain.value, 1 - STUN.duck * k), hold);
+    gain.linearRampToValueAtTime(1, now + seconds);
+    ring(now, STUN.ringLevel * k, fadeIn, seconds, fadeOut);
   }
 
   /** The hit feel's thump (hitfeel.js) of a blow the player felt, at `gain` (0..1), a blow of `strength` (0..1: lower and longer the heavier), straight into the effects bus. */
@@ -763,6 +819,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     thump,
     art,
     deafen,
+    stun,
     unlock,
     /** Set a mixer level or toggle (name: master, effects, ambience, music, voices, speakers, muted); kept. */
     set(name, value) {

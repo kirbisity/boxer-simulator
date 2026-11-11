@@ -131,14 +131,17 @@ export const AMBIENCE_LOOPS = {
   hum: { file: 'loop-hum', seconds: 4.5, lead: 0.25 },
 };
 
+/** A ringing in the ears (engine.js: a blast's deafening, a blow that dazes or staggers the man played), cut as the beds are. */
+export const RING_LOOP = { file: 'loop-ring', seconds: 1.8, lead: 0.25 };
+
 /** A far-off battle's clash of weapons (farfield.js plays it in each side's sector, as the beds are cut: one mono period). */
 export const DIN_LOOP = { file: 'loop-din', seconds: 10, lead: 0.25 };
 
 /** A fire's crackle (ambience.js plays it at each fire near the ear, by the fire's size): cut and looped as the beds are, mono, one read. */
 export const FIRE_LOOP = { file: 'loop-fire', seconds: 6.24, lead: 0.25 };
 
-/** Every loop the bank decodes: the beds, the fire and the far field's din. */
-const ALL_LOOPS = { ...AMBIENCE_LOOPS, fire: FIRE_LOOP, din: DIN_LOOP };
+/** Every loop the bank decodes: the beds, the fire, the far field's din and the ears' ring. */
+const ALL_LOOPS = { ...AMBIENCE_LOOPS, fire: FIRE_LOOP, din: DIN_LOOP, ring: RING_LOOP };
 
 /** Every loop's file. */
 export const LOOP_FILES = Object.values(ALL_LOOPS).map((loop) => loop.file);

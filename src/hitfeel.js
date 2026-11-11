@@ -13,6 +13,7 @@
 //             (the frame's pace only: the physics step is never changed)
 //   puff      a soft mist of sweat and dust off the struck point
 //   vignette  the screen's edges darkened for a moment on a heavy blow
+//   dim       the whole screen darkened for a moment by the harm a blow he takes does him
 //   haptic    a short vibration (phones that have it: navigator.vibrate)
 //   thump     a low body thump under the blow's own sound, by its energy
 //   fov       the view narrowed a degree or two, as the eye fixes on the blow
@@ -34,6 +35,7 @@ export const HITFEEL = {
     hitStop: { on: true, intensity: 1, label: 'Hit-stop', note: 'A heavy blow holds the moment' },
     puff: { on: true, intensity: 1, label: 'Impact mist', note: 'Sweat and dust off the struck place' },
     vignette: { on: true, intensity: 1, label: 'Dark edges', note: 'The edges dim on a heavy blow' },
+    dim: { on: true, intensity: 1, label: 'Dim on a hard hit', note: 'The screen darkens by the harm taken' },
     haptic: { on: true, intensity: 1, label: 'Vibration', note: 'A buzz on phones that have it' },
     thump: { on: true, intensity: 1, label: 'Body thump', note: 'A low thud under the blow' },
     fov: { on: true, intensity: 1, label: 'Focus punch', note: 'The view narrows for an instant' },
@@ -48,6 +50,10 @@ export const HITFEEL = {
   puff: { size: 0.26, opacity: 0.45, seconds: 0.35 },
   // The dark edges: only past `from` in strength; their most (opacity) and how long they fade (s).
   vignette: { from: 0.4, opacity: 0.5, seconds: 0.4 },
+  // The screen dimmed: by the harm a blow he takes does (the event's `harm`, a share of the struck part's health: a glancing blow on a
+  // helmet ~0.1, a cut into the chest ~0.4, a blow that knocks him out ~1), from `from` to `full`; its most (opacity) and how long it
+  // fades (s). Slight, and at once: the eyes swim, then clear. The user's call, 2026-11-10.
+  dim: { from: 0.05, full: 0.8, opacity: 0.4, seconds: 0.9 },
   // A vibration (ms) from the lightest blow felt to the heaviest: a phone's motor needs ~8 ms to be felt at all.
   haptic: { light: 8, heavy: 40 },
   // The thump's gain (0..1 of the effects bus) at full strength.
@@ -127,7 +133,7 @@ export function createHitFeel(settings = loadHitFeel(null)) {
     // The blow's way: into the struck man (the event's normal points out of him, toward the striker).
     const normal = event.normal ?? [0, 0, 1];
     const into = [-normal[0], -normal[1], -normal[2]];
-    pulses.push({ start: now, strength, way, into });
+    pulses.push({ start: now, strength, way, into, harm: way === 'taken' ? event.harm ?? 0 : 0 });
     while (pulses.length > 8) pulses.shift();
     const haptic = level('haptic');
     const thump = level('thump');
@@ -143,7 +149,7 @@ export function createHitFeel(settings = loadHitFeel(null)) {
   }
 
   function forget(now) {
-    const longest = Math.max(HITFEEL.kick.seconds, HITFEEL.vignette.seconds, HITFEEL.fov.seconds, HITFEEL.hitStop.seconds.heavy + HITFEEL.hitStop.ease);
+    const longest = Math.max(HITFEEL.kick.seconds, HITFEEL.vignette.seconds, HITFEEL.dim.seconds, HITFEEL.fov.seconds, HITFEEL.hitStop.seconds.heavy + HITFEEL.hitStop.ease);
     while (pulses.length && now - pulses[0].start > longest) pulses.shift();
   }
 
@@ -201,6 +207,21 @@ export function createHitFeel(settings = loadHitFeel(null)) {
     return hitFeelClamp(most);
   }
 
+  /** How dim the whole screen is now (0..1): by the harm of the blows he took. */
+  function dim(now) {
+    const amount = level('dim');
+    if (amount <= 0) return 0;
+    forget(now);
+    const spec = HITFEEL.dim;
+    let most = 0;
+    for (const pulse of pulses) {
+      if (pulse.harm < spec.from) continue;
+      const left = 1 - (now - pulse.start) / spec.seconds;
+      if (left > 0) most = Math.max(most, spec.opacity * amount * hitFeelClamp((pulse.harm - spec.from) / (spec.full - spec.from)) * left * left);
+    }
+    return hitFeelClamp(most);
+  }
+
   /** How much narrower the view is now (degrees). */
   function fov(now) {
     const amount = level('fov');
@@ -218,5 +239,5 @@ export function createHitFeel(settings = loadHitFeel(null)) {
     return most;
   }
 
-  return { settings, hear, pace, offset, vignette, fov, reset: () => pulses.splice(0), get active() { return pulses.length; } };
+  return { settings, hear, pace, offset, vignette, dim, fov, reset: () => pulses.splice(0), get active() { return pulses.length; } };
 }

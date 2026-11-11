@@ -380,8 +380,9 @@ test('a chain: a portcullis raised and a drawbridge on the heavy chain; a chaine
 
 test('breathing is silent through a fight with breath in hand, heard (recorded, by sex, at the voice\'s pitch) only when all but spent', () => {
   const at = (stamina) => exertionOf({ stamina });
-  for (const stamina of [1, 0.5, 0.3, 0.15]) assert.equal(breathPlan(breathParams(at(stamina)), true, at(stamina), 'male'), null, `stamina ${stamina}: silent`);
-  for (const stamina of [0.08, 0, -0.3]) {
+  // (From the stamina's last fifth since 2026-11-10: a warning that he is tiring.)
+  for (const stamina of [1, 0.5, 0.3, 0.25]) assert.equal(breathPlan(breathParams(at(stamina)), true, at(stamina), 'male'), null, `stamina ${stamina}: silent`);
+  for (const stamina of [0.18, 0.08, 0, -0.3]) {
     const exertion = at(stamina);
     const breath = breathParams(exertion);
     const inhale = breathPlan(breath, true, exertion, 'male', 0.9);
