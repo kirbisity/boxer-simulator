@@ -2191,6 +2191,8 @@ function detailedView(view, fighter, simple) {
     collar.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'chest'));
     hips.add(buildScaleShirt(body, dress.armor.color, view.steelEnv, steelMaterial, 'hips'));
   }
+  // How far the armour on the chest stands out behind the spine: a photo head's long hair rests on it (face.js, hairswing.js).
+  const armourBack = dress.armor && !simple ? armourBackReach(collar) : 0;
   if (dress.banner) {
     const banner = buildBanner(body, dress.banner, dress.greatBanner, dress.bannerLook);
     banner.userData.banner = true;
@@ -2217,7 +2219,7 @@ function detailedView(view, fighter, simple) {
     baseColors, vertexSegment, damageVersion: -1, headProps, dangles, swings: headgear?.swings ?? [], steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
     // The helmet as worn (lifted off and thrown when a blow knocks it off: updateProps), and whether it hid the face.
-    helmetWorn: headgear?.group ?? null, faceHidden,
+    helmetWorn: headgear?.group ?? null, faceHidden, armourBack,
   };
   if (later) queueSkin(fighterView, wanted);
   return fighterView;
@@ -2981,6 +2983,29 @@ export function clearCrowdTemplates(view) {
   view.crowdBatches = new Map();
 }
 
+/**
+ * The armour's reach behind the spine (m), measured off what is worn on the chest (`collar`, in the chest bone's frame: x
+ * forward, y up, its origin at the neck): the furthest back of its vertices over the upper back (from the neck to 0.3 m
+ * below it, within 0.1 m of the middle: where long hair lies), or 0.
+ */
+function armourBackReach(collar) {
+  collar.updateWorldMatrix(true, true);
+  const inverse = collar.matrixWorld.clone().invert();
+  const relative = new THREE.Matrix4();
+  const point = new THREE.Vector3();
+  let reach = 0;
+  collar.traverse((object) => {
+    if (!object.isMesh || object.userData.banner) return;
+    relative.multiplyMatrices(inverse, object.matrixWorld);
+    const position = object.geometry.attributes.position;
+    for (let index = 0; index < position.count; index += 1) {
+      point.fromBufferAttribute(position, index).applyMatrix4(relative);
+      if (point.y < 0.02 && point.y > -0.3 && Math.abs(point.z) < 0.1 && point.x < 0) reach = Math.max(reach, -point.x);
+    }
+  });
+  return reach;
+}
+
 function dangleColliders(fighterView, points) {
   const body = fighterView.fighter.body;
   const v = (at) => new THREE.Vector3(...at);
@@ -3212,7 +3237,10 @@ export function updateFighterView(fighterView, dt, time) {
   // What hanging hair and cloth rest on: the head, and the trunk with
   // whatever is worn over it.
   const colliders = dangleColliders(fighterView, points);
-  if (!fighterView.headDetached) fighterView.head.update(step, fighter, time, colliders);
+  // Hair also rests on the armour worn over the trunk (its reach behind the spine, measured when the armour was built).
+  const trunk = colliders[1];
+  const hairColliders = fighterView.armourBack > trunk.radius ? [...colliders, { a: trunk.a, b: trunk.b, radius: fighterView.armourBack, part: 'armour' }] : colliders;
+  if (!fighterView.headDetached) fighterView.head.update(step, fighter, time, hairColliders);
   for (const dangle of fighterView.dangles) dangle.update(step, colliders.slice(1));
   // A helmet's tassel, plume or feathers swing after the head (chinahelmview.js); still while paused (dt 0).
   if (!fighterView.headDetached) for (const swing of fighterView.swings ?? []) swing.update(step, fighter.hitAt?.[P.head] ?? null, time);

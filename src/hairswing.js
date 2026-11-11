@@ -5,10 +5,19 @@
 // link held to its length, bent back towards the shape it was cut to (its
 // rest, carried round by the head: a stiffness that is strongest at the root
 // and fades to the tips, so the ends swing most), damped, pulled down by
-// gravity, and kept out of the head (an ellipsoid fitted to it), the neck
-// and the body's capsules (trunk, shoulders, upper arms: render.js
-// dangleColliders). Each hair vertex follows its chain (or the two either
-// side of it, on a hang) by how far down it is: what lies on the scalp does
+// gravity, and kept out of the head (an ellipsoid fitted to it, fuller in
+// front for the nose and cheeks), off the face (hair cut behind it stays
+// behind it), out of the neck and the body's capsules (trunk, shoulders,
+// upper arms: render.js dangleColliders, the trunk's grown to the armour
+// worn over it). A hang's neighbouring chains are held near their rest
+// spacing, so a fast turn cannot pull the hang into a thin sheet.
+//
+// Each hair vertex follows its chain by how far down it is: a hang's vertex
+// moves with the two chains either side of it (offset, as the chains lie a
+// column or more away from it); a rope's, ringlet's or tail's turns with its
+// link (its offset from the chain's axis rotated from the link's rest
+// direction to where it points now), so a piece bends along its chain and
+// never cuts through the head between two nodes. What lies on the scalp does
 // not move.
 //
 // Cheap: chains of six nodes, no allocation a frame, one pass over the hair's
@@ -29,13 +38,16 @@ export const HAIR_SWING = {
   // Two substeps a frame at 60 fps (a long hang's tip moves a link's length a frame on a fast turn: one step overshoots).
   substeps: 2,
   maxStep: 1 / 30,
-  // Length passes a substep: two hold a six-node chain to within a few per cent.
+  // Length passes a substep: two hold a six-node chain to within a few per cent of its rest length.
   passes: 2,
   // Pushed out to this share of a collider's radius (and the head's ellipsoid grown by it): the hair lies on, not in.
   clearance: 1.06,
   // A hang's chain eased this much towards each neighbour's swing (a missing one counts as still), so the hang moves as one
   // mass in broad waves and a short side lock beside a long back (a hime's) bends with it instead of tearing.
   neighbour: 0.2,
+  // Neighbouring chains of a hang no further apart than this share of their rest spacing (the strands between them are
+  // one sheet: it stretches a little, not to twice its width).
+  spread: 1.2,
   // The neck (not one of the body's colliders): a capsule from between the shoulders to the head, this share of the head
   // collider's radius.
   neck: 0.5,
@@ -45,13 +57,16 @@ export const HAIR_SWING = {
 
 /**
  * Swing for a head's hair meshes (children of the head's group, in its space; each geometry's `userData.swing`: per vertex
- * chain a, chain b, b's share, how far down) on `chains` (local rest points, root first, optional `stiffness`, `damping`,
- * `ring`). `head`: the head's ellipsoid in local space ({ centre, radii }). Null when nothing hangs.
- * `update(dt, group, colliders)` each frame; `kick(direction, speed)` throws it.
+ * chain a, chain b, b's share, how far down) on `chains` (local rest points, root first; optional `stiffness`, `tipShare`,
+ * `damping`; `ahead`: how far forward of its rest a node may swing; `ring`: one of a hang's chains; otherwise its piece
+ * turns with it). `head`: the head in local space (hairmass.js
+ * headEllipsoid: `centre`, `radii` [front, back, up-down, side], the `face` box hair behind it stays out of). Null when nothing
+ * hangs. `update(dt, group, colliders)` each frame; `kick(direction, speed)` throws it.
  */
 export function buildHairSwing(meshes, chainSpecs, head) {
   const config = HAIR_SWING;
   if (!chainSpecs.length) return null;
+  const face = head.face;
   const chains = chainSpecs.map((spec) => {
     const count = spec.rest.length;
     const rest = new Float32Array(count * 3);
@@ -62,16 +77,28 @@ export function buildHairSwing(meshes, chainSpecs, head) {
       segments[k] = spec.rest[k].distanceTo(spec.rest[k - 1]);
       length += segments[k];
     }
+    // The nodes cut behind the face (most): kept behind it. (A fringe hangs in front of the brow and is left there.)
+    const behind = spec.rest.map((p) => p.x < face.x);
     return {
-      count, rest, segments, length, ring: Boolean(spec.ring),
-      stiffness: spec.stiffness ?? config.stiffness, damping: spec.damping ?? config.damping,
+      count, rest, segments, length, behind, ring: Boolean(spec.ring), ahead: spec.ahead,
+      stiffness: spec.stiffness ?? config.stiffness, tipShare: spec.tipShare ?? config.tipShare, damping: spec.damping ?? config.damping,
       world: new Float32Array(count * 3), previous: new Float32Array(count * 3), raw: new Float32Array(count * 3), offsets: new Float32Array(count * 3),
+      // Each link's turn from its rest direction (a 3×3 matrix, column-major), for the pieces that turn with their chain.
+      turns: spec.ring ? null : new Float32Array(count * 9),
       started: false,
     };
   });
-  // The ring's neighbours (the hang's chains, in order round the head).
+  // The ring's neighbours (the hang's chains, in order round the head), and their rest spacing node by node.
   const ring = chains.filter((chain) => chain.ring);
-  ring.forEach((chain, i) => Object.assign(chain, { left: ring[(i + ring.length - 1) % ring.length], right: ring[(i + 1) % ring.length] }));
+  ring.forEach((chain, i) => {
+    const right = ring[(i + 1) % ring.length];
+    const spacing = new Float32Array(chain.count);
+    for (let k = 0; k < chain.count; k += 1) {
+      const [x, y, z] = [chain.rest[k * 3] - right.rest[k * 3], chain.rest[k * 3 + 1] - right.rest[k * 3 + 1], chain.rest[k * 3 + 2] - right.rest[k * 3 + 2]];
+      spacing[k] = Math.hypot(x, y, z);
+    }
+    Object.assign(chain, { left: ring[(i + ring.length - 1) % ring.length], right, spacing });
+  });
   const entries = meshes.filter((mesh) => mesh.geometry.userData.swing).map((mesh) => ({
     mesh,
     rest: Float32Array.from(mesh.geometry.attributes.position.array),
@@ -83,20 +110,39 @@ export function buildHairSwing(meshes, chainSpecs, head) {
   const v = new THREE.Vector3();
   const w = new THREE.Vector3();
   const q = new THREE.Vector3();
+  const turn = new THREE.Quaternion();
+  const turnMatrix = new THREE.Matrix4();
   const neck = { a: new THREE.Vector3(), b: new THREE.Vector3(), radius: 0 };
   let scale = 1;
   const lastHead = new THREE.Vector3(Infinity, 0, 0);
   let enabled = true;
 
-  // The head's ellipsoid (local): a point inside is pushed out along its scaled direction.
-  function pushOutOfHead(position) {
+  // The head (local): an ellipsoid, fuller in front (the nose and cheeks) than behind; a point inside is pushed out along its
+  // scaled direction. Then, for a node cut behind the face, the face's box: out of it by the shorter way, back or sideways.
+  function keepOffHead(position, behindFace, mostForward) {
     v.copy(position).applyMatrix4(inverse).sub(head.centre);
-    const [ax, ay, az] = head.radii;
+    const [front, back, ay, az] = head.radii;
     const c = config.clearance;
+    const ax = v.x > 0 ? front : back;
     const inside = (v.x / (ax * c)) ** 2 + (v.y / (ay * c)) ** 2 + (v.z / (az * c)) ** 2;
-    if (inside >= 1 || inside < 1e-9) return;
-    v.multiplyScalar(1 / Math.sqrt(inside)).add(head.centre).applyMatrix4(matrix);
-    position.copy(v);
+    let moved = false;
+    if (inside < 1 && inside > 1e-9) {
+      v.multiplyScalar(1 / Math.sqrt(inside));
+      moved = true;
+    }
+    v.add(head.centre);
+    // A piece hung beside the face goes no further forward than its rest and a little (it swings back and out, never across).
+    if (v.x > mostForward) {
+      v.x = mostForward;
+      moved = true;
+    }
+    if (behindFace && v.x > face.x && Math.abs(v.z) < face.side && v.y < face.top && v.y > face.bottom) {
+      const outward = face.side - Math.abs(v.z);
+      if (v.x - face.x < outward) v.x = face.x;
+      else v.z = Math.sign(v.z || 1) * face.side;
+      moved = true;
+    }
+    if (moved) position.copy(v.applyMatrix4(matrix));
   }
   function pushOutOfCapsule(position, a, b, radius) {
     w.subVectors(b, a);
@@ -111,6 +157,7 @@ export function buildHairSwing(meshes, chainSpecs, head) {
 
   const x = new THREE.Vector3();
   const target = new THREE.Vector3();
+  const other = new THREE.Vector3();
   function step(h, colliders) {
     const gravity = -config.gravity * h * h;
     for (const chain of chains) {
@@ -142,20 +189,51 @@ export function buildHairSwing(meshes, chainSpecs, head) {
           if (pass === 0) {
             // Bent back towards the cut: the rest link (turned with the head) from the node above.
             target.fromArray(rest, i).sub(v.fromArray(rest, i - 3)).transformDirection(matrix).multiplyScalar(segments[k] * scale).add(q);
-            const bend = chain.stiffness * (1 - (1 - config.tipShare) * ((k - 1) / Math.max(1, count - 2)));
+            const bend = chain.stiffness * (1 - (1 - chain.tipShare) * ((k - 1) / Math.max(1, count - 2)));
             x.lerp(target, bend);
           }
           // Held to the link's length.
           v.subVectors(x, q);
           const span = v.length() || 1e-6;
           x.copy(q).addScaledVector(v, (segments[k] * scale) / span);
-          pushOutOfHead(x);
+          keepOffHead(x, chain.behind[k], chain.ahead === undefined ? Infinity : chain.rest[i] + chain.ahead);
           if (neck.radius) pushOutOfCapsule(x, neck.a, neck.b, neck.radius);
           for (const collider of colliders) if (collider.a !== collider.b && collider.part !== 'leg') pushOutOfCapsule(x, collider.a, collider.b, collider.radius);
           x.toArray(world, i);
         }
       }
     }
+    // A hang's sheet: neighbouring chains pulled together where they have spread past `spread` of their rest spacing.
+    for (const chain of ring) {
+      const { right } = chain;
+      for (let k = 1; k < chain.count; k += 1) {
+        const i = k * 3;
+        x.fromArray(chain.world, i);
+        other.fromArray(right.world, i);
+        v.subVectors(other, x);
+        const span = v.length();
+        const most = chain.spacing[k] * scale * config.spread;
+        if (span <= most || span < 1e-6) continue;
+        const pull = (span - most) / (2 * span);
+        x.addScaledVector(v, pull).toArray(chain.world, i);
+        other.addScaledVector(v, -pull).toArray(right.world, i);
+      }
+    }
+  }
+
+  // Each link's turn (a piece's chain): from its rest direction to its direction now, both in the head's space.
+  const from = new THREE.Vector3();
+  function linkTurns(chain) {
+    const { count, rest, raw, turns } = chain;
+    for (let k = 0; k < count - 1; k += 1) {
+      from.fromArray(rest, k * 3 + 3).sub(v.fromArray(rest, k * 3)).normalize();
+      w.fromArray(raw, k * 3 + 3).add(q.fromArray(rest, k * 3 + 3)).sub(v.fromArray(raw, k * 3).add(x.fromArray(rest, k * 3))).normalize();
+      turn.setFromUnitVectors(from, w);
+      turnMatrix.makeRotationFromQuaternion(turn);
+      const t = turnMatrix.elements;
+      turns.set([t[0], t[1], t[2], t[4], t[5], t[6], t[8], t[9], t[10]], k * 9);
+    }
+    turns.copyWithin((count - 1) * 9, (count - 2) * 9, (count - 1) * 9);
   }
 
   return {
@@ -192,7 +270,8 @@ export function buildHairSwing(meshes, chainSpecs, head) {
       const steps = config.substeps;
       const h = Math.min(dt, config.maxStep) / steps;
       for (let s = 0; s < steps; s += 1) step(h, colliders);
-      // Each node's swing, in the head's space (its world place brought back, less its rest), eased towards its neighbours'.
+      // Each node's swing, in the head's space (its world place brought back, less its rest), eased towards its neighbours'
+      // on a hang; a piece's link turns.
       for (const chain of chains) {
         for (let k = 0; k < chain.count; k += 1) {
           v.fromArray(chain.world, k * 3).applyMatrix4(inverse).sub(w.fromArray(chain.rest, k * 3));
@@ -204,10 +283,11 @@ export function buildHairSwing(meshes, chainSpecs, head) {
         const { raw, offsets } = chain;
         if (!chain.ring || ring.length < 2) {
           offsets.set(raw);
+          if (chain.turns) linkTurns(chain);
           continue;
         }
         const { left, right } = chain;
-        for (let i = 0; i < raw.length; i += 1) offsets[i] = raw[i] * (1 - 2 * share) + share * ((left.raw[i] ?? 0) + (right.raw[i] ?? 0));
+        for (let i = 0; i < raw.length; i += 1) offsets[i] = raw[i] * (1 - 2 * share) + share * (left.raw[i] + right.raw[i]);
       }
       for (const { mesh, rest, binding } of entries) {
         const position = mesh.geometry.attributes.position;
@@ -215,9 +295,9 @@ export function buildHairSwing(meshes, chainSpecs, head) {
         for (let vertex = 0, i = 0; i < rest.length; vertex += 1, i += 3) {
           const down = binding[vertex * 4 + 3];
           if (down <= 0) continue;
-          let dx = 0;
-          let dy = 0;
-          let dz = 0;
+          let px = 0;
+          let py = 0;
+          let pz = 0;
           const share = binding[vertex * 4 + 2];
           for (let pick = 0; pick < 2; pick += 1) {
             const weight = pick ? share : 1 - share;
@@ -228,13 +308,30 @@ export function buildHairSwing(meshes, chainSpecs, head) {
             const k = Math.min(last - 1, Math.floor(along));
             const f = along - k;
             const o = chain.offsets;
-            dx += weight * (o[k * 3] + (o[k * 3 + 3] - o[k * 3]) * f);
-            dy += weight * (o[k * 3 + 1] + (o[k * 3 + 4] - o[k * 3 + 1]) * f);
-            dz += weight * (o[k * 3 + 2] + (o[k * 3 + 5] - o[k * 3 + 2]) * f);
+            const r0 = chain.rest;
+            if (!chain.turns) {
+              // A hang: the chain's swing at this depth, added to the vertex's rest.
+              px += weight * (rest[i] + o[k * 3] + (o[k * 3 + 3] - o[k * 3]) * f);
+              py += weight * (rest[i + 1] + o[k * 3 + 1] + (o[k * 3 + 4] - o[k * 3 + 1]) * f);
+              pz += weight * (rest[i + 2] + o[k * 3 + 2] + (o[k * 3 + 5] - o[k * 3 + 2]) * f);
+              continue;
+            }
+            // A piece: its place on the chain's axis now, and its offset from the axis turned with the link.
+            const bx = r0[k * 3] + (r0[k * 3 + 3] - r0[k * 3]) * f;
+            const by = r0[k * 3 + 1] + (r0[k * 3 + 4] - r0[k * 3 + 1]) * f;
+            const bz = r0[k * 3 + 2] + (r0[k * 3 + 5] - r0[k * 3 + 2]) * f;
+            const ox = rest[i] - bx;
+            const oy = rest[i + 1] - by;
+            const oz = rest[i + 2] - bz;
+            const m = chain.turns;
+            const n = k * 9;
+            px += weight * (bx + o[k * 3] + (o[k * 3 + 3] - o[k * 3]) * f + m[n] * ox + m[n + 3] * oy + m[n + 6] * oz);
+            py += weight * (by + o[k * 3 + 1] + (o[k * 3 + 4] - o[k * 3 + 1]) * f + m[n + 1] * ox + m[n + 4] * oy + m[n + 7] * oz);
+            pz += weight * (bz + o[k * 3 + 2] + (o[k * 3 + 5] - o[k * 3 + 2]) * f + m[n + 2] * ox + m[n + 5] * oy + m[n + 8] * oz);
           }
-          array[i] = rest[i] + dx;
-          array[i + 1] = rest[i + 1] + dy;
-          array[i + 2] = rest[i + 2] + dz;
+          array[i] = px;
+          array[i + 1] = py;
+          array[i + 2] = pz;
         }
         position.needsUpdate = true;
       }

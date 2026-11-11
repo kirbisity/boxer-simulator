@@ -278,39 +278,15 @@
         return { shots, triangles };
       }
       if (verb === 'hairdebug') {
-        // `hairdebug::style`: each fighter's hair chains, root and tip, rest (head space) against simulated (brought back).
+        // `hairdebug::style`: after a second at rest, the woman's first chains: rest nodes, swing (head space), first link turn.
         await window.__looks.stage(`face-style-${extra}`);
-        const track = [];
-        for (let frame = 0; frame < 30; frame += 1) {
-          playHair(1);
-          track.push(window.boxer.state.views.map((view) => {
-            const chain = view.head.hairSwing?.chains[0];
-            if (!chain) return null;
-            const p = new THREE.Vector3().fromArray(chain.world, (chain.count - 1) * 3).applyMatrix4(view.head.group.matrixWorld.clone().invert());
-            return p.toArray().map((v) => v.toFixed(3)).join(',');
-          }).join(' | '));
-        }
+        window.boxer.state.views.forEach((view, index) => armsDown(index));
+        playHair(60);
+        const f3 = (array) => [...array].map((value) => Number(value.toFixed(3)));
         return {
-          track,
-          views: window.boxer.state.views.map((view) => {
-            const swing = view.head.hairSwing;
-            const inverse = view.head.group.matrixWorld.clone().invert();
-            const scale = new THREE.Vector3().setFromMatrixScale(view.head.group.matrixWorld);
-            return {
-              name: view.fighter.body.inputs.name, scale: scale.toArray().map((v) => v.toFixed(3)),
-              chains: (swing?.chains ?? []).map((chain) => {
-                const tip = (chain.count - 1) * 3;
-                const now = new THREE.Vector3().fromArray(chain.world, tip).applyMatrix4(inverse);
-                const restWorld = new THREE.Vector3().fromArray(chain.rest, tip).applyMatrix4(view.head.group.matrixWorld);
-                const colliders = (swing.colliders ?? []).map((c) => {
-                  const axis = c.b.clone().sub(c.a);
-                  const t = Math.max(0, Math.min(1, restWorld.clone().sub(c.a).dot(axis) / (axis.lengthSq() || 1)));
-                  return `${c.part ?? 'head'}:${(c.a.clone().addScaledVector(axis, t).distanceTo(restWorld) - c.radius).toFixed(3)}`;
-                });
-                return { rest: [...chain.rest.slice(tip, tip + 3)].map((v) => v.toFixed(3)), now: now.toArray().map((v) => v.toFixed(3)), length: chain.length.toFixed(3), colliders };
-              }),
-            };
-          }),
+          chains: (window.boxer.state.views[1].head.hairSwing?.chains ?? []).slice(0, 3).map((chain) => ({
+            ahead: chain.ahead, rest: f3(chain.rest), raw: f3(chain.raw), turn: chain.turns ? f3(chain.turns.slice(0, 9)) : null, length: chain.length,
+          })),
         };
       }
       if (verb === 'helmet') {
@@ -341,6 +317,11 @@
             const views = window.boxer.state.views;
             const index = views.findIndex((view) => view.fighter.body.inputs.name === `f-${style}`);
             const fighter = views[index].fighter;
+            // The other fighter out of the picture, sunk 10 m under the field (she runs at him: his hair would fill the lens).
+            views.forEach((view, other) => {
+              if (other === index) return;
+              for (let p = 1; p < view.fighter.x.length; p += 3) view.fighter.x[p] -= 10;
+            });
             armsDown(index);
             playHair(90);
             const rest = Float32Array.from(fighter.x);
@@ -353,11 +334,12 @@
             const facing = new THREE.Vector3().setFromMatrixColumn(head.matrixWorld, 0).setY(0).normalize();
             const yaw0 = Math.atan2(facing.z, facing.x);
             const pose = (t) => {
-              // Turn: 0 to 150° in 0.3 s (eased), then held. Run: 4 m/s forward, bobbing 3 cm, 2.6 strides a second.
+              // Turn: 0 to 150° in 0.3 s (eased), then held. Run: up to 4 m/s in 0.3 s (a hard start, 13 m/s²), bobbing 3 cm (smoothly),
+              // 2.6 strides a second.
               const u = Math.min(1, t / 0.3);
               const angle = kind === 'turn' ? -2.6 * u * u * (3 - 2 * u) : 0;
-              const ahead = kind === 'run' ? 4 * t : 0;
-              const bob = kind === 'run' ? 0.03 * Math.abs(Math.sin(t * Math.PI * 2.6)) : 0;
+              const ahead = kind === 'run' ? (t < 0.3 ? (4 * t * t) / 0.6 : 4 * (t - 0.15)) : 0;
+              const bob = kind === 'run' ? 0.015 * (1 - Math.cos(t * Math.PI * 2 * 2.6)) : 0;
               const [c, s] = [Math.cos(angle), Math.sin(angle)];
               for (let p = 0; p < count; p += 1) {
                 const x = rest[p * 3] - cx;
