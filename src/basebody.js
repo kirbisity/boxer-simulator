@@ -18,6 +18,7 @@
 // No Three.js: plain numbers, built in the skin worker with the rest of the loft.
 
 import { BASE_BODY_DATA } from './basebody-data.js';
+import { faceMorphWeights } from './facemorph.js';
 import { detailUv } from './skindetail.js';
 import { vec } from './pose.js';
 
@@ -71,10 +72,32 @@ export function baseBodyMesh(sex, crowd = false) {
     part: baseBytes(packed.part),
     part2: baseBytes(packed.part2),
     blend: Float32Array.from(baseBytes(packed.blend), (value) => value / 255),
-    starved: packed.starved ? Float32Array.from(new Int16Array(baseBytes(packed.starved).buffer), (value) => value / BASE_BODY_DATA.deltaScale) : null,
+    starved: packed.starved ? Float32Array.from(new Int16Array(baseBytes(packed.starved).buffer), (value) => value / BASE_BODY_DATA.deltaScale) : new Float32Array(packed.count),
   };
   decoded.set(key, mesh);
   return mesh;
+}
+
+/**
+ * How starved a body is, 0 to 1, for the emaciated reference's contour and its rib and spine detail (tools/blender/emaciated.py):
+ * the game's own measure, the face's gaunt weight (facemorph.js: from BMI and body fat), so a normal body is untouched.
+ */
+export const baseStarvation = (body) => faceMorphWeights(body).gaunt;
+
+let starvedSlopes = null;
+/**
+ * The emaciated reference's rib and spine slopes for the skin map's trunk tile (skintex.js adds them by `weight`), or null where
+ * the body is not starved: { width, height, span, slopes (round, along per texel), weight }.
+ */
+export function baseStarvedDetail(body) {
+  const weight = baseStarvation(body);
+  const packed = BASE_BODY_DATA.starvedSlopes;
+  if (weight <= 0 || !packed) return null;
+  if (!starvedSlopes) {
+    const bytes = new Int8Array(baseBytes(packed.slopes).buffer);
+    starvedSlopes = { width: packed.width, height: packed.height, span: packed.span, slopes: Float32Array.from(bytes, (value) => (value / 127) * packed.steepest) };
+  }
+  return { ...starvedSlopes, weight };
 }
 
 /** A part's frame: its axis from `a` to `b`, the ring's depth axis (the loft's: `forward` square to the axis) and width axis. */
@@ -214,7 +237,7 @@ export function measureBaseBody(mesh, refParts, height) {
     src.starved.push(starved);
     return src.part.length - 1;
   };
-  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved ? mesh.starved[vertex] : 0);
+  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex]);
 
   // The drawn points: one per source and tile (and seam side).
   const render = { source: [], part: [], t: [], angle: [], u: [] };
@@ -313,9 +336,10 @@ export function measureBaseBody(mesh, refParts, height) {
 /**
  * A fighter's base skin: each source point placed on his parts (`parts`, the loft's description of his: see measureBaseBody)
  * and blended across its joint; `relief(name)` how much of the modelled muscle relief his part shows (1 all of it, 0 the
- * smoothed surface); `height` his standing height (m). Returns the drawn points' positions (render order) and the sources'.
+ * smoothed surface); `height` his standing height (m); `starve` how starved he is (baseStarvation: the emaciated reference's
+ * contour, each point's delta out along its ring, laid on by it). Returns the drawn points' positions (render order) and the sources'.
  */
-export function placeBaseBody(rig, parts, relief, height) {
+export function placeBaseBody(rig, parts, relief, height, starve = 0) {
   const scale = height / rig.height;
   const { names, sources, render } = rig;
   const tables = {};
@@ -328,7 +352,7 @@ export function placeBaseBody(rig, parts, relief, height) {
   const shows = Object.fromEntries(names.map((name) => [name, relief(name)]));
   const placed = new Float32Array(sources.count * 3);
   const one = [0, 0, 0];
-  const place = (name, t, angle, distance, smooth, refRadius, out) => {
+  const place = (name, t, angle, distance, smooth, refRadius, starved, out) => {
     const frame = frames[name];
     const ring = tables[name](t);
     const own = smooth + (distance - smooth) * shows[name];
@@ -337,7 +361,7 @@ export function placeBaseBody(rig, parts, relief, height) {
     const flat = Math.hypot(ex, ey) || 1e-9;
     // His ring's thickness beyond the reference's (scaled to his height), laid on in full outside the ring, by depth inside it.
     const layer = flat * (ring.bend ? ring.bend(ring, angle) : 1) - scale * refRadius;
-    const reach = Math.max(BASE_BODY.leastShare * scale * own, scale * own + layer * Math.min(1, own / refRadius));
+    const reach = Math.max(BASE_BODY.leastShare * scale * own, scale * own + layer * Math.min(1, own / refRadius) + starved);
     const along = t * frame.length;
     const k = reach / flat;
     for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * (ring.offset + ex * k) + frame.widthAxis[axis] * ey * k;
@@ -347,10 +371,11 @@ export function placeBaseBody(rig, parts, relief, height) {
   for (let vertex = 0; vertex < sources.count; vertex += 1) {
     const k = vertex * 10;
     const c = sources.coords;
-    place(names[sources.part[vertex]], c[k], c[k + 1], c[k + 2], c[k + 3], c[k + 4], one);
+    const starved = sources.starved[vertex] * height * starve;
+    place(names[sources.part[vertex]], c[k], c[k + 1], c[k + 2], c[k + 3], c[k + 4], starved, one);
     const blend = sources.blend[vertex];
     if (blend > 0 && sources.part2[vertex] !== sources.part[vertex]) {
-      place(names[sources.part2[vertex]], c[k + 5], c[k + 6], c[k + 7], c[k + 8], c[k + 9], other);
+      place(names[sources.part2[vertex]], c[k + 5], c[k + 6], c[k + 7], c[k + 8], c[k + 9], starved, other);
       for (let axis = 0; axis < 3; axis += 1) one[axis] += (other[axis] - one[axis]) * blend;
     }
     placed.set(one, vertex * 3);

@@ -6,7 +6,7 @@
 // seven sides and flat normals, for a low-poly art look.
 
 import { buildBody, P } from './body.js';
-import { baseBodyMesh, baseBodyUvs, measureBaseBody, placeBaseBody } from './basebody.js';
+import { baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
 import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
@@ -1821,16 +1821,16 @@ const BASE_TRAIT = { trunk: 'trunk', neck: 'trunk', Upper: 'arm', Fore: 'fore', 
 /**
  * The base mesh placed on this body's parts (`parts`, gathered by the loft) and added to the mesh as its skin: each drawn point
  * with its part's bones (the trunk's own lists), its place along and round the part (coverage reads it), its tile coordinates
- * (`uv`: the textured styles'); `height` his standing height (m). The muscle relief the mesh was modelled with shows by how defined each part is against the
+ * (`uv`: the textured styles'); `height` his standing height (m); `starve` how starved he is (basebody.js baseStarvation). The muscle relief the mesh was modelled with shows by how defined each part is against the
  * reference's (fat smooths it: basebody.js BASE_BODY smooth*); never more than modelled.
  */
-function addBaseSkin(mesh, rig, parts, traits, uv, height) {
+function addBaseSkin(mesh, rig, parts, traits, uv, height, starve) {
   const relief = (name) => {
     const key = BASE_TRAIT[name] ?? BASE_TRAIT[name.slice(1)];
     const modelled = definedBy(rig.refTraits[key].fat);
     return modelled <= 0 ? 1 : Math.min(1, definedBy(traits[key].fat) / modelled);
   };
-  const { positions } = placeBaseBody(rig, parts, relief, height);
+  const { positions } = placeBaseBody(rig, parts, relief, height, starve);
   const uvs = uv ? baseBodyUvs(rig) : null;
   const start = mesh.positions.length / 3;
   const { render } = rig;
@@ -2613,7 +2613,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   }
 
   if (base?.measure) return { baseParts };
-  if (baseRig) addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM);
+  if (baseRig) addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body));
   // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.
   const covered = armor && mesh.cover ? coverTable(mesh.cover, { trunk: [at('pelvis'), at('neck')], neck: [at('neck'), at('head')], ...Object.fromEntries(['l', 'r'].flatMap((side) => [[`${side}Upper`, [at(`${side}Shoulder`), at(`${side}Elbow`)]], [`${side}Fore`, [at(`${side}Elbow`), at(`${side}Hand`)]], [`${side}Thigh`, [at(`${side}Hip`), at(`${side}Knee`)]], [`${side}Shin`, [at(`${side}Knee`), at(`${side}Foot`)]]])) }) : null;
   if (coverOnly) return { covered };

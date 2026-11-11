@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody } from '../src/body.js';
 import { buildSkinMesh } from '../src/bodystyles.js';
-import { BASE_BODY, baseBodyMesh, measureBaseBody, placeBaseBody } from '../src/basebody.js';
+import { BASE_BODY, baseBodyMesh, baseStarvation, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
 import { baseLoftOptions, buildLoftBody } from '../src/loftbody.js';
 import { FLAT_UV } from '../src/skindetail.js';
 import { progression } from '../tools/bodysheet-cast.js';
@@ -52,4 +52,19 @@ test('a crowd in the base style wears the crowd mesh (about 2.5k triangles of sk
   let triangles = 0;
   for (let corner = 0; corner < mesh.indices.length; corner += 3) if (skin.has(mesh.indices[corner])) triangles += 1;
   assert.ok(triangles > 2300 && triangles < 3200, `${triangles} skin triangles`);
+});
+
+test('starvation: the emaciated contour and detail only on a starved body, none on a normal one', () => {
+  for (const sex of ['male', 'female']) {
+    const rows = progression(sex);
+    const starved = buildBody(rows.find((row) => row.key === 'starved').inputs);
+    const average = buildBody(rows.find((row) => row.key === 'average').inputs);
+    assert.ok(baseStarvation(starved) > 0.9, `${sex}: the starved build is starved`);
+    assert.equal(baseStarvation(average), 0, `${sex}: an average build is not`);
+    assert.equal(baseStarvedDetail(average), null, `${sex}: no rib detail on an average build`);
+    assert.ok(baseStarvedDetail(starved)?.slopes.length > 0, `${sex}: rib detail on a starved build`);
+    const delta = baseBodyMesh(sex).starved;
+    const most = delta.reduce((m, value) => Math.max(m, Math.abs(value)), 0);
+    assert.ok(most > 0.003 && most <= 0.0151, `${sex}: a contour of up to 2.5 cm (${(most * 170).toFixed(1)} cm at 1.7 m)`);
+  }
 });

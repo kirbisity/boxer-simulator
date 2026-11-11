@@ -31,6 +31,7 @@
 
 import { buildBodyMesh } from './bodymesh.js';
 import { baseLoftOptions, buildLoftBody, buildLoftBodySteps, runSteps } from './loftbody.js';
+import { baseStarvedDetail } from './basebody.js';
 import { outfitOf } from './outfits.js';
 import { buildFleshBody, fleshAnatomy, fleshField } from './fleshbody.js';
 import { buildDetailMap } from './skindetail.js';
@@ -123,7 +124,8 @@ export function* buildSkinMeshSteps(body, style) {
 /** The slices of work that make a style's maps for a built body (see skintex.js). */
 function stepsFor(body, style, built) {
   const spec = styleSpec(style).tex;
-  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built) });
+  // (The base style's starved trunk also takes the emaciated reference's rib and spine detail.)
+  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built), starved: style === 'base' ? baseStarvedDetail(body) : null });
 }
 
 /** A built body's maps made now, not looked up or kept (the skin worker's: it hands them over). */
