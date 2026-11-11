@@ -263,7 +263,8 @@ function addExtremities(group, body, built, frames, points, { helmet = null, hai
     // Skin-coloured parts are lit as the body is; the face's own features keep their tones.
     else if (object.material === skullSkin) object.material = faceMaterial;
   });
-  group.add(head.group);
+  // (`head=off`: the body alone, to tell the head's own neck from the body's.)
+  if (query.get('head') !== 'off') group.add(head.group);
   const dress = dressFor(body.inputs, 0x888888);
   const colors = { ...roleColors(dress, new THREE.Color(hex)), accent: dress.feet.accent };
   const plain = plainMaterial();
