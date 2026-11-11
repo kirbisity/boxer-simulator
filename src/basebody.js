@@ -316,7 +316,12 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     }
     return null;
   };
-  const triangles = [];
+  // First each triangle's part and whether it crosses its part's seam (the points the seams are cut at made then), then the
+  // triangles drawn: a triangle that does not cross a seam but has an edge cut by its neighbour's takes the cut point too, so the
+  // surface stays closed (a crack along the seam otherwise: a dark slash where the inside shows).
+  const onSeam = (place) => Math.abs(place.y) < 1e-7;
+  const edgeKey = (i, j) => (i < j ? `${i}|${j}` : `${j}|${i}`);
+  const faces = [];
   for (let corner = 0; corner < mesh.triangles.length; corner += 3) {
     const corners = [mesh.triangles[corner], mesh.triangles[corner + 1], mesh.triangles[corner + 2]];
     // The triangle's part: the one its points carry most of, by their blends (so the tiles meet along the blend's middle, a
@@ -337,12 +342,29 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     const name = names[part];
     const places = corners.map((vertex) => at(name, src.position[vertex]));
     const us = places.map((place) => place.angle / BASE_TAU);
-    if (Math.max(...us) - Math.min(...us) <= 0.5) {
-      triangles.push(...corners.map((vertex, index) => draw(vertex, part, places[index], 0)));
+    const crosses = Math.max(...us) - Math.min(...us) > 0.5;
+    if (crosses) {
+      for (let index = 0; index < 3; index += 1) {
+        const [p, q] = [places[index], places[(index + 1) % 3]];
+        if (!onSeam(p) && !onSeam(q) && p.y * q.y < 0) splitPoint(corners[index], corners[(index + 1) % 3], p.y / (p.y - q.y));
+      }
+    }
+    faces.push({ corners, part, name, places, crosses });
+  }
+  const triangles = [];
+  for (const { corners, part, name, places, crosses } of faces) {
+    if (!crosses) {
+      // (With any edge's cut point drawn in, at its place in this triangle's own tile.)
+      const polygon = [];
+      for (let index = 0; index < 3; index += 1) {
+        polygon.push(draw(corners[index], part, places[index], 0));
+        const cut = splits.get(edgeKey(corners[index], corners[(index + 1) % 3]));
+        if (cut !== undefined) polygon.push(draw(cut, part, at(name, src.position[cut]), 0));
+      }
+      for (let index = 1; index + 1 < polygon.length; index += 1) triangles.push(polygon[0], polygon[index], polygon[index + 1]);
       continue;
     }
     // Across the seam (the front, where the angle wraps): cut on the width axis's zero, each side drawn at its end of the tile.
-    const onSeam = (place) => Math.abs(place.y) < 1e-7;
     const low = [];
     const high = [];
     for (let index = 0; index < 3; index += 1) {
@@ -354,11 +376,15 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
         high.push(draw(vertex, part, p, 1));
       } else if (p.y > 0) low.push(draw(vertex, part, p, 0));
       else high.push(draw(vertex, part, p, 0));
-      if (!onSeam(p) && !onSeam(q) && p.y * q.y < 0) {
-        const made = splitPoint(vertex, corners[next], p.y / (p.y - q.y));
-        const place = at(name, src.position[made]);
-        low.push(draw(made, part, place, -1));
-        high.push(draw(made, part, place, 1));
+      const cut = splits.get(edgeKey(vertex, corners[next]));
+      if (cut !== undefined) {
+        const place = at(name, src.position[cut]);
+        // (A cut point on an edge that does not cross this triangle's seam, made by a neighbour in another tile, is drawn on
+        // the side its own place falls.)
+        if (!onSeam(p) && !onSeam(q) && p.y * q.y < 0) {
+          low.push(draw(cut, part, place, -1));
+          high.push(draw(cut, part, place, 1));
+        } else (place.y > 0 ? low : high).push(draw(cut, part, place, 0));
       }
     }
     for (const polygon of [low, high]) for (let index = 1; index + 1 < polygon.length; index += 1) triangles.push(polygon[0], polygon[index], polygon[index + 1]);
