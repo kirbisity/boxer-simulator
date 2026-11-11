@@ -19,8 +19,9 @@ test('the base style builds for every body of the progression: finite, about a f
     const name = `${body.inputs.sex} ${key}`;
     for (const value of mesh.positions) if (!Number.isFinite(value)) assert.fail(`${name}: a point is not a number`);
     const triangles = mesh.indices.length / 3;
-    // (8k of base mesh, a few hundred more where its seams are split, the fight kit's lofts over it.)
-    assert.ok(triangles > 8000 && triangles < 11000, `${name}: ${triangles} triangles`);
+    // (8k of base mesh, a few hundred more where its seams are split, the fight kit's lofts over it; less the skin a closed
+    // piece covers, a starved woman's under her top coming to a few dozen under 8k.)
+    assert.ok(triangles > 7900 && triangles < 11000, `${name}: ${triangles} triangles`);
     for (const index of skinPoints(mesh)) {
       const [u, v] = [mesh.uvs[index * 2], mesh.uvs[index * 2 + 1]];
       assert.ok(u !== FLAT_UV[0] || v !== FLAT_UV[1], `${name}: skin point ${index} has its tile's coordinates`);
