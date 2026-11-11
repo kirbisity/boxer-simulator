@@ -90,6 +90,7 @@ export const UNIT_NAMES = {
   mexica: 'Mexica Warrior',
   taekwondo: 'Taekwondo Black Belt',
   judo: 'Judoka',
+  mingEliteInfantry: 'Ming Elite Infantry',
   mingEliteGun: 'Ming Elite Musketeer',
   mingShield: 'Ming Shield Soldier',
   mingBrigSpear: 'Ming Spearman',
@@ -211,6 +212,8 @@ export const WARRIORS = [
   warrior('mexica', 'Yaotl', PRESETS.contender, { name: 'Yaotl', heightCm: 160, calories: 3200, exercise: 0.75, sex: 'male', style: 'macuahuitl', outfit: { kind: 'mexicaWarrior', design: 0 }, accessories: [], look: { skinTone: 'medium', hairStyle: 'midLong', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown' } }),
   warrior('taekwondo', 'Kim Min-jun', PRESETS.taekwondo),
   warrior('judo', 'Saigo Shiro', PRESETS.judo),
+  // Qi Jiguang's men (outfits.js mingEliteInfantry): the sleeved brigandine, the steel guard on the front arm, the langxian.
+  warrior('mingEliteInfantry', 'Feng Da', PRESETS.langxian),
   warrior('mingEliteGun', 'Wu Weizhong', PRESETS.guandao, { name: 'Wu Weizhong', style: 'matchlock', outfit: { kind: 'mingElite', design: 1 } }),
   warrior('mingShield', 'Chen Bao', PRESETS.swordShield),
   warrior('mingBrigSpear', 'Sun Qi', PRESETS.swordShield, { name: 'Sun Qi', style: 'spear', outfit: { kind: 'mingBrigandine', design: 2 } }),

@@ -35,6 +35,7 @@ export const NAMES_PEOPLE = {
   'Han Crossbowman': '汉军弩手',
   'Wuxia Swordsman': '武侠剑客',
   'Wokou Pirate': '倭寇',
+  'Ming Elite Infantry': '戚家军',
   'Ming Elite Musketeer': '精锐鸟铳手',
   'Ming Shield Soldier': '藤牌手',
   'Ming Spearman': '明军长枪手',
