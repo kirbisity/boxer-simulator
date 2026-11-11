@@ -256,7 +256,10 @@ function clothLoftUv(mesh, rings, sides, inflate, paint) {
 function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'skin', inflate = 1, bones = () => null, shape = null, bend = null, uv = null, part = null, holes = null, weighAt = null } = {}) {
   const start = mesh.positions.length / 3;
   // (Each ring knows its piece, for keeping layers inside one another: keepLayersInside.)
-  if (mesh.ringOf) for (const ring of rings) ring.piece ??= start;
+  if (mesh.ringOf) for (const ring of rings) {
+    ring.piece ??= start;
+    if (rings.over) ring.over = true;
+  }
   // A colour may be a pattern: a function of the ring (and its index), and
   // of the angle round it (0 at the front, as the depth axis points).
   const paint = typeof color === 'function' ? color : () => color;
@@ -2208,7 +2211,8 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
   for (const { standoff, ring } of shares.values()) pieceRank.set(ring.piece, Math.min(pieceRank.get(ring.piece) ?? Infinity, standoff));
   for (const [vertex, { name, under, ring }] of shares) {
     if (!frames[name]) continue;
-    layers.push({ vertex, name, rank: pieceRank.get(ring.piece), under, piece: ring.piece });
+    // (Cloth worn over armour outranks every piece: the plate is held inside it, and it is drawn out over the plate.)
+    layers.push({ vertex, name, rank: ring.over ? Infinity : pieceRank.get(ring.piece), under, piece: ring.piece, over: Boolean(ring.over) });
   }
   // (The skin by its source point: the copies of one point drawn in two tiles, or either side of a seam, move as one, or the
   // surface would crack between them.)
@@ -2275,6 +2279,42 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     }
     return limit;
   };
+  // Cloth worn over armour first drawn out past every piece beneath it in its cell and those beside it (LOFT.layers.margin out).
+  for (const layer of layers) {
+    if (!layer.over || layer.r === undefined || layer.r < 1e-6) continue;
+    let most = 0;
+    const row = rowOf(layer.t);
+    const column = columnOf(layer.angle);
+    for (let dr = -1; dr <= 1; dr += 1) for (let dc = -spec.spread; dc <= spec.spread; dc += 1) {
+      for (const under of cells.get(keyOf(layer.name, row + dr, column + dc)) ?? []) if (!under.over) most = Math.max(most, under.r);
+    }
+    const want = most + spec.margin;
+    if (most > 0 && layer.r < want) {
+      const push = (want - layer.r) / layer.r;
+      for (let axis = 0; axis < 3; axis += 1) mesh.positions[layer.vertex * 3 + axis] += layer.out[axis] * push;
+      layer.out = layer.out.map((value) => value * (1 + push));
+      layer.r = want;
+    }
+    // (A skirt worn over armour, low on the trunk, hangs over the thighs' pieces too, the tassets: drawn out past them from each
+    // thigh's own axis.)
+    if (layer.name !== 'trunk' || layer.t >= spec.trunkFoot) continue;
+    for (const thigh of ['lThigh', 'rThigh']) {
+      if (!frames[thigh]) continue;
+      const place = placeOf(thigh, layer.vertex);
+      if (place.t < spec.thighRoot || place.t > 1 || place.r < 1e-6) continue;
+      let deepest = 0;
+      const r0 = rowOf(place.t);
+      const c0 = columnOf(place.angle);
+      for (let dr = -1; dr <= 1; dr += 1) for (let dc = -spec.spread; dc <= spec.spread; dc += 1) {
+        for (const under of cells.get(keyOf(thigh, r0 + dr, c0 + dc)) ?? []) if (!under.over) deepest = Math.max(deepest, under.r);
+      }
+      const reach = deepest + spec.margin;
+      if (deepest <= 0 || place.r >= reach) continue;
+      const push = (reach - place.r) / place.r;
+      for (let axis = 0; axis < 3; axis += 1) mesh.positions[layer.vertex * 3 + axis] += place.out[axis] * push;
+    }
+    Object.assign(layer, placeOf(layer.name, layer.vertex));
+  }
   for (const layer of layers) {
     if (layer.r === undefined || layer.r < 1e-6) continue;
     const limit = surface(layer.name, layer, layer);
@@ -2919,8 +2959,10 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // Cloth worn over the armour (`armor.over`, a kind from the table): Joan's huque over her plate.
   const over = ARMOR_KINDS[armor?.over] ?? null;
   // Cloth over a ridged plate lies over the ridge.
-  for (const [from, to, inflate, paint] of armorPieces(over, 'trunk', 'l')) tablePiece(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from))))), inflate, paint, abdomen, plate ? ridgedPlate : null);
-  for (const [hem, flare, inflate, paint] of armorPieces(over, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
+  // (Marked `over`: on the base mesh it is laid outside the armour beneath it wherever it covers it, keepLayersInside.)
+  const overRings = (rings) => Object.assign(rings, { over: true });
+  for (const [from, to, inflate, paint] of armorPieces(over, 'trunk', 'l')) tablePiece(overRings(trunkRings(from, to, count(Math.max(4, Math.round(14 * (to - from)))))), inflate, paint, abdomen, plate ? ridgedPlate : null);
+  for (const [hem, flare, inflate, paint] of armorPieces(over, 'skirt', 'l')) tablePiece(overRings(skirtRings(skirtTo(hem), count(6), flare)), inflate, paint, () => hanging3);
   // The neck thickens a little with fat (the roll under the jaw and at the nape is in the shape).
   const neckGirth = sculpted ? 1 + 3.4 * Math.max(0, traits.trunk.fat - 0.03) : 1;
   if (base) baseParts.neck = { a: at('neck'), b: at('head'), forward, depth: () => neckR * neckGirth, width: () => neckR * 1.05 * neckGirth, offset: () => 0, bend: neckShape(baseTraits, false) };
@@ -3099,7 +3141,9 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       const gathered = bottom.kind === 'joggers' || bottom.kind === 'trackPants';
       // Breeches cut off ragged below the knee (outfits.js RAGS): a coarse tube, whole quads gone at the hem.
       const ragged = ragLeg ? { holes: (t, angle) => ragHemTorn(ragTear(body.inputs.outfit), side, t, angle) } : {};
-      loft(mesh, along(knee, foot, frames[BONE[`${side}Shin`]].x, ragLeg ? ragLeg.shin : count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1), ragLeg ? ragLeg.sides : sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : ragLeg ? ragLeg.shinLoose : bottom.kind === 'bunker' ? 1.32 : 1.22, capStart: false, capEnd: false, ...ragged });
+      // (On the base mesh tagged as the shin's, so the skin a closed trouser leg covers is left out, as under the shorts.)
+      const trouserRings = along(knee, foot, frames[BONE[`${side}Shin`]].x, ragLeg ? ragLeg.shin : count(8), -0.14, legReach[1], () => shankR * 1.12, () => shankR * 1.1);
+      loft(mesh, base ? tagged(`${side}Shin`, trouserRings) : trouserRings, ragLeg ? ragLeg.sides : sides, { color: legPattern, inflate: bottom.kind === 'tights' ? 1.0 : gathered ? 1.12 : ragLeg ? ragLeg.shinLoose : bottom.kind === 'bunker' ? 1.32 : 1.22, capStart: false, capEnd: false, ...ragged });
       if (gathered) loft(mesh, shinRings(legReach[1] - 0.08, legReach[1], 1), sides, { color: 'trim2', inflate: 1.15, capStart: false, capEnd: false });
     }
     if (lamellar) {
