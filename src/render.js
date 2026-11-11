@@ -2031,7 +2031,9 @@ function detailedView(view, fighter, simple) {
   const ready = simple ? null : readySkin(body, wanted);
   const later = !simple && !ready && SKIN_BUILD.slicedStyles.includes(wanted) && !SKIN_BUILD.now;
   const bodyStyle = later ? 'lofted' : wanted;
-  const built = simple ? buildLoftBody(body, { lowDetail: true }) : ready ?? skinNow(body, bodyStyle);
+  // A crowd in the base style wears the base mesh's crowd count (basebody.js), placed on its low-detail rings.
+  const crowdBase = simple && (look.bodyStyle ?? BODY_STYLE) === 'base';
+  const built = simple ? buildLoftBody(body, { lowDetail: true, ...(crowdBase ? { base: true } : {}) }) : ready ?? skinNow(body, bodyStyle);
   const dressLook = dressFor(body.inputs, corner);
   // A machine (`armor.robot`) is drawn in rigid shells over its bones, not a skin: the body mesh is left empty.
   const machine = Boolean(dressLook.armor?.robot);
@@ -2242,7 +2244,7 @@ function headVariant(root, variant) {
  * `now`: build at once instead (tools, design sheets, tests). `workers`: how many skin workers (skinworker.js) build them where they can be
  * had, so the page's thread only swaps the finished skin in (0: none, all on this thread).
  */
-export const SKIN_BUILD = { slicedStyles: ['v7'], sliceMs: 5, farDistance: 30, now: false, workers: 2 };
+export const SKIN_BUILD = { slicedStyles: ['v7', 'base'], sliceMs: 5, farDistance: 30, now: false, workers: 2 };
 /**
  * A textured skin by the picture's quality tier (levelmode/quality.js: a stage's, 'high' anywhere else): on `low` it keeps its colour
  * and occlusion maps and drops the normal and roughness maps (a cheaper pixel, the anatomy still painted); both programs are compiled

@@ -5,7 +5,8 @@
 // whole body, and no lumps: every ring is a clean ellipse. 'faceted' drops to
 // seven sides and flat normals, for a low-poly art look.
 
-import { P } from './body.js';
+import { buildBody, P } from './body.js';
+import { baseBodyMesh, baseBodyUvs, measureBaseBody, placeBaseBody } from './basebody.js';
 import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
@@ -1777,6 +1778,93 @@ export function runSteps(steps) {
   }
 }
 
+// ---- The base mesh's skin (body style 'base', basebody.js) ------------------------------------------------------------------
+
+/**
+ * A part's depth, width and centre offset along it, read from its own ring maker (`ringAt(t)`: one ring at t, as `along` makes
+ * it), lazily: the ring makers are built in the order the loft needs them, and read only once the rings are all known.
+ */
+function ringProfiles(ringAt, a, b, forward) {
+  const axis = vec.normalize(vec.sub(b, a));
+  const length = vec.length(vec.sub(b, a));
+  const depthAxis = vec.normalize(vec.sub(forward, vec.scale(axis, vec.dot(forward, axis))));
+  return {
+    depth: (t) => ringAt(t).depth,
+    width: (t) => ringAt(t).width,
+    offset: (t) => vec.dot(vec.sub(ringAt(t).center, vec.add(a, vec.scale(axis, t * length))), depthAxis),
+  };
+}
+
+// The base mesh measured against its reference body's rings, once per sex and detail (basebody.js measureBaseBody).
+const BASE_RIGS = new Map();
+/** The options a base skin is built with (and measured with: the trunk's profiles depend on them): a fighter's, or a crowd's. */
+export const baseLoftOptions = (crowd) => (crowd ? { lowDetail: true } : { sculpt: 'rules', rules: { share: 0, density: 'medium' }, hideCovered: true });
+function baseRigOf(sex, crowd) {
+  const key = `${sex}|${crowd}`;
+  if (!BASE_RIGS.has(key)) {
+    const mesh = baseBodyMesh(sex, crowd);
+    const reference = buildBody(mesh.reference);
+    const { baseParts } = buildLoftBody(reference, { ...baseLoftOptions(crowd), base: { measure: true } });
+    BASE_RIGS.set(key, { ...measureBaseBody(mesh, baseParts, reference.heightM), refTraits: sculptTraits(reference) });
+  }
+  return BASE_RIGS.get(key);
+}
+
+// How much of a muscle's edges show through a fat layer (m): all under SCULPT.definedTo, none over definedFrom.
+const definedBy = (fat) => {
+  const t = Math.min(1, Math.max(0, (fat - SCULPT.definedFrom) / (SCULPT.definedTo - SCULPT.definedFrom)));
+  return t * t * (3 - 2 * t);
+};
+// Each skin part's fat, by its sculpt.js trait.
+const BASE_TRAIT = { trunk: 'trunk', neck: 'trunk', Upper: 'arm', Fore: 'fore', Thigh: 'thigh', Shin: 'shank' };
+
+/**
+ * The base mesh placed on this body's parts (`parts`, gathered by the loft) and added to the mesh as its skin: each drawn point
+ * with its part's bones (the trunk's own lists), its place along and round the part (coverage reads it), its tile coordinates
+ * (`uv`: the textured styles'); `height` his standing height (m). The muscle relief the mesh was modelled with shows by how defined each part is against the
+ * reference's (fat smooths it: basebody.js BASE_BODY smooth*); never more than modelled.
+ */
+function addBaseSkin(mesh, rig, parts, traits, uv, height) {
+  const relief = (name) => {
+    const key = BASE_TRAIT[name] ?? BASE_TRAIT[name.slice(1)];
+    const modelled = definedBy(rig.refTraits[key].fat);
+    return modelled <= 0 ? 1 : Math.min(1, definedBy(traits[key].fat) / modelled);
+  };
+  const { positions } = placeBaseBody(rig, parts, relief, height);
+  const uvs = uv ? baseBodyUvs(rig) : null;
+  const start = mesh.positions.length / 3;
+  const { render } = rig;
+  for (let index = 0; index < render.count; index += 1) {
+    const name = rig.names[render.part[index]];
+    const point = [positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]];
+    mesh.positions.push(...point);
+    mesh.weightPositions.push(...point);
+    mesh.colors.push('skin');
+    mesh.bones.push(parts[name].bones ? parts[name].bones(render.t[index], Math.cos(render.angle[index])) : null);
+    mesh.ringT.push(render.t[index]);
+    mesh.ringA.push(render.angle[index]);
+    if (uvs) mesh.uvs.set(start + index, [uvs[index * 2], uvs[index * 2 + 1]]);
+  }
+  for (const index of rig.triangles) mesh.indices.push(start + index);
+  for (const [name, [from, to]] of Object.entries(rig.ranges)) mesh.parts[name] = [start + from, start + to];
+  mesh.base = { start, count: render.count, source: render.source, sources: rig.sources.count };
+}
+
+/** The base skin's points drawn more than once (a seam, a tile's edge) given one normal: the mean of theirs. */
+function weldBaseNormals(normals, base) {
+  const sums = new Float64Array(base.sources * 3);
+  for (let index = 0; index < base.count; index += 1) {
+    const from = (base.start + index) * 3;
+    const to = base.source[index] * 3;
+    for (let axis = 0; axis < 3; axis += 1) sums[to + axis] += normals[from + axis];
+  }
+  for (let index = 0; index < base.count; index += 1) {
+    const from = base.source[index] * 3;
+    const length = Math.hypot(sums[from], sums[from + 1], sums[from + 2]) || 1;
+    for (let axis = 0; axis < 3; axis += 1) normals[(base.start + index) * 3 + axis] = sums[from + axis] / length;
+  }
+}
+
 /** A body's loft, built now (see buildLoftBodySteps). */
 export function buildLoftBody(body, options = {}) {
   return runSteps(buildLoftBodySteps(body, options));
@@ -1795,7 +1883,13 @@ export function coveredRegions(body) {
  * dear style (V7's wrap onto the flesh field) can be built a few milliseconds a frame. `hideCovered`: under armour, the skin a
  * closed piece covers is left out of the mesh (coveredRegions); `coverOnly`: stop once that is known (no mesh worth having).
  */
-export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, sculpt = false, rules = null, fillet = false, wrap = null, hideCovered = false, coverOnly = false } = {}) {
+export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, sculpt = false, rules = null, fillet = false, wrap = null, hideCovered = false, coverOnly = false, base = null } = {}) {
+  // `base`: the skin parts are the base mesh's (basebody.js) placed on this body's rings, not lofted; `base.measure` stops once the
+  // rings are known and returns them (`baseParts`: what the base mesh is measured against, baseRigOf).
+  const baseRig = base && !base.measure ? baseRigOf(body.inputs.sex === 'female' ? 'female' : 'male', lowDetail) : null;
+  const baseParts = base ? {} : null;
+  // The base mesh's own broad forms (sculpt.js mass shapes) on every body, crowds and armour too: its rings must be the same ones it was measured on.
+  const baseTraits = base ? sculptTraits(body) : null;
   // Bent by anatomy (`sculpted`): `sculpt: true` with all its fine detail on fine rings (`detailed`); `sculpt: 'mass'` only the broad forms, on the usual
   // rings (the detail style adds the rest as shading); `sculpt: 'rules'` the broad forms, the outline's own features and a share of the fine anatomy of
   // skinrules.js (`rules`: { share, fine }: how much of the fine height goes in the mesh, and whether on fine rings), the rest left to the textures.
@@ -1819,7 +1913,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const sculptProfile = ruled ? rulesProfile : stepProfile;
   // The rules' styles draw a fat limb a little fuller than the physics' radius (a heavy man's arms and thighs read as tubes at it):
   // drawn only, the body's own radii are untouched. Not under armour, which is built on the same rings.
-  const limbFatter = (key) => (ruled && !outfitOf(body.inputs).look.armor ? 1 + LOFT.limbFatDrawn * Math.max(0, body.segments[key].skinRadius - body.segments[key].muscleRadius) : 1);
+  // (Not for the base mesh, which carries its own fullness: its rings are the physics' radii.)
+  const limbFatter = (key) => (ruled && !base && !outfitOf(body.inputs).look.armor ? 1 + LOFT.limbFatDrawn * Math.max(0, body.segments[key].skinRadius - body.segments[key].muscleRadius) : 1);
   // Low detail (a crowd): fewer sides and rows, still smooth.
   const sides = faceted ? LOFT.facetedSides : lowDetail ? Math.round(LOFT.sides * 0.6) : LOFT.sides;
   const rows = faceted ? 0.5 : lowDetail ? LOFT.rowDensity * 0.6 : LOFT.rowDensity;
@@ -1960,7 +2055,10 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     trunkCount.push(1.12);
   }
   yield 'trunk shaped';
-  loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, trunkCount), trunkSides, { bones: abdomen, ...(sculpted ? { bend: ruledBend(trunkShape, 'trunk', null, coveredTrunk) } : {}), ...skinUv('trunk'), part: 'trunk' });
+  // The base mesh's trunk: on the body's own width, depth and lean (its belly's bulge in them), without the apron's hem.
+  // (The belly's bulge left out: the base mesh's belly is its own round mass, not a deeper ring.)
+  if (base) baseParts.trunk = { a: at('pelvis'), b: at('neck'), forward, depth: (u) => unbulged(bodyDepth, 1)(u), width: bodyWidth, offset: (u) => unbulged(bodyLean, 0.8)(u), bend: trunkShapes(body, baseTraits).mass, bones: (t, front) => abdomen({ t }, front) };
+  else loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, trunkCount), trunkSides, { bones: abdomen, ...(sculpted ? { bend: ruledBend(trunkShape, 'trunk', null, coveredTrunk) } : {}), ...skinUv('trunk'), part: 'trunk' });
   mesh.covers.trunk = coveredTrunk;
   // Kit is geometry, not paint: shorts, waistband and (for women) a sports
   // top are lofts a little proud of the skin, so their edges are crisp.
@@ -2312,7 +2410,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   for (const [hem, flare, inflate, paint] of armorPieces(over, 'skirt', 'l')) tablePiece(skirtRings(skirtTo(hem), count(6), flare), inflate, paint, () => hanging3);
   // The neck thickens a little with fat (the roll under the jaw and at the nape is in the shape).
   const neckGirth = sculpted ? 1 + 3.4 * Math.max(0, traits.trunk.fat - 0.03) : 1;
-  loft(mesh, along(at('neck'), at('head'), forward, ruled ? skinCount(5) : skinCount(3), ruled ? -0.2 : -0.05, 0.6, () => neckR * neckGirth, () => neckR * 1.05 * neckGirth), ruled ? 28 : fine ? SCULPT.limbSides + 4 : sides, { capEnd: false, ...(sculpted ? { bend: ruled && !armoured ? rulesShape(rulesOf, 'neck', null, rulesShare, neckShape(traits, false)) : neckShape(traits, detailed) } : {}), ...skinUv('neck'), part: 'neck' });
+  if (base) baseParts.neck = { a: at('neck'), b: at('head'), forward, depth: () => neckR * neckGirth, width: () => neckR * 1.05 * neckGirth, offset: () => 0, bend: neckShape(baseTraits, false) };
+  else loft(mesh, along(at('neck'), at('head'), forward, ruled ? skinCount(5) : skinCount(3), ruled ? -0.2 : -0.05, 0.6, () => neckR * neckGirth, () => neckR * 1.05 * neckGirth), ruled ? 28 : fine ? SCULPT.limbSides + 4 : sides, { capEnd: false, ...(sculpted ? { bend: ruled && !armoured ? rulesShape(rulesOf, 'neck', null, rulesShare, neckShape(traits, false)) : neckShape(traits, detailed) } : {}), ...skinUv('neck'), part: 'neck' });
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
   // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.
   // Plate's gorget flares down over the tops of the breast and back plates, closing the gap between them and the helmet.
@@ -2355,7 +2454,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const sleeveCover = sleeveReach ? [[-0.4, Math.min(1.1, sleeveReach)]] : [];
     const foreCover = topShape?.sleeve > 1 ? [[-0.1, topShape.sleeve - 1]] : [];
     const limbs = sculpted ? { upper: limbShapes(traits, 'arm', side, sleeveCover, armoured), fore: limbShapes(traits, 'fore', side, foreCover, armoured) } : null;
-    loft(mesh, along(shoulder, elbow, armForward, skinCount(10), sculpted ? -0.22 : -0.3, 1.0, upperDepth, upperWidth), skinSides, { capStart: sculpted, ...(limbs ? { bend: ruledBend(limbs.upper, 'upper', side, sleeveCover) } : {}), ...skinUv(`${side}Upper`), part: `${side}Upper` });
+    if (base) {
+      const shapes = { upper: limbShapes(baseTraits, 'arm', side), fore: limbShapes(baseTraits, 'fore', side) };
+      baseParts[`${side}Upper`] = { a: shoulder, b: elbow, forward: armForward, depth: upperDepth, width: upperWidth, offset: () => 0, bend: shapes.upper.mass };
+      baseParts[`${side}Fore`] = { a: elbow, b: hand, forward: armForward, ...ringProfiles((t) => forearmRings(t, t, [t])[0], elbow, hand, armForward), bend: shapes.fore.mass };
+    } else loft(mesh, along(shoulder, elbow, armForward, skinCount(10), sculpted ? -0.22 : -0.3, 1.0, upperDepth, upperWidth), skinSides, { capStart: sculpted, ...(limbs ? { bend: ruledBend(limbs.upper, 'upper', side, sleeveCover) } : {}), ...skinUv(`${side}Upper`), part: `${side}Upper` });
     mesh.covers[`${side}Upper`] = sleeveCover;
     // Forearm: full below the elbow, tapering to the wrist inside the glove
     // (or, bare, on to the wrist above the fist).
@@ -2364,7 +2467,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const forearmRings = (from, to, rings) => tagged(`${side}Fore`, along(elbow, hand, armForward, rings, from, to,
       sculptProfile([[-0.04, upperR * 0.7], [0.2, foreR * 1.05], [0.74, foreR * 0.6], [0.98, foreR * 0.6]]),
       sculptProfile([[-0.04, upperR * 0.72], [0.2, foreR * 1.18], [0.74, foreR * 0.68], [0.98, foreR * 0.7]])));
-    loft(mesh, forearmRings(-0.04, wrist, skinCount(8)), skinSides, { ...(limbs ? { bend: ruledBend(limbs.fore, 'fore', side, foreCover) } : {}), ...skinUv(`${side}Fore`), part: `${side}Fore` });
+    if (!base) loft(mesh, forearmRings(-0.04, wrist, skinCount(8)), skinSides, { ...(limbs ? { bend: ruledBend(limbs.fore, 'fore', side, foreCover) } : {}), ...skinUv(`${side}Fore`), part: `${side}Fore` });
     mesh.covers[`${side}Fore`] = foreCover;
     // Sleeves follow the arm's own shape, deltoid and all, a little off it,
     // from as deep in the shoulder as the arm's skin starts.
@@ -2431,7 +2534,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     // The legs of the bottom: how far down the thigh, then the shin, it runs.
     const legReach = { hakama: [1.04, 0.3], bloomers: [0.42, 0], trunks: [0.42, 0], longShorts: [0.62, 0], splitShorts: [0.28, 0], hikingShorts: [0.55, 0], tights: [1.04, 0.92], trackPants: [1.04, 0.9], pants: [1.04, 0.9], slacks: [1.04, 0.92], jeans: [1.04, 0.9], cargo: [1.04, 0.9], joggers: [1.04, 0.9], bunker: [1.04, 0.93], ragTrousers: [1.04, RAGS.trousers.hem + RAGS.trousers.jag * 1.7] }[bottom?.kind] ?? [0, 0];
     const legs = sculpted ? { thigh: limbShapes(traits, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : [], armoured), shank: limbShapes(traits, 'shank', side, legReach[1] > 0 ? [[-0.3, legReach[1]]] : [], armoured) } : null;
-    loft(mesh, thighRings(-0.14, 1.0, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.thigh, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : []) } : {}), ...skinUv(`${side}Thigh`), part: `${side}Thigh` });
+    if (base) baseParts[`${side}Thigh`] = { a: hip, b: knee, forward: legForward, ...ringProfiles((t) => thighRings(t, t, [t])[0], hip, knee, legForward), bend: limbShapes(baseTraits, 'thigh', side).mass };
+    else loft(mesh, thighRings(-0.14, 1.0, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.thigh, 'thigh', side, legReach[0] > 0 ? [[-0.3, legReach[0]]] : []) } : {}), ...skinUv(`${side}Thigh`), part: `${side}Thigh` });
     mesh.covers[`${side}Thigh`] = legReach[0] > 0 ? [[-0.3, legReach[0]]] : [];
     const legLoose = { hakama: 1.3, bloomers: 1.32, tights: 1.03, trackPants: 1.14, splitShorts: 1.06, trunks: 1.08, longShorts: 1.1, ragTrousers: 1.24, bunker: 1.3 }[bottom?.kind] ?? 1.12;
     const outer = side === 'l' ? 1 : -1;
@@ -2473,7 +2577,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       sculptProfile([[-0.12, shankR * 0.6], [0, shankR * 0.92], [0.28, shankR * 1.1], [0.7, shankR * 0.7], [0.97, shankR * 0.5]]),
       sculptProfile([[-0.12, shankR * 0.6], [0, shankR * 0.9], [0.28, shankR * 0.98], [0.97, shankR * 0.52]]),
       sculptProfile([[0, 0], [0.28, -shankR * 0.18], [0.7, -shankR * 0.05], [1, 0]])));
-    loft(mesh, shinRings(-0.12, 0.97, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.shank, 'shin', side, legReach[1] > 0 ? [[-0.3, legReach[1]]] : []) } : {}), ...skinUv(`${side}Shin`), part: `${side}Shin` });
+    if (base) baseParts[`${side}Shin`] = { a: knee, b: foot, forward: frames[BONE[`${side}Shin`]].x, ...ringProfiles((t) => shinRings(t, t, [t])[0], knee, foot, frames[BONE[`${side}Shin`]].x), bend: limbShapes(baseTraits, 'shank', side).mass };
+    else loft(mesh, shinRings(-0.12, 0.97, skinCount(10)), skinSides, { ...(legs ? { bend: ruledBend(legs.shank, 'shin', side, legReach[1] > 0 ? [[-0.3, legReach[1]]] : []) } : {}), ...skinUv(`${side}Shin`), part: `${side}Shin` });
     mesh.covers[`${side}Shin`] = legReach[1] > 0 ? [[-0.3, legReach[1]]] : [];
     // A plate greave covers the shin: the hose under it is not drawn (it stands wider than the greave at the ankle and showed through).
     if (legReach[1] > 0 && !skirted && !plate) {
@@ -2507,6 +2612,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     if (feet.socks) loft(mesh, shinRings(0.66, 0.75, 1), sides, { color: 'sock', inflate: 1.28, capStart: false, capEnd: false });
   }
 
+  if (base?.measure) return { baseParts };
+  if (baseRig) addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM);
   // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.
   const covered = armor && mesh.cover ? coverTable(mesh.cover, { trunk: [at('pelvis'), at('neck')], neck: [at('neck'), at('head')], ...Object.fromEntries(['l', 'r'].flatMap((side) => [[`${side}Upper`, [at(`${side}Shoulder`), at(`${side}Elbow`)]], [`${side}Fore`, [at(`${side}Elbow`), at(`${side}Hand`)]], [`${side}Thigh`, [at(`${side}Hip`), at(`${side}Knee`)]], [`${side}Shin`, [at(`${side}Knee`), at(`${side}Foot`)]]])) }) : null;
   if (coverOnly) return { covered };
@@ -2522,7 +2629,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     positionArray = relax({ positions: positionArray, indices: indexArray }, fine ? SCULPT.relaxPasses : LOFT.relaxPasses, fine ? SCULPT.relaxAmount : LOFT.relaxAmount, mesh.welds).positions;
     yield 'relaxed';
     colors.forEach((region, vertex) => {
-      if (region !== 'skin') positionArray.set(loose.subarray(vertex * 3, vertex * 3 + 3), vertex * 3);
+      // (The base mesh is a modelled surface, already smooth: relaxing it would only soften its forms.)
+      if (region !== 'skin' || (mesh.base && vertex >= mesh.base.start)) positionArray.set(loose.subarray(vertex * 3, vertex * 3 + 3), vertex * 3);
     });
   }
   // A textured part's seam is one line of points drawn twice: the same normal on both.
@@ -2533,6 +2641,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       const length = Math.hypot(...sum) || 1;
       for (let axis = 0; axis < 3; axis += 1) result[copy * 3 + axis] = result[original * 3 + axis] = sum[axis] / length;
     }
+    if (mesh.base) weldBaseNormals(result, mesh.base);
     return result;
   };
   let normals = smoothNormals();
