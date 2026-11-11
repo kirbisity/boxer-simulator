@@ -54,8 +54,9 @@ export const FACE_SHAPES = {
   // and cheekbones, narrowing through the cheeks to the jaw's corners and on to a defined chin, the face taller than it is wide.
   // A woman's jaw narrower and her chin smaller. The body widens them (photoShape): fat rounds the lower face, training squares
   // the jaw, starving hollows the cheeks.
-  photo: { jawWidth: 0.8, jawAt: 0.56, chinWidth: 0.27, chinLength: 1.12, chinForward: 0.8, faceFront: 1.0, cheek: 0, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
-  photoFemale: { jawWidth: 0.74, jawAt: 0.52, chinWidth: 0.2, chinLength: 1.06, chinForward: 0.76, faceFront: 1.0, cheek: 0.02, crown: 1.02, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
+  // (chinLength 1.08, was 1.12, and the chin's end broader, 0.36, was 0.27: the chin was long and sharp; the jaw kept narrow.)
+  photo: { jawWidth: 0.8, jawAt: 0.56, chinWidth: 0.36, chinLength: 1.08, chinForward: 0.8, faceFront: 1.0, cheek: 0, crown: 1.0, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
+  photoFemale: { jawWidth: 0.74, jawAt: 0.52, chinWidth: 0.28, chinLength: 1.02, chinForward: 0.76, faceFront: 1.0, cheek: 0.02, crown: 1.02, eye: { width: 0.3, height: 0.19, slant: 0, lash: 0.04 } },
 };
 /** A photo head's shape: its sex's real one, widened by the body (facemorph.js weights): fat, a trained jaw, starving. */
 function photoShape(female, morph) {
@@ -387,6 +388,15 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   // (On the base model's own mesh, its nose, lips and eyelids are modelled: the photo's relief map, drawn for a generic face,
   // would set a second nose and mouth on them; only a little of its fine detail is kept.)
   if (photoHead?.ears && skinMaterial.normalScale) skinMaterial.normalScale.set(0.2, 0.2);
+  // (Tried plain: the base model's mesh in the photo's skin tone only, no photo laid on it.)
+  if (photoHead?.ears && PHOTO_HEAD.model.plain && skinMaterial.map) {
+    const flatTone = new THREE.DataTexture(new Uint8Array([204, 204, 204, 255]), 1, 1, THREE.RGBAFormat);
+    flatTone.needsUpdate = true;
+    skinMaterial.map = flatTone;
+    if (skinMaterial.userData.scalp?.faceMap2) skinMaterial.userData.scalp.faceMap2.value = flatTone;
+    skinMaterial.normalMap = null;
+    skinMaterial.needsUpdate = true;
+  }
   // (A photo head keeps its own normals, the face's softened: photohead.js.)
   const skull = new SoftShell(skullGeometry, skinMaterial, body.segments.head.fleshFirmness, { recomputeNormals: !photoHead });
   group.add(skull.mesh);

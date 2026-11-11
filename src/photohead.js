@@ -29,7 +29,9 @@ export const PHOTO_HEAD = {
   // And a real head's proportions over the drawn one's: narrower (`width`: breadth about 0.8 of its length) and the face below
   // the eyes longer (`lowerLength`), so from the front the face is taller than it is wide (hairline to chin about 1.3 times the
   // cheekbones' width).
-  anatomy: { occiput: 0.08, temple: 0.045, zygoma: 0.03, jawEdge: 0.09, width: 0.85, lowerLength: 1.12 },
+  // (lowerLength 1.0, was 1.12: with the construction's own chinLength the face below the eyes came to ~1.25 of the vertex-to-eye
+  // height, where a real face's is about equal (Farkas 1994): the chin long and sharp. The user's call, 2026-11-10.)
+  anatomy: { occiput: 0.08, temple: 0.045, zygoma: 0.03, jawEdge: 0.09, width: 0.85, lowerLength: 1.0 },
   // The face's structure, of the head's radius (unit space) and of the atlas (u round, rows down), before the region's changes.
   nose: { root: 0.05, tip: 0.2, width: 0.013, tipWidth: 0.022, tipHeight: 0.018, wing: 0.06, wingAt: 0.024 },
   brow: { height: 0.018, width: 0.06, depth: 0.03, above: 0.055 },
@@ -46,7 +48,7 @@ export const PHOTO_HEAD = {
   // `relief`: the face model's features stand this much prouder on it than on the drawn head (whose flat face plane set them
   // shallow); `contrast`: a region's departures (its group's nose, lips, brow, cheekbones...) this much stronger, so the
   // facial models of the groups (faceregions.js SHAPE_GROUPS) read apart.
-  model: { on: false, eye: -0.07, mouth: -0.79, noseFootRow: 0.605, relief: 1.35, contrast: 1.5 },
+  model: { on: false, plain: false, eye: -0.07, mouth: -0.79, noseFootRow: 0.605, relief: 1.35, contrast: 1.5 },
   // Of the shading normal, how much is the smooth head's (the rest the face's): softens the nose's and sockets' facets.
   softNormal: 0.4,
   // The shadow under the nose and in the sockets, painted per vertex (1 is none).
