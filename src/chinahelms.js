@@ -36,7 +36,10 @@ export const SHELL_V = 0.1;
  * 勇 in gold (the arsenals' 朱红油贴金勇字盔).
  */
 export const CHINA_FINISHES = {
-  steel: { label: 'Raw steel', colour: '#c3c8cf', metalness: 0.95, roughness: 0.3 },
+  // (Bright, but grey as polished steel reads, not the sky's blue: a neutral base, a little of its light its own colour
+  // and a little less mirror, as the knight's harness has it (wardrobe.js WARDROBE.steel; the looks' steel roughness ~0.4).
+  // Was '#c3c8cf', 0.95, 0.3: under the open sky it went chrome blue; the user's call, 2026-11-11.)
+  steel: { label: 'Raw steel', colour: '#c5c6c7', metalness: 0.85, roughness: 0.38 },
   dark: { label: 'Blackened steel', colour: '#3c3e42', accent: '#b4b9c0', metalness: 0.7, roughness: 0.42 },
   iron: { label: 'Plain iron', colour: '#6c6862', metalness: 0.6, roughness: 0.6 },
   red: { label: 'Vermilion lacquer, 勇 in gold', colour: '#b51f1a', metalness: 0.08, roughness: 0.42, glyph: '#ecd28c' },
@@ -284,17 +287,50 @@ export const TASSELS = {
  * point, head radii up), falling `length`, kept out of the helmet's `hull` ([y, radius] up the axis) as it swings.
  */
 /**
- * The cloth hood worn under a Ming soldier's helmet (the user's photograph of Qi Jiguang's men: a cream hood under the
- * kettle hat, over the ears and the neck, the face open; the soldiers of the 平番得胜图 likewise hooded under their
- * helmets): a band of cloth round the head from under the brim (`top`, `bottom`: polar angles from the crown, shares of
- * π) leaving the face open (`open`: half the opening round, a share of π), `radius` head radii out; and its skirt falling
- * from it round the neck onto the shoulders (`skirt`: radius at its top and its hem, its height, its centre's y and x, in
- * head radii; `behind`: how far round it goes, a share of 2π, centred behind). Plain cotton, drawn cheaply (wardrobe.js mingHat `hood`).
+ * The cloth hood worn under a Ming soldier's helmet (the user's photograph of Qi Jiguang's men: an unbleached hood under
+ * the kettle hat, wrapped round the head and the neck, the face open; the soldiers of the 平番得胜图 likewise hooded under
+ * their helmets): one closed wrap of cloth following the head and the neck a few millimetres out, from under the brim
+ * down round the sides of the face, in under the jaw at the sides, down the back and sides of the neck and out over the
+ * collar onto the shoulders in soft folds. `profile`: [y, scale, centre x] down it (head radii; the scale of the wrap's
+ * ellipse `ellipse` [front, side] at that height, the centre moved back where the neck is behind the face). The face
+ * open (`face`: [y, half the opening round, a share of π] from the brow under the brim to below the chin, where it
+ * closes). The folds: `folds` round it, standing `fold` (share of the radius) in and out, growing from `foldFrom` (y) down.
  */
 export const MING_HOOD = {
-  radius: 1.12, top: 0.3, bottom: 0.72, open: 0.27,
-  skirt: { top: 0.98, hem: 1.42, tall: 1.2, y: -1.05, x: -0.08, behind: 0.72 },
+  ellipse: [1.03, 0.95],
+  profile: [[0.34, 1.07, 0], [0.05, 1.08, 0], [-0.35, 1.04, 0], [-0.7, 0.95, -0.03], [-1.0, 0.8, -0.1], [-1.3, 0.8, -0.12], [-1.6, 1.02, -0.12], [-1.88, 1.34, -0.1]],
+  face: [[0.34, 0.33], [-0.4, 0.31], [-0.8, 0.24], [-1.02, 0.1], [-1.12, 0]],
+  folds: 9, fold: 0.03, foldFrom: -1.0,
 };
+
+/** The hood's surface (MING_HOOD) as a grid: rows down its profile (`rows` between each two of its points), `cols` round from
+ * one edge of the face opening to the other (once round where it is closed); each point [x, y, z] in head radii (x forward, z left). */
+export function mingHoodGrid(hood = MING_HOOD, { rows = 4, cols = 40 } = {}) {
+  const at = (points, y, index) => {
+    for (let k = 0; k < points.length - 1; k += 1) {
+      const [y0, y1] = [points[k][0], points[k + 1][0]];
+      if (y <= y0 && y >= y1) {
+        const t = (y0 - y) / (y0 - y1);
+        return points[k][index] + (points[k + 1][index] - points[k][index]) * t;
+      }
+    }
+    return y > points[0][0] ? points[0][index] : points.at(-1)[index];
+  };
+  const ys = [];
+  for (let k = 0; k < hood.profile.length - 1; k += 1) for (let i = 0; i < rows; i += 1) ys.push(hood.profile[k][0] + (hood.profile[k + 1][0] - hood.profile[k][0]) * (i / rows));
+  ys.push(hood.profile.at(-1)[0]);
+  return ys.map((y) => {
+    const scale = at(hood.profile, y, 1);
+    const centre = at(hood.profile, y, 2);
+    const open = y < hood.face.at(-1)[0] ? 0 : at(hood.face, y, 1) * Math.PI;
+    const deep = Math.max(0, Math.min(1, (hood.foldFrom - y) / (hood.foldFrom - hood.profile.at(-1)[0])));
+    return Array.from({ length: cols + 1 }, (_, c) => {
+      const phi = open + (c / cols) * (Math.PI * 2 - 2 * open);
+      const fold = 1 + hood.fold * deep * Math.sin(phi * hood.folds);
+      return [centre + Math.cos(phi) * hood.ellipse[0] * scale * fold, y, Math.sin(phi) * hood.ellipse[1] * scale * fold];
+    });
+  });
+}
 
 export const HONGYING_MOUNTS = {
   mingHelm: { top: 2.78, length: 0.85, spike: [2.6, 3.3], hull: [[1.62, 0.7], [1.92, 0.43], [2.08, 0.24], [2.62, 0.19], [2.8, 0.1]] },

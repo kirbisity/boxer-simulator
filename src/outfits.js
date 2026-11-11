@@ -291,7 +291,7 @@ function mingBrigandineDesign(label, cloth, iron, look = {}, helm = {}, extra = 
 // hat over a cream cloth hood (chinahelms.js MING_HELMS rivetedTube; wardrobe.js mingHat `hood`). The sleeves are the coat's
 // (loftbody.js ARMOR_KINDS.mingEliteInfantry), so the padded coat under it shows only at the neck and the joints: the coat's cloth, darker.
 function mingEliteInfantryDesign(label, cloth, bind = shade(cloth, 0.35), extra = {}) {
-  return { label, ...extra, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingEliteInfantry', color: '#b9bec5', cloth, cloth2: bind, gold: '#c9a24a', leather: '#2a1d14' }, head: { kind: 'mingHat', color: '#8f949b', tassel: '#b3161b', design: 'rivetedTube', finish: 'steel', hood: '#bfb291' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+  return { label, ...extra, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingEliteInfantry', color: '#b9bec5', cloth, cloth2: bind, gold: '#c9a24a', leather: '#2a1d14' }, head: { kind: 'mingHat', color: '#8f949b', tassel: '#b3161b', design: 'rivetedTube', finish: 'steel', hood: '#a3977a' }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
