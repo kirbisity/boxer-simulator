@@ -20,6 +20,8 @@ import { disposeObject, doubleSided, outlineFor, surface } from './toon.js';
 import { armourDetailMaterial } from './detailtex.js';
 import { DETAIL_ARMOUR } from './detailmaps.js';
 import { buildRobotDogView, disposeRobotDogView, updateRobotDogView } from './robotdogview.js';
+import { HORSE_BASE_DATA } from './horsebase-data.js';
+import { SoftShell } from './soft.js';
 
 const HORSE_LOOK = {
   outline: 0.005,
@@ -30,6 +32,13 @@ const HORSE_LOOK = {
   variety: 12,
   // Horses beyond this many in a fight are drawn in low detail.
   crowd: 4,
+  // The user's horse model (lowPolyHorse.blend, horsebase-data.js) in place of the lofted body, neck, head and legs: one
+  // skinned mesh moved by the same frames, its coat texture tinted to the horse's coat, its flesh a soft body (soft.js) that
+  // dents where it is struck and sways with the gait (`sway`: dent impulse per m/s² of the body's bob, N·s). The tack, the
+  // barding, the mane and the tail's hair kept. Off until the user has seen it (the user's call, 2026-11-10).
+  base: false,
+  sway: 0.9,
+  firmness: 0.45,
 };
 
 const horseUp = new THREE.Vector3(0, 1, 0);
@@ -237,6 +246,7 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
     }
     legs[leg.key] = pieces;
   }
+  const base = HORSE_LOOK.base && !low ? buildBaseHorse(view, horse, rig, group, legs) : null;
   // Hair and cloth that move: made per horse.
   const hang = {};
   if (!low) {
@@ -248,7 +258,7 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
   }
   view.scene.add(group);
   return {
-    horse, model, group, body, frame, neck, head, ears, legs, hang, owned, detail,
+    horse, model, group, body, frame, neck, head, ears, legs, hang, owned, detail, base,
     drawn: { ...horse, capsules: [], legs: {} },
     clock: null, lastTime: null, gaitRoll: 0, lameLeg: null,
   };
@@ -717,6 +727,7 @@ export function updateHorseView(view, world = null) {
       layHorsePart(pieces.hoof.holder, coronet, vec.add(coronet, axisDown), forward);
     }
   }
+  if (view.base) updateBaseHorse(view, horse, dt);
   // Hair and cloth hang from where everything now is.
   if (view.hang.tail) {
     view.group.updateMatrixWorld(true);
@@ -728,6 +739,146 @@ export function updateHorseView(view, world = null) {
     updateStirrups(view.hang.stirrups, rig, view.frame, horse, rider, dt);
     updateReins(view.hang.reins, rig, view.head, view.frame, horse, rider);
   }
+}
+
+// ---- The user's horse model ---------------------------------------------------------------
+
+const BASE_TABLES = {};
+/** The model's arrays, decoded once. */
+function baseHorseData() {
+  if (BASE_TABLES.data) return BASE_TABLES.data;
+  const bytes = (text) => {
+    const raw = atob(text);
+    const out = new Uint8Array(raw.length);
+    for (let index = 0; index < raw.length; index += 1) out[index] = raw.charCodeAt(index);
+    return out.buffer;
+  };
+  const points = new Int16Array(bytes(HORSE_BASE_DATA.points));
+  const uvs = new Uint16Array(bytes(HORSE_BASE_DATA.uvs));
+  BASE_TABLES.data = {
+    points: Float32Array.from(points, (value) => value / 16000),
+    uvs: Float32Array.from(uvs, (value) => value / 65535),
+    triangles: Array.from(new Uint16Array(bytes(HORSE_BASE_DATA.triangles))),
+    weights: new Uint8Array(bytes(HORSE_BASE_DATA.weights)),
+  };
+  return BASE_TABLES.data;
+}
+
+/** The coat texture, loaded once. */
+function baseHorseTexture() {
+  if (!BASE_TABLES.texture) {
+    BASE_TABLES.texture = new THREE.TextureLoader().load(HORSE_BASE_DATA.image);
+    BASE_TABLES.texture.flipY = true;
+  }
+  return BASE_TABLES.texture;
+}
+
+/** A frame from `from` to `to` (y along it, x towards `forward`), as layHorsePart lays a leg's piece. */
+function baseHorseFrame(from, to, forward, out = new THREE.Matrix4()) {
+  horseY.set(to[0] - from[0], to[1] - from[1], to[2] - from[2]).normalize();
+  horseX.set(forward[0], forward[1], forward[2]);
+  horseX.addScaledVector(horseY, -horseX.dot(horseY)).normalize();
+  horseZ.crossVectors(horseX, horseY);
+  out.makeBasis(horseX, horseY, horseZ);
+  out.setPosition(from[0], from[1], from[2]);
+  return out;
+}
+
+/**
+ * The user's horse as one skinned mesh over the horse's frames: the body (the view's frame), the neck, the head, and each
+ * leg's upper leg, cannon and pastern (the pieces' holders, placed each frame from the gait). Bound where the view's frames
+ * are at rest (a standing horse at the origin): the body at the frame, the neck and the head at the rig's pivot and poll, each
+ * leg's piece along the model's own bone, stretched along it to the game's length of that piece. The lofted coat is hidden.
+ */
+function buildBaseHorse(view, horse, rig, group, legs) {
+  const data = baseHorseData();
+  const W = horse.withers;
+  const count = data.points.length / 3;
+  const positions = new Float32Array(count * 3);
+  for (let index = 0; index < positions.length; index += 1) positions[index] = data.points[index] * W;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2));
+  geometry.setIndex(data.triangles);
+  const skinIndex = new Uint16Array(count * 4);
+  const skinWeight = new Float32Array(count * 4);
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    const first = data.weights[vertex * 3 + 2] / 255;
+    skinIndex[vertex * 4] = data.weights[vertex * 3];
+    skinIndex[vertex * 4 + 1] = data.weights[vertex * 3 + 1];
+    skinWeight[vertex * 4] = first;
+    skinWeight[vertex * 4 + 1] = 1 - first;
+  }
+  geometry.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
+  geometry.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
+  geometry.computeVertexNormals();
+  // The bind: each part's frame at rest, the leg pieces stretched to the game's lengths.
+  const joints = HORSE_BASE_DATA.joints;
+  const forward = [1, 0, 0];
+  const at = (point) => point.map((value) => value * W);
+  const lengths = rig.lengths;
+  const inverses = [];
+  inverses.push(new THREE.Matrix4());
+  inverses.push(new THREE.Matrix4().makeTranslation(...rig.neckPivot).invert());
+  inverses.push(new THREE.Matrix4().makeTranslation(rig.neckPivot[0] + rig.poll[0], rig.neckPivot[1] + rig.poll[1], rig.neckPivot[2] + rig.poll[2]).invert());
+  for (const key of ['lFore', 'rFore', 'lHind', 'rHind']) {
+    const j = joints[key];
+    const pieces = [[j.root, j.knee, lengths.upper], [j.knee, j.fetlock, lengths.cannon], [j.fetlock, j.hoof, lengths.pastern + lengths.hoof]];
+    for (const [from, to, length] of pieces) {
+      const frame = baseHorseFrame(at(from), at(to), forward);
+      const modelled = vec.length(vec.sub(at(to), at(from))) || 1e-6;
+      inverses.push(new THREE.Matrix4().makeScale(1, length / modelled, 1).multiply(frame.invert()));
+    }
+  }
+  const bones = inverses.map(() => {
+    const bone = new THREE.Bone();
+    bone.matrixAutoUpdate = false;
+    return bone;
+  });
+  const material = surface(0xffffff, {});
+  material.map = baseHorseTexture();
+  const coat = new THREE.Color(horse.coat ?? '#6a4a2a');
+  const mean = HORSE_BASE_DATA.coatMean;
+  material.color.setRGB(Math.min(2, coat.r / mean[0]), Math.min(2, coat.g / mean[1]), Math.min(2, coat.b / mean[2]));
+  material.skinning = true;
+  material.needsUpdate = true;
+  const mesh = new THREE.SkinnedMesh(geometry, material);
+  mesh.bindMode = 'detached';
+  mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
+  mesh.frustumCulled = false;
+  mesh.castShadow = true;
+  view.scene.add(mesh);
+  const soft = new SoftShell(geometry, material, HORSE_LOOK.firmness, { mesh, recomputeNormals: false });
+  // The lofted coat hidden (its tack and barding kept).
+  const coatMaterial = view.horseMaterials.soft;
+  group.traverse((object) => { if (object.isMesh && object.material === coatMaterial) object.visible = false; });
+  for (const pieces of Object.values(legs)) for (const piece of Object.values(pieces)) piece.holder.traverse((object) => { if (object.isMesh && object.material === coatMaterial) object.visible = false; });
+  return { mesh, bones, soft, lastBob: null, lastRate: 0 };
+}
+
+/** Each frame: the bones from the view's frames, and the flesh swayed by the body's bob (its vertical acceleration). */
+function updateBaseHorse(view, horse, dt) {
+  const base = view.base;
+  view.group.updateMatrixWorld(true);
+  const sources = [view.frame, view.neck, view.head];
+  for (const key of ['lFore', 'rFore', 'lHind', 'rHind']) for (const piece of ['upper', 'cannon', 'pastern']) sources.push(view.legs[key]?.[piece]?.holder ?? view.frame);
+  sources.forEach((source, index) => {
+    source.updateMatrixWorld(true);
+    base.bones[index].matrixWorld.copy(source.matrixWorld);
+  });
+  // The belly and the flanks swing with the bob of the stride: an impulse into the flesh by the body's vertical acceleration.
+  const bob = view.group.position.y;
+  if (base.lastBob !== null && dt > 0) {
+    const rate = (bob - base.lastBob) / dt;
+    const accel = (rate - base.lastRate) / dt;
+    base.lastRate = rate;
+    if (Math.abs(accel) > 0.5) {
+      const W = horse.withers;
+      base.soft.dentLocal(new THREE.Vector3(-0.05 * W, 0.42 * W, 0), Math.min(6, Math.abs(accel)) * HORSE_LOOK.sway * dt * 10);
+    }
+  }
+  base.lastBob = bob;
+  base.soft.update(dt);
 }
 
 /** Remove a horse's model. */

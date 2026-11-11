@@ -15,7 +15,9 @@ export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KE
   || /^audio\/music\/data\//.test(name)
   // (Story mode's ground, its walls and ladders, is kept: worksview.js draws ladders on any battle's works.)
   || /^story\/(?!ground\/)/.test(name)
-  || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
+  || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name)
+  // (The base-model head's table: its head is off, PHOTO_HEAD.model.on.)
+  || name === 'headmodel-data';
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
 const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];
@@ -53,6 +55,10 @@ const missing = (what) => `() => { throw new Error('${what}: not in the custom b
 
 /** Stand-ins for the excluded modules that kept code imports, by module (ES module source, as a module file would be). */
 export const CUSTOM_STUBS = {
+  // The base-model head is off (photohead.js PHOTO_HEAD.model.on): its table not carried.
+  'headmodel-data': `
+export const HEAD_MODEL_DATA = { polars: 0, azimuths: 0, male: {}, female: {} };
+`,
   // Story mode (src/story/): not here; the page's hooks into it inert.
   'story/storyview': `
 export function installStory() {
