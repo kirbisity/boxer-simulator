@@ -2070,11 +2070,25 @@ const punctureOdds = (share) => share / (1 - share);
  */
 export const EDGE_PROOF = { joules: 120, at: 0.88, power: 1, spread: 0.3, most: 0.995 };
 
+/** The `cut` whose edge proof (edgeProofOf, at the middle draw) is `joules`: two layers as one of their summed proofs. */
+export function cutOfEdgeProof(joules) {
+  if (!(joules > 0)) return 0;
+  const odds = (joules / EDGE_PROOF.joules) ** (1 / EDGE_PROOF.power) * punctureOdds(EDGE_PROOF.at);
+  return Math.min(EDGE_PROOF.most, odds / (1 + odds));
+}
+
 /** The joules of edge armour of this `cut` stops outright (EDGE_PROOF), at the strike's draw `roll` (0..1). */
 export function edgeProofOf(cut, roll = 0.5) {
   const share = Math.min(EDGE_PROOF.most, Math.max(0, cut ?? 0));
   if (share <= 0) return 0;
   return EDGE_PROOF.joules * (punctureOdds(share) / punctureOdds(EDGE_PROOF.at)) ** EDGE_PROOF.power * (1 + EDGE_PROOF.spread * (2 * roll - 1));
+}
+
+/** The `pierce` whose puncture (punctureOf, a point `width` m across) is `joules`: two layers worn one over the other (outfits.js layeredProtection) as one of their summed punctures. */
+export function pierceOfPuncture(joules, width = PUNCTURE.width) {
+  if (!(joules > 0)) return 0;
+  const odds = (joules / (PUNCTURE.joules * (width / PUNCTURE.width))) ** (1 / PUNCTURE.power) * punctureOdds(PUNCTURE.at);
+  return Math.min(PUNCTURE.most, odds / (1 + odds));
 }
 
 /** The joules a point `width` m across must bring to go through armour of this `pierce` (PUNCTURE). */

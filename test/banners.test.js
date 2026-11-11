@@ -21,9 +21,9 @@ test('the banner coat guards near the Ming elite\'s, above the regular brigandin
   const brigandine = OUTFITS.mingBrigandine;
   const elite = OUTFITS.mingElite;
   for (const kind of ['blunt', 'cut', 'pierce']) assert.ok(banner.protection[kind] >= brigandine.protection[kind], kind);
-  for (const kind of ['cut', 'pierce']) assert.ok(Math.abs(banner.protection[kind] - elite.protection[kind]) <= 0.05, kind);
-  // The thick quilted cotton takes a blunt blow better than the elite's coat.
-  assert.ok(banner.protection.blunt > elite.protection.blunt);
+  // The same coat of plates as the Ming elite's and the Bayara's (outfits.js PLATE_COAT, 2026-11-10): what differs is what is worn with it.
+  for (const kind of ['blunt', 'cut', 'pierce']) assert.equal(banner.protection[kind], elite.protection[kind], kind);
+  for (const kind of ['blunt', 'cut', 'pierce']) assert.equal(OUTFITS.bayara.protection[kind], banner.protection[kind], kind);
   assert.ok(banner.extraMass > brigandine.extraMass && banner.extraMass <= elite.extraMass);
   assert.deepEqual(banner.designs.map((design) => design.label), ['Plain Yellow', 'Bordered Yellow', 'Plain White', 'Bordered White', 'Plain Red', 'Bordered Red', 'Plain Blue', 'Bordered Blue']);
   // The bordered banners bound in red, the bordered red in white; the plain in their own colour.

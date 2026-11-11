@@ -4,14 +4,19 @@ import { gearTraits, layeredProtection, UNDER_ARMOUR } from '../src/outfits.js';
 import { bannerman } from '../src/cast.js';
 import { protectionAt, seededRandom } from '../src/physics.js';
 import { gapUnder } from '../src/physics/gaps.js';
+import { edgeProofOf, punctureOf } from '../src/weapons.js';
 
 const mail = UNDER_ARMOUR.mail;
 
 test('a layer under a coat stops what its material stops of what the coat lets through, only where it lies', () => {
   const coat = { blunt: 0.7, cut: 0.9, pierce: 0.7, bullet: { head: 0.4, torso: 0.5, limb: 0.1 } };
   const both = layeredProtection(coat, mail);
-  assert.ok(Math.abs(both.regions.torso.pierce - (1 - 0.3 * (1 - mail.guard.pierce))) < 1e-9);
-  assert.ok(Math.abs(both.regions.UpperArm.cut - (1 - 0.1 * (1 - mail.guard.cut))) < 1e-9);
+  // An edge or a point breaks through each in turn: their proofs add (weapons.js EDGE_PROOF, PUNCTURE); a blow spread by each.
+  assert.ok(Math.abs(punctureOf(both.regions.torso.pierce) - (punctureOf(0.7) + punctureOf(mail.guard.pierce))) < 1e-6);
+  assert.ok(Math.abs(edgeProofOf(both.regions.UpperArm.cut) - (edgeProofOf(0.9) + edgeProofOf(mail.guard.cut))) < 1e-6);
+  assert.ok(Math.abs(both.regions.torso.blunt - (1 - 0.3 * (1 - mail.guard.blunt))) < 1e-9);
+  // Not compounded past either: the coat and the shirt together short of plate.
+  assert.ok(both.regions.torso.cut < 0.95 && both.regions.torso.cut > 0.9);
   assert.ok(Math.abs(both.bullet.torso - (1 - 0.5 * (1 - mail.bullet))) < 1e-9);
   // The head and the forearms are not under the shirt.
   assert.equal(both.regions.head, undefined);

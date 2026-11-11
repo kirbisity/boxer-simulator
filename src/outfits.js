@@ -16,6 +16,7 @@
 // Colours may be hex or 'corner' (red or blue by side).
 
 import { HELM_NAMES, OUTFIT_BLURBS, OUTFIT_SETS } from './outfitsets.js';
+import { cutOfEdgeProof, edgeProofOf, pierceOfPuncture, punctureOf } from './weapons.js';
 
 export const DAMAGE_TYPES = ['blunt', 'cut', 'pierce'];
 
@@ -519,6 +520,24 @@ export function heelFooting(heels) {
  * hardened steel (pierce 0.93, under plate's 0.95: PIERCE_SCALE); a blow spread as plate spreads it, over the quilted sleeve under it.
  */
 const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
+
+/**
+ * A coat of plates (the Ming and the Later Jin's mianjia, 棉甲): iron plates riveted inside a long coat of thick quilted cotton,
+ * many layers deep, under a cloth or brocade face, its studs the rivets' heads. The Ming elite's, the banner man's and the
+ * Bayara's are the same make (the Bayara were guarded as the Ming elite's household men were, no better: the same coat of plates
+ * under silk), so the same figures wherever it is worn: the trunk, the skirt over the thighs and shins, the sleeves where no steel
+ * guard is over them. The quilting spreads a blow (blunt 0.72); the plates turn an edge (cut 0.93); a point as a brigandine's
+ * (pierce 0.85, PIERCE_SCALE). What sets the kits apart is what else they wear: steel arm guards (MING_ARM_GUARD), mail under it
+ * (UNDER_ARMOUR.mail), a mask. (Each kit had its own figures for the coat: the Ming elite's 0.7 / 0.95 / 0.87, the coat itself
+ * credited with what its arm guards and lapping give; the user's call, 2026-11-10.)
+ */
+const PLATE_COAT = { blunt: 0.72, cut: 0.93, pierce: 0.85 };
+
+/**
+ * The Ming soldier's brigandine (a vest of plates, no sleeves): the same plates inside a thinner padded coat, one plate deep
+ * where the coat of plates laps: a blow spread a little less, an edge a little less turned; a point as any brigandine's.
+ */
+const PLATE_VEST = { blunt: 0.66, cut: 0.9, pierce: 0.85 };
 
 /**
  * Japanese limb armour: the kote's sleeves, the haidate's apron over the thighs, the suneate's shin guards. Iron splints
@@ -1345,8 +1364,10 @@ export const OUTFITS = {
     // 0.9, a brigandine's (PIERCE_SCALE; was 0.47, lowered for the arms it leaves bare, which are their own region). Over the trunk and the skirt; the vest has no sleeves, so the arms have only the quilted
     // cotton of the coat under it (a padded jack's sleeve: some of a blow spread, an edge slowed, a point little). The lamellar and the scale
     // (outfitsets.js) keep their arm guards and their arms' protection.
+    // The vest's plates as the coat of plates' but thinner padded (PLATE_VEST; was 0.63 / 0.8 / 0.85, the user's call, 2026-11-10:
+    // a good guard over the trunk, only the arms bare).
     protection: {
-      blunt: 0.63, cut: 0.8, pierce: 0.85, bullet: { head: 0.3, torso: 0.5, limb: 0 },
+      ...PLATE_VEST, bullet: { head: 0.3, torso: 0.5, limb: 0 },
       regions: { UpperArm: { blunt: 0.25, cut: 0.3, pierce: 0.15 }, Forearm: { blunt: 0.25, cut: 0.3, pierce: 0.15 } },
     },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
@@ -1394,7 +1415,8 @@ export const OUTFITS = {
     // armour of steel reaching the feet on horseback (Frois). So proof against a ball at least as the bullet-tested tōsei dō
     // is (`bulletRating` 900, was 650; the trunk's share 0.55, was 0.5, as the tōsei's), and a blow spread at least as its
     // solid lames spread it (blunt 0.7, was 0.65). Pierce 0.87, over a soldier's brigandine's 0.85 (PIERCE_SCALE) for the coat two plates deep; its seams are its lacing (`gaps`). The arms in the steel arm guards (MING_ARM_GUARD).
-    protection: { blunt: 0.7, cut: 0.95, pierce: 0.87, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { head: { deflects: true }, UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
+    // The coat as the banners' (PLATE_COAT); the arms in the steel arm guards.
+    protection: { ...PLATE_COAT, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { head: { deflects: true }, UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the brigandine coat's plates a little anywhere but the solid plates.
     // (No mail under its gaps: a Ming elite's voiders are not documented as the European ones are; the coat's padding.)
     gaps: { lacing: 0.1 },
@@ -1436,7 +1458,8 @@ export const OUTFITS = {
     // Blunt above the Ming elite's: mianjia is cotton armour, the plates set in thick quilted cotton many layers deep
     // that spreads a club's or a mace's blow over the body as a thin coat of plates does not.
     // Pierce 0.85, a brigandine's (PIERCE_SCALE).
-    protection: { blunt: 0.72, cut: 0.93, pierce: 0.85, bullet: { head: 0.4, torso: 0.5, limb: 0.15 }, regions: { head: { deflects: true } } },
+    // The coat of plates (PLATE_COAT), its sleeves too.
+    protection: { ...PLATE_COAT, bullet: { head: 0.4, torso: 0.5, limb: 0.15 }, regions: { head: { deflects: true } } },
     gaps: { lacing: 0.1 },
     courage: 0.4,
     designs: [
@@ -1474,7 +1497,9 @@ export const OUTFITS = {
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
     // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
     // Pierce 0.85, a brigandine's (PIERCE_SCALE).
-    protection: { blunt: 0.72, cut: 0.95, pierce: 0.85, bullet: { head: 0.4, torso: 0.5, limb: 0.2 }, regions: { head: { deflects: true } } },
+    // The coat of plates (PLATE_COAT: was cut 0.95), the steel arm guards over its sleeves as the Ming elite's (MING_ARM_GUARD:
+    // were the coat's, the user's call, 2026-11-10).
+    protection: { ...PLATE_COAT, bullet: { head: 0.4, torso: 0.5, limb: 0.2 }, regions: { head: { deflects: true }, UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // The coat's lacing parts as the banner coat's does; between the plates and wherever they part, the mail under it (UNDER_ARMOUR.mail `zones`).
     gaps: { lacing: 0.1 },
     courage: 0.45,
@@ -3259,14 +3284,23 @@ function protectionIn(protection, region) {
   return regions[region] ?? (region === 'torso' ? null : regions.limb) ?? protection;
 }
 
-/** A kit's protection with a layer under it (UNDER_ARMOUR): each region it covers guarded by the two in order. */
+/**
+ * A kit's protection with a layer under it (UNDER_ARMOUR): each region it covers guarded by the two in order. An edge or a point
+ * must break through each layer in turn, so their proofs add (the coat's edge proof and the mail's, weapons.js EDGE_PROOF; their
+ * punctures, PUNCTURE), and the region is the one cut and pierce with that summed proof. A blow is spread by each in turn (the share
+ * through each multiplied). (Was the shares through multiplied for the edge and the point too: near 1, the odds of two layers
+ * multiplied far past either: the Bayara's coat over mail came to 0.9925 cut, an edge proof of ~2 kJ, no edge ever through it. The
+ * user's call, 2026-11-10.)
+ */
 export function layeredProtection(protection, layer) {
   if (!layer) return protection;
   const through = (outer, under) => 1 - (1 - (outer ?? 0)) * (1 - under);
+  const cutBoth = (outer, under) => cutOfEdgeProof(edgeProofOf(outer ?? 0) + edgeProofOf(under));
+  const pierceBoth = (outer, under) => pierceOfPuncture(punctureOf(outer ?? 0) + punctureOf(under));
   const regions = { ...protection.regions };
   for (const region of layer.covers) {
     const outer = protectionIn(protection, region);
-    regions[region] = { ...protection.regions?.[region], blunt: through(outer.blunt, layer.guard.blunt), cut: through(outer.cut, layer.guard.cut), pierce: through(outer.pierce, layer.guard.pierce) };
+    regions[region] = { ...protection.regions?.[region], blunt: through(outer.blunt, layer.guard.blunt), cut: cutBoth(outer.cut, layer.guard.cut), pierce: pierceBoth(outer.pierce, layer.guard.pierce) };
   }
   return { ...protection, bullet: { ...protection.bullet, torso: through(protection.bullet?.torso, layer.bullet) }, regions };
 }

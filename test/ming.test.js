@@ -10,12 +10,14 @@ test('the Ming elite turns blades and arrows nearly as plate does; the brigandin
   const elite = OUTFITS.mingElite;
   // (Its coat's plates are inside a cloth face: a point catches and bites; the steel helmet and arm guards turn it.)
   assert.ok(!elite.deflects && elite.protection.regions.head.deflects && elite.protection.regions.Forearm.deflects);
-  assert.ok(elite.protection.cut >= 0.95);
+  // (The coat as the banners'; the steel arm guards turn an edge as plate does.)
+  assert.ok(elite.protection.regions.Forearm.cut >= 0.95 && elite.protection.cut >= 0.9);
   const brigandine = OUTFITS.mingBrigandine.protection;
   const garrison = OUTFITS.mingGarrison.protection;
   for (const kind of ['blunt', 'cut', 'pierce']) {
     assert.ok(brigandine[kind] > garrison[kind], kind);
-    assert.ok(elite.protection[kind] > brigandine[kind], kind);
+    // (The vest's plates as the coat's: a point the same; the coat's quilting deeper.)
+    assert.ok(elite.protection[kind] >= brigandine[kind] && (kind === 'pierce' || elite.protection[kind] > brigandine[kind]), kind);
   }
   // Some elites wear the steel mask; all the steel neck guard (laminated, over the shoulders) and the throat band.
   assert.ok(elite.designs.some((design) => design.head.mask));
