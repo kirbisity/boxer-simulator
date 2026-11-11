@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBody } from '../src/body.js';
+import { buildBody, P } from '../src/body.js';
+import { bindPoints } from '../src/rig.js';
 import { buildSkinMesh } from '../src/bodystyles.js';
 import { BASE_BODY, baseBodyMesh, baseStarvation, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
 import { baseLoftOptions, buildLoftBody } from '../src/loftbody.js';
@@ -27,21 +28,23 @@ test('the base style builds for every body of the progression: finite, about a f
   }
 });
 
-test('measured and placed again on its own joints and the reference rings, the base mesh comes back as modelled', () => {
+test('the reference build gets the base mesh as modelled: every point where the tool put it, scaled to its height (the forearms aside)', () => {
   for (const sex of ['male', 'female']) {
     const data = baseBodyMesh(sex);
     const reference = buildBody(data.reference);
     const H = reference.heightM;
     const { baseParts } = buildLoftBody(reference, { ...baseLoftOptions(false), base: { measure: true } });
-    const rig = measureBaseBody(data, baseParts, H);
-    // The same rings on the mesh's own joints: every point should land where it was modelled.
-    const own = Object.fromEntries(Object.entries(baseParts).map(([name, part]) => [name, { ...part, a: data.joints[BASE_BODY.axes[name][0]].map((v) => v * H), b: data.joints[BASE_BODY.axes[name][1]].map((v) => v * H) }]));
-    const { sources } = placeBaseBody(rig, own, () => 1, H);
+    const joints = Object.fromEntries(Object.entries(P).map(([name, index]) => [name, bindPoints(reference)[index]]));
+    const rig = measureBaseBody(data, baseParts, H, joints);
+    const { sources } = placeBaseBody(rig, baseParts, () => 1, H, 0, joints);
     let worst = 0;
+    // (All but the forearms, drawn out to the rig's hands: basebody.js BASE_BODY.attached.)
+    const forearm = (index) => /Fore$/.test(data.parts[index]);
     for (let vertex = 0; vertex < data.count; vertex += 1) {
+      if (forearm(data.part[vertex]) || (data.blend[vertex] > 0 && forearm(data.part2[vertex]))) continue;
       worst = Math.max(worst, Math.hypot(...[0, 1, 2].map((axis) => sources[vertex * 3 + axis] - data.positions[vertex * 3 + axis] * H)));
     }
-    assert.ok(worst < 0.0005, `${sex}: a point comes back ${(worst * 1000).toFixed(2)} mm from where it was modelled`);
+    assert.ok(worst < 0.0005, `${sex}: a point lands ${(worst * 1000).toFixed(2)} mm from where it was modelled`);
   }
 });
 

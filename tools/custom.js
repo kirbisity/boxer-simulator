@@ -19,7 +19,7 @@ export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KE
   // (The base-model head's table: its head is off, PHOTO_HEAD.model.on.)
   || name === 'headmodel-data'
   // (The base meshes' bodies, body style 'base': a style to compare, not the default; without them the style draws the loft.)
-  || name === 'basebody-data';
+  || name === 'basebody-data' || name === 'basebody';
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
 const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];
@@ -61,9 +61,18 @@ export const CUSTOM_STUBS = {
   'headmodel-data': `
 export const HEAD_MODEL_DATA = { polars: 0, azimuths: 0, male: {}, female: {} };
 `,
-  // The base meshes are not carried (body style 'base' falls back to the loft's own skin: basebody.js baseBodyAvailable).
+  // The base meshes are not carried, nor the code that places them (body style 'base' falls back to the loft's own skin).
   'basebody-data': `
 export const BASE_BODY_DATA = null;
+`,
+  basebody: `
+export const baseBodyAvailable = () => false;
+export const baseStarvation = () => 0;
+export const baseStarvedDetail = () => null;
+export const baseBodyMesh = ${missing('the base meshes')};
+export const baseBodyUvs = ${missing('the base meshes')};
+export const measureBaseBody = ${missing('the base meshes')};
+export const placeBaseBody = ${missing('the base meshes')};
 `,
   // Story mode (src/story/): not here; the page's hooks into it inert.
   'story/storyview': `

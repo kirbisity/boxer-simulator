@@ -1,14 +1,16 @@
-// The fighters' skin from the user's base meshes (body style 'base', bodystyles.js; the user's call, 2026-11-10): a modelled
-// human body, without its head, hands and feet, carried by the game's own body shapes. The mesh (src/basebody-data.js, made by
-// tools/blender/basebody.py) was modelled at one build of each sex, its `reference`. Each point of it is measured once against
-// that build's loft (loftbody.js: the same rings the plain skin is drawn on): which part it belongs to, how far along the
-// part (t), which way round (the ring's own angle), and how far out from the part's axis, against the reference ring's radius
-// there. A fighter's skin is then each point put back on his own part's axis at t, round his own ring at that angle, its
-// distance out scaled by his height against the reference's, plus the thickness by which his ring stands out beyond the
-// reference's (so scaled): fat and muscle are layers over the frame, and they move the surface out by their own depth, not by a
-// share of how far the surface lies from the bone (the shoulder's cap, far out on the trunk's narrow top ring, would otherwise
-// fly out with the trunk's fat). His height, frame, fat and muscle move it as they move the loft, and the base mesh keeps the
-// human contour the rings lack.
+// The fighters' skin from the user's base meshes (body style 'base', bodystyles.js; the user's call, 2026-11-10): the modelled
+// human body itself, without its head, hands and feet (the game's own cover them). The mesh (src/basebody-data.js, made by
+// tools/blender/basebody.py) was modelled at one build of each sex, its `reference`; a fighter of that build gets it as
+// modelled, scaled to his height, its arms turned into the rig's A-pose by the tool, and nothing else.
+//
+// Other builds change it gently, keeping its contour (the user's call, 2026-11-11: the model, used simply and faithfully):
+//   - its joints move as the game's do: each of the mesh's own joints by how this body's bind-pose joint (rig.js bindPoints)
+//     lies from the reference's, so height and frame lengthen and shorten the parts along their bones, not across;
+//   - each point is scaled out from its part's axis by a ratio, this body's ring over the reference's at its place along the
+//     part (loftbody.js: the rings the plain skin is drawn on; their depth ratio fore and aft, their width ratio across, the
+//     trunk's lean the difference of the two), smoothed along the part, so fat and muscle swell the modelled shape as a whole;
+//   - the fat belly's dome and the starved contour are added on top, out along the point's own line from the axis;
+//   - fat smooths the muscle relief modelled in the mesh (a fighter shows it by how defined he is against the reference).
 // Points near a joint carry both parts and blend between them (the tool's `blend`), so the parts meet without a step.
 //
 // The texture coordinates are the loft's (skindetail.js detailUv at the point's part, t and angle), so skintex.js paints the
@@ -39,9 +41,23 @@ export const BASE_BODY = {
   smoothPasses: 8,
   smoothStep: 0.5,
   smoothBack: -0.53,
-  // The least a point may come in towards its axis, as a share of its scaled distance (a far thinner build than the reference
-  // takes off a layer thicker than a point's own depth where the mesh lies inside its ring: two parts overlapping at a joint).
-  leastShare: 0.3,
+  // A part's girth ratio is smoothed along it over this many stops either way (0.12 of the part: a ring's profile turns at the
+  // loft's stops, a tenth of a part apart, and a ratio taken stop by stop would print them as bands).
+  ratioSmooth: 8,
+  // Joints held at the game's own, not the model's: the hands (wardrobe.js), carried on the rig's hand points, which lie further
+  // from the elbow than the model's wrist (the rig's forearm reaches the fist's middle, 0.19 of height, the model's wrist 0.14):
+  // the model's forearm is drawn out to meet the fist, as the loft's runs into the back of it. Everywhere else the model's joints.
+  attached: ['lHand', 'rHand'],
+  // An arm's own reach (loftbody.js LOFT.fit's): this share of its ring's radius round its axis, from `armFrom` (t, above the
+  // shoulder joint) down.
+  armReach: 1.6, armFrom: -0.25,
+  // Each limb's parent at its root, and where on the parent the joint is (its t): the upper arm on the trunk at the shoulders
+  // (the shoulder joint stands 0.91 of the way up the trunk: rig.js bindPoints, 0.025 of height under the neck's foot on a
+  // 0.27 trunk), the forearm on the upper arm at the elbow, the thigh on the trunk at the hip joint, the shin on the thigh at the
+  // knee, the neck on the trunk at its foot. ('side*' names stand for both sides, '*' the side.)
+  joins: { sideUpper: ['trunk', 0.91], sideFore: ['*Upper', 1], sideThigh: ['trunk', 0], sideShin: ['*Thigh', 1], neck: ['trunk', 1] },
+  // The ease from the parent's ratio into the part's own: from `joinRatio[0]` to `[1]` (t of the part).
+  joinRatio: [-0.25, 0.3],
 };
 
 const BASE_TAU = Math.PI * 2;
@@ -132,6 +148,23 @@ function placeOn(frame, ring, point) {
   return { t, angle, out: Math.hypot(x, y), radius, x, y };
 }
 
+/** A point's place on a part's own axis line: [t along, out fore and aft (the depth axis), out across (the width axis)]. */
+function axisCoords(frame, point) {
+  const rel = vec.sub(point, frame.a);
+  const t = vec.dot(rel, frame.axis) / frame.length;
+  const out = vec.sub(rel, vec.scale(frame.axis, t * frame.length));
+  return [t, vec.dot(out, frame.depthAxis), vec.dot(out, frame.widthAxis)];
+}
+
+/** A part's ring profiles sampled at BASE_BODY.stops over [from, to]: [depth, width, offset] rows. */
+function ringRows(part, from, to) {
+  const count = BASE_BODY.stops;
+  return Array.from({ length: count + 1 }, (_, index) => {
+    const t = from + ((to - from) * index) / count;
+    return [part.depth(t), part.width(t), part.offset(t)];
+  });
+}
+
 /**
  * A part's rings as a table (BASE_BODY.stops along [from, to]) read linearly: `part` is the loft's description of it
  * ({ a, b, forward, depth(t), width(t), offset(t), bend(ring, angle) }); the answer `(t) => { t, depth, width, offset, bend }`.
@@ -194,7 +227,7 @@ function smoothed(positions, neighbours) {
  *   render    the points drawn: each a source, the part whose tile it is in, its t and angle there and its share round (u)
  *   triangles the drawn triangles, grouped by part (`ranges`: each part's first and last drawn point)
  */
-export function measureBaseBody(mesh, refParts, height) {
+export function measureBaseBody(mesh, refParts, height, refJoints) {
   const names = mesh.parts;
   const scaled = Float32Array.from(mesh.positions, (value) => value * height);
   const joint = (name) => mesh.joints[name].map((value) => value * height);
@@ -224,17 +257,15 @@ export function measureBaseBody(mesh, refParts, height) {
   const at = (name, position) => placeOn(frames[name], rings[name], position);
 
   // The sources: the mesh's own points, and the points added where a triangle is split at a seam (below).
-  // (Each source's coordinates on each of its two parts: t, angle, distance out, smoothed distance out, the reference ring's radius.)
+  // (Each source's coordinates on each of its two parts, on the part's own axis line: t, out fore and aft, out across; then the
+  // same for the smoothed surface.)
   const src = { part: [], part2: [], blend: [], coords: [], position: [], relief: [], starved: [] };
   const addSource = (part, part2, blend, position, smooth, starved) => {
-    const a = at(names[part], position);
-    const b = part2 === part ? a : at(names[part2], position);
-    const sa = at(names[part], smooth);
-    const sb = part2 === part ? sa : at(names[part2], smooth);
+    const on = (index, point) => axisCoords(frames[names[index]], point);
     src.part.push(part);
     src.part2.push(part2);
     src.blend.push(blend);
-    src.coords.push(a.t, a.angle, a.out, sa.out, a.radius, b.t, b.angle, b.out, sb.out, b.radius);
+    src.coords.push(...on(part, position), ...on(part, smooth), ...on(part2, position), ...on(part2, smooth));
     src.position.push(position);
     src.relief.push(smooth);
     src.starved.push(starved);
@@ -270,6 +301,21 @@ export function measureBaseBody(mesh, refParts, height) {
     splits.set(key, made);
     return made;
   };
+  // Which upper arm's reach (BASE_BODY.armReach of its ring's radius round its axis, from armFrom above the joint) holds all of
+  // some points: that arm's part index, or null.
+  const armTile = (points) => {
+    for (const name of ['lUpper', 'rUpper']) {
+      const frame = frames[name];
+      const ring = refParts[name];
+      const within = points.every((p) => {
+        const [t, x, y] = axisCoords(frame, p);
+        const at = Math.max(BASE_BODY.armFrom, Math.min(1, t));
+        return t >= BASE_BODY.armFrom && Math.hypot(x, y) < BASE_BODY.armReach * Math.max(ring.depth(Math.max(0, at)), ring.width(Math.max(0, at)));
+      });
+      if (within) return names.indexOf(name);
+    }
+    return null;
+  };
   const triangles = [];
   for (let corner = 0; corner < mesh.triangles.length; corner += 3) {
     const corners = [mesh.triangles[corner], mesh.triangles[corner + 1], mesh.triangles[corner + 2]];
@@ -282,6 +328,12 @@ export function measureBaseBody(mesh, refParts, height) {
     }
     let part = src.part[corners[0]];
     for (const [candidate, share] of shares) if (share > shares.get(part)) part = candidate;
+    // (A trunk triangle wholly within an arm's own reach, the shoulder's cap, is drawn in that arm's tile: the trunk's paints
+    // ribs and the flank there.)
+    if (names[part] === 'trunk') {
+      const arm = armTile(corners.map((vertex) => src.position[vertex]));
+      if (arm !== null) part = arm;
+    }
     const name = names[part];
     const places = corners.map((vertex) => at(name, src.position[vertex]));
     const us = places.map((place) => place.angle / BASE_TAU);
@@ -329,6 +381,10 @@ export function measureBaseBody(mesh, refParts, height) {
     names,
     height,
     spans: span,
+    // The mesh's own joints (at the reference's height), the reference's bind-pose joints, and its rings along each part.
+    joints: Object.fromEntries(Object.keys(mesh.joints).map((name) => [name, joint(name)])),
+    refJoints,
+    refRows: Object.fromEntries(names.map((name) => [name, ringRows(refParts[name], span[name][0], span[name][1])])),
     sources: { count: src.part.length, part: Uint8Array.from(src.part), part2: Uint8Array.from(src.part2), blend: Float32Array.from(src.blend), coords: Float32Array.from(src.coords), starved: Float32Array.from(src.starved) },
     render: { count: order.length, source: pick(render.source, Int32Array), part: drawnPart, t: pick(render.t, Float32Array), angle: pick(render.angle, Float32Array), u: pick(render.u, Float32Array) },
     triangles: Uint32Array.from(triangles, (index) => remap[index]),
@@ -337,50 +393,115 @@ export function measureBaseBody(mesh, refParts, height) {
 }
 
 /**
- * A fighter's base skin: each source point placed on his parts (`parts`, the loft's description of his: see measureBaseBody)
- * and blended across its joint; `relief(name)` how much of the modelled muscle relief his part shows (1 all of it, 0 the
- * smoothed surface); `height` his standing height (m); `starve` how starved he is (baseStarvation: the emaciated reference's
- * contour, each point's delta out along its ring, laid on by it). Returns the drawn points' positions (render order) and the sources'.
+ * A fighter's base skin: each source point placed on his parts and blended across its joint. `parts` the loft's description of
+ * his rings (see measureBaseBody), `joints` his bind-pose joints (rig.js bindPoints, by name), `relief(name)` how much of the
+ * modelled muscle relief his part shows (1 all of it, 0 the smoothed surface), `height` his standing height (m), `starve` how
+ * starved he is (baseStarvation: the emaciated reference's contour, each point's delta out along its line, laid on by it).
+ * Returns the drawn points' positions (render order) and the sources'.
  */
-export function placeBaseBody(rig, parts, relief, height, starve = 0) {
-  const scale = height / rig.height;
+export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.refJoints) {
   const { names, sources, render } = rig;
-  const tables = {};
+  // The mesh's joints moved as his are from the reference's; the hands at his own (BASE_BODY.attached).
+  const moved = (name) => (BASE_BODY.attached.includes(name) ? joints[name] : vec.add(rig.joints[name], vec.sub(joints[name], rig.refJoints[name])));
   const frames = {};
+  const ratios = {};
+  const count = BASE_BODY.stops;
   for (const name of names) {
     const part = parts[name];
-    frames[name] = partFrame(part.a, part.b, part.forward);
-    tables[name] = ringTable(part, rig.spans[name][0], rig.spans[name][1]);
+    frames[name] = partFrame(moved(BASE_BODY.axes[name][0]), moved(BASE_BODY.axes[name][1]), part.forward);
+    const [from, to] = rig.spans[name];
+    const own = ringRows(part, from, to);
+    const raw = own.map(([depth, width, offset], index) => {
+      const [d0, w0, o0] = rig.refRows[name][index];
+      return [depth / (d0 || 1e-6), width / (w0 || 1e-6), offset - o0];
+    });
+    // Smoothed along the part (BASE_BODY.ratioSmooth): a moving mean, the ends held.
+    const smooth = raw.map((_, index) => {
+      const sum = [0, 0, 0];
+      let weight = 0;
+      for (let k = -BASE_BODY.ratioSmooth; k <= BASE_BODY.ratioSmooth; k += 1) {
+        const row = raw[Math.min(count, Math.max(0, index + k))];
+        for (let axis = 0; axis < 3; axis += 1) sum[axis] += row[axis];
+        weight += 1;
+      }
+      return sum.map((value) => value / weight);
+    });
+    ratios[name] = (t) => {
+      const at = Math.min(count, Math.max(0, ((t - from) / (to - from || 1)) * count));
+      const index = Math.min(count - 1, Math.floor(at));
+      const f = at - index;
+      return smooth[index].map((value, axis) => value + (smooth[index + 1][axis] - value) * f);
+    };
   }
+  // Across each joint the ratio eases from the parent's (at the joint, its depth and width ratios' mean all round) into the
+  // part's own over BASE_BODY.joinRatio (t of the part): the shoulder's cap swells with the trunk across the shoulders, not as
+  // the fat upper arm below it does, so it keeps the deltoid's curve (a fat arm's own ratio there stood the cap out as a shelf).
+  const own = { ...ratios };
+  for (const [name, [parent, at]] of Object.entries(BASE_BODY.joins)) {
+    const partName = name.startsWith('side') ? null : name;
+    for (const side of partName ? [''] : ['l', 'r']) {
+      const child = partName ?? `${side}${name.slice(4)}`;
+      const from = parent.replace('*', side);
+      if (!own[child] || !own[from]) continue;
+      const [kx, ky] = own[from](at);
+      const joint = (kx + ky) / 2;
+      const [low, high] = BASE_BODY.joinRatio;
+      ratios[child] = (t) => {
+        const mine = own[child](t);
+        const u = Math.min(1, Math.max(0, (t - low) / (high - low)));
+        const w = u * u * (3 - 2 * u);
+        return [joint + (mine[0] - joint) * w, joint + (mine[1] - joint) * w, mine[2] * w];
+      };
+    }
+  }
+  // The reference's ring semi-axes along each part (depth, width), read as the ratios are.
+  const refRing = Object.fromEntries(names.map((name) => {
+    const [from, to] = rig.spans[name];
+    const rows = rig.refRows[name];
+    return [name, (t) => {
+      const at = Math.min(count, Math.max(0, ((t - from) / (to - from || 1)) * count));
+      const index = Math.min(count - 1, Math.floor(at));
+      const f = at - index;
+      return [0, 1].map((axis) => rows[index][axis] + (rows[index + 1][axis] - rows[index][axis]) * f);
+    }];
+  }));
   const shows = Object.fromEntries(names.map((name) => [name, relief(name)]));
   const placed = new Float32Array(sources.count * 3);
-  const one = [0, 0, 0];
-  const place = (name, t, angle, distance, smooth, refRadius, starved, out) => {
+  const place = (name, c, k, starved, out) => {
     const frame = frames[name];
-    const ring = tables[name](t);
-    const own = smooth + (distance - smooth) * shows[name];
-    const ex = Math.cos(angle) * ring.depth;
-    const ey = Math.sin(angle) * ring.width;
-    const flat = Math.hypot(ex, ey) || 1e-9;
-    // His ring's thickness beyond the reference's (scaled to his height), laid on in full outside the ring, by depth inside it.
-    const layer = flat * (ring.bend ? ring.bend(ring, angle) : 1) - scale * refRadius;
-    // A part's own swell (the trunk's belly, see loftbody.js baseBelly): out along the ring, and down, its foot hanging.
-    const [swell, hang] = parts[name].swell ? parts[name].swell(t, angle) : [0, 0];
-    const reach = Math.max(BASE_BODY.leastShare * scale * own, scale * own + layer * Math.min(1, own / refRadius) + starved + swell * Math.min(1, own / refRadius));
+    const share = shows[name];
+    const t = c[k + 3] + (c[k] - c[k + 3]) * share;
+    const x = c[k + 4] + (c[k + 1] - c[k + 4]) * share;
+    const y = c[k + 5] + (c[k + 2] - c[k + 5]) * share;
+    const [kx, ky, lean] = ratios[name](t);
+    // Scaled by the ratio out to the reference ring's own reach; past it (the shoulder's cap far out on the trunk's narrow top
+    // ring, a buttock behind the hips') a point moves out as the ring's surface does, not by a share of its whole distance: the
+    // part swells as a whole, and its outlying forms ride on the swell rather than flying out with it (square, boxy shoulders).
+    const [refDepth, refWidth] = refRing[name](t);
+    const reach = (value, ring) => Math.max(-ring, Math.min(ring, value));
+    let px = x + (kx - 1) * reach(x, refDepth) + lean;
+    let py = y + (ky - 1) * reach(y, refWidth);
+    // Added along the point's own line out from the axis: the starved contour, a part's own swell (the trunk's belly, see
+    // loftbody.js baseBelly) with its foot hanging down.
+    const [swell, hang] = parts[name].swell ? parts[name].swell(t, Math.atan2(y, x)) : [0, 0];
+    const length = Math.hypot(px, py) || 1e-9;
+    const add = starved + swell;
+    px += (px / length) * add;
+    py += (py / length) * add;
     const along = t * frame.length - hang;
-    const k = reach / flat;
-    for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * (ring.offset + ex * k) + frame.widthAxis[axis] * ey * k;
+    for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * px + frame.widthAxis[axis] * py;
     return out;
   };
+  const one = [0, 0, 0];
   const other = [0, 0, 0];
   for (let vertex = 0; vertex < sources.count; vertex += 1) {
-    const k = vertex * 10;
+    const k = vertex * 12;
     const c = sources.coords;
     const starved = sources.starved[vertex] * height * starve;
-    place(names[sources.part[vertex]], c[k], c[k + 1], c[k + 2], c[k + 3], c[k + 4], starved, one);
+    place(names[sources.part[vertex]], c, k, starved, one);
     const blend = sources.blend[vertex];
     if (blend > 0 && sources.part2[vertex] !== sources.part[vertex]) {
-      place(names[sources.part2[vertex]], c[k + 5], c[k + 6], c[k + 7], c[k + 8], c[k + 9], starved, other);
+      place(names[sources.part2[vertex]], c, k + 6, starved, other);
       for (let axis = 0; axis < 3; axis += 1) one[axis] += (other[axis] - one[axis]) * blend;
     }
     placed.set(one, vertex * 3);

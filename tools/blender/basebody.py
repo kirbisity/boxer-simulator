@@ -32,6 +32,8 @@ BASE = {
     # Subdivision before decimating: the male's trunk is a coarse cage under a dense head, and two levels let the belly and the
     # flanks bend smoothly (the experiment, tools/blender/bodybuilds.py); the female's cage is even, and already at two.
     'subdivide': 2,
+    # Points this close (a share of the model's height) are one point (the mirror's seam).
+    'weld': 1e-5,
     # Triangles kept: a fighter's body about V7's skin (bodystyles.js: about 9k with its neck and limbs), a crowd's about the
     # low-detail loft's (about 2.2k: crowdlod.js).
     'triangles': {'full': 8000, 'crowd': 2500},
@@ -111,6 +113,9 @@ def keep_body():
 
 
 keep_body()
+# The female's mirror leaves its two halves unjoined down the middle (a seam of doubled points that splits the normals): points
+# closer than `weld` (fractions of the model's height: a hundredth of a millimetre) are merged.
+bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=BASE['weld'] * (max(v.co[1] for v in bm.verts) - min(v.co[1] for v in bm.verts)))
 V = np.array([v.co[:] for v in bm.verts])
 low, high = V.min(axis=0), V.max(axis=0)
 H = high[1] - low[1]
@@ -309,6 +314,13 @@ bmesh.ops.triangulate(bm, faces=bm.faces[:])
 cut_mesh = bpy.data.meshes.new('cut')
 bm.to_mesh(cut_mesh)
 print('CUT', len(cut_mesh.vertices), len(cut_mesh.polygons))
+# The cut mesh at full resolution, before decimating, for the proof sheet (tools/blender/baseproof.py): <out>-cut.obj, in the
+# game's frame and units of height.
+with open(OUT.replace('.json', '-cut.obj'), 'w') as obj_file:
+    for v in cut_mesh.vertices:
+        obj_file.write('v %.5f %.5f %.5f\n' % tuple(v.co))
+    for poly in cut_mesh.polygons:
+        obj_file.write('f ' + ' '.join(str(i + 1) for i in poly.vertices) + '\n')
 
 PARTS = ['trunk', 'neck', 'lUpper', 'lFore', 'rUpper', 'rFore', 'lThigh', 'lShin', 'rThigh', 'rShin']
 
