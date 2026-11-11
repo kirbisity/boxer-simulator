@@ -47,11 +47,11 @@ export const POSE = {
   runElbow: [-1, -0.5, 0.15],
   // A free arm hangs (and a guard's elbow sits) just clear of the trunk's side, its inner surface `margin` m off it: the
   // trunk an ellipse round its axis of the body's own equivalent radius (body.js segments.trunk.skinRadius, fat included),
-  // `widthShare` of it across and its inverse fore and aft (a waist about 1.3 times as wide as deep, ANSUR II's waist breadth
-  // and depth: √1.3), and the arm's own girth (segments.lUpperArm.skinRadius) beside it. A thin man's arm rests against his
+  // `widthShare` of it across and its inverse fore and aft (ANSUR II, 2012, public data: mean waist breadth 32.6 cm and depth
+  // 23.8 cm for men, 30.0 and 21.3 for women, about 1.4 times as wide as deep: √1.37), and the arm's own girth (segments.lUpperArm.skinRadius) beside it. A thin man's arm rests against his
   // flank and a fat man's on the side of his trunk, so the margin is nothing: they touch. Thin, the arms hang close; fat, they
   // stand out (about 6 degrees from the vertical for a thin man, 27 for an obese one). (PROOF OF CONCEPT, shoulder-poc.)
-  armClear: { widthShare: 1.14, margin: 0 },
+  armClear: { widthShare: 1.17, margin: 0 },
 };
 
 /** The trunk's half-width and half-depth a free arm's inner surface clears, plus that arm's girth (m): POSE.armClear. */

@@ -31,7 +31,7 @@
 
 import { buildBodyMesh } from './bodymesh.js';
 import { baseLoftOptions, buildLoftBody, buildLoftBodySteps, runSteps } from './loftbody.js';
-import { baseStarvedDetail } from './basebody.js';
+import { BASE_BODY, baseStarvedDetail } from './basebody.js';
 import { outfitOf } from './outfits.js';
 import { buildFleshBody, fleshAnatomy, fleshField } from './fleshbody.js';
 import { buildDetailMap } from './skindetail.js';
@@ -57,11 +57,11 @@ export const STYLE_SPECS = {
   v5: { face: true, label: 'V5 flesh-lite, painted' },
   v6: { face: true, label: 'V6 flesh hero, painted' },
   v7: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'V7 flesh-wrapped loft + V2 maps' },
-  // (PROOF OF CONCEPT, shoulder-poc, the user's call 2026-11-11: the muscle and bone maps back on the base meshes, `share` 0
-  // as v7's. With the skin placed on the model's own joints and frames (basebody.js baseBindJoints), the rules' kneecap sits on
+  // (PROOF OF CONCEPT, shoulder-poc, the user's call 2026-11-11: the muscle and bone maps back on the base meshes, `share`
+  // 0.35: the model's own relief carries about a third of it, and at v7's 0 a thin man's ribs read as starved beside v7's. With the skin placed on the model's own joints and frames (basebody.js baseBindJoints), the rules' kneecap sits on
   // the knee's front, the shin's crest down the shin and the abs on the abs at every build; at `share` 1 (round 1) they were left
   // out, when the loft's angles still turned against the model.)
-  base: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'Base meshes + V2 maps' },
+  base: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0.35, upgrade: true }, label: 'Base meshes + V2 maps' },
 };
 export const BODY_STYLE_KEYS = Object.keys(STYLE_SPECS);
 /** The style fighters are drawn in unless a look says otherwise: V7. ('lofted', the plain loft, is the old default and the placeholder while V7 is built.) */
@@ -129,7 +129,7 @@ export function* buildSkinMeshSteps(body, style) {
 function stepsFor(body, style, built) {
   const spec = styleSpec(style).tex;
   // (The base style's starved trunk also takes the emaciated reference's rib and spine detail.)
-  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built), starved: style === 'base' ? baseStarvedDetail(body) : null, folds: style !== 'base' });
+  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built), starved: style === 'base' ? baseStarvedDetail(body) : null, folds: style !== 'base', armFade: style === 'base' ? BASE_BODY.starveDetail : null });
 }
 
 /** A built body's maps made now, not looked up or kept (the skin worker's: it hands them over). */

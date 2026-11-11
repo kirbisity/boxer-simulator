@@ -113,6 +113,8 @@ export const BASE_BODY = {
   shoulderSmooth: 8,
   // (The model's upper arm hangs 25 degrees from the vertical, the game's 11 (tools/bodysheet-page.js SHEET.armRest).)
   rebindDegrees: 14, rebindClavicle: 0.35,
+  // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
+  headHold: 0.85,
   // PROOF OF CONCEPT, round 11 (the user: D is better, but the shoulders and arms smaller still, the neck longer, the woman's
   // shoulder a sharper joint, not a tube): D's rest shape, then (shoulderPlus):
   //   `in`      the shoulder's zone moved in towards the midline (m per 1.8 m): shorter clavicles, the acromion in;
@@ -130,7 +132,7 @@ export const BASE_BODY = {
   //             pec's edge in front and the lat's behind: the arm's inner face then stands off the flank, its own round form.
   shoulderPlus: {
     D1: { in: 0.02, trap: 0.04, trapKeep: 0.35, deltoid: 0.7, arm: 0.9, armFrom: -0.05, armTo: 0.2, square: 0.4, edge: 0.003, pit: 0 },
-    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.3 },
+    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.5 },
   },
 };
 
@@ -765,6 +767,8 @@ export function baseBindJoints(rig, joints, height) {
   // the model's head is not drawn, and bound leaning the model's way (13 degrees forward on the female against the rig's 6)
   // the neck's skin was turned back by the difference in play, creasing in a zigzag where its weights hand over to the chest.)
   loft.head = vec.add(loft.neck, vec.sub(joints.head, joints.neck));
+  // (Where the game draws the head, for what must stay inside it: placeBaseBody's shoulderPlus neck top.)
+  skin.gameHead = loft.head;
   for (const side of ['l', 'r']) {
     const [elbow, hand] = [loft[`${side}Elbow`], loft[`${side}Hand`]];
     const along = vec.normalize(vec.sub(hand, elbow));
@@ -951,6 +955,29 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     }
     if (!BASE_BODY.shoulderPlus[design]) shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
   }
+  // (PROOF OF CONCEPT: the widths ANSUR II measures, when asked for (globalThis.BASE_WIDTHS, a list): biacromial (across the
+  // shoulders' tops, from 1 cm above the shoulder joints up), chest breadth (the trunk's own skin across at the nipples, 0.72 of
+  // height) and bideltoid (everything across, arms included, from 12 cm under the joints to them), in the bind pose.)
+  if (globalThis.BASE_WIDTHS) {
+    const trunk = frames.trunk;
+    const joint = joints.lShoulder;
+    const [tJ] = axisCoords(trunk, joint);
+    let biacromial = 0;
+    let chest = 0;
+    let bideltoid = 0;
+    for (let vertex = 0; vertex < placed.length / 3; vertex += 1) {
+      const p = [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]];
+      const [t, , across] = axisCoords(trunk, p);
+      const up = (t - tJ) * trunk.length;
+      const name = names[sources.part[vertex]];
+      const armish = /Upper|Fore/.test(name) || (sources.blend[vertex] > 0 && /Upper|Fore/.test(names[sources.part2[vertex]]));
+      if (name === 'neck') continue;
+      if (!armish && up > -0.01 * height / 1.8) biacromial = Math.max(biacromial, Math.abs(across));
+      if (up > -0.12 * height / 1.8 && up <= 0.01 * height / 1.8) bideltoid = Math.max(bideltoid, Math.abs(across));
+      if (!armish && Math.abs(p[1] - 0.72 * height) < 0.015 * height / 1.8) chest = Math.max(chest, Math.abs(across));
+    }
+    globalThis.BASE_WIDTHS.push({ biacromial: 2 * biacromial, chest: 2 * chest, bideltoid: 2 * bideltoid });
+  }
   const positions = new Float32Array(render.count * 3);
   for (let index = 0; index < render.count; index += 1) positions.set(placed.subarray(render.source[index] * 3, render.source[index] * 3 + 3), index * 3);
   return { positions, sources: placed };
@@ -1104,6 +1131,17 @@ function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints 
       // behind and at the sides in a ragged collar.)
       const tuck = (spec.neckTuck ?? 0) * ease(0.5, 0.95, tN);
       shift = vec.add(shift, vec.add(vec.scale(neck.depthAxis, -xN * tuck), vec.scale(neck.widthAxis, -yN * tuck)));
+      // (Its top kept inside the game's head: within `headHold` of the head's radius (0.055 of height, body.js headRadius) of its
+      // centre. Its cut top stood above the head's underside behind and at the sides, and its far wall's inside showed through
+      // the open top in a fin.)
+      const head = joints.gameHead ?? joints.head;
+      const tucked = vec.add(p, shift);
+      const off = vec.sub(tucked, head);
+      const reach = vec.length(off);
+      const hold = BASE_BODY.headHold * 0.055 * height;
+      // (Behind and at the sides only: the throat under the jaw is the neck's own.)
+      const behind = 1 - ease(-0.2, 0.3, xN / (Math.hypot(xN, yN) || 1));
+      if (head && reach > hold) shift = vec.add(shift, vec.scale(off, -((reach - hold) / reach) * behind * ease(0.3, 0.7, tN)));
       shifts.set(shift, vertex * 3);
       continue;
     }
@@ -1125,7 +1163,10 @@ function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints 
     // The trapezius down: most beside the neck (off the neck's own skin), trapKeep of it at the acromion, none below the top.
     const [, nx, ny] = axisCoords(neck, p);
     const offNeck = ease(neckR * 0.95, neckR * 1.35, Math.hypot(nx, ny));
-    const trap = spec.trap * scale * top * offNeck * (1 - (1 - spec.trapKeep) * Math.min(1, out)) * (isArm ? 1 - ease(-0.2, 0.1, tA) : 1);
+    // (Beside the neck, on the trunk's own skin off its foot, the whole drop, as the neck's foot gets: the trunk's points there
+    // were left up while the neck's went down, and stood behind the head in two horns.)
+    const lateralKeep = 1 - (1 - spec.trapKeep) * Math.min(1, out);
+    const trap = spec.trap * scale * top * (offNeck * lateralKeep + (1 - offNeck)) * (isArm ? 1 - ease(-0.2, 0.1, tA) : 1);
     shift = vec.add(shift, vec.scale(trunk.axis, -trap));
     if (isArm || zone > 0) {
       // The deltoid: its bulk beyond the arm's mean radius at this t, on its outer side, cut to `deltoid`.
@@ -1162,7 +1203,8 @@ function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints 
       const below = -vec.dot(rel, trunk.axis);
       const fore = vec.dot(rel, trunk.depthAxis);
       const depthW = Math.max(0, 1 - (fore / (0.06 * scale)) ** 2) ** 2;
-      const heightW = ease(0.02 * scale, 0.05 * scale, below) * (1 - ease(0.1 * scale, 0.14 * scale, below));
+      const pitTo = spec.pitTo ?? 0.14;
+      const heightW = ease(0.02 * scale, 0.05 * scale, below) * (1 - ease((pitTo - 0.04) * scale, pitTo * scale, below));
       const nearW = ease(0.55, 0.8, out);
       shift = vec.add(shift, vec.scale(trunk.widthAxis, -Math.sign(yT) * spec.pit * scale * depthW * heightW * nearW));
     }

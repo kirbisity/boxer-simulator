@@ -150,7 +150,9 @@ export const LOFT = {
   // `jointSpan`: how far along the part (t, either way) a joint's forms reach, 0.13 (4 cm on an upper arm).
   armForms: { muscle: 0.06, joint: 0.022, jointSpan: 0.13, carried: { male: { muscle: 0.5, joint: 0 }, female: { muscle: 0, joint: 0 } } },
   // A worn point takes the bone-heat weights of the skin point nearest its weight position, looked for within this (m) round it.
-  heat: { reach: 0.06 },
+  // `bones`: the model's bones (basebody-data.js heatBones) a worn point on each part may take ('*' its side): its own and its
+  // parent's across the joint it starts at; a trunk piece the trunk's alone (the game's pelvis, spine and chest).
+  heat: { reach: 0.06, bones: { trunk: ['trunk'], neck: ['neck', 'trunk'], '*Upper': ['*UpperArm', '*Clavicle', 'trunk'], '*Fore': ['*Forearm', '*UpperArm'], '*Thigh': ['*Thigh', 'trunk'], '*Shin': ['*Shin', '*Thigh'] } },
   // PROOF OF CONCEPT (shoulder-poc): the armpit's hand-over from the trunk's bones to the upper arm's made narrow. Below the
   // shoulder's cap (t of the upper arm from `from` to `to`, eased) and on the arm's inner side, facing the trunk, each weight is
   // raised to the power 1 + `sharpen` before they are summed to one: the bone that carries most of a point carries more, so the
@@ -2143,21 +2145,40 @@ function clothHeat(mesh) {
   const size = LOFT.heat.reach;
   const cells = new Map();
   const keyOf = (p) => p.map((value) => Math.floor(value / size)).join('|');
+  // (Each skin point's part, from the skin's ranges: a worn point looks only at the skin of its own part, LOFT.heat.bones.)
+  const skinPart = (vertex) => {
+    for (const [name, [from, to]] of Object.entries(mesh.parts)) if (vertex >= from && vertex < to) return name;
+    return null;
+  };
   for (const [vertex, weights] of mesh.heat) {
     out[vertex] = weights;
     const p = [mesh.weightPositions[vertex * 3], mesh.weightPositions[vertex * 3 + 1], mesh.weightPositions[vertex * 3 + 2]];
     const key = keyOf(p);
-    (cells.get(key) ?? cells.set(key, []).get(key)).push([p, weights]);
+    (cells.get(key) ?? cells.set(key, []).get(key)).push([p, weights, skinPart(vertex)]);
   }
+  const names = baseHeatBones();
+  // (Only the bones its part may move: a waistband or a shirt's side whose nearest skin was a hanging forearm's took the hand's
+  // weight and was dragged out to the wrist in a strip.)
+  const ownOnly = (weights, part) => {
+    const allowed = LOFT.heat.bones[part.replace(/^[lr]/, '*')]?.map((bone) => bone.replace('*', part[0])) ?? null;
+    if (!allowed) return weights;
+    const kept = new Map([...weights].filter(([bone]) => allowed.includes(names[bone])));
+    const total = [...kept.values()].reduce((sum, w) => sum + w, 0);
+    if (total <= 0) return new Map([[names.indexOf(allowed[0]), 1]]);
+    for (const [bone, w] of kept) kept.set(bone, w / total);
+    return kept;
+  };
   for (let vertex = 0; vertex < count; vertex += 1) {
     // (Not a worn point with bones of its own, a skirt hung from the pelvis and both thighs, a breastplate on the chest alone:
     // those keep their own, or a coat's skirt swung out with one leg like a flared dress.)
     if (out[vertex] || mesh.heat.has(vertex) || mesh.bones[vertex]) continue;
     const p = [mesh.weightPositions[vertex * 3], mesh.weightPositions[vertex * 3 + 1], mesh.weightPositions[vertex * 3 + 2]];
     const c = p.map((value) => Math.floor(value / size));
+    const part = mesh.wornPart?.get(vertex) ?? null;
     let best = Infinity;
     for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
-      for (const [q, weights] of cells.get(`${c[0] + dx}|${c[1] + dy}|${c[2] + dz}`) ?? []) {
+      for (const [q, weights, onPart] of cells.get(`${c[0] + dx}|${c[1] + dy}|${c[2] + dz}`) ?? []) {
+        if (part && onPart !== part) continue;
         const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
         if (d < best) {
           best = d;
@@ -2165,6 +2186,7 @@ function clothHeat(mesh) {
         }
       }
     }
+    if (part && out[vertex]) out[vertex] = ownOnly(out[vertex], part);
   }
   return out;
 }
@@ -2434,6 +2456,8 @@ function fitClothToBase(mesh, parts, armoured) {
     }
     shares.set(vertex, { ring, dir, radius, name, standoff, under, share: need > 0 ? Math.max(spec.tightest, (need * standoff * spec.clear) / radius) : 1 });
   }
+  // (Each worn point's part, for its weights: clothHeat.)
+  mesh.wornPart = new Map([...shares].map(([vertex, { name }]) => [vertex, name]));
   const byRing = new Map();
   const hard = (vertex) => armoured || HARD_ROLES.has(mesh.colors[vertex]);
   for (const [vertex, { ring }] of shares) (byRing.get(ring) ?? byRing.set(ring, []).get(ring)).push(vertex);

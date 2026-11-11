@@ -373,7 +373,7 @@ export function texNoise(x, y, seed) {
 // `folds`: false for a mesh that models its own folds and creases (the base style's): the rules' fat folds, navel and armpit are
 // left out, and no crease is painted dark in the albedo or the occlusion (they are placed by the loft's landmarks, and on a
 // modelled body land beside its own: dark cuts). The creases still keep the skin matt (roughness: sweat never shines in them).
-export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, layers = ['albedo', 'normal', 'ao', 'rough'], share = 0, seed = 7, covered = null, starved = null, folds = true } = {}) {
+export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, layers = ['albedo', 'normal', 'ao', 'rough'], share = 0, seed = 7, covered = null, starved = null, folds = true, armFade = null } = {}) {
   const R = { ...rulesTraits(body), folds };
   const painted = folds ? 1 : 0;
   // Under armour (`covered`: the stretches of each part left out of the mesh, loftbody.js coveredRegions) those rows of a tile are never
@@ -406,7 +406,10 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
         const at = (tile.y + row) * ATLAS_WIDTH + tile.x + column;
         const mark = rule(t, angle);
         // The trunk's hanging apron (below its hem) and what is not skin take nothing.
-        const reach = tile.span === 'trunk' ? texSmooth(-0.125, -0.06, t) : 1;
+        let reach = tile.span === 'trunk' ? texSmooth(-0.125, -0.06, t) : 1;
+        // (`armFade` { side: [t0, t1], sideFrom }: the trunk's anatomy eased out over the shoulder's cap at the sides, where the
+        // base mesh draws its triangles in the arm's tile (basebody.js armTile): a thin man's ribs ended there in a hard edge.)
+        if (armFade && tile.span === 'trunk') reach *= 1 - texSmooth(armFade.sideFrom, 1, Math.abs(Math.sin(angle))) * texSmooth(armFade.side[0], armFade.side[1], t);
         height[at] = mark.h * (1 - share) * reach;
         crease[at] = mark.crease * reach;
         vein[at] = mark.vein;
