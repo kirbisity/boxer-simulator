@@ -10,7 +10,7 @@
 // cols, crop (torso, chest, legs), mat (standard, lambert, toon, physical: how
 // the skin is lit: the game's probe-lite look uses lambert), tone (clay or a
 // key of SKIN_TONES), pose (rest: arms lowered; bind: the A-pose the skin is
-// built in), cell (the flesh grid), relief (bump strength), perf (soft-shell
+// built in; game: arms lowered on the physics' own skeleton; stance: that on bent knees turned out), cell (the flesh grid), relief (bump strength), perf (soft-shell
 // cost), fighter (knight, gambeson, helmet-fat, helmet-thin: one dressed
 // fighter instead of the progression), motion (run, land, side: each chosen
 // build's fat masses through a move, fatslosh.js, a column per moment), outfit
@@ -18,7 +18,7 @@
 
 /* global THREE */
 import { buildBody, P, PRESETS } from '../src/body.js';
-import { BONES, BONE, boneFrames, frameMatrix } from '../src/rig.js';
+import { BONES, BONE, bindPoints, boneFrames, frameMatrix } from '../src/rig.js';
 import { buildSkinMesh, skinTexturesNow, styleSpec } from '../src/bodystyles.js';
 import { compositionKey, skinTextureCache } from '../src/skintex.js';
 import { buildHead } from '../src/face.js';
@@ -103,6 +103,8 @@ const SHEET = {
   labels: 62,
   // How far from the vertical the arms hang in the rest pose (degrees; the skin is built at 25).
   armRest: 11,
+  // The stance pose (pose=stance): sunk 8 cm on the knees, which turn out by half as much again sideways as forward.
+  stance: { sink: 0.08, out: 0.5 },
 };
 
 const stats = [];
@@ -185,6 +187,33 @@ function restPoints(points, body, degrees) {
     const unit = down.map((value) => value / length);
     posed[P[`${side}Elbow`]] = shoulder.map((value, axis) => value + unit[axis] * upper);
     posed[P[`${side}Hand`]] = shoulder.map((value, axis) => value + unit[axis] * (upper + fore));
+  }
+  return posed;
+}
+
+/**
+ * A fighter's stance on the physics' own skeleton (rig.js bindPoints), arms lowered: the body sunk `stance.sink` (m) on bent knees,
+ * each knee pushed forward and turned out by `stance.out` (its share sideways against forward), the feet where they stood; the
+ * legs' lengths kept. A stance shows how the skin follows the bones where they bend and turn (the knee and the thigh's roll).
+ */
+function stancePoints(points, body) {
+  const posed = restPoints(points, body, SHEET.armRest);
+  const sink = SHEET.stance.sink;
+  for (const name of Object.keys(P)) if (!/Foot$/.test(name)) posed[P[name]] = [posed[P[name]][0], posed[P[name]][1] - sink, posed[P[name]][2]];
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    const hip = posed[P[`${side}Hip`]];
+    const foot = posed[P[`${side}Foot`]];
+    const [upper, lower] = [body.lengths.thigh, body.lengths.shank];
+    const span = foot.map((value, axis) => value - hip[axis]);
+    const reach = Math.hypot(...span);
+    const unit = span.map((value) => value / reach);
+    const a = (upper * upper - lower * lower + reach * reach) / (2 * reach);
+    const h = Math.sqrt(Math.max(0, upper * upper - a * a));
+    const bend = [1, 0, sign * SHEET.stance.out];
+    const dot = bend.reduce((sum, value, axis) => sum + value * unit[axis], 0);
+    const across = bend.map((value, axis) => value - dot * unit[axis]);
+    const size = Math.hypot(...across);
+    posed[P[`${side}Knee`]] = hip.map((value, axis) => value + unit[axis] * a + (across[axis] / size) * h);
   }
   return posed;
 }
@@ -288,7 +317,9 @@ async function subjectFor(inputs, extras = {}) {
   let material = skinMaterial();
   if (textured) material = applySkinTextures(material, textured.textures, { relief: Number(query.get('relief') ?? 1), upgrade: Boolean(styleSpec(STYLE).tex.upgrade) });
   else if (built.detail) detailMaterial(material, built.detail, Number(query.get('relief') ?? 1));
-  const points = POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
+  // (`game`: the arms lowered on the physics' own skeleton, rig.js bindPoints, as the game holds a standing body; `rest` on the
+  // skeleton the skin was bound to, which the base style builds on the model's own joints.)
+  const points = POSE === 'stance' ? stancePoints(bindPoints(body), body) : POSE === 'game' ? restPoints(bindPoints(body), body, SHEET.armRest) : POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
   const frames = boneFrames(points, body);
   const skin = skinnedMesh(built, geometryOf(built, colors), material, frames);
   group.add(skin);

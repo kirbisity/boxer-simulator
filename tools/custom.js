@@ -73,6 +73,7 @@ export const baseBodyMesh = ${missing('the base meshes')};
 export const baseBodyUvs = ${missing('the base meshes')};
 export const measureBaseBody = ${missing('the base meshes')};
 export const placeBaseBody = ${missing('the base meshes')};
+export const baseBindJoints = ${missing('the base meshes')};
 `,
   // Story mode (src/story/): not here; the page's hooks into it inert.
   'story/storyview': `

@@ -57,7 +57,11 @@ export const STYLE_SPECS = {
   v5: { face: true, label: 'V5 flesh-lite, painted' },
   v6: { face: true, label: 'V6 flesh hero, painted' },
   v7: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'V7 flesh-wrapped loft + V2 maps' },
-  base: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'Base meshes + V2 maps' },
+  // (The base meshes carry all their own relief, `share` 1: the rules' painted anatomy, placed by the loft's landmarks and
+  // angles, lands beside the modelled kneecap, shin, ribs and pecs as a second, turned set: a kneecap's ring off the knee, a
+  // shin's crest spiralling down it, rib stripes over a thin man's smooth chest. The maps keep the skin's colour, veins and
+  // gloss, and the emaciated reference's ribs on a starved body.)
+  base: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 1, upgrade: true }, label: 'Base meshes + V2 maps' },
 };
 export const BODY_STYLE_KEYS = Object.keys(STYLE_SPECS);
 /** The style fighters are drawn in unless a look says otherwise: V7. ('lofted', the plain loft, is the old default and the placeholder while V7 is built.) */

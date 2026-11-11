@@ -6,7 +6,7 @@
 // seven sides and flat normals, for a low-poly art look.
 
 import { buildBody, P } from './body.js';
-import { baseBodyAvailable, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
+import { baseBindJoints, baseBodyAvailable, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
 import { relax, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
@@ -1891,17 +1891,17 @@ const BASE_TRAIT = { trunk: 'trunk', neck: 'trunk', Upper: 'arm', Fore: 'fore', 
 /**
  * The base mesh placed on this body's parts (`parts`, gathered by the loft) and added to the mesh as its skin: each drawn point
  * with its part's bones (the trunk's own lists), its place along and round the part (coverage reads it), its tile coordinates
- * (`uv`: the textured styles'); `height` his standing height (m); `starve` how starved he is (basebody.js baseStarvation); `joints`
- * his bind-pose joints by name. The muscle relief the mesh was modelled with shows by how defined each part is against the
- * reference's (fat smooths it: basebody.js BASE_BODY smooth*); never more than modelled.
+ * (`uv`: the textured styles'); `height` his standing height (m); `starve` how starved he is (basebody.js baseStarvation); the
+ * joints it is placed on and each forearm's reach to the hand (basebody.js baseBindJoints). The muscle relief the mesh was
+ * modelled with shows by how defined each part is against the reference's (fat smooths it: basebody.js BASE_BODY smooth*); never more than modelled.
  */
-function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, joints) {
+function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach }) {
   const relief = (name) => {
     const key = BASE_TRAIT[name] ?? BASE_TRAIT[name.slice(1)];
     const modelled = definedBy(rig.refTraits[key].fat);
     return modelled <= 0 ? 1 : Math.min(1, definedBy(traits[key].fat) / modelled);
   };
-  const { positions } = placeBaseBody(rig, parts, relief, height, starve, joints);
+  const { positions } = placeBaseBody(rig, parts, relief, height, starve, skin, reach);
   const uvs = uv ? baseBodyUvs(rig) : null;
   const start = mesh.positions.length / 3;
   const { render } = rig;
@@ -2465,8 +2465,15 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const skinBend = (shapes) => (detailed ? shapes.skin : armoured ? null : shapes.mass);
   // The rules' bend: the broad form, the outline's features and the mesh's share of the fine height, not under cloth, nothing under armour.
   const ruledBend = (shapes, part, side, covers) => (armoured || !ruled ? skinBend(shapes) : rulesShape(rulesOf, part, side, rulesShare, shapes.mass, (t) => sculptCoverShare(covers, t, 0.05)));
-  const points = bindPoints(body);
+  // On the base mesh the rings (and the skin) are built on the model's own joints, and the skin bound to the same skeleton moved
+  // onto the rig's roots (basebody.js baseBindJoints): `bindAt`, `bindFrames` what is returned for the renderer to bind to.
+  const rigPoints = bindPoints(body);
+  const baseJoints = baseRig ? baseBindJoints(baseRig, jointsByName(rigPoints), body.heightM) : null;
+  const byIndex = (named) => Object.keys(P).map((name) => named[name]);
+  const points = baseJoints ? byIndex(baseJoints.loft) : rigPoints;
   const frames = boneFrames(points, body);
+  const bindAt = baseJoints ? byIndex(baseJoints.bind) : points;
+  const bindFrames = baseJoints ? boneFrames(bindAt, body) : frames;
   const at = (name) => points[P[name]];
   const seg = body.segments;
   const L = body.lengths;
@@ -3184,7 +3191,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
 
   if (base?.measure) return { baseParts };
   if (baseRig) {
-    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), jointsByName(points));
+    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints);
     fitClothToBase(mesh, baseParts, armoured);
   }
   // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.
@@ -3330,7 +3337,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const slosh = figures ? baseSlosh(figures, positionArray, rigid, baseParts.trunk, baseBellyShape, trunkShare) : null;
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return {
-    positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames: frames, bindPoints: points,
+    positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames, bindPoints: bindAt,
     ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}), ...(tint ? { tint } : {}), ...(slosh ? { slosh } : {}),
   };
 }

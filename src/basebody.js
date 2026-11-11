@@ -5,7 +5,9 @@
 //
 // Other builds change it gently, keeping its contour (the user's call, 2026-11-11: the model, used simply and faithfully):
 //   - its joints move as the game's do: each of the mesh's own joints by how this body's bind-pose joint (rig.js bindPoints)
-//     lies from the reference's, so height and frame lengthen and shorten the parts along their bones, not across;
+//     lies from the reference's, so height and frame lengthen and shorten the parts along their bones, not across; each limb
+//     then runs in the model's own direction at the game's length, and the loft (clothes) and the rig are built on those
+//     joints, not the rig's straight A-pose (baseBindJoints: the rig follows the model);
 //   - each point is scaled out from its part's axis by a ratio, this body's ring over the reference's at its place along the
 //     part (loftbody.js: the rings the plain skin is drawn on; their depth ratio fore and aft, their width ratio across, the
 //     trunk's lean the difference of the two), smoothed along the part, so fat and muscle swell the modelled shape as a whole;
@@ -44,13 +46,30 @@ export const BASE_BODY = {
   // A part's girth ratio is smoothed along it over this many stops either way (0.12 of the part: a ring's profile turns at the
   // loft's stops, a tenth of a part apart, and a ratio taken stop by stop would print them as bands).
   ratioSmooth: 8,
-  // Joints held at the game's own, not the model's: the hands (wardrobe.js), carried on the rig's hand points, which lie further
-  // from the elbow than the model's wrist (the rig's forearm reaches the fist's middle, 0.19 of height, the model's wrist 0.14):
-  // the model's forearm is drawn out to meet the fist, as the loft's runs into the back of it. Everywhere else the model's joints.
-  attached: ['lHand', 'rHand'],
+  // The forearm's skin ends at the modelled wrist, and the game's hand (wardrobe.js buildHand) is drawn on the rig's hand point,
+  // the fist's middle (0.19 of height from the elbow; the model's wrist lies 0.14 from it, the anatomical 0.146 of Drillis and
+  // Contini: the rig's point is right, the drawn palm short, its heel only 3.3 cm behind the point). So the forearm is drawn
+  // out to `handSeat` (m per 1.8 m of height) behind the hand point, under the palm's rounded heel (its section there 2.3 by
+  // 2.9 cm, a wrist's), not to the fist's middle, and the length it gains is laid on along it unevenly: `foreTaper` the share of
+  // the stretch the elbow's end takes against the wrist's (the muscle bellies by the elbow keep their length best, the tendons
+  // by the wrist are nearly a cylinder and take the most, so the stretch reads least).
+  handSeat: 0.021,
+  foreTaper: 0.5,
   // An arm's own reach (loftbody.js LOFT.fit's): this share of its ring's radius round its axis, from `armFrom` (t, above the
   // shoulder joint) down.
   armReach: 1.6, armFrom: -0.25,
+  // The emaciated reference's contour is faded out over the shoulder's cap: within `starveArm[0]` of an upper arm's ring radius
+  // round its axis (from armFrom down) none of it, from `starveArm[1]` (its reach, armReach) all. Its figure stood with one hand
+  // on the hip and the other arm hanging (tools/blender/emaciated.py), its shoulders shrugged and turned, so the delta there is
+  // its pose, not its wasting: ±2 cm lumps on a starved man's shoulders. Its collarbones and the ribs below stay.
+  starveArm: [1.0, 1.6],
+  // Her rib and spine detail (baseStarvedDetail) is faded where it is her pose, not her wasting: above the collarbones (`top`,
+  // t of the trunk: her shrugged shoulders and turned neck printed as ridges over a starved man's shoulders), and over the
+  // shoulder's cap at the sides (`side`, t, where |sin| of the angle passes `sideFrom`: those triangles are drawn in the arm's
+  // tile, which has none, so a patch of ribs ended in a polygon on the back). Her free side is read mirrored for the other, so
+  // the round slope flips sign across the midlines: it is eased to nothing within `midline` (|sin| of the angle, about 7 degrees,
+  // 1.5 cm on a trunk) of them, where it met itself turned over as a seam down the belly.
+  starveDetail: { top: [0.84, 0.95], side: [0.66, 0.8], sideFrom: 0.55, midline: 0.12 },
   // Each limb's parent at its root, and where on the parent the joint is (its t): the upper arm on the trunk at the shoulders
   // (the shoulder joint stands 0.91 of the way up the trunk: rig.js bindPoints, 0.025 of height under the neck's foot on a
   // 0.27 trunk), the forearm on the upper arm at the elbow, the thigh on the trunk at the hip joint, the shin on the thigh at the
@@ -114,7 +133,27 @@ export function baseStarvedDetail(body) {
   if (weight <= 0 || !packed) return null;
   if (!starvedSlopes) {
     const bytes = new Int8Array(baseBytes(packed.slopes).buffer);
-    starvedSlopes = { width: packed.width, height: packed.height, span: packed.span, slopes: Float32Array.from(bytes, (value) => (value / 127) * packed.steepest) };
+    const slopes = Float32Array.from(bytes, (value) => (value / 127) * packed.steepest);
+    const { width, height, span } = packed;
+    const fade = BASE_BODY.starveDetail;
+    const smooth = (from, to, x) => {
+      const u = Math.min(1, Math.max(0, (x - from) / (to - from)));
+      return u * u * (3 - 2 * u);
+    };
+    for (let row = 0; row < height; row += 1) {
+      const t = span[0] + ((span[1] - span[0]) * row) / (height - 1);
+      for (let column = 0; column < width; column += 1) {
+        const angle = (Math.PI * 2 * column) / (width - 1);
+        const side = Math.abs(Math.sin(angle));
+        const keep = (1 - smooth(fade.top[0], fade.top[1], t)) * (1 - smooth(fade.sideFrom, 1, side) * smooth(fade.side[0], fade.side[1], t));
+        // (The round slope eased to nothing at the midlines, front and back: Math.abs(sin) the distance off them.)
+        const midline = smooth(0, fade.midline, side);
+        const at = (row * width + column) * 2;
+        slopes[at] *= keep * midline;
+        slopes[at + 1] *= keep;
+      }
+    }
+    starvedSlopes = { width, height, span, slopes };
   }
   return { ...starvedSlopes, weight };
 }
@@ -271,7 +310,22 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     src.starved.push(starved);
     return src.part.length - 1;
   };
-  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex]);
+  // (Each point's starved delta faded over the shoulder's cap: BASE_BODY.starveArm.)
+  const starveKeep = (p) => {
+    let keep = 1;
+    for (const name of ['lUpper', 'rUpper']) {
+      const [t, x, y] = axisCoords(frames[name], p);
+      if (t < BASE_BODY.armFrom) continue;
+      const at = Math.max(0, Math.min(1, t));
+      const ring = refParts[name];
+      const d = Math.hypot(x, y) / Math.max(ring.depth(at), ring.width(at));
+      const [inner, outer] = BASE_BODY.starveArm;
+      const u = Math.min(1, Math.max(0, (d - inner) / (outer - inner)));
+      keep = Math.min(keep, u * u * (3 - 2 * u));
+    }
+    return keep;
+  };
+  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex] * starveKeep(point(scaled, vertex)));
 
   // The drawn points: one per source and tile (and seam side).
   const render = { source: [], part: [], t: [], angle: [], u: [] };
@@ -419,22 +473,74 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
 }
 
 /**
+ * The joints a fighter's base skin is placed on and the loft and the rig are built on (the rig follows the model). `rig` the
+ * measured mesh (measureBaseBody), `joints` his bind-pose joints (rig.js bindPoints, by name), `height` his standing height (m).
+ *   - Each of the mesh's joints is moved as his is from the reference's (height and frame lengthen and shorten the parts along
+ *     their bones, not across).
+ *   - Each limb (and the neck to the head) then runs from its root in the model's own direction, at the game's own length: the
+ *     bones lie along the skin's own axes, so a shin ends at its foot and a sleeve's rings are the arm's (the model's legs slant
+ *     back to an ankle 9.5 cm behind the rig's, its hips stand 2 cm wider: rings on the rig's line stood off the skin by that).
+ *   - `bind`: the same skeleton with every chain moved onto the rig's own root (pelvis, hips, shoulders, neck), which is where
+ *     the physics holds them: the skin is bound to it, so in play a limb's skin keeps its place beside the trunk's however the
+ *     bones turn (bound on the model's roots, a thigh would be carried 2 cm in to the rig's hip).
+ * Returns { loft, skin, bind } (joints by name; `skin` has the forearm end at the modelled wrist, not the hand point) and
+ * `reach` (each forearm's skin drawn out to the hand, m: BASE_BODY.handSeat).
+ */
+export function baseBindJoints(rig, joints, height) {
+  const moved = Object.fromEntries(Object.keys(rig.joints).map((name) => [name, vec.add(rig.joints[name], vec.sub(joints[name], rig.refJoints[name]))]));
+  const loft = { ...moved };
+  const skin = {};
+  const reach = {};
+  // A chain from its root: each next joint in the model's direction at the rig's length.
+  const chain = (names) => {
+    for (let index = 1; index < names.length; index += 1) {
+      const [from, to] = [names[index - 1], names[index]];
+      loft[to] = vec.add(loft[from], vec.scale(vec.normalize(vec.sub(moved[to], moved[from])), vec.length(vec.sub(joints[to], joints[from]))));
+    }
+  };
+  chain(['neck', 'head']);
+  for (const side of ['l', 'r']) {
+    chain([`${side}Shoulder`, `${side}Elbow`, `${side}Hand`]);
+    chain([`${side}Hip`, `${side}Knee`, `${side}Foot`]);
+  }
+  Object.assign(skin, loft);
+  for (const side of ['l', 'r']) {
+    const [elbow, hand] = [loft[`${side}Elbow`], loft[`${side}Hand`]];
+    const along = vec.normalize(vec.sub(hand, elbow));
+    const modelled = vec.length(vec.sub(moved[`${side}Hand`], moved[`${side}Elbow`]));
+    skin[`${side}Hand`] = vec.add(elbow, vec.scale(along, modelled));
+    reach[`${side}Fore`] = Math.max(0, vec.length(vec.sub(hand, elbow)) - (BASE_BODY.handSeat * height) / 1.8 - modelled);
+  }
+  // Each chain carried onto the rig's root.
+  const bind = { ...loft };
+  const roots = { pelvis: ['pelvis'], neck: ['neck', 'head'] };
+  for (const side of ['l', 'r']) {
+    roots[`${side}Shoulder`] = [`${side}Shoulder`, `${side}Elbow`, `${side}Hand`];
+    roots[`${side}Hip`] = [`${side}Hip`, `${side}Knee`, `${side}Foot`];
+  }
+  for (const [root, names] of Object.entries(roots)) {
+    const shift = vec.sub(joints[root], loft[root]);
+    for (const name of names) bind[name] = vec.add(loft[name], shift);
+  }
+  return { loft, skin, bind, reach };
+}
+
+/**
  * A fighter's base skin: each source point placed on his parts and blended across its joint. `parts` the loft's description of
- * his rings (see measureBaseBody), `joints` his bind-pose joints (rig.js bindPoints, by name), `relief(name)` how much of the
+ * his rings (see measureBaseBody), `joints` the joints it is placed on (baseBindJoints' `skin`), `relief(name)` how much of the
  * modelled muscle relief his part shows (1 all of it, 0 the smoothed surface), `height` his standing height (m), `starve` how
- * starved he is (baseStarvation: the emaciated reference's contour, each point's delta out along its line, laid on by it).
+ * starved he is (baseStarvation: the emaciated reference's contour, each point's delta out along its line, laid on by it),
+ * `foreReach` each forearm's length drawn out past the modelled wrist (baseBindJoints).
  * Returns the drawn points' positions (render order) and the sources'.
  */
-export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.refJoints) {
+export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}) {
   const { names, sources, render } = rig;
-  // The mesh's joints moved as his are from the reference's; the hands at his own (BASE_BODY.attached).
-  const moved = (name) => (BASE_BODY.attached.includes(name) ? joints[name] : vec.add(rig.joints[name], vec.sub(joints[name], rig.refJoints[name])));
   const frames = {};
   const ratios = {};
   const count = BASE_BODY.stops;
   for (const name of names) {
     const part = parts[name];
-    frames[name] = partFrame(moved(BASE_BODY.axes[name][0]), moved(BASE_BODY.axes[name][1]), part.forward);
+    frames[name] = partFrame(joints[BASE_BODY.axes[name][0]], joints[BASE_BODY.axes[name][1]], part.forward);
     const [from, to] = rig.spans[name];
     const own = ringRows(part, from, to);
     const raw = own.map(([depth, width, offset], index) => {
@@ -514,7 +620,12 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     const add = starved + swell;
     px += (px / length) * add;
     py += (py / length) * add;
-    const along = t * frame.length - hang;
+    // (A forearm drawn out to the hand, `foreReach` m more than modelled: the stretch at t is (taper + (2 - 2·taper)·t) of the mean,
+    // its integral below; past the wrist the whole of it.)
+    const more = foreReach[name] ?? 0;
+    const taper = BASE_BODY.foreTaper;
+    const u = Math.min(1, Math.max(0, t));
+    const along = t * frame.length + more * (taper * u + (1 - taper) * u * u) - hang;
     for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * px + frame.widthAxis[axis] * py;
     return out;
   };
