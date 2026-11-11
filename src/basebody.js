@@ -113,6 +113,21 @@ export const BASE_BODY = {
   shoulderSmooth: 8,
   // (The model's upper arm hangs 25 degrees from the vertical, the game's 11 (tools/bodysheet-page.js SHEET.armRest).)
   rebindDegrees: 14, rebindClavicle: 0.35,
+  // PROOF OF CONCEPT, round 11 (the user: D is better, but the shoulders and arms smaller still, the neck longer, the woman's
+  // shoulder a sharper joint, not a tube): D's rest shape, then (shoulderPlus):
+  //   `in`      the shoulder's zone moved in towards the midline (m per 1.8 m): shorter clavicles, the acromion in;
+  //   `trap`    the trapezius lowered (m), most beside the neck and `trapKeep` of it left at the acromion: the top line from the
+  //             neck out flatter, and more of the neck showing above it;
+  //   `deltoid` the deltoid's bulk beyond the arm's ring kept at this share on its outer side;
+  //   `arm`     the upper arm's and forearm's girth about their axes (eased in below the shoulder's cap, `armFrom` to `armTo`, t);
+  //   `square`  the cap's profile in the arm's plane about the shoulder joint pushed from a circle's towards a square's (a
+  //             superellipse of exponent 4: at 45 degrees up and out 19% further) by this share: the acromion's corner where the
+  //             top line meets the arm;
+  //   `edge`    the deltoid's front and back edges, grooves this deep (m) at 0.6 of muscle showing and up to twice it at all.
+  shoulderPlus: {
+    D1: { in: 0.02, trap: 0.04, trapKeep: 0.35, deltoid: 0.7, arm: 0.9, armFrom: -0.05, armTo: 0.2, square: 0.4, edge: 0.003 },
+    D2: { in: 0.035, trap: 0.065, trapKeep: 0.3, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005 },
+  },
 };
 
 const BASE_TAU = Math.PI * 2;
@@ -280,7 +295,7 @@ export function baseBodyMesh(sex, crowd = false) {
     ...baseHeat(packed),
   };
   mesh.triangles = closeSlits(mesh.positions, new Uint16Array(baseBytes(packed.triangles).buffer));
-  if (BASE_BODY.shoulder === 'D' && mesh.heatIndex) rebindArmsDown(mesh);
+  if (BASE_BODY.shoulder?.startsWith('D') && mesh.heatIndex) rebindArmsDown(mesh);
   baseDecoded.set(key, mesh);
   return mesh;
 }
@@ -730,6 +745,12 @@ export function baseBindJoints(rig, joints, height) {
       loft[to] = vec.add(loft[from], vec.scale(vec.normalize(vec.sub(moved[to], moved[from])), vec.length(vec.sub(joints[to], joints[from]))));
     }
   };
+  // (The shoulders as wide as the rig's (body.js ARM_LENGTHS), narrower than the model's: each arm brought in across to the
+  // rig's shoulder, the model's own height and depth kept; the shoulder's cap, on the trunk, eases into it across the joint.)
+  for (const side of ['l', 'r']) {
+    const name = `${side}Shoulder`;
+    loft[name] = [moved[name][0], moved[name][1], joints[name][2]];
+  }
   chain(['neck', 'head']);  // (the skin's; the loft's head is set below)
   for (const side of ['l', 'r']) {
     chain([`${side}Shoulder`, `${side}Elbow`, `${side}Hand`]);
@@ -904,6 +925,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     placed.set(one, vertex * 3);
   }
   if (BASE_BODY.shoulder && BASE_BODY.shoulder !== 'D') {
+    if (BASE_BODY.shoulderPlus[BASE_BODY.shoulder]) shoulderPlus(BASE_BODY.shoulderPlus[BASE_BODY.shoulder], { rig, frames, placed, shoulderKeep, height, joints });
     // (The smoothed surface placed too, for the designs that drive it and carry the detail along: C and E.)
     const design = BASE_BODY.shoulder;
     let smooth = null;
@@ -923,7 +945,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
         smooth.set(one, vertex * 3);
       }
     }
-    shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
+    if (!BASE_BODY.shoulderPlus[design]) shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
   }
   const positions = new Float32Array(render.count * 3);
   for (let index = 0; index < render.count; index += 1) positions.set(placed.subarray(render.source[index] * 3, render.source[index] * 3 + 3), index * 3);
@@ -1032,6 +1054,119 @@ function shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKe
   }
   const lists = neighbours.map((set) => [...set]);
   const smoothed = laplacian(shifts, lists, BASE_BODY.shoulderSmooth);
+  for (let index = 0; index < placed.length; index += 1) placed[index] += smoothed[index];
+}
+
+/**
+ * PROOF OF CONCEPT, round 11: D's rest shape made smaller and sharper (BASE_BODY.shoulderPlus, `spec`), on the placed points
+ * (changed in place). Each point's moves are worked out on its own, then smoothed over the surface as the round 10 designs' are.
+ */
+function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints }) {
+  const ease = (a, b, x) => {
+    const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  };
+  const scale = height / 1.8;
+  const count = placed.length / 3;
+  const trunk = frames.trunk;
+  const neck = frames.neck;
+  const shifts = new Float32Array(count * 3);
+  const sides = ['l', 'r'].map((side) => {
+    const name = `${side}Upper`;
+    const joint = joints[`${side}Shoulder`];
+    const [, , across] = axisCoords(trunk, joint);
+    return { side, name, fore: `${side}Fore`, joint, across, frame: frames[name] };
+  });
+  // The neck's radius at its foot (its points' mean distance off its axis near t 0).
+  let neckR = 0;
+  let neckN = 0;
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (rig.names[rig.sources.part[vertex]] !== 'neck') continue;
+    const [t, x, y] = axisCoords(neck, [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]]);
+    if (t < 0.25) {
+      neckR += Math.hypot(x, y);
+      neckN += 1;
+    }
+  }
+  neckR = neckN ? neckR / neckN : 0.06 * scale;
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    const partName = rig.names[rig.sources.part[vertex]];
+    const p = [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]];
+    // (The neck's foot goes down with the trapezius beside it, eased out up the neck: the neck drawn out, not torn from it.)
+    if (partName === 'neck') {
+      const [tN] = axisCoords(neck, p);
+      shifts.set(vec.scale(trunk.axis, -spec.trap * scale * (1 - ease(0, 0.6, tN))), vertex * 3);
+      continue;
+    }
+    const [tT, , yT] = axisCoords(trunk, p);
+    const side = sides[yT * sides[0].across > 0 ? 0 : 1];
+    const [tA, xA, yA] = axisCoords(side.frame, p);
+    const rA = Math.hypot(xA, yA) || 1e-9;
+    const radialA = vec.add(vec.scale(side.frame.depthAxis, xA / rA), vec.scale(side.frame.widthAxis, yA / rA));
+    let shift = [0, 0, 0];
+    // The zone: the trunk's top (t over 0.8) and the arm's root; the lateral share, how far out from the neck to the acromion.
+    const out = Math.abs(yT) / Math.abs(side.across);
+    const top = ease(0.78, 0.9, tT);
+    const isArm = /Upper$|Fore$/.test(partName) || rig.sources.blend[vertex] > 0 && /Upper$|Fore$/.test(rig.names[rig.sources.part2[vertex]]);
+    const armRoot = isArm ? 1 - ease(0.2, 0.4, tA) : 0;
+    const zone = Math.max(top * ease(0.3, 0.7, out), armRoot);
+    // In: towards the midline across the trunk: the trunk's cap only, the arm's own skin kept round its bone (the rig's
+    // shoulder joint), so the shoulder comes in to the arm rather than the arm off its joint.
+    if (!isArm) shift = vec.add(shift, vec.scale(trunk.widthAxis, -Math.sign(yT) * spec.in * scale * top * ease(0.3, 0.7, out)));
+    // The trapezius down: most beside the neck (off the neck's own skin), trapKeep of it at the acromion, none below the top.
+    const [, nx, ny] = axisCoords(neck, p);
+    const offNeck = ease(neckR * 0.95, neckR * 1.35, Math.hypot(nx, ny));
+    const trap = spec.trap * scale * top * offNeck * (1 - (1 - spec.trapKeep) * Math.min(1, out)) * (isArm ? 1 - ease(-0.2, 0.1, tA) : 1);
+    shift = vec.add(shift, vec.scale(trunk.axis, -trap));
+    if (isArm || zone > 0) {
+      // The deltoid: its bulk beyond the arm's mean radius at this t, on its outer side, cut to `deltoid`.
+      const outer = -Math.sign(yT) * vec.dot(radialA, trunk.widthAxis);
+      const capW = (1 - ease(0.25, 0.45, tA)) * ease(-0.45, -0.15, tA);
+      if (outer > 0 && capW > 0) shift = vec.add(shift, vec.scale(radialA, -(1 - spec.deltoid) * 0.35 * rA * outer * capW));
+      // The corner: the cap's profile in the plane of the trunk's width and its axis, about the shoulder joint, squared.
+      const rel = vec.sub(p, side.joint);
+      const u = -Math.sign(yT) * vec.dot(rel, trunk.widthAxis) * -1;
+      const lateral = Math.abs(vec.dot(rel, trunk.widthAxis));
+      // (Only above the joint's level: the profile's upper quarter, from out to up; below it the arm hangs.)
+      const up = Math.max(0, vec.dot(rel, trunk.axis));
+      const r = Math.hypot(lateral, up);
+      if (r > 1e-6 && r < 0.09 * scale && u !== 0) {
+        const c = lateral / r;
+        const s = up / r;
+        const square = 1 / (c ** 4 + s ** 4) ** 0.25;
+        const grow = spec.square * (square - 1) * (1 - ease(0.05 * scale, 0.09 * scale, r));
+        const dir = vec.normalize(vec.add(vec.scale(trunk.widthAxis, Math.sign(vec.dot(rel, trunk.widthAxis)) * c), vec.scale(trunk.axis, s)));
+        shift = vec.add(shift, vec.scale(dir, r * grow));
+      }
+      // The deltoid's front and back edges: grooves at about 35 degrees round from the front and the back, towards the outside.
+      if (isArm && tA > -0.05 && tA < 0.45) {
+        const angle = Math.atan2(yA, xA) * Math.sign(vec.dot(side.frame.widthAxis, trunk.widthAxis) * -Math.sign(yT) || 1);
+        const groove = (a) => Math.max(0, 1 - ((angle - a) / 0.3) ** 2) ** 2;
+        const along = ease(-0.05, 0.08, tA) * (1 - ease(0.3, 0.45, tA));
+        const depth = spec.edge * scale * (0.6 + 1.4 * Math.min(1, shoulderKeep)) * along * (groove(0.6) + groove(Math.PI - 0.6));
+        shift = vec.add(shift, vec.scale(radialA, -depth));
+      }
+    }
+    // The arm thinner about its own axis.
+    if (isArm) {
+      const own = frames[partName] ?? side.frame;
+      const [t, x, y] = axisCoords(own, p);
+      const ease0 = /Upper$/.test(partName) ? ease(spec.armFrom, spec.armTo, t) : 1;
+      const k = (1 - spec.arm) * ease0;
+      shift = vec.add(shift, vec.add(vec.scale(own.depthAxis, -x * k), vec.scale(own.widthAxis, -y * k)));
+    }
+    shifts.set(shift, vertex * 3);
+  }
+  const neighbours = Array.from({ length: count }, () => new Set());
+  const tri = rig.triangles;
+  for (let corner = 0; corner < tri.length; corner += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => rig.render.source[tri[corner + k]]);
+    neighbours[a].add(b).add(c);
+    neighbours[b].add(a).add(c);
+    neighbours[c].add(a).add(b);
+  }
+  // (Smoothed less than the round 10 designs (half as many rounds): the corner and the edges are the point.)
+  const smoothed = laplacian(shifts, neighbours.map((set) => [...set]), BASE_BODY.shoulderSmooth / 2);
   for (let index = 0; index < placed.length; index += 1) placed[index] += smoothed[index];
 }
 

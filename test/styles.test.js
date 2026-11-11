@@ -128,6 +128,8 @@ test('each style fights with its own moves, chosen by distance: a boxer never ki
   const thrown = (style, gap) => new Set([9, 10].flatMap((seed) => [...thrownWith(style, gap, seed)]));
   const thrownWith = (style, gap, seed) => {
     const world = createWorld([{ ...PRESETS.light, style }, { ...PRESETS.veteran, style: 'boxing' }], { seed });
+    // (The gaps as measured at the reference reach, at his own: body.js REACH_REFERENCE.)
+    gap *= world.fighters[0].body.reachScale;
     placeFighter(world.fighters[0], -gap / 2);
     placeFighter(world.fighters[1], gap / 2);
     const types = new Set();
@@ -174,8 +176,10 @@ test('a boxer sees the punch coming and slips it: crosses that land on a still h
     let slipped = 0;
     for (let seed = 0; seed < 12; seed += 1) {
       const world = createWorld([{ ...PRESETS.heavy, style: 'boxing' }, { ...PRESETS.light, style: 'boxing' }], { seed });
-      placeFighter(world.fighters[0], -0.5);
-      placeFighter(world.fighters[1], 0.5);
+      // (A metre apart at the reference reach, at the attacker's own: body.js REACH_REFERENCE.)
+      const gap = world.fighters[0].body.reachScale;
+      placeFighter(world.fighters[0], -0.5 * gap);
+      placeFighter(world.fighters[1], 0.5 * gap);
       advance(world, 0.6);
       const [attacker, defender] = world.fighters;
       // A boxing plan, not a brawl: the defender is there to defend.

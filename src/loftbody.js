@@ -1897,7 +1897,7 @@ const BASE_RIGS = new Map();
 /** The options a base skin is built with (and measured with: the trunk's profiles depend on them): a fighter's, or a crowd's. */
 export const baseLoftOptions = (crowd) => (crowd ? { lowDetail: true } : { sculpt: 'rules', rules: { share: 0, density: 'medium' }, hideCovered: true });
 function baseRigOf(sex, crowd) {
-  const key = `${sex}|${crowd}|${BASE_BODY.shoulder === 'D'}`;
+  const key = `${sex}|${crowd}|${Boolean(BASE_BODY.shoulder?.startsWith('D'))}`;
   if (!BASE_RIGS.has(key)) {
     const mesh = baseBodyMesh(sex, crowd);
     const reference = buildBody(mesh.reference);
