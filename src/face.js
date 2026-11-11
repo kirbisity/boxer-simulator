@@ -22,7 +22,7 @@ import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint }
 import { paintFromFace, PHOTO_ATLAS, photoSkinMaterial } from './photoface.js';
 import { buildPhotoHead, PHOTO_HEAD } from './photohead.js';
 import { buildPhotoBeard, photoScalp, scalpCover } from './photohair.js';
-import { buildHairMass } from './hairmass.js';
+import { buildHairMass, buildHairRim, headEllipsoid } from './hairmass.js';
 import { buildHairSwing, HAIR_SWING } from './hairswing.js';
 
 export const LOOK_OPTIONS = {
@@ -572,13 +572,16 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
         colour.setXYZ(index, ...[hair.r, hair.g, hair.b].map((value, channel) => colour.array[index * 3 + channel] + (value - colour.array[index * 3 + channel]) * cover));
       }
     }
-    // The hair's volume, one sculpted mass (hairmass.js), and a beard's cards (photohair.js); a crowd's are painted only.
+    // The hair's volume, the style's own shape (hairmass.js), and a beard's cards (photohair.js); a crowd's are painted only.
     const colour = new THREE.Color(photo.hair);
     const coarse = Boolean(look.photoPainted);
     photo.hairTriangles = buildPhotoBeard({ group, head: photoHead, r, facialHair: look.facialHair, colour, random, coarse });
-    if (!coarse) photo.hairTriangles += buildHairMass({ group, head: photoHead, r, style: look.hairStyle, colour, random });
-    // What hangs free swings (hairswing.js): the meshes placed at the head's origin (a knot is not: it does not hang).
-    if (!coarse) hairSwing = buildHairSwing(group.children.filter((child) => child.userData.photoHair && child.position.lengthSq() === 0 && child.scale.x === 1), r);
+    if (!coarse) {
+      const hair = buildHairMass({ group, head: photoHead, r, style: look.hairStyle, colour, random });
+      photo.hairTriangles += hair.triangles;
+      // What hangs free swings on its chains (hairswing.js), kept out of the head.
+      hairSwing = buildHairSwing(hair.meshes, hair.chains, headEllipsoid(photoHead, r));
+    }
   }
   // The beard in a material of its own: an open-faced helmet hides the hair, not the beard.
   const beardMaterial = hairMaterial.clone();
@@ -657,24 +660,37 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   }
 
   // Under a helmet: no hair, and no locks swinging through the steel; the
-  // beard too, unless the helmet leaves the face open (`beard`). Returns the meshes hidden.
+  // beard too, unless the helmet leaves the face open (`beard`). A photo
+  // head keeps what hangs below the rim at the back (hairmass.js
+  // buildHairRim: long hair, a ponytail's tail, ropes), still swinging; the
+  // sideburns are painted on the skin. Returns the meshes hidden.
   let hidden = null;
   function hideHair({ beard = false } = {}) {
-    hidden = { meshes: [], dangles: dangles.slice(), face: [] };
+    hidden = { meshes: [], dangles: dangles.slice(), face: [], rims: [] };
     group.traverse((object) => {
       if (object.isMesh && object.visible && (object.material === hairMaterial || object.userData.photoHair || (!beard && (object.material === beardMaterial || object.userData.photoBeard)))) {
         object.visible = false;
         hidden.meshes.push(object);
       }
     });
+    if (!look.photoPainted) {
+      for (const mesh of hidden.meshes.filter((object) => object.userData.photoHair)) {
+        const rim = buildHairRim(mesh, r);
+        if (!rim) continue;
+        if (!rim.parent) group.add(rim);
+        rim.visible = true;
+        hidden.rims.push(rim);
+      }
+    }
     dangles.length = 0;
-    if (hairSwing) hairSwing.enabled = false;
+    if (hairSwing) hairSwing.enabled = hidden.rims.length > 0;
     return hidden.meshes;
   }
   // The helmet knocked off (physics.js knockHelmetOff): the hair it hid shows again, and swings.
   function showHair() {
     if (!hidden) return;
     for (const object of hidden.meshes) object.visible = true;
+    for (const rim of hidden.rims) rim.visible = false;
     dangles.push(...hidden.dangles);
     if (hairSwing) hairSwing.enabled = true;
     hidden = null;
