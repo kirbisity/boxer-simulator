@@ -120,6 +120,10 @@ export const LOFT = {
   // of the base mesh, 1.5 cm.)
   // (`tightest`: a piece is drawn in to the skin as well as out, where the modelled body is slimmer than the ring (its waist),
   // but to no less than this share of its ring: a waistband hugs the hips.)
+  // A collar up the trapezius (raiseCollars): away from the front by `from` (rad), in `sectors` round the trunk (and `spread`
+  // either side), to skin out at `neckShare` of the neck's radius or more, stood `standoff` (m, times the piece's own standoff
+  // share) off it.
+  collar: { from: 0.7, sectors: 48, spread: 1, neckShare: 1.1, standoff: 0.006 },
   fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.12, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
@@ -2109,7 +2113,59 @@ function fitClothToBase(mesh, parts, armoured) {
     if (laid === 1) continue;
     for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] = ring.center[axis] + dir[axis] * radius * laid;
   }
+  raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count);
   keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured);
+}
+
+/**
+ * Every trunk piece reaching the trunk's top (a shirt, a coat, a backplate, a gorget's foot) follows the base skin up to the
+ * neckline at the back and sides (LOFT.collar): the modelled trapezius rises above the loft's top rings, and a garment's collar
+ * lies on it, not under it. Each point of the piece's top ring, away from the front (`from` rad: the front neckline is cut low),
+ * is carried to the highest skin point of the trunk and the neck in its sector round the trunk (`sector`) that still lies out at
+ * the neck's foot or beyond (`neckShare` of the neck's radius), stood off it by `standoff` (m: the cloth's own thickness and
+ * the layer margin) along its line out from the axis. A piece already higher there stays.
+ */
+function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count) {
+  const spec = LOFT.collar;
+  const trunk = frames.trunk;
+  if (!trunk) return;
+  const neckFoot = frames.neck ? Math.max(frames.neck.part.depth(0), frames.neck.part.width(0)) * spec.neckShare : 0;
+  const placeOf = (p) => {
+    const rel = vec.sub(p, trunk.part.a);
+    const t = vec.dot(rel, trunk.axis) / trunk.length;
+    const out = vec.sub(rel, vec.scale(trunk.axis, t * trunk.length));
+    return { t, out, r: vec.length(out), angle: Math.atan2(vec.dot(out, trunk.widthAxis), vec.dot(out, trunk.depthAxis)) };
+  };
+  // The skin of the trunk and neck (not the arms', nor the shoulder's cap) by sector round the trunk: its highest point out at the neck's foot.
+  const sectors = spec.sectors;
+  const highest = new Array(sectors).fill(null);
+  const sectorOf = (angle) => ((Math.floor(((angle / (Math.PI * 2)) % 1 + 1) % 1 * sectors) % sectors) + sectors) % sectors;
+  for (let vertex = start; vertex < start + count; vertex += 1) {
+    const name = nameOf.get(vertex);
+    if (name !== 'trunk' && name !== 'neck') continue;
+    if (mesh.base.armFlesh?.[vertex - start] && mesh.base.armFlesh[vertex - start] !== 'trunk') continue;
+    const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
+    if (place.r < neckFoot) continue;
+    const sector = sectorOf(place.angle);
+    if (!highest[sector] || place.t > highest[sector].t) highest[sector] = place;
+  }
+  for (const [vertex, { ring, name, standoff }] of shares) {
+    if (name !== 'trunk' || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk || ring.t < pieceTop.get(ring.piece)) continue;
+    const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
+    if (Math.abs(place.angle) < spec.from) continue;
+    // (The highest skin of this sector and those beside it, so the collar is a smooth line.)
+    let top = null;
+    for (let k = -spec.spread; k <= spec.spread; k += 1) {
+      const found = highest[(sectorOf(place.angle) + k + sectors) % sectors];
+      if (found && (!top || found.t > top.t)) top = found;
+    }
+    if (!top || top.t <= place.t) continue;
+    const reach = top.r + spec.standoff * standoff;
+    const along = top.t * trunk.length;
+    const dir = vec.scale(top.out, 1 / (top.r || 1));
+    const point = vec.add(vec.add(trunk.part.a, vec.scale(trunk.axis, along)), vec.scale(dir, reach));
+    mesh.positions.splice(vertex * 3, 3, ...point);
+  }
 }
 
 /**
@@ -2225,9 +2281,10 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     // (A piece's point with another piece over it is never seen: its triangles are left out where all their points are so, so
     // two layers of one cloth do not fight through each other: hideCovered.)
     if (!layer.skin && covered && !armoured) mesh.underLayer.add(layer.vertex);
-    if (layer.r <= limit || limit <= 0) continue;
-    const pull = (limit - layer.r) / layer.r;
-    for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += layer.out[axis] * pull;
+    if (layer.r > limit && limit > 0) {
+      const pull = (limit - layer.r) / layer.r;
+      for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += layer.out[axis] * pull;
+    }
   }
 }
 // The roles worn at the waist, under a hanging belly (fitClothToBase): shorts and trousers, their bands and belts, a mawashi.
