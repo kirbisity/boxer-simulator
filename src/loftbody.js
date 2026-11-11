@@ -119,8 +119,9 @@ export const LOFT = {
   // most an arm's skin is drawn in under a trunk piece, 3 cm; an arm lying against a top's side lies further out; `hemPull` (m):
   // the most skin just past a piece's end ring is drawn in under its hem, 1 cm, about the cloth's own standoff off the skin;
   // `hideGap` (m): what lies within a piece's rings is left out only if that piece's surface is this near it, 3 cm, a padded
-  // coat's thickness: a skirt or a coat's hem standing clear of the legs is open beneath.)
-  layers: { along: 0.03, around: 36, spread: 1, reach: 6, rankGap: 0.005, margin: 0.004, endReach: 0.04, trunkFoot: 0.05, thighRoot: -0.3, mostPull: 0.03, hemPull: 0.01, hideGap: 0.03 },
+  // coat's thickness: a skirt or a coat's hem standing clear of the legs is open beneath; `hemStand` (m): how far a piece's upper
+  // hem stands past the skin under it, the cloth's thickness; `skinMargin` (m): how far the skin is drawn inside a piece over it.)
+  layers: { along: 0.03, around: 36, spread: 1, reach: 6, rankGap: 0.005, margin: 0.004, endReach: 0.04, trunkFoot: 0.05, thighRoot: -0.3, mostPull: 0.03, hemPull: 0.01, hideGap: 0.03, hemStand: 0.004, skinMargin: 0.008 },
   // (`alongBand`, m: how far up or down the part a skin point may lie from a piece's point and still hold it out: about one ring
   // of the base mesh, 1.5 cm.)
   // (`tightest`: a piece is drawn in to the skin as well as out, where the modelled body is slimmer than the ring (its waist),
@@ -2353,7 +2354,9 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
   for (const [vertex, { name, under, ring }] of shares) {
     if (!frames[name]) continue;
     // (Cloth worn over armour outranks every piece: the plate is held inside it, and it is drawn out over the plate.)
-    layers.push({ vertex, name, rank: ring.over ? Infinity : pieceRank.get(ring.piece), under, piece: ring.piece, over: Boolean(ring.over), torn: Boolean(ring.torn) });
+    // (`hem`: on its piece's top ring, a top's upper hem below the part's top.)
+    const hem = ring.t >= (pieceTop.get(ring.piece) ?? Infinity) - 1e-6 && ring.t < (name === 'trunk' ? LOFT.closedJoint.top.trunk : LOFT.closedJoint.top.limb);
+    layers.push({ vertex, name, rank: ring.over ? Infinity : pieceRank.get(ring.piece), under, piece: ring.piece, over: Boolean(ring.over), torn: Boolean(ring.torn), hem });
   }
   // (The skin by its source point: the copies of one point drawn in two tiles, or either side of a seam, move as one, or the
   // surface would crack between them.)
@@ -2421,8 +2424,11 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
       // (The piece is flat between its points round the ring, LOFT.sides of them: its facet's middle lies the chord's sag,
       // cos(π / sides) of the points' reach, inside them, where a breast's or a calf's skin between two points came through.)
       const facet = r * Math.cos(Math.PI / LOFT.sides);
-      if (facet - spec.margin < limit) {
-        limit = facet - spec.margin;
+      // (Skin a little deeper, `skinMargin`: between a piece's rings its surface is flat across, and a breast's tip under a top
+      // came through it in specks at the nominal margin.)
+      const gap = layer.skin ? spec.skinMargin : spec.margin;
+      if (facet - gap < limit) {
+        limit = facet - gap;
         limiting = piece;
       }
     }
@@ -2436,6 +2442,30 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
   // not the shorts in, as a band lies over what it holds. (Not every piece: a coat's skirt pushed out past its own body stood
   // out from it in a step at the belt.)
   const sag = 1 / Math.cos(Math.PI / LOFT.sides);
+  // A piece's upper hem stands outside the skin under it, `hemStand` (m) past the skin's furthest point in its cell and those
+  // beside it: the skin past a hem is not drawn in under it (`hemPull`), and a bandeau's upper hem sank into the breast's top in
+  // a ragged edge where the skin cut through it.
+  const skinReach = new Map();
+  for (const layer of layers) {
+    // (Not an arm's skin, nor skin blending into one: the arm lies beside a top, not under its hem.)
+    if (!layer.skin || layer.r === undefined || layer.arm) continue;
+    const key = keyOf(layer.name, rowOf(layer.t), columnOf(layer.angle));
+    skinReach.set(key, Math.max(skinReach.get(key) ?? 0, layer.r));
+  }
+  for (const layer of layers) {
+    if (!layer.hem || layer.skin || layer.r === undefined || layer.r < 1e-6) continue;
+    let most = 0;
+    const row = rowOf(layer.t);
+    const column = columnOf(layer.angle);
+    for (let dr = -1; dr <= 1; dr += 1) for (let dc = -spec.spread; dc <= spec.spread; dc += 1) most = Math.max(most, skinReach.get(keyOf(layer.name, row + dr, column + dc)) ?? 0);
+    const want = most * sag + spec.hemStand;
+    if (most > 0 && layer.r < want) {
+      const push = (want - layer.r) / layer.r;
+      for (let axis = 0; axis < 3; axis += 1) mesh.positions[layer.vertex * 3 + axis] += layer.out[axis] * push;
+      layer.out = layer.out.map((value) => value * (1 + push));
+      layer.r = want;
+    }
+  }
   for (const layer of [...layers].filter((one) => !one.skin && !one.over && one.r > 1e-6 && BAND_ROLES.has(mesh.colors[one.vertex])).sort((a, b) => a.rank - b.rank)) {
     let most = 0;
     const row = rowOf(layer.t);
@@ -3497,6 +3527,17 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
         const closes = arm === 'trunk' ? trunkTop : trunkTop || (covered[arm] ?? []).some(([low]) => low <= LOFT.closedJoint.root);
         if (arm && closes) inside[mesh.base.start + index] = 1;
       });
+      // (And the trunk's own skin above the shoulder line, away from the front neckline (LOFT.collar.from), under a trunk piece
+      // reaching the trunk's top: its collar is carried up the trapezius over it (raiseCollars), and the skin there, left in,
+      // showed in patches on a coat's shoulders where the collar meets the shirt's sleeve.)
+      const trunkTop = (mesh.cover.trunk ?? []).some(([, high]) => high >= LOFT.closedJoint.top.trunk);
+      const [from, to] = mesh.parts.trunk ?? [0, 0];
+      if (trunkTop) {
+        for (let vertex = Math.max(from, mesh.base.start); vertex < to; vertex += 1) {
+          const angle = Math.atan2(Math.sin(mesh.ringA[vertex]), Math.cos(mesh.ringA[vertex]));
+          if (mesh.ringT[vertex] >= LOFT.closedJoint.top.trunk && Math.abs(angle) > LOFT.collar.from) inside[vertex] = 1;
+        }
+      }
     }
     const kept = [];
     for (let corner = 0; corner < indexArray.length; corner += 3) {
