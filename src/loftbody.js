@@ -156,7 +156,7 @@ export const LOFT = {
   wasting: { from: 22, to: 14 },
   // The neck's girth (baseNeckGirth), m: at BMI 22, per unit of BMI, for full training (exercise 1: the trapezius and
   // sternocleidomastoid grown), at this height (scaled with the body's).
-  neck: { male: { at22: 0.375, perBmi: 0.005, trained: 0.025, height: 1.78 }, female: { at22: 0.325, perBmi: 0.005, trained: 0.012, height: 1.65 } },
+  neck: { male: { at22: 0.375, perBmi: 0.005, trained: 0.025, height: 1.78 }, female: { at22: 0.325, perBmi: 0.0033, trained: 0.012, height: 1.65 } },
   heat: { reach: 0.06, bones: { trunk: ['trunk'], neck: ['neck', 'trunk'], '*Upper': ['*UpperArm', '*Clavicle', 'trunk'], '*Fore': ['*Forearm', '*UpperArm'], '*Thigh': ['*Thigh', 'trunk'], '*Shin': ['*Shin', '*Thigh'] } },
   // PROOF OF CONCEPT (shoulder-poc): the armpit's hand-over from the trunk's bones to the upper arm's made narrow. Below the
   // shoulder's cap (t of the upper arm from `from` to `to`, eased) and on the arm's inner side, facing the trunk, each weight is
