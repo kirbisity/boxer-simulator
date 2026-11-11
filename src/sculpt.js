@@ -119,7 +119,7 @@ export function sculptTraits(body) {
 
 // Landmarks up the trunk (0 at the hip joint, 1 at the base of the neck) and
 // round it (radians from the front). Named once; see the anatomy sheets.
-const SCULPT_TRUNK = {
+export const SCULPT_TRUNK = {
   // Collarbones: the sternal end, how far the shaft climbs towards the shoulder, which angles it spans.
   clavicle: { at: 0.86, climb: 0.05, from: 0.16, to: 1.5, width: 0.02 },
   // Ribs: the first one drawn, spacing between them, how far they droop towards the front, over which angles and heights.

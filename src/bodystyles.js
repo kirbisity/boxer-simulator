@@ -24,10 +24,14 @@
 //   v6  flesh hero: the refined field at full resolution, painted per vertex
 //   v7  V5's shape on a loft: a medium-density loft (V2's texture coordinates, skin weights and maps) wrapped onto the refined
 //       field's large forms (loftbody.js wrapOnField), so the arms grow out of the trunk as in V5 at a fifth of its triangles
+// The base meshes (the user's call, 2026-11-10):
+//   base  the user's modelled male and female bodies (basebody.js) placed on the loft's rings, so every build moves them as it
+//         moves the loft; V2's texture coordinates and maps, the loft's clothes and armour over them. A style to compare: not the default.
 // Every round-two style also morphs the face with the body (the `face` flag; the head is built in face.js).
 
 import { buildBodyMesh } from './bodymesh.js';
-import { buildLoftBody, buildLoftBodySteps, runSteps } from './loftbody.js';
+import { baseLoftOptions, buildLoftBody, buildLoftBodySteps, runSteps } from './loftbody.js';
+import { baseStarvedDetail } from './basebody.js';
 import { outfitOf } from './outfits.js';
 import { buildFleshBody, fleshAnatomy, fleshField } from './fleshbody.js';
 import { buildDetailMap } from './skindetail.js';
@@ -53,6 +57,7 @@ export const STYLE_SPECS = {
   v5: { face: true, label: 'V5 flesh-lite, painted' },
   v6: { face: true, label: 'V6 flesh hero, painted' },
   v7: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'V7 flesh-wrapped loft + V2 maps' },
+  base: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'Base meshes + V2 maps' },
 };
 export const BODY_STYLE_KEYS = Object.keys(STYLE_SPECS);
 /** The style fighters are drawn in unless a look says otherwise: V7. ('lofted', the plain loft, is the old default and the placeholder while V7 is built.) */
@@ -100,6 +105,7 @@ export function* buildSkinMeshSteps(body, style) {
     const armoured = Boolean(outfitOf(body.inputs).look.armor);
     return yield* buildLoftBodySteps(body, { sculpt: 'rules', rules: { share: 0, density: 'medium' }, hideCovered: true, ...(armoured ? {} : { wrap: coarseField(body) }) });
   }
+  if (style === 'base') return yield* buildLoftBodySteps(body, { ...baseLoftOptions(false), base: true });
   switch (style) {
     case 'lofted': return buildLoftBody(body);
     case 'sculpt': return buildLoftBody(body, { sculpt: true });
@@ -118,7 +124,8 @@ export function* buildSkinMeshSteps(body, style) {
 /** The slices of work that make a style's maps for a built body (see skintex.js). */
 function stepsFor(body, style, built) {
   const spec = styleSpec(style).tex;
-  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built) });
+  // (The base style's starved trunk also takes the emaciated reference's rib and spine detail.)
+  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built), starved: style === 'base' ? baseStarvedDetail(body) : null, folds: style !== 'base' });
 }
 
 /** A built body's maps made now, not looked up or kept (the skin worker's: it hands them over). */

@@ -301,8 +301,9 @@ export function trunkRule(R, u, angle) {
     h -= 0.0012 * dev * defined * Math.exp(-((trapEdge / 0.11) ** 2));
     // The dimples over the sacrum.
     h -= 0.0025 * lean * rHump(back, 0.33, 0.07) * rHump(u, 0.07, 0.025);
-    // Rolls across the back of a heavy one.
-    if (heavy > 0.1) {
+    // Rolls across the back of a heavy one. (`R.folds` false: a mesh that models its own folds, the base style's, takes none
+    // painted: placed by the loft's landmarks, they land beside the modelled ones.)
+    if (heavy > 0.1 && R.folds !== false) {
       for (const at of [0.37, 0.5]) {
         const fold = rHump(u, at, 0.012) * rSmooth(1.4, 2.2, fa);
         h -= 0.004 * heavy * fold;
@@ -311,12 +312,13 @@ export function trunkRule(R, u, angle) {
     }
   }
 
-  // ---- Fat: the navel, the fold under the belly, the flank's fold, stretch marks.
+  // ---- Fat: the navel, the fold under the belly, the flank's fold, stretch marks (the navel and folds not on a mesh with its own).
   {
-    const navel = rHump(fa, 0, 0.055) * rHump(u, 0.26, 0.013 + 0.008 * heavy);
+    const own = R.folds === false ? 0 : 1;
+    const navel = rHump(fa, 0, 0.055) * rHump(u, 0.26, 0.013 + 0.008 * heavy) * own;
     h -= (0.0025 + 0.006 * heavy) * navel;
     crease += (0.4 + 0.5 * heavy) * navel;
-    if (heavy > 0.05) {
+    if (heavy > 0.05 && own) {
       const apron = rHump(u, 0.07 - 0.04 * R.veryHeavy, 0.024) * (1 - rSmooth(1.4, 1.9, fa));
       crease += heavy * apron;
       h -= 0.004 * heavy * apron;
@@ -331,8 +333,8 @@ export function trunkRule(R, u, angle) {
       stretch += rClamp(R.stretch) * lines * where;
     }
   }
-  // The armpit's hollow at the top of the side.
-  crease += 0.6 * rHump(fa, 1.62, 0.22) * rHump(u, 0.86, 0.04);
+  // The armpit's hollow at the top of the side (a modelled mesh has its own armpit).
+  if (R.folds !== false) crease += 0.6 * rHump(fa, 1.62, 0.22) * rHump(u, 0.86, 0.04);
   return { h: rClamp(h, -RULES.most, RULES.most), crease: rClamp(crease), vein: 0, stretch: rClamp(stretch), flush: 0 };
 }
 
@@ -376,8 +378,8 @@ export function neckRule(R, t, angle) {
   h -= 0.003 * cords * rHump(fa, 0, 0.2) * rHump(t, 0.02, 0.07);
   h -= 0.0025 * bony * rHump(fa, 1.15, 0.2) * rBand(t, 0.0, 0.4, 0.08);
   if (!female) h += 0.0035 * lean * rHump(fa, 0, 0.13) * rHump(t, 0.32, 0.06);
-  // Folds across the front and the nape of a heavy neck.
-  if (heavy > 0.1) {
+  // Folds across the front and the nape of a heavy neck (not on a mesh with its own).
+  if (heavy > 0.1 && R.folds !== false) {
     for (const at of [0.22, 0.42]) {
       const fold = rHump(t, at, 0.022);
       h -= 0.003 * heavy * fold;
