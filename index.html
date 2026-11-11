@@ -106,6 +106,8 @@
         <button data-value="physics" data-i18n="page.layerPhysics">Physics</button>
       </div>
       <label class="teams look-pick sandbox-only" aria-label="Look" title="How the game is drawn: the toon look as it has always been, or another approach to compare (also ?look=<id>)" data-i18n-aria="page.look" data-i18n-title="page.lookTitle"><span data-i18n="page.look">Look</span><select id="look"></select></label>
+      <!-- The base-mesh bodies (basebody.js), a test build's option only: the game's body or the user's Blender model. -->
+      <label class="teams body-pick sandbox-only" aria-label="Body" title="The body fighters are drawn with: the game's own, or the base model from Blender (a test, not the game's yet)"><span>Body</span><select id="body-style"><option value="v7">Game</option><option value="base">Base model (test)</option></select></label>
       <div class="seg" id="speeds" aria-label="Speed" data-i18n-aria="page.speed">
         <button data-value="0.25">¼×</button>
         <button data-value="1" class="on">1×</button>

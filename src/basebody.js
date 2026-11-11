@@ -61,7 +61,7 @@ export const BASE_BODY = {
 };
 
 const BASE_TAU = Math.PI * 2;
-const decoded = new Map();
+const baseDecoded = new Map();
 
 /** Whether the base meshes are here (a build may leave them out: tools/custom.js; the style then draws the loft's own skin). */
 export const baseBodyAvailable = () => Boolean(BASE_BODY_DATA?.male);
@@ -77,7 +77,7 @@ function baseBytes(text) {
 /** A sex's base mesh, decoded once: { parts, joints, reference, count, positions (units of height), triangles, part, part2, blend, starved }. */
 export function baseBodyMesh(sex, crowd = false) {
   const key = `${sex}|${crowd}`;
-  if (decoded.has(key)) return decoded.get(key);
+  if (baseDecoded.has(key)) return baseDecoded.get(key);
   const data = BASE_BODY_DATA[sex];
   const packed = data.meshes[crowd ? 'crowd' : 'full'];
   const ints = new Int16Array(baseBytes(packed.positions).buffer);
@@ -93,7 +93,7 @@ export function baseBodyMesh(sex, crowd = false) {
     blend: Float32Array.from(baseBytes(packed.blend), (value) => value / 255),
     starved: packed.starved ? Float32Array.from(new Int16Array(baseBytes(packed.starved).buffer), (value) => value / BASE_BODY_DATA.deltaScale) : new Float32Array(packed.count),
   };
-  decoded.set(key, mesh);
+  baseDecoded.set(key, mesh);
   return mesh;
 }
 

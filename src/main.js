@@ -1753,6 +1753,13 @@ $('#camera-feel').addEventListener('click', (event) => {
   event.currentTarget.setAttribute('aria-expanded', String(!tuner.hidden));
 });
 $('#real-walk').addEventListener('click', () => enterSandboxLevel('real'));
+// The body picker (a test build's: the base-mesh bodies, basebody.js): fighters rebuilt in it at once.
+$('#body-style').value = BODY_STYLE;
+$('#body-style').addEventListener('change', (event) => {
+  if (!BODY_STYLES.includes(event.target.value)) return;
+  setBodyStyle(event.target.value);
+  newBout();
+});
 
 // An in-page question (no alert/confirm: a sandboxed page may not have them): `yes` runs when it is said yes to.
 function askConfirm(text, yesLabel, yes) {
