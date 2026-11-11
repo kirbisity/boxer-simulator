@@ -100,7 +100,8 @@ export const LOFT = {
   // shoulders, a limb's at its far joint) or its root (t under `root`, at or above the joint) closes it with its neighbour's;
   // a closed stretch then runs `far` (t) on past the joint.
   closedJoint: { top: { trunk: 0.9, limb: 0.9 }, root: 0.05, far: 10 },
-  slosh: { bellyAcross: 1.05, bellyOut: 0.9, ballShare: 0.42 },
+  // (`ballOn`: a breast's or buttock's ball is set on the outermost skin along its line out within this share of its radius.)
+  slosh: { bellyAcross: 1.05, bellyOut: 0.9, ballShare: 0.42, ballOn: 0.3 },
   // Clothes and armour fitted to the base mesh (fitClothToBase): a piece's point clears the skin of its part within `across`
   // (m) of its line out (about a triangle's breadth of the base mesh) and up to `deeper` (m) out past it (a big belly's 3-4 cm
   // over its ring, a breast's 5-6 cm past a top's; the shoulder's cap 10 cm out past the trunk's top ring is not counted); a ring is on a part whose axis it
@@ -1926,6 +1927,15 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
     mesh.ringA[start + index] = render.angle[index];
     if (uvs) mesh.uvs.set(start + index, [uvs[index * 2], uvs[index * 2 + 1]]);
   }
+  // (Every copy of one point, drawn in two tiles or either side of a seam, takes the bones of the copy in its own part's tile:
+  // given each tile's part's bones, a copy in an arm's tile was free to take the arm and its twin in the trunk's held to the
+  // trunk's, and the two came apart in a crack once the arm moved.)
+  const ownBones = new Map();
+  for (let index = 0; index < render.count; index += 1) {
+    const source = render.source[index];
+    if (render.part[index] === rig.sources.part[source] || !ownBones.has(source)) ownBones.set(source, mesh.bones[start + index]);
+  }
+  for (let index = 0; index < render.count; index += 1) mesh.bones[start + index] = ownBones.get(render.source[index]);
   for (const index of rig.triangles) mesh.indices.push(start + index);
   for (const [name, [from, to]] of Object.entries(rig.ranges)) mesh.parts[name] = [start + from, start + to];
   // (`own`: the points wholly on their part, not blending into a neighbour across a joint: what the clothes are fitted to.)
@@ -1968,7 +1978,7 @@ function baseBelly(belly, length) {
  * trunk's rings (`trunk`, the loft's description of it) at its landmark (sculpt.js SCULPT_TRUNK), each point's weight in each
  * (sloshWeights: most at the mass's free front and foot). `figures` its springs' (sloshFigures).
  */
-function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare) {
+function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare, regions) {
   const spec = LOFT.slosh;
   const axis = vec.normalize(vec.sub(trunk.b, trunk.a));
   const length = vec.length(vec.sub(trunk.b, trunk.a));
@@ -1984,8 +1994,20 @@ function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare) {
   }
   const ball = (name, u, angle) => {
     const ring = { depth: trunk.depth(u), width: trunk.width(u) };
-    const surface = vec.add(centreAt(u), vec.add(vec.scale(out, Math.cos(angle) * ring.depth), vec.scale(side, Math.sin(angle) * ring.width)));
-    const facing = vec.normalize(vec.sub(surface, centreAt(u)));
+    const onRing = vec.add(centreAt(u), vec.add(vec.scale(out, Math.cos(angle) * ring.depth), vec.scale(side, Math.sin(angle) * ring.width)));
+    const facing = vec.normalize(vec.sub(onRing, centreAt(u)));
+    // (Centred on the skin itself, the outermost skin point along its line out within `ballOn` of its radius beside it: the base
+    // mesh stands out of the ring by some centimetres on a fat chest, and a ball centred on the ring, inside the flesh, weighted
+    // the skin over it most at its very front, which swung out into a point.)
+    let reach = 0;
+    const beside = ring.width * spec.ballShare * spec.ballOn;
+    for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+      if (regions[vertex] !== 'skin') continue;
+      const rel = vec.sub([positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]], onRing);
+      const along = vec.dot(rel, facing);
+      if (along > reach && vec.length(vec.sub(rel, vec.scale(facing, along))) < beside) reach = along;
+    }
+    const surface = vec.add(onRing, vec.scale(facing, reach));
     const across = vec.normalize(vec.cross(axis, facing));
     const radius = ring.width * spec.ballShare;
     masses.push({ name, bones: SLOSH_BONES[name], centre: surface, axes: [across, axis, facing], radii: [radius, radius, radius], hang });
@@ -3455,7 +3477,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const figures = baseRig && !lowDetail ? sloshFigures(fatLayer) : null;
   const trunkBones = new Set([BONE.pelvis, BONE.spine, BONE.chest]);
   const trunkShare = figures ? Float32Array.from(rigid, (_, vertex) => [0, 1, 2, 3].reduce((sum, slot) => sum + (trunkBones.has(weights.skinIndex[vertex * 4 + slot]) ? weights.skinWeight[vertex * 4 + slot] : 0), 0)) : null;
-  const slosh = figures ? baseSlosh(figures, positionArray, rigid, baseParts.trunk, baseBellyShape, trunkShare) : null;
+  const slosh = figures ? baseSlosh(figures, positionArray, rigid, baseParts.trunk, baseBellyShape, trunkShare, colors) : null;
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return {
     positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames, bindPoints: bindAt,
