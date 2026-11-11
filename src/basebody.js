@@ -119,7 +119,7 @@ export const BASE_BODY = {
   rebindDegrees: 14, rebindClavicle: 0.35,
   // The emaciated reference's upper-arm girth (m, her free arm at 1.68 m: tools/blender ax_model, measured round 15: 20.0 and
   // 18.0 cm round its section at 30% and 70% of its length, here as 2π times the mean distance off the arm's axis, which reads
-  // about an eighth more than the section's length on our arms), the floor D+ thins an arm to (shoulderPlus); a man's by `maleGirth` (the base meshes' male to female
+  // about a sixth less than the section's length on our arms), the floor D+ thins an arm to (shoulderPlus); a man's by `maleGirth` (the base meshes' male to female
   // shoulder-width ratio).
   armFloor: [0.17, 0.16], maleGirth: 1.11, floorGrow: 0.5,
   // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
@@ -136,9 +136,9 @@ export const BASE_BODY = {
   //             top line meets the arm;
   //   `edge`    the deltoid's front and back edges, grooves this deep (m) at 0.6 of muscle showing and up to twice it at all;
   //   `chest`, `chestRows`, `chestFrom`, `chestTo`: the chest's width brought to the loft's (v7's) ring (round 13; see shoulderPlus);
-  //   `slope`, `slopeNeck`, `armIn`, `floorBy` (round 16, by how wasted the body is: loftbody.js baseWasting): the top line's
-  //             extra drop at the acromion (m) and the share of the drop beside the neck given back, the arm's root brought in towards the ribs (m per 1.8 m), and the arm's girth floor's margin over
-  //             the emaciated reference's for an unwasted body; the corner's squaring and the flat top fade out with wasting;
+  //   `slope`, `slopeNeck`, `floorBy` (round 16, by how wasted the body is: loftbody.js baseWasting): the top line's extra drop
+  //             at the acromion (m), the share of the drop beside the neck given back, and the arm's girth floor's margin over the
+  //             emaciated reference's (applied by wasting only, round 17); the corner's squaring and the flat top fade out with it;
   //   `neckCut` the neck's top ring trimmed to this share of the head's radius under its centre;
   //   `female`  a woman's own amounts over these (round 14, the user: her shoulders narrower still);
   //   `neckTuck` the neck's top drawn in under the head by this share of its radius;
@@ -147,7 +147,7 @@ export const BASE_BODY = {
   //             pec's edge in front and the lat's behind: the arm's inner face then stands off the flank, its own round form.
   shoulderPlus: {
     D1: { in: 0.02, trap: 0.04, trapKeep: 0.35, deltoid: 0.7, arm: 0.9, armFrom: -0.05, armTo: 0.2, square: 0.4, edge: 0.003, pit: 0 },
-    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.5, chest: 1, chestRows: 0.03, chestFrom: [0.35, 0.5], chestTo: [0.72, 0.82], neckCut: 0.75, slope: 0.012, slopeNeck: 0.5, armIn: 0.02, floorBy: 0.25,
+    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.5, chest: 1, chestRows: 0.03, chestFrom: [0.35, 0.5], chestTo: [0.72, 0.82], neckCut: 0.75, slope: 0.012, slopeNeck: 0.5, floorBy: 0,
       female: { in: 0.05, deltoid: 0.15, arm: 0.72 } },
   },
 };
@@ -1004,9 +1004,9 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
       let sum = 0;
       let n = 0;
       for (let vertex = 0; vertex < placed.length / 3; vertex += 1) {
-        if (names[sources.part[vertex]] !== 'lUpper' || sources.blend[vertex] > 0) continue;
+        if (names[sources.part[vertex]] !== 'lUpper') continue;
         const [t, x, y] = axisCoords(frames.lUpper, [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]]);
-        if (Math.abs(t - share) < 0.05) {
+        if (Math.abs(t - share) < 0.1) {
           sum += Math.hypot(x, y);
           n += 1;
         }
@@ -1159,13 +1159,14 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
     }
   }
   neckR = neckN ? neckR / neckN : 0.06 * scale;
-  // Each arm's mean radius about its own axis, by tenths of its t (for the girth floor).
+  // Each arm's mean radius about its own axis, by fifths of its t (for the girth floor; the mesh has only a few points to a
+  // tenth of an upper arm).
   const armSum = new Map();
   for (let vertex = 0; vertex < count; vertex += 1) {
     const partName = rig.names[rig.sources.part[vertex]];
-    if (!/Upper$/.test(partName) || rig.sources.blend[vertex] > 0) continue;
+    if (!/Upper$/.test(partName)) continue;
     const [t, x, y] = axisCoords(frames[partName], [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]]);
-    const key = `${partName}|${Math.round(t / 0.1)}`;
+    const key = `${partName}|${Math.round(t / 0.2)}`;
     const [sum, n] = armSum.get(key) ?? [0, 0];
     armSum.set(key, [sum + Math.hypot(x, y), n + 1]);
   }
@@ -1286,17 +1287,14 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
       const [t, x, y] = axisCoords(own, p);
       const ease0 = /Upper$/.test(partName) ? ease(spec.armFrom, spec.armTo, t) : 1;
       let k = (1 - spec.arm) * ease0;
-      const mean = armMean.get(`${partName}|${Math.round(t / 0.1)}`);
+      const mean = armMean.get(`${partName}|${Math.round(t / 0.2)}`);
       if (mean && /Upper$/.test(partName)) {
         const floor = armFloorAt(t) * (height / 1.68) * (rig.sex === 'female' ? 1 : BASE_BODY.maleGirth) * (1 + spec.floorBy * (1 - waste)) / (2 * Math.PI);
         // (Grown to it where the model's own arm is under it, at most `floorGrow` of its girth more.)
-        k = Math.min(k, Math.max(-BASE_BODY.floorGrow, 1 - floor / mean));
+        // (On a wasted body only, by how wasted: thin and average arms keep their own girth.)
+        k += (Math.min(k, Math.max(-BASE_BODY.floorGrow, 1 - floor / mean)) - k) * waste;
       }
       shift = vec.add(shift, vec.add(vec.scale(own.depthAxis, -x * k), vec.scale(own.widthAxis, -y * k)));
-      // The arm's root in towards the ribs on a wasted body (`armIn` m per 1.8 m, by `waste`): the soft tissue that held it out
-      // has gone. The whole upper arm, eased out down the forearm so the wrist meets the hand.
-      const keep = /Upper$/.test(partName) ? ease(-0.4, 0, t) : 1 - ease(0, 1, t);
-      shift = vec.add(shift, vec.scale(trunk.widthAxis, -Math.sign(yT) * (spec.armIn ?? 0) * scale * waste * keep));
     }
     shifts.set(shift, vertex * 3);
   }
