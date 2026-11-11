@@ -151,6 +151,12 @@ export const LOFT = {
   armForms: { muscle: 0.06, joint: 0.022, jointSpan: 0.13, carried: { male: { muscle: 0.5, joint: 0 }, female: { muscle: 0, joint: 0 } } },
   // A worn point takes the bone-heat weights of the skin point nearest its weight position, looked for within this (m) round it.
   heat: { reach: 0.06 },
+  // PROOF OF CONCEPT (shoulder-poc): the armpit's hand-over from the trunk's bones to the upper arm's made narrow. Below the
+  // shoulder's cap (t of the upper arm from `from` to `to`, eased) and on the arm's inner side, facing the trunk, each weight is
+  // raised to the power 1 + `sharpen` before they are summed to one: the bone that carries most of a point carries more, so the
+  // flank stays the trunk's and the arm's inner face the arm's. Blender's bone heat spreads them across the whole armpit, and
+  // a lowered or raised arm dragged the flank with it into one webbed surface (the tube the user saw).
+  armpit: { sharpen: 2, from: [-0.02, 0.06], to: [0.45, 0.6] },
   // (`alongPasses`: rounds a piece's fit is smoothed ring to ring, fitClothToBase: two, a ring's reach to the next and the one
   // after.)
   fit: { alongPasses: 2, tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
@@ -2192,6 +2198,9 @@ function baseHeatWeights(weights, heat, positions, frames, rigid) {
         }
       } else mix.set(BONE[name], (mix.get(BONE[name]) ?? 0) + w);
     }
+    // (The armpit: LOFT.armpit.)
+    const sharp = armpitSharpness([positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]], frames);
+    if (sharp > 0 && [...mix.keys()].some((bone) => bone === BONE.lUpperArm || bone === BONE.rUpperArm)) for (const [bone, w] of mix) mix.set(bone, w ** (1 + LOFT.armpit.sharpen * sharp));
     const best = [...mix].sort((a, b) => b[1] - a[1]).slice(0, 4);
     const total = best.reduce((sum, [, w]) => sum + w, 0) || 1;
     for (let slot = 0; slot < 4; slot += 1) {
@@ -2199,6 +2208,30 @@ function baseHeatWeights(weights, heat, positions, frames, rigid) {
       weights.skinWeight[vertex * 4 + slot] = best[slot] ? best[slot][1] / total : 0;
     }
   });
+}
+
+/** How much of LOFT.armpit's narrowing a point at `point` (bind pose) gets, 0 to 1: the nearer upper arm's armpit zone. */
+function armpitSharpness(point, frames) {
+  const spec = LOFT.armpit;
+  const ease = (a, b, x) => {
+    const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  };
+  let most = 0;
+  for (const side of ['l', 'r']) {
+    const frame = frames[BONE[`${side}UpperArm`]];
+    const chest = frames[BONE.chest];
+    if (!frame || !chest) continue;
+    const length = vec.length(vec.sub(frame.end, frame.origin)) || 1;
+    const rel = vec.sub(point, frame.origin);
+    const t = vec.dot(rel, frame.y) / length;
+    // (Its inner side: off the arm's axis towards the chest's.)
+    const off = vec.sub(rel, vec.scale(frame.y, t * length));
+    const inward = vec.dot(off, vec.normalize(vec.sub(chest.origin, frame.origin)));
+    if (inward <= 0) continue;
+    most = Math.max(most, ease(spec.from[0], spec.from[1], t) * (1 - ease(spec.to[0], spec.to[1], t)));
+  }
+  return most;
 }
 
 /**

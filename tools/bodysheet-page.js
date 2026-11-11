@@ -35,6 +35,8 @@ import { FatSlosh } from '../src/fatslosh.js';
 import { surface } from '../src/toon.js';
 import { dualQuaternionSkinning } from '../src/dqskin.js';
 import { BASE_BODY } from '../src/basebody.js';
+import { elbowClearOfTrunk, restArmAngle } from '../src/pose.js';
+import { trunkAxes } from '../src/joints.js';
 // PROOF OF CONCEPT: `shoulder` (A..E) picks a base-body shoulder design (basebody.js BASE_BODY.shoulder).
 if (new URLSearchParams(location.search).get('shoulder')) BASE_BODY.shoulder = new URLSearchParams(location.search).get('shoulder');
 
@@ -182,7 +184,8 @@ function geometryOf(built, colors) {
 /** The particles with the arms lowered to `angle` degrees from the vertical (hanging, hands at the sides). */
 function restPoints(points, body, degrees) {
   const posed = points.map((point) => [...point]);
-  const angle = (degrees * Math.PI) / 180;
+  // (PROOF OF CONCEPT, shoulder-poc: the game's own rest hang, the angle that just clears his trunk's side: pose.js restArmAngle.)
+  const angle = degrees === SHEET.armRest ? restArmAngle(body) : (degrees * Math.PI) / 180;
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     const shoulder = points[P[`${side}Shoulder`]];
     const upper = body.lengths.upperArm;
@@ -206,7 +209,7 @@ function armPoints(points, body, kind) {
     const length = Math.hypot(...v);
     return v.map((value) => value / length);
   };
-  const rest = (SHEET.armRest * Math.PI) / 180;
+  const rest = restArmAngle(body);
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     const shoulder = points[P[`${side}Shoulder`]];
     const upper = body.lengths.upperArm;
@@ -237,9 +240,12 @@ function guardPoints(points, body) {
     const shoulder = posed[P[`${side}Shoulder`]];
     const upperDir = unit([0.55, -0.75, sign * 0.3]);
     const foreDir = unit([0.35, 0.9, -sign * 0.3]);
-    const elbow = shoulder.map((value, axis) => value + upperDir[axis] * body.lengths.upperArm);
+    let elbow = shoulder.map((value, axis) => value + upperDir[axis] * body.lengths.upperArm);
+    const hand = elbow.map((value, axis) => value + foreDir[axis] * body.lengths.forearmToFist);
+    // (The elbow clear of the trunk's side, as the game holds a guard: pose.js elbowClearOfTrunk.)
+    elbow = elbowClearOfTrunk(body, trunkAxes(posed[P.pelvis], posed[P.neck], posed[P.lShoulder], posed[P.rShoulder]), posed[P.pelvis], shoulder, elbow, hand);
     posed[P[`${side}Elbow`]] = elbow;
-    posed[P[`${side}Hand`]] = elbow.map((value, axis) => value + foreDir[axis] * body.lengths.forearmToFist);
+    posed[P[`${side}Hand`]] = hand;
   }
   return posed;
 }

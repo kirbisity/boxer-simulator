@@ -123,10 +123,14 @@ export const BASE_BODY = {
   //   `square`  the cap's profile in the arm's plane about the shoulder joint pushed from a circle's towards a square's (a
   //             superellipse of exponent 4: at 45 degrees up and out 19% further) by this share: the acromion's corner where the
   //             top line meets the arm;
-  //   `edge`    the deltoid's front and back edges, grooves this deep (m) at 0.6 of muscle showing and up to twice it at all.
+  //   `edge`    the deltoid's front and back edges, grooves this deep (m) at 0.6 of muscle showing and up to twice it at all;
+  //   `neckTuck` the neck's top drawn in under the head by this share of its radius;
+  //   `pit`     the armpit's hollow (m): the trunk's flank under the arm, from 2 to 14 cm under the shoulder joint and within
+  //             the arm's own depth fore and aft, drawn in towards the midline, deepest at the arm's middle and easing out to the
+  //             pec's edge in front and the lat's behind: the arm's inner face then stands off the flank, its own round form.
   shoulderPlus: {
-    D1: { in: 0.02, trap: 0.04, trapKeep: 0.35, deltoid: 0.7, arm: 0.9, armFrom: -0.05, armTo: 0.2, square: 0.4, edge: 0.003 },
-    D2: { in: 0.035, trap: 0.065, trapKeep: 0.3, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005 },
+    D1: { in: 0.02, trap: 0.04, trapKeep: 0.35, deltoid: 0.7, arm: 0.9, armFrom: -0.05, armTo: 0.2, square: 0.4, edge: 0.003, pit: 0 },
+    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.3 },
   },
 };
 
@@ -1094,8 +1098,13 @@ function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints 
     const p = [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]];
     // (The neck's foot goes down with the trapezius beside it, eased out up the neck: the neck drawn out, not torn from it.)
     if (partName === 'neck') {
-      const [tN] = axisCoords(neck, p);
-      shifts.set(vec.scale(trunk.axis, -spec.trap * scale * (1 - ease(0, 0.6, tN))), vertex * 3);
+      const [tN, xN, yN] = axisCoords(neck, p);
+      let shift = vec.scale(trunk.axis, -spec.trap * scale * (1 - ease(0, 0.6, tN)));
+      // (Its top tucked in under the game's head, `neckTuck` of its radius at the top: its cut edge stood out past the skull
+      // behind and at the sides in a ragged collar.)
+      const tuck = (spec.neckTuck ?? 0) * ease(0.5, 0.95, tN);
+      shift = vec.add(shift, vec.add(vec.scale(neck.depthAxis, -xN * tuck), vec.scale(neck.widthAxis, -yN * tuck)));
+      shifts.set(shift, vertex * 3);
       continue;
     }
     const [tT, , yT] = axisCoords(trunk, p);
@@ -1146,6 +1155,16 @@ function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints 
         const depth = spec.edge * scale * (0.6 + 1.4 * Math.min(1, shoulderKeep)) * along * (groove(0.6) + groove(Math.PI - 0.6));
         shift = vec.add(shift, vec.scale(radialA, -depth));
       }
+    }
+    // The armpit's hollow, on the trunk's own skin under the arm.
+    if (spec.pit && !isArm) {
+      const rel = vec.sub(p, side.joint);
+      const below = -vec.dot(rel, trunk.axis);
+      const fore = vec.dot(rel, trunk.depthAxis);
+      const depthW = Math.max(0, 1 - (fore / (0.06 * scale)) ** 2) ** 2;
+      const heightW = ease(0.02 * scale, 0.05 * scale, below) * (1 - ease(0.1 * scale, 0.14 * scale, below));
+      const nearW = ease(0.55, 0.8, out);
+      shift = vec.add(shift, vec.scale(trunk.widthAxis, -Math.sign(yT) * spec.pit * scale * depthW * heightW * nearW));
     }
     // The arm thinner about its own axis.
     if (isArm) {

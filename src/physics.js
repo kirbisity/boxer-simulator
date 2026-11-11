@@ -10,7 +10,7 @@ import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
 import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
-import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
+import { desiredPose, lockedHead, POSE, restArmAngle, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
@@ -2661,7 +2661,10 @@ function updateIntent(world, fighter, dt) {
   if (fighter.climbing) ladderPose(world, fighter, intent);
   if (fighter.handsDown) {
     // Hands at the sides, for portraits and design sheets.
-    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * 0.2 * H];
+    // (Hanging at the angle that just clears his trunk's side, thin close in, fat out: pose.js restArmAngle.)
+    const hang = restArmAngle(fighter.body);
+    const L = fighter.body.lengths;
+    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * (L.shoulderSpan / 2 + (L.upperArm + L.forearmToFist) * Math.sin(hang))];
     // Two blades held at his sides: both points down and forward, clear of his legs.
     if (fighter.offWeapon?.held) {
       intent.bladeDir = [0.45, -1, -0.1];
