@@ -33,15 +33,38 @@ export const CUSTOM_BUDGET = 15_000_000;
 // the synth made: ~0.8 MB of samples) took the page past the budget.
 // On the base-body test build (2026-11-11), the port's concrete and the shore's beach left out as well (painted instead), to
 // carry the base meshes (basebody-data, about 1 MB on the page).
-export const CUSTOM_GROUND_TILES = ['sand'];
+// Then the base-body test page became the open field alone (the user's call, 2026-11-11: "the test page can be reduced to the
+// open field only custom mode"): the sandbox's scene is the field and its picker hidden (CUSTOM_PLACE), so only the field's
+// tiles are kept: its earth under the hoof-churned strip (ground/painted.js: field `b` 'mud:hoof' → earth). Its grass (2.4 MB)
+// would take the page past the budget, and stays painted; the Colosseum's sand goes, as the field never shows it.
+export const CUSTOM_GROUND_TILES = ['earth'];
+// The one place the custom page shows (custombattle.js maps, render.js places): the open field.
+export const CUSTOM_PLACE = 'field';
+// The sky photographs kept (scenery/skyball.js SKYBALL_PHOTO_PLACES: the field wears the meadow's); the plain's and the valley's
+// (0.6 MB) only other places wear.
+const CUSTOM_SKY_PHOTOS = ['meadow'];
 
 /** Data modules cut down (as tools/bundle.js LITE does), by module: its one exported const → what is kept. */
 export const CUSTOM_DATA = {
   'detailmaps-data': (data) => Object.fromEntries(Object.entries(data).filter(([name, tile]) => tile.kind !== 'ground' || CUSTOM_GROUND_TILES.includes(name))),
+  'scenery/skyball-photo-data': (data) => Object.fromEntries(Object.entries(data).filter(([name]) => CUSTOM_SKY_PHOTOS.includes(name))),
 };
 
 /** Source rewritten, by module. */
 export const CUSTOM_TRANSFORMS = {
+  // A place whose sky photograph is left out (CUSTOM_SKY_PHOTOS: a set battle elsewhere) wears the meadow's.
+  'scenery/skyball': (source) => {
+    const choice = 'const choice = SKYBALL_PHOTO_PLACES[place] ?? SKYBALL_PHOTO_PLACES.meadow;';
+    if (!source.includes(choice)) throw new Error('src/scenery/skyball.js: the photograph\'s choice not found');
+    return source.replace(choice, 'const wanted = SKYBALL_PHOTO_PLACES[place] ?? SKYBALL_PHOTO_PLACES.meadow;\n      const choice = SKYBALL_PHOTO_DATA[wanted.photo] ? wanted : SKYBALL_PHOTO_PLACES.meadow;');
+  },
+  // The sandbox opens on the open field (CUSTOM_PLACE), not the ring, and stays there (its picker hidden: CUSTOM_CSS).
+  main: (source) => {
+    const first = "place: 'ring' };\n  state.scenario = null;";
+    const initial = "  // The sandbox's place: the ring, the Colosseum, or the subway platform.\n  place: 'ring',";
+    if (!source.includes(first) || !source.includes(initial)) throw new Error('src/main.js: the sandbox\'s first place (ring) not found to set to the field');
+    return source.replace(first, `place: '${CUSTOM_PLACE}' };\n  state.scenario = null;`).replace(initial, `  // (Custom build: the open field only; tools/custom.js.)\n  place: '${CUSTOM_PLACE}',`);
+  },
   // No music: no cues (and none of their data imported). The player finds no cue and stays silent; victory and defeat get the engine's stings.
   'audio/music/manifest': (source) => {
     const cues = /^export const MUSIC_CUES = \{\n[\s\S]*?\n\};\n/m;
@@ -51,7 +74,7 @@ export const CUSTOM_TRANSFORMS = {
 };
 
 /** The page's own extra style: the sandbox's ways into level mode hidden (they lead to what is not here). */
-export const CUSTOM_CSS = '\n/* Custom build (tools/custom.js): no level mode. */\n#level-character, #ghost-walk, #real-walk { display: none !important; }\n';
+export const CUSTOM_CSS = '\n/* Custom build (tools/custom.js): no level mode, the open field only. */\n#level-character, #ghost-walk, #real-walk, .scene-pick { display: none !important; }\n';
 
 const missing = (what) => `() => { throw new Error('${what}: not in the custom build (tools/custom.js)'); }`;
 
