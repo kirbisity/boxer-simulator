@@ -14,7 +14,7 @@
 // cost), fighter (knight, gambeson, helmet-fat, helmet-thin: one dressed
 // fighter instead of the progression), motion (run, land, side: each chosen
 // build's fat masses through a move, fatslosh.js, a column per moment), outfit
-// (an outfits.js kind: the progression dressed in it).
+// (an outfits.js kind: the progression dressed in it), mark (roles drawn in loud colours).
 
 /* global THREE */
 import { buildBody, P, PRESETS } from '../src/body.js';
@@ -135,8 +135,12 @@ function paint(built, body) {
   const roles = built.regions ? roleColors(dressFor(body.inputs, 0x888888), clay) : null;
   const plain = { skin: clay, kit: new THREE.Color(SHEET.trunks), top: new THREE.Color(SHEET.trunks), band: new THREE.Color(SHEET.waistband), trim2: new THREE.Color(SHEET.trunks), trim: new THREE.Color(SHEET.trunks) };
   const clothed = body.inputs.outfit.kind !== 'mma';
+  // `mark`: these roles (comma-separated) drawn in loud debugging colours, to see which layer is where.
+  const marked = (query.get('mark') ?? '').split(',').filter(Boolean);
+  const loud = [0xff00ff, 0x00ffff, 0xffff00, 0x00ff00].map((hex) => new THREE.Color(hex));
   built.regions?.forEach((region, vertex) => {
-    const color = (clothed ? roles[region] : plain[region] ?? roles[region]) ?? clay;
+    const mark = marked.indexOf(region);
+    const color = mark >= 0 ? loud[mark % loud.length] : (clothed ? roles[region] : plain[region] ?? roles[region]) ?? clay;
     colors.set([color.r, color.g, color.b], vertex * 3);
   });
   if (!built.regions) for (let vertex = 0; vertex < count; vertex += 1) colors.set([clay.r, clay.g, clay.b], vertex * 3);
