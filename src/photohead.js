@@ -43,7 +43,10 @@ export const PHOTO_HEAD = {
   // brow, cheekbones, lips and chin are an average man's or woman's: a region's measures change them (faceStructure, as a change
   // from no region's). The user's call, 2026-11-10. Off until its features are fitted to the face photos' (the atlas'
   // eyes, nose, mouth and chin, by a warp of the model): as it stands the photo's features miss the model's.
-  model: { on: false, eye: -0.07, mouth: -0.79 },
+  // `relief`: the face model's features stand this much prouder on it than on the drawn head (whose flat face plane set them
+  // shallow); `contrast`: a region's departures (its group's nose, lips, brow, cheekbones...) this much stronger, so the
+  // facial models of the groups (faceregions.js SHAPE_GROUPS) read apart.
+  model: { on: false, eye: -0.07, mouth: -0.79, noseFootRow: 0.605, relief: 1.35, contrast: 1.5 },
   // Of the shading normal, how much is the smooth head's (the rest the face's): softens the nose's and sockets' facets.
   softNormal: 0.4,
   // The shadow under the nose and in the sockets, painted per vertex (1 is none).
@@ -104,6 +107,43 @@ export function headModelPoint(x, y, z, female = false) {
   const at = (r, c) => table.radii[r * azimuths + c];
   const radius = (at(r0, c0) * (1 - fc) + at(r0, c1) * fc) * (1 - fr) + (at(r0 + 1, c0) * (1 - fc) + at(r0 + 1, c1) * fc) * fr;
   return [(x / length) * radius, (y / length) * radius, (z / length) * radius];
+}
+
+const HEAD_MESHES = {};
+/** The base model's own mesh for a sex: { points: [[x, y, z]] (head radii), indices }, decoded once; null without one. */
+function headMesh(female) {
+  const sex = female ? 'female' : 'male';
+  const data = HEAD_MODEL_DATA[sex];
+  if (!data?.points) return null;
+  if (HEAD_MESHES[sex]) return HEAD_MESHES[sex];
+  const bytes = (text) => {
+    const raw = atob(text);
+    const out = new Uint8Array(raw.length);
+    for (let index = 0; index < raw.length; index += 1) out[index] = raw.charCodeAt(index);
+    return out.buffer;
+  };
+  const coords = new Int16Array(bytes(data.points));
+  const points = [];
+  for (let index = 0; index < coords.length; index += 3) points.push([coords[index] / 16000, coords[index + 1] / 16000, coords[index + 2] / 16000]);
+  HEAD_MESHES[sex] = { points, indices: Array.from(new Uint16Array(bytes(data.triangles))) };
+  return HEAD_MESHES[sex];
+}
+
+/** Smooth normals of a triangle mesh (each point's faces' normals summed by their area). */
+function meshNormals(points, indices) {
+  const normals = new Float32Array(points.length * 3);
+  for (let corner = 0; corner < indices.length; corner += 3) {
+    const [a, b, c] = [indices[corner], indices[corner + 1], indices[corner + 2]];
+    const e1 = [0, 1, 2].map((axis) => points[b][axis] - points[a][axis]);
+    const e2 = [0, 1, 2].map((axis) => points[c][axis] - points[a][axis]);
+    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    for (const vertex of [a, b, c]) for (let axis = 0; axis < 3; axis += 1) normals[vertex * 3 + axis] += n[axis];
+  }
+  for (let vertex = 0; vertex < points.length; vertex += 1) {
+    const length = Math.hypot(normals[vertex * 3], normals[vertex * 3 + 1], normals[vertex * 3 + 2]) || 1;
+    for (let axis = 0; axis < 3; axis += 1) normals[vertex * 3 + axis] /= length;
+  }
+  return normals;
 }
 
 /** The region's own changes on the base model (unit space): its skull's breadth, its face's length, its jaw, its cheekbones' breadth. */
@@ -255,7 +295,9 @@ export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, r
   const chinAt = model ? (modelChin / skull[1]) * regionLower : -atlas.chinT * shape.chinLength * lowerScale(region);
   const mouthAt = model ? ((modelMarks.mouth ?? PHOTO_HEAD.model.mouth) / skull[1]) * regionLower : eye + atlas.mouthShare * (chinAt - eye);
   const bottom = model ? chinAt - 0.12 : -shape.chinLength * lowerScale(region);
-  const knots = [[1, 1], [atlas.hairlineAt, 1 - atlas.hairlineRow], [eye, 1 - marks.eyeRow], [mouthAt, 1 - marks.mouthRow], [chinAt, 1 - atlas.chinRow], [bottom, 0]];
+  // (On the base model its nose's foot too, where the photos have theirs.)
+  const noseKnot = model && modelMarks.nose !== undefined ? [[(modelMarks.nose / skull[1]) * regionLower, 1 - PHOTO_HEAD.model.noseFootRow]] : [];
+  const knots = [[1, 1], [atlas.hairlineAt, 1 - atlas.hairlineRow], [eye, 1 - marks.eyeRow], ...noseKnot, [mouthAt, 1 - marks.mouthRow], [chinAt, 1 - atlas.chinRow], [bottom, 0]];
   const vOf = (y) => {
     const height = y >= 0 ? Math.asin(Math.min(1, y / (shape.crown * (1 + 0.0)))) / (Math.PI / 2) : Math.max(bottom * 1.05, y);
     for (let knot = 1; knot < knots.length; knot += 1) {
@@ -266,6 +308,8 @@ export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, r
     return 0;
   };
   const widen = jitter.width ?? 0;
+  // (The region's departures, stronger on the base model: its facial model.)
+  const faceModelRegion = Object.fromEntries(Object.entries(region).map(([key, value]) => [key, typeof value === 'number' ? value * PHOTO_HEAD.model.contrast : value]));
   // u: across the face by the head's width there (as seen from the front), round the back by the angle beyond the side.
   const uOf = (x, z, width, az) => {
     if (width < 2e-3) return 0.5 + az / (Math.PI * 2);
@@ -282,6 +326,56 @@ export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, r
     });
     return best;
   };
+  // ---- The base model's own mesh (its nose, lips, eyelids and ears as modelled), the photo laid on it ------------------------
+  const own = model ? headMesh(female) : null;
+  if (own) {
+    const uScale = HEAD_MODEL_DATA[female ? 'female' : 'male'].uScale ?? 1;
+    // (Across the face the photo's angle stretched so its eyes land on the mesh's; easing to none round the back.)
+    const fitU = (x, y, z) => {
+      const az = Math.atan2(z, x);
+      const width = widthAt(y);
+      const u = uOf(x, z, width, az) - 0.5;
+      const angle = u * Math.PI * 2;
+      return 0.5 + (angle * (1 + (uScale - 1) * Math.exp(-((angle / 1.1) ** 2)))) / (Math.PI * 2);
+    };
+    const units = own.points.map((p) => applyRegionToModel([p[0] / skull[0], p[1] / skull[1], p[2] / skull[2]], region));
+    const meshUvs = [];
+    for (const p of units) meshUvs.push(fitU(p[0], p[1], p[2]), vOf(p[1]));
+    const unitNormals = meshNormals(units, own.indices);
+    // The region's facial model as a change on the mesh (its nose, lips, brow... from no region's), along the surface.
+    const raisedUnit = units.map((p, vertex) => {
+      const du = meshUvs[vertex * 2] - 0.5;
+      const rowAt = 1 - meshUvs[vertex * 2 + 1];
+      if (Math.abs(du) >= 0.2 || p[0] < 0) return p;
+      const change = faceStructure(du, rowAt, marks, faceModelRegion).height - faceStructure(du, rowAt, marks, {}).height;
+      const front = headSmooth(-0.2, 0.3, p[0]);
+      return p.map((value, axis) => value + unitNormals[vertex * 3 + axis] * change * front);
+    });
+    const finalUnit = raisedUnit.map(morphed);
+    const scaled = finalUnit.map((p) => [p[0] * skull[0] * radius, p[1] * skull[1] * radius, p[2] * skull[2] * radius]);
+    const colours = [];
+    for (const p of finalUnit) colours.push(...(morph ? faceMarks(p[0], p[1], p[2], morph) : [1, 1, 1]));
+    return {
+      positions: scaled.flat(),
+      normals: meshNormals(scaled, own.indices),
+      uvs: meshUvs,
+      colors: colours,
+      indices: own.indices,
+      uvAt: (x, y, z) => {
+        const unit = [x / (skull[0] * radius), y / (skull[1] * radius), z / (skull[2] * radius)];
+        return [fitU(unit[0], unit[1], unit[2]), vOf(unit[1])];
+      },
+      point: (x, y, z) => {
+        const p = morphed(bare(x, y, z));
+        return [p[0] * skull[0], p[1] * skull[1], p[2] * skull[2]];
+      },
+      most: FACE_MORPH.most,
+      mouthY: mouthAt * skull[1],
+      earZ: Math.abs(bare(-0.06, -0.08, 1)[2]),
+      // (Its own ears: the drawn ones are not added.)
+      ears: true,
+    };
+  }
   const uvs = [];
   for (let row = 0; row <= rows; row += 1) {
     for (let column = 0; column <= columns; column += 1) {
@@ -320,10 +414,9 @@ export function buildPhotoHead({ radius, deform, skull, shape, eyeLine, atlas, r
     const du = uvs[vertex * 2] - 0.5;
     const rowAt = 1 - uvs[vertex * 2 + 1];
     const front = headSmooth(-0.2, 0.3, p[0]);
-    // (On the base model the face is in its shape: only the region's change from no region's is raised.)
-    const near = Math.abs(du) < 0.2;
-    const { height: raised, shade } = near ? faceStructure(du, rowAt, marks, region) : { height: 0, shade: 0 };
-    const height = near && model ? raised - faceStructure(du, rowAt, marks, {}).height : raised;
+    // (The base model is featureless across the face: the region's face model is raised on it, where the photo's features are.)
+    const { height: raised, shade } = Math.abs(du) < 0.2 ? faceStructure(du, rowAt, marks, model ? faceModelRegion : region) : { height: 0, shade: 0 };
+    const height = model ? raised * PHOTO_HEAD.model.relief : raised;
     faces.push(p.map((value, axis) => value + baseNormals[vertex * 3 + axis] * height * front));
     shades.push(shade * front);
   });

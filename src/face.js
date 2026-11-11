@@ -384,11 +384,15 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     skullGeometry.setIndex(photoHead.indices);
     if (look.photoPainted) paintFromFace(skullGeometry, photo);
   } else skullGeometry = headGeometry(r, shape, morph ? 48 : 36);
+  // (On the base model's own mesh, its nose, lips and eyelids are modelled: the photo's relief map, drawn for a generic face,
+  // would set a second nose and mouth on them; only a little of its fine detail is kept.)
+  if (photoHead?.ears && skinMaterial.normalScale) skinMaterial.normalScale.set(0.2, 0.2);
   // (A photo head keeps its own normals, the face's softened: photohead.js.)
   const skull = new SoftShell(skullGeometry, skinMaterial, body.segments.head.fleshFirmness, { recomputeNormals: !photoHead });
   group.add(skull.mesh);
   skull.mesh.add(outlineFor(skull.mesh, 0.0035));
-  for (const side of [1, -1]) {
+  // (A head with its own ears, the base model's mesh, has none drawn.)
+  for (const side of photoHead?.ears ? [] : [1, -1]) {
     const ear = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), skinMaterial);
     ear.scale.set(0.12 * r, 0.22 * r, 0.05 * r);
     ear.position.set(-0.06 * r, -0.08 * r, side * SKULL[2] * r * 0.98);
@@ -396,7 +400,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     ear.castShadow = true;
     if (photoHead) {
       // On the photo head's side (a broad skull's ears further out), read from the atlas where they sit.
-      ear.position.z = PHOTO_HEAD.model.on ? Math.sign(ear.position.z) * photoHead.earZ * SKULL[2] * r * 0.98 : ear.position.z * (1 + 0.05 * (photo.shape.cephalic ?? 0)) * PHOTO_HEAD.anatomy.width;
+      ear.position.z = PHOTO_HEAD.model.on ? Math.sign(ear.position.z) * (photoHead.earZ * SKULL[2] + 0.025) * r : ear.position.z * (1 + 0.05 * (photo.shape.cephalic ?? 0)) * PHOTO_HEAD.anatomy.width;
       ear.updateMatrix();
       ear.geometry.applyMatrix4(ear.matrix);
       ear.position.set(0, 0, 0);
