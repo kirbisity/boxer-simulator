@@ -253,10 +253,10 @@ export const PRESETS = {
     outfit: { kind: 'mingBrigandine', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
   },
-  // A wolf-brush man of Qi Jiguang's army: a Yiwu miner, drilled, in the brigandine (the langxian went to the strongest men of a squad).
+  // A wolf-brush man of Qi Jiguang's army: a Yiwu miner, drilled, in his elite infantry's kit, the photograph's olive (the langxian went to the strongest men of a squad).
   langxian: {
     name: 'Feng Da', style: 'langxian', sex: 'male', heightCm: PEOPLES.ming.heightCm + 3, frame: 'medium', age: 27, exercise: PEOPLES.ming.exercise + 0.18, calories: PEOPLES.ming.calories + 400,
-    outfit: { kind: 'mingBrigandine', design: 0 }, accessories: [],
+    outfit: { kind: 'mingEliteInfantry', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown' },
   },
   guandao: {

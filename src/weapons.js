@@ -496,17 +496,23 @@ export const WEAPONS = {
   // not the man behind it, and he cannot step through it to the bearer;
   // swept across, it lashes (`swing`, little harm); the iron head is
   // driven at the face (`thrust`, the last fifth: `pointFrom`).
+  // (The user's figures, 12-14 ft, 3.7-4.3 m, are a little under the Jixiao xinshu's 1 zhang 5 chi at the Ming chi of
+  // ~0.32 m, ~4.8 m; kept at the manual's, as sourced. Its 9-11 tiers of branches are the `brush`, below.)
   // (`pointWidth` 0.03: its spear tip among the branches, ~3 cm; PUNCTURE.)
   langxian: {
     art: 'artSpear',
     pointFrom: 0.8, label: 'Langxian', hands: 'two', length: 3.3, strikeFrom: 1.3, handle: 1.4, spacing: 0.55, mass: 4, balance: 0.9, radius: 0.15, pointWidth: 0.03,
-    harm: { thrust: { pierce: 1, blunt: 0.35, cut: 0.05 }, swing: { blunt: 0.45, cut: 0.05 } },
+    // The head is a spearhead of steel (the Jixiao xinshu's: a spear's head set on the top of the bamboo), so its thrust
+    // pierces as the spear's does (pierce 1.3, was 1). Swept or pushed into a man, the branches' ends, trimmed sharp and
+    // in the manual's drawing tipped with small iron points or little blades, scratch and prick: a little pierce and cut
+    // (`swing` pierce 0.15, cut 0.1, was cut 0.05: light bleeding, not a wound to stop a man), the bamboo's weight a shove.
+    harm: { thrust: { pierce: 1.3, blunt: 0.35, cut: 0.05 }, swing: { blunt: 0.45, cut: 0.1, pierce: 0.15 } },
     contactSeconds: 0.008, rotation: 0.45, wrist: { omega: 6, zeta: 0.9 }, threat: 3.4, grip: 0.6,
     // Where its branches are, m out from the front hand: from a little past the hands to just short of the iron head.
     // A blade that comes in among them may be caught there (physics/brush.js).
     brush: { from: 1.2, to: 3.0 },
-    // A whole bamboo some 5 cm through at the butt (not its 0.3 m brush of branches): MATERIALS.bamboo.
-    build: { shaft: 'bamboo', shaftRadius: 0.025 },
+    // A whole culm of heavy maozhu (moso) bamboo some 5 cm through at the butt (not its 0.3 m brush of branches): MATERIALS.maozhu.
+    build: { shaft: 'maozhu', shaftRadius: 0.025 },
   },
   // A hay fork taken up by a rebel: two long wooden-shafted iron tines, not
   // made to fight. Blunt tines that pierce poorly and knock a man about;
@@ -967,6 +973,20 @@ export const WEAPONS = {
     harm: { swing: { cut: 1.1, blunt: 0.35 }, thrust: { pierce: 0.78, cut: 0.15, blunt: 0.1 } },
     contactSeconds: 0.004, rotation: 0.75, wrist: { omega: 25, zeta: 0.8 }, threat: 3.2, art: 'artDrawCut',
   },
+  // The Qi family sabre (戚家刀, changdao): the long two-handed dao Qi Jiguang gave his Zhejiang men after the Japanese
+  // swords they faced (Jixiao xinshu, the 长刀 chapter: 'this came in with the Japanese raiders... I obtained their
+  // method'), and the blades inscribed with his name that survive (the 1582 登州戚氏 blades: ~0.9 m of gently curved
+  // blade, a grip of ~0.3 m, about 1.3 kg; as published in the Great Ming Military, 2015). Between the soldier's dao
+  // (0.75 m, one hand, 0.95 kg) and the ōdachi (1.08 m, 2.3 kg): a katana's make, a little longer. A matchlock man's
+  // sidearm, drawn when the raiders are on him. Fought as the Danfo fayuan (单刀法选, Cheng Zongyou, 1621) teaches it,
+  // the Japanese cuts from a high guard: an iai art (artIai), as the katana's.
+  changdao: {
+    label: 'Changdao', hands: 'two', length: 0.9, strikeFrom: 0.13, handle: 0.3, spacing: 0.19, mass: 1.3, balance: 0.14, radius: 0.012, curve: 0.025,
+    // Its cut between the katana's 1.3 and the ōdachi's 1.4, a little longer than the one, much lighter than the other.
+    harm: { swing: { cut: 1.33, blunt: 0.45 }, thrust: { pierce: 0.7, cut: 0.15, blunt: 0.15 } },
+    // Its wrist between the katana's (20) and the ōdachi's (14): the longer blade a little slower to bring round.
+    contactSeconds: 0.004, rotation: 0.8, wrist: { omega: 18, zeta: 0.8 }, threat: 4.6, art: 'artIai',
+  },
   // The guandao: a broad, heavy crescent blade on a long shaft, fought like
   // the naginata but a quarter heavier, its weight knocking men about more
   // (blunt, and some of it through armour) while its thicker edge cuts and
@@ -1166,6 +1186,12 @@ export const MATERIALS = {
   waxwood: { hardness: 0.1, shaft: { strength: 1.4, scatter: 6, chop: 600 } },
   // Bamboo: hollow, light and springy; it splits along its fibres under an edge sooner than solid wood.
   bamboo: { hardness: 0.1, shaft: { strength: 0.8, scatter: 5, chop: 350 } },
+  // A whole culm of heavy maozhu (moso, Phyllostachys edulis), green, the langxian's: thick-walled and springy, it bends
+  // under a blow where wood snaps (`strength` 1.2), and its round, silica-hard skin turns an edge that does not meet it
+  // square while the branches round it keep most blades off it (`chop` 900, over hardwood's 600). The Jixiao xinshu chose
+  // it over an iron shaft for that: light, it takes the raiders' sword blows without being cut through, and it bends to
+  // tangle a weapon (the user's account of it, 2026-11-11).
+  maozhu: { hardness: 0.15, shaft: { strength: 1.2, scatter: 5, chop: 900 } },
   // Shield boards.
   planks: { hardness: 0.12, board: { perKg: 850, scatter: 6 } },
   plywood: { hardness: 0.12, board: { perKg: 1200, scatter: 6 } },

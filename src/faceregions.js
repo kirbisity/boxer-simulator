@@ -27,7 +27,7 @@ export const KIT_REGIONS = {
   samurai: ['japan'], ashigaru: ['japan'], samuraiTosei: ['japan'], oyoroi: ['japan'], ronin: ['japan'], yakuza: ['japan'], sohei: ['japan'], sumo: ['japan'],
   wokou: ['japan', 'china'], wokouArmoured: ['japan', 'china'],
   // China
-  mingGarrison: ['china', 'taiwan'], mingBrigandine: ['china', 'taiwan'], mingElite: ['china', 'taiwan'], mingIronLamellar: ['china', 'taiwan'],
+  mingGarrison: ['china', 'taiwan'], mingBrigandine: ['china', 'taiwan'], mingEliteInfantry: ['china'], mingElite: ['china', 'taiwan'], mingIronLamellar: ['china', 'taiwan'],
   hanSoldier: ['china'], hanCavalry: ['china', 'mongolia'], kungfu: ['china', 'taiwan'], wuxia: ['china', 'taiwan'], guanYu: ['china'], monk: ['china'],
   ironPagoda: ['china', 'mongolia'],
   // The Jurchen of the Later Jin (Manchuria: no composite of its own; the nearest, north China, Korea and Mongolia).

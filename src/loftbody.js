@@ -703,6 +703,19 @@ export const ARMOR_KINDS = {
     // Sleeveless: the rank and file's coat is a vest (the surviving bumianjia vests, the user's two photographs); the
     // arms only in the quilted sleeves of the coat under it. (The elite's coat keeps its arm guards; the lamellar its own.)
   },
+  // Qi Jiguang's elite infantry (the user's photograph): the regular's long studded coat, trunk and split skirt as his,
+  // with sleeves of the same studded cloth to the wrist (as the banner coat's), and over the front (left) forearm's
+  // sleeve a plain solid steel tube from below the elbow to above the wrist (outfits.js MING_ARM_GUARD, its `lForearm`).
+  mingEliteInfantry: {
+    trunk: [[-0.06, 0.96, 1.2, { studded: 22, base: 'cloth', edge: 'cloth2', opening: 0.012 }], [0.14, 0.24, 1.3, { buckle: 'gold', base: 'leather' }]],
+    skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    // The studded shoulder guard, and the sleeve on down past the elbow under it to meet the forearm's (no shirt between).
+    upperArm: [[0.3, 1.04, 1.22, { studded: 10, base: 'cloth', edge: 'cloth2' }], [-0.28, 0.6, 1.56, { studded: 12, base: 'cloth', edge: 'cloth2' }]],
+    forearm: {
+      l: [[-0.04, -0.03, 1.22, { studded: 10, base: 'cloth', edge: 'cloth2' }], [0.12, -0.07, 1.36, 'steel']],
+      r: [-0.04, -0.03, 1.22, { studded: 10, base: 'cloth', edge: 'cloth2' }],
+    },
+  },
   // The Eight Banners' armour (mianjia, cloth armour, the Jurchen's of the 1610s-30s; the Qing's after): the Ming
   // brigandine's own make, iron plates riveted inside a long coat, the rivet heads in rows over it, and drawn as
   // that coat is (its cloth the banner's colour, its binding `cloth2` the banner's border: red, or white on the red

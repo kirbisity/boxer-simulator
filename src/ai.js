@@ -13,7 +13,7 @@ import { BLADES, GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { startThrow, throwChoice } from './physics/throwable.js';
-import { heldOffAt } from './physics/brush.js';
+import { BRUSH, brushScreens, heldOffAt } from './physics/brush.js';
 import { expectedGap, gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
@@ -626,7 +626,10 @@ export const AI = {
   squad: { together: 1, held: 2.5, longFrom: 1.6, strikeAt: 0.9 },
   // A wolf-brush's bearer holding a man (holdWithBrush): within `band` m of the distance it holds him at he stands; off
   // it, he steps in or gives ground at `give` of his footwork, the brush kept on him.
-  brush: { band: 0.25, give: 0.5 },
+  // Held `thrustAfter` s (time for the squad's spears, ~0.6 s a thrust, to strike twice or three times: the Jixiao xinshu's
+  // order, the langxian holds and the spears kill), he follows up with the steel head at the face (`thrust`, the style's
+  // long thrust): the brush comes off him with it (physics/brush.js holdBrushes frees him), so once a hold.
+  brush: { band: 0.25, give: 0.5, thrustAfter: 1.5, thrust: 'spearThrust' },
   waitingDistance: 0.5,
   // How often (per second) a waiting fighter looks for a less crowded man.
   refocusRate: 0.6,
@@ -1472,6 +1475,7 @@ function holdWithBrush(world, fighter, opponent) {
   fighter.strafe = 0;
   fighter.running = false;
   fighter.aiCombo = null;
+  if (opponent.caught.t >= AI.brush.thrustAfter && !fighter.punch) throwPunch(world, fighter, AI.brush.thrust, 'head');
   return true;
 }
 
@@ -3822,7 +3826,9 @@ function decide(world, fighter, dt) {
     const reeling = staggerShare(fighter, WORLD.stagger.defend);
     // A heavy blow is watched for, and got out of the way of, more than a light one.
     const heavy = 1 + AI.evadeHeavy.defend * heaviness(striker, incoming);
-    if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise) * reeling * heavy)) {
+    // An enemy's wolf-brush between his eyes and the striker: he sees the blow late (physics/brush.js BRUSH.screen).
+    const screen = (world.brushBorne ??= world.fighters.some((man) => man.weapon?.spec.brush)) && brushScreens(world, fighter, striker) ? BRUSH.screen : 1;
+    if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise) * reeling * heavy * screen)) {
       let { name, side } = chooseDefence(fighter, striker, style, incoming, random);
       // Two blades: meet it with one and cut with the other.
       if (style.riposte && fighter.offWeapon?.held && riposte(world, fighter, striker, style, distance)) return;

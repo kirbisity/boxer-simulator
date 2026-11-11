@@ -336,7 +336,8 @@ function raidersOrder(mix) {
 
 // Qi Jiguang's army in the Taizhou campaign, 1561: sea raiders (WOKOU.raiders)
 // against the army he had raised in Yiwu from miners and farmers and drilled
-// himself. Not elite troops: men in the brigandine, in the mandarin-duck squad
+// himself: drilled elite infantry, still the miners and farmers he raised, in
+// the long studded brigandine with its sleeves (OUTFITS mingEliteInfantry), in the mandarin-duck squad
 // (yuanyang zhen) of his Jixiao xinshu, twelve men who fought as one: a
 // leader; two shields (the rattan shield and the dao) in front; two langxian
 // (the wolf-brush: a long bamboo with its branches left on, to entangle a
@@ -348,9 +349,11 @@ function raidersOrder(mix) {
 // squads, are not drawn up here. What made them win nine battles in a
 // month, with a handful of Ming dead against hundreds of raiders, was
 // discipline (his law: a squad that let its leader fall, or ran, was put to
-// death; drilled until they moved as one) and the squad's tactics, not
-// better men or better steel: the raiders here are sea raiders as the wokou
-// level's are (a band of 1561, more of them Chinese: WOKOU.raiders), and the soldiers wear the brigandine the garrison's regulars wear.
+// death; drilled until they moved as one), the squad's tactics and years of
+// that drill, not better men or much better steel: the raiders here are sea
+// raiders as the wokou level's are (a band of 1561, more of them Chinese:
+// WOKOU.raiders), and the soldiers' coat has the same issued plates as the
+// garrison regulars' vest (outfits.js PLATE_VEST), only carried down the arms.
 const QI = {
   // A squad's men as they stand, [style, back, across]: m behind the front
   // (the shields' line), m across from the squad's middle (+ to the squad's
@@ -378,10 +381,11 @@ const QI = {
   // Squads side by side, this far (m) between their middles: the brushes of the two a gap of 0.7 m apart.
   squads: 2,
   squadWidth: 4.9,
-  // One colour to a kind: his squad men in iron lamellar laced red, with its arm guards (OUTFITS mingBrigandine's
-  // lamellar, the user's call: the sleeveless brigandine vest left their arms bare to the wokou's long swords), and the
+  // One colour to a kind: his squad men in his elite infantry's coat, dark, bound in red (OUTFITS mingEliteInfantry
+  // design 3; the user's call, 2026-11-10: in place of the red-laced iron lamellar, its sleeves of plates and the steel
+  // tube on the front forearm guarding the arms the sleeveless vest left bare to the wokou's long swords), and the
   // iron lamellar laced in crimson for the guards of his household (OUTFITS mingElite's level design: the setup screen's, ARMIES.qi).
-  design: { brigandine: 3, elite: 5 },
+  design: { eliteInfantry: 3, elite: 5 },
 };
 
 /** The mandarin-duck squad as Qi drilled it ([style, back, across] a man): the story's southern squads stand so (src/story/battles). */
@@ -446,7 +450,7 @@ function qiArmy(random, { weapons = true } = {}) {
   for (let squad = 0; squad < QI.squads; squad += 1) {
     const middle = (squad - (QI.squads - 1) / 2) * QI.squadWidth;
     for (const [index, [style, back, across]] of QI.squad.entries()) {
-      men.push(mingSoldier(random, weapons ? style : QI_UNARMED_MIX[index], 'brigandine', { people: MING_PEOPLE.qi, design: QI.design.brigandine }));
+      men.push(mingSoldier(random, weapons ? style : QI_UNARMED_MIX[index], 'eliteInfantry', { people: MING_PEOPLE.qi, design: QI.design.eliteInfantry }));
       layout.push([back, middle + across]);
     }
   }
@@ -475,7 +479,7 @@ export function qiJiguangLevel({ morale = true, tactics = true, weapons = true, 
   return {
     title: "Qi Jiguang's army",
     place: 'Taizhou, Zhejiang · 1561',
-    blurb: { en: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled under his law until they fought as one: in brigandine, in close-ordered mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, and the fowling pieces in two ranks behind the shields, holding their fire until the raiders are close, then firing by ranks past the shields' shoulders while the front holds the raiders at the line.", zh: '还是那帮倭寇，还是那样的江南小城，隔了七年。戚继光招的是义乌的矿徒和庄稼汉，拿军法操到能当一个人使：身披布面甲，十二人一队，结鸳鸯阵——藤牌在前，狼筅迎着倭寇的脸捅，长枪从筅后递出；两排鸟铳伏在牌后，不到跟前不放，到了跟前，贴着牌肩一排一排打，前排把人死死钉在阵线上。' },
+    blurb: { en: "The same raiders, the same kind of town, seven years on. General Qi Jiguang's army of Yiwu miners and farmers, drilled daily for years under his law until they fought as one, elite infantry now, though no one would have called them gentlemen: in long studded brigandine to the knee and down both arms, a steel guard on the forearm held out to the enemy, in close-ordered mandarin-duck squads of twelve — shields in front, the wolf-brush bamboos thrust in the raiders' faces, spears past them, and the fowling pieces in two ranks behind the shields, holding their fire until the raiders are close, then firing by ranks past the shields' shoulders while the front holds the raiders at the line.", zh: '还是那帮倭寇，还是那样的江南小城，隔了七年。戚继光招的是义乌的矿徒和庄稼汉，拿军法天天操，操了几年，操到能当一个人使——如今是精兵了，虽然没人把他们当体面人：布面甲长过膝，两袖也钉着甲，迎敌的前臂上一截钢护臂，十二人一队，结鸳鸯阵——藤牌在前，狼筅迎着倭寇的脸捅，长枪从筅后递出；两排鸟铳伏在牌后，不到跟前不放，到了跟前，贴着牌肩一排一排打，前排把人死死钉在阵线上。' },
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9, ...(works ? { works } : {}) },
@@ -768,8 +772,11 @@ export const ARMIES = {
   },
   qi: {
     label: "Qi Jiguang's army",
+    // His law and his drill go with his men wherever they are set up (muster.js armyDiscipline): QI_DISCIPLINE.
+    discipline: QI_DISCIPLINE,
     ranks: {
-      brigandine: { label: 'Squad man', kinds: ['mingBrigandine'], styles: ['swordShield', 'langxian', 'spear', 'matchlock', 'dao'], make: mingRank('brigandine', MING_PEOPLE.qi, QI.design.brigandine) },
+      // His squads' men (the mandarin-duck squad's arms), all in the elite infantry's kit; their own arms the gun and the brush.
+      eliteInfantry: { label: 'Elite infantry', kinds: ['mingEliteInfantry'], styles: ['matchlock', 'langxian', 'swordShield', 'spear', 'dao'], make: mingRank('eliteInfantry', MING_PEOPLE.qi, QI.design.eliteInfantry) },
       elite: { label: 'Guard', kinds: ['mingElite'], styles: ['guandao', 'swordShield', 'spear'], make: mingRank('elite', MING_PEOPLE.qi, QI.design.elite) },
     },
   },

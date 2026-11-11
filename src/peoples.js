@@ -51,6 +51,9 @@ export const PEOPLES = {
     of: 'mingSouth',
     ranks: {
       brigandine: { heightCm: 2, weightKg: 6, exercise: 0.3, skill: 0.5 },
+      // His squads as they fight in his levels and the story (outfits.js mingEliteInfantry): the same men, trained as their
+      // kit says (no `skill` of their own: the kit's 0.65, an elite's, drilled as squads for years; the user's call, 2026-11-10).
+      eliteInfantry: { heightCm: 2, weightKg: 6, exercise: 0.3 },
       elite: { heightCm: 7, weightKg: 11, exercise: 0.3, skill: 0.55 },
     },
   },

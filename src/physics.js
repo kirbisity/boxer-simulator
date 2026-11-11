@@ -8749,7 +8749,7 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   const two = at(second, b, closest.t);
   // A blade in among a wolf-brush's branches may be caught there; caught, the two are tangled and move together (physics/brush.js).
   if (brush) {
-    brushTouch(world, first, second, a, b, one.along, two.along, true);
+    brushTouch(world, first, second, a, b, one.along, two.along, true, one.velocity, two.velocity);
     if (tangled(first, second, a, b)) return;
   }
   // Apart, shared by the hands' inverse masses.

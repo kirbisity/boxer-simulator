@@ -15,7 +15,7 @@ import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildQingHood, buildTassel } from './chinahelmview.js';
-import { HONGYING_MOUNTS, TASSELS } from './chinahelms.js';
+import { HONGYING_MOUNTS, MING_HOOD, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, headRadiusAt, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf, knightGrid } from './knighthelms.js';
 
@@ -1566,6 +1566,19 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
     case 'mingHat': {
       // In one of the rank and file's four designs (chinahelms.js MING_HELMS: `design`, `finish`), fitted over the head.
       if (head.design && buildMingDesignHelm(group, head, r, steel, { lowDetail })) {
+        // The cloth hood under it (`hood`: its colour; chinahelms.js MING_HOOD), the face open.
+        if (head.hood) {
+          const hood = MING_HOOD;
+          const linen = surface(new THREE.Color(head.hood).getHex(), { roughness: 0.92 });
+          linen.side = THREE.DoubleSide;
+          const open = hood.open * Math.PI;
+          const band = new THREE.Mesh(new THREE.SphereGeometry(hood.radius * r, lowDetail ? 10 : 20, lowDetail ? 4 : 8, Math.PI + open, Math.PI * 2 - 2 * open, hood.top * Math.PI, (hood.bottom - hood.top) * Math.PI), linen);
+          const { skirt } = hood;
+          const behind = skirt.behind * Math.PI * 2;
+          const fall = new THREE.Mesh(new THREE.CylinderGeometry(skirt.top * r, skirt.hem * r, skirt.tall * r, lowDetail ? 10 : 18, 1, true, Math.PI * 1.5 - behind / 2, behind), linen);
+          fall.position.set(skirt.x * r, skirt.y * r, 0);
+          group.add(band, fall);
+        }
         fitted = true;
         break;
       }

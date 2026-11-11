@@ -71,7 +71,7 @@ export const ARMOUR_COVERING = {
   lamellar: 'lamellar', oyoroi: 'lamellar', doMaru: 'lamellar', doMaruSode: 'lamellar', hanLamellar: 'lamellar', mingLamellar: 'lamellar', mingEliteLamellar: 'lamellar',
   mongolLamellar: 'lamellar', mongolIron: 'lamellar', kheshig: 'lamellar', ironPagoda: 'lamellar',
   // Small plates riveted inside cloth or sewn over it: a rattle of little plates under the blow.
-  scissor: 'scale', guanYu: 'scale', mingScale: 'scale', mingScaleCoat: 'scale', brigandine: 'scale', mingBrigandine: 'scale', mingElite: 'scale', bannerCoat: 'scale', bayaraCoat: 'scale',
+  scissor: 'scale', guanYu: 'scale', mingScale: 'scale', mingScaleCoat: 'scale', brigandine: 'scale', mingBrigandine: 'scale', mingEliteInfantry: 'scale', mingElite: 'scale', bannerCoat: 'scale', bayaraCoat: 'scale',
   // Quilted cotton and linen, felt and cloth over mail (a kazaghand's outside is cloth), a soft vest: the blow lands in padding.
   mingQuilt: 'padded', escaupil: 'padded', ichcahuipilli: 'padded', jaguarSuit: 'padded', featherSuit: 'padded', dolama: 'padded', kazaghand: 'padded',
   mongolDeel: 'padded', patrolVest: 'padded', plateCarrier: 'padded',

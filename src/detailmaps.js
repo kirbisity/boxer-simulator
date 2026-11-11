@@ -123,6 +123,8 @@ export const ARMOUR_TILES = {
   // The Ming coats' arm guards: the bi fu's riveted lames over a plain bracer; the elite's arms, already lamed, hammered iron.
   mingLamellar: { 'forearm.steel': 'bifu' },
   mingScaleCoat: { 'forearm.steel': 'bifu' },
+  // Qi's elite infantry: the solid steel tube over the front forearm, hammered iron as the retainer's guards.
+  mingEliteInfantry: { 'forearm.steel': 'munitionPlate' },
   mingElite: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   mingScale: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   mingEliteLamellar: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
@@ -158,7 +160,7 @@ export const ARMOUR_COVERAGE = {
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
-  mingVest: null, mingBrigandine: ['brigandine'], mingLamellar: ['lamellae', 'bifu'], mingScaleCoat: ['scale', 'bifu'],
+  mingVest: null, mingBrigandine: ['brigandine'], mingEliteInfantry: ['brigandine', 'munitionPlate'], mingLamellar: ['lamellae', 'bifu'], mingScaleCoat: ['scale', 'bifu'],
   bannerCoat: ['brigandine'], bayaraCoat: ['brigandine', 'plate', 'munitionPlate'],
   mingElite: ['brigandine', 'plate', 'munitionPlate'], mingScale: ['scale', 'plate', 'munitionPlate'], mingEliteLamellar: ['lamellae', 'plate', 'munitionPlate'],
   ironPagoda: ['lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,
@@ -483,6 +485,7 @@ export const CLOTH_GARMENTS = {
     mingQuilt: { '*': 'quilted' },
     mingVest: { '*': 'hemp', leather: 'cotton' },
     mingBrigandine: { '*': 'cotton', armor: 'none' },
+    mingEliteInfantry: { '*': 'cotton', armor: 'none' },
     mingElite: { '*': 'cloudSilk', armor: 'none' },
     mingLamellar: { '*': 'cotton', armor: 'none' },
     mingScaleCoat: { '*': 'cotton', armor: 'none' },

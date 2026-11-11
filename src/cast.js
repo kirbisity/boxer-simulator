@@ -294,8 +294,8 @@ export function sengokuWarrior(random = Math.random, side, style, rank = style =
  * chest mirror; built like the side's other men, in one of his armour's designs.
  */
 export function mingSoldier(random = Math.random, style = 'spear', rank = 'garrison', { people = 'ming', design = null } = {}) {
-  const base = varyCharacter(rank === 'elite' ? PRESETS.guandao : rank === 'brigandine' ? PRESETS.swordShield : PRESETS.mingSpear, random, { sex: 'male' });
-  const kind = { garrison: 'mingGarrison', brigandine: 'mingBrigandine', elite: 'mingElite' }[rank];
+  const base = varyCharacter(rank === 'elite' ? PRESETS.guandao : rank === 'brigandine' || rank === 'eliteInfantry' ? PRESETS.swordShield : PRESETS.mingSpear, random, { sex: 'male' });
+  const kind = { garrison: 'mingGarrison', brigandine: 'mingBrigandine', eliteInfantry: 'mingEliteInfantry', elite: 'mingElite' }[rank];
   const name = `${pickOne(['Wang', 'Li', 'Zhang', 'Liu', 'Chen', 'Yang', 'Zhao', 'Huang', 'Zhou', 'Wu', 'Qi', 'Luo'], random)} ${pickOne(['Da', 'Er', 'San', 'Si', 'Wu', 'Liu', 'Hu', 'Bao', 'Shun', 'Gui', 'Fu', 'Ming'], random)}`;
   const soldier = { ...base, sex: 'male', name, style, outfit: { kind, design: design ?? randomDesign(kind, random) }, accessories: [] };
   return builtLike(soldier, PERIOD_BUILD[people][rank], random);

@@ -149,3 +149,22 @@ test('the cap on a side is the biggest battle\'s', () => {
   const biggest = Math.max(...BATTLES.flatMap((key) => Object.values(battleOf(key).cast(seededRandom(1))).map((side) => side.length)));
   assert.equal(MUSTER.cap, biggest);
 });
+
+test('a side mustered wholly from a disciplined army brings its discipline with it; mixed with an undrilled one, it does not', () => {
+  // Qi's men set up against the wokou on the 1554 raid's field (no discipline of the level's own there).
+  const level = { ...battleOf('wokou'), armies: { red: ['raiders'], blue: ['qi', 'coast'] } };
+  const qi = ['matchlock', 'langxian', 'spear'].map((style) => ARMIES.qi.ranks.eliteInfantry.make(seededRandom(2), style));
+  const coast = [ARMIES.coast.ranks.garrison.make(seededRandom(2), 'spear')];
+  const red = level.cast(seededRandom(2)).red;
+  assert.ok(!level.formation.blue?.discipline, 'the garrison\'s field: none of its own');
+  const alone = musterLevel(level, { cast: { red, blue: qi } });
+  assert.equal(alone.formation.blue.discipline, ARMIES.qi.discipline);
+  const placed = musterLevel(level, { cast: { red, blue: qi }, places: { red: drawUp(level, 'red', red), blue: drawUp(level, 'blue', qi) } });
+  assert.equal(placed.formation.blue.discipline, ARMIES.qi.discipline, 'kept when placed by hand');
+  const mixed = musterLevel(level, { cast: { red, blue: [...qi, ...coast] } });
+  assert.ok(!mixed.formation.blue?.discipline, 'a side is as steady as its least drilled part');
+  // Never below the level's own.
+  const qiLevel = battleOf('qiJiguang');
+  const own = musterLevel(qiLevel, { cast: { red: qiLevel.cast(seededRandom(2)).red, blue: qi } });
+  assert.equal(own.formation.blue.discipline, 1);
+});

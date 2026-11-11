@@ -12,7 +12,8 @@
 //    accounts of Taizhou, 1561; scenarios.js WOKOU.raiders, the Taizhou band's mix, kept here in its proportions).
 //  - The defenders: a southern company drilled as Qi drilled his Yiwu men (Jixiao xinshu 纪效新书): squads of twelve,
 //    two shields, two wolf-brushes (langxian 狼筅), four spears, three fowling pieces, the leader at the back
-//    (scenarios.js qiJiguangLevel: its squad layout, drill and discipline, reused). No trench: a raid is not waited for.
+//    (scenarios.js qiJiguangLevel: its squad layout, drill and discipline, reused), in his elite infantry's kit (outfits.js
+//    mingEliteInfantry). No trench: a raid is not waited for.
 //
 // Numbers (assumed, stated): thirty-six raiders (the Taizhou mix ×1.4: 4 rōnin, 13 Japanese, 19 Chinese) against three
 // squads (36), 1 : 1, 72 men. The water town of the wokou levels (scene 'jiangnan', its morning mist).
@@ -43,8 +44,9 @@ export const WOKOU_1588 = {
   slot: { front: 0, second: 7, rear: 9, squadLeader: 11 },
   // An officer stands behind the middle squad (m behind its leader).
   officerBack: 2,
-  // The squads' colours (scenarios.js QI.design: the red-laced lamellar, the household's crimson).
-  design: { mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  // The squads' kit and colours (scenarios.js QI: Qi's elite infantry in the dark coat bound red, the household's crimson).
+  kit: 'mingEliteInfantry',
+  design: { mingEliteInfantry: 3, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
 /** Qi's squad of twelve: each man's [style, back, across] about his squad's middle (from qiJiguangLevel's layout). */
@@ -77,7 +79,7 @@ export const wokouBattle = {
     for (let s = 0; s < spec.squads; s += 1) {
       const middle = (s - (spec.squads - 1) / 2) * 4.9;
       for (const [style, back, across] of squad) {
-        men.push(koreaStandIn(random, style, 'mingBrigandine', { people: 'qi', design: spec.design }));
+        men.push(koreaStandIn(random, style, spec.kit, { people: 'qi', design: spec.design }));
         places.push([spec.front + back, middle + across]);
       }
     }

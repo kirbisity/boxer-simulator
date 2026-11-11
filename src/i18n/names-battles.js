@@ -120,6 +120,7 @@ export const NAMES_BATTLES = {
   'Japanese raider': '真倭',
   'Chinese raider': '从倭华盗',
   'Squad man': '鸳鸯阵兵',
+  'Elite infantry': '戚家军精兵',
   'Guard': '亲兵',
   'Rifleman': '步枪兵',
   'Yakuza': '极道',

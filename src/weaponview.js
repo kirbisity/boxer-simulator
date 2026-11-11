@@ -1008,6 +1008,8 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(ferrule, butt);
       break;
     }
+    // (The Qi family's long sabre, changdao, is drawn as the dao is, at its own length and with its long two-hand grip.)
+    case 'changdao':
     case 'dao': {
       // A willow-leaf sabre: a gentle curve to the point, a round guard, a
       // cord-wrapped grip and a red tassel from the pommel ring. Held, as a

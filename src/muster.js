@@ -237,6 +237,23 @@ export function drawUp(level, corner, men, key = 'level') {
 }
 
 /**
+ * The discipline a side mustered from these men brings with it (ARMIES' `discipline`: Qi Jiguang's law and drill go with
+ * his men to any field): the least of the armies its men come from (a man of no army, or of an army without one, counts
+ * 0). A side's discipline is one number for all of it (world.discipline; ai.js AI.morale), and a side is as steady as its
+ * least drilled part: Qi's squads beside a garrison's levies do not lend the levies his law. Null for a side of no men.
+ */
+export function armyDiscipline(level, corner, men) {
+  if (!men?.length) return null;
+  const units = unitsOf(level, corner);
+  let least = Infinity;
+  for (const inputs of men) {
+    const army = unitOf(units, inputs)?.army;
+    least = Math.min(least, (army && ARMIES[army]?.discipline) || 0);
+  }
+  return least;
+}
+
+/**
  * The level as set up: its own, but for the cast (`setup.cast`: each side's
  * men, in order) and, for a side placed by hand (`setup.places[corner]`: [x, z]
  * for each man), that side's formation: every man's place given (a `layout`
@@ -246,14 +263,18 @@ export function drawUp(level, corner, men, key = 'level') {
 export function musterLevel(level, setup) {
   const formation = { ...level.formation };
   for (const corner of ['red', 'blue']) {
+    // The side's discipline: its level's, or that of the armies it is mustered from where that is higher (armyDiscipline).
+    const brought = armyDiscipline(level, corner, setup.cast?.[corner]) ?? 0;
+    const own = level.formation?.[corner] ?? {};
+    if (brought > (own.discipline ?? 0)) formation[corner] = { ...formation[corner], discipline: brought };
     const places = setup.places?.[corner];
     if (!places) continue;
     const sign = MUSTER_SIGN[corner];
-    const own = level.formation?.[corner] ?? {};
     const riders = setup.cast[corner].some(musterRides);
+    const discipline = formation[corner]?.discipline;
     formation[corner] = {
       ...(own.drill ? { drill: own.drill } : {}),
-      ...(own.discipline !== undefined ? { discipline: own.discipline } : {}),
+      ...(discipline !== undefined ? { discipline } : {}),
       // Its baggage train (the camels with fresh arrows) stays where the level has it.
       ...(own.train ? { train: own.train } : {}),
       ...(own.facing ? { facing: own.facing } : {}),

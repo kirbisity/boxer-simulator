@@ -287,6 +287,12 @@ function mingGarrisonDesign(label, vest, sash, wrap) {
 function mingBrigandineDesign(label, cloth, iron, look = {}, helm = {}, extra = {}) {
   return { label, ...extra, top: { kind: 'longsleeve', color: look.kind ? shade(cloth, 0.7) : '#d6cbb2' }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
+// Qi Jiguang's elite infantry: the coat's cloth (its binding a shade of it, or `bind`), brass studs, the bright riveted kettle
+// hat over a cream cloth hood (chinahelms.js MING_HELMS rivetedTube; wardrobe.js mingHat `hood`). The sleeves are the coat's
+// (loftbody.js ARMOR_KINDS.mingEliteInfantry), so the padded coat under it shows only at the neck and the joints: the coat's cloth, darker.
+function mingEliteInfantryDesign(label, cloth, bind = shade(cloth, 0.35), extra = {}) {
+  return { label, ...extra, top: { kind: 'longsleeve', color: shade(cloth, 0.7) }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingEliteInfantry', color: '#b9bec5', cloth, cloth2: bind, gold: '#c9a24a', leather: '#2a1d14' }, head: { kind: 'mingHat', color: '#8f949b', tassel: '#b3161b', design: 'rivetedTube', finish: 'steel', hood: '#bfb291' }, feet: { kind: 'compactBoot', color: '#17171c' } };
+}
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
 // `look`: the same protection drawn as scale armour (`kind: 'mingScale'`), or as lamellar (`kind: 'mingEliteLamellar'`).
@@ -1382,6 +1388,53 @@ export const OUTFITS = {
       mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }, { design: 'plainPoint', finish: 'steel' }, { chosen: true }),
       mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a', cord: '#22356a' }, { design: 'plainPoint', finish: 'steel' }, { chosen: true }),
       mingBrigandineDesign('Iron scale, red coat', '#9a1f1a', '#8f949b', { kind: 'mingScaleCoat', lace: '#3a1410' }, { design: 'yongBell', finish: 'steel' }, { chosen: true }),
+    ],
+  },
+  // Ming elite infantry: Qi Jiguang's Zhejiang men (the Taizhou campaign, 1561; Korea, 1593), raised from the Yiwu miners
+  // and farmers and drilled as squads for years. The long studded brigandine to below the knee with sleeves of the same
+  // studded cloth to the wrist, a solid steel tube over the front forearm, the bright riveted kettle hat over a cloth hood
+  // (the user's reference photograph, 2026-11-10).
+  mingEliteInfantry: {
+    // Drilled daily, squad by squad, for years, under the Jixiao xinshu's law (its drill: the squad's men practised their
+    // weapons and the array until they moved as one, and were examined on them): an elite's training (the tiers above:
+    // 0.6-0.8), at its foot (0.65): picked farmers and miners made soldiers, not men trained to arms from boyhood.
+    skill: 0.65,
+    faction: 'chinese',
+    label: 'Ming — elite infantry', family: 'chinese', movement: 'good', fists: 'bare',
+    // His sidearm the Qi family's long sabre (WEAPONS changdao): what the gunners draw when the raiders are on them.
+    sidearm: 'changdao',
+    spare: 'dagger',
+    // ~13 kg on an 81 kg man: the regular's vest (0.125, ~10 kg), its plates carried on down the sleeves (~2.5 kg: the
+    // arm's share of a coat's plates) and the steel tube over the front forearm (~0.6 kg, half a pair of MING_ARM_GUARD's ~1.5 kg, less its lames).
+    extraMass: 0.16,
+    // The coat's plates the regular's (PLATE_VEST: the same issued plates, one deep, not the retainer's lapped PLATE_COAT),
+    // over the trunk, the skirt and both arms, its sleeves of the same studded cloth over plates. On the front (left)
+    // forearm, the one held out before him (the gun's fore-end, the brush, the shield), a solid steel tube (MING_ARM_GUARD;
+    // physics.js protectionAt: `lForearm` before the sideless `Forearm`). The riveted kettle hat as the regular's riveted
+    // helmet (OUTFIT_SETS mingBrigandine `tube`). The ball as the regular's (the user's call): the sleeves' plates as thin
+    // as the vest's.
+    protection: {
+      ...PLATE_VEST, bullet: { head: 0.3, torso: 0.5, limb: 0 },
+      regions: { head: { blunt: 0.58, cut: 0.87, pierce: 0.58, deflects: true }, lForearm: MING_ARM_GUARD },
+    },
+    helmet: { mass: 1.6, padding: 0.35, curve: 0.75 },
+    // Plates in cloth: a point catches in the cloth and the rivet heads and bites (BLADES.bite), as on the retainer's coat;
+    // the steel tube (its region) and the helmet turn it.
+    deflects: false,
+    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
+    gaps: { lacing: 0.1 },
+    // Higher than the general's retainer's (mingElite 0.35) and every Chinese kit's: Qi's law (a squad that let its leader
+    // fall, or ran, was put to death: Jixiao xinshu, the 'law of joint responsibility', 连坐法), the squad fighting as one
+    // and his army's nine victories in a month in Taizhou, 1561. Steady, very disciplined, slow to scare.
+    courage: 0.6,
+    designs: [
+      // The photograph's olive cloth, dark binding.
+      mingEliteInfantryDesign('Olive', '#8a7d55', '#2b2a22'),
+      mingEliteInfantryDesign('Red', '#9a1f1a'),
+      mingEliteInfantryDesign('Blue', '#22356a'),
+      // Qi's squads at Taizhou (scenarios.js QI): the dark coat bound in red, the colour the squads wore in the iron lamellar
+      // laced red before (OUTFITS mingBrigandine's), one colour to the army.
+      mingEliteInfantryDesign('Dark, red binding', '#2e2a24', '#9a1f1a'),
     ],
   },
   // Ming elite: the long brigandine coat to the knee reinforced with plates,

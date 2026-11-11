@@ -43,7 +43,7 @@ test('the wokou raiders are mostly Japanese and charge with swords: rōnin and s
   for (const corner of ['red', 'blue']) assert.ok(SCENARIOS.wokou.formation[corner].front >= 8);
 });
 
-test("Qi Jiguang's army: two mandarin-duck squads in the brigandine, and no one idle behind them (his household guards, in the elite's lamellar, are the setup screen's)", () => {
+test("Qi Jiguang's army: two mandarin-duck squads in the elite infantry's kit, and no one idle behind them (his household guards, in the elite's lamellar, are the setup screen's)", () => {
   const { blue } = SCENARIOS.qiJiguang.cast(seededRandom(2));
   assert.equal(blue.filter((man) => man.outfit.kind === 'mingElite').length, 0, 'no guards behind the squads');
   // The guards' kit kept for an army set up by hand (ARMIES.qi): the iron lamellar laced in crimson, a level design.
@@ -51,7 +51,7 @@ test("Qi Jiguang's army: two mandarin-duck squads in the brigandine, and no one 
   const look = OUTFITS.mingElite.designs[guard.outfit.design];
   assert.equal(look.armor.kind, 'mingEliteLamellar');
   assert.ok(look.levelOnly, 'a level design, not dealt at random');
-  const squads = blue.filter((man) => man.outfit.kind === 'mingBrigandine');
+  const squads = blue.filter((man) => man.outfit.kind === 'mingEliteInfantry');
   assert.equal(squads.length, blue.length, 'every man in a squad');
   assert.equal(squads.length, 24, 'two squads of twelve');
   assert.equal(new Set(squads.map((man) => man.outfit.design)).size, 1, 'one coat colour');
@@ -63,6 +63,9 @@ test("Qi Jiguang's army: two mandarin-duck squads in the brigandine, and no one 
   const order = SCENARIOS.qiJiguang.formation.blue;
   assert.equal(order.layout.length, blue.length);
   assert.ok(order.drill.squad && order.discipline === 1);
+  // The squads' men set up by hand are the same kit, and bring his discipline with them (ARMIES.qi: muster.js armyDiscipline).
+  assert.deepEqual(ARMIES.qi.ranks.eliteInfantry.kinds, ['mingEliteInfantry']);
+  assert.equal(ARMIES.qi.discipline, 1);
   assert.ok(!SCENARIOS.wokou.formation.blue.discipline, 'the garrison has none');
 });
 

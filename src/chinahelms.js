@@ -283,6 +283,19 @@ export const TASSELS = {
  * Where the older helmets (wardrobe.js) carry the red tassel (hongying): bound at `top` on the spike (`spike`: its foot and
  * point, head radii up), falling `length`, kept out of the helmet's `hull` ([y, radius] up the axis) as it swings.
  */
+/**
+ * The cloth hood worn under a Ming soldier's helmet (the user's photograph of Qi Jiguang's men: a cream hood under the
+ * kettle hat, over the ears and the neck, the face open; the soldiers of the 平番得胜图 likewise hooded under their
+ * helmets): a band of cloth round the head from under the brim (`top`, `bottom`: polar angles from the crown, shares of
+ * π) leaving the face open (`open`: half the opening round, a share of π), `radius` head radii out; and its skirt falling
+ * from it round the neck onto the shoulders (`skirt`: radius at its top and its hem, its height, its centre's y and x, in
+ * head radii; `behind`: how far round it goes, a share of 2π, centred behind). Plain cotton, drawn cheaply (wardrobe.js mingHat `hood`).
+ */
+export const MING_HOOD = {
+  radius: 1.12, top: 0.3, bottom: 0.72, open: 0.27,
+  skirt: { top: 0.98, hem: 1.42, tall: 1.2, y: -1.05, x: -0.08, behind: 0.72 },
+};
+
 export const HONGYING_MOUNTS = {
   mingHelm: { top: 2.78, length: 0.85, spike: [2.6, 3.3], hull: [[1.62, 0.7], [1.92, 0.43], [2.08, 0.24], [2.62, 0.19], [2.8, 0.1]] },
   steppeHelm: { top: 2.98, length: 0.62, spike: [2.43, 3.13], hull: [[2.2, 0.16], [2.5, 0.08], [3.1, 0.06]] },

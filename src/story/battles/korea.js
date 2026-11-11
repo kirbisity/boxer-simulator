@@ -12,7 +12,7 @@ import { mingSoldier } from '../../cast.js';
 /** The outfit kind by a man's rank (the life's `kit` for the hero, where it gives one). */
 export const KOREA_KIT = { soldier: 'mingGarrison', squadLeader: 'mingBrigandine', officer: 'mingElite' };
 // The rank each kit is cast as (cast.js mingSoldier), for a stand-in man's build.
-const KOREA_CAST_RANK = { mingGarrison: 'garrison', mingBrigandine: 'brigandine', mingElite: 'elite' };
+const KOREA_CAST_RANK = { mingGarrison: 'garrison', mingBrigandine: 'brigandine', mingEliteInfantry: 'eliteInfantry', mingElite: 'elite' };
 
 /** His age in a battle's year, from the year he was born (aging.js reads `age`). */
 const koreaAge = (born, year) => (Number.isFinite(born) ? Math.max(16, year - born) : undefined);
@@ -44,8 +44,9 @@ export function koreaComrades(life) {
 /** The hero's own kit: the life's, else his rank's. */
 export const koreaHeroKit = (life) => life.kit ?? KOREA_KIT[life.rank] ?? 'mingGarrison';
 
-// The Ming kits from least to most protection (outfits.js): the hemp vest, the brigandine, the elite's.
-const KOREA_KIT_ORDER = ['mingGarrison', 'mingBrigandine', 'mingElite'];
+// The Ming kits from least to most protection (outfits.js): the hemp vest, the brigandine, Qi's elite infantry's (the
+// brigandine with its sleeves of plates and the steel guard), the retainer's.
+const KOREA_KIT_ORDER = ['mingGarrison', 'mingBrigandine', 'mingEliteInfantry', 'mingElite'];
 /**
  * What a man wears in the place he is given: what that place in the line was issued (the column's armour, where the army
  * armoured it), or his rank's kit where that is better. A soldier put in a brigandine column wears the brigandine too.

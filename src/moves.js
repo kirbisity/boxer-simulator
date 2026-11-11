@@ -916,8 +916,13 @@ export const STYLES = {
     stance: { blade: 0.55, crouch: 0.06, width: 1.3, lean: 0.08, guardHeight: 0.05 },
     weaponGuard: { hand: [-0.06, 0.66, -0.12], dir: [1, 0.22, 0] },
     idle: { bounce: 0.1, sway: 0.3, rock: 0.2 },
-    attacks: { spearJab: 0.45, spearThrust: 0.3, spearSweep: 0.25 },
-    combos: { 'spearJab spearJab': 0.5, 'spearSweep spearJab': 0.5 },
+    // A wall that moves, not a killer (the Jixiao xinshu: the langxian screens the body and entangles, the spears kill):
+    // most of what he does is push the brush into the face of a man coming on (the short `spearJab`, the brush presented,
+    // 0.5, was 0.45) and sweep it across his weapon to tangle it (`spearSweep` 0.4, was 0.25; physics/brush.js's catch);
+    // the long thrust of the steel head is the follow-up, seldom thrown on its own (0.1, was 0.3; ai.js holdWithBrush
+    // throws it at a man held in the branches).
+    attacks: { spearJab: 0.5, spearSweep: 0.4, spearThrust: 0.1 },
+    combos: { 'spearSweep spearJab': 0.6, 'spearJab spearJab': 0.4 },
     comboChance: 0.4,
     tempo: 1.1,
     defences: { weaponBlock: 0.7, stepBack: 0.3 },
@@ -1774,6 +1779,25 @@ export const STYLES = {
     headMovement: 0.1,
     plans: { counter: 1.3, outboxer: 1, pressure: 0.9, brawler: 0.4 },
     pressure: 0.1,
+  },
+  // The Qi family's long sabre (WEAPONS changdao) as a matchlock man draws it: two hands, the Japanese cuts Qi took
+  // from the raiders (Cheng Zongyou's Danfo fayuan, 1621, after the katana's: the high guard, the downward and diagonal
+  // cuts, a thrust); fought as the katana is, a drilled soldier's sidearm, not a duellist's.
+  changdao: {
+    label: 'Changdao', hidden: true, weapon: 'changdao', fallback: 'mix',
+    cadence: { work: 1.2, move: 0.8, burst: 0.65, mobility: 0.5 },
+    stance: { blade: 0.15, crouch: 0.05, width: 1.15, lean: 0.04, guardHeight: 0 },
+    weaponGuard: { hand: [0.17, 0.6, -0.03], dir: [0.3, 1, 0.05] },
+    idle: { bounce: 0.1, sway: 0.3, rock: 0.2 },
+    attacks: { shomen: 0.25, kesagiri: 0.3, gyakuKesa: 0.15, yokogiri: 0.15, kiriage: 0.05, tsuki: 0.1 },
+    combos: { 'kesagiri gyakuKesa': 0.4, 'shomen tsuki': 0.3, 'yokogiri shomen': 0.3 },
+    comboChance: 0.45,
+    tempo: 1.1,
+    defences: { weaponBlock: 0.7, stepBack: 0.25, guard: 0.05 },
+    defendChance: 0.75,
+    headMovement: 0.1,
+    plans: { counter: 1.3, outboxer: 1.1, pressure: 0.8, brawler: 0.4 },
+    pressure: 0.05,
   },
   // The arena's pairings, each kit made to answer another's.
   // Thraex: crouched behind the small parmula, the sica hooking round a
