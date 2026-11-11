@@ -61,6 +61,9 @@ BASE = {
     # Where each part is cut, as the loft's own parts end (loftbody.js): the neck at 0.6 of the way to the head's centre
     # (the head overlaps it there), the shin at 0.97 of the way to the ankle (the foot's shoe or skin covers it).
     'neckCut': 0.6, 'ankleCut': 0.97,
+    # The loft's trunk ends this far below the hip joint (t, trunk lengths: loftbody.js lofts it from -0.12): below it the
+    # thighs' rings, and the clothes on them, take over.
+    'trunkEnd': -0.12,
     # Each joint's blend between its two parts: this far (fractions of height, about 4.5 cm) either side of the cut, so a part
     # scaled by its own girth meets its neighbour without a step.
     'blend': 0.025,
@@ -331,7 +334,11 @@ def segment(P, edges):
         is_arm = (P[:, 2] * sign > 0) & (along > -arm['radius']) & (across < arm['radius'] * np.where(along > upper * 0.15, 2.0, 1.7))
         part[is_arm & (along <= upper)] = PARTS.index(f'{side}Upper')
         part[is_arm & (along > upper)] = PARTS.index(f'{side}Fore')
-        is_leg = (P[:, 2] * sign > 0) & (P[:, 1] < crotch) & ~is_arm
+        # (The legs begin where the loft's trunk ends, `trunkEnd` below the hip joint, or at the crotch if that is higher: the
+        # buttocks' lower half is the thigh's, as the clothes on the thigh cover it.)
+        hip_line = joints['pelvis'][1] + BASE['trunkEnd'] * (joints['neck'][1] - joints['pelvis'][1])
+        # (Points on the middle line itself go to the left leg, so none is left on the trunk below its end.)
+        is_leg = ((P[:, 2] * sign > 0) | ((P[:, 2] == 0) & (sign > 0))) & (P[:, 1] < max(crotch, hip_line)) & ~is_arm
         part[is_leg & (P[:, 1] >= joints[f'{side}Knee'][1])] = PARTS.index(f'{side}Thigh')
         part[is_leg & (P[:, 1] < joints[f'{side}Knee'][1])] = PARTS.index(f'{side}Shin')
     share = np.zeros((len(P), len(PARTS)))

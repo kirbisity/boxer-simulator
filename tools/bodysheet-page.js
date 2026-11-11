@@ -13,7 +13,8 @@
 // built in), cell (the flesh grid), relief (bump strength), perf (soft-shell
 // cost), fighter (knight, gambeson, helmet-fat, helmet-thin: one dressed
 // fighter instead of the progression), motion (run, land, side: each chosen
-// build's fat masses through a move, fatslosh.js, a column per moment).
+// build's fat masses through a move, fatslosh.js, a column per moment), outfit
+// (an outfits.js kind: the progression dressed in it).
 
 /* global THREE */
 import { buildBody, P, PRESETS } from '../src/body.js';
@@ -395,7 +396,9 @@ function dressedFighters() {
 }
 
 async function main() {
-  const rows = query.get('fighter') ? dressedFighters() : progression(SEX);
+  // `outfit`: the progression dressed in an outfit (outfits.js kind, its first design), to see the clothes on every build.
+  const outfit = query.get('outfit');
+  const rows = query.get('fighter') ? dressedFighters() : progression(SEX).map((row) => (outfit ? { ...row, label: `${outfit} · ${row.label}`, inputs: { ...row.inputs, outfit: { kind: outfit, design: 0 } } } : row));
   const columns = rows.filter((row) => !ONLY || ONLY.includes(row.key));
   const subjects = [];
   for (const column of columns) {

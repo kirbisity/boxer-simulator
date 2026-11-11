@@ -44,8 +44,11 @@ export const BASE_BODY = {
   leastShare: 0.3,
 };
 
-const TAU = Math.PI * 2;
+const BASE_TAU = Math.PI * 2;
 const decoded = new Map();
+
+/** Whether the base meshes are here (a build may leave them out: tools/custom.js; the style then draws the loft's own skin). */
+export const baseBodyAvailable = () => Boolean(BASE_BODY_DATA?.male);
 
 /** Bytes from base64, in Node and the page alike. */
 function baseBytes(text) {
@@ -91,7 +94,7 @@ let starvedSlopes = null;
  */
 export function baseStarvedDetail(body) {
   const weight = baseStarvation(body);
-  const packed = BASE_BODY_DATA.starvedSlopes;
+  const packed = BASE_BODY_DATA?.starvedSlopes;
   if (weight <= 0 || !packed) return null;
   if (!starvedSlopes) {
     const bytes = new Int8Array(baseBytes(packed.slopes).buffer);
@@ -124,7 +127,7 @@ function placeOn(frame, ring, point) {
   const y = vec.dot(out, frame.widthAxis);
   const phi = Math.atan2(y, x);
   let angle = Math.atan2(r.depth * Math.sin(phi), r.width * Math.cos(phi));
-  if (angle < 0) angle += TAU;
+  if (angle < 0) angle += BASE_TAU;
   const radius = Math.hypot(r.depth * Math.cos(angle), r.width * Math.sin(angle)) * (r.bend ? r.bend(r, angle) : 1);
   return { t, angle, out: Math.hypot(x, y), radius, x, y };
 }
@@ -245,11 +248,11 @@ export function measureBaseBody(mesh, refParts, height) {
   const draw = (source, part, place, side) => {
     const key = `${source}|${part}|${side}`;
     if (drawn.has(key)) return drawn.get(key);
-    const u = side === 0 ? place.angle / TAU : side < 0 ? 0 : 1;
+    const u = side === 0 ? place.angle / BASE_TAU : side < 0 ? 0 : 1;
     render.source.push(source);
     render.part.push(part);
     render.t.push(place.t);
-    render.angle.push(u * TAU);
+    render.angle.push(u * BASE_TAU);
     render.u.push(u);
     drawn.set(key, render.source.length - 1);
     return render.source.length - 1;
@@ -281,7 +284,7 @@ export function measureBaseBody(mesh, refParts, height) {
     for (const [candidate, share] of shares) if (share > shares.get(part)) part = candidate;
     const name = names[part];
     const places = corners.map((vertex) => at(name, src.position[vertex]));
-    const us = places.map((place) => place.angle / TAU);
+    const us = places.map((place) => place.angle / BASE_TAU);
     if (Math.max(...us) - Math.min(...us) <= 0.5) {
       triangles.push(...corners.map((vertex, index) => draw(vertex, part, places[index], 0)));
       continue;

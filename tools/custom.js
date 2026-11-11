@@ -17,7 +17,9 @@ export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KE
   || /^story\/(?!ground\/)/.test(name)
   || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name)
   // (The base-model head's table: its head is off, PHOTO_HEAD.model.on.)
-  || name === 'headmodel-data';
+  || name === 'headmodel-data'
+  // (The base meshes' bodies, body style 'base': a style to compare, not the default; without them the style draws the loft.)
+  || name === 'basebody-data';
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
 const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];
@@ -58,6 +60,10 @@ export const CUSTOM_STUBS = {
   // The base-model head is off (photohead.js PHOTO_HEAD.model.on): its table not carried.
   'headmodel-data': `
 export const HEAD_MODEL_DATA = { polars: 0, azimuths: 0, male: {}, female: {} };
+`,
+  // The base meshes are not carried (body style 'base' falls back to the loft's own skin: basebody.js baseBodyAvailable).
+  'basebody-data': `
+export const BASE_BODY_DATA = null;
 `,
   // Story mode (src/story/): not here; the page's hooks into it inert.
   'story/storyview': `
