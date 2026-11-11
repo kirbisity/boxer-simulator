@@ -12,9 +12,10 @@
 //   painted density, alpha-tested with one shared strand texture (made once,
 //   on a canvas).
 //
-// The hair's volume is hairmass.js's. The drawn styles (face.js
-// LOOK_OPTIONS.hairStyle) map onto lengths: crop (buzz, fade, cornrows:
-// painted only), short, medium, long and tied.
+// The hair's volume is hairmass.js's (each style's own shape). For the
+// painted hairline the drawn styles (face.js LOOK_OPTIONS.hairStyle) map
+// onto lengths: crop (buzz, fade, cornrows: the stubble painted dense under
+// a fade's top or between the braids), short, medium, long and tied.
 
 /* global THREE */
 

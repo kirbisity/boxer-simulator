@@ -88,6 +88,26 @@
       options: true,
     };
   });
+  // Every style on a man and a woman (verb `styles`: front, three-quarter and back; verb `motion`: a turn and a run).
+  const ALL_STYLES = ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'];
+  ALL_STYLES.forEach((style) => {
+    const one = (preset, name, region, female) => ({ preset, name, faceRegion: region, age: 27, look: { skinTone: female ? 'light' : 'medium', hairStyle: style, hairColor: female ? '#3a2a1c' : '#1d1510', facialHair: 'none', eyeColor: 'brown' } });
+    SCENES[`face-style-${style}`] = {
+      about: `Hair style ${style} on a man and a woman.`,
+      place: 'field', seed: 70, frames: 8, distance: 2.8,
+      red: [one('amateur', `m-${style}`, 'italy', false)], blue: [one('contender', `f-${style}`, 'sweden', true)],
+      camera: { focus: { centre: true, height: 1.25 }, yaw: 1.25, pitch: 0.1, distance: 4.4, fov: 40 },
+      style,
+    };
+  });
+  // A helmeted pair for what shows below a helmet's rim (a man with a ponytail, a woman with long hair).
+  SCENES['face-style-helmet'] = {
+    about: 'Helmets over long hair and a ponytail.',
+    place: 'field', seed: 71, frames: 8, distance: 2.8,
+    red: [{ preset: 'legionary', name: 'helm-ponytail', faceRegion: 'italy', age: 27, look: { skinTone: 'medium', hairStyle: 'ponytail', hairColor: '#1d1510', facialHair: 'none', eyeColor: 'brown' } }],
+    blue: [{ preset: 'samurai', name: 'helm-long', faceRegion: 'japan', age: 27, look: { skinTone: 'light', hairStyle: 'long', hairColor: '#1d1510', facialHair: 'none', eyeColor: 'brown' } }],
+    camera: { focus: { centre: true, height: 1.25 }, yaw: 1.25, pitch: 0.1, distance: 4.4, fov: 40 },
+  };
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let bench = null;
 
@@ -131,6 +151,41 @@
       view.head?.group.traverse((object) => { if (object.material?.userData?.photoFace) id = object.material.userData.photoFace; });
       return { name: view.fighter.body.inputs.name, kit: view.fighter.body.inputs.outfit?.kind, face: id };
     });
+  }
+
+  // The arms let down by the sides (particles: shoulders 2, 3; elbows 4, 5; hands 6, 7), so the guard's gloves do not hide the hair.
+  function armsDown(index) {
+    const view = window.boxer.state.views[index];
+    const x = view.fighter.x;
+    const forward = new THREE.Vector3().setFromMatrixColumn(view.head.group.matrixWorld, 0).setY(0).normalize();
+    for (const [shoulder, elbow, hand] of [[2, 4, 6], [3, 5, 7]]) {
+      x[elbow * 3] = x[shoulder * 3] - forward.x * 0.03;
+      x[elbow * 3 + 1] = x[shoulder * 3 + 1] - 0.28;
+      x[elbow * 3 + 2] = x[shoulder * 3 + 2] - forward.z * 0.03;
+      x[hand * 3] = x[elbow * 3] + forward.x * 0.04;
+      x[hand * 3 + 1] = x[elbow * 3 + 1] - 0.26;
+      x[hand * 3 + 2] = x[elbow * 3 + 2] + forward.z * 0.04;
+    }
+  }
+
+  // Frames with the physics paused (the page then draws with no time passing): the hair stepped by hand, on the body's
+  // capsules as the page last drew them.
+  function playHair(frames) {
+    for (let frame = 0; frame < frames; frame += 1) {
+      window.boxer.playFrames(1);
+      for (const view of window.boxer.state.views) {
+        const swing = view.head?.hairSwing;
+        if (swing) swing.update(1 / 60, view.head.group, swing.colliders ?? []);
+      }
+    }
+  }
+
+  function hairTriangles(index) {
+    let triangles = 0;
+    window.boxer.state.views[index].head?.group.traverseVisible((object) => {
+      if (object.isMesh && (object.userData.photoHair || object.userData.photoHairRim || object.userData.photoBeard)) triangles += (object.geometry.index ? object.geometry.index.count : object.geometry.attributes.position.count) / 3;
+    });
+    return triangles;
   }
 
   function headTriangles(index) {
@@ -196,6 +251,121 @@
             shots.push(await jpeg(`face-hair-${name}${mode ? `-${mode}` : ''}`, [380, 40, 520, 600]));
             aimAtHead(index, { turn: 2.3, distance: 0.95 });
             shots.push(await jpeg(`face-hair-${name}-back${mode ? `-${mode}` : ''}`, [380, 40, 520, 600]));
+          }
+        }
+        return { shots };
+      }
+      if (verb === 'styles') {
+        // `styles[:tag[:style,style]]`: each style's man and woman, front, three-quarter and back, and the head's triangles.
+        const shots = [];
+        const triangles = {};
+        for (const style of extra ? extra.split(',') : ALL_STYLES) {
+          await window.__looks.stage(`face-style-${style}`);
+          window.boxer.state.views.forEach((view, index) => armsDown(index));
+          playHair(90);
+          for (const [index, view] of window.boxer.state.views.entries()) {
+            if (!view.head) continue;
+            const name = view.fighter.body.inputs.name;
+            triangles[name] = { head: headTriangles(index).triangles, hair: hairTriangles(index) };
+            for (const [turn, label] of [[0.12, 'front'], [0.8, 'q'], [Math.PI - 0.2, 'back']]) {
+              aimAtHead(index, { turn, distance: 1.15, pitch: 0.08 });
+              window.boxer.scene.orbit.target.y -= 0.06;
+              window.boxer.playFrames(1);
+              shots.push(await jpeg(`style-${name}-${label}${mode ? `-${mode}` : ''}`, [400, 40, 480, 640]));
+            }
+          }
+        }
+        return { shots, triangles };
+      }
+      if (verb === 'hairdebug') {
+        // `hairdebug::style`: after a second at rest, the woman's first chains: rest nodes, swing (head space), first link turn.
+        await window.__looks.stage(`face-style-${extra}`);
+        window.boxer.state.views.forEach((view, index) => armsDown(index));
+        playHair(60);
+        const f3 = (array) => [...array].map((value) => Number(value.toFixed(3)));
+        return {
+          chains: (window.boxer.state.views[1].head.hairSwing?.chains ?? []).slice(0, 3).map((chain) => ({
+            ahead: chain.ahead, rest: f3(chain.rest), raw: f3(chain.raw), turn: chain.turns ? f3(chain.turns.slice(0, 9)) : null, length: chain.length,
+          })),
+        };
+      }
+      if (verb === 'helmet') {
+        await window.__looks.stage('face-style-helmet');
+        window.boxer.state.views.forEach((view, index) => armsDown(index));
+        playHair(90);
+        const shots = [];
+        const triangles = {};
+        for (const [index, view] of window.boxer.state.views.entries()) {
+          const name = view.fighter.body.inputs.name;
+          triangles[name] = { head: headTriangles(index).triangles, hair: hairTriangles(index) };
+          for (const [turn, label] of [[0.8, 'q'], [Math.PI - 0.3, 'back']]) {
+            aimAtHead(index, { turn, distance: 1.25, pitch: 0.08 });
+            window.boxer.scene.orbit.target.y -= 0.08;
+            window.boxer.playFrames(1);
+            shots.push(await jpeg(`style-${name}-${label}${mode ? `-${mode}` : ''}`, [400, 40, 480, 640]));
+          }
+        }
+        return { shots, triangles };
+      }
+      if (verb === 'motion') {
+        // `motion:tag:style[,style]`: the woman of each style turned on the spot (a quick 150° turn: the hair left behind, then
+        // swinging after) and run forward (a bob each stride); physics frozen, the body moved by hand, the hair simulated.
+        const shots = [];
+        for (const style of (extra ?? 'long').split(',')) {
+          for (const kind of ['turn', 'run']) {
+            await window.__looks.stage(`face-style-${style}`);
+            const views = window.boxer.state.views;
+            const index = views.findIndex((view) => view.fighter.body.inputs.name === `f-${style}`);
+            const fighter = views[index].fighter;
+            // The other fighter out of the picture, sunk 10 m under the field (she runs at him: his hair would fill the lens).
+            views.forEach((view, other) => {
+              if (other === index) return;
+              for (let p = 1; p < view.fighter.x.length; p += 3) view.fighter.x[p] -= 10;
+            });
+            armsDown(index);
+            playHair(90);
+            const rest = Float32Array.from(fighter.x);
+            const count = rest.length / 3;
+            let cx = 0;
+            let cz = 0;
+            for (let p = 0; p < count; p += 1) { cx += rest[p * 3] / count; cz += rest[p * 3 + 2] / count; }
+            const head = views[index].head.group;
+            const startAt = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld);
+            const facing = new THREE.Vector3().setFromMatrixColumn(head.matrixWorld, 0).setY(0).normalize();
+            const yaw0 = Math.atan2(facing.z, facing.x);
+            const pose = (t) => {
+              // Turn: 0 to 150° in 0.3 s (eased), then held. Run: up to 4 m/s in 0.3 s (a hard start, 13 m/s²), bobbing 3 cm (smoothly),
+              // 2.6 strides a second.
+              const u = Math.min(1, t / 0.3);
+              const angle = kind === 'turn' ? -2.6 * u * u * (3 - 2 * u) : 0;
+              const ahead = kind === 'run' ? (t < 0.3 ? (4 * t * t) / 0.6 : 4 * (t - 0.15)) : 0;
+              const bob = kind === 'run' ? 0.015 * (1 - Math.cos(t * Math.PI * 2 * 2.6)) : 0;
+              const [c, s] = [Math.cos(angle), Math.sin(angle)];
+              for (let p = 0; p < count; p += 1) {
+                const x = rest[p * 3] - cx;
+                const z = rest[p * 3 + 2] - cz;
+                fighter.x[p * 3] = cx + c * x - s * z + facing.x * ahead;
+                fighter.x[p * 3 + 1] = rest[p * 3 + 1] + bob;
+                fighter.x[p * 3 + 2] = cz + s * x + c * z + facing.z * ahead;
+              }
+              return ahead;
+            };
+            let t = 0;
+            for (const mark of kind === 'turn' ? [0.15, 0.3, 0.45, 0.7, 1.2] : [0.2, 0.45, 0.8]) {
+              while (t < mark) {
+                t += 1 / 60;
+                pose(t);
+                playHair(1);
+              }
+              const ahead = pose(t);
+              const scene = window.boxer.scene;
+              scene.orbit.target.set(startAt.x + facing.x * ahead, startAt.y - 0.12, startAt.z + facing.z * ahead);
+              Object.assign(scene.orbit, { yaw: yaw0 + (kind === 'turn' ? 0.6 : Math.PI / 2), pitch: 0.06, distance: 1.5 });
+              scene.camera.fov = 30;
+              scene.camera.updateProjectionMatrix();
+              shots.push(await jpeg(`motion-${style}-${kind}-${Math.round(mark * 100)}${mode ? `-${mode}` : ''}`, [400, 40, 480, 640]));
+              t += 1 / 60;
+            }
           }
         }
         return { shots };
