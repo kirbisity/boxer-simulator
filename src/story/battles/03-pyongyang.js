@@ -89,7 +89,7 @@ export const PYONGYANG_1593 = {
   discipline: 1,
   // The Japanese army's colours at Pyongyang (scenarios.js SEKIGAHARA_WEST: black and blue).
   japanese: { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' },
-  design: { mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  design: { mingEliteInfantry: 3, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
 export const pyongyangBattle = {
@@ -104,7 +104,7 @@ export const pyongyangBattle = {
     const random = seededRandom(seed);
     const spec = PYONGYANG_1593;
     const { works, walk } = wallWorks({ x: spec.wall.x, z: [-spec.arena.halfZ - 0.5, spec.arena.halfZ + 0.5], height: spec.wall.height, ladders: spec.wall.ladders });
-    const southern = (style, rank = 'brigandine') => mingSoldier(random, style, rank, { people: 'qi', design: spec.design[rank === 'elite' ? 'mingElite' : 'mingBrigandine'] });
+    const southern = (style, rank = 'eliteInfantry') => mingSoldier(random, style, rank, { people: 'qi', design: spec.design[rank === 'elite' ? 'mingElite' : 'mingEliteInfantry'] });
     const red = { men: [], places: [] };
     const add = (part) => {
       red.men.push(...part.men);

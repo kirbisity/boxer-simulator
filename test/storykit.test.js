@@ -14,7 +14,8 @@ test('a soldier hero is never the one unarmoured man in an armoured column', () 
   const life = storyNewLife(1);
   for (const id of ['wokou', 'pyongyang', 'ulsan', 'liaodong']) {
     const setup = STORY_BATTLES[id].setup(life, 1);
-    // (Qi's own company in the 1588 raid wears his elite infantry's kit, outfits.js mingEliteInfantry; the Korea and Liaodong columns the brigandine.)
-    assert.equal(setup.fighters[setup.player].inputs.outfit.kind, id === 'wokou' ? 'mingEliteInfantry' : 'mingBrigandine', id);
+    // (Qi's own company in the 1588 raid and his southern troops in Korea wear his elite infantry's kit, outfits.js
+    // mingEliteInfantry; the Liaodong columns the brigandine.)
+    assert.equal(setup.fighters[setup.player].inputs.outfit.kind, id === 'liaodong' ? 'mingBrigandine' : 'mingEliteInfantry', id);
   }
 });

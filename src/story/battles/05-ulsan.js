@@ -20,7 +20,7 @@
 //  - The cold: WORLD.heat.climates.ulsan (physics/config.js): Ulsan's January mean ~2 °C less the Little Ice Age's.
 //
 // Numbers: the army's 4 : 1 (40,000 Ming against ~10,000) on one stretch of the inner wall: 64 Ming (three ladder
-// columns of 18 - the middle one southern troops, the flanks northern regulars in brigandine -, eight gunners, two
+// columns of 18 - the middle one southern troops in Qi's sleeved brigandine, the flanks northern regulars in brigandine -, eight gunners, two
 // officers) against 16 of Katō's men on the wall (7 matchlocks - the Japanese castle was held by its guns -, 2 bows,
 // 4 yari, 3 samurai). 80 men. The Joseon fifth of the army: the game has no Joseon soldier's kit (cast.js: none), so
 // it is left out; the Ming alone keep the ratio.
@@ -58,7 +58,7 @@ export const ULSAN_1598 = {
   rows: { front: [-6, -0.65], second: [-7.6, -0.65], rear: [-12.4, -0.65], squadLeader: [-7.6, 1.95], officer: [-15, 2] },
   // Katō's men under his colours: black lacquer, white (scenarios.js's sides carry no Katō: a plain dark tint).
   colours: { tint: { armor: '#18181c', lace: '#d8d4c8' }, banner: '#e8e4dc' },
-  design: { mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  design: { mingEliteInfantry: 3, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
 export const ulsanBattle = {
@@ -81,7 +81,7 @@ export const ulsanBattle = {
       red.men.push(...part.men);
       red.places.push(...part.places);
     };
-    const ming = (people) => (style, rank = 'brigandine') => mingSoldier(random, style, rank, { people, design: spec.design[rank === 'elite' ? 'mingElite' : 'mingBrigandine'] });
+    const ming = (people) => (style, rank = people === 'qi' ? 'eliteInfantry' : 'brigandine') => mingSoldier(random, style, rank, { people, design: spec.design[{ elite: 'mingElite', eliteInfantry: 'mingEliteInfantry' }[rank] ?? 'mingBrigandine'] });
     for (const z of wall.ladders) {
       const southern = z === 0;
       add(koreaRows({ at: [spec.column.front, z], styles: southern ? spec.southern : spec.northern, abreast: spec.column.abreast, spacing: spec.column.spacing, rowSpacing: spec.column.rowSpacing, make: ming(southern ? 'qi' : 'ming') }));
