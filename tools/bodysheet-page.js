@@ -304,7 +304,8 @@ async function subjectFor(inputs, extras = {}) {
   // The maps made all at once (a background tab throttles the timers a sliced build would wait on); timed alone.
   const hitsBefore = skinTextureCache.hits;
   const textureStart = performance.now();
-  const maps = skinTexturesNow(body, STYLE, built);
+  // (`tex=off`: the skin without its maps, to tell their shading from the mesh's.)
+  const maps = query.get('tex') === 'off' ? null : skinTexturesNow(body, STYLE, built);
   const textured = maps ? { textures: maps, ms: performance.now() - textureStart, report: { key: compositionKey(body, STYLE), cached: skinTextureCache.hits > hitsBefore, bytes: maps.bytes } } : null;
   const coldMs = performance.now() - first;
   for (let run = 0; run < 2; run += 1) {

@@ -156,7 +156,9 @@ export class FatSlosh {
       if (length < 1e-7) continue;
       // (A small mass swings less: no further than its own strain allows, a third of its size: a breast 3 cm, the belly the full swing.)
       const size = (mass.radii[0] + mass.radii[1] + mass.radii[2]) / 3;
-      const limit = Math.min(swing * SLOSH.limitMargin, size * SLOSH.mostStrain);
+      // (And no further than the mass's own `limit` where it has one: a breast or buttock by how far it stands out, loftbody.js.)
+      const limit = Math.min(swing * SLOSH.limitMargin, size * SLOSH.mostStrain, mass.limit ?? Infinity);
+      if (!(limit > 0)) continue;
       const eased = limit * Math.tanh(length / limit);
       const offset = raw.map((value) => (value * eased) / length);
       const e = raw.map((value) => value / length);

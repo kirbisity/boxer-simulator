@@ -101,7 +101,7 @@ export const LOFT = {
   // a closed stretch then runs `far` (t) on past the joint.
   closedJoint: { top: { trunk: 0.9, limb: 0.9 }, root: 0.05, far: 10 },
   // (`ballOn`: a breast's or buttock's ball is set on the outermost skin along its line out within this share of its radius.)
-  slosh: { bellyAcross: 1.05, bellyOut: 0.9, ballShare: 0.42, ballOn: 0.3 },
+  slosh: { bellyAcross: 1.05, bellyOut: 0.9, ballShare: 0.42, ballOn: 0.3, ballSwing: 0.5, midlineBand: 0.008 },
   // Clothes and armour fitted to the base mesh (fitClothToBase): a piece's point clears the skin of its part within `across`
   // (m) of its line out (about a triangle's breadth of the base mesh) and up to `deeper` (m) out past it (a big belly's 3-4 cm
   // over its ring, a breast's 5-6 cm past a top's; the shoulder's cap 10 cm out past the trunk's top ring is not counted); a ring is on a part whose axis it
@@ -134,6 +134,9 @@ export const LOFT = {
   // shaft), and the blend fades out between `radial` (shares of the arm's ring radius: the cap and the armpit's fold, not the
   // flank or the chest beside them).
   shoulder: { from: -0.3, to: 0.25, radial: [1.3, 2] },
+  // The base skin's normals smoothed over its surface (weldBaseNormals): `passes` rounds of each point's and its neighbours' mean
+  // (one round reaches an edge each way, about 1.5 cm on a man: the full model's softness; two flattened the pecs too).
+  baseNormals: { passes: 1 },
   fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
@@ -1978,7 +1981,9 @@ function baseBelly(belly, length) {
  * trunk's rings (`trunk`, the loft's description of it) at its landmark (sculpt.js SCULPT_TRUNK), each point's weight in each
  * (sloshWeights: most at the mass's free front and foot). `figures` its springs' (sloshFigures).
  */
-function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare, regions) {
+function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare, skin) {
+  // (`skin`: the whole base skin before any of it was left out under clothes, { positions, regions }, where the masses' places are
+  // measured: a breast under a top is left out of the drawn mesh.)
   const spec = LOFT.slosh;
   const axis = vec.normalize(vec.sub(trunk.b, trunk.a));
   const length = vec.length(vec.sub(trunk.b, trunk.a));
@@ -1997,20 +2002,35 @@ function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare, regions)
     const onRing = vec.add(centreAt(u), vec.add(vec.scale(out, Math.cos(angle) * ring.depth), vec.scale(side, Math.sin(angle) * ring.width)));
     const facing = vec.normalize(vec.sub(onRing, centreAt(u)));
     // (Centred on the skin itself, the outermost skin point along its line out within `ballOn` of its radius beside it: the base
-    // mesh stands out of the ring by some centimetres on a fat chest, and a ball centred on the ring, inside the flesh, weighted
-    // the skin over it most at its very front, which swung out into a point.)
+    // mesh stands out of the ring by some centimetres on a fat chest, and a ball centred on the ring lay that far inside the flesh,
+    // its weights falling away from a point the skin never reaches.)
     let reach = 0;
     const beside = ring.width * spec.ballShare * spec.ballOn;
-    for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
-      if (regions[vertex] !== 'skin') continue;
-      const rel = vec.sub([positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]], onRing);
+    for (let vertex = 0; vertex < skin.positions.length / 3; vertex += 1) {
+      if (skin.regions[vertex] !== 'skin') continue;
+      const rel = vec.sub([skin.positions[vertex * 3], skin.positions[vertex * 3 + 1], skin.positions[vertex * 3 + 2]], onRing);
       const along = vec.dot(rel, facing);
       if (along > reach && vec.length(vec.sub(rel, vec.scale(facing, along))) < beside) reach = along;
     }
     const surface = vec.add(onRing, vec.scale(facing, reach));
     const across = vec.normalize(vec.cross(axis, facing));
+    // (It swings no further than `ballSwing` of how far its foremost skin stands out before the trunk's midline at its height
+    // (within `midlineBand` of it, m), the breast past the sternum, the buttock behind the spine: a man's flat chest barely
+    // moves, a heavy breast its full swing; a very obese man's chest swung 2 cm and stood out from it as a point while it settled.)
+    const toward = vec.scale(out, Math.cos(angle) >= 0 ? 1 : -1);
     const radius = ring.width * spec.ballShare;
-    masses.push({ name, bones: SLOSH_BONES[name], centre: surface, axes: [across, axis, facing], radii: [radius, radius, radius], hang });
+    let midline = 0;
+    let front = 0;
+    for (let vertex = 0; vertex < skin.positions.length / 3; vertex += 1) {
+      if (skin.regions[vertex] !== 'skin') continue;
+      const p = [skin.positions[vertex * 3], skin.positions[vertex * 3 + 1], skin.positions[vertex * 3 + 2]];
+      const rel = vec.sub(p, centreAt(u));
+      const along = vec.dot(rel, toward);
+      if (vec.length(vec.sub(p, surface)) < radius) front = Math.max(front, along);
+      if (Math.abs(vec.dot(rel, side)) < spec.midlineBand && Math.abs(vec.dot(rel, axis)) < radius) midline = Math.max(midline, along);
+    }
+    const stands = Math.max(0, front - midline);
+    masses.push({ name, bones: SLOSH_BONES[name], centre: surface, axes: [across, axis, facing], radii: [radius, radius, radius], hang, limit: stands * spec.ballSwing });
   };
   for (const sign of [1, -1]) {
     ball('breast', SCULPT_TRUNK.chest.at, sign * SCULPT_TRUNK.chest.angle);
@@ -2528,18 +2548,44 @@ function closeCoveredJoints(covered, cover) {
   }
 }
 
-/** The base skin's points drawn more than once (a seam, a tile's edge) given one normal: the mean of theirs. */
-function weldBaseNormals(normals, base) {
+/**
+ * The base skin's points drawn more than once (a seam, a tile's edge) given one normal: the mean of theirs; then smoothed over
+ * the surface (LOFT.baseNormals): each point's normal the mean of its own and its neighbours', `passes` rounds. The model was
+ * decimated from 12k points to an 8k-triangle mesh, and on its coarser triangles a soft fold (the valley under the pec toward
+ * the flank) is lit as a hard groove; the full model's normals vary over a wider stretch. Positions are untouched.
+ */
+function weldBaseNormals(normals, base, indices) {
   const sums = new Float64Array(base.sources * 3);
   for (let index = 0; index < base.count; index += 1) {
     const from = (base.start + index) * 3;
     const to = base.source[index] * 3;
     for (let axis = 0; axis < 3; axis += 1) sums[to + axis] += normals[from + axis];
   }
+  // (The sources' neighbours, through the drawn triangles.)
+  const neighbours = Array.from({ length: base.sources }, () => new Set());
+  const sourceOf = (vertex) => (vertex >= base.start && vertex < base.start + base.count ? base.source[vertex - base.start] : -1);
+  for (let corner = 0; corner < indices.length; corner += 3) {
+    const tri = [sourceOf(indices[corner]), sourceOf(indices[corner + 1]), sourceOf(indices[corner + 2])];
+    if (tri.some((source) => source < 0)) continue;
+    for (const a of tri) for (const b of tri) if (a !== b) neighbours[a].add(b);
+  }
+  let current = sums;
+  for (let pass = 0; pass < LOFT.baseNormals.passes; pass += 1) {
+    const next = new Float64Array(current.length);
+    for (let source = 0; source < base.sources; source += 1) {
+      const own = Math.hypot(current[source * 3], current[source * 3 + 1], current[source * 3 + 2]) || 1;
+      for (let axis = 0; axis < 3; axis += 1) next[source * 3 + axis] = current[source * 3 + axis] / own;
+      for (const other of neighbours[source]) {
+        const length = Math.hypot(current[other * 3], current[other * 3 + 1], current[other * 3 + 2]) || 1;
+        for (let axis = 0; axis < 3; axis += 1) next[source * 3 + axis] += current[other * 3 + axis] / length;
+      }
+    }
+    current = next;
+  }
   for (let index = 0; index < base.count; index += 1) {
     const from = base.source[index] * 3;
-    const length = Math.hypot(sums[from], sums[from + 1], sums[from + 2]) || 1;
-    for (let axis = 0; axis < 3; axis += 1) normals[(base.start + index) * 3 + axis] = sums[from + axis] / length;
+    const length = Math.hypot(current[from], current[from + 1], current[from + 2]) || 1;
+    for (let axis = 0; axis < 3; axis += 1) normals[(base.start + index) * 3 + axis] = current[from + axis] / length;
   }
 }
 
@@ -3365,7 +3411,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       const length = Math.hypot(...sum) || 1;
       for (let axis = 0; axis < 3; axis += 1) result[copy * 3 + axis] = result[original * 3 + axis] = sum[axis] / length;
     }
-    if (mesh.base) weldBaseNormals(result, mesh.base);
+    if (mesh.base) weldBaseNormals(result, mesh.base, indexArray);
     return result;
   };
   let normals = smoothNormals();
@@ -3477,7 +3523,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const figures = baseRig && !lowDetail ? sloshFigures(fatLayer) : null;
   const trunkBones = new Set([BONE.pelvis, BONE.spine, BONE.chest]);
   const trunkShare = figures ? Float32Array.from(rigid, (_, vertex) => [0, 1, 2, 3].reduce((sum, slot) => sum + (trunkBones.has(weights.skinIndex[vertex * 4 + slot]) ? weights.skinWeight[vertex * 4 + slot] : 0), 0)) : null;
-  const slosh = figures ? baseSlosh(figures, positionArray, rigid, baseParts.trunk, baseBellyShape, trunkShare, colors) : null;
+  const slosh = figures ? baseSlosh(figures, positionArray, rigid, baseParts.trunk, baseBellyShape, trunkShare, { positions: mesh.positions, regions: mesh.colors }) : null;
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return {
     positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames, bindPoints: bindAt,
