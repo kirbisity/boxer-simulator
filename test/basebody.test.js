@@ -72,7 +72,8 @@ test('the rig follows the model: limbs along the skin\'s own axes at the game\'s
       const p = [0, 1, 2].map((axis) => mesh.positions[index * 3 + axis] - elbow[axis]);
       const t = (p[0] * along[0] + p[1] * along[1] + p[2] * along[2]) / reach;
       const off = Math.hypot(...p.map((value, axis) => value - (along[axis] / reach) * t));
-      if (off < 0.06 && t < reach + 0.05) farthest = Math.max(farthest, t);
+      // (Within 9 cm of the bound line: a forearm's 3-4 cm and the skin's offset from its bone, the shoulder's root shift.)
+      if (off < 0.09 && t < reach + 0.05) farthest = Math.max(farthest, t);
     }
     assert.ok(reach - farthest < 0.03 && farthest < reach, `${name}: the forearm ends ${((reach - farthest) * 100).toFixed(1)} cm short of the hand point`);
   }

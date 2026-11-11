@@ -36,6 +36,8 @@ export const BASE_BODY = {
   // A part's rings are read from a table of this many stops along the part's span, linearly between them (the loft's profiles
   // are smooth on that scale: their stops are a tenth of a part apart).
   stops: 64,
+  // Each part's span of t, its points' own, widened this far either end (its rings read a little past them).
+  spanMargin: 0.05,
   // Fat hides the muscle's relief modelled in the mesh: the mesh's surface low-passed (`smoothPasses` rounds of Taubin
   // smoothing, `smoothStep` in and `smoothBack` out each round, which keeps the volume) is what a fat layer leaves, and a fighter
   // shows the relief by how defined his part is against how defined the reference was (sculpt.js definedFrom, definedTo: the
@@ -50,14 +52,20 @@ export const BASE_BODY = {
   // the fist's middle (0.19 of height from the elbow; the model's wrist lies 0.14 from it, the anatomical 0.146 of Drillis and
   // Contini: the rig's point is right, the drawn palm short, its heel only 3.3 cm behind the point). So the forearm is drawn
   // out to `handSeat` (m per 1.8 m of height) behind the hand point, under the palm's rounded heel (its section there 2.3 by
-  // 2.9 cm, a wrist's), not to the fist's middle, and the length it gains is laid on along it unevenly: `foreTaper` the share of
-  // the stretch the elbow's end takes against the wrist's (the muscle bellies by the elbow keep their length best, the tendons
-  // by the wrist are nearly a cylinder and take the most, so the stretch reads least).
+  // 2.9 cm, a wrist's), not to the fist's middle, and the length it gains is laid on along it: `foreTaper` the share of the
+  // stretch the elbow's end takes against the mean, 1 an even stretch (the user's call, 2026-11-11: a stretched arm stays
+  // straight and keeps the model's sections along it; laid on mostly at the wrist, the forearm's taper ran long and thin there).
   handSeat: 0.021,
-  foreTaper: 0.5,
+  foreTaper: 1,
   // An arm's own reach (loftbody.js LOFT.fit's): this share of its ring's radius round its axis, from `armFrom` (t, above the
   // shoulder joint) down.
   armReach: 1.6, armFrom: -0.25,
+  // How much of a part's swell (or thinning) against the reference is laid on along the model's surface normals rather than
+  // round the part's axis (placeBaseBody): all of it.
+  offsetAlongNormal: 1,
+  // The normals it is laid along are the surface's after this many rounds of Laplacian smoothing (about the square root as many
+  // edges, 10 cm on a man: broader than a pec's or a breast's under-curve, narrower than the trunk's own turn round its sides).
+  normalPasses: 40,
   // The emaciated reference's contour is faded out over the shoulder's cap: within `starveArm[0]` of an upper arm's ring radius
   // round its axis (from armFrom down) none of it, from `starveArm[1]` (its reach, armReach) all. Its figure stood with one hand
   // on the hip and the other arm hanging (tools/blender/emaciated.py), its shoulders shrugged and turned, so the delta there is
@@ -225,6 +233,41 @@ function ringTable(part, from, to) {
   };
 }
 
+/** Plain Laplacian smoothing, `passes` rounds of each point halfway to its neighbours' mean (it shrinks: for directions only). */
+function laplacian(positions, neighbours, passes) {
+  let current = Float32Array.from(positions);
+  for (let pass = 0; pass < passes; pass += 1) {
+    const next = Float32Array.from(current);
+    neighbours.forEach((list, vertex) => {
+      if (!list.length) return;
+      for (let axis = 0; axis < 3; axis += 1) {
+        let sum = 0;
+        for (const other of list) sum += current[other * 3 + axis];
+        next[vertex * 3 + axis] = 0.5 * current[vertex * 3 + axis] + 0.5 * (sum / list.length);
+      }
+    });
+    current = next;
+  }
+  return current;
+}
+
+/** Each point's unit normal, the mean of its triangles' by their areas. */
+function vertexNormals(positions, triangles, count) {
+  const sums = new Float64Array(count * 3);
+  for (let corner = 0; corner < triangles.length; corner += 3) {
+    const [a, b, c] = [triangles[corner], triangles[corner + 1], triangles[corner + 2]];
+    const p = (v) => [positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]];
+    const face = vec.cross(vec.sub(p(b), p(a)), vec.sub(p(c), p(a)));
+    for (const v of [a, b, c]) for (let axis = 0; axis < 3; axis += 1) sums[v * 3 + axis] += face[axis];
+  }
+  const out = new Float32Array(count * 3);
+  for (let v = 0; v < count; v += 1) {
+    const length = Math.hypot(sums[v * 3], sums[v * 3 + 1], sums[v * 3 + 2]) || 1;
+    for (let axis = 0; axis < 3; axis += 1) out[v * 3 + axis] = sums[v * 3 + axis] / length;
+  }
+  return out;
+}
+
 /** The mesh's neighbours (each point's, from its triangles). */
 function neighboursOf(count, triangles) {
   const sets = Array.from({ length: count }, () => new Set());
@@ -285,8 +328,8 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
       const name = names[index];
       const frame = frames[name];
       const t = vec.dot(vec.sub(point(scaled, vertex), frame.a), frame.axis) / frame.length;
-      span[name][0] = Math.min(span[name][0], t - 0.05);
-      span[name][1] = Math.max(span[name][1], t + 0.05);
+      span[name][0] = Math.min(span[name][0], t - BASE_BODY.spanMargin);
+      span[name][1] = Math.max(span[name][1], t + BASE_BODY.spanMargin);
     }
   }
   for (const name of names) {
@@ -298,9 +341,19 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
   // The sources: the mesh's own points, and the points added where a triangle is split at a seam (below).
   // (Each source's coordinates on each of its two parts, on the part's own axis line: t, out fore and aft, out across; then the
   // same for the smoothed surface.)
-  const src = { part: [], part2: [], blend: [], coords: [], position: [], relief: [], starved: [] };
-  const addSource = (part, part2, blend, position, smooth, starved) => {
+  const src = { part: [], part2: [], blend: [], coords: [], position: [], relief: [], starved: [], normal: [], facing: [] };
+  // (Each point's surface normal on the model, and on each of its two parts in that part's frame: along, fore and aft, across.)
+  // (Of the surface low-passed first, BASE_BODY.normalPasses: offset along the modelled surface's own normals, the faces of a
+  // groove (between the pecs, under them) turn to each other and a fat man's offsets crossed there in folds.)
+  const normals = vertexNormals(laplacian(scaled, neighboursOf(mesh.count, mesh.triangles), BASE_BODY.normalPasses), mesh.triangles, mesh.count);
+  const addSource = (part, part2, blend, position, smooth, starved, normal) => {
     const on = (index, point) => axisCoords(frames[names[index]], point);
+    const facing = (index) => {
+      const frame = frames[names[index]];
+      return [vec.dot(normal, frame.axis), vec.dot(normal, frame.depthAxis), vec.dot(normal, frame.widthAxis)];
+    };
+    src.normal.push(normal);
+    src.facing.push(...facing(part), ...facing(part2));
     src.part.push(part);
     src.part2.push(part2);
     src.blend.push(blend);
@@ -325,7 +378,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     }
     return keep;
   };
-  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex] * starveKeep(point(scaled, vertex)));
+  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex] * starveKeep(point(scaled, vertex)), point(normals, vertex));
 
   // The drawn points: one per source and tile (and seam side).
   const render = { source: [], part: [], t: [], angle: [], u: [] };
@@ -351,7 +404,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     const near = s < 0.5 ? i : j;
     const same = src.part[i] === src.part[j] && src.part2[i] === src.part2[j];
     const blend = same ? src.blend[i] + (src.blend[j] - src.blend[i]) * s : src.blend[near];
-    const made = addSource(src.part[near], src.part2[near], blend, lerp(src.position[i], src.position[j]), lerp(src.relief[i], src.relief[j]), src.starved[i] + (src.starved[j] - src.starved[i]) * s);
+    const made = addSource(src.part[near], src.part2[near], blend, lerp(src.position[i], src.position[j]), lerp(src.relief[i], src.relief[j]), src.starved[i] + (src.starved[j] - src.starved[i]) * s, vec.normalize(lerp(src.normal[i], src.normal[j])));
     splits.set(key, made);
     return made;
   };
@@ -465,7 +518,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     joints: Object.fromEntries(Object.keys(mesh.joints).map((name) => [name, joint(name)])),
     refJoints,
     refRows: Object.fromEntries(names.map((name) => [name, ringRows(refParts[name], span[name][0], span[name][1])])),
-    sources: { count: src.part.length, part: Uint8Array.from(src.part), part2: Uint8Array.from(src.part2), blend: Float32Array.from(src.blend), coords: Float32Array.from(src.coords), starved: Float32Array.from(src.starved) },
+    sources: { count: src.part.length, part: Uint8Array.from(src.part), part2: Uint8Array.from(src.part2), blend: Float32Array.from(src.blend), coords: Float32Array.from(src.coords), starved: Float32Array.from(src.starved), facing: Float32Array.from(src.facing) },
     render: { count: order.length, source: pick(render.source, Int32Array), part: drawnPart, t: pick(render.t, Float32Array), angle: pick(render.angle, Float32Array), u: pick(render.u, Float32Array) },
     triangles: Uint32Array.from(triangles, (index) => remap[index]),
     ranges,
@@ -498,12 +551,16 @@ export function baseBindJoints(rig, joints, height) {
       loft[to] = vec.add(loft[from], vec.scale(vec.normalize(vec.sub(moved[to], moved[from])), vec.length(vec.sub(joints[to], joints[from]))));
     }
   };
-  chain(['neck', 'head']);
+  chain(['neck', 'head']);  // (the skin's; the loft's head is set below)
   for (const side of ['l', 'r']) {
     chain([`${side}Shoulder`, `${side}Elbow`, `${side}Hand`]);
     chain([`${side}Hip`, `${side}Knee`, `${side}Foot`]);
   }
   Object.assign(skin, loft);
+  // (The neck's skin keeps the model's lean, but its bone and the rings on it run the rig's way, neck to the game's own head:
+  // the model's head is not drawn, and bound leaning the model's way (13 degrees forward on the female against the rig's 6)
+  // the neck's skin was turned back by the difference in play, creasing in a zigzag where its weights hand over to the chest.)
+  loft.head = vec.add(loft.neck, vec.sub(joints.head, joints.neck));
   for (const side of ['l', 'r']) {
     const [elbow, hand] = [loft[`${side}Elbow`], loft[`${side}Hand`]];
     const along = vec.normalize(vec.sub(hand, elbow));
@@ -599,7 +656,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
   }));
   const shows = Object.fromEntries(names.map((name) => [name, relief(name)]));
   const placed = new Float32Array(sources.count * 3);
-  const place = (name, c, k, starved, out) => {
+  const place = (name, c, k, starved, out, n) => {
     const frame = frames[name];
     const share = shows[name];
     const t = c[k + 3] + (c[k] - c[k + 3]) * share;
@@ -611,8 +668,17 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     // part swells as a whole, and its outlying forms ride on the swell rather than flying out with it (square, boxy shoulders).
     const [refDepth, refWidth] = refRing[name](t);
     const reach = (value, ring) => Math.max(-ring, Math.min(ring, value));
-    let px = x + (kx - 1) * reach(x, refDepth) + lean;
-    let py = y + (ky - 1) * reach(y, refWidth);
+    // That swell is then laid on along the model's own surface normal at the point (`n`: along, fore and aft, across), its
+    // share there: the surface is offset, not stretched across, so a form keeps its shape as the part thickens or thins. Laid
+    // on round the axis, the swell slid a form sideways where its surface turns from the axis: a shoulder's cap carried out
+    // with the ribs' widening (a block on a fat man), a breast's foot and a pec's edge pushed out of their curves.
+    const dx = (kx - 1) * reach(x, refDepth);
+    const dy = (ky - 1) * reach(y, refWidth);
+    const normalShare = BASE_BODY.offsetAlongNormal;
+    const dn = dx * n[1] + dy * n[2];
+    let px = x + dx + (n[1] * dn - dx) * normalShare + lean;
+    let py = y + dy + (n[2] * dn - dy) * normalShare;
+    const lift = n[0] * dn * normalShare;
     // Added along the point's own line out from the axis: the starved contour, a part's own swell (the trunk's belly, see
     // loftbody.js baseBelly) with its foot hanging down.
     const [swell, hang] = parts[name].swell ? parts[name].swell(t, Math.atan2(y, x)) : [0, 0];
@@ -622,10 +688,13 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     py += (py / length) * add;
     // (A forearm drawn out to the hand, `foreReach` m more than modelled: the stretch at t is (taper + (2 - 2·taper)·t) of the mean,
     // its integral below; past the wrist the whole of it.)
-    const more = foreReach[name] ?? 0;
+    // (Laid on up to the mesh's own end, its wrist's cut ring, which lies a little short of the joint: `end` of the part, so the
+    // cut lands under the palm's heel and not 1-2 cm short of it.)
+    const end = foreReach[name] ? rig.spans[name][1] - BASE_BODY.spanMargin : 1;
+    const more = foreReach[name] ? foreReach[name] + (1 - end) * frame.length : 0;
     const taper = BASE_BODY.foreTaper;
-    const u = Math.min(1, Math.max(0, t));
-    const along = t * frame.length + more * (taper * u + (1 - taper) * u * u) - hang;
+    const u = Math.min(1, Math.max(0, t / end));
+    const along = t * frame.length + more * (taper * u + (1 - taper) * u * u) - hang + lift;
     for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * px + frame.widthAxis[axis] * py;
     return out;
   };
@@ -635,10 +704,11 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     const k = vertex * 12;
     const c = sources.coords;
     const starved = sources.starved[vertex] * height * starve;
-    place(names[sources.part[vertex]], c, k, starved, one);
+    const f = sources.facing;
+    place(names[sources.part[vertex]], c, k, starved, one, [f[vertex * 6], f[vertex * 6 + 1], f[vertex * 6 + 2]]);
     const blend = sources.blend[vertex];
     if (blend > 0 && sources.part2[vertex] !== sources.part[vertex]) {
-      place(names[sources.part2[vertex]], c, k + 6, starved, other);
+      place(names[sources.part2[vertex]], c, k + 6, starved, other, [f[vertex * 6 + 3], f[vertex * 6 + 4], f[vertex * 6 + 5]]);
       for (let axis = 0; axis < 3; axis += 1) one[axis] += (other[axis] - one[axis]) * blend;
     }
     placed.set(one, vertex * 3);

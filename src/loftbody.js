@@ -7,7 +7,7 @@
 
 import { buildBody, P } from './body.js';
 import { baseBindJoints, baseBodyAvailable, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
-import { relax, skinWeightsSteps } from './bodymesh.js';
+import { relax, skinWeights, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { factionOf, glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
@@ -128,6 +128,11 @@ export const LOFT = {
   // either side), to skin out at `neckShare` of the neck's radius or more, stood `standoff` (m, times the piece's own standoff
   // share) off it.
   collar: { from: 0.7, sectors: 48, spread: 1, neckShare: 1.1, standoff: 0.006 },
+  // The shoulder's turn into the arm on the base mesh (blendShoulders): the arm's share eases from `from` to `to` (t of the
+  // upper arm from its joint: from 10 cm above it on a man's 0.33 m upper arm, over the cap, to a quarter of the way down the
+  // shaft), and the blend fades out between `radial` (shares of the arm's ring radius: the cap and the armpit's fold, not the
+  // flank or the chest beside them).
+  shoulder: { from: -0.3, to: 0.25, radial: [1.3, 2] },
   fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
@@ -1994,6 +1999,71 @@ function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare) {
 }
 
 /**
+ * The base mesh's shoulders weighted as one smooth turn from the trunk into the arm (LOFT.shoulder). Weighted by distance to the
+ * bones alone (to their sixth power), the trunk's skin at the armpit's front and the shoulder's cap handed over from the chest
+ * to the upper arm within a centimetre or two, and an arm lowered from the bind pose's 25 degrees folded the skin there into a
+ * dark crease. Each point (skin, and what is worn over it, by the place it is weighted at) near an upper arm takes, of the
+ * trunk's bones and the arm's, shares that ease along the arm's axis from `from` to `to` (t of the upper arm from its joint);
+ * that blend fades out round the axis from `radial[0]` to `[1]` of the arm's ring radius, and its own weights take over.
+ */
+function blendShoulders(weights, positions, frames, parts) {
+  const spec = LOFT.shoulder;
+  const smooth = (a, b, x) => {
+    const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  };
+  for (const side of ['l', 'r']) {
+    const upper = frames[BONE[`${side}UpperArm`]];
+    const part = parts[`${side}Upper`];
+    if (!upper || !part) continue;
+    const axis = vec.sub(upper.end, upper.origin);
+    const length = vec.length(axis);
+    const unit = vec.scale(axis, 1 / length);
+    const picked = [];
+    const shares = [];
+    for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+      const p = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
+      if ((p[2] > 0) !== (side === 'l')) continue;
+      const rel = vec.sub(p, upper.origin);
+      const t = vec.dot(rel, unit) / length;
+      if (t < spec.from || t > spec.to) continue;
+      const at = Math.min(1, Math.max(0, t));
+      const radius = Math.max(part.depth(at), part.width(at));
+      const off = vec.length(vec.sub(rel, vec.scale(unit, t * length)));
+      const near = 1 - smooth(spec.radial[0] * radius, spec.radial[1] * radius, off);
+      if (near <= 0) continue;
+      picked.push(vertex);
+      shares.push([near, smooth(spec.from, spec.to, t)]);
+    }
+    if (!picked.length) continue;
+    const subset = Float32Array.from(picked.flatMap((vertex) => [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]]));
+    const trunkBones = [BONE.spine, BONE.chest, BONE.neck, BONE[`${side}Clavicle`]];
+    const armBones = [BONE[`${side}UpperArm`], BONE[`${side}Forearm`]];
+    const trunkW = skinWeights(subset, frames, picked.map(() => trunkBones));
+    const armW = skinWeights(subset, frames, picked.map(() => armBones));
+    picked.forEach((vertex, index) => {
+      const [near, arm] = shares[index];
+      const mix = new Map();
+      const add = (source, at, share) => {
+        for (let slot = 0; slot < 4; slot += 1) {
+          const w = source.skinWeight[at * 4 + slot] * share;
+          if (w > 0) mix.set(source.skinIndex[at * 4 + slot], (mix.get(source.skinIndex[at * 4 + slot]) ?? 0) + w);
+        }
+      };
+      add(weights, vertex, 1 - near);
+      add(trunkW, index, near * (1 - arm));
+      add(armW, index, near * arm);
+      const best = [...mix].sort((a, b) => b[1] - a[1]).slice(0, 4);
+      const total = best.reduce((sum, [, w]) => sum + w, 0);
+      for (let slot = 0; slot < 4; slot += 1) {
+        weights.skinIndex[vertex * 4 + slot] = best[slot]?.[0] ?? 0;
+        weights.skinWeight[vertex * 4 + slot] = best[slot] ? best[slot][1] / total : 0;
+      }
+    });
+  }
+}
+
+/**
  * The clothes and armour fitted to the base skin (LOFT.fit): they are lofted on the rings, which the modelled body stands out of
  * where it departs from an ellipse (the pecs, the buttocks, a big belly). Each point of a piece is moved out from its ring's
  * middle until it clears the skin near it by the share it stood off its ring: the skin points of the same part that lie close
@@ -3379,6 +3449,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const rigid = bones.map((list) => list === chestOnly);
   yield 'skin weights';
   const weights = yield* skinWeightsSteps(Float32Array.from(weightPositions), frames, bones);
+  if (baseRig) blendShoulders(weights, weightPositions, frames, baseParts);
   // The base mesh's fat masses that follow the frame (fatslosh.js): an overweight trunk and up, not in a crowd; each point by the
   // share the trunk's bones carry of it (an arm or a thigh lying against the belly or a breast is not moved with it), not a rigid plate.
   const figures = baseRig && !lowDetail ? sloshFigures(fatLayer) : null;
