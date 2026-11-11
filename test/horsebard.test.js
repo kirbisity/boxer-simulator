@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BARDING, HORSES, bardingAt, mountOf } from '../src/horses.js';
 import { HORSE_BUILD, buildHorseModel, horseLegTable } from '../src/horsemesh.js';
-import { horseBaseLegTable } from '../src/horsebase.js';
+import { horseBaseLegTable, horseBaseMesh } from '../src/horsebase.js';
 import { HORSE_SHAPE, horsePoint, poseHorse } from '../src/physics/mounted.js';
 import { PRESETS } from '../src/body.js';
 import { mountedKnight } from '../src/cast.js';
@@ -98,7 +98,8 @@ function legSegments(horse, build, base = false) {
     // (The loft's legs by its table; the model's as the model has them, horsebase.js.)
     const scale = base ? 1 : build.legs * (leg.fore ? 1 : 1.04);
     const table = base ? horseBaseLegTable(leg.key) : horseLegTable(leg.fore);
-    out.push({ key: leg.key, a: local(at.root), b: local(at.knee), rows: table.upper, scale });
+    // (The model's upper leg turns at its own joint: horseview.js updateBaseHorse.)
+    out.push({ key: leg.key, a: base ? horseBaseMesh().joints[leg.key].root : local(at.root), b: local(at.knee), rows: table.upper, scale });
     out.push({ key: leg.key, a: local(at.knee), b: local(at.hoof), rows: table.cannon, scale });
   }
   return out;

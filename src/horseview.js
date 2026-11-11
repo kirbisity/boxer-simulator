@@ -764,6 +764,10 @@ export function updateHorseView(view, world = null) {
 const HORSE_BELLY = { hz: 2.5, damping: 0.2, showing: 0.6, most: 0.06, hind: 0.08, fore: 0.82, ramp: 0.18, flank: 0.35 };
 
 const BASE_TABLES = {};
+const baseForward = new THREE.Vector3();
+const baseRoot = new THREE.Vector3();
+const baseKnee = new THREE.Vector3();
+const baseStretch = new THREE.Matrix4();
 
 /** The coat image (the model's coat as its brightness: horsebase-data.js), loaded once. */
 function baseHorseTexture() {
@@ -808,7 +812,7 @@ function baseHorseColours(mesh, fit, coat) {
     const [x, y] = [points[v * 3], points[v * 3 + 1]];
     const part = parts[weights[v * 3]];
     let colour = coat.body;
-    if (part === 'body' && x < joints.dock[0][0]) {
+    if (part === 'body' && mesh.dock[v]) {
       // The dock behind the croup: its hair (the hair tail hangs from its end), the mane's colour, as the loft's dock.
       colour = coat.mane;
     } else if (part === 'body') {
@@ -948,7 +952,8 @@ function buildBaseHorse(view, horse, rig, { low = false } = {}) {
   }
   const soft = low ? null : new SoftShell(geometry, material, HORSE_LOOK.firmness, { mesh: skinned, recomputeNormals: false });
   soft?.hang(baseHorseBelly(mesh, fit));
-  return { mesh: skinned, bones, soft, gut: [0, 0, 0], gutRate: [0, 0, 0], lastRate: null, lastBob: null, lastSpeed: null };
+  const roots = Object.fromEntries(['lFore', 'rFore', 'lHind', 'rHind'].map((key) => [key, at(joints[key].root)]));
+  return { mesh: skinned, bones, soft, roots, upper: lengths.upper, gut: [0, 0, 0], gutRate: [0, 0, 0], lastRate: null, lastBob: null, lastSpeed: null };
 }
 
 /**
@@ -967,6 +972,20 @@ function updateBaseHorse(view, horse, dt) {
   sources.forEach((source, index) => {
     source.updateMatrixWorld(true);
     base.bones[index].matrixWorld.copy(source.matrixWorld);
+  });
+  // Each upper leg from the model's own hip or shoulder joint (where its skin was bound, on the trunk) to the game's knee or
+  // hock, not from the game's leg root (up to 6 cm off it): the leg turns where the model's joint is, and the skin over the
+  // hip and shoulder is not dragged after a root that is not under it. Its length the joint's to the knee now.
+  const e = view.frame.matrixWorld.elements;
+  baseForward.set(e[0], e[1], e[2]).normalize();
+  ['lFore', 'rFore', 'lHind', 'rHind'].forEach((key, leg) => {
+    const knee = view.legs[key]?.cannon?.holder;
+    if (!knee) return;
+    baseRoot.set(...base.roots[key]).applyMatrix4(view.frame.matrixWorld);
+    baseKnee.setFromMatrixPosition(knee.matrixWorld);
+    const bone = base.bones[3 + leg * 3];
+    baseHorseFrame(baseRoot.toArray(), baseKnee.toArray(), baseForward.toArray(), bone.matrixWorld);
+    bone.matrixWorld.multiply(baseStretch.makeScale(1, baseRoot.distanceTo(baseKnee) / base.upper, 1));
   });
   if (!base.soft) return;
   if (dt > 0) {

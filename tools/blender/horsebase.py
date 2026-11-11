@@ -143,28 +143,74 @@ order = np.argsort(values)
 cumulative = np.cumsum(np.array(shares)[order])
 coat_luminance = float(np.array(values)[order][np.searchsorted(cumulative, cumulative[-1] / 2)])
 grey = np.clip(luminance / (COAT_GAIN * coat_luminance), 0, 1)
+PAD_TEXELS = 4
+
+
+def raster(keep, pad):
+    """The texels of the triangles `keep(tri)` passes, each grown by `pad` texels."""
+    covered = np.zeros((height, width), dtype=bool)
+    for tri in mesh.loop_triangles:
+        if not keep(tri):
+            continue
+        uv = np.array([[uv_layer[loop].uv[0] * width, uv_layer[loop].uv[1] * height] for loop in tri.loops])
+        x0, y0 = np.maximum(np.floor(uv.min(axis=0)).astype(int) - pad, 0)
+        x1, y1 = np.minimum(np.ceil(uv.max(axis=0)).astype(int) + pad, [width - 1, height - 1])
+        if x1 < x0 or y1 < y0:
+            continue
+        xs, ys = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
+        (ax, ay), (bx, by), (cx, cy) = uv
+        det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+        if abs(det) < 1e-9:
+            continue
+        l1 = ((by - cy) * (xs - cx) + (cx - bx) * (ys - cy)) / det
+        l2 = ((cy - ay) * (xs - cx) + (ax - cx) * (ys - cy)) / det
+        l3 = 1 - l1 - l2
+        # (Within `pad` of the triangle: each barycentric no more negative than the pad over the triangle's size.)
+        slack = pad / max(1.0, float(np.ptp(uv, axis=0).max()))
+        covered[y0:y1 + 1, x0:x1 + 1] |= (l1 >= -slack) & (l2 >= -slack) & (l3 >= -slack)
+    return covered
+
+
+def box_mean(values, weights, radius):
+    """Each texel's mean of `values` over the square `radius` round it, weighted by `weights` (an integral image)."""
+    def box(a):
+        padded = np.pad(a, radius + 1, mode='edge').cumsum(0).cumsum(1)
+        size = 2 * radius + 1
+        return padded[size:, size:] - padded[:-size, size:] - padded[size:, :-size] + padded[:-size, :-size]
+    total = box(weights)[:height, :width]
+    return box(values * weights)[:height, :width] / np.maximum(total, 1e-6), total
+
+
+def part_of(tri):
+    """A triangle's part: the first part of most of its corners."""
+    named = [weights[k][0][0] for k in tri.vertices]
+    return max(set(named), key=named.count)
+
+
+# The photo's own tack and markings painted out to the coat round them, so the game's bridle and its own markings show alone:
+# on the head and the neck, the halter's straps, rings and buckle (and the blaze and the eye: the game draws its own eye,
+# horsemesh.js) are whatever differs from the coat within PAINT_RADIUS by more than PAINT_STEP; on the lower legs, the white
+# socks are whatever is brighter than the coat round them by PAINT_STEP or lighter than SOCK_LEVEL. Each replaced by the mean
+# of what is left round it (twice: the first mean still has the tack in it).
+PAINT_RADIUS = 14  # texels of the 995 px photo: ~3 halter straps' width
+PAINT_STEP = 0.12  # of white, the coat at 1 / COAT_GAIN = 0.5: a quarter of the coat's level
+SOCK_LEVEL = 0.7  # 1.4 times the coat: no chestnut's coat is that light, a white sock is
+# (Over the islands grown as the mipmaps' fill below is, so their rims are painted too.)
+head_neck = raster(lambda tri: PARTS[part_of(tri)] in ('head', 'neck'), PAD_TEXELS)
+lower_legs = raster(lambda tri: PARTS[part_of(tri)].endswith(('.cannon', '.pastern')), PAD_TEXELS)
+for region, odd in [(head_neck, lambda g, m: np.abs(g - m) > PAINT_STEP), (lower_legs, lambda g, m: (g - m > PAINT_STEP) | (g > SOCK_LEVEL))]:
+    kept = region.copy()
+    for _ in range(2):
+        mean, _ = box_mean(grey, kept.astype(np.float32), PAINT_RADIUS)
+        kept = region & ~odd(grey, mean)
+    mean, support = box_mean(grey, kept.astype(np.float32), PAINT_RADIUS)
+    painted = region & ~kept
+    grey[painted] = np.where(support[painted] > 0, mean[painted], 1 / COAT_GAIN)
+
 # The photo outside the mesh's texture islands (its sky, grass and sand) set to the coat's own level: a far horse is drawn from
 # the image's small mipmaps, each texel the average of a wide patch, and the bright sky round a leg's thin island would pale
 # it. Each island grown by PAD_TEXELS first, so the edge of an island never averages in the fill either.
-PAD_TEXELS = 4
-mask = np.zeros((height, width), dtype=bool)
-for tri in mesh.loop_triangles:
-    uv = np.array([[uv_layer[loop].uv[0] * width, uv_layer[loop].uv[1] * height] for loop in tri.loops])
-    x0, y0 = np.maximum(np.floor(uv.min(axis=0)).astype(int) - PAD_TEXELS, 0)
-    x1, y1 = np.minimum(np.ceil(uv.max(axis=0)).astype(int) + PAD_TEXELS, [width - 1, height - 1])
-    if x1 < x0 or y1 < y0:
-        continue
-    xs, ys = np.meshgrid(np.arange(x0, x1 + 1) + 0.5, np.arange(y0, y1 + 1) + 0.5)
-    (ax, ay), (bx, by), (cx, cy) = uv
-    det = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
-    if abs(det) < 1e-9:
-        continue
-    l1 = ((by - cy) * (xs - cx) + (cx - bx) * (ys - cy)) / det
-    l2 = ((cy - ay) * (xs - cx) + (ax - cx) * (ys - cy)) / det
-    l3 = 1 - l1 - l2
-    # (Within PAD_TEXELS of the triangle: each barycentric no more negative than the pad over the triangle's size.)
-    slack = PAD_TEXELS / max(1.0, float(np.ptp(uv, axis=0).max()))
-    mask[y0:y1 + 1, x0:x1 + 1] |= (l1 >= -slack) & (l2 >= -slack) & (l3 >= -slack)
+mask = raster(lambda tri: True, PAD_TEXELS)
 grey[~mask] = 1 / COAT_GAIN
 out =np.ones((height, width, 4), dtype=np.float32)
 out[:, :, 0] = out[:, :, 1] = out[:, :, 2] = grey

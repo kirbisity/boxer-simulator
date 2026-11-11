@@ -43,6 +43,9 @@ const bdScale3 = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
 const BD_FRINGE = 0.035;
 // How far round a high point a plate is raised over it (cells of its grid, each ~3-5 cm: horsebard bdDrape).
 const BD_SPAN_REACH = 2;
+// How steeply a plate is beaten out to a flared hem (m out per m up): ~40° off the hang, a smith's curve over a hand's height
+// for a flare of a few cm, not a turned-out lip.
+const BD_CURVE = 0.8;
 
 /** The tiles a bard's pieces wear (detailmaps.js), by kind and finish: the field, the edges, the mail. */
 export const BARD_TILES = {
@@ -332,21 +335,34 @@ function bdDrape(ctx, { cols, rows, ray, gap, flare, below = 0 }) {
   // far as the furthest within BD_SPAN_REACH cells of it, then evened over its own 3 × 3 (so still no nearer than any of its
   // neighbours' hits: the mean of the wider maxima is never under the nearer ones).
   const spanned = bdEven(bdFurthest(reach, width, rows + 1, BD_SPAN_REACH), width, rows + 1);
-  const grid = [];
-  const origins = [];
+  const reached = [];
   for (let i = 0; i <= cols; i += 1) {
     let previous = null;
     let previousOrigin = null;
     for (let j = 0; j <= rows; j += 1) {
-      const { o, d, hang } = rays[j * width + i];
+      const { o, hang } = rays[j * width + i];
       let r = spanned[j * width + i] ?? previous ?? 0.15;
       if (hang && previous !== null) r = Math.max(r, previous + flare * vec.length(vec.sub(o, previousOrigin)));
-      grid[j * width + i] = vec.add(o, vec.scale(d, r));
-      origins[j * width + i] = o;
+      reached[j * width + i] = r;
       previous = r;
       previousOrigin = o;
     }
+    // A hem flared out over what it clears is beaten out to it in a curve from higher up, not turned out at its edge: each
+    // hanging row no further in than the row below it less BD_CURVE per unit it rises.
+    for (let j = rows - 1; j >= 0; j -= 1) {
+      const here = rays[j * width + i];
+      const below = rays[(j + 1) * width + i];
+      if (!here.hang) break;
+      const rise = vec.length(vec.sub(here.o, below.o));
+      reached[j * width + i] = Math.max(reached[j * width + i], reached[(j + 1) * width + i] - BD_CURVE * rise);
+    }
   }
+  const grid = [];
+  const origins = [];
+  rays.forEach(({ o, d }, k) => {
+    grid[k] = vec.add(o, vec.scale(d, reached[k]));
+    origins[k] = o;
+  });
   return { at: (i, j) => grid[j * width + i], inside: (i, j) => origins[j * width + i] };
 }
 

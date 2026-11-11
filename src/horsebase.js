@@ -16,6 +16,9 @@ const HB_TAU = Math.PI * 2;
 const HB_PART = { body: 0, neck: 1, head: 2 };
 // A point is in the tail beyond its dock (folded away: the hair tail hangs there) when most of its weight is on those bones.
 const HB_TAIL_SHARE = 0.5;
+// The dock's half-thickness (withers): ~5 cm on a horse; the model's dock points lie within 3.5 cm of its bone, the buttocks
+// under it 5 cm and more.
+const HB_DOCK_RADIUS = 0.04;
 // The surfaces' tables: stations along each piece and rays round each station's ring. The model's rings are 8 to 16 quads
 // round, so 40 rays round and a station every ~2.5 cm of a 1.5 m horse sample every face of it at least once.
 const HB_STATIONS = 40;
@@ -42,7 +45,8 @@ function hbBytes(text) {
 
 /**
  * The model's arrays (decoded once): `points` (x, y, z in withers heights), `uvs`, `triangles`, `weights` (each point's two
- * parts and the first's weight, bytes), `tail` (each point's share of the tail beyond its dock, 0..1).
+ * parts and the first's weight, bytes), `tail` (each point's share of the tail beyond its dock, 0..1), `dock` (each point
+ * of the dock itself: within HB_DOCK_RADIUS of its bone and past its root, not the buttocks under it).
  */
 export function horseBaseMesh() {
   if (decoded.mesh) return decoded.mesh;
@@ -57,6 +61,16 @@ export function horseBaseMesh() {
     joints: HORSE_BASE_DATA.joints,
     parts: HORSE_BASE_DATA.parts,
   };
+  const placed = decoded.mesh.points;
+  const [root, end] = decoded.mesh.joints.dock;
+  const bone = [end[0] - root[0], end[1] - root[1]];
+  const boneSquared = bone[0] * bone[0] + bone[1] * bone[1];
+  decoded.mesh.dock = Uint8Array.from({ length: placed.length / 3 }, (_, v) => {
+    const [x, y, z] = [placed[v * 3], placed[v * 3 + 1], placed[v * 3 + 2]];
+    const along = ((x - root[0]) * bone[0] + (y - root[1]) * bone[1]) / boneSquared;
+    const t = Math.min(1, along);
+    return along >= 0 && Math.hypot(x - root[0] - bone[0] * t, y - root[1] - bone[1] * t, z) < HB_DOCK_RADIUS ? 1 : 0;
+  });
   return decoded.mesh;
 }
 
@@ -192,8 +206,8 @@ function hbTube(rows, root, axis, length) {
 }
 
 /**
- * The legs a bard is cast over (horsebard.js colliders.legs): each leg's upper leg and cannon as the view draws them (on the
- * game's joints, its legs the model's: the envelope of their skin, horseBaseLegTable, as smooth tubes, so the plate stands off
+ * The legs a bard is cast over (horsebard.js colliders.legs): each leg's upper leg and cannon as the view draws them (from the
+ * model's hip or shoulder to the game's knee and hoof, its legs the model's: the envelope of their skin, horseBaseLegTable, as smooth tubes, so the plate stands off
  * all of a leg and not only off its low-poly corners), in every pose of a breed's gaits at its height. Measured once a breed.
  */
 export function horseBaseLegColliders(breed, withers) {
@@ -209,7 +223,8 @@ export function horseBaseLegColliders(breed, withers) {
       poseHorse(horse);
       for (const leg of HORSE_SHAPE.legs) {
         const joint = (name) => hbHorseLocal(horse, horse.legs[leg.key][name]);
-        const [root, knee, hoof] = [joint('root'), joint('knee'), joint('hoof')];
+        // (The upper leg from the model's own joint, as the view draws it, horseview.js updateBaseHorse.)
+        const [root, knee, hoof] = [HORSE_BASE_DATA.joints[leg.key].root, joint('knee'), joint('hoof')];
         for (const [from, to, rows] of [[root, knee, tables[leg.key].upper], [knee, hoof, tables[leg.key].cannon]]) {
           const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
           legs.push(hbTube(rows, from, [(to[0] - from[0]) / length, (to[1] - from[1]) / length], length));
@@ -273,16 +288,16 @@ export function horseBaseFit() {
   const neckSkin = hbTriangles(mesh, (v) => part(v) === HB_PART.neck || trunk(v)).flat;
   const headSkin = hbTriangles(mesh, (v) => part(v) === HB_PART.head).flat;
   const colliders = {
-    body: hbTriangles(mesh, (v) => trunk(v) && points[v * 3] > joints.dock[0][0]).mesh,
+    body: hbTriangles(mesh, (v) => trunk(v) && !mesh.dock[v]).mesh,
     // (The neck alone, as the loft's: a ray from the breast forward meets the neck, never the head beyond it.)
     neck: hbTriangles(mesh, (v) => part(v) === HB_PART.neck).mesh,
-    dock: hbTriangles(mesh, (v) => trunk(v) && points[v * 3] <= joints.dock[0][0]).mesh,
+    dock: hbTriangles(mesh, (v) => trunk(v) && mesh.dock[v]).mesh,
   };
   // The trunk's length: its body points (the dock and the folded tail left out), front to back.
   let front = -Infinity;
   let back = Infinity;
   for (let v = 0; v < points.length / 3; v += 1) {
-    if (!trunk(v) || points[v * 3] <= joints.dock[0][0]) continue;
+    if (!trunk(v) || mesh.dock[v]) continue;
     front = Math.max(front, points[v * 3]);
     back = Math.min(back, points[v * 3]);
   }
@@ -293,7 +308,23 @@ export function horseBaseFit() {
   // The trunk's middle height: the withers' pivot of the view (horseview.js, 0.76 of the withers), moved to each station's middle.
   const trunkMiddle = 0.76;
   const body = hbSurface(trunkSkin, (s) => ({ at: [trunkFrom + (trunkTo - trunkFrom) * s, trunkMiddle, 0], up: [0, 1, 0] }));
-  const bodyFn = (x, a, d = 0) => body((x - trunkFrom) / (trunkTo - trunkFrom), a, d);
+  // Past either end of its stations (where the loft, longer behind, lays a strap or a cloth's edge) the trunk is closed by a
+  // round cap, its end ring drawn in as a dome as deep as the ring's half-depth, so what lies there wraps the rump.
+  const bodyFn = (x, a, d = 0) => {
+    const s = (x - trunkFrom) / (trunkTo - trunkFrom);
+    if (s >= 0 && s <= 1) return body(s, a, d);
+    const end = s < 0 ? 0 : 1;
+    const top = body(end, Math.PI / 2);
+    const bottom = body(end, -Math.PI / 2);
+    const centre = [(top[0] + bottom[0]) / 2, (top[1] + bottom[1]) / 2, 0];
+    const half = (top[1] - bottom[1]) / 2;
+    const past = Math.min(half, Math.abs(x - (end ? trunkTo : trunkFrom)));
+    const shrink = Math.sqrt(Math.max(0, 1 - (past / half) ** 2));
+    const ring = body(end, a, 0);
+    const outward = Math.hypot(ring[1] - centre[1], ring[2]) || 1;
+    const scale = shrink + d / outward;
+    return [centre[0] + (end ? past : -past), centre[1] + (ring[1] - centre[1]) * scale, ring[2] * scale];
+  };
   // The neck: along the line from its root (where the model's neck bone starts, in the chest) to the poll, its top the crest.
   const neckPivot = joints.neckPivot;
   const poll = joints.poll;

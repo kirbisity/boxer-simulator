@@ -715,8 +715,9 @@ export function buildHorseModel(spec) {
   if (!fit) add('head', 'soft', headLoft);
   const headMarks = [];
   if (!low) {
-    // Eyes (dark with a highlight), nostrils, the corner of the mouth (the model has its own).
-    for (const side of fit ? [] : [1, -1]) {
+    // Eyes (dark with a highlight), nostrils, the corner of the mouth. (On the model too, its photo's own eye painted out with
+    // the halter, tools/blender/horsebase.py; not its brow, which is the model's own.)
+    for (const side of [1, -1]) {
       const eye = headFn(0.115, 0.62, 0.003);
       const eyeAt = [eye[0], eye[1], side * eye[2]];
       headMarks.push(hmBlob(eyeAt, [0.017, 0.019, 0.011], { tilt: 0, rings: 4, sides: 8, color: [0.03, 0.02, 0.02] }));
@@ -724,7 +725,7 @@ export function buildHorseModel(spec) {
       const nostril = headFn(0.345, 0.05, 0);
       headMarks.push(hmBlob([nostril[0], nostril[1] + 0.008, side * (nostril[2] + 0.002)], [0.018, 0.009, 0.007], { tilt: -0.4, rings: 4, sides: 7, color: [0.05, 0.035, 0.035] }));
       // The brow and the cheek's rise over the eye, a hint of the bone.
-      headMarks.push(hmBlob([eyeAt[0] - 0.004, eyeAt[1] + 0.024, side * (eye[2] - 0.001)], [0.025, 0.009, 0.012], { rings: 3, sides: 7, color: (t, a, p) => hide(p) }));
+      if (!fit) headMarks.push(hmBlob([eyeAt[0] - 0.004, eyeAt[1] + 0.024, side * (eye[2] - 0.001)], [0.025, 0.009, 0.012], { rings: 3, sides: 7, color: (t, a, p) => hide(p) }));
     }
     const mouth = [];
     for (let k = 0; k < 6; k += 1) {
