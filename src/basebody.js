@@ -126,13 +126,14 @@ export const BASE_BODY = {
   //             superellipse of exponent 4: at 45 degrees up and out 19% further) by this share: the acromion's corner where the
   //             top line meets the arm;
   //   `edge`    the deltoid's front and back edges, grooves this deep (m) at 0.6 of muscle showing and up to twice it at all;
+  //   `chest`, `chestRows`, `chestFrom`, `chestTo`: the chest's width brought to the loft's (v7's) ring (round 13; see shoulderPlus);
   //   `neckTuck` the neck's top drawn in under the head by this share of its radius;
   //   `pit`     the armpit's hollow (m): the trunk's flank under the arm, from 2 to 14 cm under the shoulder joint and within
   //             the arm's own depth fore and aft, drawn in towards the midline, deepest at the arm's middle and easing out to the
   //             pec's edge in front and the lat's behind: the arm's inner face then stands off the flank, its own round form.
   shoulderPlus: {
     D1: { in: 0.02, trap: 0.04, trapKeep: 0.35, deltoid: 0.7, arm: 0.9, armFrom: -0.05, armTo: 0.2, square: 0.4, edge: 0.003, pit: 0 },
-    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.5 },
+    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.5, chest: 1, chestRows: 0.03, chestFrom: [0.35, 0.5], chestTo: [0.72, 0.82] },
   },
 };
 
@@ -933,7 +934,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     placed.set(one, vertex * 3);
   }
   if (BASE_BODY.shoulder && BASE_BODY.shoulder !== 'D') {
-    if (BASE_BODY.shoulderPlus[BASE_BODY.shoulder]) shoulderPlus(BASE_BODY.shoulderPlus[BASE_BODY.shoulder], { rig, frames, placed, shoulderKeep, height, joints });
+    if (BASE_BODY.shoulderPlus[BASE_BODY.shoulder]) shoulderPlus(BASE_BODY.shoulderPlus[BASE_BODY.shoulder], { rig, parts, frames, placed, shoulderKeep, height, joints });
     // (The smoothed surface placed too, for the designs that drive it and carry the detail along: C and E.)
     const design = BASE_BODY.shoulder;
     let smooth = null;
@@ -976,7 +977,11 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
       if (up > -0.12 * height / 1.8 && up <= 0.01 * height / 1.8) bideltoid = Math.max(bideltoid, Math.abs(across));
       if (!armish && Math.abs(p[1] - 0.72 * height) < 0.015 * height / 1.8) chest = Math.max(chest, Math.abs(across));
     }
-    globalThis.BASE_WIDTHS.push({ biacromial: 2 * biacromial, chest: 2 * chest, bideltoid: 2 * bideltoid });
+    const spanT = rig.spans.trunk;
+    const rowsT = ringRows(parts.trunk, spanT[0], spanT[1]);
+    const [tN] = axisCoords(trunk, [joint[0], 0.72 * height, 0]);
+    const at = Math.min(BASE_BODY.stops, Math.max(0, Math.round(((tN - spanT[0]) / (spanT[1] - spanT[0])) * BASE_BODY.stops)));
+    globalThis.BASE_WIDTHS.push({ biacromial: 2 * biacromial, chest: 2 * chest, bideltoid: 2 * bideltoid, ring: 2 * rowsT[at][1] });
   }
   const positions = new Float32Array(render.count * 3);
   for (let index = 0; index < render.count; index += 1) positions.set(placed.subarray(render.source[index] * 3, render.source[index] * 3 + 3), index * 3);
@@ -1092,7 +1097,7 @@ function shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKe
  * PROOF OF CONCEPT, round 11: D's rest shape made smaller and sharper (BASE_BODY.shoulderPlus, `spec`), on the placed points
  * (changed in place). Each point's moves are worked out on its own, then smoothed over the surface as the round 10 designs' are.
  */
-function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints }) {
+function shoulderPlus(spec, { rig, parts, frames, placed, shoulderKeep, height, joints }) {
   const ease = (a, b, x) => {
     const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
     return u * u * (3 - 2 * u);
@@ -1139,8 +1144,10 @@ function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints 
       const off = vec.sub(tucked, head);
       const reach = vec.length(off);
       const hold = BASE_BODY.headHold * 0.055 * height;
-      // (Behind and at the sides only: the throat under the jaw is the neck's own.)
-      const behind = 1 - ease(-0.2, 0.3, xN / (Math.hypot(xN, yN) || 1));
+      // (Behind and at the sides, and the throat's sides beside the jaw (seen from behind, they rose past the narrower jaw in a
+      // fin); only the throat's middle under the chin is the neck's own.)
+      const r0 = Math.hypot(xN, yN) || 1;
+      const behind = Math.max(1 - ease(-0.2, 0.3, xN / r0), ease(0.35, 0.7, Math.abs(yN) / r0));
       if (head && reach > hold) shift = vec.add(shift, vec.scale(off, -((reach - hold) / reach) * behind * ease(0.3, 0.7, tN)));
       shifts.set(shift, vertex * 3);
       continue;
@@ -1227,6 +1234,59 @@ function shoulderPlus(spec, { rig, frames, placed, shoulderKeep, height, joints 
     neighbours[c].add(a).add(b);
   }
   // (Smoothed less than the round 10 designs (half as many rounds): the corner and the edges are the point.)
+  // The chest's width (`chest`, round 13; the user: "get the chest to the original width", v7's): the trunk's own skin (not an
+  // arm's, nor blending into one) across, row by row of its t (`chestRows` wide), against the loft's ring there (this body's,
+  // the ring v7 draws: parts.trunk), scaled across (the trunk's width axis; its depth and the model's surface kept) by that
+  // ratio, `chest` of the way; the ratio smoothed along the trunk and eased to none below `chestFrom` (the waist) and above
+  // `chestTo` (the shoulders, D+'s own).
+  if (spec.chest) {
+    const spanT = rig.spans.trunk;
+    const rows = ringRows(parts.trunk, spanT[0], spanT[1]);
+    const stops = BASE_BODY.stops;
+    const ringWidth = (t) => {
+      const at = Math.min(stops, Math.max(0, ((t - spanT[0]) / (spanT[1] - spanT[0] || 1)) * stops));
+      const index = Math.min(stops - 1, Math.floor(at));
+      return rows[index][1] + (rows[index + 1][1] - rows[index][1]) * (at - index);
+    };
+    const bin = spec.chestRows;
+    const widest = new Map();
+    for (let vertex = 0; vertex < count; vertex += 1) {
+      const name = rig.names[rig.sources.part[vertex]];
+      const blendArm = rig.sources.blend[vertex] > 0 && /Upper|Fore/.test(rig.names[rig.sources.part2[vertex]]);
+      if (name !== 'trunk' || blendArm) continue;
+      const p = [placed[vertex * 3] + shifts[vertex * 3], placed[vertex * 3 + 1] + shifts[vertex * 3 + 1], placed[vertex * 3 + 2] + shifts[vertex * 3 + 2]];
+      const [t, , across] = axisCoords(trunk, p);
+      const row = Math.round(t / bin);
+      widest.set(row, Math.max(widest.get(row) ?? 0, Math.abs(across)));
+    }
+    const ratioAt = (t) => {
+      // (Over the three rows about t: a row's widest point is one vertex, and alone it was noisy.)
+      let sum = 0;
+      let n = 0;
+      for (let k = -1; k <= 1; k += 1) {
+        const row = Math.round(t / bin) + k;
+        const own = widest.get(row);
+        if (own > 0) {
+          sum += ringWidth(row * bin) / own;
+          n += 1;
+        }
+      }
+      return n ? sum / n : 1;
+    };
+    for (let vertex = 0; vertex < count; vertex += 1) {
+      const name = rig.names[rig.sources.part[vertex]];
+      if (name === 'neck') continue;
+      const p = [placed[vertex * 3] + shifts[vertex * 3], placed[vertex * 3 + 1] + shifts[vertex * 3 + 1], placed[vertex * 3 + 2] + shifts[vertex * 3 + 2]];
+      const [t, , across] = axisCoords(trunk, p);
+      const weight = ease(spec.chestFrom[0], spec.chestFrom[1], t) * (1 - ease(spec.chestTo[0], spec.chestTo[1], t));
+      if (weight <= 0) continue;
+      const k = 1 + spec.chest * weight * (ratioAt(t) - 1);
+      // (The arm's own skin is left on its bone: the arms hang clear of the trunk by the physics' own rule, pose.js armClear.)
+      if (/Upper|Fore/.test(name)) continue;
+      const move = across * (k - 1);
+      for (let axis = 0; axis < 3; axis += 1) shifts[vertex * 3 + axis] += trunk.widthAxis[axis] * move;
+    }
+  }
   const smoothed = laplacian(shifts, neighbours.map((set) => [...set]), BASE_BODY.shoulderSmooth / 2);
   for (let index = 0; index < placed.length; index += 1) placed[index] += smoothed[index];
 }
