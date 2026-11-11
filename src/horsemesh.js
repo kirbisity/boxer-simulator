@@ -13,8 +13,13 @@
 // and angle, inflated by a thickness), so a plate lies on the horse that
 // wears it. What moves (mane, tail, the cloth trapper) is described here
 // (where it is hung, its colour, its triangles) and run by the view.
+//
+// With the user's horse model (`spec.base`, horseview.js HORSE_LOOK.base) the hide is that model, skinned and drawn by the
+// view: no loft is built here, and the tack, the bard and the hair's roots are laid over the model's own surfaces, measured
+// off it (horsebase.js horseBaseFit), at the same stations, angles and standoffs as over the loft's.
 
 import { vec } from './pose.js';
+import { horseBaseFit, horseBaseLegColliders } from './horsebase.js';
 import { BARD_FIT, buildBard } from './horsebard.js';
 import { tileSize } from './detailmaps.js';
 
@@ -432,9 +437,6 @@ function hmBodyFn(build) {
   };
 }
 
-/** The back's height at x. */
-const hmBackAt = (build, x) => hmBodyFn(build)(x, Math.PI / 2)[1];
-
 /** The neck as a table by t: [t, crest x, crest y, throat x, throat y, half-width]. */
 function hmNeckTable(build) {
   const arch = build.neck.arch;
@@ -551,10 +553,17 @@ export function buildHorseModel(spec) {
   const coat = horseCoat(spec.coat ?? '#5a3a22', spec.seed ?? 1);
   const random = horseRandom((spec.seed ?? 1) * 31 + 7);
   const sides = low ? 7 : 12;
-  const bodyFn = hmBodyFn(build);
-  const neckFn = hmNeckFn(build);
-  const poll = [0.635, 1.14 + build.neck.arch * 0.5, 0];
-  const headFn = hmHeadFn(build, poll);
+  // The user's model for the hide: its surfaces, the joints its neck and head turn about, and the end of its dock.
+  const fit = spec.base ? horseBaseFit() : null;
+  const bodyFn = fit ? fit.bodyFn : hmBodyFn(build);
+  const neckFn = fit ? fit.neckFn : hmNeckFn(build);
+  const poll = fit ? [...fit.poll] : [0.635, 1.14 + build.neck.arch * 0.5, 0];
+  // (The model's head measured from its poll to its muzzle, 0..1: a place on the loft's head, x of its length, is at the same
+  // share of the model's, so a noseband or an eye guard sits where it sat.)
+  const loftHeadLength = hmHeadTable(build)[hmHeadTable(build).length - 1][0];
+  const headFn = fit ? (x, a, d = 0) => fit.headFn(x / loftHeadLength, a, d) : hmHeadFn(build, poll);
+  // The back's height at x (the saddle's seat).
+  const backAt = (x) => bodyFn(x, Math.PI / 2)[1];
   const noise = (p) => Math.sin(p[0] * 61 + p[1] * 23) * Math.sin(p[1] * 47 - p[2] * 31) * Math.sin(p[2] * 53 + p[0] * 19);
 
   // ---- Colours
@@ -592,7 +601,7 @@ export function buildHorseModel(spec) {
     bodyStations.push({ c: [x, mid, 0], u: [0, 1, 0], s: [0, 0, 1], top: depth, bot: depth, hw });
   }
   // top and bottom differ (the table's top/bottom are folded into mid and depth); the ring is symmetric about mid.
-  body('soft', hmLoft(bodyStations, { sides: low ? 10 : 18, color: bodyColor, upper: 2.6, lower: 2.15 }));
+  if (!fit) body('soft', hmLoft(bodyStations, { sides: low ? 10 : 18, color: bodyColor, upper: 2.6, lower: 2.15 }));
   const musclePrims = [];
   for (const side of [1, -1]) {
     // Shoulder, forearm top, the chest's muscle, the haunch with its stifle, the buttock.
@@ -603,10 +612,10 @@ export function buildHorseModel(spec) {
     musclePrims.push(hmBlob([-0.27, 0.64, side * 0.14], [0.085, 0.07, 0.04], { tilt: 0.3, rings: 4, sides: 7, color: (t, a, p) => hide(p) }));
   }
   const muscles = low ? musclePrims.slice(0, 4) : musclePrims;
-  for (const prim of muscles) body('soft', prim);
-  // What a bard is fitted over (horsebard.js): the barrel and its muscle (not the tack), the neck, the dock.
+  if (!fit) for (const prim of muscles) body('soft', prim);
+  // What a bard is fitted over (horsebard.js): the barrel and its muscle (not the tack), the neck, the dock; or the model's.
   const snapshot = (target) => ({ p: target.p.slice(), i: target.i.slice() });
-  const colliders = { body: snapshot(acc('body', 'soft')) };
+  const colliders = fit ? { ...fit.colliders, legs: horseBaseLegColliders(spec.breed, W) } : { body: snapshot(acc('body', 'soft')) };
 
   // ---- The tail's dock (the hair is dynamic)
   const carriage = build.tail.carriage;
@@ -614,9 +623,12 @@ export function buildHorseModel(spec) {
   const dockLift = carriage[0] < 0 ? 0.075 : 0;
   const dockPath = [[dockStart[0], dockStart[1] - 0.005], [dockStart[0] - 0.04, dockStart[1] + dockLift * 0.6], [dockStart[0] - 0.075, dockStart[1] + dockLift - 0.012]];
   const dock = hmPathLoft(dockPath, [[0.038, 0.038, 0.034], [0.03, 0.03, 0.028], [0.026, 0.026, 0.024]], { sides: 6, round: { endLength: 0.02 }, color: coat.mane });
-  colliders.dock = { p: dock.p.slice(), i: dock.i.slice() };
-  body('soft', dock);
-  const tailRoot = [dockPath[2][0] - 0.005, dockPath[2][1], 0];
+  // (The model has its own dock, its tail folded into it: the hair hangs from the dock's end.)
+  if (!fit) {
+    colliders.dock = { p: dock.p.slice(), i: dock.i.slice() };
+    body('soft', dock);
+  }
+  const tailRoot = fit ? [...fit.tailRoot] : [dockPath[2][0] - 0.005, dockPath[2][1], 0];
   // The hair of the tail: dynamic (the view) unless it is a crowd's horse, which has it fixed.
   const tailRest = (lift = 0) => {
     const points = [tailRoot];
@@ -646,7 +658,7 @@ export function buildHorseModel(spec) {
   }
 
   // ---- The neck
-  const neckPivot = [0.34, 0.9, 0];
+  const neckPivot = fit ? [...fit.neckPivot] : [0.34, 0.9, 0];
   const neckStations = [];
   const neckSteps = low ? 5 : 10;
   for (let k = 0; k <= neckSteps; k += 1) {
@@ -660,8 +672,10 @@ export function buildHorseModel(spec) {
     return coat.stripe && Math.sin(a) > 0.93 ? hmLerp3(color, coat.points, 0.85) : color;
   };
   const addNeck = (kind, prim) => add('neck', kind, prim);
-  addNeck('soft', hmLoft(hmRounded(neckStations, { startLength: 0 }), { sides: low ? 8 : 14, color: neckColor, upper: 2.5, lower: 2.1 }));
-  colliders.neck = snapshot(acc('neck', 'soft'));
+  if (!fit) {
+    addNeck('soft', hmLoft(hmRounded(neckStations, { startLength: 0 }), { sides: low ? 8 : 14, color: neckColor, upper: 2.5, lower: 2.1 }));
+    colliders.neck = snapshot(acc('neck', 'soft'));
+  }
   // A barded horse's crest is under its crinet: no mane is drawn (the standing ridge or the hanging tufts), unless its
   // neck piece is round the throat only (`throat`) and its face open behind the ears (`maned`).
   const barded = Boolean(BARD_FIT[spec.barding]);
@@ -672,7 +686,7 @@ export function buildHorseModel(spec) {
   const headSteps = low ? 6 : 12;
   const headTable = hmHeadTable(build);
   const headLength = headTable[headTable.length - 1][0];
-  const headAngle = build.headAngle;
+  const headAngle = fit ? fit.headAngle : build.headAngle;
   const along = [Math.cos(headAngle), -Math.sin(headAngle), 0];
   const upAxis = [Math.sin(headAngle), Math.cos(headAngle), 0];
   for (let k = 0; k <= headSteps; k += 1) {
@@ -698,10 +712,11 @@ export function buildHorseModel(spec) {
     return color;
   };
   const headLoft = hmLoft(hmRounded(headStations, { endLength: 0.012 }), { sides: low ? 8 : 14, color: headColor, upper: 2.6, lower: 2.2 });
-  add('head', 'soft', headLoft);
+  if (!fit) add('head', 'soft', headLoft);
   const headMarks = [];
   if (!low) {
-    // Eyes (dark with a highlight), nostrils, the corner of the mouth.
+    // Eyes (dark with a highlight), nostrils, the corner of the mouth. (On the model too, its photo's own eye painted out with
+    // the halter, tools/blender/horsebase.py; not its brow, which is the model's own.)
     for (const side of [1, -1]) {
       const eye = headFn(0.115, 0.62, 0.003);
       const eyeAt = [eye[0], eye[1], side * eye[2]];
@@ -710,14 +725,14 @@ export function buildHorseModel(spec) {
       const nostril = headFn(0.345, 0.05, 0);
       headMarks.push(hmBlob([nostril[0], nostril[1] + 0.008, side * (nostril[2] + 0.002)], [0.018, 0.009, 0.007], { tilt: -0.4, rings: 4, sides: 7, color: [0.05, 0.035, 0.035] }));
       // The brow and the cheek's rise over the eye, a hint of the bone.
-      headMarks.push(hmBlob([eyeAt[0] - 0.004, eyeAt[1] + 0.024, side * (eye[2] - 0.001)], [0.025, 0.009, 0.012], { rings: 3, sides: 7, color: (t, a, p) => hide(p) }));
+      if (!fit) headMarks.push(hmBlob([eyeAt[0] - 0.004, eyeAt[1] + 0.024, side * (eye[2] - 0.001)], [0.025, 0.009, 0.012], { rings: 3, sides: 7, color: (t, a, p) => hide(p) }));
     }
     const mouth = [];
     for (let k = 0; k < 6; k += 1) {
       const x = 0.355 - k * 0.022;
       mouth.push([x, -0.115 + k * 0.004]);
     }
-    for (const side of [1, -1]) {
+    for (const side of fit ? [] : [1, -1]) {
       const strap = hmStrap((x, a, d) => {
         const p = headFn(x, a, d);
         return [p[0], p[1], side * p[2]];
@@ -744,8 +759,9 @@ export function buildHorseModel(spec) {
     return hmLoft(stations, { sides: 6, color: (t, a, p) => (t > 0.9 || (p[0] > 0.004 && t > 0.4 && Math.abs(a - 0) < 0.8) ? coat.points : hide(p)), upper: 2, lower: 2 });
   };
   acc('ear', 'soft');
-  add('ear', 'soft', earShape(1));
-  if (low) {
+  // (The model's ears are its own, carried by its head.)
+  if (!fit) add('ear', 'soft', earShape(1));
+  if (low && !fit) {
     // A crowd's horse: the ears fixed into the head.
     const base = headFn(0.0, Math.PI / 2, -0.012);
     for (const side of [1, -1]) {
@@ -766,7 +782,10 @@ export function buildHorseModel(spec) {
   for (let k = 0; k < tufts; k += 1) {
     const t = 0.06 + (0.9 * k) / (tufts - 1);
     const p = neckFn(t, Math.PI / 2, 0.004);
-    crest.push({ base: [p[0] - neckPivot[0], p[1] - neckPivot[1], 0], t, hw: hmCurve(hmNeckTable(build), t)[4], depth: (() => { const row = hmCurve(hmNeckTable(build), t); return Math.hypot(row[0] - row[2], row[1] - row[3]) / 2; })() });
+    // (Its half-width and half-depth there, off whichever neck it is.)
+    const throat = neckFn(t, -Math.PI / 2, 0);
+    const top = neckFn(t, Math.PI / 2, 0);
+    crest.push({ base: [p[0] - neckPivot[0], p[1] - neckPivot[1], 0], t, hw: neckFn(t, 0, 0)[2], depth: Math.hypot(top[0] - throat[0], top[1] - throat[1]) / 2 });
   }
   const maneSide = random() < 0.5 ? 1 : -1;
   const mane = {
@@ -833,7 +852,8 @@ export function buildHorseModel(spec) {
         return { ...merged, preset: true };
       })();
     }
-    if (low) {
+    // (The model's legs are skinned to every piece, a crowd's horse's too: its pieces kept apart, empty.)
+    if (low && !fit) {
       // A crowd's horse: the lower leg one straight piece (cannon, pastern and hoof stacked, a little shortened to the same reach).
       const merged = hmAcc();
       let drop = 0;
@@ -846,7 +866,8 @@ export function buildHorseModel(spec) {
       delete segments.hoof;
       segments.cannon = { ...merged, preset: true };
     }
-    for (const [segName, prim] of Object.entries(segments)) hmAppend(acc(`leg.${key}.${segName}`, 'soft'), prim);
+    // (The model's legs are its own: skinned to these pieces' places by the view.)
+    for (const [segName, prim] of Object.entries(segments)) hmAppend(acc(`leg.${key}.${segName}`, 'soft'), fit ? hmAcc() : prim);
   });
 
   // ---- Tack
@@ -861,7 +882,7 @@ export function buildHorseModel(spec) {
   const saddleSteps = low ? 8 : 16;
   for (let k = 0; k <= saddleSteps; k += 1) {
     const x = seatX - sd.length / 2 + (sd.length * k) / saddleSteps;
-    const back = hmBackAt(build, x);
+    const back = backAt(x);
     const seat = back + 0.045;
     const hwHere = sd.width + 0.025 * Math.exp(-(((x - pommelX) / 0.06) ** 2)) + 0.03 * Math.exp(-(((x - cantleX) / 0.06) ** 2));
     const topY = seat + bump(x);
@@ -870,7 +891,7 @@ export function buildHorseModel(spec) {
   }
   const saddleColor = (t, a, p) => (p[1] > bodyTopAt(p[0]) + 0.075 && p[2] !== 0 ? sd.trim : leather);
   function bodyTopAt(x) {
-    return hmBackAt(build, x);
+    return backAt(x);
   }
   // The saddle's tree flattened into a seat: a loft flattened on top by a low top power.
   body('soft', hmLoft(hmRounded(saddleStations, { startLength: 0.012, endLength: 0.012 }), { sides: low ? 6 : 10, color: (t, a, p) => (bump(p[0]) > 0.04 && Math.sin(a) > 0.4 ? hmLerp3(leather, sd.trim, 0.5) : leather), upper: 4, lower: 2.2 }));
@@ -1009,7 +1030,7 @@ export function buildHorseModel(spec) {
   const rig = {
     withers: W, neckPivot: hmScale3(neckPivot, W), poll: hmScale3(vec.sub(poll, neckPivot), W), earBase: hmScale3(vec.sub(earBase, poll), W), earSpread: 0.034 * W,
     headAngle, tailRoot: hmScale3(tailRoot, W), tailLength: build.tail.length * W, tailCarriage: carriage, tailLift: build.tail.lift,
-    bit: hmScale3(vec.sub(bitAt, poll), W), saddle: { x: seatX * W, top: (hmBackAt(build, seatX) + 0.045) * W, bar: [(seatX + 0.02) * W, (hmBackAt(build, seatX) - 0.015) * W, 0.115 * W], pommel: [pommelX * W, (hmBackAt(build, pommelX) + 0.045 + sd.pommel) * W], cantle: [cantleX * W, (hmBackAt(build, cantleX) + 0.045 + sd.cantle) * W] },
+    bit: hmScale3(vec.sub(bitAt, poll), W), saddle: { x: seatX * W, top: (backAt(seatX) + 0.045) * W, bar: [(seatX + 0.02) * W, (backAt(seatX) - 0.015) * W, 0.115 * W], pommel: [pommelX * W, (backAt(pommelX) + 0.045 + sd.pommel) * W], cantle: [cantleX * W, (backAt(cantleX) + 0.045 + sd.cantle) * W] },
     hind: HORSE_LEGS_KEYS.map((key) => key), lengths: { upper: LEG.upper * W, cannon: LEG.cannon * W, pastern: LEG.pastern * W, hoof: LEG.hoof * W },
     mane: { ...mane, tufts: mane.tufts.map((t) => ({ ...t, base: hmScale3(t.base, W), length: t.length * W, width: t.width * W, hw: t.hw * W, depth: t.depth * W })), count: mane.count },
     coat, dyed, trapper, low, maneHidden: !maned,
@@ -1043,5 +1064,5 @@ const HORSE_LEGS_KEYS = ['lFore', 'rFore', 'lHind', 'rHind'];
 
 /** What a model depends on (cache key). */
 export function horseModelKey(spec) {
-  return [spec.breed, spec.barding, spec.style ?? '-', spec.coat, spec.seed, spec.caparison ? 'c' : '-', spec.detail ?? 'full', spec.corner ?? '-'].join('|');
+  return [spec.breed, spec.barding, spec.style ?? '-', spec.coat, spec.seed, spec.caparison ? 'c' : '-', spec.detail ?? 'full', spec.corner ?? '-', spec.base ? 'model' : 'loft'].join('|');
 }

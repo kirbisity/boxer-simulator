@@ -29,8 +29,9 @@ test('every breed in every barding builds, full and low detail, with a bounded n
 });
 
 test('the meshes are sound: finite, indexed in range, normals unit length, and every part inside a horse-sized box', () => {
-  for (const [breed, barding] of [['destrier', 'plate'], ['steppe', 'lamellar'], ['arabian', 'bare']]) {
-    const model = buildHorseModel(spec(breed, barding, 'full', { caparison: true }));
+  // (The lofted horse's, and the tack and bards laid over the user's model, horsemesh.js `base`.)
+  for (const [breed, barding, base] of [['destrier', 'plate'], ['steppe', 'lamellar'], ['arabian', 'bare'], ['destrier', 'plate', true], ['manchu', 'brigandine', true], ['arabian', 'bare', true]]) {
+    const model = buildHorseModel(spec(breed, barding, 'full', { caparison: true, base }));
     const W = HORSES[breed].withers;
     for (const geometry of geometries(model)) {
       const count = geometry.positions.length / 3;

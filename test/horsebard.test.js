@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BARDING, HORSES, bardingAt, mountOf } from '../src/horses.js';
 import { HORSE_BUILD, buildHorseModel, horseLegTable } from '../src/horsemesh.js';
+import { horseBaseLegTable, horseBaseMesh } from '../src/horsebase.js';
 import { HORSE_SHAPE, horsePoint, poseHorse } from '../src/physics/mounted.js';
 import { PRESETS } from '../src/body.js';
 import { mountedKnight } from '../src/cast.js';
@@ -77,7 +78,7 @@ test('mass and protection by part: a bard of 30-45 kg; plate turns an edge where
 });
 
 /** A leg's drawn segments at a moment, in the horse's own frame (units of the withers): [from, to, radii(s)] each. */
-function legSegments(horse, build) {
+function legSegments(horse, build, base = false) {
   const W = horse.withers;
   // The body is drawn turned by the stride's pitch and rock about its pivot (horseview.js), and so are the legs (horsePoint):
   // undo that turn, which is affine, by reading it off three points.
@@ -94,9 +95,11 @@ function legSegments(horse, build) {
   const out = [];
   for (const leg of HORSE_SHAPE.legs) {
     const at = horse.legs[leg.key];
-    const scale = build.legs * (leg.fore ? 1 : 1.04);
-    const table = horseLegTable(leg.fore);
-    out.push({ key: leg.key, a: local(at.root), b: local(at.knee), rows: table.upper, scale });
+    // (The loft's legs by its table; the model's as the model has them, horsebase.js.)
+    const scale = base ? 1 : build.legs * (leg.fore ? 1 : 1.04);
+    const table = base ? horseBaseLegTable(leg.key) : horseLegTable(leg.fore);
+    // (The model's upper leg turns at its own joint: horseview.js updateBaseHorse.)
+    out.push({ key: leg.key, a: base ? horseBaseMesh().joints[leg.key].root : local(at.root), b: local(at.knee), rows: table.upper, scale });
     out.push({ key: leg.key, a: local(at.knee), b: local(at.hoof), rows: table.cannon, scale });
   }
   return out;
@@ -121,12 +124,17 @@ function intrusion(point, segment) {
   const foot = segment.a.map((v, k) => v + d[k] * along);
   const across = Math.abs(point[2] - foot[2]);
   const inPlane = Math.hypot(point[0] - foot[0], point[1] - foot[1]);
-  return 1 - Math.hypot(across / half, inPlane / Math.max(front, back));
+  // (In front of the leg's line its front reaches, behind it its back: the model's bone runs nearer its front than its back.)
+  const ahead = d[1] < 0 ? [-d[1], d[0]] : [d[1], -d[0]];
+  const inFront = (point[0] - foot[0]) * ahead[0] + (point[1] - foot[1]) * ahead[1] > 0;
+  const reach = Math.max(1e-6, inFront ? front : back);
+  return 1 - Math.hypot(across / half, inPlane / reach);
 }
 
 test('no piece of a bard is struck by the legs at a walk, trot, canter or gallop (the legs swept through their strides)', () => {
-  for (const [breed, barding] of [['destrier', 'plate'], ['warhorse', 'plate'], ['steppe', 'lamellar'], ['arabian', 'lamellar']]) {
-    const built = model(breed, barding);
+  // (Over the lofted horse and over the user's model, horsemesh.js `base`.)
+  for (const [breed, barding, base] of [['destrier', 'plate'], ['warhorse', 'plate'], ['steppe', 'lamellar'], ['arabian', 'lamellar'], ['destrier', 'plate', true], ['steppe', 'lamellar', true], ['manchu', 'brigandine', true]]) {
+    const built = model(breed, barding, { base });
     const build = HORSE_BUILD[breed];
     const W = HORSES[breed].withers;
     const pts = built.bard.points.body;
@@ -135,7 +143,7 @@ test('no piece of a bard is struck by the legs at a walk, trot, canter or gallop
       for (let stride = 0; stride < 1; stride += 1 / 48) {
         const horse = { withers: W, at: [0, 0], yaw: 0, speed, stride, state: 'up', capsules: [], legs: {}, shape: HORSE_SHAPE, paces: { gallop: HORSES[breed].gallop } };
         poseHorse(horse);
-        const segments = legSegments(horse, build);
+        const segments = legSegments(horse, build, base);
         for (let v = 0; v < pts.length; v += 3) {
           const p = [pts[v], pts[v + 1], pts[v + 2]];
           // (Only what hangs where the legs go: under the barrel's line.)
@@ -147,6 +155,6 @@ test('no piece of a bard is struck by the legs at a walk, trot, canter or gallop
         }
       }
     }
-    assert.ok(worst.depth < 0, `${breed} ${barding}: a leg (${worst.leg}) into the bard at ${worst.p?.map((v) => v.toFixed(3))}, ${worst.speed} m/s, stride ${worst.stride?.toFixed(2)}: ${worst.depth.toFixed(3)}`);
+    assert.ok(worst.depth < 0, `${breed} ${barding}${base ? ' (model)' : ''}: a leg (${worst.leg}) into the bard at ${worst.p?.map((v) => v.toFixed(3))}, ${worst.speed} m/s, stride ${worst.stride?.toFixed(2)}: ${worst.depth.toFixed(3)}`);
   }
 });

@@ -21,6 +21,7 @@ import { armourDetailMaterial } from './detailtex.js';
 import { DETAIL_ARMOUR } from './detailmaps.js';
 import { buildRobotDogView, disposeRobotDogView, updateRobotDogView } from './robotdogview.js';
 import { HORSE_BASE_DATA } from './horsebase-data.js';
+import { horseBaseFit, horseBaseMesh } from './horsebase.js';
 import { SoftShell } from './soft.js';
 
 const HORSE_LOOK = {
@@ -33,11 +34,10 @@ const HORSE_LOOK = {
   // Horses beyond this many in a fight are drawn in low detail.
   crowd: 4,
   // The user's horse model (lowPolyHorse.blend, horsebase-data.js) in place of the lofted body, neck, head and legs: one
-  // skinned mesh moved by the same frames, its coat texture tinted to the horse's coat, its flesh a soft body (soft.js) that
-  // dents where it is struck and sways with the gait (`sway`: dent impulse per m/s² of the body's bob, N·s). The tack, the
-  // barding, the mane and the tail's hair kept. Off until the user has seen it (the user's call, 2026-11-10).
-  base: false,
-  sway: 0.9,
+  // skinned mesh moved by the same frames, its coat image coloured the horse's coat, its flesh a soft body (soft.js) whose
+  // belly swings with the trunk's jolts (HORSE_BELLY). The tack, the bard, the mane and the tail's hair laid over it
+  // (horsemesh.js `base`). `firmness`: its flesh's (soft.js), a horse's hide over muscle a little softer than a man's.
+  base: true,
   firmness: 0.45,
 };
 
@@ -72,7 +72,8 @@ export function horseModelFor(horse, detail = 'full') {
   const seed = horseSeed(horse);
   // (The bard's finish: fluted, etched or plain plate, as the rider's harness is: horses.js mountOf.)
   const style = horse.barding === 'plate' ? horse.finish?.style ?? 'plain' : null;
-  const spec = { breed: horse.breed, barding: horse.barding, style, coat: horse.coat, seed, caparison: horseCaparison(horse, seed), detail, withers: horse.withers, corner: horse.corner };
+  const base = HORSE_LOOK.base;
+  const spec = { breed: horse.breed, barding: horse.barding, style, coat: horse.coat, seed, caparison: horseCaparison(horse, seed), detail, withers: horse.withers, corner: horse.corner, base };
   const key = horseModelKey(spec);
   if (!horseModels.has(key)) horseModels.set(key, buildHorseModel(spec));
   return horseModels.get(key);
@@ -246,7 +247,7 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
     }
     legs[leg.key] = pieces;
   }
-  const base = HORSE_LOOK.base && !low ? buildBaseHorse(view, horse, rig, group, legs) : null;
+  const base = model.spec.base ? buildBaseHorse(view, horse, rig, { low }) : null;
   // Hair and cloth that move: made per horse.
   const hang = {};
   if (!low) {
@@ -743,28 +744,32 @@ export function updateHorseView(view, world = null) {
 
 // ---- The user's horse model ---------------------------------------------------------------
 
-const BASE_TABLES = {};
-/** The model's arrays, decoded once. */
-function baseHorseData() {
-  if (BASE_TABLES.data) return BASE_TABLES.data;
-  const bytes = (text) => {
-    const raw = atob(text);
-    const out = new Uint8Array(raw.length);
-    for (let index = 0; index < raw.length; index += 1) out[index] = raw.charCodeAt(index);
-    return out.buffer;
-  };
-  const points = new Int16Array(bytes(HORSE_BASE_DATA.points));
-  const uvs = new Uint16Array(bytes(HORSE_BASE_DATA.uvs));
-  BASE_TABLES.data = {
-    points: Float32Array.from(points, (value) => value / 16000),
-    uvs: Float32Array.from(uvs, (value) => value / 65535),
-    triangles: Array.from(new Uint16Array(bytes(HORSE_BASE_DATA.triangles))),
-    weights: new Uint8Array(bytes(HORSE_BASE_DATA.weights)),
-  };
-  return BASE_TABLES.data;
-}
+/**
+ * The belly's weight: the gut with its contents (some 10-15% of a horse's mass, 50-70 kg in a 470 kg horse: the caecum and
+ * the great colon alone hold ~80-100 L) hangs in the abdomen on its mesentery and the abdominal wall, a heavy mass on a soft
+ * spring. When the trunk is jolted (each stride's rise and fall, a hard halt, a turn) it lags and swings back, and the belly
+ * and the lower flanks over it swing with it: the 'visceral piston' that couples a galloping horse's breathing to its stride
+ * (Bramble & Carrier 1983, 'Running and breathing in mammals', Science 219:251).
+ * - hz: the gut's natural frequency on its suspension, ~2.5 Hz (2-3 Hz: near the canter's and gallop's stride rate of
+ *   1.7-2.2 Hz, which is why it couples to them; well above the walk's 0.95 Hz strides, which barely stir it; the trot's
+ *   bounce, twice a stride at ~2.7 Hz, drives it hardest, as a rider sitting the trot knows).
+ * - damping: ratio ~0.2: one visible swing back after a halt and a smaller one, gone within ~1 s, never a wobble.
+ * - showing: the share of the gut's swing the skin over it shows (the abdominal wall's muscle carries the rest).
+ * - most: the furthest the gut swings (m), the wall's own limit (a horse's belly never swings more than a hand's breadth).
+ * - hind, fore: where the belly runs, from the stifle (in front of the hind legs' roots) to the girth (behind the elbows), as
+ *   shares of the way from the hind legs' roots to the fore legs'; `ramp` the share over which it fades in at each end.
+ * - flank: how far above the barrel's middle the slack reaches (of the barrel's half-depth): the flank over the gut swings
+ *   too, the loin and the back over the spine do not.
+ */
+const HORSE_BELLY = { hz: 2.5, damping: 0.2, showing: 0.6, most: 0.06, hind: 0.08, fore: 0.82, ramp: 0.18, flank: 0.35 };
 
-/** The coat texture, loaded once. */
+const BASE_TABLES = {};
+const baseForward = new THREE.Vector3();
+const baseRoot = new THREE.Vector3();
+const baseKnee = new THREE.Vector3();
+const baseStretch = new THREE.Matrix4();
+
+/** The coat image (the model's coat as its brightness: horsebase-data.js), loaded once. */
 function baseHorseTexture() {
   if (!BASE_TABLES.texture) {
     BASE_TABLES.texture = new THREE.TextureLoader().load(HORSE_BASE_DATA.image);
@@ -785,35 +790,126 @@ function baseHorseFrame(from, to, forward, out = new THREE.Matrix4()) {
 }
 
 /**
+ * Each point's own colour of the coat (horsemesh.js horseCoat, as the loft is painted): the body's, paler under the belly, a
+ * bay's or a dun's dark points down the legs, a sock or a stocking white, the hoof horn, the muzzle dark, the dock its hair's. The coat image's
+ * brightness shades it (the model's own light and dark, its muscle and hair).
+ */
+function baseHorseColours(mesh, fit, coat) {
+  const { points, weights, parts, joints } = mesh;
+  const count = points.length / 3;
+  const colours = new Float32Array(count * 3);
+  const smooth = (t) => {
+    const c = Math.max(0, Math.min(1, t));
+    return c * c * (3 - 2 * c);
+  };
+  const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  const legKeys = ['lFore', 'rFore', 'lHind', 'rHind'];
+  const white = [0.93, 0.91, 0.86];
+  const horn = [0.72, 0.66, 0.58];
+  const headAxis = [fit.muzzle[0] - fit.poll[0], fit.muzzle[1] - fit.poll[1]];
+  const headSquared = headAxis[0] * headAxis[0] + headAxis[1] * headAxis[1] || 1;
+  for (let v = 0; v < count; v += 1) {
+    const [x, y] = [points[v * 3], points[v * 3 + 1]];
+    const part = parts[weights[v * 3]];
+    let colour = coat.body;
+    if (part === 'body' && mesh.dock[v]) {
+      // The dock behind the croup: its hair (the hair tail hangs from its end), the mane's colour, as the loft's dock.
+      colour = coat.mane;
+    } else if (part === 'body') {
+      // Paler under the belly (the loft's: from a little below the barrel's middle).
+      const top = fit.bodyFn(x, Math.PI / 2)[1];
+      const bottom = fit.bodyFn(x, -Math.PI / 2)[1];
+      const down = ((top + bottom) / 2 - y) / ((top - bottom) / 2);
+      colour = mix(colour, coat.belly, smooth(down * 1.4 - 0.3));
+    } else if (part === 'head') {
+      // The muzzle's dark skin over its last fifth; a bay's or a dun's face darkened towards it.
+      const along = ((x - fit.poll[0]) * headAxis[0] + (y - fit.poll[1]) * headAxis[1]) / headSquared;
+      if (coat.type === 'bay' || coat.type === 'dun') colour = mix(colour, coat.points, smooth((along - 0.33) / 0.54) * 0.4);
+      colour = mix(colour, coat.muzzle, smooth((along - 0.77) / 0.14));
+    } else if (part !== 'neck') {
+      // Down a leg, as the loft's (horsemesh.js legColor): its share of the way from its root to the ground.
+      const key = part.split('.')[0];
+      const root = joints[key].root[1];
+      const global = Math.max(0, Math.min(1, (root - y) / root));
+      const sock = coat.socks[legKeys.indexOf(key)];
+      if (coat.type !== 'chestnut') colour = mix(colour, coat.points, smooth((global - 0.3) / 0.2) * (coat.type === 'grey' ? 0.5 : 1));
+      if (sock && global > (sock === 3 ? 0.58 : 0.82)) colour = white;
+      if (global > 0.94) colour = sock ? horn : coat.hoof;
+    }
+    colours.set(colour, v * 3);
+  }
+  return colours;
+}
+
+/** Each point's share of the belly's slack (HORSE_BELLY): along the belly, below the flank's line, by its weight on the trunk. */
+function baseHorseBelly(mesh, fit) {
+  const { points, weights, joints } = mesh;
+  const count = points.length / 3;
+  const shares = new Float32Array(count);
+  const hindX = joints.lHind.root[0];
+  const foreX = joints.lFore.root[0];
+  const smooth = (t) => {
+    const c = Math.max(0, Math.min(1, t));
+    return c * c * (3 - 2 * c);
+  };
+  for (let v = 0; v < count; v += 1) {
+    const x = points[v * 3];
+    const y = points[v * 3 + 1];
+    const first = weights[v * 3 + 2] / 255;
+    const onTrunk = (weights[v * 3] === 0 ? first : 0) + (weights[v * 3 + 1] === 0 ? 1 - first : 0);
+    if (onTrunk <= 0) continue;
+    const along = (x - hindX) / (foreX - hindX);
+    const lengthwise = smooth((along - HORSE_BELLY.hind) / HORSE_BELLY.ramp) * smooth((HORSE_BELLY.fore - along) / HORSE_BELLY.ramp);
+    const top = fit.bodyFn(x, Math.PI / 2)[1];
+    const bottom = fit.bodyFn(x, -Math.PI / 2)[1];
+    const middle = (top + bottom) / 2;
+    const half = (top - bottom) / 2;
+    const down = smooth((middle + HORSE_BELLY.flank * half - y) / ((1 + HORSE_BELLY.flank) * half));
+    shares[v] = onTrunk * lengthwise * down * HORSE_BELLY.showing;
+  }
+  return shares;
+}
+
+/**
  * The user's horse as one skinned mesh over the horse's frames: the body (the view's frame), the neck, the head, and each
  * leg's upper leg, cannon and pastern (the pieces' holders, placed each frame from the gait). Bound where the view's frames
- * are at rest (a standing horse at the origin): the body at the frame, the neck and the head at the rig's pivot and poll, each
- * leg's piece along the model's own bone, stretched along it to the game's length of that piece. The lofted coat is hidden.
+ * are at rest (a standing horse at the origin): the body at the frame, the neck and the head at the model's own neck root and
+ * poll (the rig's, horsemesh.js), each leg's piece along the model's own bone, stretched along it to the game's length of that
+ * piece. Its solid tail beyond the dock is folded into the dock's end (the hair tail hangs there); its coat image, the coat's
+ * brightness, coloured the horse's coat. The tack and the bard are built over it (horsemesh.js `base`).
  */
-function buildBaseHorse(view, horse, rig, group, legs) {
-  const data = baseHorseData();
+function buildBaseHorse(view, horse, rig, { low = false } = {}) {
+  const mesh = horseBaseMesh();
+  const fit = horseBaseFit();
   const W = horse.withers;
-  const count = data.points.length / 3;
+  const count = mesh.points.length / 3;
   const positions = new Float32Array(count * 3);
-  for (let index = 0; index < positions.length; index += 1) positions[index] = data.points[index] * W;
+  const tip = mesh.joints.dock[1];
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    // (The tail beyond the dock drawn into the dock's end by its share of it: a point wholly on it folds to the end, its
+    // triangles to nothing.)
+    const fold = mesh.tail[vertex];
+    for (let axis = 0; axis < 3; axis += 1) positions[vertex * 3 + axis] = (mesh.points[vertex * 3 + axis] * (1 - fold) + tip[axis] * fold) * W;
+  }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(data.uvs, 2));
-  geometry.setIndex(data.triangles);
+  geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2));
+  geometry.setIndex(mesh.triangles);
   const skinIndex = new Uint16Array(count * 4);
   const skinWeight = new Float32Array(count * 4);
   for (let vertex = 0; vertex < count; vertex += 1) {
-    const first = data.weights[vertex * 3 + 2] / 255;
-    skinIndex[vertex * 4] = data.weights[vertex * 3];
-    skinIndex[vertex * 4 + 1] = data.weights[vertex * 3 + 1];
+    const first = mesh.weights[vertex * 3 + 2] / 255;
+    skinIndex[vertex * 4] = mesh.weights[vertex * 3];
+    skinIndex[vertex * 4 + 1] = mesh.weights[vertex * 3 + 1];
     skinWeight[vertex * 4] = first;
     skinWeight[vertex * 4 + 1] = 1 - first;
   }
   geometry.setAttribute('skinIndex', new THREE.BufferAttribute(skinIndex, 4));
   geometry.setAttribute('skinWeight', new THREE.BufferAttribute(skinWeight, 4));
+  geometry.setAttribute('color', new THREE.BufferAttribute(baseHorseColours(mesh, fit, rig.coat), 3));
   geometry.computeVertexNormals();
   // The bind: each part's frame at rest, the leg pieces stretched to the game's lengths.
-  const joints = HORSE_BASE_DATA.joints;
+  const joints = mesh.joints;
   const forward = [1, 0, 0];
   const at = (point) => point.map((value) => value * W);
   const lengths = rig.lengths;
@@ -835,49 +931,90 @@ function buildBaseHorse(view, horse, rig, group, legs) {
     bone.matrixAutoUpdate = false;
     return bone;
   });
-  const material = surface(0xffffff, {});
+  const material = surface(0xffffff, { vertexColors: true });
   material.map = baseHorseTexture();
-  const coat = new THREE.Color(horse.coat ?? '#6a4a2a');
-  const mean = HORSE_BASE_DATA.coatMean;
-  material.color.setRGB(Math.min(2, coat.r / mean[0]), Math.min(2, coat.g / mean[1]), Math.min(2, coat.b / mean[2]));
+  // The coat image holds the horse's own coat at 1 / coatGain of white: its colours (by point) times coatGain colour it.
+  const gain = HORSE_BASE_DATA.coatGain;
+  material.color.setRGB(gain, gain, gain);
   material.skinning = true;
   material.needsUpdate = true;
-  const mesh = new THREE.SkinnedMesh(geometry, material);
-  mesh.bindMode = 'detached';
-  mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
-  mesh.frustumCulled = false;
-  mesh.castShadow = true;
-  view.scene.add(mesh);
-  const soft = new SoftShell(geometry, material, HORSE_LOOK.firmness, { mesh, recomputeNormals: false });
-  // The lofted coat hidden (its tack and barding kept).
-  const coatMaterial = view.horseMaterials.soft;
-  group.traverse((object) => { if (object.isMesh && object.material === coatMaterial) object.visible = false; });
-  for (const pieces of Object.values(legs)) for (const piece of Object.values(pieces)) piece.holder.traverse((object) => { if (object.isMesh && object.material === coatMaterial) object.visible = false; });
-  return { mesh, bones, soft, lastBob: null, lastRate: 0 };
+  const skinned = new THREE.SkinnedMesh(geometry, material);
+  skinned.bindMode = 'detached';
+  skinned.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
+  skinned.frustumCulled = false;
+  skinned.castShadow = true;
+  view.scene.add(skinned);
+  // A crowd's horse (low detail: far off, one of many) is the same mesh with no ink and no soft flesh, as its loft had neither.
+  if (HORSE_LOOK.outline && !low) {
+    const outline = outlineFor(skinned, HORSE_LOOK.outline);
+    outline.bindMode = 'detached';
+    skinned.add(outline);
+  }
+  const soft = low ? null : new SoftShell(geometry, material, HORSE_LOOK.firmness, { mesh: skinned, recomputeNormals: false });
+  soft?.hang(baseHorseBelly(mesh, fit));
+  const roots = Object.fromEntries(['lFore', 'rFore', 'lHind', 'rHind'].map((key) => [key, at(joints[key].root)]));
+  return { mesh: skinned, bones, soft, roots, upper: lengths.upper, gut: [0, 0, 0], gutRate: [0, 0, 0], lastRate: null, lastBob: null, lastSpeed: null };
 }
 
-/** Each frame: the bones from the view's frames, and the flesh swayed by the body's bob (its vertical acceleration). */
+/**
+ * Each frame: the bones from the view's frames, and the belly's slack swung by the trunk's jolts (HORSE_BELLY): the gut a
+ * damped mass on a spring, driven by the trunk's acceleration (the stride's rise and fall, speeding up and pulling up, the
+ * turn's pull to the outside), lagging and swinging back as a heavy mass does.
+ */
 function updateBaseHorse(view, horse, dt) {
   const base = view.base;
   view.group.updateMatrixWorld(true);
   const sources = [view.frame, view.neck, view.head];
-  for (const key of ['lFore', 'rFore', 'lHind', 'rHind']) for (const piece of ['upper', 'cannon', 'pastern']) sources.push(view.legs[key]?.[piece]?.holder ?? view.frame);
+  for (const key of ['lFore', 'rFore', 'lHind', 'rHind']) {
+    const pieces = view.legs[key];
+    for (const piece of ['upper', 'cannon', 'pastern']) sources.push((pieces?.[piece] ?? pieces?.cannon)?.holder ?? view.frame);
+  }
   sources.forEach((source, index) => {
     source.updateMatrixWorld(true);
     base.bones[index].matrixWorld.copy(source.matrixWorld);
   });
-  // The belly and the flanks swing with the bob of the stride: an impulse into the flesh by the body's vertical acceleration.
-  const bob = view.group.position.y;
-  if (base.lastBob !== null && dt > 0) {
-    const rate = (bob - base.lastBob) / dt;
-    const accel = (rate - base.lastRate) / dt;
+  // Each upper leg from the model's own hip or shoulder joint (where its skin was bound, on the trunk) to the game's knee or
+  // hock, not from the game's leg root (up to 6 cm off it): the leg turns where the model's joint is, and the skin over the
+  // hip and shoulder is not dragged after a root that is not under it. Its length the joint's to the knee now.
+  const e = view.frame.matrixWorld.elements;
+  baseForward.set(e[0], e[1], e[2]).normalize();
+  ['lFore', 'rFore', 'lHind', 'rHind'].forEach((key, leg) => {
+    const knee = view.legs[key]?.cannon?.holder;
+    if (!knee) return;
+    baseRoot.set(...base.roots[key]).applyMatrix4(view.frame.matrixWorld);
+    baseKnee.setFromMatrixPosition(knee.matrixWorld);
+    const bone = base.bones[3 + leg * 3];
+    baseHorseFrame(baseRoot.toArray(), baseKnee.toArray(), baseForward.toArray(), bone.matrixWorld);
+    bone.matrixWorld.multiply(baseStretch.makeScale(1, baseRoot.distanceTo(baseKnee) / base.upper, 1));
+  });
+  if (!base.soft) return;
+  if (dt > 0) {
+    // The trunk's acceleration in its own frame (x forward, y up, z to its left): up from its bob, forward from its change of
+    // speed, to its left from the turn (v × yaw rate towards the turn's inside).
+    const bob = view.group.position.y + view.body.position.y;
+    const rate = base.lastBob === null ? 0 : (bob - base.lastBob) / dt;
+    const up = base.lastRate === null ? 0 : (rate - base.lastRate) / dt;
+    base.lastBob = bob;
     base.lastRate = rate;
-    if (Math.abs(accel) > 0.5) {
-      const W = horse.withers;
-      base.soft.dentLocal(new THREE.Vector3(-0.05 * W, 0.42 * W, 0), Math.min(6, Math.abs(accel)) * HORSE_LOOK.sway * dt * 10);
+    const speed = horse.speed ?? 0;
+    const ahead = base.lastSpeed === null ? 0 : (speed - base.lastSpeed) / dt;
+    base.lastSpeed = speed;
+    // (A positive yaw rate turns it to its right, physics/mounted.js stepHorse: the trunk is pulled to its right, v × yaw rate.)
+    const left = -speed * (horse.yawRate ?? 0);
+    const omega = 2 * Math.PI * HORSE_BELLY.hz;
+    const stiffness = omega * omega;
+    const damping = 2 * HORSE_BELLY.damping * omega;
+    const drive = [ahead, up, left];
+    // (Semi-implicit Euler: stable for ω·dt = 15.7 / 60 ≈ 0.26 ≪ 2; dt is held under 0.05 s, ω·dt ≤ 0.8.)
+    for (let axis = 0; axis < 3; axis += 1) {
+      base.gutRate[axis] += (-drive[axis] - stiffness * base.gut[axis] - damping * base.gutRate[axis]) * dt;
+      const swung = base.gut[axis] + base.gutRate[axis] * dt;
+      base.gut[axis] = Math.max(-HORSE_BELLY.most, Math.min(HORSE_BELLY.most, swung));
+      // (Stopped against the wall.)
+      if (base.gut[axis] !== swung) base.gutRate[axis] = 0;
     }
+    base.soft.carry(base.gut[0], base.gut[1], base.gut[2]);
   }
-  base.lastBob = bob;
   base.soft.update(dt);
 }
 
@@ -886,6 +1023,12 @@ export function disposeHorseView(view, horseView) {
   if (horseView.robot) return disposeRobotDogView(view, horseView);
   view.scene.remove(horseView.group);
   disposeObject(horseView.group);
+  if (horseView.base) {
+    view.scene.remove(horseView.base.mesh);
+    // (Its geometry is its own; the coat image is shared by every horse and kept.)
+    horseView.base.mesh.geometry.dispose();
+    horseView.base.mesh.material.dispose();
+  }
   for (const mesh of horseView.owned) {
     mesh.parent?.remove(mesh);
     disposeObject(mesh);

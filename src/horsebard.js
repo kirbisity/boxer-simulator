@@ -39,6 +39,13 @@ const bdSmooth = (t) => {
   return c * c * (3 - 2 * c);
 };
 const bdScale3 = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+// A cloth hem's fringe: its length below the edge (of the withers: ~5 cm on a horse).
+const BD_FRINGE = 0.035;
+// How far round a high point a plate is raised over it (cells of its grid, each ~3-5 cm: horsebard bdDrape).
+const BD_SPAN_REACH = 2;
+// How steeply a plate is beaten out to a flared hem (m out per m up): ~40° off the hang, a smith's curve over a hand's height
+// for a flare of a few cm, not a turned-out lip.
+const BD_CURVE = 0.8;
 
 /** The tiles a bard's pieces wear (detailmaps.js), by kind and finish: the field, the edges, the mail. */
 export const BARD_TILES = {
@@ -76,11 +83,40 @@ BARD_FIT.mingFront = { ...BARD_FIT.lamellar, peytral: { ...BARD_FIT.lamellar.pey
 
 // ---- Casting over the horse ---------------------------------------------------------------------------------------------
 
-/** The triangles of some meshes ({p, i}), each its 9 numbers; `turns` copies the neck's turned about its pivot. */
+/** The triangles of some meshes ({p, i}), each its 9 numbers, a group a mesh with its bounding box (a ray that misses the box skips it). */
 function bdTriangles(meshes) {
-  const out = [];
-  for (const { p, i } of meshes) for (let k = 0; k < i.length; k += 1) out.push(p[i[k] * 3], p[i[k] * 3 + 1], p[i[k] * 3 + 2]);
-  return Float64Array.from(out);
+  return meshes.map(({ p, i }) => {
+    const tris = new Float64Array(i.length * 3);
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (let k = 0; k < i.length; k += 1) {
+      for (let axis = 0; axis < 3; axis += 1) {
+        const value = p[i[k] * 3 + axis];
+        tris[k * 3 + axis] = value;
+        min[axis] = Math.min(min[axis], value);
+        max[axis] = Math.max(max[axis], value);
+      }
+    }
+    return { tris, min, max };
+  });
+}
+
+/** Whether a ray from `o` along `d` passes through a box (the slab test). */
+function bdThroughBox(o, d, min, max) {
+  let near = 0;
+  let far = Infinity;
+  for (let axis = 0; axis < 3; axis += 1) {
+    if (Math.abs(d[axis]) < 1e-12) {
+      if (o[axis] < min[axis] || o[axis] > max[axis]) return false;
+      continue;
+    }
+    const a = (min[axis] - o[axis]) / d[axis];
+    const b = (max[axis] - o[axis]) / d[axis];
+    near = Math.max(near, Math.min(a, b));
+    far = Math.min(far, Math.max(a, b));
+    if (near > far) return false;
+  }
+  return true;
 }
 
 /** A mesh turned about z through `pivot` by `angle` (the neck nodding). */
@@ -97,8 +133,18 @@ function bdTurned(mesh, pivot, angle) {
   return { p, i: mesh.i };
 }
 
-/** The furthest a ray from `o` along unit `d` meets the triangles (Möller–Trumbore), or null. */
-function bdCast(tris, o, d) {
+/** The furthest a ray from `o` along unit `d` meets the groups' triangles (Möller–Trumbore), or null. */
+function bdCast(groups, o, d) {
+  let best = -1;
+  for (const group of groups) {
+    if (!bdThroughBox(o, d, group.min, group.max)) continue;
+    const hit = bdCastGroup(group.tris, o, d);
+    if (hit !== null && hit > best) best = hit;
+  }
+  return best > 0 ? best : null;
+}
+
+function bdCastGroup(tris, o, d) {
   let best = -1;
   for (let b = 0; b < tris.length; b += 9) {
     const e1x = tris[b + 3] - tris[b];
@@ -233,7 +279,7 @@ function bdDome(ctx, centre, axis, radius, height, { rings = 5, sides = 14, colo
 }
 
 /** A cloth fringe hung below a hem (its points, their outward normals): tongues `length` long, two to a segment. */
-function bdFringe(edge, normals, { length = 0.035, color, lift = 0.004, skip = null }) {
+function bdFringe(edge, normals, { length = BD_FRINGE, color, lift = 0.004, skip = null }) {
   const prim = { p: [], c: [], n: [], i: [] };
   for (let k = 0; k < edge.length - 1; k += 1) {
     if (skip && skip(k)) continue;
@@ -263,25 +309,98 @@ function bdFringe(edge, normals, { length = 0.035, color, lift = 0.004, skip = n
  * A draped piece: for each column `i` (0..cols) and row `j` (0..rows, top to hem) `ray(i, j)` gives an origin inside
  * the horse, a unit direction and whether the row hangs (below the barrel's widest); the plate lies `gap` beyond the
  * furthest surface the ray meets, and a hanging row no nearer in than the row above it plus its `flare` per unit it fell.
+ * `below`: how far a fringe hangs under the hem; the hem stands clear of what is under the fringe too, so the fringe hangs
+ * clear of it.
  */
-function bdDrape(ctx, { cols, rows, ray, gap, flare }) {
-  const grid = [];
-  const origins = [];
+function bdDrape(ctx, { cols, rows, ray, gap, flare, below = 0 }) {
+  const width = cols + 1;
+  const rays = [];
+  const reach = [];
+  // Where each ray finds the horse (null: nothing met).
+  for (let j = 0; j <= rows; j += 1) {
+    for (let i = 0; i <= cols; i += 1) {
+      const cast = ray(i, j);
+      rays[j * width + i] = cast;
+      const hit = ctx.cast(cast.o, cast.d);
+      let r = hit === null ? null : hit + gap;
+      if (j === rows && below > 0) {
+        const under = ctx.cast(vec.add(cast.o, [0, -below, 0]), cast.d);
+        if (under !== null) r = Math.max(r ?? 0, under + gap);
+      }
+      reach[j * width + i] = r;
+    }
+  }
+  // A plate spans its high points and does not sag between its neighbours (a leg met by one ray and missed by the next would
+  // otherwise poke through between them), and it is beaten round over them, not dented to a point: each place stands out as
+  // far as the furthest within BD_SPAN_REACH cells of it, then evened over its own 3 × 3 (so still no nearer than any of its
+  // neighbours' hits: the mean of the wider maxima is never under the nearer ones).
+  const spanned = bdEven(bdFurthest(reach, width, rows + 1, BD_SPAN_REACH), width, rows + 1);
+  const reached = [];
   for (let i = 0; i <= cols; i += 1) {
     let previous = null;
     let previousOrigin = null;
     for (let j = 0; j <= rows; j += 1) {
-      const { o, d, hang } = ray(i, j);
-      const hit = ctx.cast(o, d);
-      let r = hit === null ? previous ?? 0.15 : hit + gap;
+      const { o, hang } = rays[j * width + i];
+      let r = spanned[j * width + i] ?? previous ?? 0.15;
       if (hang && previous !== null) r = Math.max(r, previous + flare * vec.length(vec.sub(o, previousOrigin)));
-      grid[j * (cols + 1) + i] = vec.add(o, vec.scale(d, r));
-      origins[j * (cols + 1) + i] = o;
+      reached[j * width + i] = r;
       previous = r;
       previousOrigin = o;
     }
+    // A hem flared out over what it clears is beaten out to it in a curve from higher up, not turned out at its edge: each
+    // hanging row no further in than the row below it less BD_CURVE per unit it rises.
+    for (let j = rows - 1; j >= 0; j -= 1) {
+      const here = rays[j * width + i];
+      const below = rays[(j + 1) * width + i];
+      if (!here.hang) break;
+      const rise = vec.length(vec.sub(here.o, below.o));
+      reached[j * width + i] = Math.max(reached[j * width + i], reached[(j + 1) * width + i] - BD_CURVE * rise);
+    }
   }
-  return { at: (i, j) => grid[j * (cols + 1) + i], inside: (i, j) => origins[j * (cols + 1) + i] };
+  const grid = [];
+  const origins = [];
+  rays.forEach(({ o, d }, k) => {
+    grid[k] = vec.add(o, vec.scale(d, reached[k]));
+    origins[k] = o;
+  });
+  return { at: (i, j) => grid[j * width + i], inside: (i, j) => origins[j * width + i] };
+}
+
+/** Each cell of a grid (null: no hit) as the furthest within `reach` cells of it across and down. */
+function bdFurthest(values, width, height, reach) {
+  return values.map((_, k) => {
+    const i = k % width;
+    const j = Math.floor(k / width);
+    let most = null;
+    for (let jj = Math.max(0, j - reach); jj <= Math.min(height - 1, j + reach); jj += 1) {
+      for (let ii = Math.max(0, i - reach); ii <= Math.min(width - 1, i + reach); ii += 1) {
+        const value = values[jj * width + ii];
+        if (value !== null && (most === null || value > most)) most = value;
+      }
+    }
+    return most;
+  });
+}
+
+/** Each cell of a grid as the mean of its 3 × 3 (those with a value). */
+function bdEven(values, width, height) {
+  return values.map((value, k) => {
+    if (value === null) return null;
+    const i = k % width;
+    const j = Math.floor(k / width);
+    let sum = 0;
+    let count = 0;
+    for (let jj = Math.max(0, j - 1); jj <= Math.min(height - 1, j + 1); jj += 1) {
+      for (let ii = Math.max(0, i - 1); ii <= Math.min(width - 1, i + 1); ii += 1) {
+        const other = values[jj * width + ii];
+        if (other !== null) {
+          sum += other;
+          count += 1;
+        }
+      }
+    }
+    return sum / count;
+  });
 }
 
 /** Rows of a piece that runs round a vertical axis: the top `upper` rows fan up over the back, the rest hang to the hem. */
@@ -337,12 +456,14 @@ export function buildBard(ctx, kind) {
   };
 
   // Every neck pose the gait gives (horseview.js: down to ~-0.27 rad at the gallop, up a little at rest).
-  const tris = bdTriangles([ctx.colliders.body, ctx.colliders.dock, ...[-0.3, -0.15, 0, 0.06].map((angle) => bdTurned(ctx.colliders.neck, ctx.neckPivot, angle))]);
+  // (And the upper legs in every pose of their swing, where the model gives them: horsebase.js colliders.legs.)
+  const tris = bdTriangles([ctx.colliders.body, ctx.colliders.dock, ...(ctx.colliders.legs ?? []), ...[-0.3, -0.15, 0, 0.06].map((angle) => bdTurned(ctx.colliders.neck, ctx.neckPivot, angle))]);
   ctx.cast = (o, dir) => bdCast(tris, o, dir);
 
   /** A finished draped shell: the field, its turned edges top and bottom, a fringe below (lamellar). */
   const drapedPiece = (part, { cols, rows, ray, gap, flare, keep = null, edges = ['top', 'hem'], fringe = false, trim = false }) => {
-    const plan = bdDrape(ctx, { cols, rows, ray, gap, flare });
+    // (A fringe hangs below the hem, BD_FRINGE.)
+    const plan = bdDrape(ctx, { cols, rows, ray, gap, flare, below: fringe && !low ? BD_FRINGE : 0 });
     const kept = keep ? (i, j) => keep(i, j, plan.at) : null;
     const shell = bdGridShell(ctx, { cols, rows, at: plan.at, inside: plan.inside, tile: field, color: shade(steel), keep: kept });
     detail(part, field, shell.prim);
@@ -443,9 +564,11 @@ export function buildBard(ctx, kind) {
         const x = bdMix(-0.3, -0.62, k / 8);
         const top = bodyFn(x, Math.PI / 2, 0);
         const hit = ctx.cast([x, top[1] - 0.15, 0], [0, 1, 0]);
-        spine.push([x, top[1] - 0.15 + (hit ?? 0.15) + cr.gap + 0.006, 0]);
+        // (It ends where the croup does: past the rump of a horse shorter behind than the loft, nothing to lie on.)
+        if (hit === null) break;
+        spine.push([x, top[1] - 0.15 + hit + cr.gap + 0.006, 0]);
       }
-      ctx.add('body', 'metal', prims.hmTube(spine, spine.map(() => 0.008), { sides: 5, color: edgeSteel }));
+      if (spine.length > 1) ctx.add('body', 'metal', prims.hmTube(spine, spine.map(() => 0.008), { sides: 5, color: edgeSteel }));
     }
   }
 
