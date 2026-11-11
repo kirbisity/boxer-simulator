@@ -1379,8 +1379,8 @@ export const OUTFITS = {
       mingBrigandineDesign('Black', '#1c1c20', '#6f747c', {}, { design: 'cloudBell', finish: 'dark' }),
       // The lamellar and the scale: units of their own, with arm guards (outfitsets.js), never dealt at random to a
       // brigandine man (`chosen`): Koxinga's army at Zeelandia brings its lamellar men (scenarios.js ZEELANDIA).
-      mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }, { design: 'plainPoint', finish: 'iron' }, { chosen: true }),
-      mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a', cord: '#22356a' }, { design: 'plainPoint', finish: 'dark' }, { chosen: true }),
+      mingBrigandineDesign('Iron lamellar, red lacing', '#2a2622', '#8f949b', { kind: 'mingLamellar', lace: '#9a1f1a' }, { design: 'plainPoint', finish: 'steel' }, { chosen: true }),
+      mingBrigandineDesign('Black lamellar, blue lacing', '#1c1c20', '#3a3c42', { kind: 'mingLamellar', lace: '#22356a', cord: '#22356a' }, { design: 'plainPoint', finish: 'steel' }, { chosen: true }),
       mingBrigandineDesign('Iron scale, red coat', '#9a1f1a', '#8f949b', { kind: 'mingScaleCoat', lace: '#3a1410' }, { design: 'yongBell', finish: 'steel' }, { chosen: true }),
     ],
   },

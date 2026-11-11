@@ -68,16 +68,18 @@ export const MING_HELMS = {
   },
   rivetedTube: {
     label: 'Riveted six-plate helmet', zh: '六叶明盔', period: 'Ming, late 16th c.', finish: 'steel',
-    note: 'Bright polished iron (水磨明盔) of six plates under riveted strips, a riveted band, a narrow brim, a tall tube with a black horsehair plume; after the user\'s photo 2 and Bing Lu\'s 六叶盔.',
+    note: 'Bright polished iron (水磨明盔) of six plates under riveted strips, a riveted band, a wide brim sloping down all round as a kettle hat\'s, a tall tube with a black horsehair plume; after the user\'s photo 2 and Bing Lu\'s 六叶盔.',
     profile: [[0.12, 1], [0.35, 1.02], [0.7, 0.99], [1.0, 0.89], [1.24, 0.73], [1.42, 0.53], [1.55, 0.33], [1.62, 0.13]],
     ellipse: [1.13, 0.94], gap: 0.13,
-    brim: { reach: 0.12, fall: 0.03, lip: 0.02 },
+    // (A kettle hat's brim, wide and sloping down all round: was a narrow lip, 0.12 out; the user's call, 2026-11-10.)
+    brim: { reach: 0.42, fall: 0.14, lip: 0.03 },
     plates: 6, strips: true, band: true, rivets: true,
     finial: { kind: 'tube', r: 0.1, h: 0.52 },
     plume: 'blackPlume',
   },
   plainPoint: {
-    label: 'One-piece pointed iron helmet', zh: '一块铁', period: 'Ming, 15th-16th c.', finish: 'iron',
+    // (Bright as the other helmets were kept, the 水磨 polish: the surviving helmet it is drawn after is dark with rust; the user's call, 2026-11-10.)
+    label: 'One-piece pointed iron helmet', zh: '一块铁', period: 'Ming, 15th-16th c.', finish: 'steel',
     note: 'Raised from one piece of iron to a blunt point, a moderate brim sloping down all round, nothing on it; after the user\'s photo 3 (a surviving helmet) and Bing Lu\'s 一块铁.',
     profile: [[0.14, 1], [0.38, 0.99], [0.7, 0.93], [1.0, 0.8], [1.3, 0.62], [1.56, 0.42], [1.78, 0.22], [1.9, 0.09], [1.95, 0.02]],
     ellipse: [1.16, 0.96], gap: 0.13,
