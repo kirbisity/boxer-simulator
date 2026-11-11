@@ -1,5 +1,5 @@
 // Hair for photo faces (photoface.js): each style built from its own shape
-// (HAIR_STYLES), read from the real cut, so no two read alike at a glance:
+// (HAIR_SHAPES), read from the real cut, so no two read alike at a glance:
 //
 //   a cap: one smooth surface over the scalp, from the crown to where the
 //   hair leaves it (hairProfile: for each column round the head, the path
@@ -59,9 +59,9 @@ export const HAIR_MASS = {
  *   hang: how far down it is cut at the front (`fringe`, null: the face left open), sides and back; `blunt` (cut straight)
  *        or ragged; `drape`: how far the long hair below the jaw falls back behind the shoulders; `curl`: a bob's tips turned
  *        under; `swing`: its chains' stiffness and damping (hairswing.js).
- *   parts: what else is drawn (see buildParts).
+ *   parts: what else is drawn (see buildHairParts).
  */
-export const HAIR_STYLES = {
+export const HAIR_SHAPES = {
   // Short, cut close at the sides, the top in stiff spikes standing up and back.
   spiky: { cap: { crown: 0.05, edge: 0.02 }, parts: [{ kind: 'spikes', count: 26, length: 0.34 }] },
   // A short back and sides: full on top, tapered to almost nothing over the ears and nape.
@@ -111,7 +111,7 @@ export const HAIR_STYLES = {
   bald: {},
 };
 
-const smooth = (a, b, x) => {
+const hairSmoothstep = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
@@ -119,28 +119,28 @@ const smooth = (a, b, x) => {
 /** Where the hair leaves the scalp (polar angle from the crown), by azimuth from the face: the hairline, lifted over the ears. */
 function hairLeavePolar(azimuth) {
   const f = Math.abs(azimuth) / Math.PI;
-  return 0.95 + 1.2 * smooth(0.05, 0.95, f) - 0.28 * Math.exp(-(((Math.abs(azimuth) - 1.6) / 0.35) ** 2));
+  return 0.95 + 1.2 * hairSmoothstep(0.05, 0.95, f) - 0.28 * Math.exp(-(((Math.abs(azimuth) - 1.6) / 0.35) ** 2));
 }
 
 /**
  * How far down the hair hangs at an azimuth (a height, of r), or null where it ends at the hairline. Front (the fringe)
  * within 0.6 rad of the face, the sides to 1.45 rad (behind the ear), the back beyond; blunt cuts step, others blend.
  */
-function hangEnd(hang, azimuth) {
+function hairHangEnd(hang, azimuth) {
   const a = Math.abs(azimuth);
   if (hang.blunt) return a < 0.62 ? hang.fringe : a < 1.45 ? hang.sides : hang.back;
   if (hang.fringe === null && a < 0.62) return null;
-  const front = hang.fringe === null ? 0 : 1 - smooth(0.45, 0.75, a);
-  const back = smooth(1.35, 1.9, a);
+  const front = hang.fringe === null ? 0 : 1 - hairSmoothstep(0.45, 0.75, a);
+  const back = hairSmoothstep(1.35, 1.9, a);
   return (hang.fringe ?? 0) * front + hang.sides * (1 - front) * (1 - back) + hang.back * back;
 }
 
-const lengthsOf = (points) => {
+const hairLengthsOf = (points) => {
   const lengths = [0];
   for (let i = 1; i < points.length; i += 1) lengths.push(lengths[i - 1] + points[i].distanceTo(points[i - 1]));
   return lengths;
 };
-const tangentsOf = (points) => points.map((_, i) => points[Math.min(points.length - 1, i + 1)].clone().sub(points[Math.max(0, i - 1)]).normalize());
+const hairTangentsOf = (points) => points.map((_, i) => points[Math.min(points.length - 1, i + 1)].clone().sub(points[Math.max(0, i - 1)]).normalize());
 
 /**
  * The style's columns: for each azimuth, points from the crown over the scalp to the hairline and (hanging) down to the cut,
@@ -148,7 +148,7 @@ const tangentsOf = (points) => points.map((_, i) => points[Math.min(points.lengt
  * the scalp (`scalpLength`: what lies below it hangs). `surface(direction)`: the head's surface. Null for a style with no cap.
  */
 export function hairProfile({ style, surface, r, columns = HAIR_MASS.columns, random = Math.random }) {
-  const shape = HAIR_STYLES[style];
+  const shape = HAIR_SHAPES[style];
   if (!shape?.cap) return null;
   const { cap, hang } = shape;
   const centre = new THREE.Vector3(0, 0.05 * r, 0);
@@ -163,11 +163,11 @@ export function hairProfile({ style, surface, r, columns = HAIR_MASS.columns, ra
       const skin = surface(new THREE.Vector3(Math.sin(polar) * Math.cos(azimuth), Math.cos(polar), Math.sin(polar) * Math.sin(azimuth)));
       const radial = skin.clone().sub(centre);
       // Thick over the crown, thinning to the edge (a fade's cap down to nothing, so it meets the painted stubble).
-      const thickness = (cap.edge + (cap.crown - cap.edge) * (1 - smooth(0, 1, polar / leave))) * r;
+      const thickness = (cap.edge + (cap.crown - cap.edge) * (1 - hairSmoothstep(0, 1, polar / leave))) * r;
       points.push(centre.clone().add(radial.setLength(radial.length() + thickness)));
     }
-    const scalpLength = lengthsOf(points).at(-1);
-    let end = hang ? hangEnd(hang, azimuth) : null;
+    const scalpLength = hairLengthsOf(points).at(-1);
+    let end = hang ? hairHangEnd(hang, azimuth) : null;
     const from = points[points.length - 1];
     if (end !== null && end !== undefined) end = (end - (hang.blunt ? 0 : HAIR_MASS.ragged * Math.abs(end) * random())) * r;
     if (end !== null && end !== undefined && end < from.y - 0.05 * r) {
@@ -202,9 +202,9 @@ export function hairProfile({ style, surface, r, columns = HAIR_MASS.columns, ra
         last = point;
       }
     }
-    const lengths = lengthsOf(points);
+    const lengths = hairLengthsOf(points);
     const total = lengths.at(-1) || 1;
-    out.push({ azimuth, points, along: lengths.map((l) => l / total), total, scalpLength, tangents: tangentsOf(points), hangs: points.length > HAIR_MASS.scalpRows + 1 });
+    out.push({ azimuth, points, along: lengths.map((l) => l / total), total, scalpLength, tangents: hairTangentsOf(points), hangs: points.length > HAIR_MASS.scalpRows + 1 });
   }
   return { shape, columns: out, centre };
 }
@@ -253,7 +253,7 @@ function massSheet(blunt) {
 }
 
 /** Strands for the parts (tubes, knots): streaks the full height, repeating both ways. */
-function strandSheet() {
+function hairStrandSheet() {
   return hairCanvas('strands', (paint, random) => {
     for (let x = 0; x < 256; x += 1) {
       const tone = Math.round(150 + 80 * random());
@@ -308,7 +308,7 @@ function sheenMaterial(colour, map, { alphaTest = 0 } = {}) {
  */
 function hairSheet() {
   const sheet = { positions: [], uvs: [], tangents: [], swing: [], indices: [] };
-  sheet.vertex = (point, u, v, tangent, bind = NO_SWING) => {
+  sheet.vertex = (point, u, v, tangent, bind = HAIR_STILL) => {
     sheet.positions.push(point.x, point.y, point.z);
     sheet.uvs.push(u, v);
     sheet.tangents.push(tangent.x, tangent.y, tangent.z);
@@ -327,7 +327,7 @@ function hairSheet() {
   };
   return sheet;
 }
-const NO_SWING = [0, 0, 0, -1];
+const HAIR_STILL = [0, 0, 0, -1];
 
 /** A column resampled to `count` points by its length along, with each point's length below the hairline. */
 function resampleColumn(column, count) {
@@ -349,8 +349,8 @@ function resampleColumn(column, count) {
 }
 
 /** Points along a polyline resampled evenly to `count`. */
-function resamplePath(path, count) {
-  const lengths = lengthsOf(path);
+function hairResamplePath(path, count) {
+  const lengths = hairLengthsOf(path);
   const total = lengths.at(-1);
   const out = [];
   for (let k = 0; k < count; k += 1) {
@@ -367,7 +367,7 @@ function resamplePath(path, count) {
  * The cap and hang: one surface over the columns (around, and down each to its cut). The hang's chains are the columns every
  * `chainEvery` (each from its hairline down, as long as it hangs); a vertex follows the two either side of its column.
  */
-function capAndHang(profile, chains, r) {
+function hairCapAndHang(profile, chains, r) {
   const columns = profile.columns;
   // A cap alone (nothing hangs) has the scalp's rows only: half the triangles of one that hangs.
   const rows = HAIR_MASS.scalpRows + (columns.some((column) => column.hangs) ? HAIR_MASS.hangRows : 0) + 1;
@@ -385,7 +385,7 @@ function capAndHang(profile, chains, r) {
       continue;
     }
     ring.push(chains.length);
-    chains.push({ rest: resamplePath(hanging, HAIR_MASS.nodes), ring: true, ...swing });
+    chains.push({ rest: hairResamplePath(hanging, HAIR_MASS.nodes), ring: true, ...swing });
   }
   const repeat = 6;
   columns.forEach((column, c) => {
@@ -398,7 +398,7 @@ function capAndHang(profile, chains, r) {
     if (a < 0) [a, share] = [b, 1];
     if (b < 0) [b, share] = [a, 0];
     points.forEach((point, k) => {
-      const bind = a < 0 || below[k] <= 0 ? NO_SWING : [a, b, share, below[k]];
+      const bind = a < 0 || below[k] <= 0 ? HAIR_STILL : [a, b, share, below[k]];
       sheet.vertex(point, (c / columns.length) * repeat, 1 - k / (rows - 1), tangents[k], bind);
     });
   });
@@ -417,9 +417,9 @@ function capAndHang(profile, chains, r) {
  * A tube along `path` (local points), its radius `radius(t)` (t 0..1 along), `sides` round; flattened to `flat` of its
  * width across `up` (a braid lying on the scalp). `bind(t)`: each ring's swing binding. Frames carried along (no twist).
  */
-function addTube(sheet, path, { radius, sides = 6, bind = () => NO_SWING, up = null, flat = 1, v = 1 }) {
-  const tangents = tangentsOf(path);
-  const lengths = lengthsOf(path);
+function addHairTube(sheet, path, { radius, sides = 6, bind = () => HAIR_STILL, up = null, flat = 1, v = 1 }) {
+  const tangents = hairTangentsOf(path);
+  const lengths = hairLengthsOf(path);
   const total = lengths.at(-1) || 1;
   let normal = up ? up.clone() : new THREE.Vector3(0, 0, 1);
   if (Math.abs(normal.dot(tangents[0])) > 0.95) normal = new THREE.Vector3(1, 0, 0);
@@ -447,7 +447,7 @@ function addTube(sheet, path, { radius, sides = 6, bind = () => NO_SWING, up = n
 }
 
 /** An ellipsoid (a knot, a bun, a curl): `radii` along its own axes, `facing` its x; strands round it. */
-function addKnot(sheet, centre, radii, { segments = 12, rings = 8, facing = null } = {}) {
+function addHairKnot(sheet, centre, radii, { segments = 12, rings = 8, facing = null } = {}) {
   const base = sheet.positions.length / 3;
   const rotate = new THREE.Quaternion();
   if (facing) rotate.setFromUnitVectors(new THREE.Vector3(1, 0, 0), facing.clone().normalize());
@@ -470,15 +470,15 @@ function addKnot(sheet, centre, radii, { segments = 12, rings = 8, facing = null
 }
 
 /** A chain for a hanging part (local rest points, root first) and the binding of a point `down` along it. */
-function partChain(chains, path, swing) {
+function hairPartChain(chains, path, swing) {
   const index = chains.length;
-  const rest = resamplePath(path, HAIR_MASS.nodes);
+  const rest = hairResamplePath(path, HAIR_MASS.nodes);
   chains.push({ rest, ...swing });
   return (down) => [index, index, 0, down];
 }
 
 /** A ringlet: a tight spiral round an axis hung from `root` (local), `length` long, `turns` a head radius; its own chain. */
-function addRinglet(sheet, chains, root, { length, r, random, outward = null, swing }) {
+function addHairRinglet(sheet, chains, root, { length, r, random, outward = null, swing }) {
   const axis = [];
   const steps = 6;
   const drift = outward ? outward.clone().setY(0).normalize() : new THREE.Vector3();
@@ -487,7 +487,7 @@ function addRinglet(sheet, chains, root, { length, r, random, outward = null, sw
     // Hangs straight down, drifting a little out from the head as it falls (the curls stand off one another).
     axis.push(root.clone().add(new THREE.Vector3(0, -length * t, 0)).addScaledVector(drift, 0.15 * r * Math.sin(t * Math.PI * 0.5)));
   }
-  const bind = partChain(chains, axis, swing);
+  const bind = hairPartChain(chains, axis, swing);
   // The spiral: 0.34 r a turn (tight Victorian curls, 3.5 cm), 5 points a turn, round the axis at 0.06 r opening to 0.11 r,
   // the strand 0.055 r thick tapering to 0.035 r.
   const pitch = 0.34 * r;
@@ -505,11 +505,11 @@ function addRinglet(sheet, chains, root, { length, r, random, outward = null, sw
     spiral.push(centre.add(new THREE.Vector3(Math.cos(angle) * wide, 0, Math.sin(angle) * wide)));
     downs.push(t * length);
   }
-  addTube(sheet, spiral, { radius: (t) => (0.055 - 0.02 * t) * r, sides: 5, bind: (t, k) => bind(downs[k]), v: length / r });
+  addHairTube(sheet, spiral, { radius: (t) => (0.055 - 0.02 * t) * r, sides: 5, bind: (t, k) => bind(downs[k]), v: length / r });
 }
 
 /** A point on the head's surface by polar angle and azimuth, lifted `lift` (of r) off it, and the outward direction there. */
-function scalpAt(surface, centre, polar, azimuth, lift, r) {
+function hairScalpAt(surface, centre, polar, azimuth, lift, r) {
   const direction = new THREE.Vector3(Math.sin(polar) * Math.cos(azimuth), Math.cos(polar), Math.sin(polar) * Math.sin(azimuth));
   const skin = surface(direction);
   const out = skin.clone().sub(centre);
@@ -518,8 +518,8 @@ function scalpAt(surface, centre, polar, azimuth, lift, r) {
 }
 
 /** The style's parts into `sheet`, their chains into `chains`. */
-function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
-  const at = (polar, azimuth, lift = 0) => scalpAt(surface, centre, polar, azimuth, lift, r);
+function buildHairParts(shape, sheet, chains, { surface, centre, r, random }) {
+  const at = (polar, azimuth, lift = 0) => hairScalpAt(surface, centre, polar, azimuth, lift, r);
   for (const part of shape.parts ?? []) {
     if (part.kind === 'spikes') {
       // Stiff tufts over the top and front (polar under 1.15 rad, not over the ears or nape), standing out and leaning
@@ -557,8 +557,8 @@ function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
           const direction = new THREE.Vector3(Math.sin(sweep) * flat, Math.cos(sweep) * flat, across);
           path.push(centre.clone().add(surface(direction).sub(centre).multiplyScalar(1.015)));
         }
-        const length = lengthsOf(path).at(-1);
-        addTube(sheet, path, {
+        const length = hairLengthsOf(path).at(-1);
+        addHairTube(sheet, path, {
           radius: (t) => 0.06 * r * (0.7 + 0.3 * Math.abs(Math.sin((t * length) / (0.18 * r) * Math.PI))),
           sides: 6,
           flat: 0.55,
@@ -574,14 +574,14 @@ function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
       const size = top ? 0.19 : 0.31;
       const { point, normal } = at(polar, Math.PI, 0);
       const centreOf = point.clone().addScaledVector(normal, size * r * 0.75);
-      addKnot(sheet, centreOf, top ? [size * r, size * r * 1.15, size * r] : [size * r, size * r * 0.92, size * r * 1.05], { facing: normal });
+      addHairKnot(sheet, centreOf, top ? [size * r, size * r * 1.15, size * r] : [size * r, size * r * 0.92, size * r * 1.05], { facing: normal });
       // The hair round its base: a band of twisted hair (a flattened ring).
-      addKnot(sheet, point.clone().addScaledVector(normal, 0.02 * r), [0.05 * r, size * r * 0.85, size * r * 0.85], { segments: 10, rings: 4, facing: normal });
+      addHairKnot(sheet, point.clone().addScaledVector(normal, 0.02 * r), [0.05 * r, size * r * 0.85, size * r * 0.85], { segments: 10, rings: 4, facing: normal });
     } else if (part.kind === 'tail') {
       // A ponytail: tied at the back of the crown, out over the back of the skull, then hanging down the back, thick at the
       // tie and tapering to a brush; its own chain from just below the tie.
       const tie = at(1.2, Math.PI, 0.02);
-      addKnot(sheet, tie.point.clone().addScaledVector(tie.normal, 0.06 * r), [0.08 * r, 0.15 * r, 0.15 * r], { segments: 10, rings: 5, facing: tie.normal });
+      addHairKnot(sheet, tie.point.clone().addScaledVector(tie.normal, 0.06 * r), [0.08 * r, 0.15 * r, 0.15 * r], { segments: 10, rings: 5, facing: tie.normal });
       const start = tie.point.clone().addScaledVector(tie.normal, 0.14 * r);
       const path = [start];
       const out = tie.normal.clone().setY(0).normalize();
@@ -591,10 +591,10 @@ function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
         // Arcing out over the skull's back (0.25 r) and in again as it falls past the nape.
         path.push(start.clone().add(new THREE.Vector3(0, -down, 0)).addScaledVector(out, 0.28 * r * Math.sin(Math.min(1, t * 2.2) * Math.PI * 0.5) - 0.12 * r * t));
       }
-      const lengths = lengthsOf(path);
-      const bind = partChain(chains, path, { stiffness: 0.08, damping: 0.03 });
+      const lengths = hairLengthsOf(path);
+      const bind = hairPartChain(chains, path, { stiffness: 0.08, damping: 0.03 });
       const tube = path.map((p, k) => ({ p, down: lengths[k] }));
-      addTube(sheet, tube.map((entry) => entry.p), {
+      addHairTube(sheet, tube.map((entry) => entry.p), {
         radius: (t) => part.radius * r * (0.75 + 0.6 * Math.sin(Math.min(1, t * 3) * Math.PI * 0.5) - 0.95 * t * t),
         sides: 8,
         flat: 0.75,
@@ -616,15 +616,15 @@ function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
         const out = new THREE.Vector3(Math.cos(azimuth), 0, Math.sin(azimuth));
         const hang = [];
         for (let s = 1; s <= 6; s += 1) hang.push(hairline.clone().add(new THREE.Vector3(0, (-length * s) / 6, 0)).addScaledVector(out, 0.08 * r * Math.sin((s / 6) * Math.PI * 0.5)));
-        const bind = partChain(chains, [hairline, ...hang], { stiffness: 0.06, damping: 0.05 });
+        const bind = hairPartChain(chains, [hairline, ...hang], { stiffness: 0.06, damping: 0.05 });
         const whole = [...path, ...hang];
-        const scalp = lengthsOf(path).at(-1);
-        const lengths = lengthsOf(whole);
+        const scalp = hairLengthsOf(path).at(-1);
+        const lengths = hairLengthsOf(whole);
         const thick = part.radius * r * (0.85 + 0.3 * random());
-        addTube(sheet, whole, {
+        addHairTube(sheet, whole, {
           radius: (t) => thick * (1 - 0.3 * t),
           sides: 5,
-          bind: (t, i) => (lengths[i] > scalp ? bind(lengths[i] - scalp) : NO_SWING),
+          bind: (t, i) => (lengths[i] > scalp ? bind(lengths[i] - scalp) : HAIR_STILL),
           v: lengths.at(-1) / r,
         });
       }
@@ -635,17 +635,17 @@ function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
         const wrapped = (k % 2 ? 1 : -1) * (0.85 + (Math.PI - 0.85) * (Math.floor(k / 2) / Math.max(1, Math.ceil(part.count / 2) - 1)));
         const { point, normal } = at(hairLeavePolar(wrapped) - 0.12, wrapped, (shape.cap?.edge ?? 0) + 0.04);
         const behind = Math.abs(wrapped) / Math.PI;
-        addRinglet(sheet, chains, point, { length: part.length * r * (0.55 + 0.45 * behind) * (0.9 + 0.2 * random()), r, random, outward: normal, swing: { stiffness: 0.1, damping: 0.025 } });
+        addHairRinglet(sheet, chains, point, { length: part.length * r * (0.55 + 0.45 * behind) * (0.9 + 0.2 * random()), r, random, outward: normal, swing: { stiffness: 0.1, damping: 0.025 } });
       }
     } else if (part.kind === 'pigtails') {
       // Two bunches tied high at the sides behind the ears, a knot at each tie and ringlets hanging from it.
       for (const side of [-1, 1]) {
         const tie = at(0.95, side * 2.1, 0.02);
         const knotAt = tie.point.clone().addScaledVector(tie.normal, 0.1 * r);
-        addKnot(sheet, knotAt, [0.14 * r, 0.12 * r, 0.12 * r], { segments: 10, rings: 6, facing: tie.normal });
+        addHairKnot(sheet, knotAt, [0.14 * r, 0.12 * r, 0.12 * r], { segments: 10, rings: 6, facing: tie.normal });
         for (let k = 0; k < part.each; k += 1) {
           const spread = new THREE.Vector3((random() - 0.5) * 0.18 * r, -0.06 * r, (random() - 0.5) * 0.18 * r);
-          addRinglet(sheet, chains, knotAt.clone().add(spread).addScaledVector(tie.normal, 0.06 * r), { length: part.length * r * (0.8 + 0.3 * random()), r, random, outward: tie.normal, swing: { stiffness: 0.09, damping: 0.025 } });
+          addHairRinglet(sheet, chains, knotAt.clone().add(spread).addScaledVector(tie.normal, 0.06 * r), { length: part.length * r * (0.8 + 0.3 * random()), r, random, outward: tie.normal, swing: { stiffness: 0.09, damping: 0.025 } });
         }
       }
     } else if (part.kind === 'updo') {
@@ -655,13 +655,13 @@ function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
         const ring = k === 0 ? 0 : 0.32;
         const { point, normal } = at(0.45 + ring * Math.cos(angle), Math.PI + ring * 1.6 * Math.sin(angle), 0.02);
         const size = (k === 0 ? 0.2 : 0.14 + 0.04 * random()) * r;
-        addKnot(sheet, point.addScaledVector(normal, size * 0.8), [size, size * 0.85, size], { segments: 9, rings: 6, facing: normal });
+        addHairKnot(sheet, point.addScaledVector(normal, size * 0.8), [size, size * 0.85, size], { segments: 9, rings: 6, facing: normal });
       }
     } else if (part.kind === 'temples') {
       // A loose ringlet before each ear.
       for (const side of [-1, 1]) {
         const { point, normal } = at(1.55, side * 1.05, 0.05);
-        addRinglet(sheet, chains, point, { length: part.length * r, r, random, outward: normal, swing: { stiffness: 0.1, damping: 0.025 } });
+        addHairRinglet(sheet, chains, point, { length: part.length * r, r, random, outward: normal, swing: { stiffness: 0.1, damping: 0.025 } });
       }
     }
   }
@@ -673,7 +673,7 @@ function buildParts(shape, sheet, chains, { surface, centre, r, random }) {
  */
 export function buildHairMass({ group, head, r, style, colour, random }) {
   const surface = (direction) => new THREE.Vector3(...head.point(direction.x, direction.y, direction.z)).multiplyScalar(r);
-  const shape = HAIR_STYLES[style];
+  const shape = HAIR_SHAPES[style];
   const result = { triangles: 0, meshes: [], chains: [] };
   if (!shape) return result;
   const centre = new THREE.Vector3(0, 0.05 * r, 0);
@@ -687,10 +687,10 @@ export function buildHairMass({ group, head, r, style, colour, random }) {
     result.triangles += sheet.indices.length / 3;
   };
   const profile = hairProfile({ style, surface, r, random });
-  if (profile) add(capAndHang(profile, result.chains, r), sheenMaterial(colour, massSheet(Boolean(shape.hang?.blunt)), { alphaTest: 0.5 }));
+  if (profile) add(hairCapAndHang(profile, result.chains, r), sheenMaterial(colour, massSheet(Boolean(shape.hang?.blunt)), { alphaTest: 0.5 }));
   const parts = hairSheet();
-  buildParts(shape, parts, result.chains, { surface, centre, r, random });
-  add(parts, sheenMaterial(colour, strandSheet()));
+  buildHairParts(shape, parts, result.chains, { surface, centre, r, random });
+  add(parts, sheenMaterial(colour, hairStrandSheet()));
   return result;
 }
 
