@@ -154,6 +154,9 @@ export const LOFT = {
   // parent's across the joint it starts at; a trunk piece the trunk's alone (the game's pelvis, spine and chest).
   // How wasted a body's shoulders are by its BMI (baseWasting): none at `from`, all at `to`.
   wasting: { from: 22, to: 14 },
+  // The neck's girth (baseNeckGirth), m: at BMI 22, per unit of BMI, for full training (exercise 1: the trapezius and
+  // sternocleidomastoid grown), at this height (scaled with the body's).
+  neck: { male: { at22: 0.375, perBmi: 0.005, trained: 0.025, height: 1.78 }, female: { at22: 0.325, perBmi: 0.005, trained: 0.012, height: 1.65 } },
   heat: { reach: 0.06, bones: { trunk: ['trunk'], neck: ['neck', 'trunk'], '*Upper': ['*UpperArm', '*Clavicle', 'trunk'], '*Fore': ['*Forearm', '*UpperArm'], '*Thigh': ['*Thigh', 'trunk'], '*Shin': ['*Shin', '*Thigh'] } },
   // PROOF OF CONCEPT (shoulder-poc): the armpit's hand-over from the trunk's bones to the upper arm's made narrow. Below the
   // shoulder's cap (t of the upper arm from `from` to `to`, eased) and on the arm's inner side, facing the trunk, each weight is
@@ -1946,7 +1949,18 @@ export function baseWasting(body) {
   return Math.max(baseStarvation(body), Math.min(1, Math.max(0, (from - bmi) / (from - to))));
 }
 
-function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach }, rules = null, waste = 0) {
+/**
+ * The body's own neck girth (m round its middle), from its BMI and its training (LOFT.neck): the line through the published
+ * means (a man's about 38 cm and a woman's about 33 at a normal BMI, 37 and 34 the cut-offs for overweight: Ben-Noun, Sohar
+ * and Laor 2001, Obesity Research 9:470), half a centimetre a unit of BMI, and a trained man's neck muscle on top.
+ */
+export function baseNeckGirth(body) {
+  const spec = LOFT.neck[body.inputs.sex === 'female' ? 'female' : 'male'];
+  const bmi = body.massKg / (body.heightM * body.heightM);
+  return (spec.at22 + spec.perBmi * (bmi - 22) + spec.trained * (body.inputs.exercise ?? 0)) * (body.heightM / spec.height);
+}
+
+function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach }, rules = null, waste = 0, neckGirth = 0) {
   const relief = (name) => {
     const key = BASE_TRAIT[name] ?? BASE_TRAIT[name.slice(1)];
     const modelled = definedBy(rig.refTraits[key].fat);
@@ -1955,7 +1969,7 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
   // (PROOF OF CONCEPT, BASE_BODY.shoulder 'E': the share of the model's shoulder bulk this body keeps, its arm's muscle showing
   // as baseArmForms reads it: development × leanness × definition through the fat.)
   const shoulderKeep = rules ? Math.min(1, rules.dev * rules.traits.arm.lean * Math.min(1, Math.max(0, (0.016 - rules.traits.arm.fat) / 0.011))) : 0;
-  const { positions } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null, shoulderKeep, waste);
+  const { positions } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null, shoulderKeep, waste, neckGirth);
   const uvs = uv ? baseBodyUvs(rig) : null;
   const start = mesh.positions.length / 3;
   const { render } = rig;
@@ -3693,7 +3707,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
 
   if (base?.measure) return { baseParts };
   if (baseRig) {
-    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints, lowDetail ? null : rulesTraits(body), baseWasting(body));
+    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints, lowDetail ? null : rulesTraits(body), baseWasting(body), lowDetail ? 0 : baseNeckGirth(body));
     fitClothToBase(mesh, baseParts, armoured);
   }
   // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.
