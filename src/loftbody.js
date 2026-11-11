@@ -13,7 +13,8 @@ import { BONE, bindPoints, boneFrames } from './rig.js';
 import { factionOf, glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
 import { ARMOUR_EDGES, ARMOUR_TILES, armourTileOf, clothMaterialOf, clothUvAt, DETAIL_ARMOUR, DETAIL_MAPS, isLacedTile, mailUv, measureRings, pieceMaterial, plateUvAt, stripUv, tileUv } from './detailmaps.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
-import { SCULPT, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
+import { SCULPT, SCULPT_TRUNK, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
+import { SLOSH_BONES, sloshFigures, sloshWeights } from './fatslosh.js';
 import { ribDroop, RULES, rulesProfile, rulesShape, rulesTraits, trunkRule, trunkSilhouette } from './skinrules.js';
 
 // The loft's own profiles (eased stop to stop), by a name of their own: the builder's `sculptProfile` is this or the rules' smooth one.
@@ -80,6 +81,16 @@ export const LOFT = {
   bellyFrom: 0.035,
   bellyScale: 0.9,
   bellyDrop: 2.2,
+  // The base mesh's belly (body style 'base', baseBelly): one rounded mass, not a deeper ring. Its middle `centre` up the trunk,
+  // below the navel (0.26: the lower abdomen carries most of the fat, subcutaneous and visceral), lowered by `dropShare` of its
+  // hang; it reaches `tall` (u) up and down from there (from the rib margin to the groin) and `wide` (rad) round from the front
+  // (to the flanks). Its depth is bellyScale's, its foot's hang bellyDrop's; both fall to nothing at its edge with a flat slope,
+  // so it meets the body without a ledge.
+  bellyBall: { centre: 0.18, dropShare: 0.5, tall: 0.26, wide: 1.5 },
+  // The fat masses that follow the frame (fatslosh.js), on the base mesh's trunk: the belly's mass reaches `bellyAcross` of the
+  // trunk's half-width round it and `bellyOut` of its half-depth out from its middle; each breast and buttock is a ball of
+  // `ballShare` of the trunk's half-width there, centred on the trunk's surface at its sculpt.js landmark.
+  slosh: { bellyAcross: 1.05, bellyOut: 0.9, ballShare: 0.42 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
   wastingFrom: 0.135,
@@ -1850,6 +1861,66 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve) {
   mesh.base = { start, count: render.count, source: render.source, sources: rig.sources.count };
 }
 
+/**
+ * The base mesh's belly (LOFT.bellyBall), for a fat layer `belly` m past LOFT.bellyFrom on a trunk `length` m long, or null: its
+ * middle and reach up the trunk, its depth and its foot's hang (m), and `swell(t, angle) => [out, down]` (m) at a point of the
+ * trunk: a dome (1 - r²)² over the ellipse round its middle, so its slope is flat at its edge (no ledge at the flanks), its foot
+ * hanging down over the groin by the same dome below the middle.
+ */
+function baseBelly(belly, length) {
+  if (belly <= 0) return null;
+  const spec = LOFT.bellyBall;
+  const depth = belly * LOFT.bellyScale;
+  const drop = belly * LOFT.bellyDrop;
+  const centre = spec.centre - (drop / length) * spec.dropShare;
+  return {
+    centre, depth, drop, tall: spec.tall,
+    swell: (t, angle) => {
+      const round = Math.atan2(Math.sin(angle), Math.cos(angle));
+      const r2 = ((t - centre) / spec.tall) ** 2 + (round / spec.wide) ** 2;
+      if (r2 >= 1) return [0, 0];
+      const dome = (1 - r2) ** 2;
+      const below = Math.min(1, Math.max(0, (centre - t) / spec.tall));
+      return [depth * dome, drop * dome * below * below * (3 - 2 * below)];
+    },
+  };
+}
+
+/**
+ * The fat masses of a base skin (fatslosh.js): the belly (where there is one), the breasts and the buttocks, each placed on the
+ * trunk's rings (`trunk`, the loft's description of it) at its landmark (sculpt.js SCULPT_TRUNK), each point's weight in each
+ * (sloshWeights: most at the mass's free front and foot). `figures` its springs' (sloshFigures).
+ */
+function baseSlosh(figures, positions, rigid, trunk, belly) {
+  const spec = LOFT.slosh;
+  const axis = vec.normalize(vec.sub(trunk.b, trunk.a));
+  const length = vec.length(vec.sub(trunk.b, trunk.a));
+  const out = vec.normalize(vec.sub(trunk.forward, vec.scale(axis, vec.dot(trunk.forward, axis))));
+  const side = vec.cross(axis, out);
+  const centreAt = (u) => vec.add(vec.add(trunk.a, vec.scale(axis, u * length)), vec.scale(out, trunk.offset(u)));
+  // Freer at the front (out) and the foot (down): a mass hangs from its root at the back and top.
+  const hang = (local) => Math.min(1, Math.max(0, 0.5 + 0.5 * local[2])) * Math.min(1, Math.max(0, 0.6 - 0.4 * local[1]));
+  const masses = [];
+  if (belly) {
+    const u = belly.centre;
+    masses.push({ name: 'belly', bones: SLOSH_BONES.belly, centre: vec.add(centreAt(u), vec.scale(out, trunk.depth(u) * 0.5)), axes: [side, axis, out], radii: [trunk.width(u) * spec.bellyAcross, belly.tall * length, trunk.depth(u) * spec.bellyOut + belly.depth], hang });
+  }
+  const ball = (name, u, angle) => {
+    const ring = { depth: trunk.depth(u), width: trunk.width(u) };
+    const surface = vec.add(centreAt(u), vec.add(vec.scale(out, Math.cos(angle) * ring.depth), vec.scale(side, Math.sin(angle) * ring.width)));
+    const facing = vec.normalize(vec.sub(surface, centreAt(u)));
+    const across = vec.normalize(vec.cross(axis, facing));
+    const radius = ring.width * spec.ballShare;
+    masses.push({ name, bones: SLOSH_BONES[name], centre: surface, axes: [across, axis, facing], radii: [radius, radius, radius], hang });
+  };
+  for (const sign of [1, -1]) {
+    ball('breast', SCULPT_TRUNK.chest.at, sign * SCULPT_TRUNK.chest.angle);
+    ball('buttock', SCULPT_TRUNK.glute.at, sign * SCULPT_TRUNK.glute.angle);
+  }
+  const weights = sloshWeights(positions, masses, rigid);
+  return { figures, masses: masses.map(({ hang: _, ...mass }, index) => ({ ...mass, weights: weights[index] })) };
+}
+
 /** The base skin's points drawn more than once (a seam, a tile's edge) given one normal: the mean of theirs. */
 function weldBaseNormals(normals, base) {
   const sums = new Float64Array(base.sources * 3);
@@ -2057,7 +2128,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   yield 'trunk shaped';
   // The base mesh's trunk: on the body's own width, depth and lean (its belly's bulge in them), without the apron's hem.
   // (The belly's bulge left out: the base mesh's belly is its own round mass, not a deeper ring.)
-  if (base) baseParts.trunk = { a: at('pelvis'), b: at('neck'), forward, depth: (u) => unbulged(bodyDepth, 1)(u), width: bodyWidth, offset: (u) => unbulged(bodyLean, 0.8)(u), bend: trunkShapes(body, baseTraits).mass, bones: (t, front) => abdomen({ t }, front) };
+  const baseBellyShape = base ? baseBelly(belly, vec.length(vec.sub(at('neck'), at('pelvis')))) : null;
+  if (base) baseParts.trunk = { a: at('pelvis'), b: at('neck'), forward, depth: (u) => unbulged(bodyDepth, 1)(u), width: bodyWidth, offset: (u) => unbulged(bodyLean, 0.8)(u), bend: trunkShapes(body, baseTraits).mass, bones: (t, front) => abdomen({ t }, front), swell: baseBellyShape?.swell ?? null };
   else loft(mesh, trunkRings(Math.min(-0.12, hem), 1.12, trunkCount), trunkSides, { bones: abdomen, ...(sculpted ? { bend: ruledBend(trunkShape, 'trunk', null, coveredTrunk) } : {}), ...skinUv('trunk'), part: 'trunk' });
   mesh.covers.trunk = coveredTrunk;
   // Kit is geometry, not paint: shorts, waistband and (for women) a sports
@@ -2731,10 +2803,16 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const rigid = bones.map((list) => list === chestOnly);
   yield 'skin weights';
   const weights = yield* skinWeightsSteps(Float32Array.from(weightPositions), frames, bones);
+  // The base mesh's fat masses that follow the frame (fatslosh.js): an overweight trunk and up, not in a crowd; only the points
+  // the trunk's bones carry most (an arm or a thigh lying against the belly or a breast is not moved with it), not a rigid plate.
+  const figures = baseRig && !lowDetail ? sloshFigures(fatLayer) : null;
+  const trunkBones = new Set([BONE.pelvis, BONE.spine, BONE.chest]);
+  const still = figures ? rigid.map((fixed, vertex) => fixed || !trunkBones.has(weights.skinIndex[vertex * 4])) : null;
+  const slosh = figures ? baseSlosh(figures, positionArray, still, baseParts.trunk, baseBellyShape) : null;
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return {
     positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames: frames, bindPoints: points,
-    ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}), ...(tint ? { tint } : {}),
+    ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}), ...(tint ? { tint } : {}), ...(slosh ? { slosh } : {}),
   };
 }
 

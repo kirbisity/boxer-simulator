@@ -37,6 +37,7 @@ import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromF
 import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, HEAD_VARIANT, onlyVariant, simplifyTemplate, stretchedInverses, withoutVariant } from './crowdview.js';
 import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
+import { FatSlosh } from './fatslosh.js';
 import { buildRobotBody } from './robotview.js';
 import { buildExoFrame } from './exoview.js';
 import { disposeMaterialTextures, disposeObject, doubleSided, outlineFor, surface, unskinnedCopy } from './toon.js';
@@ -2215,7 +2216,7 @@ function detailedView(view, fighter, simple) {
   if (simple) thinOut(layers.skin, skinMesh);
   view.scene.add(group);
   const fighterView = {
-    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells,
+    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells, slosh: skin.slosh,
     baseColors, vertexSegment, damageVersion: -1, headProps, dangles, swings: headgear?.swings ?? [], steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
     // The helmet as worn (lifted off and thrown when a blow knocks it off: updateProps), and whether it hid the face.
@@ -2389,7 +2390,9 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   const shell = soft ? new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false, fixed: built.rigid }) : null;
-  return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, detailMeshes, detailOutlines, vertexSegment, shell };
+  // A fat base-style body's belly, breasts and buttocks follow the frame on springs of their own (fatslosh.js), on the shell's points.
+  const slosh = shell && built.slosh ? new FatSlosh(built.slosh, shell, built.bindFrames, BONES) : null;
+  return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, detailMeshes, detailOutlines, vertexSegment, shell, slosh };
 }
 
 /**
@@ -2616,6 +2619,7 @@ function swapSkin(view, fighterView, style, made = null) {
   Object.assign(fighterView, { built, skinMesh: skin.skinMesh, skinOutline: skin.skinOutline, steelMesh: skin.steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines, baseColors: skin.baseColors, vertexSegment: skin.vertexSegment, bodyStyle: style, damageVersion: -1 });
   const entry = fighterView.shells.find((shell) => shell.key === 'body');
   if (entry && skin.shell) entry.shell = skin.shell;
+  fighterView.slosh = skin.slosh;
   // As he was drawn: ghosted or not, his ink, his shadow.
   setLayer(fighterView, fighterView.layer);
   return true;
@@ -3210,6 +3214,8 @@ export function updateFighterView(fighterView, dt, time) {
     return;
   }
   const step = Math.min(dt, 1 / 30);
+  // (The fat's masses first: their offsets go into the body's shell with its dents.)
+  fighterView.slosh?.update(dt, frames);
   for (const entry of fighterView.shells) entry.shell.update(step);
   // What hanging hair and cloth rest on: the head, and the trunk with
   // whatever is worn over it.

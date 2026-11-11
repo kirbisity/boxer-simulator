@@ -54,6 +54,21 @@ test('a crowd in the base style wears the crowd mesh (about 2.5k triangles of sk
   assert.ok(triangles > 2300 && triangles < 3200, `${triangles} skin triangles`);
 });
 
+test('fat masses: only overweight and up, not in a crowd; firmer and quicker when overweight, slower and looser when very obese', () => {
+  const male = progression('male');
+  const built = (key, crowd = false) => {
+    const body = buildBody(male.find((row) => row.key === key).inputs);
+    return crowd ? buildLoftBody(body, { lowDetail: true, base: true }) : buildSkinMesh(body, 'base');
+  };
+  assert.equal(built('average').slosh, undefined, 'no masses on an average build');
+  assert.equal(built('veryObese', true).slosh, undefined, 'none in a crowd');
+  const over = built('overweight').slosh.figures;
+  const huge = built('veryObese').slosh;
+  assert.ok(over.omega / (2 * Math.PI) > 4 && over.zeta > 0.25, 'overweight: about 4-5 Hz, damping about 0.3');
+  assert.ok(huge.figures.omega / (2 * Math.PI) < 2.6 && huge.figures.zeta < 0.16, 'very obese: about 2-2.5 Hz, damping 0.12-0.15');
+  assert.ok(huge.masses.some((mass) => mass.name === 'belly'), 'a very obese body has a belly mass');
+});
+
 test('starvation: the emaciated contour and detail only on a starved body, none on a normal one', () => {
   for (const sex of ['male', 'female']) {
     const rows = progression(sex);

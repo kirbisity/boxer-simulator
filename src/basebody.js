@@ -361,8 +361,10 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0) {
     const flat = Math.hypot(ex, ey) || 1e-9;
     // His ring's thickness beyond the reference's (scaled to his height), laid on in full outside the ring, by depth inside it.
     const layer = flat * (ring.bend ? ring.bend(ring, angle) : 1) - scale * refRadius;
-    const reach = Math.max(BASE_BODY.leastShare * scale * own, scale * own + layer * Math.min(1, own / refRadius) + starved);
-    const along = t * frame.length;
+    // A part's own swell (the trunk's belly, see loftbody.js baseBelly): out along the ring, and down, its foot hanging.
+    const [swell, hang] = parts[name].swell ? parts[name].swell(t, angle) : [0, 0];
+    const reach = Math.max(BASE_BODY.leastShare * scale * own, scale * own + layer * Math.min(1, own / refRadius) + starved + swell * Math.min(1, own / refRadius));
+    const along = t * frame.length - hang;
     const k = reach / flat;
     for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * (ring.offset + ex * k) + frame.widthAxis[axis] * ey * k;
     return out;

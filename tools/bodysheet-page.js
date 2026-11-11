@@ -12,7 +12,8 @@
 // key of SKIN_TONES), pose (rest: arms lowered; bind: the A-pose the skin is
 // built in), cell (the flesh grid), relief (bump strength), perf (soft-shell
 // cost), fighter (knight, gambeson, helmet-fat, helmet-thin: one dressed
-// fighter instead of the progression).
+// fighter instead of the progression), motion (run, land, side: each chosen
+// build's fat masses through a move, fatslosh.js, a column per moment).
 
 /* global THREE */
 import { buildBody, P, PRESETS } from '../src/body.js';
@@ -28,6 +29,7 @@ import { SKIN_TONES } from '../src/skintones.js';
 import { FLESH } from '../src/fleshbody.js';
 import { FACE_MORPH } from '../src/facemorph.js';
 import { SoftShell } from '../src/soft.js';
+import { FatSlosh } from '../src/fatslosh.js';
 import { surface } from '../src/toon.js';
 
 const query = new URLSearchParams(location.search);
@@ -41,6 +43,40 @@ const CROP = query.get('crop');
 const MAT = query.get('mat') ?? 'standard';
 const TONE = query.get('tone') ?? 'clay';
 const POSE = query.get('pose') ?? 'rest';
+// `motion`: the fat masses through a move (fatslosh.js), the trunk's frame carried along a path; each build a run of columns.
+const MOTION = query.get('motion');
+// The moves, as the frame's path (m, from where it stands) and the moments drawn (s). Stepped at `rate` Hz.
+//   run   a running stride: the body's middle rising and falling 4 cm either way at the step rate, 2.8 Hz (170 steps a minute;
+//         a runner's centre of mass travels 6-10 cm up and down, Cavagna 1976), swaying 1.5 cm side to side at half of it
+//   land  a jump's fall from its height (0.5 m: 3.1 m/s at touchdown) stopped in 0.12 s by the knees, then standing
+//   side  a sidestep: 8 m/s² sideways for 0.15 s, the same back, then standing
+const MOVES = {
+  run: { path: (t) => [0, 0.04 * Math.sin(2 * Math.PI * 2.8 * t), 0.015 * Math.sin(Math.PI * 2.8 * t)], from: 2, moments: [0, 0.09, 0.18, 0.27, 0.36, 0.45, 0.54, 0.63] },
+  land: {
+    path: (t) => {
+      const g = 9.81;
+      const fall = 0.32;
+      const stop = 0.12;
+      const v = g * fall;
+      if (t < 0) return [0, 0.5, 0];
+      if (t < fall) return [0, 0.5 - 0.5 * g * t * t, 0];
+      const s = Math.min(t - fall, stop);
+      const a = v / stop;
+      return [0, 0.5 - 0.5 * g * fall * fall - (v * s - 0.5 * a * s * s), 0];
+    },
+    from: -0.5, moments: (query.get('moments') ?? '0.2,0.32,0.38,0.44,0.52,0.62,0.76,0.95').split(',').map(Number),
+  },
+  side: {
+    path: (t) => {
+      const a = 8;
+      const push = 0.15;
+      const z = t < 0 ? 0 : t < push ? 0.5 * a * t * t : t < 2 * push ? 0.5 * a * push * push + a * push * (t - push) - 0.5 * a * (t - push) ** 2 : a * push * push;
+      return [0, 0, z];
+    },
+    from: -0.5, moments: [0.05, 0.15, 0.25, 0.32, 0.4, 0.5, 0.65, 0.85],
+  },
+};
+const MOTION_RATE = 240;
 // `ruler`: the landmark heights measured on the emaciated reference (fractions of standing height), drawn over every cell.
 const RULER = query.get('ruler') !== null;
 const RULER_MARKS = [[1, 'crown'], [0.81, 'clavicles / notch'], [0.69, 'xiphoid'], [0.64, 'rib margin'], [0.6, 'waist'], [0.58, 'iliac crest'], [0.49, 'crotch']];
@@ -264,7 +300,27 @@ async function subjectFor(inputs, extras = {}) {
     for (let frame = 0; frame < 60; frame += 1) shell.update(1 / 60);
     softMs = { dent, update: (performance.now() - begin) / 60 };
   }
-  return { group, body, built, ms, texMs, coldMs, triangles, softMs, headY: points[P.head][1], textures: textured?.report ?? null, head };
+  return { group, body, built, ms, texMs, coldMs, triangles, softMs, headY: points[P.head][1], textures: textured?.report ?? null, head, skin, frames };
+}
+
+/** A subject's fat masses through the move (MOVES[MOTION]): a frame subject per moment, each carrying the skin's offsets then. */
+function motionFrames(subject) {
+  const move = MOVES[MOTION];
+  const { skin, frames, built } = subject;
+  if (!built.slosh) return [{ ...subject, moment: null }];
+  const shell = new SoftShell(null, null, 0.5, { mesh: skin, recomputeNormals: false });
+  const slosh = new FatSlosh(built.slosh, shell, built.bindFrames, BONES);
+  const out = [];
+  const dt = 1 / MOTION_RATE;
+  const wanted = [...move.moments];
+  for (let t = move.from; wanted.length; t += dt) {
+    const offset = move.path(t);
+    slosh.update(dt, frames.map((frame) => ({ ...frame, origin: frame.origin.map((value, axis) => value + offset[axis]) })));
+    if (t >= wanted[0] - dt / 2) {
+      out.push({ ...subject, moment: wanted.shift(), extra: Float32Array.from(shell.extra) });
+    }
+  }
+  return out;
 }
 
 // ---- Scene ---------------------------------------------------------------
@@ -299,6 +355,13 @@ function pointCamera(view, crop, subject) {
 }
 
 function shoot(subject, view) {
+  // A moment of a move: the skin at rest plus the masses' offsets then.
+  if (subject.extra) {
+    const positions = subject.skin.geometry.attributes.position;
+    const rest = subject.built.positions;
+    for (let index = 0; index < positions.array.length; index += 1) positions.array[index] = rest[index] + subject.extra[index];
+    positions.needsUpdate = true;
+  }
   scene.add(subject.group);
   pointCamera(view, CROP, subject);
   renderer.render(scene, camera);
@@ -335,7 +398,11 @@ async function main() {
   const rows = query.get('fighter') ? dressedFighters() : progression(SEX);
   const columns = rows.filter((row) => !ONLY || ONLY.includes(row.key));
   const subjects = [];
-  for (const column of columns) subjects.push({ column, ...(await subjectFor(column.inputs, column.extras)) });
+  for (const column of columns) {
+    const subject = { column, ...(await subjectFor(column.inputs, column.extras)) };
+    if (MOTION) subjects.push(...motionFrames(subject).map((frame) => ({ ...frame, column: { ...column, label: frame.moment === null ? `${column.label} (no masses)` : `${column.label} · ${MOTION} ${frame.moment.toFixed(2)} s` } })));
+    else subjects.push(subject);
+  }
   const width = CELL_W * SCALE;
   const height = CELL_H * SCALE;
   const sheet = document.createElement('canvas');

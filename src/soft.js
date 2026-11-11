@@ -37,6 +37,10 @@ export class SoftShell {
     this.velocity = new Float32Array(positions.count);
     this.fixed = fixed;
     this.active = false;
+    // Offsets of the skin's own (bind space, per vertex: fatslosh.js's masses following the frame), added to the dents' every
+    // frame `extraMoved` says they changed.
+    this.extra = null;
+    this.extraMoved = false;
     this.omega = SOFT.omegaSoft + (SOFT.omegaFirm - SOFT.omegaSoft) * firmness;
     this.depthScale = 1.6 - firmness;
   }
@@ -65,8 +69,16 @@ export class SoftShell {
   }
 
   update(dt) {
-    if (!this.active) return;
+    if (!this.active && !this.extraMoved) return;
     const positions = this.mesh.geometry.attributes.position.array;
+    const extra = this.extraMoved ? this.extra : null;
+    this.extraMoved = false;
+    if (!this.active) {
+      // Only the masses moved: the rest plus their offsets.
+      for (let index = 0; index < positions.length; index += 1) positions[index] = this.rest[index] + extra[index];
+      this.mesh.geometry.attributes.position.needsUpdate = true;
+      return;
+    }
     const stiffness = this.omega * this.omega;
     const damping = 2 * SOFT.damping * this.omega;
     let energy = 0;
@@ -76,7 +88,7 @@ export class SoftShell {
       this.offset[index] += this.velocity[index] * dt;
       energy += Math.abs(this.offset[index]) + Math.abs(this.velocity[index]) * 0.05;
       for (let axis = 0; axis < 3; axis += 1) {
-        positions[index * 3 + axis] = this.rest[index * 3 + axis] + this.normals[index * 3 + axis] * this.offset[index];
+        positions[index * 3 + axis] = this.rest[index * 3 + axis] + this.normals[index * 3 + axis] * this.offset[index] + (this.extra ? this.extra[index * 3 + axis] : 0);
       }
     }
     this.mesh.geometry.attributes.position.needsUpdate = true;
@@ -85,6 +97,7 @@ export class SoftShell {
       this.offset.fill(0);
       this.velocity.fill(0);
       this.mesh.geometry.attributes.position.array.set(this.rest);
+      if (this.extra) for (let index = 0; index < this.extra.length; index += 1) this.mesh.geometry.attributes.position.array[index] += this.extra[index];
       this.mesh.geometry.attributes.position.needsUpdate = true;
       if (this.recomputeNormals) this.mesh.geometry.computeVertexNormals();
       this.active = false;
