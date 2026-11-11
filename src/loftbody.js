@@ -2428,6 +2428,32 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     }
     return limit;
   };
+  // A band or a belt (BAND_ROLES) stands outside the pieces it is worn over, measured after the cloth was fitted: each point, in
+  // order of rank (the innermost first, so an outer band sees an inner one where it now lies), drawn out to `margin` past the furthest
+  // point of a lower-ranked piece in its cell and those beside it, that piece's facets' sag allowed for (cos(π / LOFT.sides)
+  // of its points' reach, as below). Fitted to the skin each on its own, a waistband tilted under a fat belly and the shorts
+  // under it came out at the same reach and crossed, the shorts showing through the band in patches; the band is moved out,
+  // not the shorts in, as a band lies over what it holds. (Not every piece: a coat's skirt pushed out past its own body stood
+  // out from it in a step at the belt.)
+  const sag = 1 / Math.cos(Math.PI / LOFT.sides);
+  for (const layer of [...layers].filter((one) => !one.skin && !one.over && one.r > 1e-6 && BAND_ROLES.has(mesh.colors[one.vertex])).sort((a, b) => a.rank - b.rank)) {
+    let most = 0;
+    const row = rowOf(layer.t);
+    const column = columnOf(layer.angle);
+    for (let dr = -1; dr <= 1; dr += 1) for (let dc = -spec.spread; dc <= spec.spread; dc += 1) {
+      for (const under of cells.get(keyOf(layer.name, row + dr, column + dc)) ?? []) {
+        if (under.over || under.rank >= layer.rank - spec.rankGap) continue;
+        most = Math.max(most, under.r);
+      }
+    }
+    const want = most * sag + spec.margin;
+    if (most > 0 && layer.r < want) {
+      const push = (want - layer.r) / layer.r;
+      for (let axis = 0; axis < 3; axis += 1) mesh.positions[layer.vertex * 3 + axis] += layer.out[axis] * push;
+      layer.out = layer.out.map((value) => value * (1 + push));
+      layer.r = want;
+    }
+  }
   // Cloth worn over armour first drawn out past every piece beneath it in its cell and those beside it (LOFT.layers.margin out).
   for (const layer of layers) {
     if (!layer.over || layer.r === undefined || layer.r < 1e-6) continue;
@@ -2518,6 +2544,8 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
 }
 // The roles worn at the waist, under a hanging belly (fitClothToBase): shorts and trousers, their bands and belts, a mawashi.
 const WAIST_ROLES = new Set(['kit', 'under', 'band', 'trim2', 'belt', 'mawashi', 'rope']);
+// The roles of bands and belts worn over a garment (keepLayersInside): held outside what they are worn over.
+const BAND_ROLES = new Set(['band', 'trim2', 'belt', 'rope']);
 // The roles of hard pieces (fitClothToBase): metal, moulded shells, mail and padded pieces keep their rings' shape.
 const HARD_ROLES = new Set(['steel', 'steel2', 'gold', 'armor', 'pad', 'mail', 'charge']);
 
