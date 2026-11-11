@@ -2055,7 +2055,8 @@ function fitClothToBase(mesh, parts, armoured) {
     if (vertex >= start || mesh.colors[vertex] === 'skin') continue;
     const name = partOf(ring);
     if (!name) continue;
-    const under = name === 'trunk' && underBelly(ring);
+    // (Only what is worn at the waist goes under the belly: a coat's skirt, lofted on the same unbulged rings, hangs over it.)
+    const under = name === 'trunk' && WAIST_ROLES.has(mesh.colors[vertex]) && underBelly(ring);
     const onArm = /Upper|Fore/.test(name);
     const p = mesh.positions.slice(vertex * 3, vertex * 3 + 3);
     const out = vec.sub(p, ring.center);
@@ -2229,6 +2230,8 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += layer.out[axis] * pull;
   }
 }
+// The roles worn at the waist, under a hanging belly (fitClothToBase): shorts and trousers, their bands and belts, a mawashi.
+const WAIST_ROLES = new Set(['kit', 'under', 'band', 'trim2', 'belt', 'mawashi', 'rope']);
 // The roles of hard pieces (fitClothToBase): metal, moulded shells, mail and padded pieces keep their rings' shape.
 const HARD_ROLES = new Set(['steel', 'steel2', 'gold', 'armor', 'pad', 'mail', 'charge']);
 

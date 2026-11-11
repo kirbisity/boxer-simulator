@@ -370,8 +370,12 @@ export function texNoise(x, y, seed) {
  * `starved`: slopes to add on the trunk tile ({ width, height, span, slopes: round and along per texel, weight }: the base style's
  * emaciated reference, basebody.js baseStarvedDetail), read at each texel's place along and round the trunk.
  */
-export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, layers = ['albedo', 'normal', 'ao', 'rough'], share = 0, seed = 7, covered = null, starved = null } = {}) {
-  const R = rulesTraits(body);
+// `folds`: false for a mesh that models its own folds and creases (the base style's): the rules' fat folds, navel and armpit are
+// left out, and no crease is painted dark in the albedo or the occlusion (they are placed by the loft's landmarks, and on a
+// modelled body land beside its own: dark cuts). The creases still keep the skin matt (roughness: sweat never shines in them).
+export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, layers = ['albedo', 'normal', 'ao', 'rough'], share = 0, seed = 7, covered = null, starved = null, folds = true } = {}) {
+  const R = { ...rulesTraits(body), folds };
+  const painted = folds ? 1 : 0;
   // Under armour (`covered`: the stretches of each part left out of the mesh, loftbody.js coveredRegions) those rows of a tile are never
   // seen: no rules, normals or paint are worked out for them (flat, neutral).
   const hiddenRow = (tile, row) => {
@@ -457,7 +461,7 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
     const ao = new Uint8Array(size).fill(255);
     for (let at = 0; at < size; at += 1) {
       if (at % SKINTEX.sliceTexels === 0) yield 'ao';
-      ao[at] = Math.round(255 * texClamp(occlusion[at] * (1 - 0.45 * crease[at])));
+      ao[at] = Math.round(255 * texClamp(occlusion[at] * (1 - 0.45 * painted * crease[at])));
     }
     out.ao = ao;
   }
@@ -480,7 +484,8 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
     const flat = Math.round(SKINTEX.neutral * 255);
     // Every texel [flat, flat, flat, 255] (as one little-endian word).
     new Uint32Array(albedo.buffer).fill(((255 << 24) | (flat << 16) | (flat << 8) | flat) >>> 0);
-    for (const tile of TILES) yield* paintTile(albedo, tile, { R, cavity, crease, vein, stretch, flush, seed }, (row) => hiddenRow(tile, row));
+    const darkened = painted ? crease : new Float32Array(size);
+    for (const tile of TILES) yield* paintTile(albedo, tile, { R, cavity, crease: darkened, vein, stretch, flush, seed }, (row) => hiddenRow(tile, row));
     out.albedo = albedo;
   }
   out.bytes = (out.albedo?.length ?? 0) + (out.normal?.length ?? 0) + (out.ao?.length ?? 0) + (out.rough?.length ?? 0);
