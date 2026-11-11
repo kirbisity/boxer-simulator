@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, P } from '../src/body.js';
-import { bindPoints } from '../src/rig.js';
+import { BONE, bindPoints } from '../src/rig.js';
 import { buildSkinMesh } from '../src/bodystyles.js';
-import { baseBindJoints, baseBodyMesh, baseStarvation, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
+import { BASE_BODY, baseBindJoints, baseBodyMesh, baseStarvation, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
 import { baseLoftOptions, buildLoftBody } from '../src/loftbody.js';
 import { FLAT_UV } from '../src/skindetail.js';
 import { progression } from '../tools/bodysheet-cast.js';
@@ -28,7 +28,13 @@ test('the base style builds for every body of the progression: finite, about a f
   }
 });
 
-test('the reference build gets the base mesh as modelled: every point where the tool put it, scaled to its height (the arms aside)', () => {
+test('the reference build gets the base mesh as modelled: every point where the tool put it, scaled to its height (the arms aside)', (t) => {
+  // (The model as it is: no shoulder design (BASE_BODY.shoulder null). The default, D2, reshapes the shoulders on purpose.)
+  const design = BASE_BODY.shoulder;
+  BASE_BODY.shoulder = null;
+  t.after(() => {
+    BASE_BODY.shoulder = design;
+  });
   for (const sex of ['male', 'female']) {
     const data = baseBodyMesh(sex);
     const reference = buildBody(data.reference);
@@ -68,7 +74,11 @@ test('the rig follows the model: limbs along the skin\'s own axes at the game\'s
     const along = hand.map((value, axis) => value - elbow[axis]);
     const reach = Math.hypot(...along);
     let farthest = 0;
+    // (The forearm's own skin: points the left forearm carries most of. With the arms hanging closer, a fat man's hip lay within
+    // the band beyond his hand.)
+    const forearm = (index) => [0, 1, 2, 3].some((slot) => mesh.skinIndex[index * 4 + slot] === BONE.lForearm && mesh.skinWeight[index * 4 + slot] > 0.5);
     for (const index of skinPoints(mesh)) {
+      if (!forearm(index)) continue;
       const p = [0, 1, 2].map((axis) => mesh.positions[index * 3 + axis] - elbow[axis]);
       const t = (p[0] * along[0] + p[1] * along[1] + p[2] * along[2]) / reach;
       const off = Math.hypot(...p.map((value, axis) => value - (along[axis] / reach) * t));

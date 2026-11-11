@@ -37,8 +37,8 @@ import { dualQuaternionSkinning } from '../src/dqskin.js';
 import { BASE_BODY } from '../src/basebody.js';
 import { elbowClearOfTrunk, restArmAngle } from '../src/pose.js';
 import { trunkAxes } from '../src/joints.js';
-// PROOF OF CONCEPT: `shoulder` (A..E) picks a base-body shoulder design (basebody.js BASE_BODY.shoulder).
-if (new URLSearchParams(location.search).get('shoulder')) BASE_BODY.shoulder = new URLSearchParams(location.search).get('shoulder');
+// `shoulder` (A..E, D1, D2, none) picks a base-body shoulder design (basebody.js BASE_BODY.shoulder; D2 by default).
+if (new URLSearchParams(location.search).get('shoulder')) BASE_BODY.shoulder = new URLSearchParams(location.search).get('shoulder') === 'none' ? null : new URLSearchParams(location.search).get('shoulder');
 
 const query = new URLSearchParams(location.search);
 const STYLE = query.get('style') ?? 'lofted';

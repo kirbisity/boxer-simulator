@@ -93,8 +93,10 @@ export const BASE_BODY = {
   // up). Its sides were offset along normals smoothed apart (no edge joins them), and a fat man's calf opened it into specks
   // of the background and flaps of skin.
   slitRoundness: 0.3,
-  // PROOF OF CONCEPT (shoulder-poc, 2026-11-11; the user: the base shoulder is too wide and bulky against the game's own, v7):
-  // five ways to fix it, picked by `shoulder` ('A'..'E', null for the base as it is), all acting in one zone (shoulderZone).
+  // The shoulder's design (the user, 2026-11-11: the base shoulder was too wide and bulky against the game's own, v7). Five
+  // ways were tried ('A'..'E', all acting in one zone, shoulderZone), then D's grown into D+ (shoulderPlus 'D1', 'D2'); the
+  // user's choice, shipped to the test page, is 'D2' (with its chest, round 13, and her own overrides, round 14). null draws
+  // the model as it is; the others stay selectable for the body sheet (?shoulder=…, 'none' for null).
   //   A graft:  the zone's points laid onto the loft's own surface (the trunk's top ring and the upper arm's root, v7's rings).
   //   B girdle: the zone moved in towards the midline by `girdleIn` and down by `girdleDrop` (m per 1.8 m of height), the
   //             deltoid's bulk beyond the arm's ring scaled by `deltoidScale` on its outer side.
@@ -103,7 +105,7 @@ export const BASE_BODY = {
   //             and that taken as its rest shape: a shoulder modelled lowered, bound in the game's hang.
   //   E muscle: as C, but of the model's bulk over the loft's rings only the share this body's arm muscle shows is taken off
   //             (the model read as a bodybuilder's: a bodybuilder keeps all of it, a thin man next to none).
-  shoulder: null,
+  shoulder: 'D2',
   // The zone: the trunk's top from `trunkT[0]` to `[1]` (eased: about 5 cm on a man), where its point's |sin| round the ring
   // passes `lateral[0]` to `[1]` (the sides: not the chest's middle or the neck); the upper arm down to `armT` (eased: the root's
   // third), within `armReach` of its ring's radius of its axis.
