@@ -171,8 +171,10 @@ test('the third batch: heels, a helmet, a wooden shield, punches, the fist\'s wh
   const near = plan({ type: 'thunder', distance: 200 });
   const far = plan({ type: 'thunder', distance: 4000 });
   assert.equal(near.set, 'thunder');
-  assert.ok(far.skip > near.skip && far.rate < near.rate && far.synthGain > near.synthGain, 'far thunder the rumble only, lower, the synth carrying it');
-  assert.equal(near.synth.crack, 0, 'the crack is the recording\'s, not doubled');
+  // (Since 2026-11-10 all recorded: far thunder its own takes, the rumble without a crack, lower; no synth under either.)
+  assert.equal(far.set, 'thunder-far');
+  assert.ok(far.rate < near.rate, 'far thunder lower');
+  assert.ok(!near.synth && !far.synth && near.synthGain === 0 && far.synthGain === 0, 'no synth under the recording');
 });
 
 test('the new sets scale with the blow: a harder one louder and longer, a faster drive louder', () => {

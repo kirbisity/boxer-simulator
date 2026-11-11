@@ -8,6 +8,7 @@
 import { P } from '../body.js';
 import { EAR } from './ear.js';
 import { gainOfLevel, sfxBuffer, sfxRandom, writeGrains, lowpassInPlace } from './synth.js';
+import { loopRms } from './samples.js';
 
 /**
  * The far field's numbers: the sectors, and each man's levels at 1 m (dB SPL): a man shouting in a fight, one marching or waiting, the
@@ -124,11 +125,21 @@ function clashBed(ctx) {
   });
 }
 
+/** A buffer's RMS (its first channel). */
+function synthRms(buffer) {
+  const data = buffer.getChannelData(0);
+  let sum = 0;
+  for (let index = 0; index < data.length; index += 1) sum += data[index] * data[index];
+  return Math.sqrt(sum / Math.max(1, data.length));
+}
+
 /**
  * The far field's sound: per sector a panner and two looped beds (shout, clash) with their gains. `update(sectors, dt, when)` eases each
  * to its level. Built into `out` (the ambience bus); `makePanner(azimuth, out)` gives the input of a panner for a side, wired into `out`.
+ * The clash is the recorded din once `bank` has decoded it (samples.js DIN_LOOP: a far battle's weapons), matched to the synth bed's
+ * level, which then falls silent; until then the synth's.
  */
-export function createFarField(ctx, out, makePanner) {
+export function createFarField(ctx, out, makePanner, bank = null) {
   const shout = FAR_FIELD.shouts ? shoutBed(ctx) : null;
   const clang = clashBed(ctx);
   const beds = [];
@@ -151,13 +162,37 @@ export function createFarField(ctx, out, makePanner) {
     });
     beds.push({ panner, shout: pair[0], clash: pair[1], level: [0, 0] });
   }
+  // The recorded din, once decoded: a read of it per sector (each its own place in the loop and speed, as the synth's), into its gain.
+  let din = null;
+  function adoptDin() {
+    const loop = bank?.loop?.('din');
+    if (!loop || din) return;
+    const match = synthRms(clang) / Math.max(1e-6, loopRms(loop));
+    din = beds.map((bed, sector) => {
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
+      gain.connect(bed.panner);
+      const source = ctx.createBufferSource();
+      source.buffer = loop.buffer;
+      source.loop = true;
+      source.loopStart = loop.loopStart;
+      source.loopEnd = loop.loopEnd;
+      source.playbackRate.value = 0.94 + 0.12 * ((sector * 37) % 10) / 10;
+      source.connect(gain);
+      source.start(ctx.currentTime, loop.loopStart + ((sector * 1.37) % (loop.loopEnd - loop.loopStart)));
+      return { gain, match };
+    });
+  }
   return {
     update(sectors, when) {
+      adoptDin();
       for (let sector = 0; sector < beds.length; sector += 1) {
         const levels = sectorLevels(sectors, sector);
         const bed = beds[sector];
         if (FAR_FIELD.shouts) bed.shout.gain.setTargetAtTime(Number.isFinite(levels.shout) ? gainOfLevel(levels.shout) : 0, when, FAR_FIELD.ease);
-        bed.clash.gain.setTargetAtTime(Number.isFinite(levels.clash) ? gainOfLevel(levels.clash) : 0, when, FAR_FIELD.ease);
+        const clash = Number.isFinite(levels.clash) ? gainOfLevel(levels.clash) : 0;
+        bed.clash.gain.setTargetAtTime(din ? 0 : clash, when, FAR_FIELD.ease);
+        din?.[sector].gain.gain.setTargetAtTime(clash * din[sector].match, when, FAR_FIELD.ease);
       }
     },
     beds,

@@ -31,12 +31,14 @@ test('each loop is a small mono 32 kHz MP3 long enough for its period and the le
     // CBR: its length in seconds from its size (less the Info frame), at least the period and both leads.
     const seconds = (bytes.length * 8) / (header.bitrate * 1000);
     assert.ok(seconds >= loop.seconds + 2 * loop.lead - 0.05, `${name}: ${seconds.toFixed(2)} s for ${loop.seconds} + 2 × ${loop.lead}`);
-    assert.ok(loop.seconds >= 8 && loop.seconds <= 20, `${name}: a period of ${loop.seconds} s`);
+    // (4.5 s the shortest: the stream's and the hum's recordings run ~6 s.)
+    assert.ok(loop.seconds >= 4.5 && loop.seconds <= 20, `${name}: a period of ${loop.seconds} s`);
     // A whole number of samples at 32 kHz (the file's), 44.1 and 48 kHz (a context's): the loop points fall on samples.
     for (const rate of [32000, 44100, 48000]) assert.ok(Math.abs(loop.seconds * rate - Math.round(loop.seconds * rate)) < 1e-6, `${name} at ${rate}`);
   }
-  assert.ok(total <= 260 * 1024, `${total} bytes in all`);
-  assert.deepEqual(LOOP_FILES.sort(), ['loop-fire', 'loop-market', 'loop-rain', 'loop-wind']);
+  // (Ten beds since 2026-11-10: every place's sound recorded.)
+  assert.ok(total <= 700 * 1024, `${total} bytes in all`);
+  assert.deepEqual(LOOP_FILES.sort(), ['loop-crowd', 'loop-din', 'loop-fire', 'loop-hum', 'loop-market', 'loop-rain', 'loop-roof', 'loop-sewer', 'loop-stream', 'loop-surf', 'loop-wind']);
   const readme = readFileSync(`${DIR}/README.md`, 'utf8');
   for (const name of LOOP_FILES) assert.ok(readme.includes(`${name}.mp3`), `README lists ${name}`);
 });

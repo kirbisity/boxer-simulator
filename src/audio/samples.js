@@ -41,7 +41,13 @@ export const SAMPLE_SETS = {
   woodshield: ['woodshield-1'],
   punch: Array.from({ length: 7 }, (_, index) => `punch-${index + 1}`),
   fistswing: Array.from({ length: 5 }, (_, index) => `fistswing-${index + 1}`),
-  thunder: ['thunder-1', 'thunder-2'],
+  // Thunder near (the crack and its roll; the 11-10 batch: a crack and roll, and that crack crossfaded into a long low rumble), and far
+  // (the rumble alone, and a roll without its crack).
+  thunder: ['thunder-1', 'thunder-2', 'thunder-3', 'thunder-4'],
+  'thunder-far': ['thunder-far-1', 'thunder-far-2'],
+  // (The 11-10 batch's one-shots: a bird's song cut at its gaps into five phrases; a drop of water into a pool.)
+  bird: ['bird-1', 'bird-2', 'bird-3', 'bird-4', 'bird-5'],
+  drip: ['drip-1'],
   // (The fourth batch: a body falling, a whip's lash, a wooden door's creak and its slam.)
   bodyfall: Array.from({ length: 5 }, (_, index) => `bodyfall-${index + 1}`),
   whip: ['whip-1'],
@@ -115,13 +121,24 @@ export const AMBIENCE_LOOPS = {
   rain: { file: 'loop-rain', seconds: 9.24, lead: 0.25 },
   wind: { file: 'loop-wind', seconds: 12.5, lead: 0.25 },
   market: { file: 'loop-market', seconds: 17, lead: 0.25 },
+  // (The 11-10 batch: the sea below the cliffs, an arena's crowd, rain on a roof heard under it, a river's stream, a sewer's water,
+  // a ventilation's hum.)
+  surf: { file: 'loop-surf', seconds: 9, lead: 0.25 },
+  crowd: { file: 'loop-crowd', seconds: 16, lead: 0.25 },
+  roof: { file: 'loop-roof', seconds: 7, lead: 0.25 },
+  flow: { file: 'loop-stream', seconds: 4.5, lead: 0.25 },
+  sewer: { file: 'loop-sewer', seconds: 12, lead: 0.25 },
+  hum: { file: 'loop-hum', seconds: 4.5, lead: 0.25 },
 };
+
+/** A far-off battle's clash of weapons (farfield.js plays it in each side's sector, as the beds are cut: one mono period). */
+export const DIN_LOOP = { file: 'loop-din', seconds: 10, lead: 0.25 };
 
 /** A fire's crackle (ambience.js plays it at each fire near the ear, by the fire's size): cut and looped as the beds are, mono, one read. */
 export const FIRE_LOOP = { file: 'loop-fire', seconds: 6.24, lead: 0.25 };
 
-/** Every loop the bank decodes: the beds and the fire. */
-const ALL_LOOPS = { ...AMBIENCE_LOOPS, fire: FIRE_LOOP };
+/** Every loop the bank decodes: the beds, the fire and the far field's din. */
+const ALL_LOOPS = { ...AMBIENCE_LOOPS, fire: FIRE_LOOP, din: DIN_LOOP };
 
 /** Every loop's file. */
 export const LOOP_FILES = Object.values(ALL_LOOPS).map((loop) => loop.file);

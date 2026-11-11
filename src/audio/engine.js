@@ -215,7 +215,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
       const chain = makePanner(azimuth, out);
       state.farPanners.push(chain);
       return chain.input;
-    });
+    }, state.samples);
   }
 
   /** A panner into `out` for a side (far field): HRTF placed 30 m off on that side, or stereo with the behind-dulling. */

@@ -15,6 +15,8 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 
 202 files, 864 KB in all (the seventh batch: 4 files, 47 KB: three takes of a bow drawn and a fire's loop).
 
+230 files, 1477 KB in all (the eighth batch, 2026-11-10: 17 files, 514 KB: every ambient sound the synth still made, below).
+
 | File | Source recording | Time (s) | On-screen label | Trim (s) | Bytes | Used for |
 |---|---|---|---|---|---|---|
 | slice-1.mp3 | ScreenRecording_10-29-2026_20-52-57_1.mov | 0.359-1.109 | SLICE | 0.029 | 4140 | hit: a blade or point on flesh, padding or leather |
@@ -309,3 +311,29 @@ mono loop each, panned, not as a bed).
 | flame-start-1.mp3 | 0abecb9a.wav (flamethrower) | 0.35-1.15 | - | - | 4500 | the valve opened: the head of each burst |
 | flame-roar-1.mp3 | 0abecb9a.wav (flamethrower) | 1.05-3.35 | 2.0 | 0.3 | 15552 | the jet's roar while the valve is open, looped |
 | flame-burn-1.mp3 | 9adad3cd.wav (fire burning) | 7.30-11.10 | 3.0 | 0.8 | 21600 | a man alight, a patch of fuel burning on the floor, looped |
+
+## The eighth batch (2026-11-10): the rest of the ambience
+
+Eleven screen recordings of 2026-11-10, each labelled on screen, replace every ambient sound the synth still made. The beds are cut as the
+ambience loops above (a steady section by search, its tail crossfaded into its head, -20 dBFS RMS, 0.25 s lead either side; 32 kHz mono
+48 kb/s), the first and last 0.3-1 s of each recording left out (the phone's taps). Checked looped twice: the step across each seam is
+under the 99th percentile of the rest's. The one-shots are cut as the takes above (peak -1 dBFS).
+
+| File | Source recording | Time (s) | On-screen label | Period (s) | Fade (s) | Bytes | Used for |
+|---|---|---|---|---|---|---|---|
+| loop-surf.mp3 | ScreenRecording_11-10-2026_19-02-09_1.mov | 0.30-10.80 | Coastal Calm | 9.0 | 1.5 | 57500 | the sea below the cliffs (Dunnottar, the port, the coast's fort and village), its level by the height over the water |
+| loop-crowd.mp3 | ScreenRecording_11-10-2026_18-52-57_1.mov | 6.30-23.80 | Arena Crowd | 16.0 | 1.5 | 99620 | an arena's crowd (the Colosseum, the stadium, the ring), roused by a big blow |
+| loop-roof.mp3 | ScreenRecording_11-10-2026_19-03-49_1.mov | 0.65-8.65 | Indoor Rain Sounds | 7.0 | 1.0 | 45620 | rain on the roof over his head, in the rain under one |
+| loop-stream.mp3 | ScreenRecording_11-10-2026_18-56-10_1.mov | 0.60-5.90 | Relaxing River S(ounds) | 4.5 | 0.8 | 30500 | a place's river or canal (the Jiangnan water town's): ambience.js `flow` |
+| loop-sewer.mp3 | ScreenRecording_11-10-2026_18-57-59_1.mov | 11.70-25.20 | Sewer Ambience | 12.0 | 1.5 | 75644 | a stage's own waters, its drains and sewer (Dunnottar), by the distance to the nearest: ambience.js `sewer` |
+| loop-hum.mp3 | ScreenRecording_11-10-2026_19-04-36_1.mov | 0.35-5.65 | ventilation system | 4.5 | 0.8 | 30500 | the subway's hum |
+| loop-din.mp3 | ScreenRecording_11-10-2026_19-00-01_1.mov | 2.55-14.05 | Combat Ambience | 10.0 | 1.5 | 63548 | the far field's clash (farfield.js): a battle's weapons past 20 m, a read per side |
+| bird-1.mp3, bird-2.mp3, bird-3.mp3, bird-4.mp3, bird-5.mp3 | ScreenRecording_11-10-2026_19-06-18_1.mov | 1.30-2.05, 2.05-3.05, 3.05-4.05, 4.15-4.85, 1.70-3.05 | Bird: Amazing Singer | | | 41173 | a bird's call over an open place by day (ambience.js): the song cut at its gaps into phrases, high-passed at 1.2 kHz (the recording's hiss), played at 0.9-1.1x |
+| drip-1.mp3 | ScreenRecording_11-10-2026_19-07-12_1.mov | 0.27-0.85 | Water Drop Sound Effect | | | 5267 | a drop into a pool (0.8-1.3x: the drop's size), onto stone (1.6x, its head, quieter) |
+| thunder-3.mp3 | ScreenRecording_11-10-2026_19-10-31_1.mov | 0.29-5.85 | Thunder Sound Effect | | | 22688 | thunder near: the crack and its roll |
+| thunder-4.mp3 | 19-10-31 + ScreenRecording_11-10-2026_19-10-07_1.mov | 0.29-2.00 + 1.00-4.45 | Thunder Sound Effect + Low Thunder Rumble Sound Effect | | 0.6 | 18656 | thunder near: the crack crossfaded into the long low rumble (equal power, the rumble at the crack's level) |
+| thunder-far-1.mp3 | 19-10-07 | 0.25-4.45 | Low Thunder Rumble Sound Effect | | | 17216 | thunder far (crack under 0.33, past ~800 m): the rumble alone |
+| thunder-far-2.mp3 | 19-10-31 | 1.30-5.85 | Thunder Sound Effect | | | 18656 | thunder far: the roll after the crack |
+
+The thunder takes are 32 kb/s (each under the 25 KB a take may be). The synth under thunder is gone (sfx/sampled.js); the synth beds and
+one-shots stay only until their recordings decode.

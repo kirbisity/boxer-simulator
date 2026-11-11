@@ -362,10 +362,10 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       if (params.kind !== 'matchlock') return null;
       return { set: 'gunshot', trim: 1, rate: jitter(0.04), seconds: null, fade: 0.3, skip: 0, synth: params, synthGain: 0.35 };
     case 'thunder': {
-      // A strike near cracks and roars (the whole take, at its pitch); a far one is the rumble only (the crack skipped), lower and drawn
-      // out, the synth's long rumble under it carrying it on (its loudness is the distance's, the ear's).
+      // A strike near cracks and roars (a near take, the whole of it, at its pitch); a far one only rolls (a far take: the rumble without
+      // its crack), lower; no synth under either (its loudness is the distance's, the ear's).
       const near = params.crack;
-      return { set: 'thunder', trim: sampleLerp(0.85, 1.2, near), rate: sampleLerp(0.78, 1, near) * jitter(0.04), seconds: null, fade: sampleLerp(0.9, 0.5, near), skip: sampleLerp(0.12, 0, near), synth: { ...params, crack: 0 }, synthGain: sampleLerp(0.8, 0.35, near) };
+      return { set: near > THUNDER_NEAR ? 'thunder' : 'thunder-far', trim: sampleLerp(0.85, 1.2, near), rate: sampleLerp(0.82, 1, near) * jitter(0.04), seconds: null, fade: sampleLerp(0.9, 0.5, near), skip: 0, synth: null, synthGain: 0 };
     }
     case 'voice': {
       const cry = cryOfEvent(event);
@@ -430,6 +430,9 @@ export const BOW_DRAW_PLAY = { trim: 0.9, jitter: 0.04, stretch: [0.85, 1.3], fa
 
 /** A cry's take: its trim from none to full intensity (the takes are cut to one peak), the least share of a hurt cry played, each kind's fade (s). */
 export const CRY_PLAY = { trim: [0.55, 1], hurtShare: 0.6, fade: { hurt: 0.06, scream: 0.12, moan: 0.25, fear: 0.1, dying: 0.35 } };
+
+/** Thunder's crack (thunderParams `crack`, 1 at the bolt, 0 from 1.2 km) past which a near take plays, its crack in it: ~800 m. */
+export const THUNDER_NEAR = 0.33;
 
 /** Play a take into `out` at `at` by a plan, at `gain` (the engine's). Returns the end time. */
 export function playSample(voice, out, take, plan, at, gain) {

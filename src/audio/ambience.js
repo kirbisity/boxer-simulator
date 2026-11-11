@@ -23,6 +23,7 @@ import { EAR, distanceGain } from './ear.js';
 import { gainOfLevel, sfxRandom, writeCrackle, writeGrains, lowpassInPlace } from './synth.js';
 import { playBird, playCrackle, playDrip } from './sfx/world.js';
 import { loopRms, startLoop } from './samples.js';
+import { playSample } from './sfx/sampled.js';
 
 /**
  * Each place: its beds' levels (dB SPL at the ear) when the weather is fair: `wind`, `surf` (a shore near), `crowd` (an arena's),
@@ -92,6 +93,8 @@ export function ambienceTargets(info) {
     crowd: spec.crowd ? spec.crowd + 8 * (info.excitement ?? 0) : -Infinity,
     hum: (spec.hum ?? -Infinity) - duck,
     flow: (spec.flow ?? -Infinity) - duck,
+    // (A stage's own waters, its drains and sewer: by the distance to the nearest, in createAmbience.)
+    sewer: -Infinity,
     // The market by day, thinned by the rain (under the awnings, gone home).
     market: spec.market && !info.night ? outside(spec.market - 12 * rain) - duck : -Infinity,
     birds: spec.birds && !info.night && rain === 0 ? spec.birds * (1 - muffle) : 0,
@@ -187,10 +190,14 @@ function ambienceBuffers(ctx) {
 }
 
 /** The beds the engine eases, in order. */
-export const AMBIENCE_BEDS = ['wind', 'rain', 'roof', 'surf', 'crowd', 'hum', 'flow', 'market'];
+export const AMBIENCE_BEDS = ['wind', 'rain', 'roof', 'surf', 'crowd', 'hum', 'flow', 'sewer', 'market'];
 
 /** The synth bed whose level each recorded one is matched to (the market's: the crowd's voices), and a trim over that (dB). */
-const RECORDED = { rain: { match: 'rain', trim: 0 }, wind: { match: 'wind', trim: 0 }, market: { match: 'crowd', trim: 0 } };
+const RECORDED = {
+  rain: { match: 'rain', trim: 0 }, wind: { match: 'wind', trim: 0 }, market: { match: 'crowd', trim: 0 },
+  surf: { match: 'surf', trim: 0 }, crowd: { match: 'crowd', trim: 0 }, roof: { match: 'roof', trim: 0 }, flow: { match: 'flow', trim: 0 },
+  sewer: { match: 'flow', trim: 0 }, hum: { match: 'hum', trim: 0 },
+};
 
 /**
  * A fire's crackle by its size (m: the flame's, levelmode/kitprops.js KP_FLAME: a dim torch 0.12, a torch 0.28, a lantern's 0.16, a
@@ -260,12 +267,14 @@ function bufferRms(buffer) {
  */
 export function createAmbience(ctx, out, place, bank = null) {
   const buffers = ambienceBuffers(ctx);
+  // (A sewer's water until its recording decodes: the stream's trickle.)
+  buffers.sewer = buffers.flow;
   const muffle = ctx.createBiquadFilter();
   muffle.type = 'lowpass';
   muffle.frequency.value = 20000;
   muffle.connect(out);
   // The crowd and the hum are in the place with him (not outside): they are not muffled by its walls.
-  const into = (name) => (name === 'crowd' || name === 'hum' || name === 'roof' ? out : muffle);
+  const into = (name) => (name === 'crowd' || name === 'hum' || name === 'roof' || name === 'sewer' ? out : muffle);
   const beds = {};
   const recorded = {};
   /** A recorded bed started once its loop has decoded: its gain from silence, its level matched to its synth bed's. */
@@ -359,11 +368,11 @@ export function createAmbience(ctx, out, place, bank = null) {
       for (const name of Object.keys(RECORDED)) adopt(name);
       for (const name of AMBIENCE_BEDS) {
         let level = targets[name];
-        // Water running near: the stage's waters, by the inverse distance from the nearest (the bed's level is at 1 m).
-        if (name === 'flow' && info.waters?.length && info.ear) {
+        // Water running near: the stage's waters (its drains and sewer), by the inverse distance from the nearest (the bed's level is at
+        // 1 m); a place's own river or canal is the stream (`flow`).
+        if (name === 'sewer' && info.waters?.length && info.ear) {
           const near = nearestDistance(info.waters, info.ear);
-          level = Math.max(Number.isFinite(level) ? level : -Infinity, 58 + 20 * Math.log10(distanceGain(near)));
-          if (near > EAR.radius) level = targets.flow;
+          if (near <= EAR.radius) level = 58 + 20 * Math.log10(distanceGain(near));
         }
         // (Eased: a change of place or weather fades over a second or so, and so does a recording taking over from the synth.)
         const gain = Number.isFinite(level) ? gainOfLevel(level) : 0;
@@ -389,7 +398,12 @@ export function createAmbience(ctx, out, place, bank = null) {
         const source = info.drips?.length ? nearestOf(info.drips, info.ear) : { at: [info.ear[0] + (Math.random() - 0.5) * 12, info.ear[1] + 1, info.ear[2] + (Math.random() - 0.5) * 12], distance: 6 };
         if (source && source.distance < 14) {
           const voice = place(source.at, 'ambience');
-          if (voice) playDrip(voice, voice.out, when, gainOfLevel(58 + 20 * Math.log10(distanceGain(source.distance))), Math.random() < 0.3);
+          const gain = gainOfLevel(58 + 20 * Math.log10(distanceGain(source.distance)));
+          const onStone = Math.random() < 0.3;
+          // The recorded drop (its pitch the drop's size: a big drop lower, one onto stone higher, shorter and quieter), else the synth's.
+          const drop = bank?.pick?.('drip');
+          if (voice && drop) playSample(voice, voice.out, drop, onStone ? DRIP_PLAY.stone : { ...DRIP_PLAY.pool, rate: DRIP_PLAY.pool.rate * (0.8 + Math.random() * 0.5) }, when, gain);
+          else if (voice) playDrip(voice, voice.out, when, gain, onStone);
         }
       }
       clocks.bird -= dt;
@@ -400,11 +414,19 @@ export function createAmbience(ctx, out, place, bank = null) {
         const distance = 15 + Math.random() * 30;
         const at = [info.ear[0] + Math.cos(angle) * distance, info.ear[1] + 6 + Math.random() * 10, info.ear[2] + Math.sin(angle) * distance];
         const voice = place(at, 'ambience', true);
-        if (voice) playBird(voice, voice.out, when, gainOfLevel(78 + 20 * Math.log10(1 / distance)));
+        const gain = gainOfLevel(78 + 20 * Math.log10(1 / distance));
+        // A phrase of the recorded song, its pitch a little each way (another bird of the kind), else the synth's chirps.
+        const call = bank?.pick?.('bird');
+        if (voice && call) playSample(voice, voice.out, call, { ...BIRD_PLAY, rate: 0.9 + Math.random() * 0.2 }, when, gain);
+        else if (voice) playBird(voice, voice.out, when, gain);
       }
     },
   };
 }
+
+/** How the recorded one-shots play (sfx/sampled.js playSample plans): a bird's phrase; a drop into a pool, and onto stone. */
+const BIRD_PLAY = { trim: 1, rate: 1, seconds: null, fade: 0.1, skip: 0 };
+const DRIP_PLAY = { pool: { trim: 1, rate: 1, seconds: null, fade: 0.15, skip: 0 }, stone: { trim: 0.6, rate: 1.6, seconds: 0.12, fade: 0.05, skip: 0 } };
 
 /** The distance from `ear` to the nearest of `things` ({ at }: a water's centre). */
 function nearestDistance(things, ear) {
