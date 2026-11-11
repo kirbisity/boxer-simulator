@@ -2057,6 +2057,26 @@ export const PUNCTURE = { joules: 95, at: 0.65, power: 0.5, width: 0.01, after: 
 
 const punctureOdds = (share) => share / (1 - share);
 
+/**
+ * An edge against armour, as a point's PUNCTURE: the armour stops an edge outright up to the joules it is proof against
+ * (`joules` at the cut `at`, scaled by the odds of its `cut` to the `power`, the strike's draw within ± `spread` of it),
+ * and of what the edge brings past that lets through its share (1 - cut). Riveted mail (cut 0.88) is proof against about
+ * 120 J of edge: a sword's cut (60-190 J in play) seldom parts its rings, a heavy axe's or a polearm's (300 J and more)
+ * breaks a few and goes on; quilted cloth (0.3-0.6) stops 7-25 J, the weakest slashes; heavy lamellar (0.92-0.95)
+ * 190-310 J. A man in mail under a sword is bruised and his bones broken, not cut (Williams, The Knight and the Blast
+ * Furnace, 2003: riveted mail is seldom cut by a sword; the wounds of Visby, 1361, under mail are of the blow). Before,
+ * every edge passed its (1 - cut) share however weak (a 190 J katana cut put 23 J through a mail sleeve and took the
+ * hand): the user's call, 2026-11-10.
+ */
+export const EDGE_PROOF = { joules: 120, at: 0.88, power: 1, spread: 0.3, most: 0.995 };
+
+/** The joules of edge armour of this `cut` stops outright (EDGE_PROOF), at the strike's draw `roll` (0..1). */
+export function edgeProofOf(cut, roll = 0.5) {
+  const share = Math.min(EDGE_PROOF.most, Math.max(0, cut ?? 0));
+  if (share <= 0) return 0;
+  return EDGE_PROOF.joules * (punctureOdds(share) / punctureOdds(EDGE_PROOF.at)) ** EDGE_PROOF.power * (1 + EDGE_PROOF.spread * (2 * roll - 1));
+}
+
 /** The joules a point `width` m across must bring to go through armour of this `pierce` (PUNCTURE). */
 export function punctureOf(pierce, width = PUNCTURE.width) {
   const share = Math.min(PUNCTURE.most, Math.max(0, pierce ?? 0));

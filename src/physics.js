@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
-import { BLADES, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
+import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
@@ -8252,7 +8252,12 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const goes = driven ? driven.carried : energy;
   // A curved edge slides as it goes in and draws a longer cut through flesh and cloth (weapons.js sliceGain: none through mail or plate).
   const slice = mix.cut > 0 && !haft ? sliceGain(wspec, relative, weapon.dir, distance, protection) : 1;
-  const cut = goes * mix.cut * (1 - (protection.cut ?? 0)) * sharp * slice;
+  // An edge cuts only with what it brings past the armour's proof against it (weapons.js EDGE_PROOF), and of that its share; the
+  // rest the armour stopped (below: a blow).
+  const edgeJoules = goes * mix.cut;
+  const edgeProof = edgeJoules > 0 ? edgeProofOf(protection.cut, world.random()) : 0;
+  const edgePast = Math.max(0, edgeJoules - edgeProof);
+  const cut = edgePast * (1 - (protection.cut ?? 0)) * sharp * slice;
   // A finisher's point is leaned on as it goes in (finisherPress): the work of that push, as well as the blow's.
   // The point goes through only what it brings past the armour's puncture (weapons.js PUNCTURE, pointThrough): a hand thrust
   // stops on a breastplate, a lance at the gallop goes through it. Stopped, it lands only as its blow (its blunt share, spread
@@ -8280,7 +8285,10 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // (Swung cross first, the mordhau's: the quillon's narrow steel end drives through as a hammer's face does, hiltCrush.)
   // (And the point stopped on the armour, skidding or short of going through: a blow on it, BLADES.stopped.)
   const pointStopped = pointShare * (1 - pointGoes) * BLADES.stopped;
-  const bluntShare = (mix.blunt + pointStopped) * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
+  // (And an edge stopped on armour that does not turn it: mail, lamellar, cloth take the blow under it, as a point stopped
+  // does; plate turns it, and it glances.)
+  const edgeStopped = !protection.deflects && edgeJoules > 0 ? mix.cut * (Math.min(edgeJoules, edgeProof) / edgeJoules) * BLADES.stopped : 0;
+  const bluntShare = (mix.blunt + pointStopped + edgeStopped) * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
   // (An edge always glances off plate; a point that bites square does not.)
   const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(pointLed && mix.pierce > 0)));
   // Glass on steel or hard armour chips.
