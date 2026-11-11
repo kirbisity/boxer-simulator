@@ -39,6 +39,24 @@ export class SoftShell {
     this.active = false;
     this.omega = SOFT.omegaSoft + (SOFT.omegaFirm - SOFT.omegaSoft) * firmness;
     this.depthScale = 1.6 - firmness;
+    // Slack flesh carried as one mass (a belly over its gut: `hang`), shifted bodily by `carry`.
+    this.hung = null;
+    this.shift = [0, 0, 0];
+    this.carrying = false;
+    this.carried = false;
+  }
+
+  /** Flesh that moves as one slack mass: `weights`, per vertex, the share of the mass's shift (`carry`) each point takes. */
+  hang(weights) {
+    this.hung = weights;
+  }
+
+  /** The hung mass's shift from its rest now (in the geometry's own units). */
+  carry(x, y, z) {
+    this.shift[0] = x;
+    this.shift[1] = y;
+    this.shift[2] = z;
+    this.carrying = Boolean(this.hung) && Math.abs(x) + Math.abs(y) + Math.abs(z) > 1e-6;
   }
 
   /** Push the shell in around a world point by an impulse (N·s). */
@@ -65,29 +83,41 @@ export class SoftShell {
   }
 
   update(dt) {
-    if (!this.active) return;
+    // (Shifted last frame and not now: written once more, back at rest.)
+    const shifting = this.carrying || this.carried;
+    this.carried = this.carrying;
+    if (!this.active && !shifting) return;
     const positions = this.mesh.geometry.attributes.position.array;
     const stiffness = this.omega * this.omega;
     const damping = 2 * SOFT.damping * this.omega;
+    const hung = this.carrying ? this.hung : null;
+    const [sx, sy, sz] = this.shift;
     let energy = 0;
     for (let index = 0; index < this.offset.length; index += 1) {
-      // Semi-implicit Euler is stable here: ω·dt ≤ 34 / 30 ≈ 1.1 < 2.
-      this.velocity[index] += (-stiffness * this.offset[index] - damping * this.velocity[index]) * dt;
-      this.offset[index] += this.velocity[index] * dt;
-      energy += Math.abs(this.offset[index]) + Math.abs(this.velocity[index]) * 0.05;
-      for (let axis = 0; axis < 3; axis += 1) {
-        positions[index * 3 + axis] = this.rest[index * 3 + axis] + this.normals[index * 3 + axis] * this.offset[index];
+      if (this.active) {
+        // Semi-implicit Euler is stable here: ω·dt ≤ 34 / 30 ≈ 1.1 < 2.
+        this.velocity[index] += (-stiffness * this.offset[index] - damping * this.velocity[index]) * dt;
+        this.offset[index] += this.velocity[index] * dt;
+        energy += Math.abs(this.offset[index]) + Math.abs(this.velocity[index]) * 0.05;
       }
+      const share = hung ? hung[index] : 0;
+      const o = index * 3;
+      positions[o] = this.rest[o] + this.normals[o] * this.offset[index] + sx * share;
+      positions[o + 1] = this.rest[o + 1] + this.normals[o + 1] * this.offset[index] + sy * share;
+      positions[o + 2] = this.rest[o + 2] + this.normals[o + 2] * this.offset[index] + sz * share;
     }
     this.mesh.geometry.attributes.position.needsUpdate = true;
     if (this.recomputeNormals) this.mesh.geometry.computeVertexNormals();
-    if (energy < 1e-5 * this.offset.length) {
+    if (this.active && energy < 1e-5 * this.offset.length) {
       this.offset.fill(0);
       this.velocity.fill(0);
-      this.mesh.geometry.attributes.position.array.set(this.rest);
-      this.mesh.geometry.attributes.position.needsUpdate = true;
-      if (this.recomputeNormals) this.mesh.geometry.computeVertexNormals();
       this.active = false;
+      // (Back at rest, unless the hung mass is shifted: then it is written so next frame.)
+      if (!this.carrying) {
+        this.mesh.geometry.attributes.position.array.set(this.rest);
+        this.mesh.geometry.attributes.position.needsUpdate = true;
+        if (this.recomputeNormals) this.mesh.geometry.computeVertexNormals();
+      }
     }
   }
 }
