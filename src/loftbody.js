@@ -138,6 +138,10 @@ export const LOFT = {
   // The base skin's normals smoothed over its surface (weldBaseNormals): `passes` rounds of each point's and its neighbours' mean
   // (one round reaches an edge each way, about 1.5 cm on a man: the full model's softness; two flattened the pecs too).
   baseNormals: { passes: 1 },
+  // The arm's forms at the mesh's scale (baseArmForms): a muscle's height when fully shown (m: a bodybuilder's biceps and
+  // deltoid stand 2-3 cm over the shaft between them, a fit arm's, at a third of that showing, about a centimetre), a joint's
+  // (the elbow's point, its crease, the wrist's slimming: under a centimetre); `carried`, by sex, how much of those forms the model is modelled with at its reference build.
+  armForms: { muscle: 0.025, joint: 0.008, carried: { male: 1, female: 0 } },
   // A worn point takes the bone-heat weights of the skin point nearest its weight position, looked for within this (m) round it.
   heat: { reach: 0.06 },
   fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
@@ -1889,7 +1893,7 @@ function baseRigOf(sex, crowd) {
     const mesh = baseBodyMesh(sex, crowd);
     const reference = buildBody(mesh.reference);
     const { baseParts } = buildLoftBody(reference, { ...baseLoftOptions(crowd), base: { measure: true } });
-    BASE_RIGS.set(key, { ...measureBaseBody(mesh, baseParts, reference.heightM, jointsByName(bindPoints(reference))), refTraits: sculptTraits(reference) });
+    BASE_RIGS.set(key, { ...measureBaseBody(mesh, baseParts, reference.heightM, jointsByName(bindPoints(reference))), refTraits: sculptTraits(reference), refRules: rulesTraits(reference), sex });
   }
   return BASE_RIGS.get(key);
 }
@@ -1912,13 +1916,13 @@ const BASE_TRAIT = { trunk: 'trunk', neck: 'trunk', Upper: 'arm', Fore: 'fore', 
  * joints it is placed on and each forearm's reach to the hand (basebody.js baseBindJoints). The muscle relief the mesh was
  * modelled with shows by how defined each part is against the reference's (fat smooths it: basebody.js BASE_BODY smooth*); never more than modelled.
  */
-function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach }) {
+function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach }, rules = null) {
   const relief = (name) => {
     const key = BASE_TRAIT[name] ?? BASE_TRAIT[name.slice(1)];
     const modelled = definedBy(rig.refTraits[key].fat);
     return modelled <= 0 ? 1 : Math.min(1, definedBy(traits[key].fat) / modelled);
   };
-  const { positions } = placeBaseBody(rig, parts, relief, height, starve, skin, reach);
+  const { positions } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null);
   const uvs = uv ? baseBodyUvs(rig) : null;
   const start = mesh.positions.length / 3;
   const { render } = rig;
@@ -1958,6 +1962,59 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
   const armPart = (index) => /Upper$|Fore$/.test(rig.names[index]);
   const armSkin = Uint8Array.from(render.source, (source) => (armPart(rig.sources.part[source]) || (rig.sources.blend[source] > 0 && armPart(rig.sources.part2[source])) ? 1 : 0));
   mesh.base = { start, count: render.count, source: render.source, sources: rig.sources.count, own, swell, armSkin };
+}
+
+/**
+ * The arm's forms at the mesh's own scale (LOFT.armForms; the user's call, 2026-11-11: arms of bone and muscle hinged at
+ * joints, not a rubber tube), placed as the skin rules place them (skinrules.js limbRule) but a centimetre high, not a map's
+ * few millimetres: on the upper arm the deltoid's cap and the groove where it tucks into the arm, the biceps in front, the
+ * triceps behind and the groove between them at the sides, the elbow's point behind and its crease in front; on the forearm
+ * the swell of the brachioradialis and the flexors below the elbow, the elbow's point on its back, and the wrist slimmed.
+ * The muscles' forms stand by how much muscle shows (the rules' development × the part's leanness × how defined it is through
+ * its fat), the joints' by how bony the part is (fat buries them); each less what the model already carries of it at its
+ * reference build (`carried` of the reference's: the male model is modelled lean and defined, the female smooth: tools/
+ * basebody-pack.js REFERENCE_BUILD), so the reference gets the model as made. `rules`, `refRules` rulesTraits; the answer
+ * (part name, t, angle) => metres out along the point's line from its part's axis.
+ */
+function baseArmForms(rules, refRules, carried) {
+  const spec = LOFT.armForms;
+  const smooth = (a, b, x) => {
+    const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  };
+  const hump = (x, centre, width) => Math.max(0, 1 - ((x - centre) / width) ** 2) ** 2;
+  const shows = (R, key) => {
+    const part = R.traits[key];
+    return { muscle: R.dev * part.lean * smooth(0.016, 0.005, part.fat), bony: part.bony };
+  };
+  const own = { upper: shows(rules, 'arm'), fore: shows(rules, 'fore') };
+  const ref = { upper: shows(refRules, 'arm'), fore: shows(refRules, 'fore') };
+  const muscle = (kind) => spec.muscle * (own[kind].muscle - carried * ref[kind].muscle);
+  const bony = (kind) => spec.joint * (own[kind].bony - carried * ref[kind].bony);
+  const kinds = { lUpper: ['upper', 1], rUpper: ['upper', -1], lFore: ['fore', 1], rFore: ['fore', -1] };
+  return (name, t, angle) => {
+    const kind = kinds[name];
+    if (!kind) return 0;
+    const [part, outerSign] = kind;
+    const fa = Math.abs(angle);
+    const outer = Math.sin(angle) * outerSign;
+    const m = muscle(part);
+    const j = bony(part);
+    if (part === 'upper') {
+      const deltoid = 0.8 * hump(t, 0.12, 0.2) * (0.4 + 0.6 * smooth(-0.3, 0.6, outer));
+      const tuck = -0.4 * hump(t, 0.42 - 0.12 * Math.abs(Math.cos(angle)), 0.06) * smooth(-0.6, 0.2, outer);
+      const biceps = 0.7 * hump(fa, 0, 0.9) * hump(t, 0.6, 0.25);
+      const triceps = 0.6 * hump(Math.PI - fa, 0, 1.0) * hump(t, 0.48, 0.28);
+      const groove = -0.3 * hump(fa, Math.PI / 2, 0.3) * smooth(0.3, 0.4, t) * (1 - smooth(0.8, 0.9, t));
+      const point = hump(t, 0.97, 0.06) * hump(Math.PI - fa, 0, 0.5);
+      const crease = -hump(t, 0.98, 0.04) * hump(fa, 0, 0.6);
+      return m * (deltoid + tuck + biceps + triceps + groove) + j * (point + crease);
+    }
+    const swell = 0.6 * hump(t, 0.22, 0.2) * (hump(angle * outerSign, 0.7, 0.9) + 0.7 * hump(angle * outerSign, -0.8, 0.9));
+    const point = hump(t, 0.02, 0.07) * hump(Math.PI - fa, 0, 0.5);
+    const wrist = -0.8 * smooth(0.65, 0.95, t);
+    return m * swell + j * (point + wrist);
+  };
 }
 
 /**
@@ -3521,7 +3578,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
 
   if (base?.measure) return { baseParts };
   if (baseRig) {
-    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints);
+    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints, lowDetail ? null : rulesTraits(body));
     fitClothToBase(mesh, baseParts, armoured);
   }
   // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.
@@ -3685,6 +3742,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   return {
     positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames, bindPoints: bindAt,
     ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}), ...(tint ? { tint } : {}), ...(slosh ? { slosh } : {}),
+    // (A base-mesh body, not a crowd's, is drawn skinned by dual quaternions: render.js SKIN_DQ, dqskin.js.)
+    ...(baseRig && !lowDetail ? { dualQuaternion: true } : {}),
   };
 }
 

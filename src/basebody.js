@@ -638,10 +638,11 @@ export function baseBindJoints(rig, joints, height) {
  * his rings (see measureBaseBody), `joints` the joints it is placed on (baseBindJoints' `skin`), `relief(name)` how much of the
  * modelled muscle relief his part shows (1 all of it, 0 the smoothed surface), `height` his standing height (m), `starve` how
  * starved he is (baseStarvation: the emaciated reference's contour, each point's delta out along its line, laid on by it),
- * `foreReach` each arm part's length against the model's ({ extra, within }, baseBindJoints).
+ * `foreReach` each arm part's length against the model's ({ extra, within }, baseBindJoints), `muscle(name, t, angle)` a
+ * form to add out along each point's line (m), or null.
  * Returns the drawn points' positions (render order) and the sources'.
  */
-export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}) {
+export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}, muscle = null) {
   const { names, sources, render } = rig;
   const frames = {};
   const ratios = {};
@@ -734,7 +735,8 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     // loftbody.js baseBelly) with its foot hanging down.
     const [swell, hang] = parts[name].swell ? parts[name].swell(t, Math.atan2(y, x)) : [0, 0];
     const length = Math.hypot(px, py) || 1e-9;
-    const add = starved + swell;
+    // (And the arm's forms this body shows beyond the model's, `muscle(name, t, angle)` m: loftbody.js baseArmForms.)
+    const add = starved + swell + (muscle ? muscle(name, t, Math.atan2(y, x)) : 0);
     px += (px / length) * add;
     py += (py / length) * add;
     // (An arm's length against the model's (BASE_BODY.stretch): a forearm drawn out `extra` m past its modelled wrist, laid on up

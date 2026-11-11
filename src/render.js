@@ -9,6 +9,7 @@ import { buildOyoroiBox, buildOyoroiHanging } from './oyoroi.js';
 import { buildJoustKit } from './stechzeug.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
+import { dualQuaternionSkinning } from './dqskin.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps, cachedSkinMesh, readySkinTextures, skinTextureKey, skinTexturesNow, skinTexturesSteps, storeSkinMesh, styleSpec } from './bodystyles.js';
 import { bodyCheck } from './skinworker.js';
@@ -1967,12 +1968,17 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
     dressedSkin.userData.fullMaps = { normalMap: dressedSkin.normalMap, roughnessMap: dressedSkin.roughnessMap, roughness: dressedSkin.roughness };
     skinForTier(dressedSkin);
   }
+  // (A base-mesh body (bodystyles.js 'base') skins by dual quaternions, SKIN_DQ: its joints keep their thickness when they bend.)
+  if (built.dualQuaternion && SKIN_DQ.base) dualQuaternionSkinning(dressedSkin);
   const mesh = new THREE.SkinnedMesh(geometry, dressedSkin);
   mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
   mesh.castShadow = true;
   mesh.frustumCulled = false;
   return mesh;
 }
+
+/** Whether the base-mesh bodies skin by dual quaternions (dqskin.js) rather than linear blending (the user's call, 2026-11-11). */
+export const SKIN_DQ = { base: true };
 
 /** Ways to build the skin: see bodystyles.js. V7 (a loft wrapped onto the flesh field, with maps) is the default; 'lofted' the old one. */
 export const BODY_STYLES = BODY_STYLE_KEYS;

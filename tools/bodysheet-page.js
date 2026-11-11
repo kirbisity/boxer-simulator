@@ -10,7 +10,8 @@
 // cols, crop (torso, chest, legs), mat (standard, lambert, toon, physical: how
 // the skin is lit: the game's probe-lite look uses lambert), tone (clay or a
 // key of SKIN_TONES), pose (rest: arms lowered; bind: the A-pose the skin is
-// built in; game: arms lowered on the physics' own skeleton; stance: that on bent knees turned out), cell (the flesh grid), relief (bump strength), perf (soft-shell
+// built in; game: arms lowered on the physics' own skeleton; stance: that on bent knees turned out; bend90, bend130, raised: the
+// elbows bent or the arms raised), dqs (off: a base-mesh body skinned by linear blending, not dual quaternions), cell (the flesh grid), relief (bump strength), perf (soft-shell
 // cost), fighter (knight, gambeson, helmet-fat, helmet-thin: one dressed
 // fighter instead of the progression), motion (run, land, side: each chosen
 // build's fat masses through a move, fatslosh.js, a column per moment), outfit
@@ -32,6 +33,7 @@ import { FACE_MORPH } from '../src/facemorph.js';
 import { SoftShell } from '../src/soft.js';
 import { FatSlosh } from '../src/fatslosh.js';
 import { surface } from '../src/toon.js';
+import { dualQuaternionSkinning } from '../src/dqskin.js';
 
 const query = new URLSearchParams(location.search);
 const STYLE = query.get('style') ?? 'lofted';
@@ -192,6 +194,33 @@ function restPoints(points, body, degrees) {
 }
 
 /**
+ * The arms posed on the physics' own skeleton (rig.js bindPoints), for the skinning's joints: `bend90`, `bend130` the upper
+ * arms hanging (SHEET.armRest) and the elbows bent forward by that many degrees; `raised` the arms straight out in front.
+ */
+function armPoints(points, body, kind) {
+  const posed = points.map((point) => [...point]);
+  const unit = (v) => {
+    const length = Math.hypot(...v);
+    return v.map((value) => value / length);
+  };
+  const rest = (SHEET.armRest * Math.PI) / 180;
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    const shoulder = points[P[`${side}Shoulder`]];
+    const upper = body.lengths.upperArm;
+    const fore = body.lengths.forearmToFist;
+    const down = unit([0.04, -Math.cos(rest), sign * Math.sin(rest)]);
+    const upperDir = kind === 'raised' ? unit([1, -0.05, sign * 0.15]) : down;
+    const bend = kind === 'raised' ? 0 : (Number(kind.slice(4)) * Math.PI) / 180;
+    // (Bent forward in the plane of the hanging arm and the forward axis: down turned towards +x by `bend`.)
+    const foreDir = unit(down.map((value, axis) => value * Math.cos(bend) + [1, 0, 0][axis] * Math.sin(bend)));
+    const elbow = shoulder.map((value, axis) => value + upperDir[axis] * upper);
+    posed[P[`${side}Elbow`]] = elbow;
+    posed[P[`${side}Hand`]] = elbow.map((value, axis) => value + (kind === 'raised' ? upperDir : foreDir)[axis] * fore);
+  }
+  return posed;
+}
+
+/**
  * A fighter's stance on the physics' own skeleton (rig.js bindPoints), arms lowered: the body sunk `stance.sink` (m) on bent knees,
  * each knee pushed forward and turned out by `stance.out` (its share sideways against forward), the feet where they stood; the
  * legs' lengths kept. A stance shows how the skin follows the bones where they bend and turn (the knee and the thigh's roll).
@@ -321,7 +350,9 @@ async function subjectFor(inputs, extras = {}) {
   else if (built.detail) detailMaterial(material, built.detail, Number(query.get('relief') ?? 1));
   // (`game`: the arms lowered on the physics' own skeleton, rig.js bindPoints, as the game holds a standing body; `rest` on the
   // skeleton the skin was bound to, which the base style builds on the model's own joints.)
-  const points = POSE === 'stance' ? stancePoints(bindPoints(body), body) : POSE === 'game' ? restPoints(bindPoints(body), body, SHEET.armRest) : POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
+  // (A base-mesh body skins by dual quaternions, as in the game (render.js SKIN_DQ); `dqs=off` draws it by linear blending.)
+  if (built.dualQuaternion && query.get('dqs') !== 'off') dualQuaternionSkinning(material);
+  const points = ['bend90', 'bend130', 'raised'].includes(POSE) ? armPoints(bindPoints(body), body, POSE) : POSE === 'stance' ? stancePoints(bindPoints(body), body) : POSE === 'game' ? restPoints(bindPoints(body), body, SHEET.armRest) : POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
   const frames = boneFrames(points, body);
   const skin = skinnedMesh(built, geometryOf(built, colors), material, frames);
   group.add(skin);
