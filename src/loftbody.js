@@ -103,7 +103,7 @@ export const LOFT = {
   slosh: { bellyAcross: 1.05, bellyOut: 0.9, ballShare: 0.42 },
   // Clothes and armour fitted to the base mesh (fitClothToBase): a piece's point clears the skin of its part within `across`
   // (m) of its line out (about a triangle's breadth of the base mesh) and up to `deeper` (m) out past it (a big belly's 3-4 cm
-  // over its ring; the shoulder's cap 10 cm out past the trunk's top ring is not counted); a ring is on a part whose axis it
+  // over its ring, a breast's 5-6 cm past a top's; the shoulder's cap 10 cm out past the trunk's top ring is not counted); a ring is on a part whose axis it
   // runs along (cosine over `parallel`) within `onLine` (m) of it sideways; the skin is given `clear` more (its points are the
   // triangles' corners: a triangle's middle stands a little nearer). Only the skin wholly on its part counts (its blend into a
   // neighbour under `ownBlend`), and not flesh within an arm's own reach, `armReach` of its ring's radius round its axis from
@@ -115,8 +115,11 @@ export const LOFT = {
   // (`reach`: rows either way an outer piece's rings are looked for, its rings standing up to a sixth of a part apart.)
   // (`endReach` (t): how far past a piece's end ring it still holds what is beneath, half a ring's spacing; `trunkFoot` (t):
   // below this a trunk piece is also checked against the thighs' pieces, from `thighRoot` (t) down each thigh; `mostPull` (m): the
-  // most an arm's skin is drawn in under a trunk piece, 3 cm; an arm lying against a top's side lies further out.)
-  layers: { along: 0.03, around: 36, spread: 1, reach: 6, rankGap: 0.005, margin: 0.004, endReach: 0.04, trunkFoot: 0.05, thighRoot: -0.3, mostPull: 0.03 },
+  // most an arm's skin is drawn in under a trunk piece, 3 cm; an arm lying against a top's side lies further out; `hemPull` (m):
+  // the most skin just past a piece's end ring is drawn in under its hem, 1 cm, about the cloth's own standoff off the skin;
+  // `hideGap` (m): what lies within a piece's rings is left out only if that piece's surface is this near it, 3 cm, a padded
+  // coat's thickness: a skirt or a coat's hem standing clear of the legs is open beneath.)
+  layers: { along: 0.03, around: 36, spread: 1, reach: 6, rankGap: 0.005, margin: 0.004, endReach: 0.04, trunkFoot: 0.05, thighRoot: -0.3, mostPull: 0.03, hemPull: 0.01, hideGap: 0.03 },
   // (`alongBand`, m: how far up or down the part a skin point may lie from a piece's point and still hold it out: about one ring
   // of the base mesh, 1.5 cm.)
   // (`tightest`: a piece is drawn in to the skin as well as out, where the modelled body is slimmer than the ring (its waist),
@@ -125,7 +128,7 @@ export const LOFT = {
   // either side), to skin out at `neckShare` of the neck's radius or more, stood `standoff` (m, times the piece's own standoff
   // share) off it.
   collar: { from: 0.7, sectors: 48, spread: 1, neckShare: 1.1, standoff: 0.006 },
-  fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.12, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
+  fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
   wastingFrom: 0.135,
@@ -259,6 +262,8 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
   if (mesh.ringOf) for (const ring of rings) {
     ring.piece ??= start;
     if (rings.over) ring.over = true;
+    // (Torn cloth has holes the skin shows through: never hides it, keepLayersInside.)
+    if (holes) ring.torn = true;
   }
   // A colour may be a pattern: a function of the ring (and its index), and
   // of the angle round it (0 at the front, as the depth axis points).
@@ -2091,9 +2096,21 @@ function fitClothToBase(mesh, parts, armoured) {
     const flat = Math.hypot(Math.cos(mesh.ringA[vertex]) * ring.depth, Math.sin(mesh.ringA[vertex]) * ring.width) || radius;
     const standoff = Math.max(1, radius / flat);
     let need = 0;
-    const [cx, cy, cz] = [0, 1, 2].map((axis) => Math.floor(p[axis] / size));
-    for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
-      for (const { point, swell, arm } of cells.get(`${cx + dx}|${cy + dy}|${cz + dz}`) ?? []) {
+    // (The cells round the piece's point and on along its line out, a cell at a time to `deeper` past it: the skin it must clear
+    // may stand that far out, a breast 3-6 cm past a top's ring, beyond the cells next to the point.)
+    const visited = new Set();
+    const near = [];
+    for (let step = 0; step <= spec.deeper; step += size) {
+      const [cx, cy, cz] = [0, 1, 2].map((axis) => Math.floor((p[axis] + dir[axis] * step) / size));
+      for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
+        const key = `${cx + dx}|${cy + dy}|${cz + dz}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        near.push(key);
+      }
+    }
+    for (const key of near) {
+      for (const { point, swell, arm } of cells.get(key) ?? []) {
         // (The arm's flesh fits a piece on the arm, the rest of the skin a piece on the rest; the belly's dome not one under it.)
         // (A piece on the trunk up to its top, a shirt or a coat to the neck, goes over the shoulder's cap and the trapezius too.)
         const overCap = name === 'trunk' && pieceTop.get(ring.piece) >= LOFT.closedJoint.top.trunk;
@@ -2199,8 +2216,7 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count) {
  * not the trunk's (a shirt's top rings are narrower than the shoulders it passes under), and the belly's dome is not held under
  * a waistband it hangs over.
  */
-// (`armoured`: under armour a piece beneath another is drawn in, never left out: plates and laced rows have gaps the piece shows
-// through, which a cloth tube has not.)
+// (`armoured`: under armour a piece low on the trunk is drawn in under a thigh's piece, never left out there.)
 function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured = false, pieceTop = new Map()) {
   const spec = LOFT.layers;
   mesh.underLayer = new Set();
@@ -2225,7 +2241,7 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
   for (const [vertex, { name, under, ring }] of shares) {
     if (!frames[name]) continue;
     // (Cloth worn over armour outranks every piece: the plate is held inside it, and it is drawn out over the plate.)
-    layers.push({ vertex, name, rank: ring.over ? Infinity : pieceRank.get(ring.piece), under, piece: ring.piece, over: Boolean(ring.over) });
+    layers.push({ vertex, name, rank: ring.over ? Infinity : pieceRank.get(ring.piece), under, piece: ring.piece, over: Boolean(ring.over), torn: Boolean(ring.torn) });
   }
   // (The skin by its source point: the copies of one point drawn in two tiles, or either side of a seam, move as one, or the
   // surface would crack between them.)
@@ -2279,14 +2295,22 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
       if (low && high) {
         const span = high.t - low.t;
         r = low.r + (high.r - low.r) * (span > 1e-6 ? (place.t - low.t) / span : 0);
-        within = true;
+        within = within || !low.torn;
       } else {
         const end = low ?? high;
         if (Math.abs(end.t - place.t) > spec.endReach) continue;
+        // (Skin standing out past a hem by more than `hemPull` is the body going on beyond the garment, the breast above a
+        // bandeau's edge: drawn in to the hem it crumpled into folds, so the hem is left to sink into it instead.)
+        // (A hem only: a collar up at the part's top, raised along the trapezius, holds the slope of the shoulders under it.)
+        const hem = (pieceTop.get(piece) ?? Infinity) < (name === 'trunk' ? LOFT.closedJoint.top.trunk : LOFT.closedJoint.top.limb);
+        if (layer.skin && hem && layer.r - (end.r - spec.margin) > spec.hemPull) continue;
         r = end.r;
       }
-      if (r - spec.margin < limit) {
-        limit = r - spec.margin;
+      // (The piece is flat between its points round the ring, LOFT.sides of them: its facet's middle lies the chord's sag,
+      // cos(π / sides) of the points' reach, inside them, where a breast's or a calf's skin between two points came through.)
+      const facet = r * Math.cos(Math.PI / LOFT.sides);
+      if (facet - spec.margin < limit) {
+        limit = facet - spec.margin;
         limiting = piece;
       }
     }
@@ -2345,12 +2369,38 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     }
     // (A piece's point with another piece over it is never seen: its triangles are left out where all their points are so, so
     // two layers of one cloth do not fight through each other: hideCovered.)
-    if (!layer.skin && covered && !armoured) mesh.underLayer.add(layer.vertex);
+    // (Under armour as well: what lies between one closed piece's own rings is hidden by it, a plate's or a quilted coat's; the
+    // gaps between pieces lie within none of them, and laced rows and split skirts are lofted with holes, which hide nothing.
+    // Drawn in only, trousers came through the samurai's shin guards in slivers.)
+    // (Only where the piece over it lies close, within `hideGap` either way: a skirt hanging clear of the legs is open beneath,
+    // and what is under it is seen from below; and flesh standing far out of a piece, the inner thighs between two trouser legs,
+    // fills the gap between pieces once drawn in.)
+    const close = Math.abs(limit + spec.margin - layer.r) < spec.hideGap;
+    if (!layer.skin && covered && (!armoured || close)) mesh.underLayer.add(layer.vertex);
+    // (Skin between the rings of a closed piece is under it too, and left out the same way: drawn in to the cloth's
+    // surface it still came through it in specks and patches where the cloth's facets cut across the modelled forms, at a
+    // boot's top, a coat's shoulder, a sleeve's root. Under armour too: a plate or a quilted coat is a closed tube between its own
+    // rings, and the gaps between pieces are not within any one of them. Not under torn cloth, whose holes show it.)
+    if (layer.skin && covered && close) for (const vertex of layer.group ?? [layer.vertex]) mesh.underLayer.add(vertex);
     // (An arm's skin, or skin blending into an arm, that a trunk piece would draw in by more than `mostPull` is not under it: the
     // arm lies beside the top, and drawing it in tears it into spikes.)
     if (layer.r > limit && limit > 0 && !(layer.arm && !overCap && layer.name === 'trunk' && layer.r - limit > spec.mostPull)) {
       const pull = (limit - layer.r) / layer.r;
       for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += layer.out[axis] * pull;
+    }
+    // (High on a thigh, under a trunk piece hanging over it, a coat's skirt or a fauld: held inside it from the trunk's own axis,
+    // and left out where it lies close within it, as a trunk piece is under a thigh's above. Trousers' hips came through a thin
+    // man's coat.)
+    if (!/Thigh$/.test(layer.name) || !frames.trunk) continue;
+    const onTrunk = placeOf('trunk', layer.vertex);
+    if (onTrunk.t >= spec.trunkFoot || onTrunk.r < 1e-6) continue;
+    const held = { ...layer, ...onTrunk };
+    const hang = surface('trunk', held, held);
+    if (!within) continue;
+    if (Math.abs(hang + spec.margin - onTrunk.r) < spec.hideGap) for (const vertex of layer.group ?? [layer.vertex]) mesh.underLayer.add(vertex);
+    if (onTrunk.r > hang && hang > 0) {
+      const pull = (hang - onTrunk.r) / onTrunk.r;
+      for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += onTrunk.out[axis] * pull;
     }
   }
 }
