@@ -127,13 +127,16 @@ export const BASE_BODY = {
   //             top line meets the arm;
   //   `edge`    the deltoid's front and back edges, grooves this deep (m) at 0.6 of muscle showing and up to twice it at all;
   //   `chest`, `chestRows`, `chestFrom`, `chestTo`: the chest's width brought to the loft's (v7's) ring (round 13; see shoulderPlus);
+  //   `neckCut` the neck's top ring trimmed to this share of the head's radius under its centre;
+  //   `female`  a woman's own amounts over these (round 14, the user: her shoulders narrower still);
   //   `neckTuck` the neck's top drawn in under the head by this share of its radius;
   //   `pit`     the armpit's hollow (m): the trunk's flank under the arm, from 2 to 14 cm under the shoulder joint and within
   //             the arm's own depth fore and aft, drawn in towards the midline, deepest at the arm's middle and easing out to the
   //             pec's edge in front and the lat's behind: the arm's inner face then stands off the flank, its own round form.
   shoulderPlus: {
     D1: { in: 0.02, trap: 0.04, trapKeep: 0.35, deltoid: 0.7, arm: 0.9, armFrom: -0.05, armTo: 0.2, square: 0.4, edge: 0.003, pit: 0 },
-    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.5, chest: 1, chestRows: 0.03, chestFrom: [0.35, 0.5], chestTo: [0.72, 0.82] },
+    D2: { in: 0.035, trap: 0.085, trapKeep: 0.25, deltoid: 0.35, arm: 0.78, armFrom: -0.05, armTo: 0.2, square: 0.8, edge: 0.005, pit: 0.018, neckTuck: 0.5, chest: 1, chestRows: 0.03, chestFrom: [0.35, 0.5], chestTo: [0.72, 0.82], neckCut: 0.75,
+      female: { in: 0.05, deltoid: 0.15, arm: 0.72 } },
   },
 };
 
@@ -1097,7 +1100,9 @@ function shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKe
  * PROOF OF CONCEPT, round 11: D's rest shape made smaller and sharper (BASE_BODY.shoulderPlus, `spec`), on the placed points
  * (changed in place). Each point's moves are worked out on its own, then smoothed over the surface as the round 10 designs' are.
  */
-function shoulderPlus(spec, { rig, parts, frames, placed, shoulderKeep, height, joints }) {
+function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, joints }) {
+  // (A woman's own amounts over the design's, `female`: round 14.)
+  const spec = rig.sex === 'female' && own.female ? { ...own, ...own.female } : own;
   const ease = (a, b, x) => {
     const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
     return u * u * (3 - 2 * u);
@@ -1149,6 +1154,15 @@ function shoulderPlus(spec, { rig, parts, frames, placed, shoulderKeep, height, 
       const r0 = Math.hypot(xN, yN) || 1;
       const behind = Math.max(1 - ease(-0.2, 0.3, xN / r0), ease(0.35, 0.7, Math.abs(yN) / r0));
       if (head && reach > hold) shift = vec.add(shift, vec.scale(off, -((reach - hold) / reach) * behind * ease(0.3, 0.7, tN)));
+      // (Its top ring trimmed to the head's underside: nothing of it above `neckCut` of the head's radius under the head's
+      // centre, along the neck, pushed down to that plane. Its sides beside the jaw rose past the game's narrower jaw and showed
+      // from behind in a fin.)
+      if (head && spec.neckCut) {
+        const after = vec.add(p, shift);
+        const along = vec.dot(vec.sub(after, head), neck.axis);
+        const plane = -spec.neckCut * 0.055 * height;
+        if (along > plane) shift = vec.add(shift, vec.scale(neck.axis, -(along - plane) * ease(0.2, 0.5, tN)));
+      }
       shifts.set(shift, vertex * 3);
       continue;
     }
