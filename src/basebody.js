@@ -71,8 +71,10 @@ export const BASE_BODY = {
   // The emaciated reference's contour is faded out over the shoulder's cap: within `starveArm[0]` of an upper arm's ring radius
   // round its axis (from armFrom down) none of it, from `starveArm[1]` (its reach, armReach) all. Its figure stood with one hand
   // on the hip and the other arm hanging (tools/blender/emaciated.py), its shoulders shrugged and turned, so the delta there is
-  // its pose, not its wasting: ±2 cm lumps on a starved man's shoulders. Its collarbones and the ribs below stay.
-  starveArm: [1.0, 1.6],
+  // its pose, not its wasting: ±2 cm lumps on a starved man's shoulders. Its collarbones and the ribs below stay. (Round 15,
+  // the user: a starved shoulder still had the model's thickness. With the arms lowered by D's rest shape the lumps are gone,
+  // and the fade now runs from 0.3 to 0.8 of the arm's ring radius: her bony cap, 1 cm lower over a starved man's joint.)
+  starveArm: [0.3, 0.8],
   // Her rib and spine detail (baseStarvedDetail) is faded where it is her pose, not her wasting: above the collarbones (`top`,
   // t of the trunk: her shrugged shoulders and turned neck printed as ridges over a starved man's shoulders), and over the
   // shoulder's cap at the sides (`side`, t, where |sin| of the angle passes `sideFrom`: those triangles are drawn in the arm's
@@ -885,14 +887,17 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     // Scaled by the ratio out to the reference ring's own reach; past it (the shoulder's cap far out on the trunk's narrow top
     // ring, a buttock behind the hips') a point moves out as the ring's surface does, not by a share of its whole distance: the
     // part swells as a whole, and its outlying forms ride on the swell rather than flying out with it (square, boxy shoulders).
+    // Thinning (a ratio under 1) takes the whole distance in, the outlying forms with it: held to the ring, a thin or starved
+    // body kept the model's shoulder cap at full size over a thinner arm, 1.5 cm of deltoid standing off it at every build (the
+    // user, 2026-11-11: "why does the shoulder always have some thickness").
     const [refDepth, refWidth] = refRing[name](t);
-    const reach = (value, ring) => Math.max(-ring, Math.min(ring, value));
+    const reach = (value, ring, ratio) => (ratio < 1 ? value : Math.max(-ring, Math.min(ring, value)));
     // That swell is then laid on along the model's own surface normal at the point (`n`: along, fore and aft, across), its
     // share there: the surface is offset, not stretched across, so a form keeps its shape as the part thickens or thins. Laid
     // on round the axis, the swell slid a form sideways where its surface turns from the axis: a shoulder's cap carried out
     // with the ribs' widening (a block on a fat man), a breast's foot and a pec's edge pushed out of their curves.
-    const dx = (kx - 1) * reach(x, refDepth);
-    const dy = (ky - 1) * reach(y, refWidth);
+    const dx = (kx - 1) * reach(x, refDepth, kx);
+    const dy = (ky - 1) * reach(y, refWidth, ky);
     const normalShare = BASE_BODY.offsetAlongNormal;
     const dn = dx * n[1] + dy * n[2];
     let px = x + dx + (n[1] * dn - dx) * normalShare + lean;
