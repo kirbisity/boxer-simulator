@@ -58,6 +58,13 @@ export const BODY = {
   // nothing in the physics (masses, forces, impulses, knockback) changes.
   // 0.47 (was 0.55): every blow told too little, blunt, cut and thrust alike (the user's call, 2026-11-09): each a sixth more.
   toughness: 0.47,
+  // The chin's own share (in place of `toughness`): the head speed change that drops a man. At 0.47 it was ~1.35 m/s for an
+  // average man, under the ~2-3 m/s an Olympic boxer's punch gives a dummy's head (Walilko et al. 2005), so an average punch
+  // knocked a man down and a mace through a padded helmet knocked him out cold. 0.8: ~2.3 m/s, an average punch at the knockdown
+  // line, out cold (WORLD.knockout.overChin) from ~4.3 m/s, short of the ~7 m/s of the NFL's concussions (Pellman et al. 2003).
+  // Blows still add up (concussionCapacity), and a hook or an uppercut still twists the head more (rotationalFactor). The
+  // user's call, 2026-11-10 (the moderate of the two offered; the literature's ~3 m/s the other).
+  chinToughness: 0.8,
   // Lean mass that is not skeleton or skeletal muscle: organs, skin, blood.
   // A share of lean (so it shrinks in starvation) plus a little per kg of
   // fat (a bigger body needs bigger organs). Leaves ~32 kg of muscle in a
@@ -1126,7 +1133,7 @@ export function buildBody(rawInputs) {
     },
     // Head speed change that drops this fighter, ~3–4.5 m/s ("chin").
     // A build's `brain` (the small primates: PRESETS.macaque): how much more of a speed change its brain takes than a man's.
-    chin: 3.1 * (0.8 + 0.25 * neckIndex) * Math.max(0.6, 1 - 0.004 * yearsAging) * BODY.toughness * (build?.brain ?? 1),
+    chin: 3.1 * (0.8 + 0.25 * neckIndex) * Math.max(0.6, 1 - 0.004 * yearsAging) * BODY.chinToughness * (build?.brain ?? 1),
     // A man's own hand breaking on a punch is the attacker's risk, not his health: it stays.
     // A build's `bones`: its bones' strength against a man's (thicker in section).
     fracture: {
