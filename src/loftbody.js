@@ -6,7 +6,7 @@
 // seven sides and flat normals, for a low-poly art look.
 
 import { buildBody, P } from './body.js';
-import { baseBindJoints, baseBodyAvailable, baseHeatBones, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
+import { BASE_BODY, baseBindJoints, baseBodyAvailable, baseHeatBones, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
 import { relax, skinWeights, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
@@ -1897,7 +1897,7 @@ const BASE_RIGS = new Map();
 /** The options a base skin is built with (and measured with: the trunk's profiles depend on them): a fighter's, or a crowd's. */
 export const baseLoftOptions = (crowd) => (crowd ? { lowDetail: true } : { sculpt: 'rules', rules: { share: 0, density: 'medium' }, hideCovered: true });
 function baseRigOf(sex, crowd) {
-  const key = `${sex}|${crowd}`;
+  const key = `${sex}|${crowd}|${BASE_BODY.shoulder === 'D'}`;
   if (!BASE_RIGS.has(key)) {
     const mesh = baseBodyMesh(sex, crowd);
     const reference = buildBody(mesh.reference);
@@ -1931,7 +1931,10 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
     const modelled = definedBy(rig.refTraits[key].fat);
     return modelled <= 0 ? 1 : Math.min(1, definedBy(traits[key].fat) / modelled);
   };
-  const { positions } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null);
+  // (PROOF OF CONCEPT, BASE_BODY.shoulder 'E': the share of the model's shoulder bulk this body keeps, its arm's muscle showing
+  // as baseArmForms reads it: development × leanness × definition through the fat.)
+  const shoulderKeep = rules ? Math.min(1, rules.dev * rules.traits.arm.lean * Math.min(1, Math.max(0, (0.016 - rules.traits.arm.fat) / 0.011))) : 0;
+  const { positions } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null, shoulderKeep);
   const uvs = uv ? baseBodyUvs(rig) : null;
   const start = mesh.positions.length / 3;
   const { render } = rig;

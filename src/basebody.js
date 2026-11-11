@@ -93,6 +93,26 @@ export const BASE_BODY = {
   // up). Its sides were offset along normals smoothed apart (no edge joins them), and a fat man's calf opened it into specks
   // of the background and flaps of skin.
   slitRoundness: 0.3,
+  // PROOF OF CONCEPT (shoulder-poc, 2026-11-11; the user: the base shoulder is too wide and bulky against the game's own, v7):
+  // five ways to fix it, picked by `shoulder` ('A'..'E', null for the base as it is), all acting in one zone (shoulderZone).
+  //   A graft:  the zone's points laid onto the loft's own surface (the trunk's top ring and the upper arm's root, v7's rings).
+  //   B girdle: the zone moved in towards the midline by `girdleIn` and down by `girdleDrop` (m per 1.8 m of height), the
+  //             deltoid's bulk beyond the arm's ring scaled by `deltoidScale` on its outer side.
+  //   C girth:  the zone's smoothed surface driven onto the loft's rings, the mesh's own detail carried on it.
+  //   D rebind: the model's arms lowered `rebindDegrees` about its shoulders by its own bone-heat weights before anything else,
+  //             and that taken as its rest shape: a shoulder modelled lowered, bound in the game's hang.
+  //   E muscle: as C, but of the model's bulk over the loft's rings only the share this body's arm muscle shows is taken off
+  //             (the model read as a bodybuilder's: a bodybuilder keeps all of it, a thin man next to none).
+  shoulder: null,
+  // The zone: the trunk's top from `trunkT[0]` to `[1]` (eased: about 5 cm on a man), where its point's |sin| round the ring
+  // passes `lateral[0]` to `[1]` (the sides: not the chest's middle or the neck); the upper arm down to `armT` (eased: the root's
+  // third), within `armReach` of its ring's radius of its axis.
+  shoulderZone: { trunkT: [0.8, 0.9], lateral: [0.35, 0.75], armT: [0.2, 0.38], armReach: [1.6, 2.2], armRoot: -0.1 },
+  girdleIn: 0.015, girdleDrop: 0.01, deltoidScale: 0.85,
+  // (The designs' moves smoothed over this many rounds, about three edges, 4-5 cm on a man.)
+  shoulderSmooth: 8,
+  // (The model's upper arm hangs 25 degrees from the vertical, the game's 11 (tools/bodysheet-page.js SHEET.armRest).)
+  rebindDegrees: 14, rebindClavicle: 0.35,
 };
 
 const BASE_TAU = Math.PI * 2;
@@ -205,9 +225,43 @@ function closeSlits(positions, triangles) {
   return out;
 }
 
+/**
+ * PROOF OF CONCEPT (BASE_BODY.shoulder 'D'): the model's arms lowered BASE_BODY.rebindDegrees about each shoulder joint, in the
+ * plane of the arm and the vertical, each point turned by that angle times its bone-heat weight on the arm's bones (the upper
+ * arm and the forearm all of it, the clavicle `rebindClavicle` of it: one turn about one pivot, so blending the angle is what
+ * dual quaternions would give), and the elbow and hand joints with them. The mesh is then bound as it now stands.
+ */
+function rebindArmsDown(mesh) {
+  const bones = BASE_BODY_DATA.heatBones;
+  const angle = (BASE_BODY.rebindDegrees * Math.PI) / 180;
+  const positions = Float32Array.from(mesh.positions);
+  const joints = structuredClone(mesh.joints);
+  for (const side of ['l', 'r']) {
+    const pivot = mesh.joints[`${side}Shoulder`];
+    // (Left is +z in the model's frame: turned so that the arm comes in towards the body.)
+    const sign = side === 'l' ? 1 : -1;
+    const share = new Map([[bones.indexOf(`${side}UpperArm`), 1], [bones.indexOf(`${side}Forearm`), 1], [bones.indexOf(`${side}Clavicle`), BASE_BODY.rebindClavicle]]);
+    const turn = (point, a) => {
+      const y = point[1] - pivot[1];
+      const z = point[2] - pivot[2];
+      const [c, s] = [Math.cos(a), Math.sin(a) * sign];
+      return [point[0], pivot[1] + y * c - z * s, pivot[2] + z * c + y * s];
+    };
+    for (let vertex = 0; vertex < mesh.count; vertex += 1) {
+      let w = 0;
+      for (let slot = 0; slot < 4; slot += 1) w += (share.get(mesh.heatIndex[vertex * 4 + slot]) ?? 0) * mesh.heatWeight[vertex * 4 + slot];
+      if (w <= 0) continue;
+      positions.set(turn([positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]], angle * w), vertex * 3);
+    }
+    for (const joint of ['Elbow', 'Hand']) joints[`${side}${joint}`] = turn(mesh.joints[`${side}${joint}`], angle);
+  }
+  mesh.positions = positions;
+  mesh.joints = joints;
+}
+
 /** A sex's base mesh, decoded once: { parts, joints, reference, count, positions (units of height), triangles, part, part2, blend, starved, heatIndex, heatWeight }. */
 export function baseBodyMesh(sex, crowd = false) {
-  const key = `${sex}|${crowd}`;
+  const key = `${sex}|${crowd}|${BASE_BODY.shoulder}`;
   if (baseDecoded.has(key)) return baseDecoded.get(key);
   const data = BASE_BODY_DATA[sex];
   const packed = data.meshes[crowd ? 'crowd' : 'full'];
@@ -226,6 +280,7 @@ export function baseBodyMesh(sex, crowd = false) {
     ...baseHeat(packed),
   };
   mesh.triangles = closeSlits(mesh.positions, new Uint16Array(baseBytes(packed.triangles).buffer));
+  if (BASE_BODY.shoulder === 'D' && mesh.heatIndex) rebindArmsDown(mesh);
   baseDecoded.set(key, mesh);
   return mesh;
 }
@@ -719,7 +774,7 @@ export function baseBindJoints(rig, joints, height) {
  * form to add out along each point's line (m), or null.
  * Returns the drawn points' positions (render order) and the sources'.
  */
-export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}, muscle = null) {
+export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}, muscle = null, shoulderKeep = 0) {
   const { names, sources, render } = rig;
   const frames = {};
   const ratios = {};
@@ -785,9 +840,9 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
   }));
   const shows = Object.fromEntries(names.map((name) => [name, relief(name)]));
   const placed = new Float32Array(sources.count * 3);
-  const place = (name, c, k, starved, out, n) => {
+  const place = (name, c, k, starved, out, n, forceShare = null) => {
     const frame = frames[name];
-    const share = shows[name];
+    const share = forceShare ?? shows[name];
     const t = c[k + 3] + (c[k] - c[k + 3]) * share;
     const x = c[k + 4] + (c[k + 1] - c[k + 4]) * share;
     const y = c[k + 5] + (c[k + 2] - c[k + 5]) * share;
@@ -848,9 +903,136 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     }
     placed.set(one, vertex * 3);
   }
+  if (BASE_BODY.shoulder && BASE_BODY.shoulder !== 'D') {
+    // (The smoothed surface placed too, for the designs that drive it and carry the detail along: C and E.)
+    const design = BASE_BODY.shoulder;
+    let smooth = null;
+    if (design === 'C' || design === 'E') {
+      smooth = new Float32Array(sources.count * 3);
+      for (let vertex = 0; vertex < sources.count; vertex += 1) {
+        const k = vertex * 12;
+        const c = sources.coords;
+        const starved = sources.starved[vertex] * height * starve;
+        const f = sources.facing;
+        place(names[sources.part[vertex]], c, k, starved, one, [f[vertex * 6], f[vertex * 6 + 1], f[vertex * 6 + 2]], 0);
+        const blend = sources.blend[vertex];
+        if (blend > 0 && sources.part2[vertex] !== sources.part[vertex]) {
+          place(names[sources.part2[vertex]], c, k + 6, starved, other, [f[vertex * 6 + 3], f[vertex * 6 + 4], f[vertex * 6 + 5]], 0);
+          for (let axis = 0; axis < 3; axis += 1) one[axis] += (other[axis] - one[axis]) * blend;
+        }
+        smooth.set(one, vertex * 3);
+      }
+    }
+    shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
+  }
   const positions = new Float32Array(render.count * 3);
   for (let index = 0; index < render.count; index += 1) positions.set(placed.subarray(render.source[index] * 3, render.source[index] * 3 + 3), index * 3);
   return { positions, sources: placed };
+}
+
+/**
+ * PROOF OF CONCEPT: a shoulder design (BASE_BODY.shoulder 'A', 'B', 'C' or 'E') applied to the placed points (changed in place),
+ * within BASE_BODY.shoulderZone. The loft's surface there (v7's) is the trunk's ring at its t and the upper arm's at its own,
+ * this body's (`parts`); a point outside both is moved to the nearer of the two, along its own line out from that axis.
+ */
+function shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height }) {
+  const zone = BASE_BODY.shoulderZone;
+  const ease = (a, b, x) => {
+    const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  };
+  const rings = Object.fromEntries(['trunk', 'lUpper', 'rUpper'].map((name) => {
+    const [from, to] = rig.spans[name];
+    const rows = ringRows(parts[name], from, to);
+    const count = BASE_BODY.stops;
+    return [name, (t) => {
+      const at = Math.min(count, Math.max(0, ((t - from) / (to - from || 1)) * count));
+      const index = Math.min(count - 1, Math.floor(at));
+      const f = at - index;
+      return rows[index].map((value, axis) => value + (rows[index + 1][axis] - value) * f);
+    }];
+  }));
+  // Where a point lies on a part: [t, depth, width] from the ring's centre, the ring's radius along that line, and its
+  // distance out.
+  const onRing = (name, p, t0 = null) => {
+    const frame = frames[name];
+    const [t, x, y] = axisCoords(frame, p);
+    const [depth, width, offset] = rings[name](t0 ?? t);
+    const dx = x - offset;
+    const r = Math.hypot(dx, y) || 1e-9;
+    const radius = 1 / Math.hypot(dx / r / (depth || 1e-6), y / r / (width || 1e-6));
+    return { t, dx, y, r, radius, frame };
+  };
+  // The move that lays `p` on the loft's surface (zero where it is inside it), and the point's zone weight.
+  const moveOf = (p) => {
+    const trunk = onRing('trunk', p, null);
+    const tTrunk = Math.min(1, trunk.t);
+    const trunkAt = onRing('trunk', p, tTrunk);
+    const arm = ['lUpper', 'rUpper'].map((name) => onRing(name, p)).sort((a, b) => a.r / a.radius - b.r / b.radius)[0];
+    const wTrunk = ease(zone.trunkT[0], zone.trunkT[1], trunk.t) * ease(zone.lateral[0], zone.lateral[1], Math.abs(trunk.y / trunk.r));
+    const wArm = arm.t > -0.6 ? (1 - ease(zone.armT[0], zone.armT[1], arm.t)) * (1 - ease(zone.armReach[0], zone.armReach[1], arm.r / arm.radius)) * ease(zone.trunkT[0] - 0.1, zone.trunkT[0], trunk.t) : 0;
+    const weight = Math.max(wTrunk, wArm);
+    if (weight <= 0) return { weight, move: [0, 0, 0], arm };
+    const candidates = [];
+    const out = (ring, excess) => {
+      const scale = -excess / ring.r;
+      return vec.add(vec.scale(ring.frame.depthAxis, ring.dx * scale), vec.scale(ring.frame.widthAxis, ring.y * scale));
+    };
+    const trunkExcess = trunkAt.r - trunkAt.radius;
+    const armExcess = arm.t >= zone.armRoot ? arm.r - arm.radius : Infinity;
+    if (trunkExcess <= 0 || armExcess <= 0) return { weight, move: [0, 0, 0], arm };
+    candidates.push([trunkExcess, out(trunkAt, trunkExcess)]);
+    if (Number.isFinite(armExcess)) candidates.push([armExcess, out(arm, armExcess)]);
+    candidates.sort((a, b) => a[0] - b[0]);
+    return { weight, move: candidates[0][1], arm };
+  };
+  const scale = height / 1.8;
+  const count = placed.length / 3;
+  const shifts = new Float32Array(count * 3);
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (rig.names[rig.sources.part[vertex]] === 'neck') continue;
+    const p = [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]];
+    let shift = [0, 0, 0];
+    if (design === 'A') {
+      const { weight, move } = moveOf(p);
+      shift = vec.scale(move, weight);
+    } else if (design === 'C' || design === 'E') {
+      const { weight } = moveOf(p);
+      if (weight > 0) {
+        const { move } = moveOf([smooth[vertex * 3], smooth[vertex * 3 + 1], smooth[vertex * 3 + 2]]);
+        shift = vec.scale(move, weight * (design === 'E' ? 1 - shoulderKeep : 1));
+      }
+    } else if (design === 'B') {
+      const { weight, arm } = moveOf(p);
+      if (weight > 0) {
+        const trunk = frames.trunk;
+        const [, , y] = axisCoords(trunk, p);
+        // In towards the midline (the trunk's width axis), down along the trunk.
+        shift = vec.add(vec.scale(trunk.widthAxis, -Math.sign(y) * BASE_BODY.girdleIn * scale * weight), vec.scale(trunk.axis, -BASE_BODY.girdleDrop * scale * weight));
+        // The deltoid's bulk beyond the arm's ring, on its outer side (away from the trunk), scaled down.
+        const excess = arm.r - arm.radius;
+        const outer = -Math.sign(y) * vec.dot(vec.add(vec.scale(arm.frame.depthAxis, arm.dx / arm.r), vec.scale(arm.frame.widthAxis, arm.y / arm.r)), trunk.widthAxis);
+        if (excess > 0 && outer > 0 && arm.t >= zone.armRoot) {
+          const radial = vec.add(vec.scale(arm.frame.depthAxis, arm.dx / arm.r), vec.scale(arm.frame.widthAxis, arm.y / arm.r));
+          shift = vec.add(shift, vec.scale(radial, -(1 - BASE_BODY.deltoidScale) * excess * outer * weight));
+        }
+      }
+    }
+    shifts.set(shift, vertex * 3);
+  }
+  // The moves smoothed over the surface (BASE_BODY.shoulderSmooth rounds, each point to its neighbours' mean): the zone's
+  // edge, and the neck's points it leaves where they are, eased, not stepped (a ridge round the neck's foot otherwise).
+  const neighbours = Array.from({ length: count }, () => new Set());
+  const tri = rig.triangles;
+  for (let corner = 0; corner < tri.length; corner += 3) {
+    const [a, b, c] = [0, 1, 2].map((k) => rig.render.source[tri[corner + k]]);
+    neighbours[a].add(b).add(c);
+    neighbours[b].add(a).add(c);
+    neighbours[c].add(a).add(b);
+  }
+  const lists = neighbours.map((set) => [...set]);
+  const smoothed = laplacian(shifts, lists, BASE_BODY.shoulderSmooth);
+  for (let index = 0; index < placed.length; index += 1) placed[index] += smoothed[index];
 }
 
 /** The drawn points' texture coordinates: each in its part's tile at its t and share round (skindetail.js detailUv). */

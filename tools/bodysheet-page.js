@@ -34,6 +34,9 @@ import { SoftShell } from '../src/soft.js';
 import { FatSlosh } from '../src/fatslosh.js';
 import { surface } from '../src/toon.js';
 import { dualQuaternionSkinning } from '../src/dqskin.js';
+import { BASE_BODY } from '../src/basebody.js';
+// PROOF OF CONCEPT: `shoulder` (A..E) picks a base-body shoulder design (basebody.js BASE_BODY.shoulder).
+if (new URLSearchParams(location.search).get('shoulder')) BASE_BODY.shoulder = new URLSearchParams(location.search).get('shoulder');
 
 const query = new URLSearchParams(location.search);
 const STYLE = query.get('style') ?? 'lofted';
@@ -221,6 +224,27 @@ function armPoints(points, body, kind) {
 }
 
 /**
+ * A fight stance with the guard up (pose=guard): the stance's legs, each upper arm forward, down and a little out, each forearm
+ * up and in, the fists before the chin.
+ */
+function guardPoints(points, body) {
+  const posed = stancePoints(points, body);
+  const unit = (v) => {
+    const length = Math.hypot(...v);
+    return v.map((value) => value / length);
+  };
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    const shoulder = posed[P[`${side}Shoulder`]];
+    const upperDir = unit([0.55, -0.75, sign * 0.3]);
+    const foreDir = unit([0.35, 0.9, -sign * 0.3]);
+    const elbow = shoulder.map((value, axis) => value + upperDir[axis] * body.lengths.upperArm);
+    posed[P[`${side}Elbow`]] = elbow;
+    posed[P[`${side}Hand`]] = elbow.map((value, axis) => value + foreDir[axis] * body.lengths.forearmToFist);
+  }
+  return posed;
+}
+
+/**
  * A fighter's stance on the physics' own skeleton (rig.js bindPoints), arms lowered: the body sunk `stance.sink` (m) on bent knees,
  * each knee pushed forward and turned out by `stance.out` (its share sideways against forward), the feet where they stood; the
  * legs' lengths kept. A stance shows how the skin follows the bones where they bend and turn (the knee and the thigh's roll).
@@ -352,7 +376,7 @@ async function subjectFor(inputs, extras = {}) {
   // skeleton the skin was bound to, which the base style builds on the model's own joints.)
   // (A base-mesh body skins by dual quaternions, as in the game (render.js SKIN_DQ); `dqs=off` draws it by linear blending.)
   if (built.dualQuaternion && query.get('dqs') !== 'off') dualQuaternionSkinning(material);
-  const points = ['bend90', 'bend130', 'raised'].includes(POSE) ? armPoints(bindPoints(body), body, POSE) : POSE === 'stance' ? stancePoints(bindPoints(body), body) : POSE === 'game' ? restPoints(bindPoints(body), body, SHEET.armRest) : POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
+  const points = POSE === 'guard' ? guardPoints(bindPoints(body), body) : ['bend90', 'bend130', 'raised'].includes(POSE) ? armPoints(bindPoints(body), body, POSE) : POSE === 'stance' ? stancePoints(bindPoints(body), body) : POSE === 'game' ? restPoints(bindPoints(body), body, SHEET.armRest) : POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
   const frames = boneFrames(points, body);
   const skin = skinnedMesh(built, geometryOf(built, colors), material, frames);
   group.add(skin);
