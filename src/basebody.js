@@ -87,6 +87,12 @@ export const BASE_BODY = {
   joins: { sideUpper: ['trunk', 0.91], sideFore: ['*Upper', 1], sideThigh: ['trunk', 0], sideShin: ['*Thigh', 1], neck: ['trunk', 1] },
   // The ease from the parent's ratio into the part's own: from `joinRatio[0]` to `[1]` (t of the part).
   joinRatio: [-0.25, 0.3],
+  // A slit in the modelled surface (closeSlits): an inner hole whose roundness (4π·area / perimeter², 1 for a circle) is under
+  // this. The male mesh as exported has one behind each lower shin, two thin holes meeting at a point, rows of points up to
+  // 5 mm apart that share no edge; the mesh's own open ends, the neck's, the wrists' and the soles' cuts, are round (0.89 and
+  // up). Its sides were offset along normals smoothed apart (no edge joins them), and a fat man's calf opened it into specks
+  // of the background and flaps of skin.
+  slitRoundness: 0.3,
 };
 
 const BASE_TAU = Math.PI * 2;
@@ -129,6 +135,76 @@ function baseHeat(packed) {
   return { heatIndex, heatWeight };
 }
 
+/**
+ * The triangles with each slit in the surface closed (BASE_BODY.slitRoundness): its loop of open edges, followed the other way
+ * round (so the new faces turn out as their neighbours do), cut into ears in its own plane (Newell's normal), so its sides are
+ * one surface, joined by edges, and are smoothed and offset as one.
+ */
+function closeSlits(positions, triangles) {
+  const p = (v) => [positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2]];
+  // Every open edge, a → b as its one triangle has it: the hole's loop runs b → a.
+  const directed = new Set();
+  for (let corner = 0; corner < triangles.length; corner += 3) for (let k = 0; k < 3; k += 1) directed.add(`${triangles[corner + k]}|${triangles[corner + ((k + 1) % 3)]}`);
+  const outgoing = new Map();
+  for (const key of directed) {
+    const [a, b] = key.split('|').map(Number);
+    if (directed.has(`${b}|${a}`)) continue;
+    (outgoing.get(b) ?? outgoing.set(b, []).get(b)).push(a);
+  }
+  // (A point may lie on two holes, as at the shin's slit: the open edges are walked one at a time, and each time the walk comes
+  // back to a point on its own path, the loop since is cut out as one hole.)
+  const loops = [];
+  for (const start of outgoing.keys()) {
+    const path = [start];
+    while (outgoing.get(path.at(-1))?.length) {
+      const to = outgoing.get(path.at(-1)).pop();
+      const back = path.indexOf(to);
+      if (back < 0) path.push(to);
+      else loops.push([to, ...path.splice(back + 1)]);
+    }
+  }
+  const added = [];
+  for (const loop of loops) {
+    if (loop.length < 3) continue;
+    const normal = [0, 0, 0];
+    let perimeter = 0;
+    loop.forEach((v, index) => {
+      const [a, b] = [p(v), p(loop[(index + 1) % loop.length])];
+      normal[0] += (a[1] - b[1]) * (a[2] + b[2]);
+      normal[1] += (a[2] - b[2]) * (a[0] + b[0]);
+      normal[2] += (a[0] - b[0]) * (a[1] + b[1]);
+      perimeter += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+    });
+    const area = Math.hypot(...normal) / 2;
+    if (!(perimeter > 0) || (4 * Math.PI * area) / perimeter ** 2 >= BASE_BODY.slitRoundness) continue;
+    // Ears: a corner turning the loop's way with no other point of the loop inside it, clipped until three are left.
+    const left = [...loop];
+    const turn = (a, b, c) => vec.dot(vec.cross(vec.sub(p(b), p(a)), vec.sub(p(c), p(b))), normal);
+    const inside = (q, a, b, c) => turn(a, b, q) >= 0 && turn(b, c, q) >= 0 && turn(c, a, q) >= 0;
+    while (left.length > 3) {
+      const index = left.findIndex((b, at) => {
+        const a = left[(at + left.length - 1) % left.length];
+        const c = left[(at + 1) % left.length];
+        return turn(a, b, c) > 0 && !left.some((q) => q !== a && q !== b && q !== c && inside(q, a, b, c));
+      });
+      // (A loop with no clean ear left, folded on itself: closed as a fan from its first point.)
+      if (index < 0) {
+        for (let at = 1; at + 1 < left.length; at += 1) added.push(left[0], left[at], left[at + 1]);
+        left.length = 0;
+        break;
+      }
+      added.push(left[(index + left.length - 1) % left.length], left[index], left[(index + 1) % left.length]);
+      left.splice(index, 1);
+    }
+    if (left.length === 3) added.push(...left);
+  }
+  if (!added.length) return triangles;
+  const out = new Uint16Array(triangles.length + added.length);
+  out.set(triangles);
+  out.set(added, triangles.length);
+  return out;
+}
+
 /** A sex's base mesh, decoded once: { parts, joints, reference, count, positions (units of height), triangles, part, part2, blend, starved, heatIndex, heatWeight }. */
 export function baseBodyMesh(sex, crowd = false) {
   const key = `${sex}|${crowd}`;
@@ -142,13 +218,14 @@ export function baseBodyMesh(sex, crowd = false) {
     reference: data.reference,
     count: packed.count,
     positions: Float32Array.from(ints, (value) => value / BASE_BODY_DATA.positionScale),
-    triangles: new Uint16Array(baseBytes(packed.triangles).buffer),
+    triangles: null,
     part: baseBytes(packed.part),
     part2: baseBytes(packed.part2),
     blend: Float32Array.from(baseBytes(packed.blend), (value) => value / 255),
     starved: packed.starved ? Float32Array.from(new Int16Array(baseBytes(packed.starved).buffer), (value) => value / BASE_BODY_DATA.deltaScale) : new Float32Array(packed.count),
     ...baseHeat(packed),
   };
+  mesh.triangles = closeSlits(mesh.positions, new Uint16Array(baseBytes(packed.triangles).buffer));
   baseDecoded.set(key, mesh);
   return mesh;
 }

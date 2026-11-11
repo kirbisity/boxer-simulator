@@ -140,11 +140,20 @@ export const LOFT = {
   baseNormals: { passes: 1 },
   // The arm's forms at the mesh's scale (baseArmForms): a muscle's height when fully shown (m: a bodybuilder's biceps and
   // deltoid stand 2-3 cm over the shaft between them, a fit arm's, at a third of that showing, about a centimetre), a joint's
-  // (the elbow's point, its crease, the wrist's slimming: under a centimetre); `carried`, by sex, how much of those forms the model is modelled with at its reference build.
-  armForms: { muscle: 0.025, joint: 0.008, carried: { male: 1, female: 0 } },
+  // (the elbow's point, its crease, the wrist's slimming: a centimetre and a half on a bony arm). Both are read at the fight
+  // camera's distance (3-4 m, the arm 60-80 px tall): at 2.5 cm and 0.8 cm the forms were there in a close view and gone at
+  // the fight's, the arm a smooth tube. `carried`, by sex, how much of the muscles' and the joints' forms the model is made with
+  // at its reference build: the male model is lean and defined, but decimated to a fighter's 8k triangles (edges 1.5 cm) its
+  // arm keeps only the broad masses, about half the muscle's relief and none of the elbow's point or the wrist's slimming; with
+  // all of it taken as carried, a thin or average man's arm lost 1-2 cm of deltoid and biceps against the model and an athletic
+  // one's got nothing, and no man showed an elbow. The female model is smooth.
+  // `jointSpan`: how far along the part (t, either way) a joint's forms reach, 0.13 (4 cm on an upper arm).
+  armForms: { muscle: 0.06, joint: 0.022, jointSpan: 0.13, carried: { male: { muscle: 0.5, joint: 0 }, female: { muscle: 0, joint: 0 } } },
   // A worn point takes the bone-heat weights of the skin point nearest its weight position, looked for within this (m) round it.
   heat: { reach: 0.06 },
-  fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
+  // (`alongPasses`: rounds a piece's fit is smoothed ring to ring, fitClothToBase: two, a ring's reach to the next and the one
+  // after.)
+  fit: { alongPasses: 2, tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
   wastingFrom: 0.135,
@@ -1978,6 +1987,7 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
  */
 function baseArmForms(rules, refRules, carried) {
   const spec = LOFT.armForms;
+  const JOINT_SPAN = spec.jointSpan;
   const smooth = (a, b, x) => {
     const u = Math.min(1, Math.max(0, (x - a) / (b - a)));
     return u * u * (3 - 2 * u);
@@ -1989,8 +1999,8 @@ function baseArmForms(rules, refRules, carried) {
   };
   const own = { upper: shows(rules, 'arm'), fore: shows(rules, 'fore') };
   const ref = { upper: shows(refRules, 'arm'), fore: shows(refRules, 'fore') };
-  const muscle = (kind) => spec.muscle * (own[kind].muscle - carried * ref[kind].muscle);
-  const bony = (kind) => spec.joint * (own[kind].bony - carried * ref[kind].bony);
+  const muscle = (kind) => spec.muscle * (own[kind].muscle - carried.muscle * ref[kind].muscle);
+  const bony = (kind) => spec.joint * (own[kind].bony - carried.joint * ref[kind].bony);
   const kinds = { lUpper: ['upper', 1], rUpper: ['upper', -1], lFore: ['fore', 1], rFore: ['fore', -1] };
   return (name, t, angle) => {
     const kind = kinds[name];
@@ -2006,12 +2016,18 @@ function baseArmForms(rules, refRules, carried) {
       const biceps = 0.7 * hump(fa, 0, 0.9) * hump(t, 0.6, 0.25);
       const triceps = 0.6 * hump(Math.PI - fa, 0, 1.0) * hump(t, 0.48, 0.28);
       const groove = -0.3 * hump(fa, Math.PI / 2, 0.3) * smooth(0.3, 0.4, t) * (1 - smooth(0.8, 0.9, t));
-      const point = hump(t, 0.97, 0.06) * hump(Math.PI - fa, 0, 0.5);
-      const crease = -hump(t, 0.98, 0.04) * hump(fa, 0, 0.6);
+      // (The joint's forms span LOFT.armForms.jointSpan of the part either way, about 4 cm: the olecranon with the triceps' tendon
+      // running into it, the crease's fold. Narrower, they fell between the mesh's rings, 1.5 cm apart on the arm, and printed
+      // nothing.)
+      const point = 0.4 * hump(t, 0.95, JOINT_SPAN) * hump(Math.PI - fa, 0, 0.8);
+      const crease = -hump(t, 0.97, 0.6 * JOINT_SPAN) * hump(fa, 0, 0.7);
       return m * (deltoid + tuck + biceps + triceps + groove) + j * (point + crease);
     }
     const swell = 0.6 * hump(t, 0.22, 0.2) * (hump(angle * outerSign, 0.7, 0.9) + 0.7 * hump(angle * outerSign, -0.8, 0.9));
-    const point = hump(t, 0.02, 0.07) * hump(Math.PI - fa, 0, 0.5);
+    // (The olecranon is the ulna's, and turns with the forearm: most of the point stands on the forearm's side of the joint,
+    // where its skin follows the forearm's bone. Laid on the upper arm's side, the joint's blended skin rounded it into the
+    // bend's arc and the bent elbow showed none.)
+    const point = 1.3 * hump(t, 0, JOINT_SPAN) * hump(Math.PI - fa, 0, 0.8);
     const wrist = -0.8 * smooth(0.65, 0.95, t);
     return m * swell + j * (point + wrist);
   };
@@ -2398,6 +2414,32 @@ function fitClothToBase(mesh, parts, armoured) {
       }
       // (Cloth never less than its own point needs: the smoothing only bridges it over the dips, a top across the breasts.)
       laidOf.set(vertex, hard(vertex) ? sum / weight : Math.max(sum / weight, shares.get(vertex).share));
+    }
+  }
+  // Then along the piece, ring to ring (LOFT.fit.alongPasses rounds of each point's and its neighbours' in the rings either
+  // side, at the same place round): each ring fitted on its own stood out from the next in bands, a coat over a very fat
+  // belly in rings round it like a stack of tyres.
+  const byPiece = new Map();
+  for (const [ring, vertices] of byRing) (byPiece.get(ring.piece) ?? byPiece.set(ring.piece, []).get(ring.piece)).push([ring, vertices]);
+  for (const list of byPiece.values()) {
+    list.sort((a, b) => a[0].t - b[0].t);
+    for (let pass = 0; pass < spec.alongPasses; pass += 1) {
+      const before = new Map(laidOf);
+      list.forEach(([, vertices], index) => {
+        const below = list[index - 1]?.[1];
+        const above = list[index + 1]?.[1];
+        vertices.forEach((vertex, step) => {
+          let sum = 2 * before.get(vertex);
+          let weight = 2;
+          for (const other of [below, above]) {
+            if (other?.length !== vertices.length) continue;
+            sum += before.get(other[step]);
+            weight += 1;
+          }
+          const mean = sum / weight;
+          laidOf.set(vertex, hard(vertex) ? mean : Math.max(mean, shares.get(vertex).share));
+        });
+      });
     }
   }
   for (const [vertex, { ring, dir, radius, share }] of shares) {
