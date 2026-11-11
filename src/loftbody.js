@@ -114,8 +114,9 @@ export const LOFT = {
   // ring's radius); what lies beneath is drawn `margin` (m: a few millimetres, the thickness of cloth) inside it.
   // (`reach`: rows either way an outer piece's rings are looked for, its rings standing up to a sixth of a part apart.)
   // (`endReach` (t): how far past a piece's end ring it still holds what is beneath, half a ring's spacing; `trunkFoot` (t):
-  // below this a trunk piece is also checked against the thighs' pieces, from `thighRoot` (t) down each thigh.)
-  layers: { along: 0.03, around: 36, spread: 1, reach: 6, rankGap: 0.005, margin: 0.004, endReach: 0.04, trunkFoot: 0.05, thighRoot: -0.3 },
+  // below this a trunk piece is also checked against the thighs' pieces, from `thighRoot` (t) down each thigh; `mostPull` (m): the
+  // most an arm's skin is drawn in under a trunk piece, 3 cm; an arm lying against a top's side lies further out.)
+  layers: { along: 0.03, around: 36, spread: 1, reach: 6, rankGap: 0.005, margin: 0.004, endReach: 0.04, trunkFoot: 0.05, thighRoot: -0.3, mostPull: 0.03 },
   // (`alongBand`, m: how far up or down the part a skin point may lie from a piece's point and still hold it out: about one ring
   // of the base mesh, 1.5 cm.)
   // (`tightest`: a piece is drawn in to the skin as well as out, where the modelled body is slimmer than the ring (its waist),
@@ -1905,7 +1906,10 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, joints) {
   const own = Uint8Array.from(render.source, (source) => (rig.sources.part2[source] === rig.sources.part[source] || rig.sources.blend[source] < LOFT.fit.ownBlend ? 1 : 0));
   // (`swell`: how far the belly's dome stands each point out, m: a waistband sits under its overhang, fitClothToBase.)
   const swell = Float32Array.from(render.part, (part, index) => (rig.names[part] === 'trunk' && parts.trunk.swell ? parts.trunk.swell(render.t[index], render.angle[index])[0] : 0));
-  mesh.base = { start, count: render.count, source: render.source, sources: rig.sources.count, own, swell };
+  // (`armSkin`: points that are an arm's or blend into one, across the armpit: keepLayersInside.)
+  const armPart = (index) => /Upper$|Fore$/.test(rig.names[index]);
+  const armSkin = Uint8Array.from(render.source, (source) => (armPart(rig.sources.part[source]) || (rig.sources.blend[source] > 0 && armPart(rig.sources.part2[source])) ? 1 : 0));
+  mesh.base = { start, count: render.count, source: render.source, sources: rig.sources.count, own, swell, armSkin };
 }
 
 /**
@@ -2105,7 +2109,8 @@ function fitClothToBase(mesh, parts, armoured) {
         sum += shares.get(other).share;
         weight += 1;
       }
-      laidOf.set(vertex, sum / weight);
+      // (Cloth never less than its own point needs: the smoothing only bridges it over the dips, a top across the breasts.)
+      laidOf.set(vertex, hard(vertex) ? sum / weight : Math.max(sum / weight, shares.get(vertex).share));
     }
   }
   for (const [vertex, { ring, dir, radius, share }] of shares) {
@@ -2114,7 +2119,7 @@ function fitClothToBase(mesh, parts, armoured) {
     for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] = ring.center[axis] + dir[axis] * radius * laid;
   }
   raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count);
-  keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured);
+  keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured, pieceTop);
 }
 
 /**
@@ -2180,7 +2185,7 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count) {
  */
 // (`armoured`: under armour a piece beneath another is drawn in, never left out: plates and laced rows have gaps the piece shows
 // through, which a cloth tube has not.)
-function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured = false) {
+function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured = false, pieceTop = new Map()) {
   const spec = LOFT.layers;
   mesh.underLayer = new Set();
   const cells = new Map();
@@ -2218,7 +2223,7 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     if (!own) continue;
     // (The shoulder's cap is the arm's, the neck's slope the trunk's: held to those parts' layers.)
     const flesh = mesh.base.armFlesh?.[vertex - start];
-    layers.push({ vertex, group, name: flesh ?? own, rank: 0, skin: true, dome: (mesh.base.swell?.[vertex - start] ?? 0) > 0 });
+    layers.push({ vertex, group, name: flesh ?? own, rank: 0, skin: true, arm: Boolean(mesh.base.armSkin?.[vertex - start]), dome: (mesh.base.swell?.[vertex - start] ?? 0) > 0 });
   }
   for (const layer of layers) {
     if (!frames[layer.name]) continue;
@@ -2231,9 +2236,11 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
   // `endReach`, so the skin dips under a hem rather than standing over its edge); Infinity where none lies over it.
   // (`within` set when the place lies between two of a piece's rings, not only past its end: only then is a piece beneath hidden.)
   let within = false;
+  let limiting = null;
   const surface = (name, place, layer) => {
     let limit = Infinity;
     within = false;
+    limiting = null;
     const row = rowOf(place.t);
     const column = columnOf(place.angle);
     const below = new Map();
@@ -2261,7 +2268,10 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
         if (Math.abs(end.t - place.t) > spec.endReach) continue;
         r = end.r;
       }
-      limit = Math.min(limit, r - spec.margin);
+      if (r - spec.margin < limit) {
+        limit = r - spec.margin;
+        limiting = piece;
+      }
     }
     return limit;
   };
@@ -2269,6 +2279,8 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     if (layer.r === undefined || layer.r < 1e-6) continue;
     const limit = surface(layer.name, layer, layer);
     const covered = within;
+    // (A piece up to the trunk's top, a coat to the neck, goes over the shoulder's cap and holds its skin however far.)
+    const overCap = limiting !== null && pieceTop.get(limiting) >= LOFT.closedJoint.top.trunk;
     // (A piece low on the trunk lies over the thighs as well: under a thigh's piece there it is left out, not drawn in.)
     if (!layer.skin && layer.name === 'trunk' && layer.t < spec.trunkFoot) {
       for (const thigh of ['lThigh', 'rThigh']) {
@@ -2281,7 +2293,9 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     // (A piece's point with another piece over it is never seen: its triangles are left out where all their points are so, so
     // two layers of one cloth do not fight through each other: hideCovered.)
     if (!layer.skin && covered && !armoured) mesh.underLayer.add(layer.vertex);
-    if (layer.r > limit && limit > 0) {
+    // (An arm's skin, or skin blending into an arm, that a trunk piece would draw in by more than `mostPull` is not under it: the
+    // arm lies beside the top, and drawing it in tears it into spikes.)
+    if (layer.r > limit && limit > 0 && !(layer.arm && !overCap && layer.name === 'trunk' && layer.r - limit > spec.mostPull)) {
       const pull = (limit - layer.r) / layer.r;
       for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += layer.out[axis] * pull;
     }
