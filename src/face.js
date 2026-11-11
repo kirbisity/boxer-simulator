@@ -396,7 +396,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     ear.castShadow = true;
     if (photoHead) {
       // On the photo head's side (a broad skull's ears further out), read from the atlas where they sit.
-      ear.position.z *= (1 + 0.05 * (photo.shape.cephalic ?? 0)) * PHOTO_HEAD.anatomy.width;
+      ear.position.z = PHOTO_HEAD.model.on ? Math.sign(ear.position.z) * photoHead.earZ * SKULL[2] * r * 0.98 : ear.position.z * (1 + 0.05 * (photo.shape.cephalic ?? 0)) * PHOTO_HEAD.anatomy.width;
       ear.updateMatrix();
       ear.geometry.applyMatrix4(ear.matrix);
       ear.position.set(0, 0, 0);
@@ -485,7 +485,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   // Mouth: a drawn line that opens into a dark mouth with the guard showing.
   // (A photo's mouth where its lips are: the atlas' lip line, photohead.js.)
   const photoMouth = (FACE.eyeLine / SKULL[1] + PHOTO_ATLAS.mouthShare * (-PHOTO_ATLAS.chinT * shape.chinLength - FACE.eyeLine / SKULL[1])) * SKULL[1];
-  const mouth = onSurface(new THREE.Group(), probe, raycaster, r, photo ? photoMouth * PHOTO_HEAD.anatomy.lowerLength * (1 + 0.05 * (photo.shape.faceLength ?? 0)) : -0.6, 0, 0.004 * r);
+  const mouth = onSurface(new THREE.Group(), probe, raycaster, r, photo ? (PHOTO_HEAD.model.on ? photoHead.mouthY : photoMouth * PHOTO_HEAD.anatomy.lowerLength * (1 + 0.05 * (photo.shape.faceLength ?? 0))) : -0.6, 0, 0.004 * r);
   const lineShape = new THREE.Shape();
   lineShape.moveTo(-0.12 * r, 0.01 * r);
   lineShape.quadraticCurveTo(0, -0.012 * r, 0.12 * r, 0.01 * r);
