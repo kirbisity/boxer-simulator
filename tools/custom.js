@@ -27,7 +27,9 @@ export const CUSTOM_BUDGET = 15_000_000;
 // concrete, the shore's beach, the earth of the green, the field and Sengoku); the rest (the grass, the town's cobbles,
 // the plain's dry grass and gravel) drawn painted as with the maps off. Chosen to leave about 1 MB of the budget for the game to grow
 // into; every other baked picture (the armour's, the cloth atlas, the helmets', the sky photograph, the photo faces) is kept whole.
-export const CUSTOM_GROUND_TILES = ['sand', 'concrete', 'beach', 'earth'];
+// The earth (0.7 MB: the green, the field, Sengoku) left out too on 2026-11-10, when the recorded ambience (every bed and one-shot
+// the synth made: ~0.8 MB of samples) took the page past the budget.
+export const CUSTOM_GROUND_TILES = ['sand', 'concrete', 'beach'];
 
 /** Data modules cut down (as tools/bundle.js LITE does), by module: its one exported const → what is kept. */
 export const CUSTOM_DATA = {
