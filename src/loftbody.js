@@ -6,7 +6,7 @@
 // seven sides and flat normals, for a low-poly art look.
 
 import { buildBody, P } from './body.js';
-import { baseBindJoints, baseBodyAvailable, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
+import { baseBindJoints, baseBodyAvailable, baseHeatBones, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
 import { relax, skinWeights, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
@@ -138,6 +138,8 @@ export const LOFT = {
   // The base skin's normals smoothed over its surface (weldBaseNormals): `passes` rounds of each point's and its neighbours' mean
   // (one round reaches an edge each way, about 1.5 cm on a man: the full model's softness; two flattened the pecs too).
   baseNormals: { passes: 1 },
+  // A worn point takes the bone-heat weights of the skin point nearest its weight position, looked for within this (m) round it.
+  heat: { reach: 0.06 },
   fit: { tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, clothSpan: 0.6, overhang: 0.005, across: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
@@ -1940,6 +1942,12 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
     if (render.part[index] === rig.sources.part[source] || !ownBones.has(source)) ownBones.set(source, mesh.bones[start + index]);
   }
   for (let index = 0; index < render.count; index += 1) mesh.bones[start + index] = ownBones.get(render.source[index]);
+  // (Each drawn point's bone-heat weights, by its source: the model's own skinning, baseHeatWeights.)
+  mesh.heat = new Map();
+  for (let index = 0; index < render.count; index += 1) {
+    const heat = rig.sources.heat?.[render.source[index]];
+    if (heat) mesh.heat.set(start + index, heat);
+  }
   for (const index of rig.triangles) mesh.indices.push(start + index);
   for (const [name, [from, to]] of Object.entries(rig.ranges)) mesh.parts[name] = [start + from, start + to];
   // (`own`: the points wholly on their part, not blending into a neighbour across a joint: what the clothes are fitted to.)
@@ -2039,6 +2047,82 @@ function baseSlosh(figures, positions, rigid, trunk, belly, trunkShare, skin) {
   }
   const weights = sloshWeights(positions, masses, rigid, trunkShare);
   return { figures, masses: masses.map(({ hang: _, ...mass }, index) => ({ ...mass, weights: weights[index] })) };
+}
+
+/**
+ * Each point's bone-heat weights (an array by vertex: a Map of BASE_BODY_DATA.heatBones index to weight, or null): the base
+ * skin's own, and every worn point's (the clothes and armour lofted over it) those of the skin point nearest the place it is
+ * weighted at (its weight position: the body's surface beneath it), within `LOFT.heat.reach` (m), so the cloth turns as the skin
+ * under it does.
+ */
+function clothHeat(mesh) {
+  const count = mesh.positions.length / 3;
+  const out = new Array(count).fill(null);
+  const size = LOFT.heat.reach;
+  const cells = new Map();
+  const keyOf = (p) => p.map((value) => Math.floor(value / size)).join('|');
+  for (const [vertex, weights] of mesh.heat) {
+    out[vertex] = weights;
+    const p = [mesh.weightPositions[vertex * 3], mesh.weightPositions[vertex * 3 + 1], mesh.weightPositions[vertex * 3 + 2]];
+    const key = keyOf(p);
+    (cells.get(key) ?? cells.set(key, []).get(key)).push([p, weights]);
+  }
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    // (Not a worn point with bones of its own, a skirt hung from the pelvis and both thighs, a breastplate on the chest alone:
+    // those keep their own, or a coat's skirt swung out with one leg like a flared dress.)
+    if (out[vertex] || mesh.heat.has(vertex) || mesh.bones[vertex]) continue;
+    const p = [mesh.weightPositions[vertex * 3], mesh.weightPositions[vertex * 3 + 1], mesh.weightPositions[vertex * 3 + 2]];
+    const c = p.map((value) => Math.floor(value / size));
+    let best = Infinity;
+    for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) for (let dz = -1; dz <= 1; dz += 1) {
+      for (const [q, weights] of cells.get(`${c[0] + dx}|${c[1] + dy}|${c[2] + dz}`) ?? []) {
+        const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
+        if (d < best) {
+          best = d;
+          out[vertex] = weights;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The base mesh skinned with the model's own weights: Blender's bone heat on the model's skeleton (tools/blender/baseweights.py;
+ * the user's call, 2026-11-11: arms that read as hinged at real joints, not a rubber tube). Weighted by distance to the bones
+ * (to their sixth power) each point went to its nearest bone within a centimetre or two, so a raised arm creased the chest
+ * and the shoulder bent as a tube; bone heat spreads each bone's share over the surface by diffusion. Each bone of Blender's
+ * skeleton is the game's of that name, but its one trunk bone, whose share is parted among the game's pelvis, spine and chest
+ * by their distance weights at the point. `heat` the points' weights (clothHeat), `rigid` the points held by the chest alone (a
+ * breastplate), which keep theirs. The answer is written into `weights` ({ skinIndex, skinWeight }).
+ */
+function baseHeatWeights(weights, heat, positions, frames, rigid) {
+  const names = baseHeatBones();
+  const trunkBones = [BONE.pelvis, BONE.spine, BONE.chest];
+  const picked = [];
+  heat.forEach((weightsOf, vertex) => {
+    if (weightsOf && !rigid[vertex]) picked.push(vertex);
+  });
+  const subset = Float32Array.from(picked.flatMap((vertex) => [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]]));
+  const trunk = skinWeights(subset, frames, picked.map(() => trunkBones));
+  picked.forEach((vertex, index) => {
+    const mix = new Map();
+    for (const [bone, w] of heat[vertex]) {
+      const name = names[bone];
+      if (name === 'trunk') {
+        for (let slot = 0; slot < 4; slot += 1) {
+          const share = trunk.skinWeight[index * 4 + slot];
+          if (share > 0) mix.set(trunk.skinIndex[index * 4 + slot], (mix.get(trunk.skinIndex[index * 4 + slot]) ?? 0) + w * share);
+        }
+      } else mix.set(BONE[name], (mix.get(BONE[name]) ?? 0) + w);
+    }
+    const best = [...mix].sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const total = best.reduce((sum, [, w]) => sum + w, 0) || 1;
+    for (let slot = 0; slot < 4; slot += 1) {
+      weights.skinIndex[vertex * 4 + slot] = best[slot]?.[0] ?? 0;
+      weights.skinWeight[vertex * 4 + slot] = best[slot] ? best[slot][1] / total : 0;
+    }
+  });
 }
 
 /**
@@ -3447,6 +3531,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   if (coverOnly) return { covered };
   yield 'lofted';
   let { positions, indices, colors, bones, weightPositions } = mesh;
+  // (The base mesh's bone-heat weights per point, the skin's own and each worn point's from the skin beneath it: baseHeatWeights.)
+  let heat = mesh.heat ? clothHeat(mesh) : null;
   if (faceted) ({ positions, indices, colors, bones, weightPositions } = facet(positions, indices, colors, bones, weightPositions));
   let positionArray = Float32Array.from(positions);
   let indexArray = Uint32Array.from(indices);
@@ -3564,6 +3650,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       weightPositions = Array.from(order, (from) => [weightPositions[from * 3], weightPositions[from * 3 + 1], weightPositions[from * 3 + 2]]).flat();
       colors = Array.from(order, (from) => colors[from]);
       bones = Array.from(order, (from) => bones[from]);
+      if (heat) heat = Array.from(order, (from) => heat[from]);
       indexArray = Uint32Array.from(kept, (vertex) => used[vertex]);
     }
   }
@@ -3586,7 +3673,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const rigid = bones.map((list) => list === chestOnly);
   yield 'skin weights';
   const weights = yield* skinWeightsSteps(Float32Array.from(weightPositions), frames, bones);
-  if (baseRig) blendShoulders(weights, weightPositions, frames, baseParts);
+  if (heat) baseHeatWeights(weights, heat, weightPositions, frames, rigid);
+  else if (baseRig) blendShoulders(weights, weightPositions, frames, baseParts);
   // The base mesh's fat masses that follow the frame (fatslosh.js): an overweight trunk and up, not in a crowd; each point by the
   // share the trunk's bones carry of it (an arm or a thigh lying against the belly or a breast is not moved with it), not a rigid plate.
   const figures = baseRig && !lowDetail ? sloshFigures(fatLayer) : null;

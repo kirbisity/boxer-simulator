@@ -52,11 +52,13 @@ export const BASE_BODY = {
   // the fist's middle (0.19 of height from the elbow; the model's wrist lies 0.14 from it, the anatomical 0.146 of Drillis and
   // Contini: the rig's point is right, the drawn palm short, its heel only 3.3 cm behind the point). So the forearm is drawn
   // out to `handSeat` (m per 1.8 m of height) behind the hand point, under the palm's rounded heel (its section there 2.3 by
-  // 2.9 cm, a wrist's), not to the fist's middle, and the length it gains is laid on along it: `foreTaper` the share of the
-  // stretch the elbow's end takes against the mean, 1 an even stretch (the user's call, 2026-11-11: a stretched arm stays
-  // straight and keeps the model's sections along it; laid on mostly at the wrist, the forearm's taper ran long and thin there).
+  // 2.9 cm, a wrist's), not to the fist's middle. The upper arm runs at the game's length too. The length either gains is laid
+  // on in the shaft's middle, between `stretch[0]` and `[1]` of the part (with a smooth rise and fall, 1 - cos), and both
+  // ends keep the model's own scale: the elbow's point and crease, the deltoid's insertion, the forearm's swell below the elbow
+  // and the wrist's slimness. Stretched evenly (the user's call, 2026-11-11: the arms read as rubber tubes), the joints'
+  // forms were drawn out with the shafts and the arm lost its hinge.
   handSeat: 0.021,
-  foreTaper: 1,
+  stretch: [0.2, 0.85],
   // An arm's own reach (loftbody.js LOFT.fit's): this share of its ring's radius round its axis, from `armFrom` (t, above the
   // shoulder joint) down.
   armReach: 1.6, armFrom: -0.25,
@@ -90,6 +92,9 @@ export const BASE_BODY = {
 const BASE_TAU = Math.PI * 2;
 const baseDecoded = new Map();
 
+/** The bones Blender's bone-heat weights name (tools/blender/baseweights.py), or null where the data has none. */
+export const baseHeatBones = () => BASE_BODY_DATA?.heatBones ?? null;
+
 /** Whether the base meshes are here (a build may leave them out: tools/custom.js; the style then draws the loft's own skin). */
 export const baseBodyAvailable = () => Boolean(BASE_BODY_DATA?.male);
 
@@ -101,7 +106,30 @@ function baseBytes(text) {
   return bytes;
 }
 
-/** A sex's base mesh, decoded once: { parts, joints, reference, count, positions (units of height), triangles, part, part2, blend, starved }. */
+/**
+ * A mesh's bone-heat weights, four a point (tools/baseweights-pack.js: 4-bit indices, three weights and the rest), as
+ * { heatIndex (Uint8, into BASE_BODY_DATA.heatBones), heatWeight (Float32) }; nulls where the mesh has none (a crowd's).
+ */
+function baseHeat(packed) {
+  if (!packed.heat) return { heatIndex: null, heatWeight: null };
+  const nibbles = baseBytes(packed.heat.index);
+  const three = baseBytes(packed.heat.weight);
+  const heatIndex = new Uint8Array(packed.count * 4);
+  const heatWeight = new Float32Array(packed.count * 4);
+  for (let vertex = 0; vertex < packed.count; vertex += 1) {
+    let rest = 1;
+    for (let slot = 0; slot < 4; slot += 1) {
+      heatIndex[vertex * 4 + slot] = (nibbles[vertex * 2 + (slot >> 1)] >> ((slot & 1) * 4)) & 15;
+      // (The fourth is the rest, under half a step of the stored weights' rounding taken as none.)
+      const w = slot < 3 ? three[vertex * 3 + slot] / 255 : rest > 1.5 / 255 ? rest : 0;
+      heatWeight[vertex * 4 + slot] = w;
+      rest -= w;
+    }
+  }
+  return { heatIndex, heatWeight };
+}
+
+/** A sex's base mesh, decoded once: { parts, joints, reference, count, positions (units of height), triangles, part, part2, blend, starved, heatIndex, heatWeight }. */
 export function baseBodyMesh(sex, crowd = false) {
   const key = `${sex}|${crowd}`;
   if (baseDecoded.has(key)) return baseDecoded.get(key);
@@ -119,6 +147,7 @@ export function baseBodyMesh(sex, crowd = false) {
     part2: baseBytes(packed.part2),
     blend: Float32Array.from(baseBytes(packed.blend), (value) => value / 255),
     starved: packed.starved ? Float32Array.from(new Int16Array(baseBytes(packed.starved).buffer), (value) => value / BASE_BODY_DATA.deltaScale) : new Float32Array(packed.count),
+    ...baseHeat(packed),
   };
   baseDecoded.set(key, mesh);
   return mesh;
@@ -233,6 +262,15 @@ function ringTable(part, from, to) {
   };
 }
 
+/** Two points' bone-heat weights mixed, `s` of the way from the first to the second (null where either has none). */
+function mixHeat(a, b, s) {
+  if (!a || !b) return a ?? b;
+  const mixed = new Map();
+  for (const [bone, w] of a) mixed.set(bone, (mixed.get(bone) ?? 0) + w * (1 - s));
+  for (const [bone, w] of b) mixed.set(bone, (mixed.get(bone) ?? 0) + w * s);
+  return mixed;
+}
+
 /** Plain Laplacian smoothing, `passes` rounds of each point halfway to its neighbours' mean (it shrinks: for directions only). */
 function laplacian(positions, neighbours, passes) {
   let current = Float32Array.from(positions);
@@ -341,12 +379,20 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
   // The sources: the mesh's own points, and the points added where a triangle is split at a seam (below).
   // (Each source's coordinates on each of its two parts, on the part's own axis line: t, out fore and aft, out across; then the
   // same for the smoothed surface.)
-  const src = { part: [], part2: [], blend: [], coords: [], position: [], relief: [], starved: [], normal: [], facing: [] };
+  const src = { part: [], part2: [], blend: [], coords: [], position: [], relief: [], starved: [], normal: [], facing: [], heat: [] };
   // (Each point's surface normal on the model, and on each of its two parts in that part's frame: along, fore and aft, across.)
   // (Of the surface low-passed first, BASE_BODY.normalPasses: offset along the modelled surface's own normals, the faces of a
   // groove (between the pecs, under them) turn to each other and a fat man's offsets crossed there in folds.)
   const normals = vertexNormals(laplacian(scaled, neighboursOf(mesh.count, mesh.triangles), BASE_BODY.normalPasses), mesh.triangles, mesh.count);
-  const addSource = (part, part2, blend, position, smooth, starved, normal) => {
+  // (`heat`: the point's bone-heat weights, a Map of bone index (BASE_BODY_DATA.heatBones) to weight, or null.)
+  const heatOf = (vertex) => {
+    if (!mesh.heatIndex) return null;
+    const weights = new Map();
+    for (let slot = 0; slot < 4; slot += 1) if (mesh.heatWeight[vertex * 4 + slot] > 0) weights.set(mesh.heatIndex[vertex * 4 + slot], mesh.heatWeight[vertex * 4 + slot]);
+    return weights;
+  };
+  const addSource = (part, part2, blend, position, smooth, starved, normal, heat = null) => {
+    src.heat.push(heat);
     const on = (index, point) => axisCoords(frames[names[index]], point);
     const facing = (index) => {
       const frame = frames[names[index]];
@@ -378,7 +424,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     }
     return keep;
   };
-  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex] * starveKeep(point(scaled, vertex)), point(normals, vertex));
+  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex] * starveKeep(point(scaled, vertex)), point(normals, vertex), heatOf(vertex));
 
   // The drawn points: one per source and tile (and seam side).
   const render = { source: [], part: [], t: [], angle: [], u: [] };
@@ -404,7 +450,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     const near = s < 0.5 ? i : j;
     const same = src.part[i] === src.part[j] && src.part2[i] === src.part2[j];
     const blend = same ? src.blend[i] + (src.blend[j] - src.blend[i]) * s : src.blend[near];
-    const made = addSource(src.part[near], src.part2[near], blend, lerp(src.position[i], src.position[j]), lerp(src.relief[i], src.relief[j]), src.starved[i] + (src.starved[j] - src.starved[i]) * s, vec.normalize(lerp(src.normal[i], src.normal[j])));
+    const made = addSource(src.part[near], src.part2[near], blend, lerp(src.position[i], src.position[j]), lerp(src.relief[i], src.relief[j]), src.starved[i] + (src.starved[j] - src.starved[i]) * s, vec.normalize(lerp(src.normal[i], src.normal[j])), mixHeat(src.heat[i], src.heat[j], s));
     splits.set(key, made);
     return made;
   };
@@ -518,7 +564,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     joints: Object.fromEntries(Object.keys(mesh.joints).map((name) => [name, joint(name)])),
     refJoints,
     refRows: Object.fromEntries(names.map((name) => [name, ringRows(refParts[name], span[name][0], span[name][1])])),
-    sources: { count: src.part.length, part: Uint8Array.from(src.part), part2: Uint8Array.from(src.part2), blend: Float32Array.from(src.blend), coords: Float32Array.from(src.coords), starved: Float32Array.from(src.starved), facing: Float32Array.from(src.facing) },
+    sources: { count: src.part.length, part: Uint8Array.from(src.part), part2: Uint8Array.from(src.part2), blend: Float32Array.from(src.blend), coords: Float32Array.from(src.coords), starved: Float32Array.from(src.starved), facing: Float32Array.from(src.facing), heat: src.heat },
     render: { count: order.length, source: pick(render.source, Int32Array), part: drawnPart, t: pick(render.t, Float32Array), angle: pick(render.angle, Float32Array), u: pick(render.u, Float32Array) },
     triangles: Uint32Array.from(triangles, (index) => remap[index]),
     ranges,
@@ -537,7 +583,8 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
  *     the physics holds them: the skin is bound to it, so in play a limb's skin keeps its place beside the trunk's however the
  *     bones turn (bound on the model's roots, a thigh would be carried 2 cm in to the rig's hip).
  * Returns { loft, skin, bind } (joints by name; `skin` has the forearm end at the modelled wrist, not the hand point) and
- * `reach` (each forearm's skin drawn out to the hand, m: BASE_BODY.handSeat).
+ * `reach` (each arm part's length against the model's: a forearm's `extra` out to the hand, BASE_BODY.handSeat; an upper arm's
+ * `within` its game-length frame).
  */
 export function baseBindJoints(rig, joints, height) {
   const moved = Object.fromEntries(Object.keys(rig.joints).map((name) => [name, vec.add(rig.joints[name], vec.sub(joints[name], rig.refJoints[name]))]));
@@ -566,7 +613,11 @@ export function baseBindJoints(rig, joints, height) {
     const along = vec.normalize(vec.sub(hand, elbow));
     const modelled = vec.length(vec.sub(moved[`${side}Hand`], moved[`${side}Elbow`]));
     skin[`${side}Hand`] = vec.add(elbow, vec.scale(along, modelled));
-    reach[`${side}Fore`] = Math.max(0, vec.length(vec.sub(hand, elbow)) - (BASE_BODY.handSeat * height) / 1.8 - modelled);
+    // (The forearm drawn out past its modelled length to the palm's heel: `extra`; the upper arm's frame is at the game's length,
+    // the model's shorter, `within` of it taken up in the shaft.)
+    reach[`${side}Fore`] = { extra: Math.max(0, vec.length(vec.sub(hand, elbow)) - (BASE_BODY.handSeat * height) / 1.8 - modelled) };
+    const upper = vec.length(vec.sub(loft[`${side}Elbow`], loft[`${side}Shoulder`]));
+    reach[`${side}Upper`] = { within: Math.max(0, upper - vec.length(vec.sub(moved[`${side}Elbow`], moved[`${side}Shoulder`]))) };
   }
   // Each chain carried onto the rig's root.
   const bind = { ...loft };
@@ -587,7 +638,7 @@ export function baseBindJoints(rig, joints, height) {
  * his rings (see measureBaseBody), `joints` the joints it is placed on (baseBindJoints' `skin`), `relief(name)` how much of the
  * modelled muscle relief his part shows (1 all of it, 0 the smoothed surface), `height` his standing height (m), `starve` how
  * starved he is (baseStarvation: the emaciated reference's contour, each point's delta out along its line, laid on by it),
- * `foreReach` each forearm's length drawn out past the modelled wrist (baseBindJoints).
+ * `foreReach` each arm part's length against the model's ({ extra, within }, baseBindJoints).
  * Returns the drawn points' positions (render order) and the sources'.
  */
 export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}) {
@@ -686,15 +737,20 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     const add = starved + swell;
     px += (px / length) * add;
     py += (py / length) * add;
-    // (A forearm drawn out to the hand, `foreReach` m more than modelled: the stretch at t is (taper + (2 - 2·taper)·t) of the mean,
-    // its integral below; past the wrist the whole of it.)
-    // (Laid on up to the mesh's own end, its wrist's cut ring, which lies a little short of the joint: `end` of the part, so the
-    // cut lands under the palm's heel and not 1-2 cm short of it.)
-    const end = foreReach[name] ? rig.spans[name][1] - BASE_BODY.spanMargin : 1;
-    const more = foreReach[name] ? foreReach[name] + (1 - end) * frame.length : 0;
-    const taper = BASE_BODY.foreTaper;
-    const u = Math.min(1, Math.max(0, t / end));
-    const along = t * frame.length + more * (taper * u + (1 - taper) * u * u) - hang + lift;
+    // (An arm's length against the model's (BASE_BODY.stretch): a forearm drawn out `extra` m past its modelled wrist, laid on up
+    // to the mesh's own end, its wrist's cut ring, a little short of the joint (`end` of the part), so the cut lands under the
+    // palm's heel; an upper arm's frame at the game's length, `within` m more than modelled, taken up in its shaft.)
+    const arm = foreReach[name];
+    let along = t * frame.length - hang + lift;
+    if (arm) {
+      const end = arm.extra ? rig.spans[name][1] - BASE_BODY.spanMargin : 1;
+      const extra = arm.extra ? arm.extra + (1 - end) * frame.length : 0;
+      const [a, b] = BASE_BODY.stretch;
+      const u = t / end;
+      const x = Math.min(1, Math.max(0, (u - a) / (b - a)));
+      const shaft = x - Math.sin(2 * Math.PI * x) / (2 * Math.PI);
+      along += extra * shaft + (arm.within ?? 0) * (shaft - Math.min(1, Math.max(0, u)));
+    }
     for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * px + frame.widthAxis[axis] * py;
     return out;
   };

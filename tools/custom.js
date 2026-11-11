@@ -67,6 +67,7 @@ export const BASE_BODY_DATA = null;
 `,
   basebody: `
 export const baseBodyAvailable = () => false;
+export const baseHeatBones = () => null;
 export const baseStarvation = () => 0;
 export const baseStarvedDetail = () => null;
 export const baseBodyMesh = ${missing('the base meshes')};
