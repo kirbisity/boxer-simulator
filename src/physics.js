@@ -800,7 +800,8 @@ export function protectionAt(gear, capsuleKey) {
   const regions = gear.protection.regions;
   const own = regions && (regions[capsuleKey] ?? regions[capsuleKey.replace(/^[lr](?=[A-Z])/, '')] ?? regions[bulletRegion(capsuleKey)]);
   if (!own) return gear.deflects === undefined ? gear.protection : { ...gear.protection, deflects: gear.deflects };
-  return { ...gear.protection, deflects: gear.deflects, ...own };
+  // (A kit's `bites`, its plates' own glancing of a point, is the plates'; a region of other stuff says its own.)
+  return { ...gear.protection, deflects: gear.deflects, bites: undefined, ...own };
 }
 
 /** A brittle edge (obsidian) loses part of its cut: on armour, a shield or a steel blade. */
@@ -8333,8 +8334,10 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // (A beak swung into him leads square to the haft: it meets the plate along its own swing, not the weapon's line.)
   const pointLed = spec.mode === 'thrust' || Boolean(beak);
   const facing = beak ? Math.abs(vec.dot(vec.normalize(relative), normal)) : Math.abs(vec.dot(weapon.dir, normal));
-  // (A finisher's point is driven square down onto him: it does not skid.)
-  const skids = Boolean(protection.deflects) && pointLed && mix.pierce > 0 && facing < BLADES.bite && !punch.finisher;
+  // (A finisher's point is driven square down onto him: it does not skid.) Hard plates under a cloth face that do not
+  // turn a blade as bare plate does may still turn a slanting point, within their own `bites` (outfits.js BRIGANDINE_MAKES).
+  const bites = protection.deflects ? BLADES.bite : protection.bites;
+  const skids = bites > 0 && pointLed && mix.pierce > 0 && facing < bites && !punch.finisher;
   // (The point's share as it came: what of it the armour stops lands as a blow, BLADES.stopped, below.)
   const pointShare = mix.pierce;
   if (skids) {
@@ -8387,7 +8390,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const edgeStopped = !protection.deflects && edgeJoules > 0 ? mix.cut * (Math.min(edgeJoules, edgeProof) / edgeJoules) * BLADES.stopped : 0;
   const bluntShare = (mix.blunt + pointStopped + edgeStopped) * (1 - (protection.blunt ?? 0) * (1 - (haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0)));
   // (An edge always glances off plate; a point that bites square does not.)
-  const glanced = Boolean(protection.deflects) && (skids || (mix.cut + mix.pierce > 0.2 && !(pointLed && mix.pierce > 0)));
+  const glanced = skids || (Boolean(protection.deflects) && mix.cut + mix.pierce > 0.2 && !(pointLed && mix.pierce > 0));
   // Glass on steel or hard armour chips.
   if (wspec.brittle && (protection.cut ?? 0) >= BLADES.chipsOn && mix.cut + mix.pierce > 0.2) chip(world, attacker);
   // An edge dulls on what is harder than flesh (its share of the blow, against the armour's hardness), and the blade takes
