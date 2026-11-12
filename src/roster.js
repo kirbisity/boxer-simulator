@@ -163,7 +163,9 @@ export const WARRIORS = [
   { ...warrior('joan', 'Joan of Arc', PRESETS.joan), legend: { order: 2, kicker: { en: 'Joan of Arc', zh: '贞德' }, line: { en: 'White plate, bareheaded, the arming sword; she bears the standard when she leads.', zh: '一身白甲，不戴头盔，手握佩剑；冲锋在前时，旗帜由她亲自扛。' } } },
   // Maximilian I, the great jouster, on foot in his Gestech harness with the lance: a legend, not the flagship.
   { ...warrior('maximilian', 'Maximilian I', PRESETS.maximilian), legend: { order: 2.5, kicker: { en: 'The Last Knight', zh: '最后的骑士' }, line: { en: 'The jousting emperor in his Stechzeug: the frog-mouthed helm bolted to the breast, and the lance.', zh: '爱比武的皇帝，披挂比武重甲：蛙嘴盔直接栓死在胸甲上，手里一杆骑枪。' } } },
-  warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow),
+  // Genoa's crossbowmen were hired professionals, contracted company by company (a professional's skill, 0.45; harder
+  // worked than the preset's 0.6, at 0.7).
+  warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow, { skill: 0.45, exercise: 0.7 }),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', heightCm: 160, calories: 3525, outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
@@ -172,7 +174,8 @@ export const WARRIORS = [
   warrior('naginata', 'Tomoe Gozen', PRESETS.naginata),
   warrior('sohei', 'Musashibō Benkei', PRESETS.sohei),
   warrior('odachi', 'Makara Naotaka', PRESETS.odachi),
-  warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', calories: 4050, exercise: 0.75, sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
+  // The English foot of the 15th century as their people's build (peoples.js english: 171 cm, hard-worked 0.86).
+  warrior('footSpear', 'Will Ward', PRESETS.contender, { name: 'Will Ward', heightCm: 171, calories: 4050, exercise: 0.86, sex: 'male', style: 'spear', outfit: { kind: 'footman', design: 0 }, accessories: [] }),
   warrior('archer', 'Nasu no Yoichi', PRESETS.bow),
   warrior('teppo', 'Suzuki Magoichi', PRESETS.matchlock),
   warrior('mingGuandao', 'Liu Ting', PRESETS.guandao),
@@ -227,7 +230,9 @@ export const WARRIORS = [
   warrior('bannerGuandao', 'Baturu', PRESETS.bannerGuandao),
   warrior('bannerSpear', 'Ilan', PRESETS.bannerBow, { name: 'Ilan', style: 'spear', outfit: { kind: 'bannerArmour', design: 6 } }),
   warrior('arquebus', 'Hans Brenner', PRESETS.contender, { name: 'Hans Brenner', calories: 4050, exercise: 0.75, sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] }),
-  warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', calories: 4050, exercise: 0.75, sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
+  // A longbowman trained at the butts from boyhood by statute (the Archery Acts): a professional's skill (0.45), his people's
+  // build (peoples.js english).
+  warrior('footBow', 'Tom Fletcher', PRESETS.contender, { name: 'Tom Fletcher', heightCm: 171, calories: 4050, exercise: 0.86, skill: 0.45, sex: 'male', style: 'bow', outfit: { kind: 'footman', design: 2 }, accessories: [] }),
   warrior('ashigaruSpear', 'Gonbei', PRESETS.yari),
   warrior('ashigaruBow', 'Sakuzaemon', PRESETS.spear, { name: 'Sakuzaemon', heightCm: 157, calories: 2500, style: 'archerYumi', outfit: { kind: 'ashigaru', design: 1 }, accessories: [] }),
   warrior('hoplomachus', 'Priscus', PRESETS.hoplomachus),

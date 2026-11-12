@@ -1032,8 +1032,10 @@ export const OUTFITS = {
   // inside cloth), a mail shirt, or a breastplate — over a quilted coat,
   // and a kettle hat. Never full cover; light enough to march in.
   footman: {
-    // Trained: a drilled foot soldier (`skill`: OUTFITS' tiers).
-    skill: 0.35,
+    // Trained: a drilled foot soldier, a little above a garrison's regular (`skill` 0.4, was 0.35; OUTFITS' tiers): the
+    // companies of the Hundred Years' War and after were paid men under indenture who served season after season (the
+    // user's call, 2026-11-12).
+    skill: 0.4,
     faction: 'knights',
     label: 'Foot soldier', family: 'knight', movement: 'good', fists: 'bare',
     sidearm: 'shortSword',
@@ -1044,20 +1046,25 @@ export const OUTFITS = {
     // Ming coat's (was 0.85): either brigandine is near proof against an edge, rivets and plates behind every inch of cloth (the
     // user's call, 2026-11-11).
     // The kettle hat, steel over an arming cap: better against an edge and a blow (was as the body: 0.4/0.75/0.6).
-    // The arms in mail sleeves or light guards, the legs in hose: less than the trunk (were all as the body).
+    // The arms in mail sleeves with plate or splinted guards over them, as the kit draws them (the 15th-century footman's
+    // vambraces and couters: Embleton, Soldiers of the Hundred Years War; the Beauchamp Pageant's archers): blunt 0.3, cut
+    // 0.7, pierce 0.45 (were 0.25 / 0.6 / 0.35). The legs in hose, often with splinted or quilted defences over the thigh
+    // and knee: 0.2 / 0.45 / 0.25 (were 0.15 / 0.35 / 0.2). A little up, on the user's call, 2026-11-12.
     protection: {
       ...brigandineOf({ blunt: 0.45, cut: 0.92, pierce: 0.85 }, 'european'), bullet: { head: 0.35, torso: 0.35, limb: 0 },
       regions: {
         head: { blunt: 0.55, cut: 0.92, pierce: 0.65 },
-        UpperArm: { blunt: 0.25, cut: 0.6, pierce: 0.35 },
-        Forearm: { blunt: 0.25, cut: 0.6, pierce: 0.35 },
-        Thigh: { blunt: 0.15, cut: 0.35, pierce: 0.2 },
-        Shank: { blunt: 0.15, cut: 0.35, pierce: 0.2 },
+        UpperArm: { blunt: 0.3, cut: 0.7, pierce: 0.45 },
+        Forearm: { blunt: 0.3, cut: 0.7, pierce: 0.45 },
+        Thigh: { blunt: 0.2, cut: 0.45, pierce: 0.25 },
+        Shank: { blunt: 0.2, cut: 0.45, pierce: 0.25 },
       },
     },
     // A fitted brigandine's openings (BRIGANDINE_MAKES.european): no mail gussets in this kit to close them.
     gaps: BRIGANDINE_MAKES.european.gaps,
-    courage: 0.25,
+    // A little steadier than a levy (0.3, was 0.25): paid companies that knew one another and their captain (the user's call,
+    // 2026-11-12).
+    courage: 0.3,
     designs: [
       footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { design: 'a', brim: 1.9 }),
       footmanDesign('Brigandine, blue', 'brigandine', '#1f2f5a', '#b8a888', { design: 'c', brim: 1.75, tall: true }),

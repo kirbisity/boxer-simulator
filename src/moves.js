@@ -924,9 +924,12 @@ export const STYLES = {
     attacks: { spearJab: 0.5, spearSweep: 0.4, spearThrust: 0.1 },
     combos: { 'spearSweep spearJab': 0.6, 'spearJab spearJab': 0.4 },
     comboChance: 0.4,
-    tempo: 1.1,
-    defences: { weaponBlock: 0.7, stepBack: 0.3 },
-    defendChance: 0.75,
+    // A 4.7 m culm with its brush is slow to bring back across the body: fewer blows (`tempo` 1.25, was 1.1) and a parry
+    // less often in time (`defendChance` 0.6, was 0.75; more of it a step back than a block): the long pole's moment of
+    // inertia, as physics.js WORLD.weaponTurn caps its swing; toned down on the user's call, 2026-11-12.
+    tempo: 1.25,
+    defences: { weaponBlock: 0.55, stepBack: 0.45 },
+    defendChance: 0.6,
     headMovement: 0,
     plans: { outboxer: 2, counter: 1.2, pressure: 0.3, brawler: 0.1 },
     pressure: 0.02,
