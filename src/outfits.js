@@ -1040,11 +1040,13 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.22): ~9 kg on a 75 kg man, against a brigandine's 8–15 kg or a mail shirt's ~10 kg.
     extraMass: 0.12,
     // The torso in a brigandine: cut 0.85 (was 0.75), blunt 0.45 (was 0.4); pierce 0.85, a brigandine's (PIERCE_SCALE; the breastplate set's 0.95);
-    // its make the European's (BRIGANDINE_MAKES.european: 0.85 / 0.41 / 0.85, a slanting point turned; its gaps).
+    // its make the European's (BRIGANDINE_MAKES.european: 0.92 / 0.41 / 0.85, a slanting point turned; its gaps). Cut 0.92 as the
+    // Ming coat's (was 0.85): either brigandine is near proof against an edge, rivets and plates behind every inch of cloth (the
+    // user's call, 2026-11-11).
     // The kettle hat, steel over an arming cap: better against an edge and a blow (was as the body: 0.4/0.75/0.6).
     // The arms in mail sleeves or light guards, the legs in hose: less than the trunk (were all as the body).
     protection: {
-      ...brigandineOf({ blunt: 0.45, cut: 0.85, pierce: 0.85 }, 'european'), bullet: { head: 0.35, torso: 0.35, limb: 0 },
+      ...brigandineOf({ blunt: 0.45, cut: 0.92, pierce: 0.85 }, 'european'), bullet: { head: 0.35, torso: 0.35, limb: 0 },
       regions: {
         head: { blunt: 0.55, cut: 0.92, pierce: 0.65 },
         UpperArm: { blunt: 0.25, cut: 0.6, pierce: 0.35 },
@@ -1458,7 +1460,10 @@ export const OUTFITS = {
     // the steel tube (its region) and the helmet turn it.
     deflects: false,
     // The long coat's openings (BRIGANDINE_MAKES.ming): the armholes, the seams between its plates; its skirt closes the groin.
-    gaps: BRIGANDINE_MAKES.ming.gaps,
+    // A little wider than the retainer's coat (thrust 0.43, swing 0.11, lacing 0.13, against 0.4 / 0.1 / 0.12): a soldier's coat
+    // issued by the army, its sleeves of studded cloth and its plates fewer than a general's household man's, worn loose for
+    // the squad's drill (the user's call, 2026-11-11: "slightly").
+    gaps: { ...BRIGANDINE_MAKES.ming.gaps, thrust: 0.43, swing: 0.11, lacing: 0.13 },
     // Higher than the general's retainer's (mingElite 0.35) and every Chinese kit's: Qi's law (a squad that let its leader
     // fall, or ran, was put to death: Jixiao xinshu, the 'law of joint responsibility', 连坐法), the squad fighting as one
     // and his army's nine victories in a month in Taizhou, 1561. Steady, very disciplined, slow to scare.
