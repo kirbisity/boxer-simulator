@@ -1,4 +1,4 @@
-# Gladiator
+# Historically Accurate Combat Simulator (HACS)
 
 Fighters built from bone, joint and muscle, fought in a physics simulation.
 

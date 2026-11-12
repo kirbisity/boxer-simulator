@@ -175,7 +175,7 @@ export function playIntro(stage, onDone) {
   root.setAttribute('aria-label', t('intro.label'));
   if (reduced) root.classList.add('reduced');
   const title = introNode('div', 'intro-title');
-  title.append(introNode('em', '', t('intro.legendsOf')), introNode('h1', '', 'Gladiator'), introNode('p', '', t('menu.home.lede')));
+  title.append(introNode('em', '', t('intro.legendsOf')), introNode('h1', '', t('game.title')), introNode('p', '', t('menu.home.lede')));
   const card = introNode('div', 'intro-card');
   const head = introNode('div', 'intro-faction');
   const captions = introNode('div', 'intro-captions');

@@ -46,7 +46,7 @@ export const UI_SQUAD = {
   'squad.waves': { en: '{n} waves', zh: '{n} 波' },
 
   // ---- The share line and the poster (lastgate.js).
-  'squad.shareLine': { en: '{title} as the {label}: {kills} {foes} {felled} ({mine} by my hand), {waves}, {clock}. Gladiator', zh: '{title}，我是{label}：{felled}{foes}{kills}名（亲手{mine}名），撑过{waves}，坚持{clock}。Gladiator' },
+  'squad.shareLine': { en: '{title} as the {label}: {kills} {foes} {felled} ({mine} by my hand), {waves}, {clock}. HACS', zh: '{title}，我是{label}：{felled}{foes}{kills}名（亲手{mine}名），撑过{waves}，坚持{clock}。HACS' },
   'squad.poster.over': { en: 'THE SQUAD STOOD', zh: '小队死守到底' },
   'squad.poster.fell': { en: '{n} FELL', zh: '斩敌 {n}' },
   'squad.poster.by': { en: '{mine} BY HIS HAND · {waves}', zh: '亲手 {mine} · {waves}' },
