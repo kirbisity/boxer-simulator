@@ -1,5 +1,5 @@
 {
-  "_about": "Prompts for the Gladiator music cues, rendered with ACE-Step 1.5 (acestep-v15-turbo, 8 steps, no LM thinking) through mugen-lab scripts/gen.py. lyrics '[Instrumental]' sets the model's instrumental flag. render: seconds asked of the model; loop: the loop length taken from it (null for a sting, which is cut to sting seconds and faded). take: the seed picked by tools/music-convert.py (best of the seeds listed).",
+  "_about": "Prompts for the HACS music cues, rendered with ACE-Step 1.5 (acestep-v15-turbo, 8 steps, no LM thinking) through mugen-lab scripts/gen.py. lyrics '[Instrumental]' sets the model's instrumental flag. render: seconds asked of the model; loop: the loop length taken from it (null for a sting, which is cut to sting seconds and faded). take: the seed picked by tools/music-convert.py (best of the seeds listed).",
   "common": {
     "lyrics": "[Instrumental]",
     "suffix": ", instrumental, no vocals, no singing, no choir, no voice"

@@ -12,7 +12,7 @@ test('the poster says how long the squad stood and how many fell to it, the hero
   assert.equal(words.by, '21 BY HIS HAND · 7 WAVES');
   assert.equal(words.name, 'MAKARA NAOTAKA');
   assert.equal(words.title, 'THE SAMURAI · ŌDACHI');
-  assert.equal(words.mark, 'GLADIATOR · LAST STAND SQUAD');
+  assert.equal(words.mark, 'HACS · LAST STAND SQUAD');
   assert.equal(lastGatePosterWords({ hero: 'knight', seconds: 61, kills: 0, heroKills: 0, waves: 1 }).by, '0 BY HIS HAND · 1 WAVE');
   assert.equal(lastGatePosterWords({ hero: 'knight', seconds: 61, kills: 0 }).name, 'KNIGHT');
   assert.equal(lastGatePosterWords({ hero: 'mongol', seconds: 61, kills: 1 }).title, 'THE MONGOL ARCHER · COMPOSITE BOW');
@@ -22,7 +22,7 @@ test('the poster says how long the squad stood and how many fell to it, the hero
 
 test('sharing: the poster as an image where files share; else saved with the line copied; else the line shared, copied, or shown to copy', async () => {
   const blob = new Blob(['png'], { type: 'image/png' });
-  const text = 'Last Stand Squad as the Samurai: 57 rebels cut down (21 by my hand), 7 waves, 4:12. Gladiator';
+  const text = 'Last Stand Squad as the Samurai: 57 rebels cut down (21 by my hand), 7 waves, 4:12. HACS';
   const calls = [];
   const clip = (ok = true) => ({ writeText: async (line) => { if (!ok) throw new Error('denied'); calls.push(['copy', line]); } });
   const save = () => calls.push(['save']);

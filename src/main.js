@@ -787,7 +787,7 @@ function frame(now) {
     const key = String(error?.stack ?? error);
     if (!frameErrors.has(key)) {
       frameErrors.add(key);
-      console.error('Gladiator frame error (the game carries on):', error);
+      console.error('HACS frame error (the game carries on):', error);
     }
   }
   resolution.worked(performance.now() - started);

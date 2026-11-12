@@ -348,9 +348,9 @@ test('the best runs, a board for each level, ten long, best first (kills, then w
 });
 
 test('the line to share', () => {
-  assert.equal(lastGateShareText({ hero: 'samurai', seconds: 222, kills: 57, heroKills: 21, waves: 8 }), 'Last Stand Squad as the Samurai: 57 rebels cut down (21 by my hand), 8 waves, 3:42. Gladiator');
-  assert.equal(lastGateShareText({ hero: 'knight', seconds: 61, kills: 1, heroKills: 1, waves: 1 }), 'Last Stand Squad as the Knight: 1 rebel ridden down (1 by my hand), 1 wave, 1:01. Gladiator');
-  assert.equal(lastGateShareText({ hero: 'police', seconds: 185, kills: 40, heroKills: 30, waves: 6 }), 'Last Stand Squad as the SWAT officer: 40 androids taken down (30 by my hand), 6 waves, 3:05. Gladiator');
+  assert.equal(lastGateShareText({ hero: 'samurai', seconds: 222, kills: 57, heroKills: 21, waves: 8 }), 'Last Stand Squad as the Samurai: 57 rebels cut down (21 by my hand), 8 waves, 3:42. HACS');
+  assert.equal(lastGateShareText({ hero: 'knight', seconds: 61, kills: 1, heroKills: 1, waves: 1 }), 'Last Stand Squad as the Knight: 1 rebel ridden down (1 by my hand), 1 wave, 1:01. HACS');
+  assert.equal(lastGateShareText({ hero: 'police', seconds: 185, kills: 40, heroKills: 30, waves: 6 }), 'Last Stand Squad as the SWAT officer: 40 androids taken down (30 by my hand), 6 waves, 3:05. HACS');
 });
 
 test('the field\'s puddles: shallow water in ellipses, splashed and heard as water over mud, drawn as the castle\'s water, and blood clouds in them', async () => {
