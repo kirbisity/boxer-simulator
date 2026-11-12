@@ -1442,8 +1442,9 @@ export const OUTFITS = {
   mingEliteInfantry: {
     // Drilled daily, squad by squad, for years, under the Jixiao xinshu's law (its drill: the squad's men practised their
     // weapons and the array until they moved as one, and were examined on them): an elite's training (the tiers above:
-    // 0.6-0.8), at its foot (0.65): picked farmers and miners made soldiers, not men trained to arms from boyhood.
-    skill: 0.65,
+    // 0.6-0.8), at its foot (0.6, was 0.65; lowered a little on the user's call, 2026-11-12): picked farmers and miners made
+    // soldiers, not men trained to arms from boyhood.
+    skill: 0.6,
     faction: 'chinese',
     label: 'Ming — elite infantry', family: 'chinese', movement: 'good', fists: 'bare',
     // His sidearm the Qi family's long sabre (WEAPONS changdao): what the gunners draw when the raiders are on them.
