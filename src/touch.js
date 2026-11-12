@@ -15,7 +15,7 @@
 // elsewhere stay selectable and scroll as usual.
 
 import { P } from './body.js';
-import { hurtShare } from './ai.js';
+import { hurtShare, paintHealth } from './ai.js';
 import { ACTIONS, CONTROL, contextAction, crawlReady, horseAction, lockCandidate, moveName, toggleCrawl } from './control.js';
 import { createRecognizer, stickZone } from './gesture.js';
 import { inFight, jumpNow, opponentFor, point, reachOf, sidearmSwapReady } from './physics.js';
@@ -116,7 +116,7 @@ export function installFightControls(root, hooks) {
   crawl.setAttribute('aria-label', t('touch.crawl'));
   crawl.dataset.i18nAria = 'touch.crawl';
   const status = root.appendChild(uiElement('div', 'player-status'));
-  status.innerHTML = `<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" data-i18n-title="touch.adrenaline" title="${t('touch.adrenaline')}"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>`;
+  status.innerHTML = `<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i><b class="due" hidden></b></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" data-i18n-title="touch.adrenaline" title="${t('touch.adrenaline')}"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>`;
   // Adrenaline: a hair-thin line under stamina, a tick where his weapon's art comes within reach (weaponarts.js ARTS.ready).
   status.querySelector('.adrenaline').style.setProperty('--ready', `${ARTS.ready * 100}%`);
   const marker = root.appendChild(uiElement('div', 'target-marker'));
@@ -545,7 +545,8 @@ export function installFightControls(root, hooks) {
     const bleeding = bleedingFast(me);
     const tag = me.state === 'down' ? 'down' : me.pin ? 'holding' : me.dazed > 0 ? 'dazed' : me.stagger > 0 ? 'reeling' : me.reloading ? 'loading' : bleeding ? 'bleeding' : null;
     status.querySelector('.tag').textContent = tag ? t(`touch.tag.${tag}`) : '';
-    status.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(me)) * 100)}%`;
+    // (With its ghost: how far his health is still falling, from the blows he has taken: paintHealth.)
+    paintHealth(status.querySelector('.health'), me, true);
     status.querySelector('.health').classList.toggle('bleeding', bleeding);
     paintStamina(status.querySelector('.stamina'), me.stamina);
     const adrenaline = status.querySelector('.adrenaline');

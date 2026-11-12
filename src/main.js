@@ -5,7 +5,7 @@ import { greyedHair } from './aging.js';
 import { getLang, LANG_NAMES, onLangChange, SEP, t, tname, toggleLang, translatePage } from './i18n.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
-import { hurtShare, thinkAll } from './ai.js';
+import { paintHealth, thinkAll } from './ai.js';
 import { withTanks } from './physics/flame.js';
 import { CUSTOM_STYLE_KEYS, MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, reviveFighter, startCrawl, startJump, throwPunch, WORLD } from './physics.js';
@@ -1438,7 +1438,8 @@ function renderHud() {
     // The sandbox reads out fear and adrenaline; everywhere else, one health bar says enough.
     const feeling = t('fight.feeling', { fear: Math.round((fighter.fear ?? 0) * 100), adrenaline: Math.round((fighter.adrenaline ?? 0) * 100) });
     card.querySelector('.speed').textContent = `${fighter.stats.lastHandSpeed.toFixed(1)} m/s${mood}${feeling}`;
-    card.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(fighter)) * 100)}%`;
+    // (The player's own man's with its ghost, how far his health is still falling: paintHealth.)
+    paintHealth(card.querySelector('.health'), fighter, Boolean(fighter.player));
     // A great vessel open (a limb lost: maiming.js): the bar pulses and drains.
     card.querySelector('.health').classList.toggle('bleeding', bleedingFast(fighter));
     let roster = card.querySelector('.roster');

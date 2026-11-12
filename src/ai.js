@@ -2261,6 +2261,27 @@ export function hurtShare(fighter) {
   return Math.min(1, Math.max(bodyHarm(fighter), AI.panic.perKnockdown * fighter.knockdowns));
 }
 
+/** Where his hurt is going (hurtShare with the injury still to be felt: physics.js injure): the health bar's ghost. */
+export function hurtDueShare(fighter) {
+  return Math.min(1, Math.max(bodyHarm(fighter, true), AI.panic.perKnockdown * fighter.knockdowns));
+}
+
+/**
+ * Paint a health bar (`.bar.health`: its fill `i`, and for the player's own man its ghost `b.due`) for a fighter: the fill
+ * is his health now; the ghost, the stretch it is still falling through to where the blows he took will leave it, as the
+ * injury to his head and trunk is felt over the seconds after (WORLD.injury.drainSeconds).
+ */
+export function paintHealth(bar, fighter, ghost = false) {
+  const now = 1 - hurtShare(fighter);
+  bar.querySelector('i').style.width = `${Math.round(now * 100)}%`;
+  const due = bar.querySelector('b.due');
+  if (!due) return;
+  const to = ghost ? 1 - hurtDueShare(fighter) : now;
+  due.hidden = now - to < 0.005;
+  due.style.left = `${to * 100}%`;
+  due.style.width = `${Math.max(0, now - to) * 100}%`;
+}
+
 /**
  * The couched charge: true while it has the fighter (running in, or the
  * blow under way). Once its blow is over the lance is kept (it breaks only
