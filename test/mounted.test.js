@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
-import { advance, aimPoint, bladeStrike, createWorld, handVelocityOf, placeFighter, point, throwPunch } from '../src/physics.js';
+import { advance, aimPoint, bladeStrike, createWorld, handVelocityOf, injuryOf, placeFighter, point, throwPunch } from '../src/physics.js';
 import { BARDING, canRide, HORSES, mountOf } from '../src/horses.js';
 import { ladenMass, turnRadius } from '../src/physics/mounted.js';
 import { ATTACKERS, firstBlow } from '../tools/couched.js';
@@ -259,8 +259,8 @@ test('a horse at the gallop bowls a man over and carries him, the reaction slowi
   }
   assert.ok(ladenMass(bare.w, bare.horse) > bare.horse.mass + 100, 'the rider and his kit are in the mass');
   // Harm of the blow, through his armour.
-  assert.ok(bare.foes[0].trauma.trunk > 0.8, `bare ${bare.foes[0].trauma.trunk.toFixed(2)}`);
-  assert.ok(plate.foes[0].trauma.trunk < 0.6 * bare.foes[0].trauma.trunk, `plate ${plate.foes[0].trauma.trunk.toFixed(2)}`);
+  assert.ok(injuryOf(bare.foes[0], 'trunk') > 0.8, `bare ${injuryOf(bare.foes[0], 'trunk').toFixed(2)}`);
+  assert.ok(injuryOf(plate.foes[0], 'trunk') < 0.6 * injuryOf(bare.foes[0], 'trunk'), `plate ${injuryOf(plate.foes[0], 'trunk').toFixed(2)}`);
   assert.equal(bare.w.events.filter((e) => e.kind === 'horseDown').length, 0);
 });
 

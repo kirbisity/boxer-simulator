@@ -316,7 +316,15 @@ export const WORLD = {
   // turns in the instant the thrust travels, so no point lands on the very spot it was laid for (0.3: ±3 cm; was none at
   // skill 1, and every master's thrust found the middle of the breastplate: the user's call, 2026-11-09). An edge or a
   // head, swung through its arc, is laid as before.
-  skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, fightScatter: 0.3, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25, artScatter: 0.6 },
+  // `holdAngle` (rad): how true an ordinary trained man (skill 0.5; none at 1, skillScatter's narrowing) holds a weapon's
+  // line as he lays its point: ~0.6°, so the point is off ~1 cm a sword's length out of his hand, ~2 cm on a naginata's or a
+  // heavy spear's, ~3.5 cm on a pike's (physics.js throwPunch `wander`: a gap is ~5 cm, BLADES.gaps.size). The
+  // hold's angular error, not the hand's place, is what a lever magnifies: a held aim's angular wobble is of this order
+  // standing still (a rifle's aim point wanders ~1-5 mrad in trained shooters' holds: Mononen, Konttinen, Viitasalo &
+  // Era 2007, Scand. J. Med. Sci. Sports 17: 180-185), several times that in a moving thrust (an estimate: no measure of
+  // a thrust's held angle found). Against what it was (none for any weapon under 3.2 kg), an ordinary man's sword finds a
+  // gap a sixth less often (5 / (5 + 1)), a naginata's a quarter less, a pike's two fifths less.
+  skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, holdAngle: 0.01, fightScatter: 0.3, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25, artScatter: 0.6 },
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
   // holds most of it through a round; an unfit one empties in about a minute.
@@ -497,6 +505,10 @@ export const WORLD = {
   // 24-43 J, "primarily the combined kinetic energy of the knife and the arm", at 5.8-12 m/s (Horsfall 1999,
   // Chadwick et al. 1999): ~1-3 kg, so one hand couples only a few per cent of the body, at a full lunge. Mounted
   // thrusts are their own (mounted.js mountedBehind) and take nothing from this.
+  // These shares are what is coupled; what each brings is paced by its own speed (physics.js bodyPace, armsPaced: the
+  // trunk at the step's ~1-3 m/s, the upper arm slower than the hand), so a thrust's energy is the kinetic energy that is
+  // really in it: a two-handed spear's 40-110 J at 4-6 m/s, a heavy spear's or a naginata's ~150-220 J only at a 7-9 m/s
+  // hand, a knife's 30-70 J (they were 150-470 J when the body's fifth was taken to move at the point's speed, 2026-11-11).
   thrustBody: { twoHands: 0.2, oneHand: 0.03, fullStep: 2.1 },
   // Damage that stays. Head damage and knockdowns weaken the chin; a blow
   // stuns for this many seconds per m/s of head speed change; after getting
@@ -1003,7 +1015,15 @@ export const WORLD = {
   // that reached it past the armour, in full from this (× BODY.toughness): Kroell's 23 kg pendulum at 4.3 m/s, ~216 J, the
   // rib fractures of the chest's tolerance (Kroell et al. 1974); a lance's light jab whose peak force cracks a rib (its
   // contact short and stiff) drives in a few joules and hurts as little.
-  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, fractured: 0.15, chestJoules: 216, shockStrength: 0.6, limbWeight: 0.12,
+  // `drainSeconds`: the injury a blow does to the head or the trunk is felt over the seconds after it (physics.js injure,
+  // drainInjury), the whole of what kills (trunkFatal, headFatal) in this long, a wound deeper than that the faster (all
+  // of it in this long): a man run through the heart or with his chest stove in lives on a few seconds, falls and dies,
+  // not on the spot. With the heart stopped the brain keeps
+  // consciousness for 5-10 s on the oxygen in it (Rossen, Kabat & Anderson 1943, Arch. Neurol. Psychiatry 50: 510-528:
+  // sudden arrest of the cerebral circulation, unconscious in 5-11 s, mean 6.8 s), and a man shot through the heart has
+  // 10-15 s of voluntary action (DiMaio, Gunshot Wounds, 2nd ed., 1999); a wound short of that is felt (the shock of it,
+  // the blood going) as fast. A point through the brain is at once (physics.js: stabbed through the head), as the head off is.
+  injury: { trunkFatal: 2.5, headFatal: 2.2, limbBreak: 1.8, fractured: 0.15, chestJoules: 216, shockStrength: 0.6, limbWeight: 0.12, drainSeconds: 10,
     severed: { base: 0.25, perMass: 2.5, share: { wrist: 0.006, elbow: 0.022, shoulder: 0.05, ankle: 0.0145, knee: 0.061, hip: 0.161 } } },
   // Firing: the recoil's peak force is its impulse over `seconds` (the
   // gun's kick spread through a braced hand, or a stock into the shoulder).

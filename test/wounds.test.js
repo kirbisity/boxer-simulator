@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { BLADES, WEAPONS } from '../src/weapons.js';
-import { advance, backedMass, bodyHarm, breakJoint, contactStress, createWorld, cutIntoLimb, limbResistance, placeFighter, reachOf, WORLD } from '../src/physics.js';
+import { advance, backedMass, bodyHarm, breakJoint, contactStress, createWorld, cutIntoLimb, injuryOf, limbResistance, placeFighter, reachOf, WORLD } from '../src/physics.js';
 import { directFighter, newOrders } from '../src/control.js';
 import { firstMet, startFinisher } from '../src/finisher.js';
 import { blowAt, finish, pair } from '../tools/wounds.js';
@@ -92,7 +92,7 @@ test('a blunt head crushes by how its face presses in against the 15 cm pendulum
       const { world, me, him } = pair('mace', reachOf(probe.me) * 1.05, 1);
       const done = blowAt(world, me, him, 'maceSide', (man) => [man.x[P.neck * 3], man.x[P.neck * 3 + 1] - 0.3, man.x[P.neck * 3 + 2]]);
       assert.ok(done?.hit?.kind === 'landed' && done.hit.target === 'trunk' && !done.hit.haft, `the head landed on the body: ${done?.hit?.target}`);
-      return him.trauma.trunk;
+      return injuryOf(him, 'trunk');
     } finally {
       WEAPONS.flangedMace.face = saved;
       WORLD.injury.fractured = fractured;
@@ -149,7 +149,8 @@ test('the finisher kills a man down in plate through the gap at his throat, and 
 
 test('the finisher looks for a gap he can get at: on a man in mail, the point meets his head or body, not his own leg lying across it', () => {
   // (Before, 2-3 in 20 of these met the man's shank folded over the armpit the dagger was put to, and left him alive.)
-  const runs = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => finish('knight', 'mail', seed));
+  // (Watched the 10 s and the seconds a mortal wound leaves him, WORLD.injury.drainSeconds.)
+  const runs = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => finish('knight', 'mail', seed, 10 + WORLD.injury.drainSeconds));
   for (const run of runs) assert.ok(['head', 'trunk'].includes(run.blow?.target), `the point met his ${run.blow?.target}`);
   assert.ok(runs.filter((run) => run.killed).length >= 7, `killed ${runs.filter((run) => run.killed).length} of 8`);
 });

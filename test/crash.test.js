@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
-import { advance, createWorld, crashBetween, crashBraced, crashHarm, crashHardness, crashMass, crashOf, fall, fighterParty, perform, placeFighter, point, wholeVelocity, WORLD } from '../src/physics.js';
+import { advance, createWorld, crashBetween, crashBraced, crashHarm, crashHardness, crashMass, crashOf, fall, fighterParty, injuryOf, perform, placeFighter, point, wholeVelocity, WORLD } from '../src/physics.js';
 import { vec } from '../src/pose.js';
 import { crashOnce } from '../tools/crash.js';
 
@@ -48,7 +48,7 @@ test('armour takes a share of a crash as it does of a blow, hard armour is worse
     const world = pair(key, 'amateur');
     const victim = world.fighters[0];
     crashHarm(world, victim, 'trunk', { impulse: 300, mass: 40, closing, energy: 900, point: [0, 1, 0], normal: [1, 0, 0], hard });
-    return victim.trauma?.trunk ?? 0;
+    return injuryOf(victim, 'trunk');
   };
   const bare = harmed('street');
   const plate = harmed('knight');
@@ -71,7 +71,7 @@ test('a crash to the head shakes the brain and a crash to the chest breaks ribs:
   assert.notEqual(head.victim.state, 'up', 'a head struck at that speed puts a man down');
   assert.equal(chest.event.headDeltaV, 0);
   assert.ok(chest.victim.injuries.some((injury) => injury.kind === 'rib'), 'ribs broke');
-  assert.ok(chest.victim.trauma.trunk > 0.3 && chest.victim.damage.trunk > 0.3);
+  assert.ok(injuryOf(chest.victim, 'trunk') > 0.3 && chest.victim.damage.trunk > 0.3);
   assert.ok(!head.victim.injuries.some((injury) => injury.kind === 'rib'));
 });
 
@@ -111,9 +111,9 @@ test('a horse into a man is the same crash: his trunk takes the horse\'s speed o
   assert.ok(reduced > 20 && reduced < 50, `${reduced.toFixed(0)} kg`);
   assert.ok(Math.abs(e.energy / (0.5 * reduced * e.speed * e.speed) - 1) < 0.01, 'energy is half the reduced mass times the speed squared');
   assert.ok(e.force > 4000 && bare.man.injuries.some((injury) => injury.kind === 'rib'), `${(e.force / 1000).toFixed(1)} kN, ribs broke`);
-  assert.ok(bare.man.trauma.trunk > 1.2 && plate.man.trauma.trunk < 0.6 * bare.man.trauma.trunk, `bare ${bare.man.trauma.trunk.toFixed(2)}, plate ${plate.man.trauma.trunk.toFixed(2)}`);
+  assert.ok(injuryOf(bare.man, 'trunk') > 1.2 && injuryOf(plate.man, 'trunk') < 0.6 * injuryOf(bare.man, 'trunk'), `bare ${injuryOf(bare.man, 'trunk').toFixed(2)}, plate ${injuryOf(plate.man, 'trunk').toFixed(2)}`);
   // He lands, and the fall hurts him too (his head on the ground).
-  assert.ok(bare.world.events.some((event) => event.kind === 'impact' && event.fighter === bare.man.id) || bare.man.trauma.trunk > 1.5, 'and the landing');
+  assert.ok(bare.world.events.some((event) => event.kind === 'impact' && event.fighter === bare.man.id) || injuryOf(bare.man, 'trunk') > 1.5, 'and the landing');
 });
 
 test('a charge into a shield is stopped by the board: the shield arm and the man braced behind it take the blow and the momentum, not the man behind', () => {
@@ -199,7 +199,7 @@ test('a heavy man running into a file of men runs on through them, on his feet a
     assert.ok(point(runner.x, P.pelvis)[0] > men.length * 1.3 + 2, `at ${point(runner.x, P.pelvis)[0].toFixed(1)} m`);
     assert.ok(speeds.at(-1) > 0.6 * Math.max(...speeds), `${speeds.at(-1).toFixed(1)} of ${Math.max(...speeds).toFixed(1)} m/s`);
     // Several crashes in a row add up on him, but as bruises.
-    assert.ok(runner.trauma.trunk > 0 && runner.trauma.trunk < 1, `trunk ${runner.trauma.trunk.toFixed(2)}`);
+    assert.ok(injuryOf(runner, 'trunk') > 0 && injuryOf(runner, 'trunk') < 1, `trunk ${injuryOf(runner, 'trunk').toFixed(2)}`);
   }
 });
 
@@ -277,7 +277,7 @@ test('a crash taken braced costs no wind, and one taken standing costs a little:
     return victim;
   };
   const braced = take(true, 0.9);
-  assert.ok(!braced.faintDue && Math.abs(braced.stamina - 0.9) < 1e-9 && braced.trauma.trunk > 0, 'bruised, not winded');
+  assert.ok(!braced.faintDue && Math.abs(braced.stamina - 0.9) < 1e-9 && injuryOf(braced, 'trunk') > 0, 'bruised, not winded');
   const standing = take(false, 0.9);
   assert.ok(standing.stamina < 0.9 && standing.stamina >= 0.9 - WORLD.wind.pushCap - 1e-9, `winded a little (${standing.stamina})`);
   const tired = take(false, WORLD.overdraft.floor + 0.05);

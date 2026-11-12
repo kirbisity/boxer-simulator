@@ -45,13 +45,17 @@ test('a spear thrust into the chest takes the chest\'s health, which the health 
   const struck = light.world.fighters[1];
   assert.equal(light.hit.target, 'trunk');
   assert.ok(light.hit.pierce > 5);
-  assert.ok(partHealth(struck, 'trunk') < 0.95, `chest ${partHealth(struck, 'trunk')}`);
-  assert.ok(bodyHarm(struck) > 0.05, 'the health bar drops');
+  // (Felt over the seconds after the blow, physics.js injure: where it is falling to, `due`, at once.)
+  assert.ok(partHealth(struck, 'trunk', true) < 0.95, `chest ${partHealth(struck, 'trunk', true)}`);
+  assert.ok(bodyHarm(struck, true) > 0.05, 'the health bar drops');
   assert.ok(!(struck.bleed >= bleedToLose(collapseAt(), 30)), `bleeds ${struck.bleed}`);
   // A full one, through the heart: the chest's health is gone, and he dies of it, not of the blood.
   const full = strikeAt('spear', 'spearThrust', 'body', 2.4);
   assert.ok(full.hit.pierce > 60);
-  assert.equal(partHealth(full.world.fighters[1], 'trunk'), 0);
+  assert.equal(partHealth(full.world.fighters[1], 'trunk', true), 0);
+  // (Not on the spot: within WORLD.injury.drainSeconds, the seconds a man run through lives on.)
+  assert.notEqual(full.world.fighters[1].state, 'out', 'not dead on the spot');
+  advance(full.world, WORLD.injury.drainSeconds);
   assert.ok(full.events.some((event) => event.kind === 'killed' && event.effects.includes('died of his injuries')));
 });
 
