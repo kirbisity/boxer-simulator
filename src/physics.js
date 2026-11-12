@@ -1422,6 +1422,19 @@ function pairedGun(world, fighter, intent, dt) {
 }
 
 /**
+ * The fastest a weapon turns about the hand (rad/s): WORLD.weaponTurnLimit, and less the greater its moment of inertia
+ * there (its mass × the gyration the swing's sag uses: a rod of its whole reach and its balance out from the hand), by
+ * WORLD.weaponTurn's power law (Cross & Bower 2006). A light blade is the wrists' limit; a polearm, a great club, a
+ * hammer on its haft, its own.
+ */
+export function turnLimit(spec) {
+  const reach = spec.length + spec.handle;
+  const inertia = spec.mass * ((reach * reach) / 12 + spec.balance * spec.balance);
+  const turn = WORLD.weaponTurn;
+  return Math.min(WORLD.weaponTurnLimit, turn.rate * (turn.inertia / Math.max(1e-6, inertia)) ** turn.power);
+}
+
+/**
  * Move the weapon with the hands, each substep. The wrists turn it towards
  * where the move points it, a spring as fast as its inertia allows (stiffer
  * with both hands on it), while its own weight pulls the point down. In two
@@ -1460,9 +1473,14 @@ function updateWeapon(fighter, h, weapon = fighter.weapon) {
   const drive = vec.scale(unit, omega * omega * strength * angle);
   const brake = vec.scale(weapon.spin, 2 * zeta * omega * Math.max(0.3, strength));
   weapon.spin = vec.add(weapon.spin, vec.scale(vec.add(vec.sub(drive, brake), sag), h));
-  // Wrists turn a weapon no faster than this (rad/s).
+  // Wrists turn a weapon no faster than this (rad/s), and a weapon heavier in the swing slower (turnLimit).
   const turnRate = vec.length(weapon.spin);
-  if (turnRate > WORLD.weaponTurnLimit) weapon.spin = vec.scale(weapon.spin, WORLD.weaponTurnLimit / turnRate);
+  const limit = turnLimit(spec);
+  if (turnRate > limit) weapon.spin = vec.scale(weapon.spin, limit / turnRate);
+  // Held to its limit, the weapon is behind where the stroke would have it: the stroke takes as long as the turn does.
+  // Its pace (the stroke's clock, intentFor) is the limit over the turn the wrists would give it to close the angle
+  // still left (ω × angle, the spring's own pace), at the most 1; it is 1 whenever the weapon keeps up.
+  weapon.turnPace = turnRate > limit ? Math.min(1, Math.max(WORLD.weaponTurn.slowest, limit / Math.max(1e-6, omega * angle))) : 1;
   let dir = rotateAbout(previous, weapon.spin, h);
   if (able) {
     // The wrist bends only so far: a blade cannot point back into the
@@ -2504,7 +2522,8 @@ function updateIntent(world, fighter, dt) {
     const heavy = blade?.held ? Math.max(1, Math.sqrt(blade.spec.mass / WORLD.weapons.heavyFrom)) : 1;
     // The stroke at the pace his arms give the weapon; a bow drawn as fast as he can pull it (handling.js).
     const held = punch.spec.path === 'blade' ? (blade?.held ? blade : null) : fighter.weapon?.held ? fighter.weapon : null;
-    const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) : 1;
+    // (In the drive, no faster than the weapon turns: a polearm or a club held to its turn limit takes the longer, updateWeapon.)
+    const pace = held && (punch.spec.path === 'blade' || held.spec.bow) ? (held.handling?.speed ?? 1) * (punch.t >= punch.spec.windup && punch.t <= punch.spec.extendUntil ? held.turnPace ?? 1 : 1) : 1;
     // Heard: a bow (not a crossbow) bending as its string is drawn, from the draw's first instant to the loose (the release is the `shot`).
     if (!punch.drawn && punch.spec.path === 'aim' && held?.spec.bow && !held.spent) {
       punch.drawn = true;

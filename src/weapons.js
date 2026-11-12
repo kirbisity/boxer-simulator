@@ -1988,6 +1988,8 @@ export function createWeapon(kind) {
   return {
     kind, spec, main: spec.hand === 'l' ? 'l' : 'r', off: spec.hand === 'l' ? 'r' : 'l', held: true, twoHanded: spec.hands !== 'one',
     dir: [1, 0, 0], spin: [0, 0, 0], tip: [0, 0, 0], tipPrev: null, tipVelocity: [0, 0, 0], strain: 0,
+    // The share of the turn the stroke asks that the weapon can make (physics.js updateWeapon, turnLimit): the stroke's pace.
+    turnPace: 1,
     // A gun with a charge (a matchlock) starts loaded.
     loaded: true, reloaded: 0,
     // What a weapon gains in the fight, named here (unset) so that every weapon has one shape.

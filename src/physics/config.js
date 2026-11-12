@@ -32,6 +32,17 @@ export const WORLD = {
   twoHandWrist: 1.7,
   // Wrists turn a weapon no faster than this (rad/s): real cuts peak near 20–30.
   weaponTurnLimit: 25,
+  // And a weapon heavier in the swing turns slower (physics.js turnLimit): its peak turn about the hand falls with its
+  // moment of inertia there, as (inertia / I)^power, from `rate` (rad/s) at `inertia` (kg·m²) — a swung implement's
+  // speed falls as I^-0.27 above ~0.03 kg·m², whatever its mass at the same I (Cross & Bower 2006, J. Sports Sci. 24:
+  // 23-30: rods swung by men; 0.25 for softball bats, 0.26 for golf clubs). Anchored on a sabre's blade (I ~0.1 about the
+  // hand: the dao, the sabre), which turns at ~20 rad/s at its blows here and puts its tip at ~18-20 m/s with the hand's
+  // speed, as elite sabre fencers' tips do (17.5-19.5 m/s, 240 fps video of the vertical cut, Emerging Investigators
+  // 21-230, 2022). A longsword then peaks at ~17 rad/s, a mace ~11, a naginata ~10, a guandao ~9, a war hammer or a
+  // kanabo ~8, a langxian ~6: the polearm's long lever no longer outruns the sword's tip (it was ~15 rad/s for all,
+  // the spring's pace, the inertia not counted: a guandao's tip at 24-32 m/s, its blows at 240-340 J, 2026-11-11).
+  // `slowest`: the least pace (a share of the move's own) a stroke so held back runs at (physics.js updateWeapon turnPace).
+  weaponTurn: { rate: 20, inertia: 0.1, power: 0.27, slowest: 0.3 },
   // A blade fending off a strike drives out this far (share of the line to the strike) past where they meet.
   fendDrive: 0.25,
   // Where along it a blade meets a strike it is set across (share of its
