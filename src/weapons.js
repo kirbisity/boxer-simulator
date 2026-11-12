@@ -13,7 +13,8 @@
 // along the blade into the target pierces; an edge moving across it cuts.
 
 import { vec } from './pose.js';
-import { muzzleEnergy } from './physics/ballistics.js';
+import { ballGunSpread, ballGunVelocity, muzzleEnergy } from './physics/ballistics.js';
+import { WORLD } from './physics/config.js';
 
 // Crossbows: spanned once and loaded like a gun (`shot`, one at a time, no
 // misfire), they loose a bolt that flies as an arrow does (`bolt`), shorter
@@ -124,8 +125,11 @@ export const WHIP = {
 // Its ball (`projectile`; physics/ballistics.js): ~13 g of lead (~13 mm, between the ashigaru's 3-monme gun, 11 g, and
 // the 6-monme, 23 g) at ~390 m/s (the Graz armoury's trials of its 16th-17th c. long guns, Krenn, Kalaus & Hall 1995:
 // 400-500 m/s for longer barrels and heavier charges; an arquebus's 300-400): ~1 kJ at the muzzle, falling as it flies
-// (the round ball's drag: ~700 J at 30 m, ~340 at 120).
-const MATCHLOCK_BALL = { kg: 0.013, velocity: 392, curve: 'sphere' };
+// (the round ball's drag: ~700 J at 30 m, ~340 at 120). Its load (`MATCHLOCK_LOAD`: a ~1 m barrel, half the ball's
+// weight of powder, stocked to the cheek) is the one the black-powder rule is fitted to (physics/ballistics.js BALL_GUN):
+// its velocity and its spread (0.014) are the rule's at that load.
+const MATCHLOCK_LOAD = { barrel: 1.0, kg: 0.013, charge: 0.5, hold: 'cheek' };
+const MATCHLOCK_BALL = { kg: MATCHLOCK_LOAD.kg, velocity: ballGunVelocity(MATCHLOCK_LOAD), curve: 'sphere' };
 export const MATCHLOCK = {
   projectile: MATCHLOCK_BALL,
   energy: muzzleEnergy(MATCHLOCK_BALL),
@@ -136,7 +140,7 @@ export const MATCHLOCK = {
   limbBreak: 0.75,
   impulse: 5.2,
   recoil: 9,
-  spread: 0.014,
+  spread: ballGunSpread(MATCHLOCK_LOAD),
   movingSpread: 0.035,
   misfire: 0.08,
   reloadSeconds: 15,
@@ -168,28 +172,39 @@ export const NIAOCHONG = { ...MATCHLOCK, spread: 0.018, misfire: 0.12 };
  * a triangle on the end of a wooden shaft, each with its own touch-hole, lit
  * one after another for a quick volley (`barrels`, `between` s apart). Short
  * barrels and a small charge: a lighter, slower ball than a matchlock's
- * (~350 J) that scatters (`spread`). Ming border troops did not reload it in
+ * (~175 J) that scatters (`spread`). Ming border troops did not reload it in
  * the press of a fight: they swung it as a club, the iron barrels its head.
  * Dimensions are estimates (the sources give none): ~1.3 m, ~4 kg.
  * Cheap, short and inaccurate: no sights, fired from the hip or under the arm, the shot not aimed (Qi Jiguang's complaint
- * of the northern troops' fast guns, 快枪, in 《练兵实纪》, as quoted secondhand), a wide `spread` (0.05, the matchlock's
- * 0.014); its iron touch-holes lit by hand from a slow match, so one in eight fails (`misfire`).
+ * of the northern troops' fast guns, 快枪: they cannot hit, they often burst, the bird gun is to be preferred, 《纪效新书》
+ * and 《练兵实纪》, as quoted secondhand); its iron touch-holes lit by hand from a slow match, so one in eight fails (`misfire`).
+ * Its velocity and its spread are the black-powder rule's (physics/ballistics.js BALL_GUN) for its load (`THREE_EYED_LOAD`).
  */
-const THREE_EYED_BALL = { kg: 0.012, velocity: 183, curve: 'sphere' };
+// Its load: barrels ~30 cm long (a hand cannon's; the surviving pieces' 25-35 cm), each a ~12 g lead ball (a ~13 mm bore:
+// an estimate, the surviving pieces' bores 12-20 mm), ~24 calibres to the matchlock's ~77; a light charge (`charge` 0.15
+// of the ball's weight, under a third of the bird gun's share: an estimate), as a barrel of welded wrought iron that
+// often bursts (Qi) is loaded by men who fear it; pointed from the hip (`hold`) along its whole 1.3 m (WEAPONS.threeEyed
+// `length` and `handle`). By the rule: ~170 m/s (was 183), ~175 J at the muzzle (was ~200: replica hand cannons of its
+// barrel length chronograph ~150-250 m/s), ~130 J at 50 m; a spread of ~0.056 rad (was 0.05; the matchlock's 0.014).
+const THREE_EYED_LOAD = { barrel: 0.3, kg: 0.012, charge: 0.15, hold: 'hip', piece: 1.3 };
+const THREE_EYED_BALL = { kg: THREE_EYED_LOAD.kg, velocity: ballGunVelocity(THREE_EYED_LOAD), curve: 'sphere' };
+// Its wound tables (`lethal`, `bleed`, `limbBreak`; its knock, `impulse`) were set for its ball at ~200 J (`THREE_EYED_TABLE_J`):
+// they go with its energy as a spent ball's do (physics/ranged.js spentShot: the wound as the energy, the knock as the momentum).
+const THREE_EYED_TABLE_J = 200;
+const THREE_EYED_SHARE = muzzleEnergy(THREE_EYED_BALL) / THREE_EYED_TABLE_J;
+const threeEyedScaled = (table) => Object.fromEntries(Object.entries(table).map(([part, value]) => [part, value * THREE_EYED_SHARE]));
 export const THREE_EYED = {
-  // Its barrels are short (~30 cm, a hand cannon's): the charge burns out of the muzzle before it has driven the ball far, ~200 J
-  // (it was 350): proof plate holds it (a plated kit rated past it: physics/ranged.js bulletHit), it bruises and stuns.
-  // Its ball (`projectile`): ~12 g of lead (a ~13 mm bore: an estimate, the surviving pieces' bores 12-20 mm) at ~180 m/s
-  // (the speed that gives the ~200 J; replica hand cannons of its barrel length chronograph ~150-250 m/s): slow, it keeps
-  // its speed better than a matchlock's supersonic ball, but has little to keep (~150 J at 50 m).
+  // Its barrels are short: the charge burns out of the muzzle before it has driven the ball far: proof plate holds it (a
+  // plated kit rated past it: physics/ranged.js bulletHit), it bruises and stuns. Slow, it keeps its speed better than a
+  // matchlock's supersonic ball, but has little to keep.
   projectile: THREE_EYED_BALL,
   energy: muzzleEnergy(THREE_EYED_BALL),
-  lethal: { head: 0.95, torso: 0.6, limb: 0.25 },
-  bleed: { head: 0.0016, torso: 0.0024, limb: 0.001 },
-  limbBreak: 0.25,
-  impulse: 2.2,
+  lethal: threeEyedScaled({ head: 0.95, torso: 0.6, limb: 0.25 }),
+  bleed: threeEyedScaled({ head: 0.0016, torso: 0.0024, limb: 0.001 }),
+  limbBreak: 0.25 * THREE_EYED_SHARE,
+  impulse: 2.2 * Math.sqrt(THREE_EYED_SHARE),
   recoil: 5,
-  spread: 0.05,
+  spread: ballGunSpread(THREE_EYED_LOAD),
   movingSpread: 0.06,
   misfire: 0.12,
   barrels: 3,
@@ -512,7 +527,9 @@ export const WEAPONS = {
     // A blade that comes in among them may be caught there (physics/brush.js).
     brush: { from: 1.2, to: 3.0 },
     // A whole culm of heavy maozhu (moso) bamboo some 5 cm through at the butt (not its 0.3 m brush of branches): MATERIALS.maozhu.
-    build: { shaft: 'maozhu', shaftRadius: 0.025 },
+    // Its top, under the iron head, ~2.8 cm through (`shaftTop`, radius m: a culm thins along its length, ~5 cm to ~3 over
+    // the 4.7 m of a small moso culm's butt end: an estimate): its bending is the mean section's (SHAFT_FLEX).
+    build: { shaft: 'maozhu', shaftRadius: 0.025, shaftTop: 0.014 },
   },
   // A hay fork taken up by a rebel: two long wooden-shafted iron tines, not
   // made to fight. Blunt tines that pierce poorly and knock a man about;
@@ -1187,18 +1204,25 @@ export const MATERIALS = {
   iron: { hardness: 0.7, dulls: 0.0022, blade: { strength: 500, scatter: 4, capacity: 9000, fails: 'bent' } },
   // Tin bronze: work-hardened at the edge but soft behind it; it bends.
   bronze: { hardness: 0.6, dulls: 0.0025, blade: { strength: 600, scatter: 5, capacity: 7000, fails: 'bent' } },
-  // Hardwood (ash, oak, hickory): the shaft the brace figure is set against.
-  hardwood: { hardness: 0.1, shaft: { strength: 1, scatter: 6, chop: 600 } },
-  // White-wax wood: Chinese ash grown slow and straight, it bends far and springs back where a stiffer ash snaps.
-  waxwood: { hardness: 0.1, shaft: { strength: 1.4, scatter: 6, chop: 600 } },
-  // Bamboo: hollow, light and springy; it splits along its fibres under an edge sooner than solid wood.
-  bamboo: { hardness: 0.1, shaft: { strength: 0.8, scatter: 5, chop: 350 } },
+  // Hardwood (ash, oak, hickory): the shaft the brace figure is set against. Its bending (SHAFT_FLEX): white ash, E ~12 GPa
+  // along the grain, ~670 kg/m³ (USDA Wood Handbook, 2010: as WORLD.wear.column takes it), solid (`bore` 0).
+  hardwood: { hardness: 0.1, shaft: { strength: 1, scatter: 6, chop: 600, modulus: 12e9, density: 670, bore: 0 } },
+  // White-wax wood: Chinese ash grown slow and straight, it bends far and springs back where a stiffer ash snaps (E ~10
+  // GPa, under white ash's: an estimate from its bending far, the same ~670 kg/m³).
+  waxwood: { hardness: 0.1, shaft: { strength: 1.4, scatter: 6, chop: 600, modulus: 10e9, density: 670, bore: 0 } },
+  // Bamboo: hollow, light and springy; it splits along its fibres under an edge sooner than solid wood. A thin-walled cane
+  // (`bore` 0.7, the hollow's radius over the culm's), its wall E ~15 GPa at ~700 kg/m³ (as maozhu's, below).
+  bamboo: { hardness: 0.1, shaft: { strength: 0.8, scatter: 5, chop: 350, modulus: 15e9, density: 700, bore: 0.7 } },
   // A whole culm of heavy maozhu (moso, Phyllostachys edulis), green, the langxian's: thick-walled and springy, it bends
   // under a blow where wood snaps (`strength` 1.2), and its round, silica-hard skin turns an edge that does not meet it
   // square while the branches round it keep most blades off it (`chop` 900, over hardwood's 600). The Jixiao xinshu chose
   // it over an iron shaft for that: light, it takes the raiders' sword blows without being cut through, and it bends to
   // tangle a weapon (the user's account of it, 2026-11-11).
-  maozhu: { hardness: 0.15, shaft: { strength: 1.2, scatter: 5, chop: 900 } },
+  // Its bending (SHAFT_FLEX): the culm wall's E along the fibres ~10-20 GPa at ~500-900 kg/m³ (Dixon & Gibson, 'The
+  // structure and mechanics of Moso bamboo', J. Materials Science, 2014; Janssen, *Mechanical Properties of Bamboo*, 1991):
+  // 15 GPa and 700 kg/m³; thick-walled at the butt (~1 cm on a 5 cm culm: `bore` 0.6). About ash's stiffness for its
+  // weight: what makes the langxian flex is its length and its thinning culm (WEAPONS.langxian `build`), not its stuff.
+  maozhu: { hardness: 0.15, shaft: { strength: 1.2, scatter: 5, chop: 900, modulus: 15e9, density: 700, bore: 0.6 } },
   // Shield boards.
   planks: { hardness: 0.12, board: { perKg: 850, scatter: 6 } },
   plywood: { hardness: 0.12, board: { perKg: 1200, scatter: 6 } },
@@ -2013,6 +2037,54 @@ export function handShares(spec) {
 }
 
 /**
+ * A long shaft's flex at the moment of a blow (effectiveMassAt). Struck across, a shaft is not rigid in the few
+ * milliseconds of contact (the weapon's `contactSeconds`, τ): the blow runs back along it as a bending wave, and only what
+ * that wave reaches in τ takes part. A bending wave in a beam is dispersive, its group speed 2√ω (EI/ρA)^¼ (Graff, *Wave
+ * Motion in Elastic Solids*, 1975, flexural waves in an Euler-Bernoulli beam), at the pulse's own frequency ω ≈ π/τ: in τ it
+ * runs `reach` = 2√(πτ) (EI/ρA)^¼, where for a tube of outer radius R and hollow r, EI/ρA = E (R² + r²) / 4ρ (its
+ * material's `modulus` E, `density` ρ and `bore` r/R: MATERIALS; R the shaft's own, or for a tapering culm the mean of its
+ * butt's and its top's, `shaftTop`). The turning mass behind the point struck (the arms and the shaft past it, levered
+ * about the hands) comes in as the share of the wood between the hand and that point the wave has crossed, reach / wood,
+ * when the wood is longer than the wave goes (a first-order estimate: the hands and the far shaft turn only as far as the
+ * bend reaches them). The wood is the free shaft (freeShaft: to the head's socket or the langets' foot); a steel head is
+ * stiff, the wave crosses it at once. Along the shaft (a thrust) the wave is a compression wave at √(E/ρ), ~4 km/s in ash: it crosses
+ * 20 m in 5 ms, so a thrust's push is unchanged. What it comes to: a 5 m pike of 3.4 cm ash (τ 5 ms) reaches ~1.5 m, ~half
+ * of its point's lever; the langxian's thinning culm (τ 8 ms) ~2.3 m, most of its brush's; a war spear's 1.5 m, its whole
+ * lever (none); a sword has no shaft, and its blade is struck edge-on, its stiff way (none). Worked out once per weapon.
+ */
+const SHAFT_FLEX = { pulse: Math.PI, defaultSeconds: 0.005 };
+const bendReaches = new WeakMap();
+
+/**
+ * A weapon's shaft flex (SHAFT_FLEX), worked out once: `reach` (m), how far a blow's bending wave runs along its shaft in
+ * its contact (Infinity: no shaft, or none that bends), and `wood` (m), its free shaft ahead of the hand (null: all pole).
+ */
+export function shaftFlexOf(spec) {
+  if (bendReaches.has(spec)) return bendReaches.get(spec);
+  const build = buildOf(spec, WORLD.wear.shaftFrom);
+  const stuff = build.shaft ? MATERIALS[build.shaft]?.shaft : null;
+  let reach = Infinity;
+  if (stuff?.modulus && build.shaftRadius > 0) {
+    const outer = spec.build?.shaftTop ? Math.sqrt(build.shaftRadius * spec.build.shaftTop) : build.shaftRadius;
+    const inner = outer * (stuff.bore ?? 0);
+    const perMass = (stuff.modulus * (outer * outer + inner * inner)) / (4 * stuff.density);
+    const seconds = spec.contactSeconds ?? SHAFT_FLEX.defaultSeconds;
+    reach = 2 * Math.sqrt(SHAFT_FLEX.pulse * seconds) * perMass ** 0.25;
+  }
+  const bend = { reach, wood: reach === Infinity ? null : freeShaft(spec, build) };
+  bendReaches.set(spec, bend);
+  return bend;
+}
+
+/** The share of the turning mass a blow at `distance` m from the main hand meets through the shaft's flex (SHAFT_FLEX). */
+function shaftFlexShare(spec, distance) {
+  const { reach, wood } = shaftFlexOf(spec);
+  if (reach === Infinity) return 1;
+  const lever = Math.abs(distance);
+  return Math.min(1, reach / Math.max(1e-3, wood == null ? lever : Math.min(lever, wood)));
+}
+
+/**
  * The effective mass at `distance` along the blade from the main hand, for
  * the weapon held by an arm whose own effective mass sits at the grip: a
  * free rigid body of the two, struck at that point (1/m = 1/M + d²/I).
@@ -2028,7 +2100,8 @@ export function effectiveMassAt(spec, armMass, distance, armLength = 0.6, along 
   // A committed blow is struck with the wrist locked: arm and weapon turn
   // as one about the shoulder for the instant of contact.
   const pivoted = (armMass * (armLength * 0.45) ** 2 + ownInertia + spec.mass * (armLength + spec.balance) ** 2) / (armLength + Math.abs(distance)) ** 2;
-  const turning = Math.max(loose, pivoted);
+  // (A long shaft's flex: only as much of that turning mass as its bending wave reaches in the contact, SHAFT_FLEX.)
+  const turning = Math.max(loose, pivoted) * shaftFlexShare(spec, distance);
   // Along the blade (a thrust) the arm and weapon push as one mass; across
   // it (a cut) they must turn. Mixed by how the contact moves: a push in one
   // line (an edge, a point sliding) meets the two in series. A point that goes
