@@ -209,8 +209,10 @@ test('a blow on a shield is an impact: the blade rebounds or glances off, never 
 test('a hard blow knocks the shield arm out of line, a heavy weapon far more often than a light one', () => {
   const effects = (style, move) => [1, 2, 3, 4].flatMap((seed) => strikeAt(style, move, 'body', 1.6, { defenderStyle: 'templar', seed }).events.filter((event) => event.target === 'shield').flatMap((event) => event.effects));
   const aside = (style, move) => effects(style, move).filter((effect) => effect === 'shield knocked aside').length;
-  assert.ok(aside('odachi', 'yokogiri') >= 2, 'the ōdachi beats the heater aside');
-  assert.ok(aside('odachi', 'yokogiri') > aside('katana', 'yokogiri'), 'the lighter katana less often');
+  // (The kanabo, was the ōdachi: at its speed ceiling (physics.js turnLimit) the ōdachi's sweep now meets the heater at
+  // ~15-25 N·s, the katana's at ~13, and knocks it aside as seldom; the 5 kg club's ~30-45 N·s beats it aside every time.)
+  assert.ok(aside('kanabo', 'hammerSide') >= 2, 'the kanabo beats the heater aside');
+  assert.ok(aside('kanabo', 'hammerSide') > aside('katana', 'yokogiri'), 'the lighter katana less often');
   // Knocked aside, his guard is open: he cannot bring the shield to meet the next until he has it back.
   const world = createWorld([{ ...PRESETS.contender, style: 'templar' }, { ...PRESETS.contender, style: 'odachi' }]);
   const [knight] = world.fighters;
@@ -233,7 +235,8 @@ test('a shield on arm straps is harder to tear away than one held in the fist', 
     advance(world, 0.8);
     for (let blow = 0; blow < 3 && knight.shield; blow += 1) {
       throwPunch(world, swordsman, 'yokogiri', 'body');
-      advance(world, 0.5);
+      // (0.8 s, was 0.5: the ōdachi's sweep, held to its turn limit, takes longer than that, physics.js turnLimit.)
+      advance(world, 0.8);
     }
     return world.events.some((event) => event.kind === 'disarmed' && event.effects[0].includes('torn from his arm'));
   };

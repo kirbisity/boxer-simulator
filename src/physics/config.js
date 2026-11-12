@@ -178,8 +178,11 @@ export const WORLD = {
   // mass as (mass / `refKg`)^`fit`, a little slower than the load does, so a heavy helmet still comes off a little sooner.
   // Calibrated by tools/helmet-off.js: knockouts by heavy head blows take an open helmet off about half the time, a
   // half-enclosed one about a fifth, an enclosed one almost never (10 seeds, 2026-11-04: open 49.8% of 2647 knockouts,
-  // half 19.4% of 1802, enclosed 0.2% of 1688).
-  helmetOff: { ease: 1, holds: { open: 6.6, half: 31, enclosed: 100 }, refKg: 2, fit: 0.9, catch: { base: 1, rim: 0.6, rimAt: 0.3, rimWidth: 0.25, seat: 0.8, lift: 0.3 } },
+  // half 19.4% of 1802, enclosed 0.2% of 1688). Again after the brain's share through a rigid shell (physics.js
+  // brainShare) left far fewer knockouts through a helmet, and only the hardest blows (6 seeds, 2026-11-11): open 14 J,
+  // was 6.6 (the median slip of its knockouts, ~50% of 105; it was 72%); half-enclosed none knocked out in 6 seeds, its
+  // hold left at 31; enclosed 0% of 16 at 100.
+  helmetOff: { ease: 1, holds: { open: 14, half: 31, enclosed: 100 }, refKg: 2, fit: 0.9, catch: { base: 1, rim: 0.6, rimAt: 0.3, rimWidth: 0.25, seat: 0.8, lift: 0.3 } },
   // Dazed: a head blow past `from` of the chin (short of a knockdown) leaves
   // him dazed for `minSeconds`–`maxSeconds` by how near the knockdown it
   // came: slower to react (`reaction` s), his muscles at (1 − `strength`),

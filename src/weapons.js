@@ -752,8 +752,13 @@ export const WEAPONS = {
     // 2026-11-08). Drawing only: `radius`, `mass` and `balance` stay as they were, so it hits as it did.
     drawnRadius: 0.035,
   },
+  // Its `balance` (m out from the hand to its centre of mass) as a flanged mace is measured: a copy of a 15th-c. German
+  // all-steel one (Museum Replicas, reviewed on myArmoury: 58 cm long, 1.41 kg, a 17 cm grip, its point of balance
+  // 13 cm above the guard) balances 22 cm out of a hand at the middle of its grip, 0.43 of the way from the hand to the
+  // head's end: the steel shaft carries as much of its weight as the flanges. So 0.29 m of its 0.66 (was 0.72, past its
+  // own end, which put its weight in the swing and its mass at the flanges at twice what they are, 2026-11-11).
   flangedMace: {
-    label: 'Flanged mace', hands: 'one', length: 0.66, strikeFrom: 0.5, handle: 0.12, mass: 1.6, balance: 0.72, radius: 0.036,
+    label: 'Flanged mace', hands: 'one', length: 0.66, strikeFrom: 0.5, handle: 0.12, mass: 1.6, balance: 0.29, radius: 0.036,
     harm: { swing: { blunt: 1.5 }, thrust: { blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.9, art: 'artCrushOne', crush: 0.55,
     // (Its striking `face`, m: a flange's edge, ~5 cm deep and a few mm thick, lands first, not the round of the head.)
@@ -767,9 +772,11 @@ export const WEAPONS = {
   // were said to carry under their tunics at Cajamarca. Lighter in the head
   // than an iron mace (a bronze star of ~0.6 kg, `mass` with the haft), so
   // less crush against steel; its points bite as it lands (`pierce`).
+  // (`balance`: its centre of mass from its own parts, the star's ~0.6 kg at the middle of the head, 0.68 m out, and the
+  // haft's 0.65 kg at the middle of its run from the butt to the head, 0.25 m: 0.46 m; it was 0.74, the very end of it.)
   champi: {
     art: 'artCrushOne',
-    label: 'Champi', hands: 'one', length: 0.74, strikeFrom: 0.62, handle: 0.12, mass: 1.25, balance: 0.74, radius: 0.05,
+    label: 'Champi', hands: 'one', length: 0.74, strikeFrom: 0.62, handle: 0.12, mass: 1.25, balance: 0.46, radius: 0.05,
     harm: { swing: { blunt: 1.3, pierce: 0.25 }, thrust: { blunt: 0.35 } },
     contactSeconds: 0.004, rotation: 0.95, wrist: { omega: 14, zeta: 0.85 }, threat: 3.6, crush: 0.3,
     // A wooden haft ~3 cm through under the star (its `radius` is the star's).

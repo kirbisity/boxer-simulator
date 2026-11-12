@@ -90,7 +90,9 @@ test('a blunt head crushes by how its face presses in against the 15 cm pendulum
     try {
       const probe = pair('mace', 1, 1);
       const { world, me, him } = pair('mace', reachOf(probe.me) * 1.05, 1);
-      const done = blowAt(world, me, him, 'maceSide', (man) => [man.x[P.neck * 3], man.x[P.neck * 3 + 1] - 0.3, man.x[P.neck * 3 + 2]]);
+      // (Laid 0.2 m under the neck, was 0.3: the mace swung at its turn limit, physics.js turnLimit, with its weight where
+      // a mace's is, comes in lower through its arc, and laid at 0.3 its head met his thigh.)
+      const done = blowAt(world, me, him, 'maceSide', (man) => [man.x[P.neck * 3], man.x[P.neck * 3 + 1] - 0.2, man.x[P.neck * 3 + 2]]);
       assert.ok(done?.hit?.kind === 'landed' && done.hit.target === 'trunk' && !done.hit.haft, `the head landed on the body: ${done?.hit?.target}`);
       return injuryOf(him, 'trunk');
     } finally {
