@@ -352,9 +352,13 @@ export function stepHorse(world, horse, h) {
     // (What a robot could jump, short of its jump's height, it does not pull up for: it jumps it: riding.js robotJumps.)
     if (mire && horse.spec?.legs) horse.clearance = 0.85 * (mountJumpOf(world, horse)?.height ?? 0);
     const balk = mire ? horseBalks(world, horse) : Infinity;
-    // A horse of its own side about to be run into: swerved from, and followed no faster than it (WORLD.mount.avoid).
-    const avoid = friendlyAvoid(world, horse);
-    const wanted = Math.max(-1, Math.min(top, balk, avoid.speed, goal.speed));
+    // A horse of its own side about to be run into: swerved from, and followed no faster than it (WORLD.mount.avoid); not
+    // under the player, whose horse goes where his reins send it (keeping off his own side's horses is his to do).
+    const ridden = world.fighters[horse.rider]?.player && world.fighters[horse.rider].mount === horse;
+    const avoid = ridden ? HORSE_UNSWERVED : friendlyAvoid(world, horse);
+    // A hedge of the enemy's levelled points before it: no faster than a canter, however it is urged (WORLD.mount.hedge).
+    const hedge = hedgeBalk(world, horse);
+    const wanted = Math.max(-1, Math.min(top, balk, avoid.speed, hedge, goal.speed));
     const change = wanted - horse.speed;
     // Pulling up is harder than getting away (a horse sits back on its hocks).
     const most = horse.accel * (change < 0 ? 1.4 : 1) * h;
@@ -379,6 +383,8 @@ export function stepHorse(world, horse, h) {
     horse.yawWant = want;
     horse.yawRate += Math.max(-twist * h, Math.min(twist * h, want - horse.yawRate));
     horse.yaw += horse.yawRate * h;
+    // Turning sheds its speed: a share for each radian it turns (WORLD.mount.turn `bleed`), its legs pushing across, not on.
+    horse.speed *= Math.exp(-WORLD.mount.turn.bleed * Math.abs(horse.yawRate) * h);
     // It leans into the turn, as a runner does (gait.js bankOf): the push through its legs is v × yaw rate, positive to the right.
     // (Reached by a critically damped spring, WORLD.mount.turn `bank`: the lean's own rate never jumps, so neither does the
     // saddle's swing across, high over its hooves.)
@@ -1570,7 +1576,11 @@ export function jolt(world, horse, delta, reason = 'brought down by the crash') 
   horse.shock += size;
   const rider = horse.rider === null ? null : world.fighters[horse.rider];
   if (rider?.mount === horse) {
-    rider.knock = rider.knock.map((value, axis) => value - delta[axis]);
+    // A stop along its line pitches him on into the pommel, which carries `pommel` of it through with the horse (WORLD.mount.seat);
+    // a knock across it, or one from behind, the saddle holds nothing of.
+    const carried = along < 0 ? WORLD.mount.seat.pommel * along : 0;
+    const felt = [delta[0] - ahead[0] * carried, delta[1], delta[2] - ahead[2] * carried];
+    rider.knock = rider.knock.map((value, axis) => value - felt[axis]);
     rider.joltLost = (rider.joltLost ?? [0, 0, 0]).map((value, axis) => value - delta[axis]);
   }
   if (horse.state === 'up' && horse.shock > spec.fall) bringDown(world, horse, reason);
@@ -1874,6 +1884,41 @@ function trodOn(world, horse) {
       world.events.push({ time: world.time, kind: 'trampled', fighter: man.id, horse: horse.id, attacker: rider?.id, speed: Math.abs(horse.speed), hoofSpeed: speed, part: under.key, impulse: tread.impulse, crawling, fell: tread.flattened || undefined, harmed: Boolean(tread.harm), horseJolt: jolted, effects });
     }
   }
+}
+
+// A horse that swerves from nothing (the player's: friendlyAvoid not asked).
+const HORSE_UNSWERVED = { turn: 0, speed: Infinity };
+
+/**
+ * The most a horse will come on at (m/s) with a hedge of the enemy's levelled points before it (WORLD.mount.hedge): a
+ * canter where they stand `dense` to the metre of front or thicker in the way it goes, else no limit. Looked again every
+ * `every` s; a horse going back, at a walk or a trot is not checked.
+ */
+function hedgeBalk(world, horse) {
+  const spec = WORLD.mount.hedge;
+  if (horse.hedge && world.time - horse.hedge.at < spec.every && world.time >= horse.hedge.at) return horse.hedge.speed;
+  let speed = Infinity;
+  // (Checked from a trot: a horse held to a canter by them goes on seeing them.)
+  if (horse.speed > horse.paces.trot) {
+    const ahead = [Math.cos(horse.yaw), -Math.sin(horse.yaw)];
+    let points = 0;
+    for (const man of world.fighters) {
+      if (man.mount || man.corner === horse.corner || man.state !== 'up' || man.panicked) continue;
+      const weapon = man.weapon;
+      if (!weapon?.held || (weapon.spec.length ?? 0) < spec.long || !(weapon.spec.harm?.thrust?.pierce > 0)) continue;
+      const dx = man.root[0] - horse.at[0];
+      const dz = man.root[1] - horse.at[1];
+      const along = dx * ahead[0] + dz * ahead[1];
+      if (along <= 0 || along > spec.look || Math.abs(dx * -ahead[1] + dz * ahead[0]) > spec.width) continue;
+      // Levelled at it: he faces the horse.
+      const toHorse = Math.atan2(dz, -dx);
+      const facing = Math.atan2(Math.sin(toHorse - man.yaw), Math.cos(toHorse - man.yaw));
+      if (Math.abs(facing) <= spec.facing) points += 1;
+    }
+    if (points / (2 * spec.width) >= spec.dense) speed = horse.paces.canter;
+  }
+  horse.hedge = { at: world.time, speed };
+  return speed;
 }
 
 /**

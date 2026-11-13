@@ -97,11 +97,12 @@ function tapCharge(riderKey, seed, seconds = 12) {
     fastest = Math.max(fastest, Math.abs(me.mount?.speed ?? 0));
   };
   while (w.time < seconds && !orders.charged) advance(w, 1 / 60, step);
-  const hit = w.events.find((event) => (event.kind === 'landed' || event.kind === 'blocked') && event.attacker === me.id);
+  // (Ridden straight at him, the player's charge, 2026-11-13: the horse itself may get there first and ride him down.)
+  const hit = w.events.find((event) => ((event.kind === 'landed' || event.kind === 'blocked') && event.attacker === me.id) || (event.kind === 'trampled' && event.fighter === man.id));
   return { w, me, man, orders, charge, fastest, hit };
 }
 
-test('on horseback a tap of the attack at a man far off charges him: the horse gallops at him, the blow is made in passing, he rides through, wheels round to face him and hands the reins back', () => {
+test('on horseback a tap of the attack at a man far off charges him: the horse gallops straight at him, the blow (or the horse) meets him, he rides through, wheels round to face him and hands the reins back', () => {
   let hits = 0;
   for (const seed of [1, 2, 3, 4]) {
     const { me, man, orders, charge, fastest, hit } = tapCharge('sabre', seed);

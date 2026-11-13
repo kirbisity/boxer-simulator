@@ -1479,7 +1479,14 @@ export const WORLD = {
     // at `speed` m/s or slower (a walk), set down `beside` m off its side; a riderless horse standing within `reach` m is mounted.
     dismount: { speed: 1.8, beside: 0.9, reach: 1.6 },
     line: { spacing: 3, rankBack: 5, margin: 1.5 },
-    seat: { speed: 4.2, across: 0.55, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
+    // seat `speed` 5 (was 4.2; the user's call, 2026-11-13: in a horse-to-horse fight both riders came off even where one won,
+    // ~1.5 of 2 riders a bout, tools/mounted-bouts.js): a knight's seat in a war saddle, braced in long stirrups, held men on
+    // through lance strikes that broke the lance (the joust's record: most courses broke lances without unhorsing).
+    // `pommel`: of a sudden stop along the horse's line (a crash, a horse checked by a braced point), the share the war saddle's high
+    // pommel and the rider braced in his stirrups carry him through with the horse rather than over its neck: he is pitched
+    // into the pommel, not out of the saddle (a third: the bow of a war saddle stands a hand above the thigh, the legs braced
+    // forward against the stirrups take the rest as they can). Across or from behind it holds nothing.
+    seat: { speed: 5, pommel: 0.35, across: 0.55, horseShare: 0.2, kickFree: 3, carried: 0.5, grip: 0.25 },
     reach: { easy: 0.6, most: 0.7, steps: 14, inHz: 3, outHz: 1.2, damping: 1, seat: 0.35 },
     coupling: { forms: { couched: 0.6, twoThrust: 0.35, oneThrust: 0.12, twoSwing: 0.04, oneSwing: 0.03 }, across: 0.4, horse: 0.167 },
     twist: 1.3,
@@ -1502,13 +1509,30 @@ export const WORLD = {
     // not into the horse. It is the war spear shaft's strength for every shaft (physics/wear.js driveShaft, at its own
     // thickness and wood): past it the shaft snaps.
     brace: { length: 1.5, still: 0.5, share: 0.5, shaft: 1000 },
-    crash: { fall: 6, lateral: 1.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
+    // crash `fall` 8.5 (was 6; with `lateral` 1.5 a flank blow still fells it at ~5.7): along its own line a horse takes the knock
+    // on four braced legs set 1.4 m apart fore and aft, and horses that met head-on mostly stayed up (both shied and took it on
+    // the shoulder); at 6 two horses meeting at a canter both went down, so every mounted meeting unhorsed both riders. The T-bone
+    // (a horse struck in the flank, its feet only 0.35 m apart across) still brings it down.
+    crash: { fall: 8.5, lateral: 1.5, shockSeconds: 0.2, shoveDecay: 3, alliedFrom: 5 },
     // A horse will not run into another horse if it can help it (a herd animal, and a rider rides his line knee to knee, not
     // into his comrade): each horse looks `ahead` s along its way (at least `nearest` m) at the horses of its own side and, where
     // one will come within `clear` m of it (barrel to barrel: two horses' widths and a knee's room), it swerves off by up to
     // `swerve` rad (the more the nearer the miss and the sooner), to the side the other is not, and if the other is in its path
     // ahead goes no faster than it plus `gain` m/s. Looked again every `every` s (a horse sees and answers in a few tenths).
     avoid: { ahead: 1.5, nearest: 3, clear: 1.8, swerve: 0.6, gain: 0.5, every: 0.1 },
+    // `arc` (rad either side of the horse's line): what a man in the saddle can strike at and guard against (physics.js
+    // inRiderArc). Over the horse's neck and out to just short of square on either side (86°: the man at his stirrup a
+    // pace ahead is still his to cut at, leaning out); behind him, or square beside
+    // him, his arm cannot come round past his own body and the saddle's cantle, nor his eye follow, so a horse taken in the
+    // flank (the T-bone) carries a rider who can neither strike nor parry.
+    arc: 1.5,
+    // The one thing a horse will not be ridden into: a hedge of points (physics/mounted.js hedgeBalk). Looking `look` m ahead (its
+    // stopping distance from the gallop to a canter and some: ~11 m at its pulling up, so it sees them in time to check)
+    // across `width` m either side of its line, it counts the enemy's levelled long points (a held weapon of `long` m or more
+    // that thrusts, its bearer facing it within `facing` rad); `dense` or more points to the metre of front (a pike or spear
+    // block: two or three ranks at ~1 m a file show 2-5) and it will come on no faster than a canter however it is urged (the
+    // squares at Waterloo, the Swiss and Flemish pike: horses balked at the points, not at men). Looked again every `every` s.
+    hedge: { look: 20, width: 2.5, long: 1.8, facing: 1.0, dense: 1.2, every: 0.25 },
     stamina: { gallopSeconds: 60, restSeconds: 90, slows: 0.3, easy: 0.5 },
     // The horse's turning (physics/mounted.js stepHorse).
     // - into (s): the time it takes to get into its sharpest turn at its pace, or out of it: its yaw rate changes no faster
@@ -1522,7 +1546,10 @@ export const WORLD = {
     // - bank: its lean into the turn (atan(v·ω/g), as a runner's) reached by a critically damped spring of `hz` (`damping` 1):
     //   ~0.3 s behind its turn (2/ω), its rate never jumping (the saddle, ~1.6 m up, swings across with it: a faster lean
     //   swings it harder, 2 Hz doubled the rider's jerk); it was a first-order lag of 0.25 s, whose rate jumped as a turn began.
-    turn: { into: 0.3, settle: 4, bank: { hz: 1, damping: 1 } },
+    // - bleed (/rad): the speed a horse sheds turning, a share of it for each radian it turns (its legs push across as well as on,
+    //   and a galloping horse checks itself into a turn): 0.2 loses ~27% wheeling through a right angle, so a pursuer that turns
+    //   after a rider loses ground on him (the feigned flight, the caracole's wheel), and a charge holds its speed only straight.
+    turn: { into: 0.3, settle: 4, bank: { hz: 1, damping: 1 }, bleed: 0.2 },
     // The rider's balance in a turn (physics/mounted.js turnBalance): he leans his trunk in toward the turn's centre by the
     // angle that balances gravity against the turn's push across (atan(v·ω/g)), for the turn the horse will be making `lead`
     // s from now (the turn he asked for with the reins, as fast as the horse can come into it: `into`): the lean starts as the

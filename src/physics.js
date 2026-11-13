@@ -2145,6 +2145,21 @@ function couchedNear(world, fighter, punch) {
  * Throw a strike (any attack in MOVES) at the opponent. The zone defaults to
  * the move's first. Returns false if the fighter cannot throw it now.
  */
+/**
+ * Whether a place ([x, y, z]) is before a man in the saddle: within WORLD.mount.arc of his horse's line, where he can
+ * strike and guard (behind him, or square beside him, his arm and eye cannot come round). A man on foot: anywhere.
+ */
+export function inRiderArc(fighter, at) {
+  const horse = fighter.mount;
+  if (!horse) return true;
+  const dx = at[0] - horse.at[0];
+  const dz = at[2] - horse.at[1];
+  const length = Math.hypot(dx, dz);
+  // (So near the horse's middle he is over it, not beside it: let be.)
+  if (length < 0.3) return true;
+  return (Math.cos(horse.yaw) * dx - Math.sin(horse.yaw) * dz) / length >= Math.cos(WORLD.mount.arc);
+}
+
 export function throwPunch(world, fighter, type, zone = null, { heavy = false, at = null, riposte = false, coil = 0, gap = false } = {}) {
   const spec = MOVES[type];
   if (spec?.kind === 'rush' || spec?.kind === 'clinch') return perform(world, fighter, type);
@@ -2171,6 +2186,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   // On a ladder his hands are on its rungs: he strikes only from its head, over the walk's edge (physics/ladders.js).
   if (fighter.climbing && !fighter.climbing.top) return false;
   if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
+  // From the saddle only what is before him (WORLD.mount.arc: inRiderArc): nothing behind, nor square beside him.
+  if (fighter.mount && !inRiderArc(fighter, at ?? point(target.x, P.pelvis))) return false;
   // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
   if (blade && fighter.caught && blade === caughtBlade(fighter)) return false;
   const aimZone = fromKnees ? 'legs' : spec.zones.includes(zone) ? zone : spec.zones[0];

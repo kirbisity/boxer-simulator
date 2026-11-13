@@ -186,3 +186,74 @@ test('an AI rider whose horse is failing reins in and gets down before it falls 
   assert.equal(rider.state, 'up', 'on his feet, not thrown');
   assert.ok(world.events.some((event) => event.kind === 'unhorsed' && event.fighter === rider.id && event.effects[0] === 'gets down from his horse'));
 });
+
+// ---- The horse under the player, a momentum fight (2026-11-13) ----------------
+
+test('a rider strikes and guards only before him: over the horse\'s neck, not behind him nor square beside him', async () => {
+  const { inRiderArc } = await import('../src/physics.js');
+  const w = createWorld([{ inputs: { ...structuredClone(PRESETS.knight), mounted: true }, corner: 'red' }, { inputs: structuredClone(PRESETS.knight), corner: 'blue' }], { seed: 1, arena: FIELD });
+  const me = w.fighters[0];
+  const [x, z] = me.mount.at;
+  const yaw = me.mount.yaw;
+  const at = (angle, distance = 3) => [x + Math.cos(yaw + angle) * distance, 1, z - Math.sin(yaw + angle) * distance];
+  assert.equal(inRiderArc(me, at(0)), true, 'ahead');
+  assert.equal(inRiderArc(me, at(0.9)), true, 'ahead and to the side');
+  assert.equal(inRiderArc(me, at(Math.PI / 2)), false, 'square beside him (the T-bone)');
+  assert.equal(inRiderArc(me, at(Math.PI)), false, 'behind');
+  assert.equal(inRiderArc(w.fighters[1], at(Math.PI)), true, 'a man on foot turns to anything');
+});
+
+test('the horse under the player goes where he steers it, a turn costs it speed, and it balks only at a hedge of points', () => {
+  // A hedge: two ranks of six with levelled points, facing him; a charge at them is held to a canter. One alone does not stop it.
+  const charge = (count) => {
+    const blue = Array.from({ length: count }, () => ({ inputs: { ...structuredClone(PRESETS.maximilian), mounted: false }, corner: 'blue' }));
+    const w = createWorld([{ inputs: { ...structuredClone(PRESETS.knight), mounted: true }, corner: 'red' }, ...blue], { seed: 2, arena: FIELD });
+    const [me, ...men] = w.fighters;
+    placeMounted(me, -30, 0, 0);
+    const files = Math.ceil(count / 2);
+    men.forEach((man, index) => {
+      placeFighter(man, count > 1 ? Math.floor(index / files) * 1.2 : 0, count > 1 ? ((index % files) - (files - 1) / 2) * 0.9 : 0);
+      man.yaw = Math.PI;
+    });
+    me.player = true;
+    let most = 0;
+    for (let t = 0; t < 6; t += 1 / 60) {
+      advance(w, 1 / 60, () => {
+        me.mount.goal = { heading: 0, speed: me.mount.paces.gallop };
+        me.mount.goalAt = w.time + 1;
+        me.cooldown = 1;
+        for (const man of men) {
+          man.move = 0;
+          man.cooldown = 1;
+        }
+      });
+      const ahead = men[0].root[0] - me.mount.at[0];
+      if (ahead > 3 && ahead < 8) most = Math.max(most, me.mount.speed);
+    }
+    return { most, horse: me.mount };
+  };
+  const hedge = charge(12);
+  const lone = charge(1);
+  assert.ok(hedge.most <= hedge.horse.paces.canter + 0.3, `into the hedge no faster than a canter: ${hedge.most.toFixed(1)} m/s`);
+  assert.ok(lone.most > lone.horse.paces.canter + 1, `at one man, on at the gallop: ${lone.most.toFixed(1)} m/s`);
+});
+
+test('riding into an enemy of his own steering, the player\'s blow is readied for him at the man before him', () => {
+  const w = createWorld([{ inputs: { ...structuredClone(PRESETS.knight), mounted: true }, corner: 'red' }, { inputs: structuredClone(PRESETS.knight), corner: 'blue' }], { seed: 3, arena: FIELD });
+  const [me, man] = w.fighters;
+  placeMounted(me, -25, 0, 0);
+  placeFighter(man, 0, 0.8);
+  const orders = newOrders();
+  let readied = null;
+  for (let t = 0; t < 6 && !readied; t += 1 / 60) {
+    advance(w, 1 / 60, (world, dt) => {
+      man.move = 0;
+      man.cooldown = 1;
+      // The stick full ahead (along +x, the way the horse faces): his own steering, no tap.
+      orders.stick = { dir: [1, 0], amount: 1 };
+      directFighter(world, me, orders, dt);
+    });
+    readied = orders.autoCharged ?? null;
+  }
+  assert.ok(readied && readied.target === man.id, 'a blow readied at the man he rode at');
+});

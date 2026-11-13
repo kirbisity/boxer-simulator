@@ -21,29 +21,33 @@ import { ROBOT_DOGS, ROBOT_SHELL } from './robotdogs.js';
  * height and weight by its own line below. Paces go with size and build: the
  * small horses no faster than the riding horses, the heaviest the slowest
  * away and the widest in a turn; none tuned to a fight.
+ * Gallops raised and `accel` eased a fifth (2026-11-13, the user's call: a horse fight a fight of momentum): a ridden
+ * horse's flat-out sprint is ~14-16 m/s (polo ponies 14-15 timed, endurance Arabs ~15, a Thoroughbred's 17-19 unladen
+ * and lightly ridden), the heavy great horse ~11-12; and from a stand a horse takes 4-6 s to its full gallop (its first
+ * strides ~3 m/s² falling off as it gathers speed), not 3: so a man who must turn or check loses ground he cannot buy back.
  */
 export const HORSES = {
   // The great horse of the knights: deep and strong, not fast, and no giant: most war horses' bones stand 14–15.2 hands
   // (142–157 cm) and few over 15 (Clark 2004; Ameen et al. 2021, the English medieval horse bones), a heavy-boned horse of
   // that height ~550 kg (was 1.58 m, 600 kg).
-  destrier: { label: 'Destrier', mass: 560, withers: 1.55, gallop: 10.5, canter: 5.8, trot: 3.6, walk: 1.6, accel: 3.2, lateral: 5.5, spin: 1.3, coats: ['#3a2a1e', '#5a3a22', '#2a2622', '#8a8a86'] },
+  destrier: { label: 'Destrier', mass: 560, withers: 1.55, gallop: 11.5, canter: 5.8, trot: 3.6, walk: 1.6, accel: 2.6, lateral: 5.5, spin: 1.3, coats: ['#3a2a1e', '#5a3a22', '#2a2622', '#8a8a86'] },
   // The riding warhorse (courser, jennet, Andalusian; a Han or Ferghana horse; the Romans' cavalry horses): lighter, quicker.
   // The courser of the same bones as the destrier's lower half (Clark 2004); the Roman cavalry horses of the frontier finds
   // 1.40–1.50 m (Junkelmann, *Die Reiter Roms*, 1990–92); ~14.3 hands, ~470 kg (was 1.52 m, 480 kg).
-  warhorse: { label: 'Warhorse', mass: 470, withers: 1.5, gallop: 12, canter: 6, trot: 3.6, walk: 1.6, accel: 3.6, lateral: 6.5, spin: 1.5, coats: ['#6a3a1c', '#4a2a18', '#2a2420', '#9a6a3a'] },
+  warhorse: { label: 'Warhorse', mass: 470, withers: 1.5, gallop: 14, canter: 6, trot: 3.6, walk: 1.6, accel: 2.9, lateral: 6.5, spin: 1.5, coats: ['#6a3a1c', '#4a2a18', '#2a2420', '#9a6a3a'] },
   // The Arab horse of Saladin's horsemen: light, fast, quick to turn. The breed stands 142–152 cm and weighs 380–450 kg
   // (the breed societies' standard; Edwards, *The Arabian*, 1973) (was 1.48 m, 430 kg).
-  arabian: { label: 'Arabian', mass: 420, withers: 1.47, gallop: 12.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 4, lateral: 7, spin: 1.7, coats: ['#d8d2c6', '#7a4a24', '#5a3a22', '#3a2a20'] },
+  arabian: { label: 'Arabian', mass: 420, withers: 1.47, gallop: 14.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 3.2, lateral: 7, spin: 1.7, coats: ['#d8d2c6', '#7a4a24', '#5a3a22', '#3a2a20'] },
   // The Turkoman (Turkmen) horse of Central Asia, the Akhal-Teke's kind: the Nisaean horse of the Parthian and Persian
   // cataphracts, the Turkmen frontier warriors' and the Ottoman sipahi's: tall, lean, long in the leg, a racer's
   // endurance. 145–160 cm, 400–450 kg (the Akhal-Teke's breed figures, Hendricks, *International Encyclopedia of Horse
   // Breeds*, 1995); quick, a little less handy than the smaller Arab.
-  turkoman: { label: 'Turkoman horse', mass: 430, withers: 1.53, gallop: 12.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 3.9, lateral: 6.8, spin: 1.6, coats: ['#b08a52', '#6a4a2a', '#3a2a20', '#c8b89a', '#4a3a30'] },
+  turkoman: { label: 'Turkoman horse', mass: 430, withers: 1.53, gallop: 14.5, canter: 6.2, trot: 3.7, walk: 1.7, accel: 3.1, lateral: 6.8, spin: 1.6, coats: ['#b08a52', '#6a4a2a', '#3a2a20', '#c8b89a', '#4a3a30'] },
   // The steppe horse (Mongol and Kipchak; the Jurchen picks are HORSES.manchu): small, hardy, quick to turn. 12–14 hands (122–142 cm), the
   // Mongolian horse's mean 127–128 cm (Oklahoma State University, *Breeds of Livestock*), the Chinese Mongolian horse's
   // 1.28 m, 300–360 kg (Hendricks 1995); a little under its old 1.34 m and 320 kg. Its gallop is a long-distance runner's
   // (Mongolian horses race 15–30 km), no faster than a riding horse's over a sprint.
-  steppe: { label: 'Steppe horse', mass: 300, withers: 1.3, gallop: 11, canter: 5.8, trot: 3.4, walk: 1.6, accel: 3.8, lateral: 7, spin: 1.8, coats: ['#8a6a42', '#5a4030', '#2a2420', '#b8a888', '#6a5a4a'] },
+  steppe: { label: 'Steppe horse', mass: 300, withers: 1.3, gallop: 13, canter: 5.8, trot: 3.4, walk: 1.6, accel: 3.0, lateral: 7, spin: 1.8, coats: ['#8a6a42', '#5a4030', '#2a2420', '#b8a888', '#6a5a4a'] },
   // The Ming border army's horse: steppe-bred, but the pick of what the Ming bought at the Liaodong horse markets (from
   // the Mongols and Jurchens) and through the tea-horse trade of the northwest (the tea-horse offices of Xining, Hezhou and
   // Taozhou, horses of the Tibetan uplands: Rossabi, 'The Tea and Horse Trade with Inner Asia during the Ming', *Journal
@@ -52,17 +56,17 @@ export const HORSES = {
   // Byeokjegwan (1593) the Japanese coveted the Ming's big horses (Tachibana house papers, as quoted secondhand).
   // The generals' household riders had the pick of it: the top of the Hequ's height and over its weight, a sturdier horse
   // than the herd's (the user's call, 2026-11-09; was 1.36 m, 350 kg), a little slower away and wider in a turn for it.
-  mingBorder: { label: 'Ming border horse', mass: 380, withers: 1.4, gallop: 11, canter: 5.8, trot: 3.5, walk: 1.6, accel: 3.5, lateral: 6.6, spin: 1.65, coats: ['#6a4a2a', '#8a6a42', '#2a2420', '#5a3a22', '#b8a888'] },
+  mingBorder: { label: 'Ming border horse', mass: 380, withers: 1.4, gallop: 13, canter: 5.8, trot: 3.5, walk: 1.6, accel: 2.8, lateral: 6.6, spin: 1.65, coats: ['#6a4a2a', '#8a6a42', '#2a2420', '#5a3a22', '#b8a888'] },
   // The Manchurian horse of the Jurchen heavy horsemen (the Jin's Iron Pagoda, 1140; the Later Jin's Bayara guard, 1619):
   // the steppe horse's kind, bred on the grass of the Liao and Sungari valleys and bought from the Khorchin and Khalkha
   // Mongols, the guard's picked from the herds as the Ming generals' were from theirs: a little over the Mongolian's size
   // (the user's call, 2026-11-09; they rode HORSES.steppe), under the Ming border army's pick.
-  manchu: { label: 'Manchurian horse', mass: 330, withers: 1.34, gallop: 11, canter: 5.8, trot: 3.4, walk: 1.6, accel: 3.7, lateral: 6.9, spin: 1.75, coats: ['#5a4030', '#8a6a42', '#2a2420', '#6a4a2a', '#b8a888'] },
+  manchu: { label: 'Manchurian horse', mass: 330, withers: 1.34, gallop: 13, canter: 5.8, trot: 3.4, walk: 1.6, accel: 3.0, lateral: 6.9, spin: 1.75, coats: ['#5a4030', '#8a6a42', '#2a2420', '#6a4a2a', '#b8a888'] },
   // The Japanese horse of the samurai (the Kiso and Misaki kind): small and stocky. The horse bones of medieval Kamakura
   // (the Zaimokuza site, 1333) stand ~109–140 cm, most about 130 (Hayashida Shigeyuki 1957, as quoted secondhand in the
   // surveys of Japan's native breeds); the Kiso horse today ~133 cm, the Misaki ~130 cm: ~1.29 m, ~300 kg (was
   // 1.30 m, 320 kg). Slower than the steppe horse and less handy (shorter-legged, heavier in the forehand).
-  japanese: { label: 'Japanese horse', mass: 300, withers: 1.29, gallop: 10, canter: 5.4, trot: 3.3, walk: 1.5, accel: 3.4, lateral: 6.5, spin: 1.7, coats: ['#3a2a1e', '#6a4a2a', '#2a2420', '#8a6a4a'] },
+  japanese: { label: 'Japanese horse', mass: 300, withers: 1.29, gallop: 11.5, canter: 5.4, trot: 3.3, walk: 1.5, accel: 2.7, lateral: 6.5, spin: 1.7, coats: ['#3a2a1e', '#6a4a2a', '#2a2420', '#8a6a4a'] },
 };
 
 /**

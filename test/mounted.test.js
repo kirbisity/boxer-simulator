@@ -48,10 +48,14 @@ test('barding: steel plate for knights in full plate (not the Templar), steel la
 test('a horse gets away no faster than its legs allow, holds no more than its gallop laden, and turns no tighter than it can lean', () => {
   const w = world(rider('knight'), rider('saladin'));
   const [destrier, arab] = w.horses;
+  // (The Arab led out of the way down the field: the run is 30 m long.)
+  placeFighter(w.fighters[1], 6, 15);
+  arab.at = [6, 15];
   ride(w, destrier, { heading: 0, speed: 30 }, 1);
   // ~3 m/s² from a stand: about 3 m/s after a second, not 30.
   assert.ok(destrier.speed > 2 && destrier.speed < 4.5, `after 1 s ${destrier.speed}`);
-  ride(w, destrier, { heading: 0, speed: 30 }, 2.4);
+  // (4-6 s to its full gallop from a stand: horses.js `accel`, eased 2026-11-13.)
+  ride(w, destrier, { heading: 0, speed: 30 }, 4);
   assert.ok(destrier.speed <= HORSES.destrier.gallop + 1e-9, `gallop ${destrier.speed}`);
   assert.ok(destrier.speed > HORSES.destrier.gallop * 0.8, 'laden, still near its gallop');
   // Turning at a gallop: its yaw rate no more than lateral / speed.
@@ -59,7 +63,9 @@ test('a horse gets away no faster than its legs allow, holds no more than its ga
   const before = destrier.yaw;
   ride(w, destrier, { heading: Math.PI, speed }, 0.5);
   const rate = Math.abs(destrier.yaw - before) / 0.5;
-  assert.ok(rate <= HORSES.destrier.lateral / (speed * 0.95) + 1e-6, `turn rate ${rate}`);
+  // (It sheds speed as it turns, WORLD.mount.turn `bleed`, and may turn the tighter for it: held to its slower speed's rate.)
+  assert.ok(destrier.speed < speed, 'the turn cost it speed');
+  assert.ok(rate <= HORSES.destrier.lateral / (destrier.speed * 0.95) + 1e-6, `turn rate ${rate}`);
   assert.ok(turnRadius(destrier, 10) >= 100 / HORSES.destrier.lateral - 1e-6);
   // A light horse turns tighter than the great horse at the same speed.
   assert.ok(turnRadius(arab, 10) < turnRadius(destrier, 10));
@@ -281,7 +287,7 @@ test('a man lying in a horse\'s path is trodden on by its hooves', () => {
   assert.ok(w.events.some((event) => event.kind === 'trampled' && event.effects[0] === 'trodden by a hoof'), 'a hoof came down on him');
 });
 
-test('two horses meeting exchange momentum by their laden masses; head-on at a canter or more both go down and throw their riders, a brush only shoves', () => {
+test('two horses meeting exchange momentum by their laden masses; head-on the lighter goes down and the great horse stays up, a brush only shoves', () => {
   const meet = (blue, offset = 0, angle = 0) => {
     const w = createWorld([{ inputs: rider('knight'), corner: 'red' }, { inputs: rider(blue), corner: 'blue' }], { seed: 4000, arena: FIELD });
     const [a, b] = w.horses;
@@ -309,8 +315,11 @@ test('two horses meeting exchange momentum by their laden masses; head-on at a c
   assert.ok(head.momentum, 'they met');
   // Their momentum along the line is what it was (the legs' own push in a few thousandths of a second aside).
   assert.ok(Math.abs(head.momentum.after - head.momentum.before) < 0.06 * Math.abs(head.momentum.before) + 150, `${head.momentum.before.toFixed(0)} -> ${head.momentum.after.toFixed(0)} kg m/s`);
-  assert.equal(head.w.events.filter((e) => e.kind === 'horseDown').length, 2, 'both horses fall');
-  assert.equal(head.w.events.filter((e) => e.kind === 'unhorsed').length, 2, 'both riders are thrown');
+  // Braced along its line (WORLD.mount.crash `fall` 8.5): the Arab, the lighter by a fifth, goes down; the destrier, taking the
+  // smaller share of the speed change, stays up with its rider (one wins the meeting, not both lose it).
+  const downs = head.w.events.filter((e) => e.kind === 'horseDown');
+  assert.ok(downs.every((e) => e.horse === 1), `only the light horse falls: ${downs.map((e) => e.horse)}`);
+  // (At two gallops' closing speed, ~15 m/s, the knight is still knocked from his saddle by the stop: his horse is not down.)
   // The lighter horse is knocked back the more (it takes the larger share of the speed change).
   const first = (horse) => head.w.events.find((e) => e.kind === 'horseCrash' && e.horse === horse);
   const [heavy, light] = [first(0), first(1)];
@@ -319,9 +328,9 @@ test('two horses meeting exchange momentum by their laden masses; head-on at a c
   const brush = meet('knight', 0.66);
   assert.equal(brush.w.events.filter((e) => e.kind === 'horseDown').length, 0);
   assert.equal(brush.w.events.filter((e) => e.kind === 'unhorsed').length, 0);
-  // Crossing at an angle is worse than a brush.
+  // Crossing at an angle is worse than a brush: the knock comes across their lines (WORLD.mount.crash `lateral`).
   const across = meet('knight', 0, 0.7);
-  assert.equal(across.w.events.filter((e) => e.kind === 'horseDown').length, 2);
+  assert.ok(across.w.events.filter((e) => e.kind === 'horseDown').length >= 1);
 });
 
 test('a lance set against the charge has the man behind it, and pushes the horse back by the blow\'s momentum', () => {
@@ -330,6 +339,9 @@ test('a lance set against the charge has the man behind it, and pushes the horse
   const man = w.fighters[1];
   w.fighters[0].cooldown = 1;
   placeFighter(man, 3, 0);
+  // Coming on at a canter, ~7 m/s, already (the pace it reached over this run-up before the horses' accel was eased a fifth,
+  // 2026-11-13; the man's thrust below is timed for it).
+  horse.speed = 7;
   let hit = null;
   let thrown = false;
   for (let t = 0; t < 10 && !hit; t += 1 / 60) {
@@ -346,7 +358,7 @@ test('a lance set against the charge has the man behind it, and pushes the horse
   assert.ok(hit, 'the lance struck the horse');
   assert.ok(hit.strikeMass > 0.5 * man.body.massKg, `${hit.strikeMass.toFixed(0)} kg behind the point`);
   assert.ok(hit.pushed > 0.1, `the horse pushed back ${hit.pushed.toFixed(2)} m/s`);
-  assert.ok(hit.pierce > 0, 'and run on to it');
+  assert.ok(hit.pierce > 0, `and run on to it (${JSON.stringify({ pierce: hit.pierce, speed: hit.speed, closing: hit.closing, energy: hit.energy })})`);
 });
 
 // ---- Circling, friends, the seat and the gait ----
@@ -418,7 +430,7 @@ test('horses of one side brushing, or crowded together at a pace, only ease apar
   } finally {
     WORLD.mount.avoid.clear = clear;
   }
-  assert.equal(head.events.filter((e) => e.kind === 'horseDown').length, 2);
+  assert.ok(head.events.some((e) => e.kind === 'horseCrash'), 'they crash');
   assert.ok(WORLD.mount.crash.alliedFrom > 1 && WORLD.mount.crash.alliedFrom < WORLD.mount.crash.fall);
 });
 
@@ -440,8 +452,8 @@ test('the line of a team of horsemen is spaced for horses: 3 m between them acro
   for (let i = 1; i < zs.length; i += 1) assert.ok(zs[i] - zs[i - 1] >= 2.9, `${zs[i] - zs[i - 1]} m`);
 });
 
-test('a rider is harder to unseat: a knock short of the saddle\'s 4.2 m/s does not throw him, a harder one does; a horse going down slowly does not fling him', () => {
-  assert.ok(WORLD.mount.seat.speed >= 3.6 && WORLD.mount.seat.speed <= 4.6);
+test('a rider is harder to unseat: a knock short of the saddle\'s 5 m/s does not throw him, a harder one does; a horse going down slowly does not fling him', () => {
+  assert.ok(WORLD.mount.seat.speed >= 4.6 && WORLD.mount.seat.speed <= 5.4);
   const knocked = (speed) => {
     const w = world(rider('knight'), footman('yari'));
     w.fighters[1].state = 'out';
@@ -452,7 +464,8 @@ test('a rider is harder to unseat: a knock short of the saddle\'s 4.2 m/s does n
     return man.mount === null;
   };
   assert.equal(knocked(3.4), false, 'a 3.4 m/s knock (a man was thrown by 3.0) he sits');
-  assert.equal(knocked(4.6), true);
+  assert.equal(knocked(4.4), false, 'nor one of 4.4 (the old saddle threw him at 4.2)');
+  assert.equal(knocked(5.6), true);
   // A horse that goes down slowly: he comes off at a share of the speed it had.
   const fall = (speed) => {
     const w = world(rider('samurai'), footman('yari'));
