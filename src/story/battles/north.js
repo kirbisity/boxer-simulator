@@ -7,7 +7,7 @@
 
 import { normaliseInputs } from '../../body.js';
 import { greyedHair } from '../../aging.js';
-import { canRide } from '../../horses.js';
+import { kitRides } from '../../horses.js';
 import { koreaKitFor } from './korea.js';
 
 export const NORTH = {
@@ -58,14 +58,14 @@ const northDistance = (a, b) => Math.hypot(a.at[0] - b.at[0], a.at[1] - b.at[1])
  * A man put in a place, in the better of his own kit and what that place was issued (korea.js koreaKitFor); and a place on
  * horse (a rider's: its man cast `mounted`) is a horse with it: the man put there rides it, the place's horse (its breed,
  * outfit `horse`), as the man he stands in for did. A coat that is no rider's (the garrison's hemp vest: its kit names no
- * horse, horses.js canRide) gives way to the place's own, the rider's harness that went with the horse. A place is the
+ * horse, horses.js kitRides) gives way to the place's own, the rider's harness that went with the horse. A place is the
  * battle's, and so is its horse: never one more for him, nor one fewer.
  */
 function northDressed(inputs, place) {
   const outfit = { ...inputs.outfit, kind: koreaKitFor(inputs.outfit?.kind, place.inputs?.outfit?.kind) };
   if (!place.inputs?.mounted) return normaliseInputs({ ...inputs, outfit });
   const horse = place.inputs.outfit?.horse ? { horse: place.inputs.outfit.horse } : {};
-  const rides = canRide({ ...inputs, outfit });
+  const rides = kitRides({ ...inputs, outfit });
   return normaliseInputs({ ...inputs, mounted: true, outfit: { ...outfit, ...(rides ? {} : { kind: place.inputs.outfit.kind, design: place.inputs.outfit.design }), ...horse } });
 }
 

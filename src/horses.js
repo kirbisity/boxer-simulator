@@ -3,7 +3,7 @@
 // people rode) and his horse is barded if it says that too (`barding`).
 // Nothing here names a character; the outfits name their horses.
 
-import { FACTIONS, factionOf, outfitOf } from './outfits.js';
+import { FACTIONS, factionOf, OUTFITS, outfitOf } from './outfits.js';
 import { ROBOT_DOGS, ROBOT_SHELL } from './robotdogs.js';
 
 /**
@@ -164,14 +164,43 @@ export const breedOf = (key) => HORSES[key] ?? ROBOT_DOGS[key];
  */
 export function breedKeyOf(inputs) {
   const own = inputs.outfit?.horse;
-  const kit = outfitOf(inputs).spec.horse;
+  const spec = outfitOf(inputs).spec;
+  const kit = spec.horse ?? peopleHorse(spec, inputs.outfit?.kind);
   if (!breedOf(kit)) return null;
   return HORSES[own] ? own : kit;
 }
 
-/** Whether a character rides: his kit names the horse his people rode. */
+// Who never rides: beasts (the primates) and machines (a robot rides only what it is bolted to: robotdogs.js).
+const HORSELESS_FACTIONS = new Set(['primates', 'machines']);
+
+/**
+ * The horse a man of a kit that names none rides (2026-11-13, the user's call: any man may be put on a horse, a bannerman
+ * or a Ming line soldier as readily as a born horseman): the breed his own army's riders ride (the riding kits of his
+ * faction whose names begin as his kit's does: a Ming garrison man on the Ming riders' horse, not the Han cavalry's), else
+ * the commonest among all his faction's riding kits, else the riding warhorse (a people with no horses of its own mounted
+ * on bought or taken ones, as the Spanish horses came to the Mexica and the Inca); none for a beast or a machine.
+ */
+function peopleHorse(spec, kind) {
+  if (HORSELESS_FACTIONS.has(spec.faction) || spec.machine) return null;
+  const line = /^[a-z]+/.exec(kind ?? '')?.[0];
+  const riders = Object.entries(OUTFITS).filter(([, kit]) => kit.faction === spec.faction && HORSES[kit.horse]);
+  const own = riders.filter(([key]) => line && /^[a-z]+/.exec(key)?.[0] === line);
+  const tally = new Map();
+  for (const [, kit] of own.length ? own : riders) tally.set(kit.horse, (tally.get(kit.horse) ?? 0) + 1);
+  // (The commonest; a tie goes to the kit listed first.)
+  let best = null;
+  for (const [breed, count] of tally) if (!best || count > best[1]) best = [breed, count];
+  return best?.[0] ?? 'warhorse';
+}
+
+/** Whether a character can ride: any man (his kit's horse, or his people's: peopleHorse); not a beast or a machine. */
 export function canRide(inputs) {
   return Boolean(breedKeyOf(inputs));
+}
+
+/** Whether his kit itself is a rider's (names its horse): what a story's coat for a mounted place is chosen by (story/battles/north.js). */
+export function kitRides(inputs) {
+  return Boolean(breedOf(outfitOf(inputs).spec.horse));
 }
 
 /**

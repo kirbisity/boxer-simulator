@@ -26,10 +26,11 @@ const ride = (w, horse, goal, seconds) => {
   }
 };
 
-test('riding is the kit\'s: knights, samurai and the steppe ride; gladiators and boxers do not, and are not put on a horse', () => {
+test('any man may ride (2026-11-13): knights, samurai and the steppe, and gladiators and footmen too when put on a horse; beasts and machines never', () => {
   for (const key of ['knight', 'templar', 'maximilian', 'samurai', 'tametomo', 'kheshig', 'ironPagoda', 'saladin', 'sipahi', 'gaziAlp', 'guanYu', 'hidalgo']) assert.ok(canRide(PRESETS[key]), key);
-  for (const key of ['murmillo', 'heavy', 'police', 'macuahuitl', 'legionary', 'yari', 'street']) assert.ok(!canRide(PRESETS[key]), key);
-  const w = world(rider('murmillo'), rider('knight'));
+  for (const key of ['murmillo', 'heavy', 'police', 'macuahuitl', 'legionary', 'yari', 'street']) assert.ok(canRide(PRESETS[key]), key);
+  for (const key of ['gorilla', 'chimp', 'humanoid', 'combatBot']) assert.ok(!canRide(PRESETS[key]), key);
+  const w = world(rider('gorilla'), rider('knight'));
   assert.equal(w.horses.length, 1);
   assert.equal(w.fighters[0].mount ?? null, null);
   assert.ok(w.fighters[1].mount);

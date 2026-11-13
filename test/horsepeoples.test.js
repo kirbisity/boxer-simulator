@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { normaliseInputs, P } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { gothWarrior, hunRider, lateRomanSoldier, parthianRider, republicanLegionary, xiongnuRider } from '../src/cast.js';
-import { canRide, mountOf } from '../src/horses.js';
+import { canRide, kitRides, mountOf } from '../src/horses.js';
 import { MUSTER } from '../src/muster.js';
 import { factionOf, FACTIONS, gearTraits, HELMETS, outfitOf } from '../src/outfits.js';
 import { advance, createWorld, seededRandom } from '../src/physics.js';
@@ -31,7 +31,9 @@ test('the new kit: each people\'s, the horse peoples ride, the horse archers car
   assert.equal(factionOf(men.cataphract), 'parthians');
   assert.ok(FACTIONS.goths && FACTIONS.parthians);
   for (const kind of ['xiongnu', 'hun', 'hunNoble', 'gothNoble', 'cataphract', 'parthianArcher']) assert.ok(canRide(men[kind]), kind);
-  for (const kind of ['lateRoman', 'goth', 'republicanLegionary']) assert.ok(!canRide(men[kind]), kind);
+  // The foot's kits name no horse (kitRides); put on one, each rides his own people's (any man may ride, 2026-11-13).
+  for (const kind of ['lateRoman', 'goth', 'republicanLegionary']) assert.ok(!kitRides(men[kind]) && canRide(men[kind]), kind);
+  assert.equal(mountOf(men.goth).breed, 'warhorse');
   // The cataphract's horse is armoured; the horse archers' are not.
   assert.notEqual(mountOf(men.cataphract).barding, 'bare');
   assert.equal(mountOf(men.parthianArcher).barding, 'bare');
