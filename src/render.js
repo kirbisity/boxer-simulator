@@ -26,6 +26,7 @@ import { orbitAboveGround } from './watchcam.js';
 import { arenaColosseum } from './props/arena.js';
 import { harbourPort } from './props/harbour.js';
 import { SUBWAY_ARENA, subwayPuddleFilm, subwayStation } from './props/subway.js';
+import { swayGrass } from './clothwind.js';
 import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks, coastPalms, coastPier, coastSampans, coastShip, coastShipMaterials } from './props/coast.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
 import { buildAirPack, buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
@@ -122,6 +123,8 @@ export function createScene(canvas, { alpha = false } = {}) {
  * scene is built the first time it is needed; lighting goes with it.
  */
 export function setPlace(view, place, arena, weather = null) {
+  // A place with weather of its own whenever a level brings none (PLACE_WEATHER: the open field's driven grey sky).
+  weather ??= PLACE_WEATHER[place] ?? null;
   // A battle's fieldworks (its arena's `works`: stakes, palisades, woods, ditches, mud), over whatever place it is fought in.
   showWorks(view, arena);
   // A battle map's floor, much wider than the place's own, has the place built for it (scenery.js sceneryFor
@@ -282,6 +285,13 @@ function lightPlace(view, place) {
 // where the fog is opaque, the photograph's ball below the mist line is not
 // drawn, and tree cards wholly beyond the fog are left out.
 
+// A place's own weather, where a level brings none: the open field under a low, driven overcast, the photograph's blue sky
+// toned most of the way to a cold grey and its sun dimmed through the cloud, the haze closing in on the far side of the
+// floor; and its wind (wind.js PLACE_WIND: weather with a fog would otherwise lie still, as mist does) blowing hard.
+const PLACE_WEATHER = {
+  field: { fog: [34, 130], colour: 0x8c969d, sky: 0.7, sun: 0.6, wind: { speed: 7, gust: 0.55 } },
+};
+
 /** The camera's far plane where a place says nothing else (metres). */
 const CAMERA_FAR = 60;
 /** How far past the fog's opaque distance the camera still sees: the dome and photograph (radius 40, 30) must stay inside it. */
@@ -400,7 +410,8 @@ const PLACE_LIGHT = {
   // Stage 1, Dunnottar: a storm at dusk over a black sea; a bruised purple-grey haze that thickens with distance (levelmode/storm.js).
   dunnottar: { background: 0x3a3646, fog: [45, 360], far: 720, key: 0x8e8aa8, keyIntensity: 0.05, rim: 0x5c6488, sun: 0.75, hemi: 0.58 },
   // An open field for horsemen: a clear day, the haze far off.
-  field: { background: 0xb4d2ee, fog: [45, 140], key: 0xfff4e0, keyIntensity: 0.15, rim: 0xd6e6ff, sun: 1.0 },
+  // A wide field under a low, driven sky: overcast and windy, the light flat and cool, the far hills lost in haze.
+  field: { background: 0x939ea6, fog: [32, 125], key: 0xdce4ea, keyIntensity: 0.2, rim: 0xb4c0cc, sun: 0.55, hemi: 0.74 },
   // A tropical shore: bright, hazy over the sea.
   coastFort: { background: 0xc6e0f2, fog: [35, 130], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
@@ -433,8 +444,9 @@ export const PLACE_ARENAS = {
   port: { halfX: 10, halfZ: 6 },
   sengoku: { halfX: 11, halfZ: 7 },
   plain: { halfX: 12, halfZ: 8 },
-  // Room for horsemen to charge, pass and wheel round (WORLD.mount): 60 by 40 m inside a rail.
-  field: { halfX: 30, halfZ: 20 },
+  // Room for horsemen to charge, pass, wheel round and draw a pursuit off (WORLD.mount; a feigned flight wants a long run):
+  // 90 by 60 m inside a rail, the steppe battles' floor (was 60 by 40).
+  field: { halfX: 45, halfZ: 30 },
   coastFort: { halfX: 12, halfZ: 8 },
   coastVillage: { halfX: 12, halfZ: 8 },
   // The square between the shops and the canal: room for the wokou raid's formations.
@@ -801,11 +813,15 @@ function buildField(arena = PLACE_ARENAS.field) {
       g.fillRect(Math.random() * w, Math.random() * h, 1, 2 + Math.random() * 4);
     }
   }, [8, 8]);
-  const ground = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), lit(0xffffff, { map: grass }));
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(140 + 2 * arena.halfX, 140 + 2 * arena.halfZ), lit(0xffffff, { map: grass }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   ground.userData.scenery = 'ground';
   place.add(ground);
+  // Rough grass over it, bowing and swaying in the wind (clothwind.js), and a few stones.
+  const litter = fieldLitter(59, arena, { grass: 0x5e7a3a, stone: 0x6e6a62, tufts: 1400, stones: 90, half: [arena.halfX + 12, arena.halfZ + 10] });
+  swayGrass(litter[0].material, 0.38);
+  place.add(...litter);
   // Hoof-churned earth down the middle of the ground.
   const track = new THREE.Mesh(new THREE.PlaneGeometry(arena.halfX * 1.7, arena.halfZ * 0.9), lit(0x7a6a48, { transparent: true, opacity: 0.35 }));
   track.rotation.x = -Math.PI / 2;
@@ -818,7 +834,7 @@ function buildField(arena = PLACE_ARENAS.field) {
     const angle = (index / 12) * Math.PI * 2;
     const hill = new THREE.Mesh(new THREE.SphereGeometry(12 + Math.random() * 8, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), lit(0x6d8a45));
     hill.scale.y = 0.22 + Math.random() * 0.18;
-    hill.position.set(Math.cos(angle) * 52, -0.5, Math.sin(angle) * 50);
+    hill.position.set(Math.cos(angle) * (arena.halfX + 22), -0.5, Math.sin(angle) * (arena.halfZ + 30));
     hill.userData.scenery = 'hills';
     place.add(hill);
   }

@@ -55,7 +55,8 @@ export const PLACE_WIND = {
   port: { toward: [0.6, -0.25], speed: 4, gust: 0.4 },
   sengoku: { toward: [0.94, 0.34], speed: 2, gust: 0.35 },
   plain: { toward: [0.94, -0.34], speed: 3, gust: 0.35 },
-  field: { toward: [0.94, 0.34], speed: 3, gust: 0.35 },
+  // The open field is a windy one: a fresh breeze (Beaufort 5, 8-10.7 m/s at 10 m; ~7 near the ground), gusting hard.
+  field: { toward: [0.94, 0.34], speed: 7, gust: 0.55 },
   coastFort: { toward: [0.3, -0.95], speed: 4.5, gust: 0.3 },
   coastVillage: { toward: [0.3, -0.95], speed: 4.5, gust: 0.3 },
   jiangnan: { toward: [0.94, 0.34], speed: 1.2, gust: 0.3 },

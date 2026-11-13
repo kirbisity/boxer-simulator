@@ -11,6 +11,7 @@ import { FACTIONS } from './outfits.js';
 import { WARRIORS } from './roster.js';
 import { drawUp, intoZone, MUSTER } from './muster.js';
 import { tname } from './i18n.js';
+import { SUBWAY_ARENA } from './props/subway.js';
 
 export const CUSTOM_BATTLE = {
   // Its key where a level's would be (main.js state.scenario; the menu's card).
@@ -24,7 +25,7 @@ export const CUSTOM_BATTLE = {
   // (scenarios.js, drawn apart: the riders' room to charge and wheel; the town, the water town and the port only as wide
   // as their house fronts, shops and containers leave), `glyph` for its card where it has no picture.
   maps: {
-    field: { label: 'Open field', glyph: '🌾', arena: { halfX: 30, halfZ: 20 }, camera: { yaw: -0.5, pitch: 0.42, distance: 30, maxDistance: 40 } },
+    field: { label: 'Open field', glyph: '🌾', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
     plain: { label: 'The plain', glyph: '🏞️', arena: { halfX: 30, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.45, distance: 28, maxDistance: 38 } },
     meadow: { label: 'Meadow', glyph: '🌼', arena: { halfX: 12, halfZ: 8 }, camera: { yaw: -0.5, pitch: 0.42, distance: 13, maxDistance: 17 } },
     sengoku: { label: 'Sengoku valley', glyph: '🏯', arena: { halfX: 30, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 } },
@@ -37,6 +38,12 @@ export const CUSTOM_BATTLE = {
     mobei: { label: 'Gobi steppe', glyph: '🐎', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
     catalaunian: { label: 'Catalaunian plains', glyph: '🌿', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
     carrhae: { label: 'Desert', glyph: '🏜️', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
+    // The other battles' grounds (each its level's floor, without its works: the stakes and ditches were that day's; render.js PLACE_ARENAS).
+    agincourt: { label: 'Agincourt field', glyph: '🏹', arena: { halfX: 50, halfZ: 11.5 }, camera: { yaw: -0.5, pitch: 0.42, distance: 30, maxDistance: 46 } },
+    cerignola: { label: 'Cerignola slope', glyph: '🍇', arena: { halfX: 32, halfZ: 11 }, camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 30 } },
+    coastVillage: { label: 'Coast village', glyph: '🛖', arena: { halfX: 12, halfZ: 8 }, camera: { yaw: -0.5, pitch: 0.42, distance: 13, maxDistance: 17 } },
+    subway: { label: 'Subway', glyph: '🚇', arena: SUBWAY_ARENA, camera: { yaw: -0.25, pitch: 0.3, distance: 8, maxDistance: 10 } },
+    stadium: { label: 'Stadium', glyph: '🏟️', arena: { halfX: 10, halfZ: 7 }, camera: { yaw: -0.35, pitch: 0.36, distance: 12, maxDistance: 15 } },
   },
   // A side drawn up as the level has it: ten or twelve abreast, the bows and guns in front (formation.js), the riders on the flanks.
   order: { spacing: 1.2, rowSpacing: 1.5, perRow: 12, shootersFront: 4, frontShare: 0.3, frontMost: 14 },
