@@ -1744,7 +1744,7 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
-export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null, artillery = null, timeLimit = null } = {}) {
+export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null, artillery = null, timeLimit = null, general = null } = {}) {
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
@@ -1828,6 +1828,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
       wingOrder ??= order.wings;
     }
   }
+  if (general) centreGeneral(fighters, general, formation[general.corner], riding);
   for (const fighter of fighters) fighter.arena = arena;
   // On fieldworks with relief (a bank, a rampart, a hill: physics/fieldworks.js ditches), each man stood on the ground where he is
   // placed, not at y = 0 inside it (the stance snaps to the relief on the first step, and a body sunk a metre in is flung out).
@@ -1930,6 +1931,34 @@ function lineUpMounted(team, sign, apart, arena, rides) {
     const inRank = Math.min(perRank, behind.length - rank * perRank);
     at(fighter, firstRank + rank * rankBack, ((index % perRank) - (inRank - 1) / 2) * spacing);
   });
+}
+
+/**
+ * The man played as his side's general (`general`: { corner, index }, the
+ * index'th of that side) stands in the middle of his own arm, as a general
+ * led from among his men (AI.general: not before them, nor off on a flank):
+ * he changes places with the man of his arm (the horse, the shot or the foot)
+ * nearest its middle. Not for a side too small to have a general, nor one
+ * drawn up man by man (a `layout`: each place a man's part in his squad).
+ */
+function centreGeneral(fighters, general, order, riding) {
+  const team = fighters.filter((fighter) => fighter.corner === general.corner);
+  const me = team[general.index];
+  if (!me || team.length < WORLD.standard.minSide || order?.layout) return;
+  const armOf = (fighter) => (riding(fighter.body.inputs) ? 'horse' : STYLES[fighter.style]?.ranged ? 'shot' : 'foot');
+  const arm = team.filter((fighter) => armOf(fighter) === armOf(me));
+  const middle = [0, 0];
+  for (const fighter of arm) {
+    middle[0] += fighter.root[0] / arm.length;
+    middle[1] += fighter.root[1] / arm.length;
+  }
+  const fromMiddle = (fighter) => Math.hypot(fighter.root[0] - middle[0], fighter.root[1] - middle[1]);
+  const centre = arm.reduce((best, fighter) => (fromMiddle(fighter) < fromMiddle(best) ? fighter : best));
+  if (centre === me) return;
+  const [mine, theirs] = [[...me.root], [...centre.root]];
+  placeFighter(me, theirs[0], theirs[1]);
+  placeFighter(centre, mine[0], mine[1]);
+  [me.wing, centre.wing] = [centre.wing, me.wing];
 }
 
 /**

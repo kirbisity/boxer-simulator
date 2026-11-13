@@ -565,6 +565,11 @@ export function moveWings(world, dt) {
     const horse = fighter.mount;
     const near = world.fighters.some((other) => other.mount && other.corner !== fighter.corner && other.state === 'up' && Math.hypot(other.mount.at[0] - horse.at[0], other.mount.at[1] - horse.at[1]) < WINGS.alarm);
     const struck = fighter.hitAt.some((time) => time > world.time - 1);
+    // Reined in by his general's Hold (command.js horseHeld): only an enemy upon him lets him go.
+    if (fighter.wing.byOrder && world.groupCommands?.[fighter.corner]?.horse?.kind === 'hold') {
+      if (near || struck) fighter.wing.held = false;
+      continue;
+    }
     if (closed || late || near || struck) fighter.wing.held = false;
   }
 }

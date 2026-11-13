@@ -208,6 +208,11 @@ export const UI_FIGHT = {
   'order.call.hold': { en: 'Hold!', zh: '顶住！' },
   'order.call.free': { en: 'As you were', zh: '各自为战' },
   'order.call.form': { en: 'Back to formation!', zh: '归队列阵！' },
+  // The arms an order may go to (command.js COMMAND_GROUPS).
+  'order.group.all': { en: 'All', zh: '全军' },
+  'order.group.foot': { en: 'Foot', zh: '步兵' },
+  'order.group.shot': { en: 'Shot', zh: '射手' },
+  'order.group.horse': { en: 'Horse', zh: '骑兵' },
 
   // ---- The moments over a man (drama.js) ----
   'drama.knockout': { en: 'KO', zh: 'KO' },

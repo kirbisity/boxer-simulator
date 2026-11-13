@@ -139,6 +139,10 @@ body:not(.playing) .fu-pick { display: none; }
 .fu-order.on kbd { color: rgba(25, 19, 0, 0.6); }
 .fight-ui[data-device="mouse"] .fu-order kbd { display: block; }
 .fu-order-said { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px) + 4 * 36px + 3 * 6px + 8px); padding: 3px 10px; border-radius: 999px; background: rgba(10, 12, 18, 0.6); font: 700 13px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; }
+.fu-orders .fu-order-said { position: static; justify-self: start; margin-top: 2px; }
+.fu-arms { display: flex; gap: 2px; padding: 2px; border-radius: 16px; pointer-events: auto; background: rgba(10, 12, 18, 0.55); border: 1px solid rgba(255, 255, 255, 0.3); }
+.fu-arm { height: 26px; padding: 0 9px; border: 0; border-radius: 13px; background: transparent; color: var(--fg); font: 600 10px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; touch-action: none; cursor: pointer; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
+.fu-arm.on { background: var(--gold); color: #191300; text-shadow: none; }
 .fu-orders-five ~ .fu-order-said { top: calc(12px + env(safe-area-inset-top, 0px) + 5 * 36px + 4 * 6px + 8px); }
 .fu-order[hidden] { display: none; }
 .fu-order-said-in { animation: fu-order-said 1.6s ease-out forwards; }
