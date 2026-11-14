@@ -132,9 +132,11 @@ export const BASE_BODY = {
   // are the game's own, drawn to the game's rings there, and the border's cut ring was made to sit under them (a build's own
   // ring stood 1.4 times as wide as the base's at the wrist, the emaciated one's 0.6). A forearm's and a shin's lower third is
   // bone and tendon, which a build hardly changes; the neck's skin ends 0.6 of the way to the head's middle.
+  // (The neck's ease is the last third of its skin: begun at 0.2, the neck's own points stood at the other placing among the
+  // trapezius' that climb its flank, which are the trunk's and so the build's own all the way up: a toothed seam down its side.)
   // `hold`: the builds' skin about the neck's top is kept inside the game's head (headHold), none of the hold below the first
   // t of the neck and all of it from the second: the trapezius' points, the trunk's, climb the nape to 0.55 of the neck.
-  family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.2, 0.5] }, hold: [0.3, 0.55] },
+  family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.4, 0.6] }, hold: [0.3, 0.55] },
   // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
   headHold: 0.85,
   // PROOF OF CONCEPT, round 11 (the user: D is better, but the shoulders and arms smaller still, the neck longer, the woman's

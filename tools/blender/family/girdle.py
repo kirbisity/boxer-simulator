@@ -21,16 +21,19 @@ GIRDLE = dict(
     # The line's rise from the acromion to the neck's root, per unit across: the collarbone's own on the model (its inner end
     # 0.82 of stature at 0.04 across, the acromion 0.80 at 0.11), what is left of the trapezius lying on it.
     slope=0.24,
-    # The neck's root: where the line gives way to the neck's column, as a share of the shoulder joint's distance from the middle,
-    # and how steeply the outline climbs inside it (the neck's side: nearly upright).
-    root=0.37, neck=3.0,
+    # The neck's side: an upright wall `root` of the shoulder joint's distance from the middle (a wasted neck is a column from
+    # the jaw to its root, the trapezius' upper fibres no cone about it). Her sculpt's neck is 83 to 90 mm across under the
+    # jaw and 27 cm round. The walls stand 90 mm apart on her and 102 on the man; the knee, held on each pass, leaves the skin
+    # 5 to 6 mm inside each: 79 mm across on her, 88 on him (ANSUR II's leanest twentieth of necks are 302 mm round on women
+    # and 360 mm on men: 1.19 to one, as 88 to 79 is 1.11).
+    root=0.28,
     # The knee the skin turns over the bone with (a soft minimum's width under the line; the corner's radius): 3 mm of skin and
     # tendon under the line, 6 mm round the acromion's edge.
     knee=0.0018, corner=0.0035,
-    # Beside the neck the angle between it and the shoulder is filled (the trapezius' upper fibres and the levator under the
-    # skin: a web, not a crease): there the line turns up the neck over `web`, and the skin leaves it as softly (11 mm; the
-    # mesh's points stand 12 to 15 mm apart there, and a sharper turn would leave them as teeth round the neck's base).
-    web=0.006,
+    # Beside the neck the angle between it and the shoulder is filled (what is left of the trapezius' upper fibres and the
+    # levator under the skin: a web, not a crease): the wall and the line meet in a round of `web` (a soft minimum of the two:
+    # 7 mm, half the 12 to 15 mm between the mesh's points there; a sharper turn would leave them as teeth round the neck's base).
+    web=0.004,
     # Fore and aft of the joint the shoulder is the humerus' head under its cover: the head's radius (24 mm), the cuff's tendons
     # and what is left of the deltoid (5 mm), the skin (3 mm): 32 mm each way. The head is a ball, so the top falls away fore
     # and aft as a ball's does, to stand upright at that depth.
@@ -101,12 +104,16 @@ def bound(X, V, J, E, spec, hollows):
             z = X[:, 2] * sign; y = X[:, 1].copy()
             past = np.clip(np.abs(X[:, 0] - s[0]), 0, depth)
             top = s[1] + spec['rise'] - ramp(*spec['ball'], z - zs) * (depth - np.sqrt(depth ** 2 - past ** 2))
-            return z, y, top, top + spec['slope'] * (edge - z) + (spec['neck'] - spec['slope']) * web * np.logaddexp(0, (root - z) / web)
+            return z, y, top, top + spec['slope'] * (edge - z)
+        def outline(z, y, line):
+            # How far outside the neck's wall and over the collar line, the two met in the web's round; and the wall's share of it.
+            out, up = z - root, y - line
+            return -web * np.logaddexp(-out / web, -up / web), 1 / (1 + np.exp(np.clip((out - up) / web, -50, 50)))
         z, y, top, line = lid()
         # Where the skin meets the line is a crease (the collarbone in front, the blade's spine behind), and a crease is clean
         # only along the mesh's own edges: each edge that crosses it gives its nearer end to the crossing, sliding it there
         # along the edge (so along the skin, and by half an edge at most). Once: on the first pass, where the crease is made.
-        over = y - line; a, b = E[:, 0], E[:, 1]; inside = (z > 0) & (z < zs + spec['ball'][0])
+        over = outline(z, y, line)[0]; a, b = E[:, 0], E[:, 1]; inside = (z > 0) & (z < zs + spec['ball'][0])
         cross = np.where(inside[a] & inside[b] & (over[a] * over[b] < 0) & hollows)[0]
         share = np.abs(over[a[cross]]) / (np.abs(over[a[cross]]) + np.abs(over[b[cross]]))
         least = np.full(len(X), 0.5 + 1e-9); toward = np.full(len(X), -1)
@@ -125,10 +132,12 @@ def bound(X, V, J, E, spec, hollows):
         along1 = qz * n1[1] - qy * n1[0]            # along the collar line, out from the knee's centre
         along2 = qz * d[0] + qy * d[1]              # along the arm's line, down from it
         newz, newy = z.copy(), y.copy()
-        # Under the collar line (and the neck's side inside the root): down, with the soft knee.
-        kz = k + (web - k) * (1 - ramp(root, root + spec['opens'], z))
+        # Under the collar line down, inside the neck's wall in (a point of the neck's flank stays at its height, and the
+        # column keeps its rings), in the round between them both ways: with the soft knee.
         one = (z > 0) & (along1 <= 0)
-        newy[one] = (-kz * np.logaddexp(-y / kz, -line / kz))[one]
+        over, wall = outline(z, y, line); lies = 1 - wall
+        by = k * np.logaddexp(0, over / k) / (wall * (wall + lies * spec['slope']) + lies * lies)
+        newz[one] = (z - by * wall)[one]; newy[one] = (y - by * lies)[one]
         # Round the knee.
         far = np.hypot(qz, qy)
         two = (along1 > 0) & (along2 < 0) & (far > r)
