@@ -52,6 +52,7 @@ import { plainsCamelTrain, plainsRidge } from './props/plains.js';
 import { buildStormPlace, stormRelease } from './levelmode/storm.js';
 import { showWorks, updateWorksView } from './worksview.js';
 import { worksOf } from './physics/fieldworks.js';
+import { buildCanalTown, CANAL_TOWN_LIGHT } from './places/canaltown.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -130,14 +131,15 @@ export function setPlace(view, place, arena, weather = null) {
   // A battle map's floor, much wider than the place's own, has the place built for it (scenery.js sceneryFor
   // pushes the backdrop out); the place's own floor and that one are kept side by side, each shown by turns.
   const home = PLACE_ARENAS[place];
-  const floor = home && arena && arena.halfX >= home.halfX * WIDE_FLOOR ? arena : null;
+  // (A place that is a whole town or a length of wall, `own`, is built once whatever is fought in it: its ground is its own.)
+  const floor = home && !home.own && arena && arena.halfX >= home.halfX * WIDE_FLOOR ? arena : null;
   // A place whose ground is dug for a ditch (the works' ditches: Qi Jiguang's trench in the water town's square) is built for
   // that battle too, apart from the place the other levels there share.
-  const dug = arena?.works?.ditches?.length ? arena : null;
+  const dug = !home?.own && arena?.works?.ditches?.length ? arena : null;
   const swapped = swapFloor(view, place, floor ?? dug);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, canaltown: buildCanalTown, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -152,6 +154,8 @@ export function setPlace(view, place, arena, weather = null) {
     view.places[place].userData.bind?.(view);
   }
   if (view.place === 'dunnottar' && place !== 'dunnottar') stormRelease(view);
+  // A place that took something of the view's for itself (the town kit's: the sun's shadow box) gives it back.
+  if (view.place !== place) view.places[view.place]?.userData.leave?.(view);
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
   view.place = place;
   releaseOldPlaces(view, place);
@@ -417,6 +421,8 @@ const PLACE_LIGHT = {
   coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   // A water town south of the Yangtze: soft bright sky, damp air, the wooded hills 50–80 m out in the haze.
   jiangnan: { background: 0xc6d6e0, fog: [30, 110], far: 112, key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
+  // The story's places built by the town kit (src/places): each brings its own light.
+  canaltown: CANAL_TOWN_LIGHT,
   // A highland valley at 2,700 m late in the afternoon: thin clear air, the haze warm toward evening, the hills 90 m out and more.
   cajamarca: { background: 0xd8d0bc, fog: [60, 190], far: 200, key: 0xffe2b8, keyIntensity: 0.12, rim: 0xffd6a0, sun: 0.95 },
   // Agincourt: a low grey October sky after rain, the light flat, the woods dark.
@@ -451,6 +457,8 @@ export const PLACE_ARENAS = {
   coastVillage: { halfX: 12, halfZ: 8 },
   // The square between the shops and the canal: room for the wokou raid's formations.
   jiangnan: { halfX: 14, halfZ: 9 },
+  // (`own`: one built copy whatever the arena, setPlace.)
+  canaltown: { halfX: 18, halfZ: 9, own: true },
   // The square of Cajamarca between its long halls (props/cajamarca.js CAJAMARCA_PLAN).
   cajamarca: { halfX: 16, halfZ: 11 },
   // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).
