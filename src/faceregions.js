@@ -316,6 +316,15 @@ export function regionShape(region) {
 /** The region's group (SHAPE_GROUPS), or null. */
 export const regionGroup = (region) => REGION_GROUP[region] ?? null;
 
+/**
+ * The groups with a head of their own (headgrid-data.js, tools/headbases.mjs): the four whose faces' measures are published by
+ * group (North American White, Turkish, Chinese, African American: the tool's sources). Every other head is a mix of these.
+ */
+export const HEAD_BASE_GROUPS = ['northEurope', 'westAsia', 'eastAsia', 'westAfrica'];
+
+/** A group's shape offsets (SHAPE_GROUPS). */
+export const groupShape = (group) => ({ ...(SHAPE_GROUPS[group] ?? {}) });
+
 /** Detail the photo shader paints, 0..1: freckle-prone regions, and how heavy a man's beard shadow is by group. */
 export const REGION_DETAIL = {
   freckles: { ireland: 1, england: 0.7, sweden: 0.6, netherlands: 0.5, whiteAmerican: 0.5, germany: 0.4, russia: 0.4, poland: 0.4, ukraine: 0.3, france: 0.3, czechRepublic: 0.3, austria: 0.3, switzerland: 0.3, hungary: 0.2 },

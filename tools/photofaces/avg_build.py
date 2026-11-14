@@ -21,10 +21,18 @@ from scipy.ndimage import gaussian_filter, map_coordinates
 W, H = 512, 256
 U_EYE, U_EAR = 0.0668, 0.258
 R_EYE, R_MOUTH, R_CHIN = 0.44, 0.70, 0.88
+# Where the head model (tools/blender/head/grid.py's `atlas`, the same for both sexes) has the marks a photo's are laid
+# on: its brow's middle and its nose's wing by row, the wing and the mouth's corner by u out from the midline. The eyes
+# and the lip line above are its too (rows 0.443 and 0.695). The paint rides the model's points, so a feature painted
+# off its mark is painted off the form: a nostril on the lip, a wing on the cheek.
+R_BROW, R_NOSE = 0.383, 0.598
+U_WING, U_CORNER = 0.037, 0.055
+FREE = 2.0  # this many times as far out as a mark, the paint is where the photo has it: the cheek between takes up the difference
 MOUTH_SHARE = 0.56
 NEUTRAL = 0.45  # (low, so whites of the eyes can be brighter than a dark skin: up to 1/NEUTRAL of it)
 RELIEF_GAIN = 3.0  # (half the 1024-wide atlas' 6: the same slopes at half the texels)
-DELIGHT = 0.6  # how much of the face's broad light is divided out
+DELIGHT = 0.85  # how much of the face's broad light is divided out: most of it, the head model's sockets, nose and lips shading themselves (0.6 while the head was a smooth ball left the photo's socket shadow to be shaded twice: a bruise round a man's eyes)
+DELIGHT_RANGE = (0.7, 1.7)  # the most a shadow is lifted and a highlight lowered: the lid under a brow is down to 0.47 of its cheek's luminance over the 86 tiles, 0.57 at the median, which this lifts most of the way to the cheek's
 
 
 def smoothstep(a, b, x):
@@ -145,24 +153,38 @@ def roughness():
     return rough
 
 
+def tent(x, left, peak, right):
+    """1 at `peak`, down to 0 at `left` and `right`."""
+    return np.clip(np.minimum((x - left) / (peak - left), (right - x) / (right - peak)), 0, 1)
+
+
 def project(tile, mark):
-    """The atlas sampled from the frontal photo: u by azimuth (x = centre + R sin(azimuth)), rows through eye, lip line, chin."""
+    """The atlas sampled from the frontal photo: u by azimuth (x = centre + R sin(azimuth)), rows through brow, eye,
+    nostrils, lip line and chin; at the nostrils' row the photo's wings are drawn to the model's, at the lip line its
+    mouth's corners, less by the row between and by the distance past the mark."""
     (x1, y1), (x2, y2) = mark['eyes']
     cx, ey, half = (x1 + x2) / 2, (y1 + y2) / 2, (x2 - x1) / 2
     my = mark['mouth']
     chin = ey + (my - ey) / MOUTH_SHARE
     radius = half / np.sin(U_EYE * 2 * np.pi)
-    az = ((np.arange(W) + 0.5) / W - 0.5) * 2 * np.pi
-    px = cx + radius * np.sin(np.clip(az, -np.pi / 2, np.pi / 2))
     rows = (np.arange(H) + 0.5) / H
-    knots_r = [R_EYE, R_MOUTH, R_CHIN]
-    knots_y = [ey, my, chin]
+    knots_r = [R_BROW, R_EYE, R_NOSE, R_MOUTH, R_CHIN]
+    knots_y = [mark['brow'], ey, mark['nose'], my, chin]
     py = np.interp(rows, knots_r, knots_y, left=np.nan, right=np.nan)
-    above = rows < R_EYE
-    py[above] = ey - (R_EYE - rows[above]) * (my - ey) / (R_MOUTH - R_EYE)
+    above = rows < R_BROW
+    py[above] = mark['brow'] - (R_BROW - rows[above]) * (my - ey) / (R_MOUTH - R_EYE)
     below = rows > R_CHIN
     py[below] = chin + (rows[below] - R_CHIN) * (chin - my) / (R_CHIN - R_MOUTH)
-    yy, xx = np.meshgrid(py, px, indexing='ij')
+    # Sideways: the photo's u for the atlas', a row at a time.
+    du = np.abs((np.arange(W) + 0.5) / W - 0.5)
+    def drawn(model, photo):
+        """The photo's u where the atlas has `du`: `photo` (pixels out from the midline) at the model's mark, as it is from FREE marks out."""
+        at = np.arcsin(min(1.0, photo / radius)) / (2 * np.pi)
+        return np.interp(du, [0, model, FREE * model, 0.5], [0, at, FREE * model, 0.5]) - du
+    shift = tent(rows, R_EYE, R_NOSE, R_MOUTH)[:, None] * drawn(U_WING, mark['wing'])[None, :] + tent(rows, R_NOSE, R_MOUTH, R_CHIN)[:, None] * drawn(U_CORNER, mark['corner'])[None, :]
+    az = ((np.arange(W) + 0.5) / W - 0.5) * 2 * np.pi
+    xx = cx + radius * np.sin(np.clip(az[None, :] + np.sign(az)[None, :] * shift * 2 * np.pi, -np.pi / 2, np.pi / 2))
+    yy = np.repeat(py[:, None], W, axis=1)
     face = np.stack([map_coordinates(tile[..., c], [yy, xx], order=1, mode='nearest') for c in range(3)], axis=2)
     # The face oval (photo space): forehead below the hair, cheeks inside the outline, down past the chin.
     top, bottom = ey - 0.85 * (my - ey), chin - 0.03 * (chin - ey)
@@ -193,7 +215,7 @@ def build(key, mark, tiles_dir, out):
     # Light flattened: the face's broad luminance divided out (frequency separation), its fine detail kept.
     lo = gaussian_filter(lum(face) * mask, 10) / np.maximum(gaussian_filter(mask, 10), 1e-3)
     ref = lum(skin[None, None])[0, 0]
-    flat = face * np.clip((ref / np.maximum(lo, 1e-3)) ** DELIGHT, 0.75, 1.4)[..., None]
+    flat = face * np.clip((ref / np.maximum(lo, 1e-3)) ** DELIGHT, *DELIGHT_RANGE)[..., None]
     flat = flat * mask[..., None] + skin * (1 - mask[..., None])
     # The rest of the head: the face's colours pushed out (blur over the mask) and eased to the skin's mean.
     reach = gaussian_filter(mask, 14)
@@ -224,7 +246,7 @@ def build(key, mark, tiles_dir, out):
     rel = rel * (1 - forehead) + (rel / np.maximum(broad, 1e-3)) * forehead
     # Drawn brow hairs and lashes in the composite's brow colour (darkened), seeded per face.
     rng = np.random.default_rng(zlib.crc32(key.encode()))
-    brow_tone = np.array([colour_at(tile, cx + s * half, ey - 0.33 * (my - ey), max(1.5, half * 0.12)) for s in (-1, 1)]).mean(axis=0)
+    brow_tone = np.array([colour_at(tile, cx + s * half, mark['brow'], max(1.5, half * 0.12)) for s in (-1, 1)]).mean(axis=0)
     hair_rel = np.minimum(brow_tone, hair * 1.2 + 0.02) / skin * 0.75
     # Where the composite's brows are: the darkest row over each eye.
     band = gaussian_filter(lum(albedo), 1.0)
