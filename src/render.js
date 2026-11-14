@@ -123,6 +123,8 @@ export function createScene(canvas, { alpha = false } = {}) {
  * scene is built the first time it is needed; lighting goes with it.
  */
 export function setPlace(view, place, arena, weather = null) {
+  // Whether the level brought this weather (the open air of env/ honours a level's, and puts its own in place of PLACE_WEATHER's).
+  const brought = weather !== null;
   // A place with weather of its own whenever a level brings none (PLACE_WEATHER: the open field's driven grey sky).
   weather ??= PLACE_WEATHER[place] ?? null;
   // A battle's fieldworks (its arena's `works`: stakes, palisades, woods, ditches, mud), over whatever place it is fought in.
@@ -137,6 +139,7 @@ export function setPlace(view, place, arena, weather = null) {
   const swapped = swapFloor(view, place, floor ?? dug);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
+  view.weatherBrought = brought;
   const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
@@ -302,7 +305,8 @@ const WEATHER_TREE_REACH = 30;
 const WEATHER_MIST_COLOUR = new THREE.Color(0xdde2e2);
 
 function applyWeather(view) {
-  const weather = view.weather;
+  // A place drawn as open air (env/index.js) has its weather from there: sun, fog and sky are already its own.
+  const weather = view.env?.on ? null : view.weather;
   const group = view.places?.[view.place];
   if (!group) return;
   const mist = weather?.sky ?? 0;
@@ -821,11 +825,14 @@ function buildField(arena = PLACE_ARENAS.field) {
   // Rough grass over it, bowing and swaying in the wind (clothwind.js), and a few stones.
   const litter = fieldLitter(59, arena, { grass: 0x5e7a3a, stone: 0x6e6a62, tufts: 1400, stones: 90, half: [arena.halfX + 12, arena.halfZ + 10] });
   swayGrass(litter[0].material, 0.38);
+  // (Tagged, with the track below, so the open air's own grass and worn earth can stand in for them: env/index.js ENV_REPLACES.)
+  for (const mesh of litter) mesh.userData.scenery = 'litter';
   place.add(...litter);
   // Hoof-churned earth down the middle of the ground.
   const track = new THREE.Mesh(new THREE.PlaneGeometry(arena.halfX * 1.7, arena.halfZ * 0.9), lit(0x7a6a48, { transparent: true, opacity: 0.35 }));
   track.rotation.x = -Math.PI / 2;
   track.position.y = 0.004;
+  track.userData.scenery = 'groundmarks';
   place.add(track);
   // The rail round the ground: post-and-rail, posts every 4 m (src/props/rural.js).
   place.add(ruralFieldRail(arena));
@@ -1208,7 +1215,9 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
     palisadeSpan: arena.halfX,
   }));
   // Autumn grass in tufts and field stones beyond the trampled ground.
-  place.add(...fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] }));
+  const litter = fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] });
+  for (const mesh of litter) mesh.userData.scenery = 'litter';
+  place.add(...litter);
   return place;
 }
 

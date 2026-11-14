@@ -92,6 +92,7 @@ import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
+import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
 import { installStory } from './story/storyview.js';
 import { createStoryPlaceMark } from './story/placemark.js';
 import { mountCameraTuner } from './camtuner.js';
@@ -164,6 +165,14 @@ const shortName = (name) => {
 // The look (looks.js): ?look= over the one remembered. One that needs nothing loaded is in force before the scene is made; the others are switched to once the page is up.
 const startingLookId = lookIdFromSearch(location.search) ?? rememberedLookId() ?? OFFICIAL_LOOK_ID;
 activateLookNow(startingLookId);
+
+// The open air (env/): ?env=off draws every place as it was before it; ?weather=<name> (env/config.js ENV_WEATHER:
+// clear, cloudy, overcast, rain, mist, snow, dust) puts that weather on every place it draws. Before the scene is made, so the first place has them.
+{
+  const asked = new URLSearchParams(location.search);
+  if (asked.get('env') === 'off') envSetEnabled(null, false);
+  if (asked.get('weather')) envSetWeather(null, asked.get('weather'));
+}
 
 const scene = createScene($('#stage'));
 if (activeLook().id !== DEFAULT_LOOK_ID) reapplyPlace(scene);
@@ -780,6 +789,8 @@ function frame(now) {
   last = now;
   try {
     resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)), { tiered: Boolean(state.world?.stage) });
+    // The open air's own tier (env/index.js): how much grass, leaf and drift this device draws in time.
+    envAdapt(scene, interval, qualityMode);
     // A V7 skin's maps by the stage's tier (render.js setSkinQuality): on 'low', no normal or roughness map.
     setSkinQuality(state.views, state.world?.stage ? resolution.tier ?? 'high' : 'high');
     // A big moment slows the simulation, not the drawing.
@@ -1342,6 +1353,7 @@ function drawWorld(dt, drawIt = true) {
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
   updateClothWind(scene, world);
+  envUpdate(scene, world);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
@@ -3849,6 +3861,17 @@ const boxer = window.boxer = {
   adaptiveResolution: (on) => {
     if (on !== undefined) resolution.set(on, scene);
     return resolution.info(scene);
+  },
+  // The open air (env/): put a weather on ('clear', 'cloudy', 'overcast', 'rain', 'mist', 'snow', 'dust'; null: each place's own), or with no
+  // argument say what is in force ({ on, place, weather, tier, weathers, wind }).
+  weather: (name) => {
+    if (name !== undefined) envSetWeather(scene, name);
+    return envInfo(scene);
+  },
+  // The open air on or off (off: every place as it was before it); no argument: what is in force.
+  env: (on) => {
+    if (on !== undefined) envSetEnabled(scene, on);
+    return envInfo(scene);
   },
   // The quality of the stage's picture: 'auto' (a ladder of pixels and tiers walked by the frame times), 'high' (everything, full pixels) or 'low' (the cheapest
   // picture, the fewest pixels); remembered. No argument: what it is doing now ({ mode, tier, ratio, ... }).
