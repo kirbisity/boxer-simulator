@@ -58,7 +58,7 @@ import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awar
 import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
-import { cameraTerrain, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
+import { cameraTerrain, createStageWorld, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { attemptCount, attemptLog, attemptStory, bossFightOn, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { snapshotGear } from './levelmode/checkpoints.js';
@@ -93,6 +93,9 @@ import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks,
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
 import { installStory } from './story/storyview.js';
+import { STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
+import { tkSetTier } from './townkit/place.js';
+import { tkWeatherNow } from './townkit/weather.js';
 import { createStoryPlaceMark } from './story/placemark.js';
 import { mountCameraTuner } from './camtuner.js';
 
@@ -770,7 +773,11 @@ let qualityMode = readQuality(typeof localStorage === 'undefined' ? null : local
 const holdQuality = (view = null) => resolution.pin(qualityMode === 'auto' ? null : pinnedRung(qualityMode, Infinity), view);
 holdQuality();
 // The tier a rung gives goes to the stage's drawing (and, there being none yet, to the one made next: enterStage).
-resolution.onTier = (tier) => stageView?.setQuality?.(tier);
+// (And to the town kit's places, which drop their near detail on the low tier: townkit/place.js.)
+resolution.onTier = (tier) => {
+  stageView?.setQuality?.(tier);
+  tkSetTier(tier);
+};
 function frame(now) {
   // The next frame is asked for first: an error in this one must never stop the game.
   requestAnimationFrame(frame);
@@ -2912,9 +2919,59 @@ function enterStoryWorld(setup, { paused = false } = {}) {
   return state.world;
 }
 
+/**
+ * A story place walked freely (places/storyplaces.js: `key`), before or after its battle: the hero alone in the place's
+ * stage world (levelmode/stage.js, as the Dunnottar stage: its floors, stairs and walls; nobody to fight), drawn by the
+ * place's own builder, played on foot with the follow camera. `inputs`: the walker (the battle's hero); `weather`: the
+ * place's weather for the day (the kit's values: townkit/weather.js); `at`, `facing`: where he starts, else the stage's.
+ */
+function enterStoryRoam(key, { inputs, weather = null, at = null, facing = null } = {}) {
+  const entry = STORY_PLACES[key];
+  if (!entry) throw new Error(`no story place called ${key}`);
+  if (state.game !== 'story') setGame('story');
+  leaveStage();
+  state.scenario = null;
+  state.muster = null;
+  state.playSide = 'red';
+  state.lead = { red: 0, blue: 0 };
+  const stage = entry.stage();
+  const start = at ? { ...stage.start, at, facing: facing ?? stage.start.facing } : stage.start;
+  state.world = createStageWorld({ ...stage, start }, normaliseInputs(structuredClone(inputs)), { seed: state.seed, awareness: false });
+  clearGore(scene);
+  setPlace(scene, entry.place, PLACE_ARENAS[entry.place], weather ? { town: weather } : null);
+  fightMarks.reset();
+  fightMarks.warm();
+  cameraWalls = stageCameraRoom(() => state.world.arena.terrain);
+  followCam.reset();
+  // (Behind him as he arrives: the orbit's yaw is the world's, his facing the stage's.)
+  Object.assign(scene.orbit, { ...entry.camera, yaw: (start.facing ?? 0) + Math.PI + entry.camera.yaw });
+  watchCam = createWatchCam();
+  cameraNote = '';
+  document.body.dataset.place = entry.place;
+  $('#place').closest('label').hidden = true;
+  rebuildViews({ progressive: true });
+  state.eventCursor = 0;
+  state.finishedAt = null;
+  resetDrama(state.drama);
+  resetChargeFeel();
+  $('#log').replaceChildren();
+  $('#banner').hidden = true;
+  state.orders = newOrders();
+  fightControls.reset();
+  state.sideAsked = true;
+  $('#side-pick').hidden = true;
+  $('#modes button[data-value="play"]:not([data-side])').click();
+  state.walkRunning = false;
+  renderHud();
+  boxer.finishBuilding();
+  state.paused = false;
+  return state.world;
+}
+
 const story = installStory({
   storage: browserStorage,
   stage: enterStoryWorld,
+  roam: enterStoryRoam,
   world: () => state.world,
   pause: (on) => {
     state.paused = Boolean(on);
@@ -3899,6 +3956,25 @@ const boxer = window.boxer = {
     boxer.finishBuilding();
     return state.world.stage.active;
   },
+  // A story place walked freely, outside any chapter (places/storyplaces.js: 'canaltown', 'pyongyang'): `weather` a name of
+  // the place's weathers ('damp', 'rain', 'dry'...) or the kit's values. `?place=<key>&weather=<name>` in the address opens one.
+  roam: (key = 'canaltown', { weather = null, at = null, facing = null } = {}) => {
+    skipIntro();
+    menus.close();
+    document.body.classList.remove('sheet');
+    const entry = STORY_PLACES[key];
+    if (!entry) throw new Error(`no story place called ${key} (${Object.keys(STORY_PLACES).join(', ')})`);
+    const world = enterStoryRoam(key, { inputs: story.heroInputs(), weather: typeof weather === 'string' ? entry.weathers[weather] : weather, at, facing });
+    return { place: entry.place, terrain: world.arena.terrain.solids?.length ?? null };
+  },
+  // The weather of the town kit's place now (townkit/weather.js: wet, pool, snow, rain 0..1, mist, fog [near, far]): `placeWeather({ wet: 1, pool: 0.8, rain: 1 })`
+  // sets the view's (the place follows it each frame); nothing given, what is drawn now.
+  placeWeather: (values = null) => {
+    if (values) scene.weather = { ...scene.weather, town: { ...scene.weather?.town, ...values } };
+    return values ? scene.weather.town : tkWeatherNow();
+  },
+  storyPlaces: STORY_PLACES,
+  storyPlaceWeather,
   // The look of the Dunnottar stage (levelmode/stagelooks.js): `stageLook()` says which (and the names); `stageLook(name)` changes it now; `stageLook(undefined, { still: true })` stops the lightning.
   // A strike now (`stageStrike(true)` holds it at its first crack, for a picture; `stageStrike(null)` lets go).
   stageStrike: (hold = false) => { stormStrikeNow(hold); return true; },
@@ -4115,3 +4191,8 @@ const boxer = window.boxer = {
 };
 // `#flame` in the address: the flamethrower's demo (boxer.flameDemo).
 if (/^#(.*&)?flame(&|$)/.test(location.hash)) setTimeout(() => boxer.flameDemo(), 0);
+// `?place=canaltown` (a key of places/storyplaces.js) opens that story place to walk; `&weather=rain` (a name of its weathers) sets its day.
+{
+  const wanted = new URLSearchParams(location.search);
+  if (STORY_PLACES[wanted.get('place')]) setTimeout(() => boxer.roam(wanted.get('place'), { weather: wanted.get('weather') }), 0);
+}

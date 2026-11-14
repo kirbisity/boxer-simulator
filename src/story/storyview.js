@@ -15,7 +15,7 @@
 
 import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from './chapters/index.js';
 import { STORY_BATTLES } from './battles/index.js';
-import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
+import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyHeroInputs, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
 import { storyGetLang, storyOnLang, storySetLang } from './language.js';
 import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyDeploy, storyFinaleDone, storyHeadsIn, storyLifeLived, storyNextChapter, storyPlaceOf, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
@@ -911,6 +911,8 @@ export function installStory(hooks) {
   return {
     open, tick, think, steer, close,
     hooks: testHooks,
+    /** The hero's inputs as his life has him now (a stand-in man where no life is begun): the walker of a story place opened by itself (main.js boxer.roam). */
+    heroInputs: () => storyHeroInputs(life ?? storyNewLife(null, { family: STORY_FAMILY, hero: STORY_HERO })),
     /** The hero is the scene's (not the player's) while a scene or the finale plays. */
     holding: () => Boolean(scene || finale),
     /** The men a scene holds still (they think nothing of their own): main.js leaves them out of the AI's thinking. */
