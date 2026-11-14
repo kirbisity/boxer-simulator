@@ -61,7 +61,7 @@ export function envMeter(tone, air, x, z) {
     const left = Math.min(across - 2, Math.floor(column));
     for (let channel = 0; channel < 3; channel += 1) {
       const a = air.table[left * 4 + channel];
-      envSeen[channel] = (a + (air.table[left * 4 + 4 + channel] - a) * (column - left)) / 255;
+      envSeen[channel] = (a + (air.table[left * 4 + 4 + channel] - a) * (column - left)) / 255 * ENV.sky.most;
     }
     haze = Math.pow(envLuma(envSeen), 2.2);
   }

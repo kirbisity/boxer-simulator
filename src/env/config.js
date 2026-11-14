@@ -59,8 +59,8 @@ export const ENV = {
     // `sunGain` this sets how much stronger sunlit ground is than shaded ground: measured outdoors under a clear
     // sky the whole light on level ground is about 5 times the sky's alone with the sun at 30 degrees and 6 to 8
     // near noon (approximate figures from memory: direct sun about 100 klx square-on, the clear sky's own 10 to
-    // 20 klx). What these two give here, as luminance (the display sum to the 2.2 power): 5.2 at the meadow's
-    // 30 degrees, 5.7 at the field's 34.
+    // 20 klx). What these two give here, as luminance (the display sum to the 2.2 power): 5.1 at the meadow's
+    // 30 degrees, 5.6 at the field's 34, 2.4 under the 15 degree sun of the sengoku place (the light probe's figures).
     skyFill: 1.0,
     // A cloud's shaded base beside the sky's light on the ground (by eye: the slate-blue bases of the references).
     cloudBase: 0.6,
@@ -197,6 +197,10 @@ export const ENV = {
     // The dome draws it, the haze takes its horizon row, the light probe is its sum: they cannot disagree.
     across: 64,
     up: 32,
+    // The brightest the table holds (a display value; its 8 bits are spread over 0..most). Toward a low sun
+    // the sky is brighter than anything on the ground, and a table that stopped at 1 was one flat white there:
+    // with the range kept, the last pass's curve rolls it off and the brightening toward the sun is drawn.
+    most: 2,
     // The sun's disc: 0.27 degrees in radius (its real size), drawn `discGain` times the sky's ceiling so the
     // shoulder curve holds it as a glare; and a tight glow round it `glowGain` at 1 degree, falling off as a
     // power of the angle (lens and eye flare, by eye).
@@ -215,6 +219,12 @@ export const ENV = {
     // (approximate); 1500 and 2600 by eye give cumulus that reads the size it does in the reference frames.
     height: 1500,
     scale: 2600,
+    // A cumulus is as deep as it is broad or less (fair-weather ones a few hundred metres to a kilometre:
+    // approximate). The sheet is drawn at `levels` heights from its base to `deep` m over it, each level's
+    // clouds narrower by `taper` of the noise (a cloud's top is smaller than its base). By eye.
+    deep: 700,
+    levels: 3,
+    taper: 0.09,
     // The wind aloft is stronger than at the ground and the clouds ride it: this many times the ground wind
     // (approximate: the power-law profile u ~ z^0.14 over grass gives about 2 at 1500 m from 2 m; 2.5 by eye,
     // so the drift is seen within a round).
@@ -515,9 +525,12 @@ export const PLACE_ENV = {
     terrain: {
       seed: 37,
       layers: [
+        // (The hills that shut the valley in stand 200 to 300 m over its floor a kilometre or two off, and the
+        // mountain to the north over a thousand at about ten: approximate, from memory of the map.)
         { from: 0, full: 50, height: 1.2, length: 40, shape: 'roll' },
-        { from: 70, full: 520, height: 150, length: 620, shape: 'ridge' },
-        { from: 500, full: 2400, height: 520, length: 2200, shape: 'ridge' },
+        { from: 70, full: 520, height: 170, length: 620, shape: 'ridge' },
+        { from: 500, full: 2200, height: 560, length: 2000, shape: 'ridge' },
+        { from: 2600, full: 7000, height: 1250, length: 4600, shape: 'ridge' },
       ],
     },
     ground: { grass: 0x6a7836, dry: 0xa08c46, soil: 0x6a553a, rock: 0x77756e, floor: 0.6, worn: [{ x: 0, z: 0, rx: 12, rz: 6, turn: 0, by: 0.7 }] },

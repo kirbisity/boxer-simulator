@@ -113,14 +113,14 @@ export function envAirState(place, weather) {
         rgb[2] += (tintColour.b * (0.5 + 0.5 * rgb[2]) - rgb[2]) * low;
       }
       const at = (row * across + column) * 4;
-      for (let channel = 0; channel < 3; channel += 1) table[at + channel] = Math.round(Math.min(1, rgb[channel]) * 255);
+      for (let channel = 0; channel < 3; channel += 1) table[at + channel] = Math.round(Math.min(1, rgb[channel] / ENV.sky.most) * 255);
       table[at + 3] = 255;
       // Irradiance on level ground: radiance x sin(elevation) over the hemisphere. Rows are even in sqrt(sine), so
       // a row stands for a band of solid angle 2 v dv wide in sine; the 2 pi of azimuth cancels in the mean.
       const band = sine * v;
-      for (let channel = 0; channel < 3; channel += 1) skyLight[channel] += Math.min(1, rgb[channel]) * band;
+      for (let channel = 0; channel < 3; channel += 1) skyLight[channel] += Math.min(ENV.sky.most, rgb[channel]) * band;
       weight += band;
-      if (row === 0) for (let channel = 0; channel < 3; channel += 1) horizon[channel] += Math.min(1, rgb[channel]) / across;
+      if (row === 0) for (let channel = 0; channel < 3; channel += 1) horizon[channel] += Math.min(ENV.sky.most, rgb[channel]) / across;
     }
   }
   air.table = table;
@@ -159,7 +159,7 @@ export function envSkyAt(air, x, y, z, out) {
   const column = Math.round((Math.acos(cosine) / Math.PI) * (across - 1));
   const row = Math.round(Math.sqrt(Math.min(1, y)) * (up - 1));
   const at = (row * across + column) * 4;
-  for (let channel = 0; channel < 3; channel += 1) out[channel] = air.table[at + channel] / 255;
+  for (let channel = 0; channel < 3; channel += 1) out[channel] = air.table[at + channel] / 255 * ENV.sky.most;
   return out;
 }
 
@@ -287,7 +287,7 @@ uniform vec2 uEnvLook;
 vec3 envSky(vec3 dir) {
   vec2 level = normalize(dir.xz + vec2(1e-5, 0.0));
   float across = acos(clamp(dot(level, normalize(uEnvSunDir.xz)), -1.0, 1.0)) / 3.14159265;
-  return texture2D(uEnvSky, vec2(across, sqrt(clamp(dir.y, 0.0, 1.0)))).rgb;
+  return texture2D(uEnvSky, vec2(across, sqrt(clamp(dir.y, 0.0, 1.0)))).rgb * ${ENV.sky.most.toFixed(1)};
 }
 
 vec3 envAirlight(vec3 dir) {
