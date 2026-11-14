@@ -41,16 +41,18 @@ export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
       planted += 1;
     }
   }
-  // What grows among the rocks of an outcrop.
+  // What grows among the rocks of an outcrop (from a stream of its own, so a change to a stand of trees far off
+  // does not move the plants a view is framed by).
+  const among = envRandom(place.terrain.seed * 977 + 31);
   for (const outcrop of place.outcrops ?? []) {
     const kinds = outcrop.kinds ?? ['dock', 'bracken'];
     for (let plant = 0; plant < (outcrop.plants ?? 0); plant += 1) {
       const kind = ENV_TREES[kinds[plant % kinds.length]];
-      const angle = random() * Math.PI * 2;
-      const radius = Math.sqrt(random()) * outcrop.radius;
+      const angle = among() * Math.PI * 2;
+      const radius = Math.sqrt(among()) * outcrop.radius;
       const x = outcrop.at[0] + Math.cos(angle) * radius;
       const z = outcrop.at[1] + Math.sin(angle) * radius;
-      const tall = kind.height[0] + (kind.height[1] - kind.height[0]) * random();
+      const tall = kind.height[0] + (kind.height[1] - kind.height[0]) * among();
       if (Math.abs(x) < keepOut[0] + 1 && Math.abs(z) < keepOut[1] + 1) continue;
       const y = height(x, z);
       trees.push({ kind: kinds[plant % kinds.length], x, y, z, height: tall, lit: envSunPast(height, sun, x, y + tall, z) });
@@ -711,6 +713,15 @@ function envCrownPoint(kind, random, masses, out) {
   out[4] = fy / facing;
   out[5] = fz / facing;
   out[6] = Math.min(1, 0.25 + 0.75 * whole) * (0.55 + 0.45 * shell);
+  // A plant of the ground has no inside: every leaf of it lies open to the sky, its face up and a little out, the
+  // lowest ones under the others. (Shaded as a crown's underside they stood as black cut-outs in lit grass.)
+  if (kind.shape === 'tuft') {
+    const out_ = Math.hypot(nx * 0.5, 0.85, nz * 0.5);
+    out[3] = (nx * 0.5) / out_;
+    out[4] = 0.85 / out_;
+    out[5] = (nz * 0.5) / out_;
+    out[6] = 0.8 + 0.2 * (ny * 0.5 + 0.5);
+  }
   return out;
 }
 
@@ -830,8 +841,9 @@ export function envBuildTrees({ place, trees }) {
         bTo.push(...to);
         bBark.push(colour.r, colour.g, colour.b, tree.lit);
       };
-      // A conifer's trunk runs to its tip; a broadleaf's to where its limbs have all left it.
-      const top = conifer ? kind.crown.at + kind.crown.tall * 0.96 : Math.max(...tree.masses.map((mass) => mass.from[1]));
+      // A conifer's trunk runs to its tip; a broadleaf's to where its limbs have all left it, or, where the limbs
+      // are not drawn, on into the crown they would have carried (which else hangs in the air over a stump).
+      const top = conifer ? kind.crown.at + kind.crown.tall * 0.96 : band.limbs ? Math.max(...tree.masses.map((mass) => mass.from[1])) : kind.crown.at + kind.crown.tall * 0.4;
       wood([0, -0.15, 0, radius], [0, top * tall, 0, radius * (conifer ? 0.12 : 0.6)]);
       if (!band.limbs) continue;
       for (const mass of tree.masses) {

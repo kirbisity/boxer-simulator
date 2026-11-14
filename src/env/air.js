@@ -36,6 +36,9 @@ export function envSkyRadiance(air, x, y, z, out) {
   const g = tune.hazeForward;
   const mie = (1 - g * g) / Math.pow(1 + g * g - 2 * g * cosine, 1.5);
   const share = tune.skyPathShare[0] + (tune.skyPathShare[1] - tune.skyPathShare[0]) * sine;
+  // What the haze has thrown wide of the sun's beam on its way down (envAirState: the same 1 - g^2 of its depth
+  // that dims the sun on the ground) is not lost: it is the haze's own even light, from every side.
+  const strewn = tune.sunPower * air.sunShare * air.sun[1] * (1 - Math.exp(-air.hazeDepth * (1 - g * g) * air.sunMass)) * tune.hazeStrewn;
   // (The CIE ratio is of luminance; the lid's colour is a display value, so the ratio goes through the display's power.)
   const lid = Math.pow((1 + 2 * sine) / 3, 1 / 2.2);
   for (let channel = 0; channel < 3; channel += 1) {
@@ -43,7 +46,7 @@ export function envSkyRadiance(air, x, y, z, out) {
     const depth = depthR + air.hazeDepth;
     const scattered = 1 - Math.exp(-depth * mass);
     const reaching = tune.sunPower * air.sunShare * Math.exp(-depth * air.sunMass * share);
-    const single = reaching * scattered * (depthR * rayleigh + air.hazeDepth * mie) / depth;
+    const single = (reaching * (depthR * rayleigh + air.hazeDepth * mie) + strewn * Math.exp(-depthR * air.sunMass * share) * air.hazeDepth) * scattered / depth;
     const many = tune.sunPower * (0.35 + 0.65 * air.sunShare) * Math.exp(-depth * air.sunMass * share) * scattered * tune.multiScatter * (depthR / tune.rayleighDepth[2] + 0.35);
     const clear = envDisplay(single + many);
     const grey = air.overcast[channel] * lid;
@@ -80,8 +83,9 @@ export function envAirState(place, weather) {
     // air that hides the hills is the air that whitens the sky and reddens and dims the sun.
     hazeDepth: (tune.koschmieder / visibility) * hazeHeight,
     cover,
-    // The sheet's form, from a field of cumulus to a deck (ENV.clouds.deck): [the share of small lumps, how far in a base is dark].
-    form: [ENV.clouds.ragged, ENV.clouds.baseAt].map((value) => value * (1 - (weather.deck ?? 0) * (1 - ENV.clouds.deck))),
+    // The sheet's form, from a field of cumulus to a deck (ENV.clouds.deck): [the share of small lumps, how far in a base is dark,
+    // and how many times wider than a cumulus's its edge is].
+    form: [[ENV.clouds.ragged, ENV.clouds.deck], [ENV.clouds.baseAt, ENV.clouds.deckBase], [1, ENV.clouds.deckEdge]].map(([value, slab]) => value * (1 + (weather.deck ?? place.clouds.deck ?? 0) * (slab - 1))),
     gloom: weather.gloom,
     // The sky turns from blue with clouds on it to a lid as the last gaps close.
     lid: Math.min(1, Math.max(0, (cover - 0.7) / 0.3)),
@@ -268,7 +272,7 @@ export function envUniforms() {
   u.uEnvCloud.value = new THREE.Vector4(0, 0, 1 / ENV.clouds.scale, ENV.clouds.height);
   u.uEnvCloudTravel.value = new THREE.Vector2(0, 0);
   u.uEnvCloudLit.value = new THREE.Vector3(1, 1, 1);
-  u.uEnvCloudForm.value = new THREE.Vector2(ENV.clouds.ragged, ENV.clouds.baseAt);
+  u.uEnvCloudForm.value = new THREE.Vector3(ENV.clouds.ragged, ENV.clouds.baseAt, 1);
   u.uEnvCloudDark.value = new THREE.Vector3(0.5, 0.5, 0.5);
   u.uEnvWet.value = new THREE.Vector2(0, 0);
   u.uEnvShade.value = new THREE.Vector4(0, 0, 1, 1);
@@ -323,7 +327,7 @@ uniform vec4 uEnvWind;
 uniform vec2 uEnvWindTravel;
 uniform vec4 uEnvCloud;
 uniform vec2 uEnvCloudTravel;
-uniform vec2 uEnvCloudForm;
+uniform vec3 uEnvCloudForm;
 uniform vec3 uEnvCloudLit;
 uniform vec3 uEnvCloudDark;
 uniform vec2 uEnvWet;
@@ -366,15 +370,26 @@ float envHazeColumn(float fromY, float toY) {
   return abs(d) < 1e-3 ? exp(-a) : (exp(-a) - exp(-b)) / d;
 }
 
+// The sheet's broad masses, 0..1: the noise picture's lumps (750 m to 100 m at the sheet's scale) gathered into
+// fields and clear lanes several kilometres across by a second, slower reading of it, turned and at a scale
+// with no common measure with the first, so the sky does not come round again every 12 km as the picture does.
+// (index.js envCloudBroadAt is the same on the processor.)
+float envCloudBroad(vec2 sheet) {
+  float lumps = texture2D(uEnvNoise, sheet * 0.125).b;
+  float fields = texture2D(uEnvNoise, vec2(0.8 * sheet.x - 0.6 * sheet.y, 0.6 * sheet.x + 0.8 * sheet.y) * 0.0291 + vec2(0.21, 0.63)).r;
+  return lumps + (fields - 0.5) * ${ENV.clouds.fields.toFixed(3)};
+}
+
 // How far inside a cloud a sheet point is: below 0 clear sky, 0 the cloud's edge, about 0.3 its thick middle.
+// The small lumps are read a little aside by the broad masses, which keeps them from repeating in rows too.
 float envCloudDepth(vec2 sheet) {
-  float broad = texture2D(uEnvNoise, sheet * 0.125).b;
-  float fine = texture2D(uEnvNoise, sheet * 0.53 + vec2(0.37, 0.11)).a;
+  float broad = envCloudBroad(sheet);
+  float fine = texture2D(uEnvNoise, sheet * 0.53 + vec2(0.37, 0.11) + broad * 0.12).a;
   return broad * 0.68 + (0.16 + (fine - 0.5) * uEnvCloudForm.x) - mix(0.74, 0.26, uEnvCloud.x);
 }
 
 float envCloud(vec2 sheet) {
-  return smoothstep(-0.07, 0.11, envCloudDepth(sheet));
+  return smoothstep(-0.07 * uEnvCloudForm.z, 0.11 * uEnvCloudForm.z, envCloudDepth(sheet));
 }
 
 // The sheet point straight up the sun's ray from a point on the land.
@@ -386,7 +401,7 @@ vec2 envCloudOver(vec3 world) {
 float envSunShare(vec3 world) {
   if (uEnvCloud.y <= 0.0) return 1.0;
   vec2 sheet = envCloudOver(world);
-  float broad = texture2D(uEnvNoise, sheet * 0.125).b;
+  float broad = envCloudBroad(sheet);
   float edge = mix(0.74, 0.26, uEnvCloud.x);
   return 1.0 - uEnvCloud.y * smoothstep(edge - 0.12, edge + 0.16, broad * 0.68 + 0.16);
 }

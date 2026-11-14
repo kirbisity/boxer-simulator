@@ -344,13 +344,20 @@ function envGustAt(wind, time, x, z) {
   return Math.max(0, 1 + tune.depth * wind.gust * ((front * 0.65 + paw * 0.35) - 0.5) * 2);
 }
 
+/** The cloud sheet's broad masses (air.js envCloudBroad, on the processor). */
+function envCloudBroadAt(sheetX, sheetZ) {
+  const fields = envNoiseAt((0.8 * sheetX - 0.6 * sheetZ) * 0.0291 + 0.21, (0.6 * sheetX + 0.8 * sheetZ) * 0.0291 + 0.63, 0);
+  return envNoiseAt(sheetX * 0.125, sheetZ * 0.125, 2) + (fields - 0.5) * ENV.clouds.fields;
+}
+
 /**
  * How far inside the cloud a sheet point is (air.js envCloudDepth, on the processor): below 0 a gap. Without
  * `grain` the broad masses alone, the fine grain at its mean (what shades a whole floor at once).
  */
 function envCloudDepthAt(air, sheetX, sheetZ, grain = false) {
-  const fine = grain ? 0.5 + (envNoiseAt(sheetX * 0.53 + 0.37, sheetZ * 0.53 + 0.11, 3) - 0.5) * (air.form[0] / 0.32) : 0.5;
-  return envNoiseAt(sheetX * 0.125, sheetZ * 0.125, 2) * 0.68 + fine * 0.32 - (0.74 + (0.26 - 0.74) * air.cover);
+  const broad = envCloudBroadAt(sheetX, sheetZ);
+  const fine = grain ? 0.5 + (envNoiseAt(sheetX * 0.53 + 0.37 + broad * 0.12, sheetZ * 0.53 + 0.11 + broad * 0.12, 3) - 0.5) * (air.form[0] / 0.32) : 0.5;
+  return broad * 0.68 + fine * 0.32 - (0.74 + (0.26 - 0.74) * air.cover);
 }
 
 const envEase = (from, to, value) => {
