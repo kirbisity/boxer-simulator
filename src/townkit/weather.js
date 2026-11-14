@@ -27,8 +27,11 @@ export const TK_WEATHER = {
   mirror: [0.06, 0.85],
   // The damp band at a wall's foot: its height (m) and how dark; and how green the moss in it.
   foot: { height: 0.9, dark: 0.3, moss: [0.36, 0.44, 0.24] },
-  // Snow's colour, and how level a surface must be to hold it (the normal's y: from none to full).
-  snow: { colour: [0.9, 0.92, 0.95], holds: [0.45, 0.8] },
+  // Snow's colour, and how level a surface must be to hold it (the normal's y: from none to full). The colour is well under
+  // fresh snow's own reflectance (about 0.9): the page has no tone mapping, and at 0.9 a sunlit field clips to flat white
+  // and loses its shape; at this it keeps its shading under the Pyongyang place's sun. `drift`: how much darker its
+  // wind-packed patches are (a few metres across), so a field of it is not one tone.
+  snow: { colour: [0.76, 0.79, 0.84], holds: [0.45, 0.8], drift: 0.1 },
 };
 
 /** The uniforms every kit material shares: the weather (tkSetWeather), the mirror's sources, the clock. */
@@ -139,7 +142,7 @@ const TK_COLOUR = `
   // (Lying snow is white wherever it holds; less of it leaves bare patches, a few metres and a few tens of metres across.)
   tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(0.25, 0.55, blot * 0.42 + fine * 0.28 + tkFbm(vTkPos.xz * 0.045 + 7.0) * 0.3 + uTkSnow * uTkHold * 0.45) * (1.0 - tkPoolHere);
   diffuseColor.rgb *= mix(1.0, ${TK_WEATHER.wetDark.toFixed(2)}, max(tkWetHere, tkPoolHere * 0.8));
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${TK_WEATHER.snow.colour.join(', ')}), tkSnowHere);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${TK_WEATHER.snow.colour.join(', ')}) * (1.0 - ${TK_WEATHER.snow.drift.toFixed(2)} * tkFbm(vTkPos.xz * 0.3 + 3.0)), tkSnowHere);
 }
 `;
 
