@@ -2522,8 +2522,8 @@ function metal(steel, hex) {
 // the bowl and falling over the neck guard to the shoulders, wild and uneven; never across the face.
 const SHAGUMA = { locks: 220, width: 0.13, length: [1.8, 3.7], lift: 0.25, droop: 4.2, segments: 7 };
 
-// A plume of yak hair (the white, red or black haguma of the tōsei kabuto: the Met's and the Ann and Gabriel Barbier-Mueller
-// Museum's): bound at the bowl's point, standing a little from it and falling down the back and both sides to below the
+// A plume of yak hair (the white, red or black haguma of the tōsei kabuto of the 16th-17th
+// c.): bound at the bowl's point, standing a little from it and falling down the back and both sides to below the
 // chin, the brow and face kept clear; `tone`: how light its shadows stay (white hair is not grey at its roots).
 // `spread`: how far a lock keeps heading outward as it falls; `over` (head radii): how far it lies off the helmet it falls over.
 const HAGUMA = { locks: 420, width: 0.07, length: [3.3, 4.7], lift: 0.3, droop: 7, spread: 0.12, segments: 10, tone: [0.74, 0.26], over: 0.05 };
@@ -2695,7 +2695,7 @@ const NANBAN_SKULL = {
   outline: [[1.16, 0.12], [1.15, 0.4], [1.08, 0.78], [0.92, 1.18], [0.66, 1.58], [0.36, 1.92], [0.1, 2.14], [0, 2.18]],
   brim: 0.3, rivets: 14, rivetY: 0.24,
 };
-// The shiinari ("acorn-shaped") bowl of the tōsei kabuto (the Met's russet-iron shiinari kabuto with white yak hair, 17th c.):
+// The shiinari ("acorn-shaped") bowl of the tōsei kabuto (russet iron, 16th-17th c.):
 // plates raised tall to a blunt point, the join a ridge down the front and back, a close row of rivets round the foot and a
 // narrow flat brim all round in place of the peak.
 const SHIINARI_SKULL = {

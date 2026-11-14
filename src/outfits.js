@@ -79,6 +79,8 @@ export const ARMOUR_DECOR = {
 };
 
 // What the plate harnesses offer: every steel but the lacquer, and the three gilt and brass decorations.
+// A piece made with the brass borders (as finishedLook lays a chosen decoration on).
+const GOTHIC_BRASS = { decor: { kind: ARMOUR_DECOR.brass.kind, gold: ARMOUR_DECOR.brass.gold }, gold: ARMOUR_DECOR.brass.gold };
 const PLATE_FINISHES = { steels: ['bright', 'white', 'blued', 'blackened', 'russet'], decors: ['etched', 'embossed', 'brass'], pieces: ['armor', 'head', 'feet'] };
 // The Ming helmets: bright or black lacquer, and their two decorations (on the helmet alone).
 const MING_FINISHES = { steels: ['bright', 'blackLacquer'], decors: ['tunshou', 'guardians'], pieces: ['head'] };
@@ -890,7 +892,8 @@ export const OUTFITS = {
     picked: [0, 1, 2, 3],
     designs: [
       // The gothic shape — fluted plate, the German sallet and bevor — in bright polished steel.
-      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet' }, feet: { kind: 'sabaton', color: '#b7bcc4', ...SABATONS.sallet } },
+      // Its borders of applied gilt brass (ARMOUR_DECOR.brass), the arming doublet under it a dull purple.
+      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#4a2f4f' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true, ...GOTHIC_BRASS }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet', ...GOTHIC_BRASS }, feet: { kind: 'sabaton', color: '#b7bcc4', ...SABATONS.sallet, ...GOTHIC_BRASS } },
       // Italian plate of about 1400 under the visored (hounskull) bascinet and its mail.
       plateDesign('Milanese', '#a7adb6', false, false, '#3a2a22', 'hounskull'),
       plateDesign('Blackened', '#3a3d42', true, true, '#1c1a18', 'sallet'),
@@ -1198,7 +1201,7 @@ export const OUTFITS = {
     courage: 0.85,
     designs: [
       toseiDesign('Iron', '#3b3e44', '#1d2a4f', 'crescent', 'black', '#1c1d26'),
-      // Russet iron under a shiinari bowl dressed in white yak hair, laced dark blue (the Met's shiinari kabuto, 17th c.).
+      // Russet iron under a shiinari bowl dressed in white yak hair, laced dark blue.
       { ...toseiDesign('Russet', '#6b4a32', '#1d2a4f', null, 'red', '#2a1f18'), head: { kind: 'kabuto', design: 'shiinari', color: '#6b4a32', mask: 'red', plume: '#e9e3d2', lace: '#1d2a4f', gold: '#d6a743' } },
       { ...toseiDesign('Black lacquer', '#17171a', '#b3161b', 'tall', 'black', '#141416'), head: { kind: 'kabuto', color: '#17171a', crest: 'crescent', mask: 'black', maskDesign: 'oni', plume: '#e9e3d2', lace: '#b3161b', gold: '#d6a743' } },
       toseiDesign('Silver', '#9aa0a8', '#1d2a4f', 'sun', 'black', '#23202b'),

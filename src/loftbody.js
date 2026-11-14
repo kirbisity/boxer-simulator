@@ -305,6 +305,10 @@ export const LOFT = {
   // lames to above the knee, laminated pauldrons of `pauldronLames` over the
   // shoulders (standing out to `pauldron`), and mail at the armpits showing
   // between the pauldron and the rerebrace.
+  // A field harness's pauldron: one plate from `from` to `to` down the upper arm, closed over the point of the shoulder
+  // (its top, inside the shoulder, is closed), standing off the arm by `flare` ([place down the arm, times the arm]):
+  // fullest over the deltoid and drawn in to its turned lower edge.
+  pauldron: { from: -0.3, to: 0.44, flare: [[-0.3, 1.22], [-0.2, 1.42], [-0.05, 1.52], [0.2, 1.48], [0.44, 1.36]] },
   joust: { tassetTo: 0.68, tassetLames: 5, pauldron: 1.8, pauldronLames: 4, mail: [0.1, 0.4, 1.3] },
   ridged: { ridge: 0.18, width: 0.6, fade: 0.12, flare: 0.05, flareOver: 0.06, rope: 0.035 },
   // Its front drawn sharp (breastplateOn, not in a crowd): the two halves as
@@ -4257,7 +4261,17 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       // A jousting harness: mail at the armpit under the pauldron, the pauldron in lames (not in a crowd).
       if (armor.joust) loft(mesh, upperArmRings(LOFT.joust.mail[0], LOFT.joust.mail[1], count(3)), sides, { color: paintFor(MAIL, armor), inflate: LOFT.joust.mail[2], capStart: false, capEnd: false });
       const pauldron = upperArmRings(-0.2, 0.38, count(armor.joust ? 4 : 3));
-      if (plate) harnessPiece(pauldron, big);
+      if (plate && !armor.joust) {
+        const spec = LOFT.pauldron;
+        const cap = upperArmRings(spec.from, spec.to, count(6));
+        for (const ring of cap) {
+          const next = Math.max(1, spec.flare.findIndex(([place]) => place >= ring.t));
+          const [[a, low], [b, high]] = [spec.flare[next - 1], spec.flare.at(next)];
+          ring.flare = low + (high - low) * Math.max(0, Math.min(1, (ring.t - a) / (b - a)));
+        }
+        loft(mesh, stiffen(mesh, cap, 'plate'), sides, { color: 'steel', shape: (ring) => ring.flare, capEnd: false });
+        if (mesh.steelUv) harnessEdgesOn(mesh, cap.slice(-2), spec.flare.at(-1)[1], sides);
+      } else if (plate) harnessPiece(pauldron, big);
       else armorPiece(pauldron, big);
       if (armor.joust && !lowDetail) lamesOn(mesh, pauldron, big, { lames: LOFT.joust.pauldronLames, base: 'steel' }, () => null);
       if (plate) harnessPiece(upperArmRings(0.36, 1.0, count(4)), 1.28);
