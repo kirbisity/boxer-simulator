@@ -1,4 +1,4 @@
-# Starvation from the user's emaciated reference (ax_model.blend, object "anabelle.001", 21k points; the user's call,
+# Starvation from the emaciated reference (ax_model.blend, object "anabelle.001", 21k points;
 # 2026-11-10): for every point of the base meshes (tools/blender/basebody.py's output) on the trunk, the neck, the thighs and the
 # shins, how far the emaciated body's surface lies in or out from the regular body's along the ring's radius (the starved
 # delta); and the emaciated body's rib and spine detail (its normal map) as slopes on the skin map's trunk tile. The game blends

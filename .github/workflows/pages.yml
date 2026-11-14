@@ -1,4 +1,4 @@
-# Publishes Gladiator to GitHub Pages. There is no build: the game is plain
+# Publishes Historically Accurate Combat Simulator (HACS) to GitHub Pages. There is no build: the game is plain
 # ES modules, so the site is the game's own files, copied as they are.
 # It deploys straight on every push to main: no test gate (run `npm test` locally when wanted).
 name: Deploy to GitHub Pages

@@ -150,7 +150,7 @@ function tonicEffect(me) {
   return {
     t: 0,
     seconds: LEVEL_CONFIG.tonic.seconds,
-    from: { bloodLost: me.bloodLost ?? 0, concussion: me.concussion, gunshot: me.gunshot ?? 0, damage: { ...me.damage }, trauma: { ...me.trauma } },
+    from: { bloodLost: me.bloodLost ?? 0, concussion: me.concussion, gunshot: me.gunshot ?? 0, damage: { ...me.damage }, trauma: { ...me.trauma }, traumaDue: { ...me.traumaDue } },
   };
 }
 
@@ -178,6 +178,8 @@ export function updateTonics(world, dt) {
       if (joint && me.broken.has(`${key[0]}${joint}`)) continue;
       if (me.trauma?.[key]) me.trauma[key] = Math.max(0, me.trauma[key] - from.trauma[key] * step);
     }
+    // (And what was still to be felt of it, physics.js injure: the head's and the trunk's.)
+    for (const key of Object.keys(from.traumaDue)) if (me.traumaDue?.[key]) me.traumaDue[key] = Math.max(0, me.traumaDue[key] - from.traumaDue[key] * step);
     if (effect.t >= effect.seconds) {
       me.knockdowns = 0;
       level.tonics.splice(index, 1);

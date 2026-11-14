@@ -1,9 +1,9 @@
-// The fighters' skin from the user's base meshes (body style 'base', bodystyles.js; the user's call, 2026-11-10): the modelled
+// The fighters' skin from the modelled base meshes (body style 'base', bodystyles.js; 2026-11-10): the modelled
 // human body itself, without its head, hands and feet (the game's own cover them). The mesh (src/basebody-data.js, made by
 // tools/blender/basebody.py) was modelled at one build of each sex, its `reference`; a fighter of that build gets it as
 // modelled, scaled to his height, its arms turned into the rig's A-pose by the tool, and nothing else.
 //
-// Other builds change it gently, keeping its contour (the user's call, 2026-11-11: the model, used simply and faithfully):
+// Other builds change it gently, keeping its contour (2026-11-11: the model, used simply and faithfully):
 //   - its joints move as the game's do: each of the mesh's own joints by how this body's bind-pose joint (rig.js bindPoints)
 //     lies from the reference's, so height and frame lengthen and shorten the parts along their bones, not across; each limb
 //     then runs in the model's own direction at the game's length, and the loft (clothes) and the rig are built on those
@@ -55,7 +55,7 @@ export const BASE_BODY = {
   // 2.9 cm, a wrist's), not to the fist's middle. The upper arm runs at the game's length too. The length either gains is laid
   // on in the shaft's middle, between `stretch[0]` and `[1]` of the part (with a smooth rise and fall, 1 - cos), and both
   // ends keep the model's own scale: the elbow's point and crease, the deltoid's insertion, the forearm's swell below the elbow
-  // and the wrist's slimness. Stretched evenly (the user's call, 2026-11-11: the arms read as rubber tubes), the joints'
+  // and the wrist's slimness. Stretched evenly (2026-11-11: the arms read as rubber tubes), the joints'
   // forms were drawn out with the shafts and the arm lost its hinge.
   handSeat: 0.021,
   stretch: [0.2, 0.85],
@@ -72,7 +72,7 @@ export const BASE_BODY = {
   // round its axis (from armFrom down) none of it, from `starveArm[1]` (its reach, armReach) all. Its figure stood with one hand
   // on the hip and the other arm hanging (tools/blender/emaciated.py), its shoulders shrugged and turned, so the delta there is
   // its pose, not its wasting: ±2 cm lumps on a starved man's shoulders. Its collarbones and the ribs below stay. (Round 15,
-  // the user: a starved shoulder still had the model's thickness. With the arms lowered by D's rest shape the lumps are gone,
+  // noted: a starved shoulder still had the model's thickness. With the arms lowered by D's rest shape the lumps are gone,
   // and the fade now runs from 0.3 to 0.8 of the arm's ring radius: her bony cap, 1 cm lower over a starved man's joint.)
   starveArm: [0.3, 0.8],
   // The trunk's drawn anatomy (the rules', and her bone relief: baseStarvedDetail) is faded over the shoulder's cap at the sides
@@ -92,7 +92,7 @@ export const BASE_BODY = {
   // up). Its sides were offset along normals smoothed apart (no edge joins them), and a fat man's calf opened it into specks
   // of the background and flaps of skin.
   slitRoundness: 0.3,
-  // The shoulder's design (the user, 2026-11-11: the base shoulder was too wide and bulky against the game's own, v7). Five
+  // The shoulder's design (2026-11-11: the base shoulder was too wide and bulky against the game's own, v7). Five
   // ways were tried ('A'..'E', all acting in one zone, shoulderZone), then D's grown into D+ (shoulderPlus 'D1', 'D2'); the
   // user's choice, shipped to the test page, is 'D2' (with its chest, round 13, and her own overrides, round 14). null draws
   // the model as it is; the others stay selectable for the body sheet (?shoulder=…, 'none' for null).
@@ -123,7 +123,7 @@ export const BASE_BODY = {
   // (m per 1.8 m), none past the second (placeBaseBody: round 18).
   capReach: [0.12, 0.22],
   // The family of builds a fighter's skin is blended from (baseFamily; the remodel of 2026-11, tools/blender/family): each
-  // sex's base mesh refitted, point for point, to an emaciated body (E: the user's emaciated reference, and her frame refitted
+  // sex's base mesh refitted, point for point, to an emaciated body (E: the emaciated reference, and her frame refitted
   // to a man's), an ordinary one (N: ANSUR II's means at a BMI of 21.5, hers, and 22.5, his), a muscular one (M: the man's
   // the base model itself), three fat ones (F1 to F3: ANSUR II's means at 27, 33 and 40) and the game's fattest body (F4: a BMI
   // of 100, F3 grown as fat grows to that body's volume, family/swell.py). `use`: off, a fighter's skin is
@@ -140,7 +140,7 @@ export const BASE_BODY = {
   family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3', 'F4'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.4, 0.6] }, hold: [0.3, 0.55] },
   // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
   headHold: 0.85,
-  // PROOF OF CONCEPT, round 11 (the user: D is better, but the shoulders and arms smaller still, the neck longer, the woman's
+  // PROOF OF CONCEPT, round 11 (noted: D is better, but the shoulders and arms smaller still, the neck longer, the woman's
   // shoulder a sharper joint, not a tube): D's rest shape, then (shoulderPlus):
   //   `in`      the shoulder's zone moved in towards the midline (m per 1.8 m): shorter clavicles, the acromion in;
   //   `trap`    the trapezius lowered (m), most beside the neck and `trapKeep` of it left at the acromion: the top line from the
@@ -160,7 +160,7 @@ export const BASE_BODY = {
   //   `deltoidBy`, `deltoidWaste` (round 17): `deltoid`'s kept share scaled by the arm's muscle showing, from the first (none)
   //             to the second (a bodybuilder's), and less by this share of wasting;
   //   `neckCut` the neck's top ring trimmed to this share of the head's radius under its centre;
-  //   `female`  a woman's own amounts over these (round 14, the user: her shoulders narrower still);
+  //   `female`  a woman's own amounts over these (round 14: her shoulders narrower still);
   //   `neckTuck` the neck's top drawn in under the head by this share of its radius;
   //   `pit`     the armpit's hollow (m): the trunk's flank under the arm, from 2 to 14 cm under the shoulder joint and within
   //             the arm's own depth fore and aft, drawn in towards the midline, deepest at the arm's middle and easing out to the
@@ -973,7 +973,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
       const [kx, ky] = own[from](at);
       // (The upper arm's cap takes the trunk's ratio across the joint, so a fat arm does not stand the cap out as a shelf; but
       // the deltoid is the arm's muscle: by how much of it shows (`shoulderKeep`), the cap's ratio moves towards the arm's own
-      // there (round 17, the user: the shoulder had the same muscle at every build; a bodybuilder's cap took an average man's).)
+      // there (round 17: the shoulder had the same muscle at every build; a bodybuilder's cap took an average man's).)
       const ownAt = /Upper$/.test(child) ? own[child](0) : null;
       const joint = (kx + ky) / 2 + (ownAt ? (((ownAt[0] + ownAt[1]) / 2 - (kx + ky) / 2) * Math.min(1, shoulderKeep)) : 0);
       const [low, high] = BASE_BODY.joinRatio;
@@ -1441,7 +1441,7 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
       const outer = -Math.sign(yT) * vec.dot(radialA, trunk.widthAxis);
       const capW = (1 - ease(0.25, 0.45, tA)) * ease(-0.45, -0.15, tA);
       // (Its share kept by the body's own muscle there (`shoulderKeep`, the arm's development x leanness x definition: a
-      // bodybuilder's 1, an average man's about 0.15) and less again on a wasted body: round 17, the user: the shoulder had the
+      // bodybuilder's 1, an average man's about 0.15) and less again on a wasted body: round 17: the shoulder had the
       // same muscle at every build. `deltoidBy` [least, most] of `deltoid`'s share.)
       const keepShare = Math.min(1, spec.deltoid * (spec.deltoidBy[0] + (spec.deltoidBy[1] - spec.deltoidBy[0]) * Math.min(1, shoulderKeep)) * (1 - spec.deltoidWaste * waste));
       if (outer > 0 && capW > 0) shift = vec.add(shift, vec.scale(radialA, -(1 - keepShare) * 0.35 * rA * outer * capW));
@@ -1509,7 +1509,7 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
     neighbours[c].add(a).add(b);
   }
   // (Smoothed less than the round 10 designs (half as many rounds): the corner and the edges are the point.)
-  // The chest's width (`chest`, round 13; the user: "get the chest to the original width", v7's): the trunk's own skin (not an
+  // The chest's width (`chest`, round 13: "get the chest to the original width", v7's): the trunk's own skin (not an
   // arm's, nor blending into one) across, row by row of its t (`chestRows` wide), against the loft's ring there (this body's,
   // the ring v7 draws: parts.trunk), scaled across (the trunk's width axis; its depth and the model's surface kept) by that
   // ratio, `chest` of the way; the ratio smoothed along the trunk and eased to none below `chestFrom` (the waist) and above
@@ -1564,7 +1564,7 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
   }
   const smoothed = laplacian(shifts, neighbours.map((set) => [...set]), BASE_BODY.shoulderSmooth / 2);
   for (let index = 0; index < placed.length; index += 1) placed[index] += smoothed[index];
-  // The neck's girth (round 17; the user: the neck did not follow the body), after the moves above are smoothed in (round 18:
+  // The neck's girth (round 17: the neck did not follow the body), after the moves above are smoothed in (round 18:
   // measured before them, the smoothing then moved the neck's points along it and the girth came out off the target): its middle (`neckBand` of its t) scaled round its
   // axis to the body's own neck girth (loftbody.js baseNeckGirth), its section's length measured as the outline of its points
   // there; eased out up to the head's underside and down into the trapezius (`neckEase`, t).

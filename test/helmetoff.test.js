@@ -43,16 +43,21 @@ test('the slip: the head\'s speed change on the helmet\'s mass, more on the rim 
 
 // Every heavy head blow of the calibration (tools/helmet-off.js: big punches, kicks, knees, elbows, heavy weapons, from
 // several attackers on a man fresh or worn down), over seeds: of those that knock him out, the share that take the helmet.
-test('knocked out by a heavy blow, an open helmet comes off about half the time, a half-enclosed one about a fifth; an enclosed one stays', () => {
-  const open = measureHelm({ kind: 'footman', design: 0 }, 3);
-  assert.ok(open.kos >= 30, `enough knockouts to judge (${open.kos})`);
-  assert.ok(open.off / open.kos > 0.3 && open.off / open.kos < 0.7, `kettle hat off in ${open.off} of ${open.kos} knockouts`);
-  const half = measureHelm({ kind: 'samurai', design: 0 }, 4);
-  assert.ok(half.kos >= 30, `enough knockouts to judge (${half.kos})`);
-  assert.ok(half.off / half.kos > 0.05 && half.off / half.kos < 0.4, `kabuto off in ${half.off} of ${half.kos} knockouts`);
-  const enclosed = measureHelm({ kind: 'knight', design: 3 }, 3);
-  assert.ok(enclosed.kos >= 30, `enough knockouts to judge (${enclosed.kos})`);
-  assert.ok(enclosed.off / enclosed.kos < 0.03, `close helmet off in ${enclosed.off} of ${enclosed.kos} knockouts`);
+// Through a rigid shell the brain feels only the helmet's share of a blow (physics.js brainShare): the kettle hat, the
+// kabuto, the close helmet see hardly a knockout among these blows now, and the open class's knockouts are mostly through
+// the jingasa, a light iron hat that does not count as rigid (its cut proof under BLADES.gaps.rigidFrom). So: the jingasa
+// comes off in a share of them about the open class's (helmetOff.holds.open, recalibrated 2026-11-11: 50.5% of the class's
+// 105 in 6 seeds; this hat's own 12 of 40), and through a half-enclosed or an enclosed helm a heavy blow knocks a man out
+// seldom and never takes the helm (was: enough knockouts through each to judge, ~30, before the rigid shell counted).
+test('knocked out by a heavy blow, an open hat comes off often; through a half-enclosed or enclosed helm a heavy blow seldom knocks him out, and never takes it', () => {
+  const open = measureHelm({ kind: 'ashigaru', design: 0 }, 3);
+  assert.ok(open.kos >= 20, `enough knockouts to judge (${open.kos})`);
+  assert.ok(open.off / open.kos > 0.2 && open.off / open.kos < 0.7, `jingasa off in ${open.off} of ${open.kos} knockouts`);
+  for (const [helm, seeds, name] of [[{ kind: 'samurai', design: 0 }, 4, 'kabuto'], [{ kind: 'knight', design: 3 }, 3, 'close helmet']]) {
+    const shut = measureHelm(helm, seeds);
+    assert.ok(shut.kos <= open.kos / 4, `${name}: knocked out ${shut.kos} times, the jingasa ${open.kos}`);
+    assert.equal(shut.off, 0, `${name} off in ${shut.off} of ${shut.kos} knockouts`);
+  }
 });
 
 test('a helmet knocked off flies as a prop, and he is bare-headed for the rest of the fight', () => {

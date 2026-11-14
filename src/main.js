@@ -5,7 +5,7 @@ import { greyedHair } from './aging.js';
 import { getLang, LANG_NAMES, onLangChange, SEP, t, tname, toggleLang, translatePage } from './i18n.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
-import { hurtShare, thinkAll } from './ai.js';
+import { paintHealth, thinkAll } from './ai.js';
 import { withTanks } from './physics/flame.js';
 import { CUSTOM_STYLE_KEYS, MOVES, STRATEGIES, STYLE_KEYS, STYLES } from './moves.js';
 import { advance, opponentFor, collapseAt, dropWeapon, concussionCapacity, createWorld, perform, placeFighter, placeOnFloor, point, reviveFighter, startCrawl, startJump, throwPunch, WORLD } from './physics.js';
@@ -21,7 +21,7 @@ import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
 import { breakRun, contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl, swingAt } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
-import { canCommand, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
+import { canCommand, chooseGroup, chosenGroup, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
 import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
@@ -91,6 +91,7 @@ import { hasOrigin, originOf, REGION_ORIGINS, regionName, regionTone, setShade, 
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
+import { updateClothWind } from './clothwind.js';
 import { installStory } from './story/storyview.js';
 import { createStoryPlaceMark } from './story/placemark.js';
 import { mountCameraTuner } from './camtuner.js';
@@ -248,6 +249,7 @@ const fightControls = installFightControls($('#fight-ui'), {
   marks: () => (state.mode === 'play' ? fightMarks : null),
   clock: () => fightMarksClock,
   order: (kind) => orderSide(kind),
+  group: (step) => chooseOrderGroup(step),
   // In a stage the man he is on is one near or aware of him, not the nearest of the garrison.
   opponent: (world, me) => (world.stage?.level ? levelOpponent(world, me) : opponentFor(world, me)),
 });
@@ -298,13 +300,20 @@ chargeArrow.visible = false;
 scene.scene.add(chargeArrow);
 let chargeArrowAt = -Infinity;
 
-/** Give the player's side an order (command.js): a charge goes the way the camera looks, or at the man he is locked on. */
+/** Step the arm his orders go to (command.js chooseGroup: All, Foot, Shot, Horse): +1 or -1, or an arm's key. */
+function chooseOrderGroup(step) {
+  const me = player();
+  if (state.mode !== 'play' || !canCommand(state.world, me)) return;
+  chooseGroup(state.world, me, step);
+}
+
+/** Give the player's side (the arm chosen) an order (command.js): a charge goes the way the camera looks, or at the man he is locked on. */
 function orderSide(kind) {
   const me = player();
   if (state.mode !== 'play' || !canCommand(state.world, me)) return;
   const locked = lockedTarget();
   const dir = locked ? [locked.x[P.pelvis * 3] - me.x[P.pelvis * 3], locked.x[P.pelvis * 3 + 2] - me.x[P.pelvis * 3 + 2]] : floorAxes().ahead;
-  const command = giveOrder(state.world, me, kind, { dir });
+  const command = giveOrder(state.world, me, kind, { dir, group: chosenGroup(state.world, me) });
   if (command?.kind !== 'charge') return;
   chargeArrow.position.set(command.at[0] + command.dir[0] * CHARGE_ARROW.ahead, 0.03, command.at[1] + command.dir[1] * CHARGE_ARROW.ahead);
   chargeArrow.rotation.y = Math.atan2(-command.dir[1], command.dir[0]);
@@ -432,7 +441,9 @@ function newBout() {
   const cramped = mounted && state.game !== 'sandbox' && (PLACE_ARENAS[state.place]?.halfX ?? 0) < PLACE_ARENAS.field.halfX * 0.6;
   const place = scenario?.scene ?? (cramped ? 'field' : state.place);
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
-  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation, place });
+  // In a battle the man played is his side's general, drawn up in the middle of his arm (physics.js centreGeneral); the sandbox already stands its lead in the middle.
+  const general = scenario && state.game !== 'tutorial' ? { corner: state.playSide, index: state.lead[state.playSide] ?? 0 } : null;
+  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation, place, general });
   presentWorld(place, arena, scenario);
   if (state.game === 'tutorial') placeYard();
 }
@@ -787,7 +798,7 @@ function frame(now) {
     const key = String(error?.stack ?? error);
     if (!frameErrors.has(key)) {
       frameErrors.add(key);
-      console.error('Gladiator frame error (the game carries on):', error);
+      console.error('HACS frame error (the game carries on):', error);
     }
   }
   resolution.worked(performance.now() - started);
@@ -1330,6 +1341,7 @@ function drawWorld(dt, drawIt = true) {
   updateWhips(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
+  updateClothWind(scene, world);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
@@ -1438,7 +1450,8 @@ function renderHud() {
     // The sandbox reads out fear and adrenaline; everywhere else, one health bar says enough.
     const feeling = t('fight.feeling', { fear: Math.round((fighter.fear ?? 0) * 100), adrenaline: Math.round((fighter.adrenaline ?? 0) * 100) });
     card.querySelector('.speed').textContent = `${fighter.stats.lastHandSpeed.toFixed(1)} m/s${mood}${feeling}`;
-    card.querySelector('.health i').style.width = `${Math.round((1 - hurtShare(fighter)) * 100)}%`;
+    // (The player's own man's with its ghost, how far his health is still falling: paintHealth.)
+    paintHealth(card.querySelector('.health'), fighter, Boolean(fighter.player));
     // A great vessel open (a limb lost: maiming.js): the bar pulses and drains.
     card.querySelector('.health').classList.toggle('bleeding', bleedingFast(fighter));
     let roster = card.querySelector('.roster');
@@ -1753,7 +1766,7 @@ $('#camera-feel').addEventListener('click', (event) => {
   event.currentTarget.setAttribute('aria-expanded', String(!tuner.hidden));
 });
 $('#real-walk').addEventListener('click', () => enterSandboxLevel('real'));
-// The body picker (a test build's: the base-mesh bodies, basebody.js): fighters rebuilt in it at once.
+// The body picker (the game's base-mesh bodies, basebody.js, or V7 before them, to compare): fighters rebuilt in it at once.
 $('#body-style').value = BODY_STYLE;
 $('#body-style').addEventListener('change', (event) => {
   if (!BODY_STYLES.includes(event.target.value)) return;
@@ -1969,7 +1982,7 @@ const KEYS = {
   j: 'jab', k: 'cross', h: 'hook', u: 'uppercut', l: 'roundhouse', o: 'lowKick', i: 'teep', n: 'knee', m: 'elbow', ',': 'upElbow',
   c: 'clinch', r: 'rush', q: 'roll', e: 'parry', z: 'leanBack', x: 'check', b: 'body', y: 'rHook', g: 'collarTie',
 };
-// Orders to his side, in a battle (command.js): 7 To me, 8 Charge, 9 Hold, 0 Free (1–6 are the attack buttons).
+// Orders to his side, in a battle (command.js): 7 To me, 8 Charge, 9 Hold, 0 Free (1–6 are the attack buttons); [ and ] the arm they go to.
 const ORDER_KEYS = Object.fromEntries(COMMAND_ORDERS.map((entry) => [entry.key, entry.kind]));
 // The movement keys held in the fight (not walk mode), and when the guard key (T) went down.
 const fightKeys = new Set();
@@ -2063,6 +2076,9 @@ window.addEventListener('keydown', (press) => {
   } else if (ORDER_KEYS[key]) {
     press.preventDefault();
     orderSide(ORDER_KEYS[key]);
+  } else if (key === '[' || key === ']') {
+    press.preventDefault();
+    chooseOrderGroup(key === ']' ? 1 : -1);
   } else if (KEYS[key]) {
     press.preventDefault();
     command(KEYS[key]);
@@ -3834,7 +3850,7 @@ const boxer = window.boxer = {
   finishSkins: () => pumpSkinBuilds(scene, Infinity),
   // How skins are built (render.js SKIN_BUILD: workers, slice ms, reach), to tune or compare.
   skinBuild: SKIN_BUILD,
-  // The body style fighters are drawn in from the next build on (bodystyles.js: 'v7' the default, 'lofted' the old one); no argument: the one in force.
+  // The body style fighters are drawn in from the next build on (bodystyles.js: 'base' the default, 'v7' and 'lofted' the ones before it); no argument: the one in force.
   bodyStyle: (style) => {
     if (BODY_STYLES.includes(style)) setBodyStyle(style);
     return BODY_STYLE;

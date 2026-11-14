@@ -1,4 +1,4 @@
-// Dual-quaternion skinning (the user's call, 2026-11-11: arms that bend at their joints, not like a rubber tube). Linear blend
+// Dual-quaternion skinning (2026-11-11: arms that bend at their joints, not like a rubber tube). Linear blend
 // skinning averages each point's bones' matrices: where two bones turn apart (the elbow bent, the arm raised from the shoulder,
 // the forearm twisted) the average of two rotations is no rotation at all but a squeeze, and the joint loses its volume, the
 // elbow pinching flat and the shoulder collapsing. Dual quaternions blend the bones' rigid motions as motions: the joint turns

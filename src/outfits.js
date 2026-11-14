@@ -528,6 +528,38 @@ export function heelFooting(heels) {
 const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
 
 /**
+ * What a brigandine is by its make (`BRIGANDINE_MAKES`): small plates riveted inside cloth, near plate against an edge
+ * either way (an edge meets iron behind every rivet), but two constructions, each costing or gaining a few points on the
+ * coat's own figures and opening where its cut leaves it open (`gaps`, physics/gaps.js). Only the brigandines: a knight's
+ * harness and lamellar keep their figures. Slight on purpose (the user's calls, 2026-11-11).
+ * - `ming`: the bumianjia (布面甲) and the Qing coat made as it was: thin iron plates (~1-2 mm, a few centimetres across, on
+ *   surviving Ming and Qing coats; Great Ming Military, 2015-16) lapped inside many layers of quilted cotton, a long loose
+ *   coat to below the knee. The quilting takes a blow (blunt as the coat's own: the cotton is what spreads it); an edge
+ *   near plate's (cut -1 point); a point finds the thin plates' edges and seams (pierce -3). The long coat leaves no great
+ *   opening over the trunk and thighs: its skirt closes the groin (`closed`), the armholes at a harness's (`thrust` 0.4,
+ *   `swing` 0.1); between the plates a point may part the cloth (`lacing` 0.12: rivets through cloth hold the plates'
+ *   edges less close than laced rows).
+ * - `european`: the 15th-century brigandine: fewer, larger plates, some of steel and hardened (Williams, *The Knight and
+ *   the Blast Furnace*, 2003, finds brigandine plates of steel as well as iron), tailored close to the trunk, over a thinner
+ *   arming coat. A point is kept out as the coat's own figure has it (pierce +0), and a slanting one turned: its hard plates
+ *   skid a point that meets them more than ~45° off square (`bites` 0.71, the cosine; bare polished plate's ~35°, 0.82,
+ *   BLADES.bite: the cloth face catches a point sooner; an estimate). A blow is not spread by thin padding and small plates
+ *   (blunt -4). Cut close to the body, it opens at the armpits, the elbows and the groin, where a fully armed man wore mail
+ *   gussets or plate to close them (a kit's `gaps.mail`); a kit without them is opened a little more there than a harness
+ *   (`thrust` 0.46, `swing` 0.12), its plates closely lapped and riveted (`lacing` 0.1).
+ */
+const BRIGANDINE_MAKES = {
+  ming: { guard: { blunt: 0, cut: -0.01, pierce: -0.03 }, gaps: { thrust: 0.4, swing: 0.1, lacing: 0.12, closed: ['groin'] } },
+  european: { guard: { blunt: -0.04, cut: 0, pierce: 0 }, bites: 0.71, gaps: { thrust: 0.46, swing: 0.12, lacing: 0.1 } },
+};
+/** A brigandine's figures: the coat's own (`guard`: blunt, cut, pierce), with what its `make` (BRIGANDINE_MAKES) gains or costs it. */
+const brigandineOf = (guard, make) => {
+  const { guard: shift, bites } = BRIGANDINE_MAKES[make];
+  const figures = Object.fromEntries(Object.entries(guard).map(([kind, value]) => [kind, Math.round((value + (shift[kind] ?? 0)) * 100) / 100]));
+  return bites ? { ...figures, bites } : figures;
+};
+
+/**
  * A coat of plates (the Ming and the Later Jin's mianjia, 棉甲): iron plates riveted inside a long coat of thick quilted cotton,
  * many layers deep, under a cloth or brocade face, its studs the rivets' heads. The Ming elite's, the banner man's and the
  * Bayara's are the same make (the Bayara were guarded as the Ming elite's household men were, no better: the same coat of plates
@@ -536,14 +568,17 @@ const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
  * (pierce 0.85, PIERCE_SCALE). What sets the kits apart is what else they wear: steel arm guards (MING_ARM_GUARD), mail under it
  * (UNDER_ARMOUR.mail), a mask. (Each kit had its own figures for the coat: the Ming elite's 0.7 / 0.95 / 0.87, the coat itself
  * credited with what its arm guards and lapping give; the user's call, 2026-11-10.)
+ * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.72, cut 0.92 (was 0.93), pierce 0.82 (was 0.85).
  */
-const PLATE_COAT = { blunt: 0.72, cut: 0.93, pierce: 0.85 };
+const PLATE_COAT = brigandineOf({ blunt: 0.72, cut: 0.93, pierce: 0.85 }, 'ming');
 
 /**
  * The Ming soldier's brigandine (a vest of plates, no sleeves): the same plates inside a thinner padded coat, one plate deep
  * where the coat of plates laps: a blow spread a little less, an edge a little less turned; a point as any brigandine's.
+ * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.66, cut 0.89 (was 0.9), pierce 0.82 (was 0.85).
  */
-const PLATE_VEST = { blunt: 0.66, cut: 0.9, pierce: 0.85 };
+const PLATE_VEST = brigandineOf({ blunt: 0.66, cut: 0.9, pierce: 0.85 }, 'ming');
+
 
 /**
  * Japanese limb armour: the kote's sleeves, the haidate's apron over the thighs, the suneate's shin guards. Iron splints
@@ -997,29 +1032,39 @@ export const OUTFITS = {
   // inside cloth), a mail shirt, or a breastplate — over a quilted coat,
   // and a kettle hat. Never full cover; light enough to march in.
   footman: {
-    // Trained: a drilled foot soldier (`skill`: OUTFITS' tiers).
-    skill: 0.35,
+    // Trained: a drilled foot soldier, a little above a garrison's regular (`skill` 0.4, was 0.35; OUTFITS' tiers): the
+    // companies of the Hundred Years' War and after were paid men under indenture who served season after season (the
+    // user's call, 2026-11-12).
+    skill: 0.4,
     faction: 'knights',
     label: 'Foot soldier', family: 'knight', movement: 'good', fists: 'bare',
     sidearm: 'shortSword',
     // Armour at 0.55 of its old weight (was 0.22): ~9 kg on a 75 kg man, against a brigandine's 8–15 kg or a mail shirt's ~10 kg.
     extraMass: 0.12,
-    // The torso in a brigandine: cut 0.85 (was 0.75), blunt 0.45 (was 0.4); pierce 0.85, a brigandine's (PIERCE_SCALE; the breastplate set's 0.95).
+    // The torso in a brigandine: cut 0.85 (was 0.75), blunt 0.45 (was 0.4); pierce 0.85, a brigandine's (PIERCE_SCALE; the breastplate set's 0.95);
+    // its make the European's (BRIGANDINE_MAKES.european: 0.92 / 0.41 / 0.85, a slanting point turned; its gaps). Cut 0.92 as the
+    // Ming coat's (was 0.85): either brigandine is near proof against an edge, rivets and plates behind every inch of cloth (the
+    // user's call, 2026-11-11).
     // The kettle hat, steel over an arming cap: better against an edge and a blow (was as the body: 0.4/0.75/0.6).
-    // The arms in mail sleeves or light guards, the legs in hose: less than the trunk (were all as the body).
+    // The arms in mail sleeves with plate or splinted guards over them, as the kit draws them (the 15th-century footman's
+    // vambraces and couters: Embleton, Soldiers of the Hundred Years War; the Beauchamp Pageant's archers): blunt 0.3, cut
+    // 0.7, pierce 0.45 (were 0.25 / 0.6 / 0.35). The legs in hose, often with splinted or quilted defences over the thigh
+    // and knee: 0.2 / 0.45 / 0.25 (were 0.15 / 0.35 / 0.2). A little up, on the user's call, 2026-11-12.
     protection: {
-      blunt: 0.45, cut: 0.85, pierce: 0.85, bullet: { head: 0.35, torso: 0.35, limb: 0 },
+      ...brigandineOf({ blunt: 0.45, cut: 0.92, pierce: 0.85 }, 'european'), bullet: { head: 0.35, torso: 0.35, limb: 0 },
       regions: {
         head: { blunt: 0.55, cut: 0.92, pierce: 0.65 },
-        UpperArm: { blunt: 0.25, cut: 0.6, pierce: 0.35 },
-        Forearm: { blunt: 0.25, cut: 0.6, pierce: 0.35 },
-        Thigh: { blunt: 0.15, cut: 0.35, pierce: 0.2 },
-        Shank: { blunt: 0.15, cut: 0.35, pierce: 0.2 },
+        UpperArm: { blunt: 0.3, cut: 0.7, pierce: 0.45 },
+        Forearm: { blunt: 0.3, cut: 0.7, pierce: 0.45 },
+        Thigh: { blunt: 0.2, cut: 0.45, pierce: 0.25 },
+        Shank: { blunt: 0.2, cut: 0.45, pierce: 0.25 },
       },
     },
-    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between a brigandine's plates a little anywhere but the solid plates.
-    gaps: { lacing: 0.1 },
-    courage: 0.25,
+    // A fitted brigandine's openings (BRIGANDINE_MAKES.european): no mail gussets in this kit to close them.
+    gaps: BRIGANDINE_MAKES.european.gaps,
+    // A little steadier than a levy (0.3, was 0.25): paid companies that knew one another and their captain (the user's call,
+    // 2026-11-12).
+    courage: 0.3,
     designs: [
       footmanDesign('Brigandine, red velvet', 'brigandine', '#7a1a22', '#c8b48a', { design: 'a', brim: 1.9 }),
       footmanDesign('Brigandine, blue', 'brigandine', '#1f2f5a', '#b8a888', { design: 'c', brim: 1.75, tall: true }),
@@ -1376,8 +1421,8 @@ export const OUTFITS = {
       ...PLATE_VEST, bullet: { head: 0.3, torso: 0.5, limb: 0 },
       regions: { UpperArm: { blunt: 0.25, cut: 0.3, pierce: 0.15 }, Forearm: { blunt: 0.25, cut: 0.3, pierce: 0.15 } },
     },
-    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
-    gaps: { lacing: 0.1 },
+    // The long coat's openings (BRIGANDINE_MAKES.ming): the armholes, the seams between its plates; its skirt closes the groin.
+    gaps: BRIGANDINE_MAKES.ming.gaps,
     courage: 0.2,
     designs: [
       mingBrigandineDesign('Red', '#9a1f1a', '#8f949b', {}, { design: 'yongBell', finish: 'red' }),
@@ -1397,8 +1442,9 @@ export const OUTFITS = {
   mingEliteInfantry: {
     // Drilled daily, squad by squad, for years, under the Jixiao xinshu's law (its drill: the squad's men practised their
     // weapons and the array until they moved as one, and were examined on them): an elite's training (the tiers above:
-    // 0.6-0.8), at its foot (0.65): picked farmers and miners made soldiers, not men trained to arms from boyhood.
-    skill: 0.65,
+    // 0.6-0.8), at its foot (0.6, was 0.65; lowered a little on the user's call, 2026-11-12): picked farmers and miners made
+    // soldiers, not men trained to arms from boyhood.
+    skill: 0.6,
     faction: 'chinese',
     label: 'Ming — elite infantry', family: 'chinese', movement: 'good', fists: 'bare',
     // His sidearm the Qi family's long sabre (WEAPONS changdao): what the gunners draw when the raiders are on them.
@@ -1421,8 +1467,11 @@ export const OUTFITS = {
     // Plates in cloth: a point catches in the cloth and the rivet heads and bites (BLADES.bite), as on the retainer's coat;
     // the steel tube (its region) and the helmet turn it.
     deflects: false,
-    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the coat's plates a little anywhere but the solid plates.
-    gaps: { lacing: 0.1 },
+    // The long coat's openings (BRIGANDINE_MAKES.ming): the armholes, the seams between its plates; its skirt closes the groin.
+    // A little wider than the retainer's coat (thrust 0.43, swing 0.11, lacing 0.13, against 0.4 / 0.1 / 0.12): a soldier's coat
+    // issued by the army, its sleeves of studded cloth and its plates fewer than a general's household man's, worn loose for
+    // the squad's drill (the user's call, 2026-11-11: "slightly").
+    gaps: { ...BRIGANDINE_MAKES.ming.gaps, thrust: 0.43, swing: 0.11, lacing: 0.13 },
     // Higher than the general's retainer's (mingElite 0.35) and every Chinese kit's: Qi's law (a squad that let its leader
     // fall, or ran, was put to death: Jixiao xinshu, the 'law of joint responsibility', 连坐法), the squad fighting as one
     // and his army's nine victories in a month in Taizhou, 1561. Steady, very disciplined, slow to scare.
@@ -1470,9 +1519,9 @@ export const OUTFITS = {
     // solid lames spread it (blunt 0.7, was 0.65). Pierce 0.87, over a soldier's brigandine's 0.85 (PIERCE_SCALE) for the coat two plates deep; its seams are its lacing (`gaps`). The arms in the steel arm guards (MING_ARM_GUARD).
     // The coat as the banners' (PLATE_COAT); the arms in the steel arm guards.
     protection: { ...PLATE_COAT, bullet: { head: 0.4, torso: 0.55, limb: 0.2 }, regions: { head: { deflects: true }, UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
-    // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the brigandine coat's plates a little anywhere but the solid plates.
+    // The long coat's openings (BRIGANDINE_MAKES.ming): the armholes, the seams between its plates; its skirt closes the groin.
     // (No mail under its gaps: a Ming elite's voiders are not documented as the European ones are; the coat's padding.)
-    gaps: { lacing: 0.1 },
+    gaps: BRIGANDINE_MAKES.ming.gaps,
     courage: 0.35,
     designs: [
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
@@ -1510,10 +1559,10 @@ export const OUTFITS = {
     extraMass: 0.22,
     // Blunt above the Ming elite's: mianjia is cotton armour, the plates set in thick quilted cotton many layers deep
     // that spreads a club's or a mace's blow over the body as a thin coat of plates does not.
-    // Pierce 0.85, a brigandine's (PIERCE_SCALE).
+    // Pierce 0.82, a brigandine's (PIERCE_SCALE, less its make: BRIGANDINE_MAKES.ming).
     // The coat of plates (PLATE_COAT), its sleeves too.
     protection: { ...PLATE_COAT, bullet: { head: 0.4, torso: 0.5, limb: 0.15 }, regions: { head: { deflects: true } } },
-    gaps: { lacing: 0.1 },
+    gaps: BRIGANDINE_MAKES.ming.gaps,
     courage: 0.4,
     designs: [
       bannerDesign('Plain Yellow', '#e0a51e'),
@@ -1549,12 +1598,12 @@ export const OUTFITS = {
     under: 'mail',
     // The Ming elite's guard, the throat a little less (a padded hood and collar, not the elite's steel neck guard).
     // (Blunt above it: the same thick quilted cotton under the brocade as the banner coat's.)
-    // Pierce 0.85, a brigandine's (PIERCE_SCALE).
+    // Pierce 0.82, a brigandine's (PIERCE_SCALE, less its make: BRIGANDINE_MAKES.ming).
     // The coat of plates (PLATE_COAT: was cut 0.95), the steel arm guards over its sleeves as the Ming elite's (MING_ARM_GUARD:
     // were the coat's, the user's call, 2026-11-10).
     protection: { ...PLATE_COAT, bullet: { head: 0.4, torso: 0.5, limb: 0.2 }, regions: { head: { deflects: true }, UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // The coat's lacing parts as the banner coat's does; between the plates and wherever they part, the mail under it (UNDER_ARMOUR.mail `zones`).
-    gaps: { lacing: 0.1 },
+    gaps: BRIGANDINE_MAKES.ming.gaps,
     courage: 0.45,
     designs: [
       bayaraDesign('Blue brocade', '#5a78a6', '#1f2f5a'),

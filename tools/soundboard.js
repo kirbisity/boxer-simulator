@@ -480,7 +480,7 @@ button.take:hover { border-color: var(--bronze); }
 
 const MARKUP = `<div class="wrap">
 <div class="top">
-  <h1>Gladiator Sound Board</h1>
+  <h1>HACS Sound Board</h1>
   <label class="vol" for="volume">Volume <input id="volume" type="range" min="0" max="1.5" step="0.01" value="0.9"></label>
   <span id="status">Tap any play button to turn sound on.</span>
   <nav id="nav"></nav>
@@ -494,6 +494,6 @@ const script = `${modules}\n// ---- the board ----\n(${board.toString()})();\n`;
 new vm.Script(script);
 if (/<\/script/i.test(script)) throw new Error('a closing script tag inside the code');
 const fonts = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=JetBrains+Mono:wght@400;500;600&family=Source+Sans+3:wght@400;600&display=swap">';
-const page = `<meta charset="utf-8">\n<title>Gladiator Sound Board</title>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${fonts}\n<style>${STYLE}</style>\n${MARKUP}\n<script>\n${script}</script>\n`;
+const page = `<meta charset="utf-8">\n<title>HACS Sound Board</title>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n${fonts}\n<style>${STYLE}</style>\n${MARKUP}\n<script>\n${script}</script>\n`;
 writeFileSync(out, page);
 console.log(`${out}: ${(page.length / 1024).toFixed(0)} KB`);

@@ -69,6 +69,8 @@ test('a full katana cut at a joint takes the part off; the fight is over for him
   const { events, world } = strikeAt('katana', 'kesagiri', 'body', 1.5);
   const severed = events.find((event) => event.kind === 'severed');
   assert.ok(severed, 'severed');
+  // (The cut on into his body kills him within the seconds a mortal wound leaves, WORLD.injury.drainSeconds.)
+  advance(world, WORLD.injury.drainSeconds);
   assert.equal(world.fighters[1].state, 'out');
   assert.ok(world.debris.some((piece) => piece.kind === 'piece'), 'the part lies loose');
   const gone = SEVER_PARTS[severed.joint].capsules.map((key) => `${severed.side}${key}`);
@@ -90,16 +92,20 @@ test('a point through the heart takes the chest\'s health, not a bleed timer: a 
   const bare = strikeAt('katana', 'tsuki', 'body', 1.5);
   assert.ok(bare.hit.along > 0.9, 'point first');
   assert.ok(bare.events.some((event) => (event.effects ?? []).includes('stabbed through the chest')));
+  // (He lives on the seconds a mortal wound leaves, WORLD.injury.drainSeconds, and dies of it.)
+  assert.notEqual(bare.world.fighters[1].state, 'out', 'not dead on the spot');
+  advance(bare.world, WORLD.injury.drainSeconds);
   assert.ok(bare.events.some((event) => event.kind === 'killed' && event.effects.includes('died of his injuries')), 'dead of the injury to his chest');
   assert.ok(!bare.events.some((event) => event.kind === 'bledOut'));
   // A knife only just past the mark: a tenth of his chest left, fighting on, bleeding out over most of a minute.
-  // (0.75 m, was 0.8: at BODY.toughness 0.47 the stab from 0.8 m is past what kills.)
-  const knifed = strikeAt('knife', 'stab', 'body', 0.75);
+  // (0.8 m again, was 0.75: the arm and the body behind the point at their own speeds, physics.js armsPaced and bodyPace,
+  // the stab from 0.75 m falls short of the heart.)
+  const knifed = strikeAt('knife', 'stab', 'body', 0.8);
   const victim = knifed.world.fighters[1];
   assert.ok(knifed.events.some((event) => (event.effects ?? []).includes('stabbed through the chest')));
   assert.notEqual(victim.state, 'out', 'not dead on the spot');
-  assert.ok(partHealth(victim, 'trunk') < 0.2, `chest ${partHealth(victim, 'trunk')}`);
-  assert.ok(bodyHarm(victim) > 0.8, 'the health bar near empty');
+  assert.ok(partHealth(victim, 'trunk', true) < 0.2, `chest ${partHealth(victim, 'trunk', true)}`);
+  assert.ok(bodyHarm(victim, true) > 0.8, 'the health bar near empty');
   advance(knifed.world, 20);
   assert.notEqual(victim.state, 'out', 'not bled out in seconds');
   advance(knifed.world, 40);
@@ -203,8 +209,10 @@ test('a blow on a shield is an impact: the blade rebounds or glances off, never 
 test('a hard blow knocks the shield arm out of line, a heavy weapon far more often than a light one', () => {
   const effects = (style, move) => [1, 2, 3, 4].flatMap((seed) => strikeAt(style, move, 'body', 1.6, { defenderStyle: 'templar', seed }).events.filter((event) => event.target === 'shield').flatMap((event) => event.effects));
   const aside = (style, move) => effects(style, move).filter((effect) => effect === 'shield knocked aside').length;
-  assert.ok(aside('odachi', 'yokogiri') >= 2, 'the ōdachi beats the heater aside');
-  assert.ok(aside('odachi', 'yokogiri') > aside('katana', 'yokogiri'), 'the lighter katana less often');
+  // (The kanabo, was the ōdachi: at its speed ceiling (physics.js turnLimit) the ōdachi's sweep now meets the heater at
+  // ~15-25 N·s, the katana's at ~13, and knocks it aside as seldom; the 5 kg club's ~30-45 N·s beats it aside every time.)
+  assert.ok(aside('kanabo', 'hammerSide') >= 2, 'the kanabo beats the heater aside');
+  assert.ok(aside('kanabo', 'hammerSide') > aside('katana', 'yokogiri'), 'the lighter katana less often');
   // Knocked aside, his guard is open: he cannot bring the shield to meet the next until he has it back.
   const world = createWorld([{ ...PRESETS.contender, style: 'templar' }, { ...PRESETS.contender, style: 'odachi' }]);
   const [knight] = world.fighters;
@@ -227,7 +235,8 @@ test('a shield on arm straps is harder to tear away than one held in the fist', 
     advance(world, 0.8);
     for (let blow = 0; blow < 3 && knight.shield; blow += 1) {
       throwPunch(world, swordsman, 'yokogiri', 'body');
-      advance(world, 0.5);
+      // (0.8 s, was 0.5: the ōdachi's sweep, held to its turn limit, takes longer than that, physics.js turnLimit.)
+      advance(world, 0.8);
     }
     return world.events.some((event) => event.kind === 'disarmed' && event.effects[0].includes('torn from his arm'));
   };
@@ -237,13 +246,13 @@ test('a shield on arm straps is harder to tear away than one held in the fist', 
 
 test('a knife stab through a thin quilted jack hurts the trunk and opens nothing that bleeds; enough bleeding still collapses a man', () => {
   // Through a garrison's thin jack: the point gets a little way in — an injury, not a bleed. (Lamellar stops a knife's
-  // ~75 J outright: weapons.js PUNCTURE.)
-  const { hit, world } = strikeAt('knife', 'stab', 'body', 1.2, { outfit: 'levy' });
+  // ~50 J outright: weapons.js PUNCTURE; so does the levy's thicker quilted jack, as a stab vest stops 24-43 J.)
+  const { hit, world } = strikeAt('knife', 'stab', 'body', 1.2, { outfit: 'mingGarrison' });
   assert.ok(hit.pierce > 0, 'the stab went in');
   assert.equal(hit.bleeds, false);
   const victim = world.fighters[1];
   assert.ok(!(victim.bleed > 0), 'it does not bleed');
-  assert.ok(partHealth(victim, 'trunk') < 1 && bodyHarm(victim) > 0, 'but the trunk is hurt, and the health bar shows it');
+  assert.ok(partHealth(victim, 'trunk', true) < 1 && bodyHarm(victim, true) > 0, 'but the trunk is hurt, and the health bar shows it');
   // Enough bleeding, and he goes down for good.
   victim.bleed = 0.05;
   advance(world, 20);

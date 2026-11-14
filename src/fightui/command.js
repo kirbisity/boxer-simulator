@@ -5,9 +5,11 @@
 // set before the fight) where the side has them (Last Stand Squad). The order standing is lit gold, as
 // a choice is in the footer. Shown only in a fight his side is big enough
 // for orders. A new order is called for a moment under the column, however
-// it was given (a tap, or keys 7–0).
+// it was given (a tap, or keys 7–0). Above the column, where his side has more
+// than one arm, a row of tabs: All, Foot, Shot, Horse (keys [ and ]); the orders go
+// to the arm lit, and the pills show that arm's order and the orders it takes.
 
-import { canCommand, COMMAND_ORDERS, ordersFor, standingOrder } from '../command.js';
+import { canCommand, chosenGroup, COMMAND_GROUPS, COMMAND_ORDERS, groupsFor, orderOver, ordersFor, standingOrder } from '../command.js';
 import { fightUiElement } from './kit.js';
 import { onLangChange, t } from '../i18n.js';
 
@@ -34,7 +36,8 @@ const FIGHT_UI_COMMAND_ICONS = {
 
 /**
  * Put the order buttons in `root`. `hooks`: world(), player(), now() (s),
- * order(kind) (gives it: main.js, which knows where the camera looks).
+ * order(kind) (gives it: main.js, which knows where the camera looks),
+ * group(step) (chooses the arm: an arm's key).
  * Returns { update, reset }.
  */
 export function fightUiCommandBar(root, hooks) {
@@ -42,6 +45,22 @@ export function fightUiCommandBar(root, hooks) {
   bar.setAttribute('role', 'group');
   bar.setAttribute('aria-label', t('fightui.orders'));
   bar.hidden = true;
+  const arms = bar.appendChild(fightUiElement('div', 'fu-arms'));
+  arms.setAttribute('role', 'tablist');
+  const armButtons = COMMAND_GROUPS.map((entry) => {
+    const button = fightUiElement('button', 'fu-arm', t(`order.group.${entry.key}`));
+    button.type = 'button';
+    button.dataset.group = entry.key;
+    button.title = `${t(`order.group.${entry.key}`)} ([ ])`;
+    button.addEventListener('pointerdown', (press) => {
+      press.preventDefault();
+      press.stopPropagation();
+      hooks.group?.(entry.key);
+      navigator.vibrate?.(10);
+    });
+    return button;
+  });
+  arms.append(...armButtons);
   const buttons = COMMAND_ORDERS.map((entry) => {
     const button = fightUiElement('button', 'fu-order', `<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true">${FIGHT_UI_COMMAND_ICONS[entry.kind]}</svg><span>${t(`order.${entry.kind}`)}</span><kbd>${entry.key}</kbd>`);
     button.type = 'button';
@@ -58,6 +77,7 @@ export function fightUiCommandBar(root, hooks) {
     return button;
   });
   bar.append(...buttons);
+  // The call sits in the column, under the last pill shown, however many there are.
   // A switch of language (src/i18n.js) relabels the pills and the bar.
   onLangChange(() => {
     bar.setAttribute('aria-label', t('fightui.orders'));
@@ -66,8 +86,9 @@ export function fightUiCommandBar(root, hooks) {
       button.querySelector('span').textContent = t(`order.${entry.kind}`);
       button.title = `${t(`order.call.${entry.kind}`)} (${entry.key})`;
     }
+    for (const button of armButtons) button.textContent = t(`order.group.${button.dataset.group}`);
   });
-  const said = root.appendChild(fightUiElement('div', 'fu-order-said'));
+  const said = bar.appendChild(fightUiElement('div', 'fu-order-said'));
   said.hidden = true;
   let shown = null;
   let heard = null;
@@ -82,17 +103,24 @@ export function fightUiCommandBar(root, hooks) {
       said.hidden = true;
       return;
     }
-    // Formation only where the side has places of its own; the call under the column moved down a pill for it.
-    const offered = new Set(ordersFor(world, me.corner).map((entry) => entry.kind));
+    // The arms he has (only All: no tabs), the one chosen lit.
+    const groups = groupsFor(world, me);
+    const group = chosenGroup(world, me);
+    arms.hidden = groups.length < 2;
+    for (const button of armButtons) {
+      button.hidden = !groups.includes(button.dataset.group);
+      button.classList.toggle('on', button.dataset.group === group);
+    }
+    // Formation only where the side has places of its own; the horse only what a rider can be told.
+    const offered = new Set(ordersFor(world, me.corner, group).map((entry) => entry.kind));
     for (const button of buttons) button.hidden = !offered.has(button.dataset.order);
-    bar.classList.toggle('fu-orders-five', offered.size > 4);
-    const kind = standingOrder(world, me.corner);
-    if (kind !== shown) {
-      shown = kind;
+    const kind = standingOrder(world, me.corner, group);
+    if (`${group}:${kind}` !== shown) {
+      shown = `${group}:${kind}`;
       for (const button of buttons) button.classList.toggle('on', button.dataset.order === kind);
     }
     // A new order (or the order taken back): called for a moment.
-    const serial = world.commands?.[me.corner]?.serial ?? 0;
+    const serial = orderOver(world, me.corner, group)?.serial ?? 0;
     const order = `${kind}:${serial}`;
     if (heard !== null && order !== heard) {
       said.textContent = t(`order.call.${kind}`);

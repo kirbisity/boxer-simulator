@@ -136,3 +136,51 @@ test('a broken, crawling or fled man hears no order; the order lapses with its g
   keepOrders(world);
   assert.equal(standingOrder(world, 'red'), 'free');
 });
+
+// Arms (command.js COMMAND_GROUPS): the foot, the shot and the horse ordered apart.
+test('arms: an order to the shot leaves the foot free; an order to all takes back every arm\'s', async () => {
+  const { groupsFor, groupOf } = await import('../src/command.js');
+  const { world, player } = orderBattle('catalaunian', 1);
+  assert.deepEqual(groupsFor(world, player), ['all', 'foot', 'shot', 'horse']);
+  giveOrder(world, player, 'hold', { group: 'shot' });
+  assert.equal(standingOrder(world, 'red', 'shot'), 'hold');
+  assert.equal(standingOrder(world, 'red', 'foot'), 'free');
+  const shooter = world.fighters.find((fighter) => fighter.corner === 'red' && fighter !== player && groupOf(fighter) === 'shot');
+  const footman = world.fighters.find((fighter) => fighter.corner === 'red' && fighter !== player && groupOf(fighter) === 'foot');
+  // (A shooter held in his rank keeps it: orderKeepsPlace is false for him too. What tells is whether the order reached him.)
+  orderKeepsPlace(world, shooter);
+  orderKeepsPlace(world, footman);
+  assert.equal(shooter.order?.serial, world.groupCommands.red.shot.serial);
+  assert.equal(footman.order, undefined);
+  // The horse take only what a rider can be told.
+  assert.equal(giveOrder(world, player, 'rally', { group: 'horse' }), null);
+  giveOrder(world, player, 'charge');
+  assert.equal(standingOrder(world, 'red', 'shot'), 'charge');
+  assert.deepEqual(world.groupCommands.red, {});
+});
+
+test('arms: the horse held by his order stay on their wing past the time it would have gone; Charge lets them go', () => {
+  const { world, player } = orderBattle('catalaunian', 1);
+  giveOrder(world, player, 'hold', { group: 'horse' });
+  world.wings.by = 0;
+  runOrders(world, player, 1);
+  const riders = world.fighters.filter((fighter) => fighter.corner === 'red' && fighter.mount && fighter.state === 'up');
+  assert.ok(riders.length && riders.every((fighter) => fighter.wing?.held), 'all held');
+  giveOrder(world, player, 'charge', { group: 'horse' });
+  assert.ok(riders.every((fighter) => !fighter.wing.held), 'all let go');
+});
+
+test('the general played stands in the middle of his arm, however many his side', () => {
+  for (const count of [5, 20, 60]) {
+    const sides = legionSides(seededRandom(2), count);
+    const level = SCENARIOS.legion;
+    const entries = [...sides.red.map((inputs) => ({ inputs, corner: 'red' })), ...sides.blue.map((inputs) => ({ inputs, corner: 'blue' }))];
+    const world = createWorld(entries, { seed: 2, arena: level.arena, formation: level.formation, general: { corner: 'red', index: 0 } });
+    const red = world.fighters.filter((fighter) => fighter.corner === 'red');
+    const me = red[0];
+    const arm = red.filter((fighter) => Boolean(fighter.mount) === Boolean(me.mount));
+    const middle = [mean(arm.map((fighter) => at(fighter)[0])), mean(arm.map((fighter) => at(fighter)[1]))];
+    const nearest = Math.min(...arm.map((fighter) => apart(at(fighter), middle)));
+    assert.ok(apart(at(me), middle) <= nearest + 1e-6, `${count} a side: ${apart(at(me), middle).toFixed(2)} m from the middle (nearest man ${nearest.toFixed(2)})`);
+  }
+});

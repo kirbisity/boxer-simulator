@@ -1,4 +1,4 @@
-# The fighters' bodies from the user's base meshes (Base_Male_Mesh.blend, female.blend; the user's call, 2026-11-10): each mesh
+# The fighters' bodies from the modelled base meshes (Base_Male_Mesh.blend, female.blend; 2026-11-10): each mesh
 # without its head, hands and feet (the game's own head, hands and feet cover those, face.js and wardrobe.js), its arms turned
 # down into the rig's A-pose, decimated to a fighter's and a crowd's count of triangles, in the game's frame (units of standing
 # height, x forward, y up, z to the left, the ground at y 0), with its joints as modelled and each point's skin part (and the

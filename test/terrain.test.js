@@ -335,6 +335,8 @@ function falls(height, how) {
         }
         advance(world, 1 / 60);
       }
+      // (A mortal fall kills within the seconds after it, WORLD.injury.drainSeconds: physics.js injure.)
+      advance(world, WORLD.injury.drainSeconds);
       const dead = fighter.state === 'out';
       results.push({ name, seed, dead, legs: legShare(fighter), broken: [...fighter.broken], trunk: fighter.trauma?.trunk ?? 0, up: fighter.state === 'up' });
     }

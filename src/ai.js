@@ -7,7 +7,7 @@ import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { MAIMING, maimFear } from './maiming.js';
-import { aimPoint, armGone, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { aimPoint, armGone, inRiderArc, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { BLADES, GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
@@ -2261,6 +2261,27 @@ export function hurtShare(fighter) {
   return Math.min(1, Math.max(bodyHarm(fighter), AI.panic.perKnockdown * fighter.knockdowns));
 }
 
+/** Where his hurt is going (hurtShare with the injury still to be felt: physics.js injure): the health bar's ghost. */
+export function hurtDueShare(fighter) {
+  return Math.min(1, Math.max(bodyHarm(fighter, true), AI.panic.perKnockdown * fighter.knockdowns));
+}
+
+/**
+ * Paint a health bar (`.bar.health`: its fill `i`, and for the player's own man its ghost `b.due`) for a fighter: the fill
+ * is his health now; the ghost, the stretch it is still falling through to where the blows he took will leave it, as the
+ * injury to his head and trunk is felt over the seconds after (WORLD.injury.drainSeconds).
+ */
+export function paintHealth(bar, fighter, ghost = false) {
+  const now = 1 - hurtShare(fighter);
+  bar.querySelector('i').style.width = `${Math.round(now * 100)}%`;
+  const due = bar.querySelector('b.due');
+  if (!due) return;
+  const to = ghost ? 1 - hurtDueShare(fighter) : now;
+  due.hidden = now - to < 0.005;
+  due.style.left = `${to * 100}%`;
+  due.style.width = `${Math.max(0, now - to) * 100}%`;
+}
+
 /**
  * The couched charge: true while it has the fighter (running in, or the
  * blow under way). Once its blow is over the lance is kept (it breaks only
@@ -3801,7 +3822,8 @@ function decide(world, fighter, dt) {
   // In a crowd, the strike to answer is whichever is coming at me.
   // Only a blow aimed at him: one at a team-mate is not his to answer.
   // A man in a helm bolted to his breast sees only through its slit (sightAngle): a blow from outside it comes unseen.
-  const striker = world.fighters.find((other) => hostile(other, fighter) && other.punch?.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)));
+  // In the saddle he answers only a blow from before him (physics.js inRiderArc): one from behind or square beside him he never meets.
+  const striker = world.fighters.find((other) => hostile(other, fighter) && other.punch?.target === fighter.id && (!fighter.body.gear.headLocked || inSight(fighter, other)) && inRiderArc(fighter, point(other.x, P.pelvis)));
   const incoming = striker?.punch;
   if (incoming && fighter.seenPunch !== incoming) {
     fighter.seenPunch = incoming;

@@ -873,7 +873,7 @@ export function lastGateClock(seconds) {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
 }
 
-/** The line a player shares: "Last Stand Squad as the Samurai: 57 rebels cut down (21 by my hand), 8 waves, 3:42. Gladiator". */
+/** The line a player shares: "Last Stand Squad as the Samurai: 57 rebels cut down (21 by my hand), 8 waves, 3:42. HACS". */
 export function lastGateShareText(result) {
   const mode = lgMode(result.hero);
   const foes = result.kills === 1 ? mode.foe : mode.foes;
@@ -895,6 +895,6 @@ export function lastGatePosterWords(result, name = null) {
     by: t('squad.poster.by', { mine: result.heroKills ?? 0, waves: t(waves === 1 ? 'squad.poster.wave' : 'squad.poster.waves', { n: waves }) }),
     name: tname(name ?? mode.label).toUpperCase(),
     title: t('squad.poster.title', { label: tname(mode.label).toUpperCase(), weapon: tname(mode.weapon).toUpperCase() }),
-    mark: `GLADIATOR · ${tname(LAST_GATE.title).toUpperCase()}`,
+    mark: `HACS · ${tname(LAST_GATE.title).toUpperCase()}`,
   };
 }

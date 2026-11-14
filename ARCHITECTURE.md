@@ -1,6 +1,6 @@
 # Architecture
 
-Gladiator is a physics simulation first and a game second. Every fighter is
+Historically Accurate Combat Simulator (HACS, formerly Gladiator) is a physics simulation first and a game second. Every fighter is
 a particle skeleton driven by muscles, every blow an impulse, every injury a
 consequence of what the simulation measured. This page says where each part
 lives, where its numbers are tuned, and how to add to it without scattering

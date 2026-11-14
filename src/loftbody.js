@@ -2185,7 +2185,7 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
 }
 
 /**
- * The arm's forms at the mesh's own scale (LOFT.armForms; the user's call, 2026-11-11: arms of bone and muscle hinged at
+ * The arm's forms at the mesh's own scale (LOFT.armForms; 2026-11-11: arms of bone and muscle hinged at
  * joints, not a rubber tube), placed as the skin rules place them (skinrules.js limbRule) but a centimetre high, not a map's
  * few millimetres: on the upper arm the deltoid's cap and the groove where it tucks into the arm, the biceps in front, the
  * triceps behind and the groove between them at the sides, the elbow's point behind and its crease in front; on the forearm
@@ -2399,7 +2399,7 @@ function clothHeat(mesh) {
 
 /**
  * The base mesh skinned with the model's own weights: Blender's bone heat on the model's skeleton (tools/blender/baseweights.py;
- * the user's call, 2026-11-11: arms that read as hinged at real joints, not a rubber tube). Weighted by distance to the bones
+ * 2026-11-11: arms that read as hinged at real joints, not a rubber tube). Weighted by distance to the bones
  * (to their sixth power) each point went to its nearest bone within a centimetre or two, so a raised arm creased the chest
  * and the shoulder bent as a tube; bone heat spreads each bone's share over the surface by diffusion. Each bone of Blender's
  * skeleton is the game's of that name, but its one trunk bone, whose share is parted among the game's pelvis, spine and chest

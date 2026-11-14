@@ -201,6 +201,58 @@ export function holdover(projectile, distance) {
   return Math.atan(row.drop / Math.max(0.5, distance));
 }
 
+/**
+ * One rule for every black-powder ball gun of the matchlock's age (weapons.js MATCHLOCK, THREE_EYED): its ball's muzzle
+ * velocity and its aim, from its barrel (`barrel` m), its ball (`kg` of lead: the bore is the ball's own diameter, so the
+ * barrel's length in calibres), its charge (`charge`, a share of the ball's weight) and how it is held (`hold`).
+ * - Velocity (ballGunVelocity): Hutton's ballistic-pendulum trials at Woolwich (1775-91; Hutton, *Tracts on Mathematical
+ *   and Philosophical Subjects*, 1812): with the same powder and ball, the velocity went nearly as the square root of the
+ *   charge (`chargePower` 0.5: the powder's work goes as its weight) and as about the fifth root of the bore's length in
+ *   calibres (`lengthPower` 0.2: a longer bore burns more of the charge before the ball leaves and lets its gas expand
+ *   further, each calibre more giving less: sub-linear; his guns ran ~15-40 calibres). Fitted to one gun, the matchlock
+ *   (`ref`: the Graz armoury's trials, ~392 m/s for a ~13 g ball out of a ~1 m barrel, Krenn, Kalaus & Hall 1995; on half
+ *   the ball's weight of powder, an estimate in the period's third to two thirds); every other ball gun follows from it.
+ *   (The Adams's percussion ball and the modern rounds keep their chronographed figures: another age's powder.)
+ * - Aim (ballGunSpread, rad, one deviation): the ball's own wander (`wander`: a loose round ball out of a smoothbore swerves
+ *   as its chance spin takes it; the matchlock's 0.014 less its sights' share) and the aim's, side by side. A gun at the
+ *   cheek is laid by its sights: the eye's error lining the fore-sight on the back-sight (`sighting` m, ~1.5 mm with a
+ *   period notch and bead: an estimate) over the sight radius, the barrel's length (the sights at breech and muzzle), so
+ *   the shorter the barrel the wider. A gun at the hip or under the arm (`hold` 'hip') has no stock to the cheek and no
+ *   line to the eye: it is pointed by feel and by the eye from half a metre above it, its error at the end of the length
+ *   he points (`piece` m, the whole piece from the rear hand) `pointing` m, a hand's breadth (~3° on a 1.3 m piece: a man's
+ *   width at ~10 m is one deviation; an estimate, fitted to nothing but that). Qi Jiguang of the northern troops' fast guns
+ *   (快枪, the three-eyed gun among them): they cannot hit, they often burst, and the bird gun (鸟铳) is to be preferred
+ *   (《纪效新书》, as quoted secondhand).
+ */
+export const BALL_GUN = {
+  lead: 11340,
+  ref: { velocity: 392, barrel: 1.0, kg: 0.013, charge: 0.5 },
+  chargePower: 0.5,
+  lengthPower: 0.2,
+  wander: 0.0139,
+  sighting: 0.0015,
+  pointing: 0.07,
+};
+
+/** A lead ball's diameter (m), the bore it fits, from its mass (kg). */
+export function ballBore(kg) {
+  return Math.cbrt((6 * kg) / (Math.PI * BALL_GUN.lead));
+}
+
+/** A black-powder ball gun's muzzle velocity (m/s), BALL_GUN's rule: `barrel` m, ball `kg`, `charge` a share of its weight. */
+export function ballGunVelocity({ barrel, kg, charge }) {
+  const { ref, chargePower, lengthPower } = BALL_GUN;
+  const calibres = barrel / ballBore(kg);
+  const refCalibres = ref.barrel / ballBore(ref.kg);
+  return ref.velocity * (charge / ref.charge) ** chargePower * (calibres / refCalibres) ** lengthPower;
+}
+
+/** A black-powder ball gun's spread (rad), BALL_GUN's rule: sighted at the cheek over its `barrel`, or pointed at the hip over its `piece`. */
+export function ballGunSpread({ barrel, hold = 'cheek', piece = barrel }) {
+  const aim = hold === 'hip' ? BALL_GUN.pointing / piece : BALL_GUN.sighting / barrel;
+  return Math.hypot(BALL_GUN.wander, aim);
+}
+
 /** A projectile's muzzle energy (J). */
 export function muzzleEnergy(projectile) {
   return 0.5 * projectile.kg * projectile.velocity * projectile.velocity;

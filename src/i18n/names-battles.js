@@ -166,6 +166,9 @@ export const NAMES_BATTLES = {
   'Coast fort': '海岸要塞',
   'Harbour': '港口',
   'Gobi steppe': '戈壁草原',
+  'Agincourt field': '阿金库尔战场',
+  'Cerignola slope': '切里尼奥拉山坡',
+  'Coast village': '海边村落',
   'Catalaunian plains': '卡太隆尼平原',
   'Desert': '沙漠',
 

@@ -875,8 +875,10 @@ export function chargeAt(world, fighter, charge) {
     horse.goal = { heading: steerInside(world, horse, clear.heading), speed: clear.speed };
   };
   if (charge.phase === 'charge') {
-    // His near side, on his weapon side, at the room the riding AI gives a pass (ride()).
-    const passAt = vec.add(target, vec.scale([-along[2], 0, along[0]], passWidth(fighter, opponent, style, lance)));
+    // His near side, on his weapon side, at the room the riding AI gives a pass (ride()); the player's horse is ridden
+    // straight at his man, into him if he stands (a couched point still carried its own width off the horse's line).
+    const width = fighter.player ? (lance ? WORLD.mount.passLance : 0) : passWidth(fighter, opponent, style, lance);
+    const passAt = vec.add(target, vec.scale([-along[2], 0, along[0]], width));
     // (Close in, the line is held: no swerve at the last moment.)
     setGoal(distance > 3 ? headingOf(passAt[0] - me[0], passAt[2] - me[2]) : horse.goal.heading, horse.paces.gallop);
     if (!charge.struck) blowInPassing(world, fighter, charge, opponent, style, lance);

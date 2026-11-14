@@ -44,8 +44,8 @@ const LENGTH = {
   ankle: 0.039, shank: 0.246, thigh: 0.245, trunk: 0.27, neckToHead: 0.115,
   hipSpan: 0.1, headRadius: 0.055,
 };
-// The arms and shoulders, fractions of standing height, one table per sex (the user's call, 2026-11-11: "size down the entire
-// shoulder and arm assembly"; set to the user's numbers here). The figures now are the base models' own (src/basebody-data.js
+// The arms and shoulders, fractions of standing height, one table per sex (2026-11-11: "size down the entire
+// shoulder and arm assembly"; set to the numbers given). The figures now are the base models' own (src/basebody-data.js
 // joints): `upperArm` the shoulder joint to the elbow (male 0.1775, female 0.1623); `forearmToFist` the elbow to the point the
 // game's hand is drawn on, the model's elbow to wrist (male 0.1422, female 0.1300) and the hand's heel to its point
 // (basebody.js BASE_BODY.handSeat, 0.0117); `shoulderSpan` between the shoulder joints, narrower than the models' (male

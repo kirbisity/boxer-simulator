@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Gladiator</title>
+<title>Historically Accurate Combat Simulator (HACS)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <link rel="stylesheet" href="boxer.css">
@@ -18,7 +18,7 @@
   <header class="hud">
     <section class="card red" id="hud-red">
       <div class="top"><span class="name"></span><span class="kd"></span></div>
-      <div class="bar health" title="Health" data-i18n-title="page.health"><i></i></div>
+      <div class="bar health" title="Health" data-i18n-title="page.health"><i></i><b class="due" hidden></b></div>
       <div class="bar stamina" title="Stamina" data-i18n-title="page.stamina"><i></i></div>
       <div class="bar brain" title="Brain strain: accumulated head impacts" data-i18n-title="page.brain"><i></i></div>
       <div class="bar blood" title="Blood lost: at the end of this bar he collapses" data-i18n-title="page.blood" hidden><i></i></div>
@@ -27,7 +27,7 @@
     <div class="clock" id="clock">0:00</div>
     <section class="card blue" id="hud-blue">
       <div class="top"><span class="name"></span><span class="kd"></span></div>
-      <div class="bar health" title="Health" data-i18n-title="page.health"><i></i></div>
+      <div class="bar health" title="Health" data-i18n-title="page.health"><i></i><b class="due" hidden></b></div>
       <div class="bar stamina" title="Stamina" data-i18n-title="page.stamina"><i></i></div>
       <div class="bar brain" title="Brain strain: accumulated head impacts" data-i18n-title="page.brain"><i></i></div>
       <div class="bar blood" title="Blood lost: at the end of this bar he collapses" data-i18n-title="page.blood" hidden><i></i></div>
@@ -106,8 +106,8 @@
         <button data-value="physics" data-i18n="page.layerPhysics">Physics</button>
       </div>
       <label class="teams look-pick sandbox-only" aria-label="Look" title="How the game is drawn: the toon look as it has always been, or another approach to compare (also ?look=<id>)" data-i18n-aria="page.look" data-i18n-title="page.lookTitle"><span data-i18n="page.look">Look</span><select id="look"></select></label>
-      <!-- The base-mesh bodies (basebody.js), a test build's option only: the game's body or the user's Blender model. -->
-      <label class="teams body-pick sandbox-only" aria-label="Body" title="The body fighters are drawn with: the game's own, or the base model from Blender (a test, not the game's yet)"><span>Body</span><select id="body-style"><option value="v7">Game</option><option value="base">Base model (test)</option></select></label>
+      <!-- The base-mesh bodies (basebody.js), a test build's option only: the game's body or the Blender model. -->
+      <label class="teams body-pick sandbox-only" aria-label="Body" title="The body fighters are drawn with: the game's modelled body, or the one before it (V7), to compare"><span>Body</span><select id="body-style"><option value="base">Game</option><option value="v7">Before (V7)</option></select></label>
       <div class="seg" id="speeds" aria-label="Speed" data-i18n-aria="page.speed">
         <button data-value="0.25">¼×</button>
         <button data-value="1" class="on">1×</button>

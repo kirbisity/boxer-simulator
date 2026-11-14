@@ -4,7 +4,8 @@
 // every module this imports is plain numbers too, so every style can be built
 // and checked in Node.
 //
-// 'v7' is the default (DEFAULT_BODY_STYLE); 'lofted' the old default and the baseline. 'smoothed' and 'dense' are the
+// 'base' is the default (DEFAULT_BODY_STYLE: the modelled bodies, since 2026-11-14); 'v7' the default before it, 'lofted' the
+// one before that and the baseline. 'smoothed' and 'dense' are the
 // anatomy field (bodymesh.js), 'faceted' the loft in flat low poly.
 //
 // Round one of the body-drawing prototypes (docs: tools/bodysheet.html):
@@ -24,9 +25,9 @@
 //   v6  flesh hero: the refined field at full resolution, painted per vertex
 //   v7  V5's shape on a loft: a medium-density loft (V2's texture coordinates, skin weights and maps) wrapped onto the refined
 //       field's large forms (loftbody.js wrapOnField), so the arms grow out of the trunk as in V5 at a fifth of its triangles
-// The base meshes (the user's call, 2026-11-10):
-//   base  the user's modelled male and female bodies (basebody.js) placed on the loft's rings, so every build moves them as it
-//         moves the loft; V2's texture coordinates and maps, the loft's clothes and armour over them. A style to compare: not the default.
+// The base meshes (2026-11-10):
+//   base  the modelled male and female bodies (basebody.js) placed on the loft's rings, so every build moves them as it
+//         moves the loft; V2's texture coordinates and maps, the loft's clothes and armour over them. The game's body (DEFAULT_BODY_STYLE).
 // Every round-two style also morphs the face with the body (the `face` flag; the head is built in face.js).
 
 import { buildBodyMesh } from './bodymesh.js';
@@ -57,15 +58,19 @@ export const STYLE_SPECS = {
   v5: { face: true, label: 'V5 flesh-lite, painted' },
   v6: { face: true, label: 'V6 flesh hero, painted' },
   v7: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'V7 flesh-wrapped loft + V2 maps' },
-  // (PROOF OF CONCEPT, shoulder-poc, the user's call 2026-11-11: the muscle and bone maps back on the base meshes, `share`
+  // (PROOF OF CONCEPT, shoulder-poc, 2026-11-11: the muscle and bone maps back on the base meshes, `share`
   // 0.35: the model's own relief carries about a third of it, and at v7's 0 a thin man's ribs read as starved beside v7's. With the skin placed on the model's own joints and frames (basebody.js baseBindJoints), the rules' kneecap sits on
   // the knee's front, the shin's crest down the shin and the abs on the abs at every build; at `share` 1 (round 1) they were left
   // out, when the loft's angles still turned against the model.)
   base: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0.35, upgrade: true }, label: 'Base meshes + V2 maps' },
 };
 export const BODY_STYLE_KEYS = Object.keys(STYLE_SPECS);
-/** The style fighters are drawn in unless a look says otherwise: V7. ('lofted', the plain loft, is the old default and the placeholder while V7 is built.) */
-export const DEFAULT_BODY_STYLE = 'v7';
+/**
+ * The style fighters are drawn in unless a look says otherwise: the base meshes ('base'; where a build leaves them out, tools/custom.js,
+ * loftbody.js draws the loft they are placed on instead). 'lofted', the plain loft, is the placeholder while a body is built; 'v7' the
+ * default before the base meshes, still to be had.
+ */
+export const DEFAULT_BODY_STYLE = 'base';
 
 /** What a style does beyond the mesh (see STYLE_SPECS); an unknown style does nothing more (the plain loft's). */
 export const styleSpec = (style) => STYLE_SPECS[style] ?? STYLE_SPECS.lofted;

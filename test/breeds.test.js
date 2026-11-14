@@ -19,11 +19,12 @@ test('each breed stands and weighs within its sources', () => {
   assert.ok(HORSES.destrier.accel < HORSES.steppe.accel && HORSES.destrier.lateral < HORSES.steppe.lateral, 'the heaviest the slowest away and widest in a turn');
 });
 
-test('the Ming horsemen ride the border horse; a man on foot is not made to ride by it', () => {
+test('the Ming horsemen ride the border horse, and so does a Ming foot soldier put on a horse', () => {
   const random = seededRandom(3);
   assert.equal(mountOf(mingHorseman(random, 'dao')).breed, 'mingBorder');
   assert.equal(mountOf(mingSoldier(random, 'dao', 'elite')).breed, 'mingBorder');
-  // An own horse on a kit that does not ride does not make him ride.
+  // A garrison man's kit names no horse: put on one, he rides his own army's (horses.js peopleHorse), not the Han cavalry's.
   const levy = mingSoldier(random, 'spear', 'garrison');
-  assert.equal(canRide({ ...levy, outfit: { ...levy.outfit, horse: 'mingBorder' } }), false);
+  assert.equal(canRide(levy), true);
+  assert.equal(mountOf(levy).breed, 'mingBorder');
 });

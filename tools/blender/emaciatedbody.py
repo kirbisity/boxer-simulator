@@ -1,5 +1,5 @@
-# The starved body from the user's emaciated reference itself (ax_model.blend, object "anabelle.001", 21k points; the user's
-# call, 2026-11-11: "simply use the provided emaciated model"): for every point of the base meshes, the whole of her surface
+# The starved body from the emaciated reference itself (ax_model.blend, object "anabelle.001", 21k points;
+# 2026-11-11: "simply use the provided emaciated model"): for every point of the base meshes, the whole of her surface
 # along the ring's radius at its place on its part (t along, its angle round), against the female base's there, arms included:
 # her girth and her contour, not her contour alone (tools/blender/emaciated.py kept only the contour, each ring's mean taken
 # off). The game blends the base body to this by how wasted a body is (src/basebody.js, loftbody.js baseWasting).
@@ -134,7 +134,7 @@ print('HER ARM', FREE_SIDE, shoulder.round(4).tolist(), elbow.round(4).tolist())
 print('EMACIATED', 'height (blend units)', round(H, 3), 'free side', FREE, elbows, 'straight leg', STRAIGHT, {k: round(v, 4) for k, v in bend.items()}, {k: v.round(4).tolist() for k, v in joints.items()})
 
 
-# ---- Re-posed (the user, 2026-11-11: "align that through the regular posture and then just use it") -------------------------
+# ---- Re-posed (2026-11-11: "align that through the regular posture and then just use it") -------------------------
 # An armature fitted to her own joints, bound with Blender's automatic (bone heat) weights; her arms brought to the base
 # model's hang and her legs to its stance, each bone turned from where it points on her to where the female base's points.
 # Her limbs' joints placed by eye (scratchpad joints/her-joints.json, in her.npz's raw frame: the free arm and the standing
@@ -362,7 +362,7 @@ def trunk_widths(base):
     return lambda t: np.mean([rows.get(int(math.floor(t / EMACIATED['bin'])) + k, 0) or rows.get(int(math.floor(t / EMACIATED['bin'])), 1e-3) for k in (-1, 0, 1)])
 
 
-# The man's starved body (the user, 2026-11-11: "just use the same emaciated body and adjust it to the male body's shape a
+# The man's starved body (2026-11-11: "just use the same emaciated body and adjust it to the male body's shape a
 # bit ... the size of the shoulder and the hip"): her surface, with the trunk's width (across, not its depth) scaled at each t
 # by his base trunk's over the female base's there (`sexWidth`, clamped: his wider shoulders and ribcage, his narrower hips),
 # and her chest flattened to his base's front where her breasts stand out past it (`chestBand`, t of the trunk, the front

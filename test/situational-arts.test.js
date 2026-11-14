@@ -151,8 +151,10 @@ test('situational arts: each does what it is for', () => {
   assert.ok(wrist.disarmed >= 2, `wrist cut disarmed ${wrist.disarmed} of ${wrist.tries}`);
   assert.ok((wrist.parts.rForearm ?? 0) >= wrist.tries * 0.25, `at his sword arm: ${JSON.stringify(wrist.parts)}`);
   // The leg sweep and the hammer's hook take his feet.
+  // (Two in nine, was three: the spear held to its turn limit, physics.js turnLimit, sweeps through his shin as hard as
+  // before (its best blow ~21 N·s, was ~18) but slower, and carries his foot from under him less often.)
   const sweep = survey('artLegSweep', 'spear');
-  assert.ok(sweep.fell >= sweep.tries * 0.3, `swept down ${sweep.fell} of ${sweep.tries}`);
+  assert.ok(sweep.fell >= 2, `swept down ${sweep.fell} of ${sweep.tries}`);
   const hook = survey('artHook', 'warhammer');
   assert.ok(hook.fell >= 2, `hooked down ${hook.fell} of ${hook.tries}`);
   // The beak goes into plate where the crushing blow cannot.

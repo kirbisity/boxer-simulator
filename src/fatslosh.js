@@ -1,4 +1,4 @@
-// A fat body's flesh following its frame (the user's call, 2026-11-10: "like a water bag", not a rigid object): the belly, the
+// A fat body's flesh following its frame (2026-11-10: "like a water bag", not a rigid object): the belly, the
 // breasts and the buttocks each a mass on a spring and damper of its own, driven by the acceleration of the bone it hangs from.
 // It lags behind a move and settles after it: a run shows a steady bounce with each stride, a landing a heavy drop and a few
 // slow wobbles, a sidestep a swing the other way. Only for a trunk fat layer of an overweight build and up, and not in a crowd.
@@ -20,7 +20,7 @@ export const SLOSH = {
   // Natural frequency (Hz) and damping ratio, from the overweight end to the very obese: an overweight belly is firm and settles
   // at once (4-5 Hz, a damping ratio about 0.3); a very large one is a heavy slow mass that sloshes for three or four wobbles
   // after a landing (2-2.5 Hz, 0.12-0.15). Measured soft-tissue wobbling masses: abdominal and gluteal fat 2-5 Hz, lightly damped
-  // (Pain and Challis 2001, wobbling-mass models of the human body; the user's figures, 2026-11-10).
+  // (Pain and Challis 2001, wobbling-mass models of the human body; 2026-11-10).
   hz: [4.5, 2.25],
   damping: [0.3, 0.135],
   // The most a mass swings (m): about 1 cm on an overweight belly, 5-6 cm on a very obese one at a jump's landing (the tissue

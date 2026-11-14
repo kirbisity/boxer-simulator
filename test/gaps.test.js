@@ -49,7 +49,7 @@ function onHead(man, rise, round) {
 const zoneOnTrunk = (man, height, round) => gapZoneAt(man, 'trunk', ...onTrunk(man, height, round));
 const zoneOnHead = (man, rise, round) => gapZoneAt(man, 'head', ...onHead(man, rise, round));
 
-test('the middle of the breastplate, the back plate and the crown never have a gap; the armpit, the groin, the throat and the sights do', () => {
+test('the middle of the breastplate, the back plate and the crown never have a gap; the armpit, the groin (not under a long coat), the throat and the sights do', () => {
   for (const kind of ['knight', 'samuraiTosei', 'mingElite', 'ottomanHeavy', 'samurai', 'conquistadorPlate']) {
     const man = standing(kind);
     for (const height of [0.2, 0.4, 0.6, 0.75]) {
@@ -62,7 +62,9 @@ test('the middle of the breastplate, the back plate and the crown never have a g
     assert.equal(zoneOnTrunk(man, 0.8, 90), 'armpit', `${kind}: under the arm`);
     assert.equal(zoneOnTrunk(man, 0.8, -95), 'armpit', `${kind}: under the other arm`);
     assert.equal(zoneOnTrunk(man, 0.82, 132), 'armpit', `${kind}: behind the arm, high`);
-    assert.equal(zoneOnTrunk(man, 0.02, 10), 'groin', `${kind}: under the fauld`);
+    // (The Ming long coat's skirt closes the groin: outfits.js BRIGANDINE_MAKES.ming; a point there finds only its seams.)
+    if (kind === 'mingElite') assert.notEqual(zoneOnTrunk(man, 0.02, 10), 'groin', `${kind}: under the long coat's skirt`);
+    else assert.equal(zoneOnTrunk(man, 0.02, 10), 'groin', `${kind}: under the fauld`);
     assert.equal(zoneOnHead(man, -0.75, 10), 'neck', `${kind}: the throat`);
     assert.equal(zoneOnHead(man, -0.4, 170), 'neck', `${kind}: the nape`);
   }

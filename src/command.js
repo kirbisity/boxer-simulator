@@ -24,6 +24,14 @@
 // fight, his order lapses.
 // Who hears him (`world.commandMen[corner]`, where it is set: story mode, by his rank): only those men (a squad
 // leader's squad), or nobody (a private soldier commands no one, and has no orders to give). Unset, his whole side.
+// Arms (COMMAND_GROUPS): a general parts his field as commanders always have, into
+// his foot, his shot and his horse, and may order each apart (`world.groupCommands[corner][group]`):
+// the shot told to hold while the foot comes to him and the horse charges. An order
+// to all (`world.commands[corner]`) takes back every order to an arm. Which arm a man
+// is in is read from him (groupOf), never listed. The horse are not walked about by
+// orders (a rider's footwork is his horse's): Charge lets them go from their wing, Hold
+// reins them in where they are (holding as a wing does, formation.js moveWings, till an enemy is on them), Free gives them
+// back to their wing's own time to go.
 
 import { P } from './body.js';
 import { slotAt } from './formation.js';
@@ -49,6 +57,14 @@ export const COMMAND = {
   ranksWithin: 2,
 };
 
+// The arms, in the order the player steps through them ([ and ]): `orders`, where given, the only ones an arm takes.
+export const COMMAND_GROUPS = [
+  { key: 'all' },
+  { key: 'foot' },
+  { key: 'shot' },
+  { key: 'horse', orders: ['charge', 'hold', 'free'] },
+];
+
 // The orders in the order of their buttons: icon, word, key.
 export const COMMAND_ORDERS = [
   { kind: 'rally', label: 'To me', key: '7' },
@@ -59,9 +75,44 @@ export const COMMAND_ORDERS = [
   { kind: 'form', label: 'Formation', key: '-', places: true },
 ];
 
-/** The orders this side may be given: all but Formation where it has no places of its own. */
-export function ordersFor(world, corner) {
-  return COMMAND_ORDERS.filter((entry) => !entry.places || Boolean(world?.formPlaces?.[corner]));
+/** The orders this side (or one arm of it, `group`) may be given: all but Formation where it has no places of its own, and the horse's own few. */
+export function ordersFor(world, corner, group = 'all') {
+  const allowed = COMMAND_GROUPS.find((entry) => entry.key === group)?.orders;
+  return COMMAND_ORDERS.filter((entry) => (!entry.places || Boolean(world?.formPlaces?.[corner])) && (!allowed || allowed.includes(entry.kind)));
+}
+
+/** The arm a man fights in: the horse while mounted, the shot if he went out with a bow or gun (kept: a gunner with his sword out is still of the shot), else the foot. */
+export function groupOf(fighter) {
+  if (fighter.mount) return 'horse';
+  fighter.commandArm ??= fighter.weapon?.held && (fighter.weapon.spec.shot || fighter.weapon.spec.ranged) ? 'shot' : 'foot';
+  return fighter.commandArm;
+}
+
+/** The arms of his side he can order apart: 'all', then each arm with anyone in it who hears him; just 'all' where there is only one arm. */
+export function groupsFor(world, by) {
+  if (!world || !by) return ['all'];
+  const present = new Set();
+  for (const fighter of world.fighters) {
+    if (fighter !== by && fighter.corner === by.corner && fighter.state !== 'out' && hearsOrders(world, fighter)) present.add(groupOf(fighter));
+  }
+  const arms = COMMAND_GROUPS.filter((entry) => entry.key !== 'all' && present.has(entry.key)).map((entry) => entry.key);
+  return arms.length > 1 ? ['all', ...arms] : ['all'];
+}
+
+/** The arm his orders go to now ('all' unless he chose one: chooseGroup). */
+export function chosenGroup(world, by) {
+  const chosen = world?.orderGroups?.[by?.corner] ?? 'all';
+  return groupsFor(world, by).includes(chosen) ? chosen : 'all';
+}
+
+/** Choose the arm his orders go to: `step` +1 or -1 through those he has, or a key of COMMAND_GROUPS. */
+export function chooseGroup(world, by, step) {
+  const groups = groupsFor(world, by);
+  const now = groups.indexOf(chosenGroup(world, by));
+  const next = typeof step === 'number' ? groups[(now + step + groups.length) % groups.length] : (groups.includes(step) ? step : 'all');
+  world.orderGroups ??= {};
+  world.orderGroups[by.corner] = next;
+  return next;
 }
 
 const commandAt = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
@@ -80,40 +131,81 @@ export function canCommand(world, fighter) {
 /** Whether this man hears his side's orders: everyone, unless the side's orders reach only some (`world.commandMen`). */
 const hearsOrders = (world, fighter) => !world.commandMen?.[fighter.corner] || world.commandMen[fighter.corner].includes(fighter.id);
 
-/** The order his side is under ('rally', 'charge', 'hold'), or 'free'. */
-export function standingOrder(world, corner) {
-  return world?.commands?.[corner]?.kind ?? 'free';
+/** The order his side (or one arm of it) is under ('rally', 'charge', 'hold', 'form'), or 'free': an arm's own order over the side's. */
+export function standingOrder(world, corner, group = 'all') {
+  const own = group === 'all' ? null : world?.groupCommands?.[corner]?.[group];
+  return (own ?? world?.commands?.[corner])?.kind ?? 'free';
+}
+
+/** The order standing over this arm (its own, else the side's), or null: what a new call is told by. */
+export function orderOver(world, corner, group = 'all') {
+  return (group === 'all' ? null : world?.groupCommands?.[corner]?.[group]) ?? world?.commands?.[corner] ?? null;
 }
 
 /**
  * Give his side an order: `kind` one of COMMAND_ORDERS, `by` the man giving
- * it, `dir` ([x, z], for a charge) the way to go. 'free' takes the order back.
+ * it, `dir` ([x, z], for a charge) the way to go, `group` the arm it goes to
+ * (COMMAND_GROUPS: 'all', the default, his whole side). 'free' takes the order back.
  */
-export function giveOrder(world, by, kind, { dir = null } = {}) {
+export function giveOrder(world, by, kind, { dir = null, group = 'all' } = {}) {
   world.commands ??= {};
+  world.groupCommands ??= {};
   if (kind === 'form' && !world.formPlaces?.[by.corner]) return null;
+  if (!ordersFor(world, by.corner, group).some((entry) => entry.kind === kind)) return null;
+  const arms = (world.groupCommands[by.corner] ??= {});
+  if (group === 'horse') orderHorse(world, by.corner, kind);
   if (kind === 'free') {
-    delete world.commands[by.corner];
+    if (group === 'all') {
+      delete world.commands[by.corner];
+      for (const arm of Object.keys(arms)) delete arms[arm];
+    } else delete arms[group];
     return null;
   }
   const at = commandAt(by);
   const length = dir ? Math.hypot(dir[0], dir[1]) : 0;
   const way = length > 1e-6 ? [dir[0] / length, dir[1] / length] : [Math.cos(by.yaw), -Math.sin(by.yaw)];
   world.orderCount = (world.orderCount ?? 0) + 1;
-  const command = { kind, by: by.id, at, dir: way, since: world.time, serial: world.orderCount };
-  // Hold: the formation's anchor stays where it is now.
+  const command = { kind, by: by.id, at, dir: way, since: world.time, serial: world.orderCount, group };
+  // Hold to all or to the foot: the formation's anchor (the foot's ranks) stays where it is now.
   const formation = world.formations?.[by.corner];
-  if (kind === 'hold' && formation) command.anchor = [...formation.anchor];
-  if (kind === 'rally') command.places = rallyPlaces(world, by);
+  if (kind === 'hold' && formation && (group === 'all' || group === 'foot')) command.anchor = [...formation.anchor];
+  if (kind === 'rally') command.places = rallyPlaces(world, by, group);
   // Formation: each man's own place, fixed in the world ([x, z] by his id).
   if (kind === 'form') command.places = structuredClone(world.formPlaces[by.corner]);
-  world.commands[by.corner] = command;
+  if (group === 'all') {
+    world.commands[by.corner] = command;
+    for (const arm of Object.keys(arms)) delete arms[arm];
+  } else arms[group] = command;
   return command;
 }
 
+/**
+ * An order to the horse, on the riders themselves (their `wing`, formation.js):
+ * Charge lets every held rider go; Hold reins in every rider up where he is,
+ * held as a wing is (marked `byOrder`); Free hands those back to their wing's
+ * own time to go if the side still has one waiting (`world.wings`), else lets them go.
+ */
+function orderHorse(world, corner, kind) {
+  // A side with no wing waiting is given one held only by the order (`ordered`: it goes at no time of its own), so an enemy upon a reined-in man still lets him go (moveWings).
+  if (kind === 'hold') world.wings ??= { release: 0, by: Infinity, review: 0, ordered: true };
+  for (const fighter of world.fighters) {
+    if (fighter.corner !== corner || !fighter.mount || fighter.state !== 'up' || !hearsOrders(world, fighter)) continue;
+    if (kind === 'charge' && fighter.wing) fighter.wing.held = false;
+    else if (kind === 'hold') fighter.wing = { side: fighter.wing?.side ?? (Math.sign(fighter.mount.at[1]) || 1), held: true, byOrder: true };
+    else if (kind === 'free' && fighter.wing?.byOrder) {
+      fighter.wing.byOrder = false;
+      fighter.wing.held = Boolean(world.wings) && !world.wings.ordered;
+    }
+  }
+}
+
+
 /** Every order taken back (leaving play: the side goes its own way). */
 export function clearOrders(world) {
-  if (world) world.commands = {};
+  if (!world) return;
+  world.commands = {};
+  world.groupCommands = {};
+  world.orderGroups = {};
 }
 
 /**
@@ -122,10 +214,10 @@ export function clearOrders(world) {
  * nearest men in the nearest ring, each ring's men in the order they stand
  * round him, so nobody crosses another to get to his place.
  */
-function rallyPlaces(world, by) {
+function rallyPlaces(world, by, group = 'all') {
   const spec = COMMAND.rally;
   const centre = commandAt(by);
-  const men = world.fighters.filter((fighter) => fighter.corner === by.corner && fighter !== by && hearsOrders(world, fighter))
+  const men = world.fighters.filter((fighter) => fighter.corner === by.corner && fighter !== by && hearsOrders(world, fighter) && (group === 'all' || groupOf(fighter) === group))
     .map((fighter) => ({ fighter, at: commandAt(fighter) }))
     .sort((a, b) => commandApart(a.at, centre) - commandApart(b.at, centre));
   const places = {};
@@ -149,7 +241,7 @@ function rallyPlaces(world, by) {
 
 /** The order this man is to obey now, or null: none, or he is in no state to hear it. His own record of it is fresh for a new order. */
 function orderFor(world, fighter) {
-  const command = world.commands?.[fighter.corner];
+  const command = world.groupCommands?.[fighter.corner]?.[groupOf(fighter)] ?? world.commands?.[fighter.corner];
   if (!command || command.by === fighter.id || !hearsOrders(world, fighter)) return null;
   if (fighter.state !== 'up' || fighter.panicked || fighter.crawling || fighter.fled || fighter.mount) return null;
   if (fighter.order?.serial !== command.serial) {
@@ -174,15 +266,21 @@ function orderFor(world, fighter) {
  * in the ranks out of them on an order is in the fight, not a pose behind it.
  */
 export function keepOrders(world) {
+  for (const arms of Object.values(world.groupCommands ?? {})) {
+    for (const [group, command] of Object.entries(arms)) {
+      const giver = world.fighters[command.by];
+      if (!giver || giver.state === 'out') delete arms[group];
+    }
+  }
   for (const [corner, command] of Object.entries(world.commands ?? {})) {
     const giver = world.fighters[command.by];
-    if (!giver || giver.state === 'out') {
-      delete world.commands[corner];
-      continue;
-    }
+    if (!giver || giver.state === 'out') delete world.commands[corner];
+  }
+  for (const corner of ['red', 'blue']) {
     const formation = world.formations?.[corner];
     if (!formation) continue;
-    if (command.anchor) formation.anchor = [...command.anchor];
+    const command = world.groupCommands?.[corner]?.foot ?? world.commands?.[corner];
+    if (command?.anchor) formation.anchor = [...command.anchor];
     for (const id of formation.members) {
       const fighter = world.fighters[id];
       if (!orderFor(world, fighter) || fighter.order.ranks) continue;

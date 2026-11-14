@@ -1,4 +1,4 @@
-# The base meshes' skin weights from Blender's own automatic (bone heat) weighting (the user's call, 2026-11-11: arms that read
+# The base meshes' skin weights from Blender's own automatic (bone heat) weighting (2026-11-11: arms that read
 # as hinged at real joints, not a bent rubber tube). The game's distance weights (bodymesh.js skinWeights, to their sixth
 # power) hand each point to its nearest bone over a centimetre or two; bone heat spreads each bone's share over the surface
 # by diffusion, so the shoulder, the armpit and the elbow turn as one surface and a raised arm no longer creases the chest.

@@ -1,4 +1,4 @@
-# The proof sheet (the user's call, 2026-11-11): for one sex, the Blender model as modelled, the model as the game takes it
+# The proof sheet (2026-11-11): for one sex, the Blender model as modelled, the model as the game takes it
 # (cut and its arms turned), the game's body at the reference build, and an overlay of the last two (the model's silhouette
 # grey, the game's outline red, the area only one covers tinted: blue the model's, red the game's), from the front, the side and
 # the back; the renders from tools/blender/baseproof.py. Below it, any further sheets given (the build series).

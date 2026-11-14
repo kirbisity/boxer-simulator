@@ -143,27 +143,38 @@ test("the player's adrenaline: up with blows landed and taken and with danger ne
 });
 
 // Each art against the plain blows of the same weapon (its style's own swings, or thrusts for a thrust), thrown at an
-// unresisting man from a few distances: the art's best contact beats every plain blow's best by at least ART_MARGIN, by the
-// measure its family is about — the cut it opens, the blunt blow (impulse × its blunt share), the point's wound — and it
-// lands: most of its strikes meet him with the weapon's head (not short, not the haft).
-// Two fall a little short of it, by the physics rather than the tuning: the guandao's plain diagonal cut already meets him
-// at about the polearm's top speed (~32 m/s, its head's ~34 in the art), so its wheel gains only by the mass turning behind
-// it; and a one-handed mace has one arm to swing it (its art's head ~23 m/s, a plain blow's ~18).
+// unresisting man from a few distances: the art's best contact against every plain blow's best, by the measure its family
+// is about — the cut it opens, the blunt blow (impulse × its blunt share), the point's wound — and it lands: most of its
+// strikes meet him with the weapon's head (not short, not the haft).
+// What an art can gain is bounded by the physics, not set: a weapon turns no faster than its moment of inertia lets it
+// (physics.js turnLimit, WORLD.weaponTurn: swing speed ∝ I^-0.27, Cross & Bower 2006), so an art cannot outrun its plain
+// blows by speed once both are at that ceiling; it gains by the body it puts behind the blow (its step, its turn, its
+// arm's weight), and a light blade whose plain cut is short of the ceiling by its speed as well. Each family's `margin`
+// is what that comes to, as measured (2026-11-11; the art's best over the plain blows' best, a tenth or so under it):
+// - the swords' arts (iai, the draw cut, the pommel) still ~1.9-2.2× (the katana's, the dao's: margin 1.6, as before);
+// - the ōdachi's iai 1.43× and the spear's lunge 1.43× (1.25: the body behind them, the long blade at its ceiling);
+// - the war hammer's crush 1.23×, the wolf-tooth mace's 1.21× (1.1: their heads at the ceiling in both);
+// - the flanged mace's 1.93× (1.55, as before, now its balance is a mace's: weapons.js);
+// - the naginata's and the guandao's wheel ~0.78× and the kanabo's crush 0.82× (0.7): all of the wheel's speed is the
+//   weapon turning, which the ceiling holds, where the plain cut adds the arms' own; the art's worth is its reach round
+//   and its sweep, no longer a harder blow than the best plain one (the user's call, 2026-11-11: the trade accepted).
+// `lands`: the share of its strikes that must meet him with the head (0.75; slowed to their ceiling, the guandao's wheel
+// meets him with it half the time, the war hammer's crush two in three).
 const ART_MARGIN = 1.6;
 const FAMILIES = [
   { style: 'katana', art: 'artIai', measure: 'cut', distances: [1.2, 1.5, 1.8] },
-  { style: 'odachi', art: 'artIai', measure: 'cut', distances: [1.5, 1.8, 2.1] },
+  { style: 'odachi', art: 'artIai', measure: 'cut', distances: [1.5, 1.8, 2.1], margin: 1.25 },
   { style: 'longsword', art: 'artPommel', measure: 'blunt', distances: [0.9, 1.1, 1.3] },
   { style: 'wuxia', art: 'artDrawCut', measure: 'cut', distances: [1.2, 1.5, 1.8] },
   { style: 'dao', art: 'artDrawCut', measure: 'cut', distances: [1.2, 1.5, 1.8] },
-  { style: 'naginata', art: 'artWheel', measure: 'cut', distances: [1.5, 2.1, 2.4] },
+  { style: 'naginata', art: 'artWheel', measure: 'cut', distances: [1.5, 2.1, 2.4], margin: 0.7 },
   // (1.4, was 1.45: a plain blow may now break the arm's bone in one (body.js fractureN), and the edge has less to go through.)
-  { style: 'guandao', art: 'artWheel', measure: 'cut', distances: [1.8, 2.1, 2.4], margin: 1.4 },
-  { style: 'warhammer', art: 'artCrush', measure: 'blunt', distances: [1.2, 1.5, 1.8] },
-  { style: 'kanabo', art: 'artCrushClub', measure: 'blunt', distances: [1.2, 1.5, 1.8] },
+  { style: 'guandao', art: 'artWheel', measure: 'cut', distances: [1.8, 2.1, 2.4], margin: 0.7, lands: 0.5 },
+  { style: 'warhammer', art: 'artCrush', measure: 'blunt', distances: [1.2, 1.5, 1.8], margin: 1.1, lands: 0.6 },
+  { style: 'kanabo', art: 'artCrushClub', measure: 'blunt', distances: [1.2, 1.5, 1.8], margin: 0.7 },
   { style: 'maceShield', art: 'artCrushOne', measure: 'blunt', distances: [0.9, 1.1, 1.2, 1.3, 1.5], margin: 1.55 },
-  { style: 'langyaShield', art: 'artCrushOne', measure: 'blunt', distances: [0.9, 1.1, 1.2, 1.3, 1.5] },
-  { style: 'spear', art: 'artSpear', measure: 'pierce', distances: [2.3, 2.6, 2.9] },
+  { style: 'langyaShield', art: 'artCrushOne', measure: 'blunt', distances: [0.9, 1.1, 1.2, 1.3, 1.5], margin: 1.1 },
+  { style: 'spear', art: 'artSpear', measure: 'pierce', distances: [2.3, 2.6, 2.9], margin: 1.25 },
 ];
 const measured = (hit, measure) => (measure === 'blunt' ? hit.impulse * hit.bluntMix : hit[measure] ?? 0);
 /** A move's best contact by `measure` over its zones and `distances`, and how many of its strikes met him with the head first. */
@@ -182,14 +193,14 @@ function best(style, move, measure, distances) {
   return { top, headFirst, tries };
 }
 
-for (const { style, art, measure, distances, margin = ART_MARGIN } of FAMILIES) {
-  test(`weapon art ${art} with the ${STYLES[style].label}: decisively harder than any of its plain blows (${measure}), and it lands`, () => {
+for (const { style, art, measure, distances, margin = ART_MARGIN, lands = 0.75 } of FAMILIES) {
+  test(`weapon art ${art} with the ${STYLES[style].label}: as hard as the speed ceiling lets it against its plain blows (${measure}), and it lands`, () => {
     assert.equal(WEAPONS[STYLES[style].weapon].art, art);
     const mode = measure === 'pierce' ? 'thrust' : 'swing';
     const plain = Object.keys(STYLES[style].attacks).filter((move) => MOVES[move].path === 'blade' && MOVES[move].mode === mode);
     const strongest = Math.max(...plain.map((move) => best(style, move, measure, distances).top));
     const own = best(style, art, measure, distances);
     assert.ok(own.top > strongest * margin, `${art} ${own.top.toFixed(1)} against the best plain blow's ${strongest.toFixed(1)}`);
-    assert.ok(own.headFirst >= own.tries * 0.75, `${art} met him with the head in ${own.headFirst} of ${own.tries}`);
+    assert.ok(own.headFirst >= own.tries * lands, `${art} met him with the head in ${own.headFirst} of ${own.tries}`);
   });
 }

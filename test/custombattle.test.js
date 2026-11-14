@@ -14,7 +14,7 @@ const memoryStorage = () => {
 const brokenStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
 const men = (unit, count, at = [0, 0]) => Array.from({ length: count }, () => ({ unit, at }));
 
-test('every faction offered has fighters, and each of its units makes a man of itself: on horse only where his people rode', () => {
+test('every faction offered has fighters, and each of its units makes a man of itself: on foot, and on horse for any man', () => {
   const factions = customFactions();
   assert.ok(factions.length >= 10, factions.map((faction) => faction.key).join());
   for (const { key } of factions) {
@@ -30,8 +30,9 @@ test('every faction offered has fighters, and each of its units makes a man of i
   }
   // Every fighter of the roster is offered by his faction.
   for (const warrior of WARRIORS) assert.ok(customUnitsOf(warrior.faction).some((unit) => unit.warrior === warrior.key), warrior.key);
-  // The Mexica never saw a horse before the Spaniards: no riders among them.
-  assert.ok(customUnitsOf('mexica').every((unit) => !unit.mounted));
+  // Any man may be put on a horse (2026-11-13, the user's call), the Mexica on the Spaniards' kind; beasts and machines not.
+  assert.ok(customUnitsOf('mexica').some((unit) => unit.mounted));
+  assert.ok(customUnitsOf('primates').every((unit) => !unit.mounted));
 });
 
 test('a custom battle is a level on its chosen ground: its floor, its units, the caps, each man where he was put', () => {

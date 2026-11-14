@@ -1,4 +1,4 @@
-# The proof sheet's renders (the user's call, 2026-11-11: the game's base body must look like the model): the user's base mesh as
+# The proof sheet's renders (2026-11-11: the game's base body must look like the model): the modelled base mesh as
 # modelled, the same mesh as the game takes it (head, hands and feet cut off, arms turned into the rig's A-pose, at full
 # resolution), and the game's body at the reference build (tools/baseproof-export.js), each from the front, the side and the
 # back under one orthographic camera and one light, on a transparent ground so their silhouettes can be laid over each other

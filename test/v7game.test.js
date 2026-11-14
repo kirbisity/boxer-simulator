@@ -64,11 +64,11 @@ const skinTriangles = (mesh) => {
   return count;
 };
 
-test('V7 is the default body style, the plain loft still to be had', () => {
-  assert.equal(DEFAULT_BODY_STYLE, 'v7');
+test('The base meshes are the default body style, V7 and the plain loft still to be had', () => {
+  assert.equal(DEFAULT_BODY_STYLE, 'base');
   const render = readFileSync(new URL('../src/render.js', import.meta.url), 'utf8');
   assert.match(render, /export let BODY_STYLE = DEFAULT_BODY_STYLE;/);
-  assert.match(render, /slicedStyles: \['v7'\]/);
+  assert.match(render, /slicedStyles: \['v7', 'base'\]/);
   const main = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
   assert.match(main, /\['lofted', '1 · Lofted/, 'the design sheet still lists the old style');
 });
@@ -127,9 +127,10 @@ test('the crowd\'s body (the low-detail loft) is byte for byte what it was', () 
   const hash = (mesh) => createHash('sha256').update(Buffer.from(mesh.positions.buffer)).update(Buffer.from(mesh.normals.buffer)).update(Buffer.from(mesh.indices.buffer)).update(Buffer.from(mesh.skinIndex.buffer)).update(Buffer.from(mesh.skinWeight.buffer)).digest('hex').slice(0, 16);
   const paint = (mesh) => createHash('sha256').update(`${mesh.regions.join(',')}|${mesh.rigid.join(',')}`).digest('hex').slice(0, 16);
   // Made before V7 came into the game (the low-detail loft of these presets); samurai and hanCrossbow since re-cut to their period's build (163 and 169 cm).
+  // Made again on 2026-11-14, with the base meshes the game's body: every body's arms and shoulders are the models' (body.js ARM_LENGTHS).
   const before = {
-    contender: ['65f215b325a9747e', 'a132c7944de33631'], knight: ['74e8bb3e895e0175', '1dd77ca0785dcb63'], samurai: ['cbd3a27ee0c71065', '984738ad34524b74'],
-    hanCrossbow: ['791c5d2068efd4ca', '721b46fd40ea145d'], crossbow: ['ff8ef72c410e4834', 'ba8f41a002601561'], templar: ['93aea5cbdd2ae832', '9d1016be266f106f'], heavy: ['366ae5ce1cdb70b4', '8d77b60ca133d7e4'],
+    contender: ['910073bf1eb7a0b4', 'a132c7944de33631'], knight: ['b73ac88d5e97a351', '1dd77ca0785dcb63'], samurai: ['31ee242d6a6a5e98', '984738ad34524b74'],
+    hanCrossbow: ['c5dae3e5327a2fc7', '721b46fd40ea145d'], crossbow: ['59f2081dd4cd9d62', 'ba8f41a002601561'], templar: ['20fd85c6b3305c52', '9d1016be266f106f'], heavy: ['1f8cbe2cdd58dfb7', '8d77b60ca133d7e4'],
   };
   for (const [preset, [geometry, regions]] of Object.entries(before)) {
     const mesh = buildLoftBody(buildBody(PRESETS[preset]), { lowDetail: true });

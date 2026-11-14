@@ -18,6 +18,7 @@ import { crowdBatch } from './crowdview.js';
 import { bloodDyeClear, bloodDyeCreate, bloodDyeLand, bloodDyeUpload } from './blooddye.js';
 import { BATTLE_FX, BLACK_POWDER, battleFxAddGlint, battleFxArc, battleFxClear, battleFxElectricFlash, battleFxGlint, battleFxPrimary, battleFxShot, battleFxSpark, battleFxUpdate } from './battlefx.js';
 import { machineFxBusy, machineFxClear, machineFxCreate, machineFxHear, machineFxStep } from './machinefx.js';
+import { flutterCloth } from './clothwind.js';
 
 export const GORE = {
   // Blood: drops thrown from a wound or a stump, and the stains they leave.
@@ -167,7 +168,9 @@ function buildStandard(spec, colour, envMap) {
     g.fillRect(0, 0, canvas.width, canvas.height);
     paint?.(g, canvas.width, canvas.height);
     const material = new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), side: THREE.DoubleSide, roughness: 0.9 });
-    let geometry = new THREE.PlaneGeometry(width, height);
+    // (Segments along the cloth, for it to flutter in the place's wind: clothwind.js.)
+    flutterCloth(material, width);
+    let geometry = new THREE.PlaneGeometry(width, height, 12, 2);
     if (shape) {
       // A cut outline: drawn as a shape with UVs over its bounding box.
       geometry = new THREE.ShapeGeometry(shape);

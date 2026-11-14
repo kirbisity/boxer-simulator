@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { P, PRESETS, normaliseInputs } from '../src/body.js';
-import { advance, createWorld, placeFighter, point, startCrawl } from '../src/physics.js';
+import { advance, createWorld, injuryOf, placeFighter, point, startCrawl } from '../src/physics.js';
 import { WORLD } from '../src/physics/config.js';
 import { footingOn, holdsUnder, partUnder, treadOn } from '../src/physics/footing.js';
 import { gaitAt, hoofSpeed, HORSE_SHAPE, ladenMass, placeMounted } from '../src/physics/mounted.js';
@@ -41,7 +41,8 @@ function hoofOnBack(key, speed) {
   assert.equal(under.key, 'trunk');
   const tread = treadOn(w, under, { mass: share * laden, speed: hoofSpeed(horse, gait), weight: share * laden * WORLD.gravity, reason: 'knocked flat by a hoof' });
   advance(w, 0.2);
-  return { w, crawler, tread, hoof: hoofSpeed(horse, gait), trunk: crawler.trauma?.trunk ?? 0 };
+  // (The injury it did, felt or still to be felt over the seconds after it: physics.js injure.)
+  return { w, crawler, tread, hoof: hoofSpeed(horse, gait), trunk: injuryOf(crawler, 'trunk') };
 }
 
 test('a hoof on a crawling man\'s back presses him flat; at a walk it bruises and may crack ribs, at a gallop it kills', () => {
@@ -57,6 +58,8 @@ test('a hoof on a crawling man\'s back presses him flat; at a walk it bruises an
   assert.notEqual(walk.crawler.state, 'out');
   assert.ok(gallop.trunk > 4 * walk.trunk, `gallop ${gallop.trunk.toFixed(2)} against walk ${walk.trunk.toFixed(2)}`);
   assert.ok(gallop.trunk > WORLD.injury.trunkFatal, 'a galloping horse\'s weight on his chest is past what kills');
+  // (Dead of it within the seconds a mortal wound leaves him, WORLD.injury.drainSeconds.)
+  advance(gallop.w, WORLD.injury.drainSeconds);
   assert.equal(gallop.crawler.state, 'out');
 });
 

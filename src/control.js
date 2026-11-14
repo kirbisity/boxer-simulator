@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { AI, chooseDefence } from './ai.js';
 import { blowSide, DEFENCES, MOVES, pointRoomOf, STYLES, moveRange, tapAttacks } from './moves.js';
-import { aimPoint, BLOCKS, dropWeapon, protectionAt, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
+import { aimPoint, BLOCKS, inRiderArc, dropWeapon, protectionAt, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
 import { dismount, dismountReady, horseToMount, mountHorse } from './physics/mounted.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
@@ -73,6 +73,11 @@ export const CONTROL = {
   },
   // An attack asked for while busy waits this long (s) for the hands to come back.
   bufferSeconds: 0.35,
+  // Riding into an enemy himself (autoCharge): at `fromCanter` of a canter or faster, a man before him the horse will reach
+  // within `within` s (plus `reach` m: his weapon's reach from the saddle) has the pass's blow readied at him; not again for
+  // `again` s (one blow a pass). `within` 0.9 s: about the time a cut or a couched point takes to come to its mark from the
+  // saddle (riding.js contactTime ~0.3-0.5 s) with the rider's own reading of the man coming up before it.
+  autoCharge: { fromCanter: 0.9, within: 0.9, reach: 2, again: 1.2 },
   // He turns to face the place he strikes at for this long (s).
   faceSeconds: 0.6,
   // With no enemy within `foeEngaged` m, an attack goes at whoever is nearest within `anyoneWithin` m, enemy or not (a civilian, a prisoner, a
@@ -847,6 +852,39 @@ export function chargeOrder(world, fighter, orders, man, move, zone) {
 }
 
 /**
+ * The player riding into an enemy of his own steering: the nearest enemy on his feet before him (physics.js inRiderArc),
+ * that the horse will reach within CONTROL.autoCharge `within` s at the pace it goes, has a blow readied at him for the
+ * pass (chargeOrder, the reins left in the player's hands), at a canter or faster; once a man, until he is past.
+ */
+function autoCharge(world, fighter, orders) {
+  const horse = fighter.mount;
+  const spec = CONTROL.autoCharge;
+  if (!horse || fighter.state !== 'up' || fighter.punch || fighter.cooldown > 0 || horse.speed < horse.paces.canter * spec.fromCanter) return;
+  if (orders.autoCharged && world.time - orders.autoCharged.at < spec.again) return;
+  const style = STYLES[fighter.style];
+  if (!style || style.ranged) return;
+  const reach = horse.speed * spec.within + spec.reach;
+  let best = null;
+  let bestApart = Infinity;
+  for (const man of world.fighters) {
+    if (man.state !== 'up' || !hostile(man, fighter) || man.crawling) continue;
+    const at = man.mount ? [man.mount.at[0], 0, man.mount.at[1]] : point(man.x, P.pelvis);
+    const apart = Math.hypot(at[0] - horse.at[0], at[2] - horse.at[1]);
+    if (apart > reach || apart >= bestApart || !inRiderArc(fighter, at)) continue;
+    best = man;
+    bestApart = apart;
+  }
+  if (!best) return;
+  const move = chooseAttack(world, fighter, best, best.mount ? 'mid' : 'high', 'heavy')?.move;
+  if (!move) return;
+  // (The man and his part as a tap would choose them; the pass's own timing and steering of the blow do the rest: riding.js chargeAt.)
+  if (chargeOrder(world, fighter, orders, best, move, best.mount ? 'body' : 'head')) {
+    orders.charge.reins = false;
+    orders.autoCharged = { at: world.time, target: best.id };
+  }
+}
+
+/**
  * Carry out the first attack asked for: thrown at once, wherever it is aimed,
  * a man there or not (kept a moment only while the hands are busy). A request
  * carries `at` (a place in the world) or a `line` (at his man).
@@ -1380,6 +1418,8 @@ export function directFighter(world, fighter, orders, dt) {
   if (fighter.orderPickup !== undefined && fighter.orderPickup !== null && goPickUp(world, fighter)) return;
   // Charging (chargeOrder): the horse is ridden at his man by the charge, not the stick; over, the reins are the player's.
   if (!orders.charge?.reins && !goClinch(world, fighter, opponent)) steer(world, fighter, orders, opponent, dt);
+  // Ridden into an enemy at a gallop or a canter of his own steering: the blow is readied for him at the man before him (autoCharge).
+  if (!orders.charge) autoCharge(world, fighter, orders);
   if (orders.charge && !chargeAt(world, fighter, orders.charge)) {
     // (Kept, with how it ended, for the screen and the tests.)
     orders.charged = orders.charge;

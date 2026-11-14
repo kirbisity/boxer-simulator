@@ -151,7 +151,7 @@ export function installMenus(game) {
   function home() {
     game.attract();
     redraw = home;
-    const body = screen('home', 'Gladiator', t('menu.home.lede'), null);
+    const body = screen('home', t('game.title'), t('menu.home.lede'), null);
     body.parentElement.classList.add('home');
     body.append(el('div', { className: 'choices home-choices' },
       choice({ glyph: '🏆', kicker: t('menu.home.career.kicker'), title: t('menu.home.career.title'), text: t('menu.home.career.text'), tone: 'career' }),
