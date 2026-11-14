@@ -17,7 +17,7 @@ import { activeLook } from './looks.js';
 import { PAINTED_GROUND } from './ground/painted.js';
 import { LIVING_GROUND } from './ground/living.js';
 import { PLACE_ARENAS } from './render.js';
-import { envApply, envBuild, envLeave, envWanted } from './env/index.js';
+import { envApply, envBuild, envLeave, envOwnDrawn, envWanted } from './env/index.js';
 
 /**
  * What each open-air place has beyond its ground, for a variant to draw in
@@ -184,8 +184,11 @@ export function applyScenery(view, place) {
   envLeave(view);
   if (!group) return;
   const chosen = sceneryInForce === 'default' ? sceneryForLook(view, place) : sceneryInForce;
-  const parts = spec ? partsOf(sceneryById(chosen)) : [CURRENT];
-  const replaced = new Set(parts.flatMap((part) => part.replaces ?? []));
+  // A place that draws itself (env/config.js `own`) joins the open air whole: nothing of it is replaced, its ground
+  // stays, and with the open air off it is shown exactly as it is built.
+  const own = chosen === OPEN_AIR.id && envOwnDrawn(place);
+  const parts = own ? [OPEN_AIR] : spec ? partsOf(sceneryById(chosen)) : [CURRENT];
+  const replaced = new Set(own ? [] : parts.flatMap((part) => part.replaces ?? []));
   const wanted = new Set(parts.map((part) => part.id));
   group.traverse((object) => {
     if (object.userData.scenery) object.visible = !replaced.has(object.userData.scenery);
@@ -205,7 +208,7 @@ export function applyScenery(view, place) {
     built.visible = true;
     part.apply?.({ place, view, spec, group: built });
   }
-  applyGround(view, place, group, wanted.has(OPEN_AIR.id));
+  applyGround(view, place, group, wanted.has(OPEN_AIR.id) && !own);
 }
 
 // ---- ground styles ---------------------------------------------------------

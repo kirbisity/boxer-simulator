@@ -12,19 +12,26 @@
 //   envSetEnabled(view, on)    off: every place as it was before this system
 //   envAdapt(view, ms, mode)   once a frame: step the env's quality tier to what the device can draw
 //
+// A place that draws itself (a town, a walled city) joins from its own module, without a line here:
+//   envRegisterPlace(name, description)   describe it (config.js: `own: true` and what differs from ENV_PLACE_PLAIN)
+//   envRegisterWeather(name, over, values)  a weather of its own, laid over one of ENV_WEATHER's
+//   envPlaceWeather(view, place, name)    the weather on that place from now on
+// and reads back, each frame, view.env (on, air, weather, wind, falling: 0..1 of the weather's fall coming down at
+// the camera now, wet: 0..1 the ground's wetness now) and the shared uniforms (air.js ENV_UNIFORMS).
+//
 // What a level brings is honoured: a level's own mist (scenarios.js `weather.fog`) becomes the env's mist at the
 // same thickness, and a dusk or night scene (`dim`, `colour`, `halos`) is left to the look that already draws it.
 
 /* global THREE */
 
-import { ENV, ENV_WEATHER, PLACE_ENV } from './config.js';
-import { envAirState, envAirToUniforms, envInstallTone, envSkyAt, envUniforms } from './air.js';
+import { ENV, ENV_PLACE_PLAIN, ENV_WEATHER, PLACE_ENV } from './config.js';
+import { envAirState, envAirToUniforms, envInstallTone, envSkyAt, envSunWay, envUniforms } from './air.js';
 import { envNoiseAt } from './noise.js';
 import { envBuildSky } from './sky.js';
 import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, envSunPast } from './terrain.js';
 import { envBuildGrass, envGrassQuality } from './grass.js';
 import { envBuildTrees, envPlantTrees, envTreeShadows, envTreesQuality } from './trees.js';
-import { envBuildParticles, envParticlesPixel, envParticlesSet } from './particles.js';
+import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostDraw, envToneOf } from './post.js';
 import { activeLook } from '../looks.js';
 import { hidePaintedSky, setRenderer } from '../looks/kit.js';
@@ -59,6 +66,32 @@ function envWeatherOf(view, place) {
 export function envWanted(view, place) {
   return !!PLACE_ENV[place] && envChosen.enabled && activeLook().id === 'probe-lite' && envWeatherOf(view, place) !== null;
 }
+
+/**
+ * Describe a place to the open air at run time: `description` laid over ENV_PLACE_PLAIN (config.js lists what a
+ * place that draws itself may say). From then on scenery.js joins it and leaves it as it does the others.
+ */
+export function envRegisterPlace(name, description) {
+  PLACE_ENV[name] = { ...ENV_PLACE_PLAIN, ...description };
+  return PLACE_ENV[name];
+}
+
+/** A weather of a place's own: `values` laid over the ENV_WEATHER entry `over` (a town's damp morning over 'mist'). */
+export function envRegisterWeather(name, over, values) {
+  ENV_WEATHER[name] = { ...ENV_WEATHER[over], ...values };
+  return ENV_WEATHER[name];
+}
+
+/** Put a weather on one place from now on (a battle's own day), and show it if the place is shown. Returns the name, or null if either is unknown. */
+export function envPlaceWeather(view, place, name) {
+  if (!PLACE_ENV[place] || !ENV_WEATHER[name]) return null;
+  PLACE_ENV[place].weather = name;
+  if (view?.place === place) reapplyPlace(view);
+  return name;
+}
+
+/** Whether `place` draws itself and only joins the open air (no land, grass or trees are made for it, nothing of it hidden). */
+export const envOwnDrawn = (place) => !!PLACE_ENV[place]?.own;
 
 /**
  * What stands on the ground of a place and is kept (fences, houses, banners' poles, camp gear): [{ x, z, halfX,
@@ -103,44 +136,74 @@ function envFootprints(group) {
 
 /** The variant's group for a place: sky, land, grass, trees and the air's drift, built once from its description. */
 export function envBuild({ place, view, spec }) {
+  const group = new THREE.Group();
+  group.userData.env = 'open-air';
+  envFill(group, place, view, spec);
+  return group;
+}
+
+/** Make a place's open air into `group` from its description as it is now (again, if the place is described again: envApply). */
+function envFill(group, place, view, spec) {
   const own = PLACE_ENV[place];
   const arena = view.floor ?? PLACE_ARENAS[place];
+  const sun = envSunWay(own.sun);
+  group.userData.envMap?.dispose();
+  group.userData.envMap?.envCover?.dispose();
+  group.traverse((object) => {
+    object.geometry?.dispose();
+    object.material?.dispose();
+  });
+  group.clear();
+  group.userData.envOf = own;
+  if (own.own) {
+    // A place that draws itself: the sky, what falls and drifts over its own ground and under its own roofs, and
+    // the sun through its openings.
+    const height = own.height ?? (() => 0);
+    const map = { value: envBuildNearMap({ place: own, height, sun, keepOut: [0, 0], floor: [arena.halfX, arena.halfZ], shadows: [], footprints: [] }) };
+    map.cover = { value: map.value.envCover };
+    const parts = { sky: envBuildSky(), particles: envBuildParticles(map, own.cover), beams: envBuildBeams(own.openings ?? [], sun) };
+    group.add(parts.sky, parts.particles, parts.beams);
+    group.userData.envParts = parts;
+    group.userData.envHeight = height;
+    group.userData.envMap = map.value;
+    return;
+  }
   // The level ground: the scenery's own, and never less than the floor fought on (a battle's is wider than the place's).
   const keepOut = [Math.max(spec.keepOut[0], arena.halfX + 2), Math.max(spec.keepOut[1], arena.halfZ + 2)];
-  const sun = envAirState(own, ENV_WEATHER.clear).sun;
   const height = envHeightField(own.terrain, keepOut);
   const footprints = envFootprints(view.places[place]);
   const trees = envPlantTrees({ place: own, height, sun, keepOut, footprints });
   const map = { value: envBuildNearMap({ place: own, height, sun, keepOut, floor: [arena.halfX, arena.halfZ], shadows: envTreeShadows(trees, sun), footprints }) };
   map.cover = { value: map.value.envCover };
-  const group = new THREE.Group();
   const parts = {
     sky: envBuildSky(),
     terrain: envBuildTerrain({ place: own, height, sun, map }),
     grass: envBuildGrass({ place: own, map }),
     trees: envBuildTrees({ place: own, trees }),
-    particles: envBuildParticles(map),
+    particles: envBuildParticles(map, own.cover),
+    beams: envBuildBeams(own.openings ?? [], sun),
   };
-  group.add(parts.sky, parts.terrain, parts.grass, parts.trees, parts.particles);
-  group.userData.env = 'open-air';
+  group.add(parts.sky, parts.terrain, parts.grass, parts.trees, parts.particles, parts.beams);
   group.userData.envParts = parts;
   group.userData.envHeight = height;
-  return group;
+  group.userData.envMap = map.value;
 }
 
 /** Draw the tier in force: what share of the blades, the leaf cards and the drift, and whether clouds shade the land. */
 function envApplyTier(state) {
   const quality = ENV.quality[envChosen.tier];
   const parts = state.group.userData.envParts;
-  envGrassQuality(parts.grass, quality.grass, quality.far);
-  envTreesQuality(parts.trees, quality.cards);
+  if (parts.grass) envGrassQuality(parts.grass, quality.grass, quality.far);
+  if (parts.trees) envTreesQuality(parts.trees, quality.cards);
   envParticlesSet(parts.particles, PLACE_ENV[state.place].drift, state.weather, quality.particles);
   envAirToUniforms(state.air, state.weather, quality, PLACE_ENV[state.place]);
 }
 
 /** Take the scene over for the place: the light, the haze, the far plane, the wind, the weather's share of everything. */
-export function envApply({ place, view, group }) {
+export function envApply({ place, view, spec, group }) {
   const own = PLACE_ENV[place];
+  // (A place described again since this was made, by envRegisterPlace, is made again.)
+  if (group.userData.envOf !== own) envFill(group, place, view, spec);
   const weather = envWeatherOf(view, place);
   const air = envAirState(own, weather);
   const lights = view.lights;
@@ -172,35 +235,48 @@ export function envApply({ place, view, group }) {
   lights.sun.color.setRGB(air.sunColour[0] / peak, air.sunColour[1] / peak, air.sunColour[2] / peak);
   const sunPower = peak * envSunPast(group.userData.envHeight, air.sun, 0, 1, 0);
   lights.sun.intensity = sunPower;
-  lights.sun.position.set(air.sun[0], air.sun[1], air.sun[2]).multiplyScalar(14);
-  lights.sun.target.position.set(0, 0, 0);
-  // The sun's width in its shadow (terrain.js envInstallShadow): texels of blur per unit of the shadow map's depth.
+  if (own.own) {
+    // A place that draws itself keeps the shadow box where it put it (or has it carried: envUpdate); the sun
+    // stands the description's way from whatever it is aimed at.
+    const target = lights.sun.target.position;
+    const stand = lights.sun.position.distanceTo(target) || 14;
+    lights.sun.position.set(air.sun[0], air.sun[1], air.sun[2]).multiplyScalar(stand).add(target);
+  } else {
+    lights.sun.position.set(air.sun[0], air.sun[1], air.sun[2]).multiplyScalar(14);
+    lights.sun.target.position.set(0, 0, 0);
+  }
+  // The sun's shadow as the look made it, to hand back: its edge (envUpdate sets the sun's width each frame) and its box.
   const shadow = lights.sun.shadow;
   const radius = view.env?.on ? view.env.radius : shadow.radius;
-  shadow.radius = -((shadow.camera.far - shadow.camera.near) * ENV.shadow.sunWidth * ENV.shadow.soften) / ((shadow.camera.right - shadow.camera.left) / shadow.mapSize.x);
+  const box = view.env?.on ? view.env.box : ['left', 'right', 'top', 'bottom', 'near', 'far'].map((side) => shadow.camera[side]);
 
   // What is not drawn by an env shader (fighters, props) is hazed by the renderer's fog: exponential-squared is the
   // one it has, set to agree with the haze at ENV.air.fogMatch m, about the far side of a floor.
   const horizon = new THREE.Color(air.horizon[0], air.horizon[1], air.horizon[2]);
   view.scene.background = horizon;
   view.scene.fog = new THREE.FogExp2(horizon.getHex(), Math.sqrt(air.extinction / ENV.air.fogMatch));
-  view.cameraFar = ENV.terrain.reach * 1.25;
-  view.camera.far = view.cameraFar;
-  view.camera.updateProjectionMatrix();
+  // (A place that draws itself knows how far it reaches; the sky needs no far plane: it is drawn at the camera.)
+  if (!own.own || own.far) {
+    view.cameraFar = own.far ?? ENV.terrain.reach * 1.25;
+    view.camera.far = view.cameraFar;
+    view.camera.updateProjectionMatrix();
+  }
 
   // One wind for everything: the place's (or the level's), as the weather drives it, put in force for the cloth
   // and the flames too (wind.js setWindOver), its gusts the same field the grass shows (envGustAt).
   setWindOver(null);
-  const base = placeWind(place, view.weatherBrought ? view.weather : null);
+  const reach = own.wind ? Math.hypot(...own.wind.toward) || 1 : 1;
+  const base = own.wind ? { x: own.wind.toward[0] / reach, z: own.wind.toward[1] / reach, speed: own.wind.speed, gust: own.wind.gust } : placeWind(place, view.weatherBrought ? view.weather : null);
   const wind = { x: base.x, z: base.z, speed: base.speed * weather.wind, gust: Math.min(1, base.gust + weather.gust) };
   wind.swell = (time) => envGustAt(wind, time, 0, 0);
   setWindOver(place, wind);
   view.clothWindBase = null;
   view.windBase = null;
 
-  // The shafts: the share of light the haze scatters toward the eye over the depth of a view, of the sun there is.
-  const shafts = ENV.post.shafts * weather.sun * (1 - Math.exp(-air.extinction * ENV.post.shaftPath));
-  view.env = { on: true, place, group, air, weather, wind, probe, sunPower, tone, shafts, radius, fill };
+  // (The ground stays as wet as it was through a change of light or tier under the same weather.)
+  const wet = view.env?.place === place && view.env.weather.name === weather.name ? view.env.wet : undefined;
+  view.env = { on: true, place, group, air, weather, wind, probe, sunPower, tone, shafts: 0, radius, box, fill, wet, falling: 0, time: undefined };
+  envUniforms().uEnvOn.value = 1;
   if (!envChosen.started) {
     // A phone or a tablet starts a tier down; the controller raises it if the frames allow.
     envChosen.started = true;
@@ -215,7 +291,11 @@ export function envLeave(view) {
   if (!view.env?.on) return;
   view.env.on = false;
   view.drawOver = null;
-  view.lights.sun.shadow.radius = view.env.radius;
+  envUniforms().uEnvOn.value = 0;
+  const shadow = view.lights.sun.shadow;
+  shadow.radius = view.env.radius;
+  ['left', 'right', 'top', 'bottom', 'near', 'far'].forEach((side, at) => { shadow.camera[side] = view.env.box[at]; });
+  shadow.camera.updateProjectionMatrix();
   setPhotoFill(view.env.fill, view.scene);
   view.scene.remove(view.env.probe);
   setWindOver(null);
@@ -246,14 +326,62 @@ function envGustAt(wind, time, x, z) {
   return Math.max(0, 1 + tune.depth * wind.gust * ((front * 0.65 + paw * 0.35) - 0.5) * 2);
 }
 
+/**
+ * How far inside the cloud a sheet point is (air.js envCloudDepth, on the processor): below 0 a gap. Without
+ * `grain` the broad masses alone, the fine grain at its mean (what shades a whole floor at once).
+ */
+function envCloudDepthAt(air, sheetX, sheetZ, grain = false) {
+  const fine = grain ? envNoiseAt(sheetX * 0.53 + 0.37, sheetZ * 0.53 + 0.11, 3) : 0.5;
+  return envNoiseAt(sheetX * 0.125, sheetZ * 0.125, 2) * 0.68 + fine * 0.32 - (0.74 + (0.26 - 0.74) * air.cover);
+}
+
+const envEase = (from, to, value) => {
+  const t = Math.min(1, Math.max(0, (value - from) / (to - from)));
+  return t * t * (3 - 2 * t);
+};
+
 /** How much of the sun the clouds leave at the floor's middle (air.js envSunShare, on the processor). */
 function envCloudShareAt(air, travelX, travelZ, strength) {
   if (strength <= 0) return 1;
   const slant = (ENV.clouds.height / ENV.clouds.scale) / Math.max(air.sun[1], 0.12);
-  const broad = envNoiseAt((air.sun[0] * slant - travelX) * 0.125, (air.sun[2] * slant - travelZ) * 0.125, 2);
-  const edge = 0.74 + (0.26 - 0.74) * air.cover;
-  const t = Math.min(1, Math.max(0, (broad * 0.68 + 0.16 - (edge - 0.12)) / 0.28));
-  return 1 - strength * t * t * (3 - 2 * t);
+  return 1 - strength * envEase(-0.12, 0.16, envCloudDepthAt(air, air.sun[0] * slant - travelX, air.sun[2] * slant - travelZ));
+}
+
+/**
+ * Carry the sun's shadow box with the camera (a description's `shadowBox`): `half` m each way round the ground
+ * ahead of the camera, `depth` m from the sun's stand to it, moved a whole texel at a time along the light's own
+ * right and up so a shadow's edge does not crawl as the camera moves.
+ */
+function envCarryShadow(view, state, box) {
+  const sun = view.lights.sun;
+  const camera = sun.shadow.camera;
+  const [sx, sy, sz] = state.air.sun;
+  if (camera.right !== box.half || camera.far !== box.depth * 1.5) {
+    camera.left = camera.bottom = -box.half;
+    camera.right = camera.top = box.half;
+    camera.near = box.depth * 0.5;
+    camera.far = box.depth * 1.5;
+    camera.updateProjectionMatrix();
+  }
+  const eye = view.camera.position;
+  const fx = eye.x + envLookWay.x * box.half * 0.6;
+  const fz = eye.z + envLookWay.z * box.half * 0.6;
+  const fy = state.group.userData.envHeight(fx, fz);
+  // The light's right (level, across the sun's way) and up, as the shadow camera has them.
+  const level = Math.hypot(sx, sz) || 1;
+  const rx = sz / level;
+  const rz = -sx / level;
+  const ux = sy * rz;
+  const uy = sz * rx - sx * rz;
+  const uz = -sy * rx;
+  const texel = (2 * box.half) / sun.shadow.mapSize.x;
+  const right = fx * rx + fz * rz;
+  const up = fx * ux + fy * uy + fz * uz;
+  const dr = Math.round(right / texel) * texel - right;
+  const du = Math.round(up / texel) * texel - up;
+  sun.target.position.set(fx + rx * dr + ux * du, fy + uy * du, fz + rz * dr + uz * du);
+  sun.position.set(sx, sy, sz).multiplyScalar(box.depth).add(sun.target.position);
+  sun.target.updateMatrixWorld();
 }
 
 let envLookWay = null;
@@ -275,12 +403,49 @@ export function envUpdate(view, world) {
   view.camera.getWorldDirection(envLookWay);
   u.uEnvLook.value.set(envLookWay.x, envLookWay.z);
   view.lights.sun.intensity = state.sunPower * envCloudShareAt(state.air, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y);
+  const own = PLACE_ENV[state.place];
+  const parts = state.group.userData.envParts;
+  const eye = view.camera.position;
+
+  // A shower: what falls comes out of thick cloud only, so it comes and goes as the sheet crosses overhead (the
+  // same sheet the sky shows and the land is shaded by), the air thickens in it, and the ground wets fast and
+  // dries slowly behind it (config.js `fall.under`, ENV.terrain.wetIn).
+  const fall = state.weather.fall;
+  let falling = fall ? 1 : 0;
+  let thick = 1;
+  if (fall?.under) {
+    const cloud = envCloudDepthAt(state.air, eye.x / ENV.clouds.scale - wind.x * aloft, eye.z / ENV.clouds.scale - wind.z * aloft, true);
+    const share = envEase(fall.under[0], fall.under[1], cloud);
+    falling = fall.least + (1 - fall.least) * share;
+    thick = 1 + (state.air.visibility / fall.thick - 1) * share;
+    envParticlesFalling(parts.particles, fall.kind, falling);
+  }
+  const wetTo = state.weather.wet * (fall?.under && falling < 0.3 ? ENV.terrain.dryTo : 1);
+  const passed = Math.max(0, time - (state.time ?? time));
+  state.time = time;
+  state.wet = state.wet === undefined ? wetTo : state.wet + (wetTo - state.wet) * (1 - Math.exp(-passed / (wetTo > state.wet ? ENV.terrain.wetIn : ENV.terrain.dryOut)));
+  state.falling = falling;
+  u.uEnvWet.value.x = state.wet;
+  u.uEnvFall.value = falling;
+  const extinction = state.air.extinction * thick;
+  u.uEnvHaze.value.set(extinction * state.air.hazeHue[0], extinction * state.air.hazeHue[1], extinction * state.air.hazeHue[2], u.uEnvHaze.value.w);
+  u.uEnvRayleigh.value.w = extinction;
+  view.scene.fog.density = Math.sqrt(extinction / ENV.air.fogMatch);
+  // The shafts: the share of light the air scatters toward the eye over the depth of a view (what falls is part
+  // of that air), of the sun there is.
+  state.shafts = ENV.post.shafts * state.weather.sun * (1 - Math.exp(-extinction * ENV.post.shaftPath));
+
+  // The sun's shadow: its box carried where the place asks, and its width in the edge (terrain.js
+  // envInstallShadow): texels of blur per unit of the map's depth, of the box as it is now.
+  if (own.shadowBox) envCarryShadow(view, state, own.shadowBox);
+  const shadow = view.lights.sun.shadow;
+  shadow.radius = -((shadow.camera.far - shadow.camera.near) * ENV.shadow.sunWidth * ENV.shadow.soften) / ((shadow.camera.right - shadow.camera.left) / shadow.mapSize.x);
+  if (parts.beams) envBeamsLook(parts.beams, eye);
   // What stands on the ground, for the shade at its feet and the grass under them: the fighters nearest the camera.
   const bodies = u.uEnvBodies.value;
   const [foot, hips] = ENV.shadow.bodies;
   let filled = 0;
   if (world?.fighters) {
-    const eye = view.camera.position;
     const near = world.fighters.filter((fighter) => fighter?.x?.length >= 45).map((fighter) => ({ x: fighter.x, far: Math.hypot(fighter.x[24] - eye.x, fighter.x[26] - eye.z) })).sort((a, b) => a.far - b.far);
     for (const { x } of near.slice(0, bodies.length / 3)) {
       // (body.js: the hips are particle 8, the feet 13 and 14.)
@@ -294,7 +459,7 @@ export function envUpdate(view, world) {
   for (let at = 0; at < filled; at += 1) middle.set(middle.x + bodies[at].x / filled, middle.y + bodies[at].y / filled, middle.z + bodies[at].z / filled, 0);
   for (let at = 0; at < filled; at += 1) middle.w = Math.max(middle.w, Math.hypot(bodies[at].x - middle.x, bodies[at].y - middle.y, bodies[at].z - middle.z) + ENV.shadow.bodyReach);
   for (; filled < bodies.length; filled += 1) bodies[filled].w = 0;
-  envParticlesPixel(state.group.userData.envParts.particles, (view.camera.fov * Math.PI) / 180, view.renderer.domElement.height);
+  envParticlesPixel(parts.particles, (view.camera.fov * Math.PI) / 180, view.renderer.domElement.height);
 }
 
 /** Put a weather on (a name in ENV_WEATHER), or with null go back to each place's own. Returns the name in force, or null. */
@@ -327,6 +492,8 @@ export function envInfo(view) {
     tier: envChosen.tier,
     weathers: Object.keys(ENV_WEATHER),
     wind: state?.on ? { x: state.wind.x, z: state.wind.z, speed: state.wind.speed, gust: state.wind.gust } : null,
+    falling: state?.on ? state.falling : 0,
+    wet: state?.on ? state.wet : 0,
   };
 }
 

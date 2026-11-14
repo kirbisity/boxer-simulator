@@ -52,6 +52,12 @@ export function envSkyRadiance(air, x, y, z, out) {
   return out;
 }
 
+/** The unit way to the sun of a description's `sun` ({ azimuth rad, elevation degrees }): [x, y, z]. */
+export function envSunWay(sun) {
+  const elevation = sun.elevation * ENV_DEG;
+  return [Math.cos(sun.azimuth) * Math.cos(elevation), Math.sin(elevation), Math.sin(sun.azimuth) * Math.cos(elevation)];
+}
+
 /**
  * Everything the light needs, from a place's description and the weather on it:
  * { sun: unit direction to the sun, sunMass, sunShare, sunColour: the sun's light on the ground (display),
@@ -61,9 +67,8 @@ export function envSkyRadiance(air, x, y, z, out) {
  */
 export function envAirState(place, weather) {
   const tune = ENV.air;
-  const elevation = place.sun.elevation * ENV_DEG;
   const azimuth = place.sun.azimuth;
-  const sun = [Math.cos(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.sin(azimuth) * Math.cos(elevation)];
+  const sun = envSunWay(place.sun);
   const cover = weather.cover ?? place.clouds.cover;
   const visibility = weather.visibility ?? place.air.visibility;
   const hazeHeight = weather.hazeHeight ?? place.air.hazeHeight;
@@ -214,6 +219,10 @@ export const ENV_UNIFORMS = {
   uEnvBodies: { value: [] },
   // xyz: the middle of those; w: how far from it any of them still presses grass or shades the ground (0: none do).
   uEnvBodiesAt: { value: null },
+  // 1 while an open-air place is shown, 0 otherwise: a place's own dressed material (envDress) is then as it was made.
+  uEnvOn: { value: 0 },
+  // How much of what the weather lets fall is falling at the camera now, 0..1 (a shower passing: index.js envUpdate).
+  uEnvFall: { value: 0 },
 };
 
 /** Fill the uniforms' values in (the first use needs THREE). */
@@ -286,6 +295,8 @@ uniform vec3 uEnvCloudDark;
 uniform vec2 uEnvWet;
 uniform float uEnvDry;
 uniform vec2 uEnvLook;
+uniform float uEnvOn;
+uniform float uEnvFall;
 
 vec3 envSky(vec3 dir) {
   vec2 level = normalize(dir.xz + vec2(1e-5, 0.0));
@@ -353,6 +364,61 @@ float envGust(vec2 xz) {
   return uEnvWind.z * max(0.0, 1.0 + ${ENV.wind.depth.toFixed(2)} * uEnvWind.w * (pattern - 0.5) * 2.0);
 }
 `;
+
+// ---- a place's own materials ---------------------------------------------------------------------------------------
+
+/**
+ * Put a place's own material (one of the renderer's: basic, Lambert, Phong, standard) in the open air. While an
+ * open-air place is shown (uEnvOn) it is hazed as the land is (envHaze, in place of the renderer's fog, which
+ * knows one colour and no height); with `wet` or `snow` above 0 it also darkens and shines in the rain and
+ * whitens on its upward faces, by those shares of what the weather lays (uEnvWet; not a basic material, which
+ * has no normal; a Lambert one by its corners' normals, the others by each pixel's). With the open air off the
+ * material is as it was made.
+ * What the material's own onBeforeCompile does is kept and runs first: dress a material once, after any such
+ * patch. A material marked userData.envOwn does all of this itself and is left alone, as is one the renderer's
+ * fog is off for (a sky, a glow) and any other kind (a shader of the place's own, a sprite). Returns the material.
+ */
+export function envDress(material, { wet = 0, snow = 0 } = {}) {
+  if (material.userData.envOwn || material.userData.envDressed || !material.fog) return material;
+  if (!(material.isMeshBasicMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial || material.isMeshStandardMaterial)) return material;
+  material.userData.envDressed = true;
+  const inner = material.onBeforeCompile;
+  const key = material.customProgramCacheKey();
+  const lays = (wet > 0 || snow > 0) && !material.isMeshBasicMaterial;
+  const corners = material.isMeshLambertMaterial;
+  material.customProgramCacheKey = () => `${key}|env|${lays ? [wet, snow] : ''}`;
+  material.onBeforeCompile = (shader, renderer) => {
+    inner.call(material, shader, renderer);
+    Object.assign(shader.uniforms, envUniforms());
+    shader.vertexShader = `varying vec3 vEnvWorld;\nvarying float vEnvUp;\n${shader.vertexShader}`.replace('#include <fog_vertex>', `#include <fog_vertex>
+      ${lays && corners ? 'vEnvUp = normalize( ( vec4( transformedNormal, 0.0 ) * viewMatrix ).xyz ).y;' : ''}
+      vec4 envAt = vec4( transformed, 1.0 );
+      #ifdef USE_INSTANCING
+        envAt = instanceMatrix * envAt;
+      #endif
+      vEnvWorld = ( modelMatrix * envAt ).xyz;`);
+    // (The renderer hazes after its tone curve; the open air's haze is light like the rest and goes before it.)
+    let fragment = `varying vec3 vEnvWorld;\nvarying float vEnvUp;\n${ENV_GLSL}\n${shader.fragmentShader}`
+      .replace('#include <tonemapping_fragment>', 'if ( uEnvOn > 0.5 ) gl_FragColor.rgb = envHaze( gl_FragColor.rgb, cameraPosition, vEnvWorld );\n#include <tonemapping_fragment>')
+      .replace('#include <fog_fragment>', 'if ( uEnvOn < 0.5 ) {\n#include <fog_fragment>\n}');
+    // Snow lies on what faces up, first in the lee of the grain (as on the land: terrain.js); under it nothing is wet.
+    const after = corners ? '#include <emissivemap_fragment>' : '#include <normal_fragment_maps>';
+    if (lays) fragment = fragment.replace(after, `${after}
+      if ( uEnvOn > 0.5 ) {
+        float envUp = ${corners ? 'vEnvUp' : 'normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz ).y'};
+        float envGrain = texture2D( uEnvNoise, vEnvWorld.xz / 2.9 ).a;
+        float envSnow = uEnvWet.y * ${snow.toFixed(2)} * smoothstep( 0.25, 0.6, envUp - 0.45 + ( envGrain - 0.5 ) * 0.4 + 0.5 * uEnvWet.y );
+        float envWetBy = uEnvWet.x * ${wet.toFixed(2)} * ( 1.0 - envSnow );
+        diffuseColor.rgb = mix( diffuseColor.rgb * ( 1.0 - envWetBy * ${(1 - ENV.terrain.wetDarken).toFixed(2)} ), vec3( ${ENV.terrain.snowColour.join(', ')} ), envSnow );
+        #ifdef STANDARD
+          roughnessFactor = mix( roughnessFactor * ( 1.0 - envWetBy * ${(1 - ENV.terrain.wetRough).toFixed(2)} ), 0.9, envSnow );
+        #endif
+      }`);
+    shader.fragmentShader = fragment;
+  };
+  material.needsUpdate = true;
+  return material;
+}
 
 // ---- the curve, where the frame has no last pass ---------------------------------------------------------------------
 

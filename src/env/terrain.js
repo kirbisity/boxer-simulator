@@ -362,7 +362,7 @@ void main() {
 
   // Snow lies on what is level, first in the lee of the grain.
   float snow = uEnvWet.y * smoothstep(0.25, 0.6, normal.y - 0.45 + (fine - 0.5) * 0.4 * near + 0.5 * uEnvWet.y) * (1.0 - 0.35 * woods);
-  colour = mix(colour, vec3(0.9, 0.92, 0.96), snow);
+  colour = mix(colour, vec3(${ENV.terrain.snowColour.join(', ')}), snow);
 
   // Rain: the earth darkens (more than the grass, which sheds it), and water stands in the worn hollows.
   float wet = uEnvWet.x;
