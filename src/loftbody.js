@@ -114,7 +114,7 @@ export const LOFT = {
   // `overhang` (m): the belly's dome past which a point of it hangs over a waistband rather than under it.
   // `sampling`: the skin's faces wider than `across` are sampled within, this share of `across` apart. `tuck` (m): on a family
   // body the skin is kept this far in under a piece's end ring (skinInTheOpen): a waistband stands 2-3 cm off a big belly's foot.
-  // `leanRing` (m): the radius of the ring a soft piece's inflate was drawn on (standsOff): a lean waist, 22 cm deep and 30 wide
+  // `leanRing` (m): the radius of the ring a soft piece's inflate was drawn on (laidOver): a lean waist, 22 cm deep and 30 wide
   // (ANSUR II men at BMI 22: waist depth 21.6, breadth 30.5 cm), taken at its mean.
   // Layers kept inside one another (keepLayersInside): cells `along` (t) by 1/`around` of the way round, a point held by its own
   // and `spread` cells either side round; a layer counts as outer when it stands off its ring `rankGap` more (a share of the
@@ -243,7 +243,14 @@ export const LOFT = {
   armpit: { sharpen: 2, from: [-0.02, 0.06], to: [0.45, 0.6] },
   // (`alongPasses`: rounds a piece's fit is smoothed ring to ring, fitClothToBase: two, a ring's reach to the next and the one
   // after.)
-  fit: { alongPasses: 2, tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, overhang: 0.005, across: 0.03, sampling: 0.5, tuck: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25, herReach: 0.6, leanRing: 0.13 },
+  // (`kinds`: how closely each kind of piece is cut to the body, by what it is made of (stiffnessOf; `soft`: cloth, mail and
+  // padding). `squeeze`: of the flesh standing out past the ring the piece was drawn on, the share it does not enclose: a
+  // fitted plate is cut to the lean frame and presses in what is soft over it, and the body under it is not seen. `waist`:
+  // the share of its thickness off the body it keeps at the trunk's waist (all of it at the chest's full breadth): a cuirass
+  // rests on the waist and stands off the chest; the waist looked for within `waistIn` of the trunk's length. `ribs`: the share
+  // of its thickness a cuirass keeps at its side, where it is cut to the rib cage.)
+  fit: { kinds: { plate: { squeeze: 0.8, waist: 0.25 }, rows: { squeeze: 0.6, waist: 0.5 }, coat: { squeeze: 0.4, waist: 0.75 }, panel: { squeeze: 0.4, waist: 0.75 }, hung: { squeeze: 0.4, waist: 0.75 }, soft: { squeeze: 0, waist: 1 } },
+    ribs: 0.6, waistIn: [0.1, 0.6], alongPasses: 2, tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, overhang: 0.005, across: 0.03, sampling: 0.5, tuck: 0.03, deeper: 0.07, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25, herReach: 0.6, leanRing: 0.13 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
   wastingFrom: 0.135,
@@ -439,6 +446,8 @@ function stiffBody(mesh, kind) {
  */
 function stiffen(mesh, rings, kind, panels = 0, hung = false) {
   if (!kind) return rings;
+  // (What it is cut as, kept on the ring whether or not the mesh has stiff bodies: fitClothToBase.)
+  for (const ring of rings) ring.kind = hung ? 'panel' : kind;
   if (hung) {
     const down = Array.from({ length: panels }, () => stiffBody(mesh, 'panel'));
     for (const ring of rings) ring.body = down;
@@ -3092,6 +3101,8 @@ function fitClothToBase(mesh, parts, armoured) {
     return vec.length(off) < spec.armReach * (1 + spec.herReach * (mesh.base.herShare ?? 0)) * Math.max(frame.part.depth(Math.max(0, t)), frame.part.width(Math.max(0, t)));
   }) ?? null;
   const armsReach = (point, name) => armOf(point, name) !== null;
+  const LEG = /^([lr])(Thigh|Shin|Foot)$/;
+  const otherLeg = (name, flesh) => LEG.test(name) && LEG.test(flesh) && name[0] !== flesh[0];
   // Each base point of another part within an arm's reach (the shoulder's cap on the trunk), by arm: covered with the arm's root.
   mesh.base.armFlesh = new Array(count).fill(null);
   // The skin's points by part, in cells of `across` (a spatial hash).
@@ -3178,14 +3189,66 @@ function fitClothToBase(mesh, parts, armoured) {
   // plate for a bigger man is the same plate made bigger, its padding with it); but cloth is no thicker on a fat body than on a
   // lean one, and its inflate is a thickness only on the `leanRing` it was drawn on: at a share of a fat belly's 23 cm the
   // waistband stood 2.3 cm off the skin all round, a hoop the trunks hung inside.
-  const standsOff = (need, standoff, vertex) => (standoff * spec.clear - 1) * (hard(vertex) ? need : Math.min(need, spec.leanRing));
+  // What a point is cut as (LOFT.fit.kinds), and how much of its thickness a trunk's ring keeps: none of the `waist` share
+  // taken off where the trunk is as broad as at the chest, all of it at the waist.
+  // (Under armour every layer of a part is cut as its armour is, the kind most of the part's stiff points are: on the same
+  // rings the layers then keep their order, the arming coat under the plate.)
+  const kindOf = (vertex) => mesh.ringOf.get(vertex)?.kind ?? mesh.kinds?.get(mesh.stiff?.[vertex]) ?? (PLATE_PAINTS.has(mesh.colors[vertex]) ? 'plate' : 'soft');
+  const worn = {};
+  if (armoured) {
+    const tally = {};
+    for (const [vertex, ring] of mesh.ringOf) {
+      if (vertex >= start || mesh.colors[vertex] === 'skin' || kindOf(vertex) === 'soft' || !partOf(ring)) continue;
+      const counts = tally[partOf(ring)] ??= {};
+      counts[kindOf(vertex)] = (counts[kindOf(vertex)] ?? 0) + 1;
+    }
+    for (const [name, counts] of Object.entries(tally)) worn[name] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const cutOf = (vertex, name) => spec.kinds[worn[name] ?? kindOf(vertex)] ?? spec.kinds.soft;
+  // A cuirass is cut to the rib cage (`ribCut`: a trunk's piece of plate or of rows): no wider at any height than the trunk's
+  // own flesh there, the arm's and the shoulder's cap left to the pieces worn on them, its armholes cut in round the arm's
+  // root. `ribsAt` a ring: that flesh's reach to either side of the ring's middle (m; the skin within `alongBand` of it).
+  const ribCut = (vertex, name) => name === 'trunk' && (kindOf(vertex) === 'plate' || kindOf(vertex) === 'rows');
+  const ribFlesh = new Map();
+  if (frames.trunk) for (const list of cells.values()) for (const { point, name, arm } of list) {
+    if (arm || (name !== 'trunk' && name !== 'neck')) continue;
+    const row = Math.floor(vec.dot(vec.sub(point, frames.trunk.part.a), frames.trunk.axis) / spec.alongBand);
+    (ribFlesh.get(row) ?? ribFlesh.set(row, []).get(row)).push(point);
+  }
+  const ribs = new Map();
+  const ribsAt = (ring) => {
+    if (ribs.has(ring)) return ribs.get(ring);
+    const row = Math.floor(vec.dot(vec.sub(ring.center, frames.trunk.part.a), frames.trunk.axis) / spec.alongBand);
+    const reach = [0, 0];
+    for (let near = row - 1; near <= row + 1; near += 1) for (const point of ribFlesh.get(near) ?? []) {
+      const across = vec.dot(vec.sub(point, ring.center), ring.widthAxis);
+      reach[across > 0 ? 0 : 1] = Math.max(reach[across > 0 ? 0 : 1], Math.abs(across));
+    }
+    ribs.set(ring, reach);
+    return reach;
+  };
+  let [waistWidth, chestWidth, waistAt] = [Infinity, 0, 0];
+  for (let t = spec.waistIn[0]; t <= spec.waistIn[1]; t += 0.05) if (trunk.width(t) < waistWidth) [waistWidth, waistAt] = [trunk.width(t), t];
+  for (let t = waistAt; t <= 1.0001; t += 0.05) chestWidth = Math.max(chestWidth, trunk.width(t));
+  const kept = (cut, name, t) => (name !== 'trunk' || chestWidth - waistWidth < 1e-6 ? 1 : cut.waist + (1 - cut.waist) * Math.min(1, Math.max(0, (trunk.width(Math.min(1, Math.max(0, t))) - waistWidth) / (chestWidth - waistWidth))));
+  // How far out a point lies over skin `need` out from its ring's centre (m). The flesh past `flat`, the ring it was drawn on,
+  // is enclosed less its cut's `squeeze`; and it stands off that by its inflate, a thickness: the share of the ring it was
+  // drawn on, no more on a body that stands out of it (cloth: of the `leanRing` at most; it is no thicker on a fat body than
+  // on a lean one, and at a share of a fat belly's 23 cm a waistband stood 2.3 cm off the skin all round, a hoop the trunks
+  // hung inside). `thick` that share (the inflate less one, `kept`).
+  const laidOver = (need, thick, vertex, flat, cut) => {
+    const within = need <= flat ? need : flat + (need - flat) * (1 - cut.squeeze);
+    return within + thick * Math.min(within, hard(vertex) ? flat : spec.leanRing);
+  };
   // (And back: the skin under a point laid `reach` out.)
-  const skinUnder = (reach, standoff, vertex) => {
-    const over = standoff * spec.clear;
-    return hard(vertex) || reach <= spec.leanRing * over ? reach / over : reach - (over - 1) * spec.leanRing;
+  const skinUnder = (reach, thick, vertex, flat, { squeeze }) => {
+    const lean = hard(vertex) ? flat : spec.leanRing;
+    const within = reach <= lean * (1 + thick) ? reach / (1 + thick) : reach - thick * lean;
+    return within <= flat || squeeze >= 1 ? within : flat + (within - flat) / (1 - squeeze);
   };
   // How high each piece reaches up its part (a coat to the neck goes over the shoulder's cap: below).
   const pieceTop = new Map();
+  const ribPieces = new Set();
   for (const ring of mesh.ringOf.values()) pieceTop.set(ring.piece, Math.max(pieceTop.get(ring.piece) ?? -Infinity, ring.t));
   for (const [vertex, ring] of mesh.ringOf) {
     if (vertex >= start || mesh.colors[vertex] === 'skin') continue;
@@ -3203,6 +3266,8 @@ function fitClothToBase(mesh, parts, armoured) {
     const flat = Math.hypot(Math.cos(mesh.ringA[vertex]) * ring.depth, Math.sin(mesh.ringA[vertex]) * ring.width) || radius;
     const standoff = Math.max(1, radius / flat);
     let need = 0;
+    let capped = false;
+    let legs = false;
     // (The cells round the piece's point and on along its line out, a cell at a time to `deeper` past it: the skin it must clear
     // may stand that far out, a breast 3-6 cm past a top's ring, beyond the cells next to the point.)
     // (And for what is cinched, CINCHED_ROLES, the cells on in towards the centre as far as `tightest`: it is drawn in to the body
@@ -3221,10 +3286,13 @@ function fitClothToBase(mesh, parts, armoured) {
       }
     }
     for (const key of near) {
-      for (const { point, swell, arm } of cells.get(key) ?? []) {
+      for (const { point, swell, arm, name: fleshOf } of cells.get(key) ?? []) {
+        // (A leg's piece clears its own leg and the trunk over it, not the other leg across the gap between them: a cuisse's
+        // inner side found the other thigh 4 cm past it and went out to enclose both.)
+        if (otherLeg(name, fleshOf)) continue;
         // (The arm's flesh fits a piece on the arm, the rest of the skin a piece on the rest; the belly's dome not one under it.)
         // (A piece on the trunk up to its top, a shirt or a coat to the neck, goes over the shoulder's cap and the trapezius too.)
-        const overCap = name === 'trunk' && pieceTop.get(ring.piece) >= LOFT.closedJoint.top.trunk;
+        const overCap = name === 'trunk' && !ribCut(vertex, name) && pieceTop.get(ring.piece) >= LOFT.closedJoint.top.trunk;
         if ((arm !== onArm && !(arm && overCap)) || (under && swell > spec.overhang)) continue;
         const rel = vec.sub(point, ring.center);
         const along = vec.dot(rel, dir);
@@ -3234,11 +3302,24 @@ function fitClothToBase(mesh, parts, armoured) {
         const aside = vec.sub(rel, vec.scale(dir, along));
         const up = vec.dot(aside, frames[name].axis);
         if (Math.abs(up) > spec.alongBand || vec.length(vec.sub(aside, vec.scale(frames[name].axis, up))) > spec.across) continue;
-        need = Math.max(need, along);
+        if (along > need) [need, capped, legs] = [along, arm && !onArm, name === 'trunk' && LEG.test(fleshOf)];
       }
     }
-    const reach = need > 0 ? (need + standsOff(need, standoff, vertex)) / radius : 1;
-    shares.set(vertex, { ring, dir, radius, name, standoff, under, lies: need > 0 && reach >= spec.tightest, share: need > 0 ? Math.max(spec.tightest, reach) : 1 });
+    // (A leg's flesh under a trunk's piece, a fauld's foot or a skirt over the thighs, is cleared whole: the leg wears its own
+    // pieces at its own cut, and a groin's mail pressed in to the trunk's lean ring sank inside the hose of both thighs.)
+    const cut = legs ? { ...cutOf(vertex, name), squeeze: 0 } : cutOf(vertex, name);
+    const thick = (standoff * spec.clear - 1) * kept(cut, name, ring.t);
+    let reach = need > 0 ? laidOver(need, thick, vertex, radius / standoff, cut) / radius : 1;
+    let found = need > 0;
+    let most = Infinity;
+    if (ribCut(vertex, name)) {
+      const across = vec.dot(dir, ring.widthAxis);
+      const rib = ribsAt(ring)[across > 0 ? 0 : 1];
+      if (rib > 0 && Math.abs(across) > 1e-3) most = rib * (1 + thick * spec.ribs) / Math.abs(across) / radius;
+      if (most < reach) [reach, found] = [most, true];
+      ribPieces.add(ring.piece);
+    }
+    shares.set(vertex, { ring, dir, radius, name, standoff, thick, cut, under, need, capped, most, lies: need > 0 && reach >= spec.tightest, share: found ? Math.max(spec.tightest, reach) : 1 });
   }
   // (Each worn point's part, for its weights: clothHeat.)
   mesh.wornPart = new Map([...shares].map(([vertex, { name }]) => [vertex, name]));
@@ -3304,17 +3385,18 @@ function fitClothToBase(mesh, parts, armoured) {
   // nearest that place, clothHeat, within LOFT.heat.reach, and a fat belly's skin stood further than that from the ring the
   // trunks were lofted on, so some of their points found the skin and turned with it and the rest kept the loft's own bones,
   // the trunks torn to tatters once the fighter crouched.)
-  for (const [vertex, { ring, dir, radius, share, standoff }] of shares) {
-    const laid = laidOf.get(vertex) ?? share;
+  for (const [vertex, { ring, dir, radius, share, standoff, thick, cut, most }] of shares) {
+    // (A cuirass's side no further out than its cut, whatever the rest of its ring came to.)
+    const laid = Math.min(most, laidOf.get(vertex) ?? share);
     if (laid === 1) continue;
     for (let axis = 0; axis < 3; axis += 1) {
       mesh.positions[vertex * 3 + axis] = ring.center[axis] + dir[axis] * radius * laid;
-      mesh.weightPositions[vertex * 3 + axis] = ring.center[axis] + dir[axis] * skinUnder(radius * laid, standoff, vertex);
+      mesh.weightPositions[vertex * 3 + axis] = ring.center[axis] + dir[axis] * skinUnder(radius * laid, thick, vertex, radius / standoff, cut);
     }
   }
   holdLegsUnderWaist(mesh, frames, shares);
   raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count);
-  keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured, pieceTop);
+  keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured, pieceTop, ribPieces);
   // (A family body's belly is the model's own, not the loft's dome: the trunk's skin no piece lies over is found on the pieces
   // themselves, `open`. Under armour the skin is left out by the armour's own table, coverage.)
   if (mesh.base.family && !armoured) mesh.base.open = skinInTheOpen(mesh, 'trunk', frames, shares, nameOf, start, count);
@@ -3499,7 +3581,7 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count) {
  * a waistband it hangs over.
  */
 // (`armoured`: under armour a piece low on the trunk is drawn in under a thigh's piece, never left out there.)
-function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured = false, pieceTop = new Map()) {
+function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured = false, pieceTop = new Map(), ribPieces = new Set()) {
   const spec = LOFT.layers;
   mesh.underLayer = new Set();
   const cells = new Map();
@@ -3696,7 +3778,9 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     const limit = surface(layer.name, layer, layer);
     const covered = within;
     // (A piece up to the trunk's top, a coat to the neck, goes over the shoulder's cap and holds its skin however far.)
-    const overCap = limiting !== null && pieceTop.get(limiting) >= LOFT.closedJoint.top.trunk;
+    // (Not a cuirass, cut in round the arm's root, `ribPieces`: the shoulder's cap and what is worn over it lie beside it.)
+    const overCap = limiting !== null && pieceTop.get(limiting) >= LOFT.closedJoint.top.trunk && !ribPieces.has(limiting);
+    const beside = layer.skin ? layer.arm : shares.get(layer.vertex)?.capped;
     // (A piece low on the trunk lies over the thighs as well: under a thigh's piece there it is left out, not drawn in.)
     if (!layer.skin && layer.name === 'trunk' && layer.t < spec.trunkFoot) {
       for (const thigh of ['lThigh', 'rThigh']) {
@@ -3715,7 +3799,13 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     // and what is under it is seen from below; and flesh standing far out of a piece, the inner thighs between two trouser legs,
     // fills the gap between pieces once drawn in.)
     const close = Math.abs(limit + spec.margin - layer.r) < spec.hideGap;
-    if (!layer.skin && covered && (!armoured || close)) mesh.underLayer.add(layer.vertex);
+    // (Nor under armour below the trunk's foot: a fauld or a coat's skirt hangs open over the thighs, and the breeches under
+    // its hem are seen from below.)
+    const openHem = armoured && layer.name === 'trunk' && layer.t < spec.trunkFoot;
+    // (Under a cuirass, cut inside the shoulder's flesh, the trunk's cloth is under it however far it is drawn in: the arming
+    // coat's shoulder, left where the flesh put it, stood through the plate's edge in slivers.)
+    const underCuirass = ribPieces.has(limiting) && layer.name === 'trunk';
+    if (!layer.skin && covered && (!armoured || close || underCuirass) && !openHem) mesh.underLayer.add(layer.vertex);
     // (Skin between the rings of a closed piece is under it too, and left out the same way: drawn in to the cloth's
     // surface it still came through it in specks and patches where the cloth's facets cut across the modelled forms, at a
     // boot's top, a coat's shoulder, a sleeve's root. Under armour too: a plate or a quilted coat is a closed tube between its own
@@ -3723,7 +3813,7 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     if (layer.skin && covered && close) for (const vertex of layer.group ?? [layer.vertex]) mesh.underLayer.add(vertex);
     // (An arm's skin, or skin blending into an arm, that a trunk piece would draw in by more than `mostPull` is not under it: the
     // arm lies beside the top, and drawing it in tears it into spikes.)
-    if (layer.r > limit && limit > 0 && !(layer.arm && !overCap && layer.name === 'trunk' && layer.r - limit > spec.mostPull)) {
+    if (layer.r > limit && limit > 0 && !(beside && !overCap && !(underCuirass && !layer.skin) && layer.name === 'trunk' && layer.r - limit > spec.mostPull)) {
       const pull = (limit - layer.r) / layer.r;
       for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += layer.out[axis] * pull;
     }
@@ -3736,7 +3826,7 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     const held = { ...layer, ...onTrunk };
     const hang = surface('trunk', held, held);
     if (!within) continue;
-    if (Math.abs(hang + spec.margin - onTrunk.r) < spec.hideGap) for (const vertex of layer.group ?? [layer.vertex]) mesh.underLayer.add(vertex);
+    if (!armoured && Math.abs(hang + spec.margin - onTrunk.r) < spec.hideGap) for (const vertex of layer.group ?? [layer.vertex]) mesh.underLayer.add(vertex);
     if (onTrunk.r > hang && hang > 0) {
       const pull = (hang - onTrunk.r) / onTrunk.r;
       for (const vertex of layer.group ?? [layer.vertex]) for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += onTrunk.out[axis] * pull;
