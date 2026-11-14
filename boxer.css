@@ -14,7 +14,8 @@
   --line: rgba(var(--ink), 0.14);
   --line-strong: rgba(var(--ink), 0.34);
   --fg: #ece5d3;
-  --muted: #a69d88;
+  --soft: #cfc7b3;
+  --muted: #b8b09b;
   --red: #d6442f;
   --blue: #4c82d8;
   --gold: #d8b25e;
@@ -1712,3 +1713,37 @@ html:lang(zh) .dw-vs { font-style: italic; }
 .info-pop-card { border-radius: var(--r-plate); border-color: var(--line-strong); padding: 18px 18px 16px; }
 .info-pop-close { border-radius: var(--r); }
 .info-pop { backdrop-filter: none; background: rgba(var(--pit), 0.8); }
+
+/* ---- Read at a glance ----
+   What is said second is still said: a plate's line, a row of links, a man's kit are in the soft ink (10:1 on a plate, 7:1 over a lit
+   scene under the dimming), never under 13 px; the fight's names and counts are no smaller or fainter than they were. */
+.screen-head .lede { color: var(--soft); font-size: 15px; }
+.choices.home-choices .choice .note { font-size: 14px; line-height: 1.42; color: var(--soft); }
+.choices.home-choices .choice::after { color: rgba(var(--gilt), 0.8); font-size: 17px; top: 12px; }
+html:lang(zh) .choices.home-choices .choice::after { font-size: 15px; font-family: var(--cjk-serif); font-weight: 700; }
+.choice em { font-size: 11.5px; }
+.home-links { gap: 0; background: rgba(var(--pit), 0.72); border: 1px solid var(--line); border-radius: var(--r); padding: 0 6px; }
+.replay-intro { font-size: 13.5px; color: var(--fg); padding: 10px 16px; }
+.replay-intro .label-glyph { color: var(--gold); opacity: 1; }
+html:lang(zh) .replay-intro { font-size: 14.5px; }
+.dw-name span { font-size: 14px; color: var(--soft); }
+.dw-mount, .dw-own { font-size: 13px; color: var(--fg); background: rgba(var(--pit), 0.55); border-color: var(--line-strong); padding: 6px 14px; }
+.dw-tab b { font-size: 13px; letter-spacing: 0.06em; }
+.dw-tab { color: var(--soft); }
+.dw-tab.on { color: var(--fg); }
+.card .top { font: 700 18px/1.2 var(--display); letter-spacing: 0.06em; color: var(--fg); text-shadow: 0 1px 2px rgba(var(--pit), 1), 0 0 8px rgba(var(--pit), 0.8); }
+.card .kd { font: 700 16px/1.2 var(--display); letter-spacing: 0.06em; color: var(--gold); }
+.meta { font: 500 11.5px/1.35 var(--mono); color: rgba(var(--ink), 0.88); text-shadow: 0 1px 2px rgba(var(--pit), 1), 0 0 6px rgba(var(--pit), 0.9); }
+.log li { font-size: 12px; color: rgba(var(--ink), 0.9); }
+
+/* The title page: the name large on a ground darkened for it (the arena lit only below, where the plates are), between the book's
+   initials on their rule and the long rule under the line. */
+#home.screen { background: linear-gradient(180deg, rgba(var(--pit), 0.94) 0, rgba(var(--pit), 0.88) 30%, rgba(var(--pit), 0.6) 58%, rgba(var(--pit), 0.82) 100%); }
+.home .screen-head .titles { gap: 12px; }
+.home .screen-head .titles::before { font-size: 13px; letter-spacing: 0.5em; text-indent: 0.5em; padding: 0 0 9px; border-bottom: 1px solid rgba(var(--gilt), 0.55); min-width: min(300px, 70%); text-align: center; }
+.home .screen-head h1 { font: 700 clamp(42px, 7vw, 102px)/0.94 var(--title); letter-spacing: -0.005em; color: #f6f0e0; max-width: 11.5em; text-shadow: 0 2px 0 rgba(var(--pit), 0.9), 0 0 44px rgba(var(--pit), 1); margin-top: 4px; }
+.home .screen-head .lede { font: italic 500 clamp(18px, 1.9vw, 25px)/1.25 var(--title); color: var(--gold); max-width: 50ch; }
+.home .screen-head .titles::after { width: min(520px, 86%); height: 11px; opacity: 1; -webkit-mask-size: calc(50% - 12px) 1px, calc(50% - 12px) 1px, 9px 9px; mask-size: calc(50% - 12px) 1px, calc(50% - 12px) 1px, 9px 9px; }
+html:lang(zh) .home .screen-head h1 { letter-spacing: 0.06em; font-size: clamp(40px, 6.4vw, 92px); line-height: 1.05; }
+html:lang(zh) .home .screen-head .lede { font-size: clamp(16px, 1.6vw, 20px); font-style: normal; letter-spacing: 0.08em; }
+@media (max-height: 760px) and (min-width: 761px) { .home .screen-head h1 { font-size: clamp(34px, 9vh, 68px); } }
