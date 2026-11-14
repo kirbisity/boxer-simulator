@@ -331,7 +331,9 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
       Promise.resolve().then(() => TK_AIR.weather(view, key, named));
     }
     const open = !!view.env?.on && view.env.place === key;
-    tkWeather.uTkTime.value = time % 3600;
+    // One clock: in the open air its own (the fight's, which stands still when the fight does: the gusts its
+    // noise sends and the things the kit moves in them keep step); alone, the page's.
+    tkWeather.uTkTime.value = (open ? view.env.time ?? time : time) % 3600;
     if (lay) tkSetLay(lay.lay, lay.textures, north);
     const wind = open ? view.env.wind : placeWind(key);
     tkSetAir(open, [wind.x, wind.z, wind.speed]);

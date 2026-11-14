@@ -14,10 +14,12 @@ import { slabOf, wallLine, wallOf } from '../physics/terrain.js';
 import { tkgFrame } from '../townkit/geo.js';
 import { tkRandom } from '../townkit/tex.js';
 import {
-  tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLantern, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
+  TK_HOUSE, tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
   tkSlabBridgeSolids, tkTree, tkWaterSteps, tkWaterStepsSolids, tkYardWall, tkYardWallSolid,
 } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
+import { tkStir } from '../townkit/stir.js';
+import { TK_THINGS, tkBasket, tkCart, tkFirewood, tkPoles, tkSacks, tkScatter, tkTub } from '../townkit/things.js';
 
 /** The town's plan (m). Every figure is a choice for the game's ground, set against the battle's court and a walker's reach; none is a measurement of a real town. */
 export const CANAL_TOWN = {
@@ -165,14 +167,27 @@ export function canalTownPlan() {
   // The lions at the mouth of the north lane, facing the square.
   const lions = [{ at: [t.northLane.x[0] - 1.0, t.square.z[0] + 0.9] }, { at: [t.northLane.x[1] + 1.0, t.square.z[0] + 0.9] }];
   const gate = { a: [t.northLane.x[0], t.northLane.gate], b: [t.northLane.x[1], t.northLane.gate] };
-  ctPlanMade = { houses, walls, bridges, steps, quays, trees, boats, lions, gate };
+  // Handcarts left standing: by the square's north shops, on the quay lanes, in the back street.
+  const carts = [
+    { at: [-20.5, -8.6], yaw: 1.2, load: TK_THINGS.hemp }, { at: [17.5, -8.9], yaw: -0.5, tipped: true }, { at: [-33, 7.5], yaw: Math.PI / 2 + 0.2, load: TK_THINGS.straw },
+    { at: [52, 7.6], yaw: -Math.PI / 2, tipped: true }, { at: [-12, -26.9], yaw: 1.7, load: TK_THINGS.hemp }, { at: [30, 27.9], yaw: -1.4 },
+  ];
+  ctPlanMade = { houses, walls, bridges, steps, quays, trees, boats, lions, gate, carts };
   return ctPlanMade;
 }
 
-/** What hangs and stands at a house's front, from its seed: lanterns under the eave, a signboard, jars by the door. Local to its front (x along it, z out). */
+/**
+ * How often a house's front has each thing (0..1), and how. Choices for a lived-in street, by eye: none is counted
+ * from a source. `washing`: an upper floor's poles thrust out over the street with the day's wash on them (`out` m
+ * long, `rise` m higher at the tip), or a cord along the front under the eave; `smoke`: a kitchen fire lit;
+ * the rest stand against the wall within `deep` m of it, so the way stays clear.
+ */
+const CT_FRONT = { washing: { poles: 0.34, cord: 0.14, out: 2.3, rise: 0.25 }, smoke: 0.2, firewood: 0.2, poles: 0.22, baskets: 0.38, tub: 0.22, sacks: 0.3, deep: 0.8 };
+
+/** What hangs and stands at a house's front, from its seed: lanterns under the eave, a signboard, jars by the door, the wash, firewood, baskets. Local to its front (x along it, z out). */
 function ctDressing(house) {
   const random = tkRandom(house.seed + 77);
-  const things = { lanterns: [], sign: null, jars: [] };
+  const things = { lanterns: [], sign: null, jars: [], washing: [], stands: [], smoke: false };
   if (house.far) return things;
   const half = house.width / 2;
   const eave = house.storeys > 1 ? house.heights[0] : house.heights[0] - 0.1;
@@ -183,6 +198,23 @@ function ctDressing(house) {
     const count = 1 + Math.floor(random() * 3);
     for (let k = 0; k < count; k += 1) things.jars.push({ x: lx + k * 0.62, z: 0.42 + 0.1 * random(), high: 0.55 + 0.35 * random(), lid: random() < 0.7 });
   }
+  // (Drawn after the older things, so their places are as they were.)
+  const more = tkRandom(house.seed + 177);
+  const f = CT_FRONT;
+  if (house.storeys > 1) {
+    const top = house.heights[0] + house.heights[1];
+    const pick = more();
+    if (pick < f.washing.poles) {
+      for (const lx of more() < 0.5 ? [-half * 0.45, half * 0.45] : [(more() - 0.5) * half]) things.washing.push({ a: [lx, top - 1.2, 0.05], b: [lx, top - 1.2 + f.washing.rise, f.washing.out], pole: 0.02, dry: more() });
+    } else if (pick < f.washing.poles + f.washing.cord) things.washing.push({ a: [-half + 0.5, top - 0.55, 0.62], b: [half - 0.5, top - 0.55, 0.62], pole: 0, dry: more() });
+  }
+  things.smoke = more() < f.smoke;
+  const spot = () => (more() - 0.5) * (house.width - 1.6);
+  if (more() < f.firewood) things.stands.push({ kind: 'firewood', x: spot(), long: 1.1 + more() * 1.2, high: 0.5 + 0.6 * more() });
+  if (more() < f.poles) things.stands.push({ kind: 'poles', x: spot(), count: 2 + Math.floor(more() * 4) });
+  if (more() < f.baskets) for (let k = 0, lx = spot(), count = 1 + Math.floor(more() * 3); k < count; k += 1) things.stands.push({ kind: 'basket', x: lx + k * 0.58, z: 0.4 + 0.3 * more(), wide: 0.4 + 0.2 * more(), full: more() < 0.5 });
+  if (more() < f.tub) things.stands.push({ kind: 'tub', x: spot(), z: 0.38 + 0.3 * more() });
+  if (house.shops && more() < f.sacks) things.stands.push({ kind: 'sacks', x: spot(), count: 2 + Math.floor(more() * 4) });
   return things;
 }
 
@@ -279,8 +311,10 @@ const CT_AIR = {
   weathers: { damp: 'canalmist', rain: 'canalshowers', dry: 'canalcloudy' },
   first: 'damp',
   own: {
-    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.32, saturation: 0.95, ev: 0.8 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.7 }],
-    canalshowers: ['showers', { label: 'Showers on the town', grade: { contrast: 1.36, saturation: 0.94, ev: 0.6 } }],
+    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.32, saturation: 0.95, ev: 1.0 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.7 }],
+    // (A showery day's wind: 2.6 times the town's light air, about 3.6 m/s at the ground and 9 aloft, which carries a
+    // shower over in a few minutes, so the rain comes and goes within one fight; a little less cloud, for the gaps.)
+    canalshowers: ['showers', { label: 'Showers on the town', grade: { contrast: 1.36, saturation: 0.94, ev: 1.2 }, wind: 2.6, cover: 0.6 }],
     canalcloudy: ['cloudy', { label: 'Broken cloud over the town', grade: { contrast: 1.32, ev: 0.7 } }],
   },
 };
@@ -292,6 +326,8 @@ export const CANAL_TOWN_LIGHT = {
 
 // The town's lie (townkit/lay.js): the ground it maps (the walked town and a row beyond: what is further is seen only
 // over roofs), and the way the air moves for what the wind lays (toward [x, z]: along the canal, a light air from the west).
+// How well weeds take (things.js tkScatter `grows`): in a paving's joints, and on open earth.
+const CT_GROWS = { paved: 0.32, earth: 1 };
 const CT_LAY = { box: { x: [-152, 152], z: [-40, 40] }, wind: [1, 0.15] };
 
 /**
@@ -324,12 +360,38 @@ export function buildCanalTown() {
   const tier = tkTier();
   const blocks = tkBlocks();
   const world = tkgFrame();
+  const stir = tkStir(2);
   for (const house of plan.houses) {
     const builder = blocks.at(house.at[0], house.at[1], house.far);
     tkHouse(builder, house);
     const front = tkgFrame(house.at[0], 0, house.at[1], house.yaw).child(0, 0, house.depth / 2);
     const things = ctDressing(house);
-    for (const [lx, ly, lz] of things.lanterns) tkLantern(builder, ...front(lx, ly, lz));
+    for (const [lx, ly, lz] of things.lanterns) stir.lantern(...front(lx, ly, lz));
+    for (const wash of things.washing) stir.washing(front(...wash.a), front(...wash.b), wash);
+    for (const stand of things.stands) {
+      const seed = house.seed + Math.round(stand.x * 100);
+      if (stand.kind === 'firewood') tkFirewood(builder, front.child(stand.x, 0, 0.03), { ...stand, seed });
+      else if (stand.kind === 'poles') tkPoles(builder, front.child(stand.x, 0, 0), { ...stand, seed });
+      else if (stand.kind === 'basket') tkBasket(builder, ...front(stand.x, 0, stand.z), { wide: stand.wide, high: stand.wide * 0.7, full: stand.full ? [0.5, 0.56, 0.3] : null });
+      else if (stand.kind === 'tub') tkTub(builder, ...front(stand.x, 0, stand.z));
+      else if (stand.kind === 'sacks') tkSacks(builder, ...front(stand.x, 0, 0.35), { count: stand.count, seed });
+    }
+    if (!house.far) {
+      // The eaves drip, front and back (the back's drops fall to the yard, or to the canal behind the far bank's houses).
+      const over = house.roof?.overhang ?? TK_HOUSE.overhang;
+      const top = house.storeys > 1 ? house.heights[0] + house.heights[1] : house.heights[0];
+      const half = house.width / 2;
+      stir.drips(front(-half, top, over), front(half, top, over), 0);
+      stir.drips(front(-half, top, -house.depth - over), front(half, top, -house.depth - over), house.row.startsWith('water') ? t.canal.water : 0);
+      // A kitchen's smoke, from a vent in the back slope of the roof.
+      if (things.smoke) {
+        const rise = house.roof?.rise ?? (house.depth / 2 + over) * TK_HOUSE.pitch;
+        const [vx, vz] = [(house.seed % 2 ? -1 : 1) * half * 0.5, -house.depth * 0.72];
+        const vy = top + rise * (1 - (house.depth * 0.22) / (house.depth / 2 + over));
+        builder.box('brick', front.child(vx, 0, vz), -0.22, 0.22, vy - 0.3, vy + 0.5, -0.22, 0.22, { colour: [0.6, 0.6, 0.6], skip: 'bottom' });
+        stir.smoke(...front(vx, vy + 0.55, vz), 0.8);
+      }
+    }
     if (things.sign) tkSign(builder, front.child(things.sign.x, 0, 0), { y: things.sign.y });
     for (const jar of things.jars) tkJar(builder, ...front(jar.x, 0, jar.z), { high: jar.high, lid: jar.lid });
   }
@@ -355,6 +417,7 @@ export function buildCanalTown() {
   }
   for (const boat of plan.boats) tkBoat(blocks.at(...boat.at), boat.at[0], t.canal.water, boat.at[1], boat.yaw, boat);
   for (const lion of plan.lions) tkLion(blocks.at(...lion.at), tkgFrame(lion.at[0], 0, lion.at[1], 0));
+  for (const cart of plan.carts) tkCart(blocks.at(...cart.at), tkgFrame(cart.at[0], 0, cart.at[1], cart.yaw), cart);
   // The ground: flags on the square, cobbles in the lanes and streets with a course of flags down the middle, earth elsewhere; the water.
   const ground = blocks.wide;
   const reach = t.canal.reach;
@@ -362,7 +425,10 @@ export function buildCanalTown() {
   tkPaving(ground, 'earth', -reach, reach, -110, cz0, -0.05, [0.8, 0.8, 0.78]);
   tkPaving(ground, 'earth', -reach, reach, cz1, 110, -0.05, [0.8, 0.8, 0.78]);
   tkPaving(ground, 'flags', t.square.x[0], t.square.x[1], t.square.z[0], t.square.z[1]);
+  // (What is paved, for what grows: weeds take in a paving's joints, thinly.)
+  const paved = [[t.square.x[0], t.square.x[1], t.square.z[0], t.square.z[1]]];
   const lane = (x0, x1, z0, z1) => {
+    paved.push([x0, x1, z0, z1]);
     tkPaving(ground, 'cobble', x0, x1, z0, z1, -0.01);
     const along = x1 - x0 > z1 - z0;
     const mid = along ? (z0 + z1) / 2 : (x0 + x1) / 2;
@@ -385,15 +451,25 @@ export function buildCanalTown() {
   // where feet go (the ways below: the lanes' middles, the quay, the bridges, the square's crossings).
   const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2 });
 
+  // What grows and gathers, by the lie: weeds at the walls' feet and in the unworn margins of the paving, thick on
+  // open earth; fallen leaves and straw in the corners.
+  if (tier !== 'low') {
+    tkScatter(blocks, lay.lay, {
+      box: { x: [-110, 110], z: CT_LAY.box.z }, seed: 2, colour: TK_THINGS.green, stones: false,
+      grows: (x, z) => (z > cz0 - 0.4 && z < cz1 + 0.4 ? null : paved.some(([x0, x1, z0, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1) ? CT_GROWS.paved : CT_GROWS.earth),
+    });
+  }
+
   const materials = tkMaterialsFor(tier, { extra: { quay: { sheet: 'ashlar', foot: 1.6, ground: t.canal.water, blotch: 1.3 } } });
   const meshes = tkMeshes(blocks, materials, { tier });
   const root = new THREE.Group();
   root.name = 'canaltown';
   const sky = tkSky({ horizon: CT_LIGHT.haze, zenith: 0x8fa3b2, cloud: 0.82, cloudColour: 0xe9ecec, radius: 480, sun: CT_LIGHT.sun, glow: 0.18 });
   const rain = tkRain({ count: tier === 'low' ? 1300 : 2600 });
-  root.add(meshes, sky, rain);
+  const moved = stir.make(materials, tier);
+  root.add(meshes, moved.group, sky, rain);
   tkKeep(root, meshes, {
-    sun: CT_LIGHT.sun, shadow: 0.55, sky, rain, key: 'canaltown', tier, mirrorAt: [0, 1.5, 4], lay, north: [0, -1], air: CT_AIR,
+    sun: CT_LIGHT.sun, shadow: 0.55, sky, rain, key: 'canaltown', tier, mirrorAt: [0, 1.5, 4], lay, north: [0, -1], air: CT_AIR, stir: moved.tick,
     weather: (view) => ({ ...CANAL_TOWN_WEATHER.damp, ...(view.weather?.town ?? null) }),
   });
   root.userData.lay = lay.lay;

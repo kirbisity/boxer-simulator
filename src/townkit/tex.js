@@ -51,6 +51,11 @@ export const TK_TEX = {
   // any way; a pine's needles stand in `bundles` fans, each fan's needles spreading from its twig's end.
   foliage: { size: 256, metres: 1, relief: 0.03, count: 150, long: 0.062, wide: 0.03, face: [0.33, 0.45, 0.22], spray: 0.9 },
   needles: { size: 256, metres: 1, relief: 0.02, count: 520, long: 0.085, wide: 0.0055, face: [0.2, 0.3, 0.19], spray: 0.86, bundles: 30 },
+  // A tuft of grass or weed, cut out by alpha, for the cards that stand at wall feet and in joints: `count` blades
+  // from the sheet's foot, fanning `fan` of its width to each side, each `wide` of the sheet at its base and tapering,
+  // bending over as it rises. Painted pale (`face` at the foot, `tip` at the ends): the card's own colour tints it
+  // green or dead.
+  tuft: { size: 256, metres: 1, relief: 0.02, count: 34, fan: 0.36, wide: 0.02, face: [0.62, 0.6, 0.44], tip: [0.92, 0.9, 0.7] },
 };
 
 /** A seeded generator, 0..1 (mulberry32). */
@@ -392,6 +397,32 @@ const TKX_PAINTERS = {
     };
   },
 
+  blades(spec, seed) {
+    const random = tkRandom(seed);
+    const blades = Array.from({ length: spec.count }, () => {
+      const lean = (random() * 2 - 1) * spec.fan;
+      return { foot: 0.5 + (random() - 0.5) * 0.14, lean: lean * 0.45, bend: lean * 0.55 + (random() - 0.5) * 0.2, long: 0.35 + 0.62 * Math.pow(random(), 0.7), wide: spec.wide * (0.6 + 0.8 * random()), tone: 0.75 + 0.5 * random() };
+    });
+    return (u, v, pixel) => {
+      let best = null;
+      let edge = 1;
+      for (const blade of blades) {
+        const t = v / blade.long;
+        if (t > 1) continue;
+        const across = Math.abs(u - (blade.foot + blade.lean * t + blade.bend * t * t)) / (blade.wide * (1 - 0.88 * t));
+        if (across < edge) {
+          edge = across;
+          best = blade;
+        }
+      }
+      pixel.a = best ? 1 : 0;
+      const t = best ? v / best.long : 0;
+      for (let k = 0; k < 3; k += 1) pixel.c[k] = (spec.face[k] + (spec.tip[k] - spec.face[k]) * t) * (best?.tone ?? 1) * (0.55 + 0.45 * Math.min(1, v * 5));
+      pixel.h = best ? 1 - edge : 0;
+      pixel.r = 0.75;
+      pixel.j = 0;
+    };
+  },
   lattice(spec) {
     const { bars, bar } = spec;
     return (u, v, pixel) => {
@@ -417,7 +448,7 @@ const TKX_PAINTERS = {
 const TKX_SHEETS = {
   brick: ['brick', 3, 0], ashlar: ['stone', 11, 0], rubble: ['stone', 23, 0.55], flags: ['stone', 37, 0.12], cobble: ['cobble', 41, 0],
   plaster: ['plaster', 53, 0], timber: ['timber', 61, 0], rooftile: ['rooftile', 71, 0], earth: ['earth', 83, 0], rock: ['rock', 97, 0], lattice: ['lattice', 0, 0],
-  foliage: ['leaves', 101, 0], needles: ['leaves', 103, 0],
+  foliage: ['leaves', 101, 0], needles: ['leaves', 103, 0], tuft: ['blades', 107, 0],
 };
 
 /**

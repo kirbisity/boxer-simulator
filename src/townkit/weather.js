@@ -53,7 +53,10 @@ export const TK_WEATHER = {
   bare: { colour: [0.36, 0.35, 0.34], low: 0.42, high: 0.16 },
   // The baked shade: how much of the sky's light the lie's map may take (1: all it says), how much darker the
   // dirt makes a surface the rain never washes, and how much of the light a joint's own depth takes.
-  shade: { most: 0.9, dirt: 0.22, joint: 0.4 },
+  // `bounce`: an upright face shut off from the sky still has the light the open ground before it throws back.
+  // The lie's sky share is read `reach` m out from the face, and the face has at least `share` of it (the ground's
+  // reflectance, damp stone throws back about 0.3 and its wet film mirrors more at a low angle: 0.5 by eye), more over snow.
+  shade: { most: 0.9, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 } },
   // A way's worn middle is this much paler and smoother than its edges; its edges this much darker.
   tread: { pale: 0.1, edge: 0.24 },
   // Snow's colour, and how level a surface must be to hold it (the normal's y: from none to full). `colour` is for
@@ -212,6 +215,7 @@ float tkSnowHere = 0.0;
 vec3 tkUp = vec3(0.0, 1.0, 0.0);
 // From the lie: the sky's share here, how far under cover (0..1), the wear, and the joint's depth (the sheet's).
 float tkSky = 1.0;
+float tkBounce = 0.0;
 float tkUnder = 0.0;
 float tkWear = 0.0;
 float tkJoint = 0.0;
@@ -265,6 +269,8 @@ const TK_COLOUR = `
       tkWear = la.b;
       lies = la.a;
       nearWall = lb.b;
+      // (The light off the ground before an upright face: weather.js TK_WEATHER.shade.bounce.)
+      if (upright > 0.01) tkBounce = upright * ${TK_WEATHER.shade.bounce.share.toFixed(2)} * (1.0 + ${TK_WEATHER.shade.bounce.snow.toFixed(2)} * uTkSnow) * texture2D(uTkLayA, (vTkPos.xz + n.xz * ${TK_WEATHER.shade.bounce.reach.toFixed(2)} - uTkLay.xy) * uTkLay.zw).r;
       if (upright > 0.01) fall = texture2D(uTkLayB, (vTkPos.xz - n.xz * 0.35 - uTkLay.xy) * uTkLay.zw).r * uTkLayH.y + uTkLayH.x - vTkPos.y;
     }
   }
@@ -412,7 +418,7 @@ if (tkSnowHere > 0.0) {
 // The baked shade, on the light that comes from the sky and the ground (not the sun's own: its shadows are cast).
 const TK_SHADE = `
 {
-  float tkOpen = mix(1.0, tkSky, ${TK_WEATHER.shade.most.toFixed(2)}) * (1.0 - ${TK_WEATHER.shade.joint.toFixed(2)} * tkJoint * (1.0 - tkSnowHere) * step(0.01, uTkDirt.z));
+  float tkOpen = mix(1.0, max(tkSky, tkBounce), ${TK_WEATHER.shade.most.toFixed(2)}) * (1.0 - ${TK_WEATHER.shade.joint.toFixed(2)} * tkJoint * (1.0 - tkSnowHere) * step(0.01, uTkDirt.z));
   reflectedLight.indirectDiffuse *= tkOpen;
   reflectedLight.indirectSpecular *= tkOpen;
 }
@@ -610,6 +616,13 @@ export const TK_MATERIALS = {
   lattice: { sheet: 'lattice', cutout: true, blotch: 0.4 },
   foliage: { sheet: 'foliage', cutout: true, blotch: 0.8, sway: [TK_STIR_RULE.tree.bend, TK_STIR_RULE.tree.flutter] },
   needles: { sheet: 'needles', cutout: true, blotch: 0.8, sway: [TK_STIR_RULE.tree.bend, TK_STIR_RULE.tree.flutter * 0.5] },
+  // Grass and weeds standing in tufts (townkit/things.js): they bend with the wind far more than a tree does, a
+  // 0.4 m tuft's tips going over about 0.15 m in a 6 m/s wind (bend 0.026 on the height squared), and shiver.
+  tuft: { sheet: 'tuft', cutout: true, blotch: 0.5, snow: 0.15, sway: [0.026, 0.002] },
+  // Scraps lying flat (fallen leaves, straw, an arrow's feathers), each its own colour; and an eave's icicles, pale
+  // and blue as the sky they show.
+  scrap: { sheet: 'plaster', plain: true, twoSided: true, snow: 0.4, blotch: 0.5 },
+  icicle: { sheet: 'plaster', plain: true, colour: [0.8, 0.9, 0.97], snow: 0, blotch: 0.2 },
   // Cloth and paper that hang and fly (townkit/stir.js): the plaster sheet's fine grain under each piece's own
   // colour, seen from both sides, holding no snow.
   cloth: { sheet: 'plaster', plain: true, twoSided: true, snow: 0, blotch: 0.5, hung: true },
