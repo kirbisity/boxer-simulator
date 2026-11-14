@@ -1,0 +1,288 @@
+// The town kit's assembly: what the makers (townkit/geo.js) laid, cut into blocks of ground and made into meshes
+// whose fine detail is drawn only near the camera; the sky over a place too wide for the arena's own dome; the rain;
+// and the place's keeping each frame (the sun following the camera so the fighters' shadows fall wherever they go,
+// the buildings' own shadow baked once, the mirror the puddles show taken once).
+
+import { ktShadow, ktShadowBake } from '../levelmode/kitshadow.js';
+import { tkgBuilder } from './geo.js';
+import { tkMaterials, tkSetWeather, tkWeather } from './weather.js';
+
+/** Tuning for the assembly. */
+export const TK_PLACE = {
+  // The side of a block of ground (m): pieces are gathered by block so that three culls what is behind the camera, and
+  // the fine detail of a block (tile rolls, rafters, lattice frames) is drawn only within `near` m of the camera's
+  // focus. 24 m is about four house fronts; 46 m is where a tile roll is under a pixel at the usual view.
+  block: 24, near: 46,
+  // The low tier (a phone, a slow integrated GPU): no fine detail at any distance, sheets at half size, no cube mirror.
+  low: { near: 0, size: 256, mirror: false, rain: 0.5 },
+  // The sun's own shadow camera while a kit place is shown: its half width round the camera's focus (m) and how far off
+  // it stands. The arena's is 9 m round the origin; here the fighters may be anywhere.
+  sun: { half: 16, distance: 60 },
+  // The cube mirror's side (px) and the rain's streaks: how many, the box they fall in round the camera (m), their length and speed.
+  mirror: 128, rain: { count: 2600, box: [34, 16, 34], length: 0.55, speed: 13 },
+};
+
+// The quality tier now ('high' | 'low'): the page's own measure of the machine (adaptres.js, told through tkSetTier) once it
+// has one; until then a guess from the pointer (a touch screen is taken for a phone).
+let tkTierNow = null;
+
+/** The tier a kit place is built and kept at. */
+export const tkTier = () => tkTierNow ?? (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'low' : 'high');
+
+/** Tell the kit the tier (main.js, from the frame-rate controller): on 'low' no fine detail is shown from then on. */
+export function tkSetTier(tier) {
+  tkTierNow = tier === 'low' ? 'low' : 'high';
+}
+
+/** Builders by block of ground: `at(x, z)` is the builder for whatever stands at world (x, z). */
+export function tkBlocks(cell = TK_PLACE.block) {
+  const blocks = new Map();
+  return {
+    cell,
+    /** `plain`: for a thing no walker comes near: its fine detail is never made. */
+    at(x, z, plain = false) {
+      const key = `${Math.floor(x / cell)},${Math.floor(z / cell)}`;
+      if (!blocks.has(key)) blocks.set(key, tkgBuilder());
+      const builder = blocks.get(key);
+      return plain ? { ...builder, at: (level, work) => (level === 'near' ? undefined : builder.at(level, work)) } : builder;
+    },
+    /** One builder for things too large to belong to a block (the ground, far hills): never level-of-detail switched. */
+    wide: tkgBuilder(),
+    all: () => [...blocks.values()],
+  };
+}
+
+function tkGeometry(batch) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(batch.position), 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(batch.normal), 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(batch.uv), 2));
+  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(batch.colour), 3));
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/**
+ * The meshes of a place: `blocks` (tkBlocks) made into a group. `tier` 'low' leaves the fine detail out. Returns the
+ * group; `group.userData.detail(focus)` shows each block's fine detail or its stand-in by its distance from `focus`
+ * (a THREE.Vector3), and `group.userData.casters` are the meshes that throw the baked shadow.
+ */
+export function tkMeshes(blocks, materials, { tier = 'high' } = {}) {
+  const group = new THREE.Group();
+  const switched = [];
+  const casters = [];
+  const near = tier === 'low' ? 0 : TK_PLACE.near;
+  const add = (builder, wide) => {
+    for (const batch of builder.batches()) {
+      if (!batch.position.length || (batch.level === 'near' && !near)) continue;
+      const mesh = new THREE.Mesh(tkGeometry(batch), materials.get(batch.material));
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      mesh.name = `townkit:${batch.material}:${batch.level}`;
+      group.add(mesh);
+      if (batch.level === 'all' && !wide && batch.material !== 'water') casters.push(mesh);
+      if (batch.level !== 'all') {
+        mesh.visible = batch.level === 'far';
+        switched.push({ mesh, level: batch.level, centre: mesh.geometry.boundingSphere.center, radius: mesh.geometry.boundingSphere.radius });
+      }
+    }
+  };
+  for (const builder of blocks.all()) add(builder, false);
+  add(blocks.wide, true);
+  group.userData.casters = casters;
+  group.userData.detail = (focus) => {
+    const fine = near > 0 && tkTier() !== 'low';
+    for (const entry of switched) {
+      const close = fine && entry.centre.distanceTo(focus) - entry.radius < near;
+      entry.mesh.visible = entry.level === 'near' ? close : !close;
+    }
+  };
+  group.userData.triangles = () => {
+    let count = 0;
+    for (const mesh of group.children) if (mesh.visible && mesh.geometry) count += mesh.geometry.attributes.position.count / 3;
+    return count;
+  };
+  return group;
+}
+
+/**
+ * The sky: a dome that goes with the camera, painted in the shader from the horizon's colour to the zenith's with cloud
+ * drifting across it (`cloud` 0..1: how much of it is covered; 1 is an overcast with no blue). Out of the fog; behind all.
+ */
+export function tkSky({ horizon, zenith, cloud = 0.6, cloudColour = 0xf2f2ee, radius = 900, sun = [0.4, 0.6, 0.3], glow = 0.25 }) {
+  const material = new THREE.ShaderMaterial({
+    uniforms: {
+      uHorizon: { value: new THREE.Color(horizon) }, uZenith: { value: new THREE.Color(zenith) }, uCloud: { value: new THREE.Color(cloudColour) },
+      uCover: { value: cloud }, uTime: tkWeather.uTkTime, uSun: { value: new THREE.Vector3(...sun).normalize() }, uGlow: { value: glow },
+    },
+    vertexShader: 'varying vec3 vDir;\nvoid main() {\n  vDir = position;\n  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n}',
+    fragmentShader: `
+      varying vec3 vDir;
+      uniform vec3 uHorizon; uniform vec3 uZenith; uniform vec3 uCloud; uniform float uCover; uniform float uTime; uniform vec3 uSun; uniform float uGlow;
+      float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n(vec2 p) { vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1.0, 0.0)), f.x), mix(h(i + vec2(0.0, 1.0)), h(i + vec2(1.0, 1.0)), f.x), f.y); }
+      float fbm(vec2 p) { float v = 0.0; float a = 0.5; for (int i = 0; i < 5; i += 1) { v += a * n(p); p = p * 2.03 + 11.0; a *= 0.5; } return v; }
+      void main() {
+        vec3 d = normalize(vDir);
+        float up = clamp(d.y, 0.0, 1.0);
+        vec3 sky = mix(uHorizon, uZenith, pow(up, 0.55));
+        // The cloud deck: a flat layer seen in perspective, thinning to haze at the horizon.
+        vec2 p = d.xz / (d.y + 0.18) * 1.6 + vec2(uTime * 0.004, uTime * 0.002);
+        float c = smoothstep(1.0 - uCover * 1.05, 1.35 - uCover * 0.75, fbm(p) + 0.25 * fbm(p * 3.1 + 5.0));
+        float shade = 0.72 + 0.28 * fbm(p * 1.7 + 3.0);
+        sky = mix(sky, uCloud * shade, c * smoothstep(0.0, 0.22, up));
+        sky += uGlow * pow(max(dot(d, uSun), 0.0), 6.0) * vec3(1.0, 0.95, 0.85);
+        gl_FragColor = vec4(mix(uHorizon, sky, smoothstep(-0.02, 0.1, d.y)), 1.0);
+      }`,
+    side: THREE.BackSide, depthWrite: false, depthTest: true, fog: false,
+  });
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(radius, 32, 16), material);
+  dome.renderOrder = -10;
+  dome.frustumCulled = false;
+  dome.name = 'townkit:sky';
+  return dome;
+}
+
+/** Rain: streaks falling in a box that goes with the camera, wrapped in the shader (one draw, no work per frame); shown by uTkRain. */
+export function tkRain({ count = TK_PLACE.rain.count, slant = [0.12, 0.05] } = {}) {
+  const { box, length, speed } = TK_PLACE.rain;
+  const position = new Float32Array(count * 6);
+  const end = new Float32Array(count * 2);
+  let seed = 9;
+  const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < count; k += 1) {
+    const at = [random() * box[0], random() * box[1], random() * box[2]];
+    position.set([...at, ...at], k * 6);
+    end[k * 2 + 1] = 1;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  geometry.setAttribute('end', new THREE.BufferAttribute(end, 1));
+  const material = new THREE.ShaderMaterial({
+    uniforms: { uTime: tkWeather.uTkTime, uRain: tkWeather.uTkRain, uBox: { value: new THREE.Vector3(...box) }, uEye: { value: new THREE.Vector3() }, uSlant: { value: new THREE.Vector2(...slant) } },
+    vertexShader: `
+      attribute float end; uniform float uTime; uniform vec3 uBox; uniform vec3 uEye; uniform vec2 uSlant; varying float vFade;
+      void main() {
+        vec3 p = position;
+        p.y -= uTime * ${speed.toFixed(1)} * (0.85 + 0.3 * fract(position.x * 7.3));
+        p.xz += uSlant * p.y;
+        // Wrapped into the box round the eye.
+        p = mod(p - uEye + uBox * 0.5, uBox) - uBox * 0.5 + uEye;
+        p.y += end * ${length.toFixed(2)};
+        p.xz += uSlant * end * ${length.toFixed(2)};
+        vFade = 1.0 - smoothstep(uBox.x * 0.3, uBox.x * 0.5, length(p.xz - uEye.xz));
+        gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: 'uniform float uRain; varying float vFade;\nvoid main() {\n  gl_FragColor = vec4(0.82, 0.86, 0.9, 0.34 * uRain * vFade);\n}',
+    transparent: true, depthWrite: false, fog: false,
+  });
+  const rain = new THREE.LineSegments(geometry, material);
+  rain.frustumCulled = false;
+  rain.name = 'townkit:rain';
+  rain.userData.eye = material.uniforms.uEye.value;
+  return rain;
+}
+
+/**
+ * A kit place's keeping. `root`: the place's group; `meshes`: tkMeshes's group in it; `sun`: the unit vector toward the sun;
+ * `shadow`: how much of the sun the baked shadow takes (0..1); `weather`: () => the weather wanted now (tkSetWeather's
+ * argument, and `fog` [near, far] for the haze), asked each frame, so whatever drives it (the story's view, a hook, a weather system) is followed.
+ * Sets `root.userData.bind`, `.tick` and `.leave` (render.js calls them).
+ */
+export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = null, weather = () => null, mirrorAt = [0, 1.6, 0], key = 'townkit', tier = 'high' }) {
+  const state = { view: null, saved: null, mirror: null, mirrored: false, checked: 0 };
+  const dir = new THREE.Vector3(...sun).normalize();
+  const focus = new THREE.Vector3();
+  const ahead = new THREE.Vector3();
+  root.userData.bind = (view) => {
+    state.view = view;
+  };
+  const takeSun = (view) => {
+    const light = view.lights.sun;
+    const camera = light.shadow.camera;
+    if (!state.saved) {
+      state.saved = { position: light.position.clone(), target: light.target.position.clone(), box: [camera.left, camera.right, camera.top, camera.bottom, camera.near, camera.far] };
+      const { half, distance } = TK_PLACE.sun;
+      Object.assign(camera, { left: -half, right: half, top: half, bottom: -half, near: distance - 30, far: distance + 30 });
+      camera.updateProjectionMatrix();
+    }
+    light.target.position.copy(focus);
+    light.position.copy(focus).addScaledVector(dir, TK_PLACE.sun.distance);
+    light.target.updateMatrixWorld();
+  };
+  const takeMirror = (view) => {
+    state.mirrored = true;
+    if (tier === 'low') return;
+    // The place alone (and its lights), seen all round from a man's height where the fight is: what the puddles show.
+    const target = new THREE.WebGLCubeRenderTarget(TK_PLACE.mirror, { format: THREE.RGBFormat, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+    const camera = new THREE.CubeCamera(0.3, 600, target);
+    camera.position.set(...mirrorAt);
+    const hidden = [];
+    for (const child of view.scene.children) {
+      if (child !== root && !child.isLight && child.visible) {
+        hidden.push(child);
+        child.visible = false;
+      }
+    }
+    if (rain) rain.visible = false;
+    tkWeather.uTkEnvOn.value = 0;
+    camera.update(view.renderer, view.scene);
+    for (const child of hidden) child.visible = true;
+    state.mirror = target;
+    tkWeather.uTkEnv.value = target.texture;
+    tkWeather.uTkEnvOn.value = 1;
+  };
+  root.userData.tick = (time) => {
+    const view = state.view;
+    if (!view) return;
+    tkWeather.uTkTime.value = time % 3600;
+    const wanted = weather(view);
+    if (wanted) tkSetWeather(wanted);
+    // (The haze's reach is the weather's too: `fog` [near, far] on the scene's own fog.)
+    if (wanted?.fog && view.scene.fog) {
+      view.scene.fog.near = wanted.fog[0];
+      view.scene.fog.far = wanted.fog[1];
+    }
+    const camera = view.camera;
+    // The camera's focus: the point on the ground it looks at, no further than the fine detail reaches.
+    camera.getWorldDirection(ahead);
+    const reach = Math.min(30, ahead.y < -0.05 ? camera.position.y / -ahead.y : 30);
+    focus.copy(camera.position).addScaledVector(ahead, reach);
+    meshes.userData.detail(focus);
+    if (sky) sky.position.copy(camera.position);
+    if (rain) {
+      rain.visible = tkWeather.uTkRain.value > 0.01;
+      rain.userData.eye.copy(camera.position);
+    }
+    takeSun(view);
+    // The baked shadow is one map shared with the castle stage: taken again if another place's bake replaced it.
+    if (ktShadow.uKitShadowInfo.value?.x !== shadow || state.checked !== view.renderer.info.render.frame >> 6) {
+      state.checked = view.renderer.info.render.frame >> 6;
+      ktShadowBake(view.renderer, root, meshes.userData.casters, [dir.x, dir.y, dir.z], shadow, key);
+    }
+    if (!state.mirrored) takeMirror(view);
+    else if (state.mirror) {
+      tkWeather.uTkEnv.value = state.mirror.texture;
+      tkWeather.uTkEnvOn.value = 1;
+    }
+  };
+  root.userData.leave = (view) => {
+    if (!state.saved) return;
+    const light = view.lights.sun;
+    light.position.copy(state.saved.position);
+    light.target.position.copy(state.saved.target);
+    light.target.updateMatrixWorld();
+    const [left, right, top, bottom, near, far] = state.saved.box;
+    Object.assign(light.shadow.camera, { left, right, top, bottom, near, far });
+    light.shadow.camera.updateProjectionMatrix();
+    state.saved = null;
+    tkWeather.uTkEnvOn.value = 0;
+  };
+  // (scenerylod.js merges a place's still meshes and chunks its instances: this place is already in blocks. Call tkKeep last.)
+  for (const child of root.children) child.userData.lodChunks = true;
+  return state;
+}
+
+/** The kit's materials at a quality tier ('low' halves the sheets). */
+export const tkMaterialsFor = (tier, options = {}) => tkMaterials({ size: tier === 'low' ? TK_PLACE.low.size : 512, ...options });
