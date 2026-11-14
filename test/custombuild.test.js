@@ -46,7 +46,7 @@ test('the custom page is one file under its budget, without the music, the storm
   const out = join(mkdtempSync(join(tmpdir(), 'custom-bundle-')), 'gladiator-custom.html');
   bundle(out, '--custom');
   const size = statSync(out).size;
-  assert.ok(size < CUSTOM_BUDGET && CUSTOM_BUDGET <= 15_000_000, `${size} bytes`);
+  assert.ok(size < CUSTOM_BUDGET && CUSTOM_BUDGET < 16_000_000, `${size} bytes`);
   const page = readFileSync(out, 'utf8');
   assert.doesNotMatch(page, /sourceMappingURL/);
   // (Long strings survive minifying whole: a piece of each is enough to find it.)

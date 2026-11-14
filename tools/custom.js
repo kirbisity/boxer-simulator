@@ -1,5 +1,5 @@
 // The custom build (`node tools/bundle.js --custom` → dist/gladiator-custom.html): a test bed that is only the sandbox (custom
-// mode: the fighter builder and its fights), opened at once, in one file under 15 MB. The fights are the same code as the full
+// mode: the fighter builder and its fights), opened at once, in one file under its budget (CUSTOM_BUDGET). The fights are the same code as the full
 // game's (physics, AI, weapons, outfits, fire, sound effects, the builder's roster and presets); what custom mode never reaches is
 // left out: level mode (the Dunnottar stages, their kit, the storm and its sky photographs, the story, cutscenes and HUD), story mode, Last
 // Stand Squad (and its squad builder), the intro, the tutorial, the home screen and its other modes, and the music (its cues
@@ -22,8 +22,9 @@ export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KE
 // field works), and the level's characters (offered among the builder's presets).
 const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];
 
-/** The most a custom page may weigh (bytes, the page itself: nothing goes beside it). */
-export const CUSTOM_BUDGET = 15_000_000;
+/** The most a custom page may weigh (bytes, the page itself: nothing goes beside it). Set under the 16 MB a published test
+ *  page may weigh, with room for the wrapper it is published in. */
+export const CUSTOM_BUDGET = 15_500_000;
 
 // The grounds' baked tiles (detailmaps-data, 0.4 to 2.4 MB each) kept, for the sandbox's own places (the Colosseum's sand, the port's
 // concrete, the shore's beach, the earth of the green, the field and Sengoku); the rest (the grass, the town's cobbles,
