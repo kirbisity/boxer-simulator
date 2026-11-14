@@ -23,7 +23,7 @@ export const STORY_PLACE_MARK = {
   colour: GENERAL_MARK.colour,
 };
 
-/** The mark, in the view's scene: `update(world, mark)` each frame; `mark` from the story page (storyview.js placeMark), or null. */
+/** The mark, in the view's scene: `update(world, mark)` each frame; `mark` from the story page (storyview.js placeMark: { place, hero, corner, away, size?, floor? }), or null. */
 export function createStoryPlaceMark(view) {
   const material = (opacity) => new THREE.MeshBasicMaterial({ transparent: true, opacity, depthTest: false, depthWrite: false, side: THREE.DoubleSide, fog: false });
   const ring = new THREE.Mesh(new THREE.RingGeometry(...STORY_PLACE_MARK.ring, 40), material(STORY_PLACE_MARK.opacity.ring));
@@ -41,7 +41,9 @@ export function createStoryPlaceMark(view) {
   arrow.frustumCulled = false;
   arrow.name = 'story-place-arrow';
   view.scene.add(ring, arrow);
-  const ground = (works, x, z) => (works ? reliefAt(works, x, z) : 0) + STORY_PLACE_MARK.lift;
+  // (A mark may bring its own ground, `floor(x, z)`: a place walked before its battle has floors, not field works.)
+  let floor = null;
+  const ground = (works, x, z) => (floor ? floor(x, z) : works ? reliefAt(works, x, z) : 0) + STORY_PLACE_MARK.lift;
 
   return {
     update(world, mark) {
@@ -50,6 +52,9 @@ export function createStoryPlaceMark(view) {
       if (!ring.visible) return;
       const works = worksOf(world.arena);
       const [px, pz] = mark.place;
+      floor = mark.floor ?? null;
+      // (`size`: the ring's radius as a multiple of one man's place: a muster point is several men's.)
+      ring.scale.setScalar(mark.size ?? 1);
       const colour = STORY_PLACE_MARK.colour[mark.corner] ?? STORY_PLACE_MARK.colour.red;
       ring.material.color.set(colour);
       ring.position.set(px, ground(works, px, pz), pz);

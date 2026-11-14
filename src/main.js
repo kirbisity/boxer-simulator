@@ -58,6 +58,7 @@ import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awar
 import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
+import { floorAt } from './physics/terrain.js';
 import { cameraTerrain, createStageWorld, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { attemptCount, attemptLog, attemptStory, bossFightOn, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
@@ -93,7 +94,7 @@ import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks,
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
 import { installStory } from './story/storyview.js';
-import { STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
+import { STORY_MUSTER_RADIUS, STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
 import { tkSetTier } from './townkit/place.js';
 import { tkWeatherNow } from './townkit/weather.js';
 import { createStoryPlaceMark } from './story/placemark.js';
@@ -2911,7 +2912,10 @@ function enterStoryWorld(setup, { paused = false } = {}) {
   state.world = createWorld(setup.fighters, setup.options);
   // (The scene is the view's; a battle's `options.place` may be only its climate's key.)
   const place = setup.view?.scene ?? setup.options.place ?? 'field';
-  presentWorld(place, setup.options.arena, setup.view ?? null);
+  // (A place that can be walked has its weather by the day: the same in the battle as on the walk before and after it.)
+  const { view } = setup;
+  const town = view?.roam && STORY_PLACES[view.roam] && !view.weather?.town ? storyPlaceWeather(view.roam, storyDayRoll(view.day ?? state.seed)) : null;
+  presentWorld(place, setup.options.arena, town ? { ...view, weather: { ...view.weather, town } } : view ?? null);
   state.sideAsked = true;
   takeSide(corner);
   boxer.finishBuilding();
@@ -2925,7 +2929,7 @@ function enterStoryWorld(setup, { paused = false } = {}) {
  * place's own builder, played on foot with the follow camera. `inputs`: the walker (the battle's hero); `weather`: the
  * place's weather for the day (the kit's values: townkit/weather.js); `at`, `facing`: where he starts, else the stage's.
  */
-function enterStoryRoam(key, { inputs, weather = null, at = null, facing = null } = {}) {
+function enterStoryRoam(key, { inputs, weather = null, day = null, after = false, at = null, facing = null } = {}) {
   const entry = STORY_PLACES[key];
   if (!entry) throw new Error(`no story place called ${key}`);
   if (state.game !== 'story') setGame('story');
@@ -2935,6 +2939,12 @@ function enterStoryRoam(key, { inputs, weather = null, at = null, facing = null 
   state.playSide = 'red';
   state.lead = { red: 0, blue: 0 };
   const stage = entry.stage();
+  // (After the battle he is where it was fought, on the muster point; before it, where the place is entered.)
+  if (after && !at) {
+    at = [...(entry.after?.at ?? entry.muster)];
+    facing ??= entry.after?.facing ?? null;
+  }
+  if (!weather && day !== null) weather = storyPlaceWeather(key, storyDayRoll(day));
   const start = at ? { ...stage.start, at, facing: facing ?? stage.start.facing } : stage.start;
   state.world = createStageWorld({ ...stage, start }, normaliseInputs(structuredClone(inputs)), { seed: state.seed, awareness: false });
   clearGore(scene);
@@ -2965,8 +2975,12 @@ function enterStoryRoam(key, { inputs, weather = null, at = null, facing = null 
   renderHud();
   boxer.finishBuilding();
   state.paused = false;
-  return state.world;
+  const { terrain } = state.world.arena;
+  return { world: state.world, muster: [entry.muster[0], entry.muster[2]], radius: STORY_MUSTER_RADIUS, floor: (x, z) => Math.max(0, floorAt(terrain, x, z)) };
 }
+
+/** A day's number (a battle's seed: runner.js storyBattleSetup) as a roll in [0, 1) for the day's weather. */
+const storyDayRoll = (day) => (Math.imul(day >>> 0, 2654435761) >>> 0) / 2 ** 32;
 
 const story = installStory({
   storage: browserStorage,
@@ -3964,7 +3978,7 @@ const boxer = window.boxer = {
     document.body.classList.remove('sheet');
     const entry = STORY_PLACES[key];
     if (!entry) throw new Error(`no story place called ${key} (${Object.keys(STORY_PLACES).join(', ')})`);
-    const world = enterStoryRoam(key, { inputs: story.heroInputs(), weather: typeof weather === 'string' ? entry.weathers[weather] : weather, at, facing });
+    const { world } = enterStoryRoam(key, { inputs: story.heroInputs(), weather: typeof weather === 'string' ? entry.weathers[weather] : weather, at, facing });
     return { place: entry.place, terrain: world.arena.terrain.solids?.length ?? null };
   },
   // The weather of the town kit's place now (townkit/weather.js: wet, pool, snow, rain 0..1, mist, fog [near, far]): `placeWeather({ wet: 1, pool: 0.8, rain: 1 })`

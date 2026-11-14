@@ -25,7 +25,7 @@
 
 import { roninWarrior, wokouRaider } from '../../cast.js';
 import { seededRandom } from '../../physics.js';
-import { qiJiguangLevel, WEATHER_MIST } from '../../scenarios.js';
+import { qiJiguangLevel } from '../../scenarios.js';
 import { koreaAssemble, koreaHeroKit, KOREA_KIT, koreaFighter, koreaComrades, koreaKitFor, koreaStandIn } from './korea.js';
 
 export const WOKOU_1588 = {
@@ -64,7 +64,10 @@ export const wokouBattle = {
   year: WOKOU_1588.year,
   title: { zh: '倭寇犯境', en: 'Raiders from the sea' },
   // What the engine draws it in (render.js place, its mist).
-  view: { scene: 'jiangnan', weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 }, camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 28 } },
+  // What the engine draws it in: the canal town (places/canaltown.js), which can be walked before and after the battle
+  // (`roam`: places/storyplaces.js) and brings its own damp, mist and rain by the day (so no `weather.fog` here: that would
+  // replace the place's own).
+  view: { scene: 'canaltown', roam: 'canaltown', camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 28 } },
   seconds: 180,
   setup(life, seed = 1) {
     const random = seededRandom(seed);
