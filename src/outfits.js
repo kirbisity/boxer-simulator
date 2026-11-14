@@ -892,12 +892,13 @@ export const OUTFITS = {
     // The designs in play (picked from the five); the game shuffles among them.
     picked: [0, 1, 2, 3],
     designs: [
-      // The gothic shape — fluted plate, the German sallet and bevor — in bright polished steel.
+      // The gothic shape — smooth plate with sprays of flutes (`fluted: 'sprays'`, not the close fluting of the 1510s-20s), a
+      // sharp keel and a narrow waist, the German sallet and bevor — in bright polished steel.
       // Its borders of applied gilt brass (ARMOUR_DECOR.brass), the arming doublet under it a dull purple.
-      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#4a2f4f' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true, ...GOTHIC_BRASS }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet', ...GOTHIC_BRASS }, feet: { kind: 'sabaton', color: '#b7bcc4', ...SABATONS.sallet, ...GOTHIC_BRASS } },
+      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#4a2f4f' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: 'sprays', ...GOTHIC_BRASS }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet', ...GOTHIC_BRASS }, feet: { kind: 'sabaton', color: '#b7bcc4', ...SABATONS.sallet, ...GOTHIC_BRASS } },
       // Italian plate of about 1400 under the visored (hounskull) bascinet and its mail.
       plateDesign('Milanese', '#a7adb6', false, false, '#3a2a22', 'hounskull'),
-      plateDesign('Blackened', '#3a3d42', true, true, '#1c1a18', 'sallet'),
+      plateDesign('Blackened', '#3a3d42', 'sprays', true, '#1c1a18', 'sallet'),
       // The fluted harness of the 1510s-20s and its close helmet.
       plateDesign('Bright, wine arming coat', '#c4c9d0', true, false, '#5a1a22', 'closeHelmet'),
       plateDesign('Russeted', '#7a5a42', false, true, '#2a2622', 'hounskull'),
