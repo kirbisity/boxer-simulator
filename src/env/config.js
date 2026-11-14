@@ -105,6 +105,12 @@ export const ENV = {
     // down faster than the lights come up (a toe). Mid-grey is 0.18 of a white card's light (the photographic
     // convention), so colours near the middle keep their authored values and only the ends are bent.
     grey: 0.18,
+    // The fill on a face's ambient light (photoface.js PHOTO_FACES.fill, 1.8) was set against places whose
+    // ambient is a fraction of what a sky gives and whose frame has no exposure: under this sky, metered, 1.8
+    // bleached a pale face under overcast (its middle at 0.78 of the display). This is the fill while an open-air
+    // place is shown: by eye against close-ups under clear sky and overcast, between a pale face bleaching under
+    // overcast (above) and a face turned from a clear sun going grey, a man's eye sockets a brown band (below).
+    faceFill: 1.5,
     // The exposure is metered as a camera does it (post.js envMeter), off what the view holds: the land (a grey
     // card's worth of the light falling on level ground, sun x sin elevation + sky, as luminance) and, through
     // thick air, the haze's own light the way the camera looks, by the share of a sight line `view` m long that
@@ -459,7 +465,7 @@ export const ENV_WEATHER = {
   // Ground mist at dawn: a layer some tens of metres deep, the sun and the sky above it clear, the air near still.
   // (Mist is by definition visibility over 1 km and fog under; a valley's dawn fog is 100-400 m. 260 by eye, so the
   // far side of the floor is soft and the trees beyond are shapes.)
-  mist: { label: 'Mist', grade: { contrast: 1.36, saturation: 0.9, ev: 0.2 }, fine: 0.15, cover: 0.2, gloom: 0, sun: 0.85, visibility: 260, hazeHeight: 26, wind: 0.3, gust: 0, wet: 0.35, fall: null, snow: 0 },
+  mist: { label: 'Mist', grade: { contrast: 1.36, saturation: 0.9 }, fine: 0.15, cover: 0.2, gloom: 0, sun: 0.85, visibility: 260, hazeHeight: 26, wind: 0.3, gust: 0, wet: 0.35, fall: null, snow: 0 },
   // Snow driving on a hard wind: visibility under a km in moderate snow (approximate), the ground white.
   snow: { label: 'Snow', grade: { contrast: 1.3, saturation: 0.85, warmth: -0.02, ev: 0.3 }, fine: 0, cover: 1, gloom: 0.25, sun: 0.05, visibility: 700, hazeHeight: 600, wind: 1.6, gust: 0.15, wet: 0, fall: { kind: 'snow', share: 1 }, snow: 0.85 },
   // Dust lifted off dry ground by a hard wind: an ochre haze near the ground.

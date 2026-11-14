@@ -31,6 +31,7 @@ import { hidePaintedSky, setRenderer } from '../looks/kit.js';
 import { probeLiteProject } from '../looks/probe-lite.js';
 import { PLACE_ARENAS, reapplyPlace } from '../render.js';
 import { placeWind, setWindOver } from '../wind.js';
+import { PHOTO_FACES, setPhotoFill } from '../photoface.js';
 
 // What is chosen for the whole page: `enabled` (false: no place is drawn this way), `weather` a forced ENV_WEATHER
 // name or null, `tier` the quality tier in force, and the tier controller's running figures.
@@ -151,6 +152,9 @@ export function envApply({ place, view, group }) {
   envInstallShadow();
   setRenderer(view, { toneMapping: THREE.CustomToneMapping });
   view.drawOver = envDraw;
+  // The faces' fill, for this light (config.js faceFill): the place's own comes back when it is left.
+  const fill = view.env?.on ? view.env.fill : PHOTO_FACES.fill;
+  setPhotoFill(ENV.tone.faceFill, view.scene);
 
   // One sky: the look's dome and the painted ones stand down, and the fighters' ambient light is this sky's.
   if (st?.dome) st.dome.visible = false;
@@ -196,7 +200,7 @@ export function envApply({ place, view, group }) {
 
   // The shafts: the share of light the haze scatters toward the eye over the depth of a view, of the sun there is.
   const shafts = ENV.post.shafts * weather.sun * (1 - Math.exp(-air.extinction * ENV.post.shaftPath));
-  view.env = { on: true, place, group, air, weather, wind, probe, sunPower, tone, shafts, radius };
+  view.env = { on: true, place, group, air, weather, wind, probe, sunPower, tone, shafts, radius, fill };
   if (!envChosen.started) {
     // A phone or a tablet starts a tier down; the controller raises it if the frames allow.
     envChosen.started = true;
@@ -212,6 +216,7 @@ export function envLeave(view) {
   view.env.on = false;
   view.drawOver = null;
   view.lights.sun.shadow.radius = view.env.radius;
+  setPhotoFill(view.env.fill, view.scene);
   view.scene.remove(view.env.probe);
   setWindOver(null);
   view.clothWindBase = null;
