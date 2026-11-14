@@ -2,40 +2,40 @@
    One colour for each kind of blow, set on each element as --fu-col (the kind's) or --fu-lit (the move just asked for): see FIGHT_UI.colours. */
 
 /* The special button lit when it has something to do. */
-.fight-ui[data-fightui] .action-button:not(.idle) { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 16px rgba(255, 207, 74, 0.55); animation: fu-ready 1.6s ease-in-out infinite; }
-@keyframes fu-ready { 50% { box-shadow: 0 0 26px rgba(255, 207, 74, 0.9); } }
+.fight-ui[data-fightui] .action-button:not(.idle) { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 16px rgba(var(--gilt), 0.55); animation: fu-ready 1.6s ease-in-out infinite; }
+@keyframes fu-ready { 50% { box-shadow: 0 0 26px rgba(var(--gilt), 0.9); } }
 
 .fu-icon { width: 100%; height: 100%; display: block; overflow: visible; }
 
 /* Shared states: greyed when it cannot be thrown; a sweep while a blow is in flight; a flash for what happened. */
 .fu-tired { opacity: 0.38; filter: grayscale(1); }
-.fu-busy::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; background: conic-gradient(rgba(0, 0, 0, 0) calc(var(--fu-cool, 0) * 360deg), rgba(0, 0, 0, 0.42) 0); }
+.fu-busy::after { content: ''; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; background: conic-gradient(rgba(var(--pit), 0) calc(var(--fu-cool, 0) * 360deg), rgba(var(--pit), 0.42) 0); }
 .fu-flash { animation: fu-flash 0.5s ease-out; }
 [data-fu-flash="asked"] { --fu-flash: var(--fu-lit, #ffffff); }
 [data-fu-flash="hit"] { --fu-flash: #ffffff; }
 [data-fu-flash="glance"] { --fu-flash: #ffe9a8; }
-[data-fu-flash="blocked"], [data-fu-flash="parried"] { --fu-flash: #b7c3d0; }
-[data-fu-flash="miss"] { --fu-flash: #8a93a6; }
+[data-fu-flash="blocked"], [data-fu-flash="parried"] { --fu-flash: #ccc3b0; }
+[data-fu-flash="miss"] { --fu-flash: #9e9687; }
 @keyframes fu-flash { 0% { box-shadow: 0 0 0 0 var(--fu-flash), inset 0 0 0 40px color-mix(in srgb, var(--fu-flash) 55%, transparent); scale: 1.14; } 100% { box-shadow: 0 0 0 18px transparent, inset 0 0 0 40px transparent; scale: 1; } }
 [data-fu-flash="miss"].fu-flash { animation-name: fu-miss; }
 @keyframes fu-miss { 0%, 100% { translate: 0 0; } 25% { translate: -5px 0; } 75% { translate: 5px 0; } }
 
 /* The word of the blow, beside the man it went at: its icon and name in its kind's colour, then how it went. */
-.fu-toast { --fu-col: #ffffff; position: fixed; left: 0; top: 0; z-index: 3; translate: 0 -50%; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: 999px; background: rgba(10, 12, 18, 0.78); border: 2px solid var(--fu-col); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); pointer-events: none; opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
+.fu-toast { --fu-col: #ffffff; position: fixed; left: 0; top: 0; z-index: 3; translate: 0 -50%; display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 4px; border-radius: var(--r-pill); background: rgba(var(--pit), 0.78); border: 2px solid var(--fu-col); box-shadow: 0 2px 10px rgba(var(--pit), 0.5); pointer-events: none; opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
 .fu-toast.left { translate: -100% -50%; flex-direction: row-reverse; padding: 4px 4px 4px 6px; }
 .fu-toast.show { opacity: 1; animation: fu-pop 0.2s ease-out; }
 @keyframes fu-pop { from { scale: 1.3; } to { scale: 1; } }
 .fu-toast-icon { width: 30px; height: 30px; color: var(--fu-col); }
-.fu-toast-name { padding-right: 6px; font: 700 16px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fu-col); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
-.fu-toast-outcome { display: flex; align-items: center; gap: 4px; padding: 3px 9px 3px 6px; border-radius: 999px; font: 700 12px var(--mono); font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; }
+.fu-toast-name { padding-right: 6px; font: 700 16px/1 var(--display); letter-spacing: 0.04em; text-transform: uppercase; color: var(--fu-col); text-shadow: 0 1px 2px rgba(var(--pit), 0.9); }
+.fu-toast-outcome { display: flex; align-items: center; gap: 4px; padding: 3px 9px 3px 6px; border-radius: var(--r-pill); font: 700 12px var(--mono); font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; }
 .fu-toast-outcome i { width: 15px; height: 15px; }
 .fu-toast[data-outcome=""] .fu-toast-outcome { display: none; }
 .fu-toast[data-outcome="hit"] { box-shadow: 0 0 20px color-mix(in srgb, var(--fu-col) 70%, transparent); }
-.fu-toast[data-outcome="hit"] .fu-toast-outcome { background: var(--fu-col); color: #10121a; }
+.fu-toast[data-outcome="hit"] .fu-toast-outcome { background: var(--fu-col); color: rgb(var(--pit)); }
 .fu-toast[data-outcome="glance"] .fu-toast-outcome { background: #ffe9a8; color: #2a2108; }
-.fu-toast[data-outcome="blocked"] .fu-toast-outcome, .fu-toast[data-outcome="parried"] .fu-toast-outcome { background: #b7c3d0; color: #0e1724; }
+.fu-toast[data-outcome="blocked"] .fu-toast-outcome, .fu-toast[data-outcome="parried"] .fu-toast-outcome { background: #ccc3b0; color: #1c1814; }
 .fu-toast[data-outcome="miss"] { opacity: 0.85; }
-.fu-toast[data-outcome="miss"] .fu-toast-outcome { color: #c3c9d6; border: 1.5px dashed #8a93a6; }
+.fu-toast[data-outcome="miss"] .fu-toast-outcome { color: #d4cbb7; border: 1.5px dashed #9e9687; }
 
 /* Hit: the edge of the screen the blow came from pulses red. */
 .fu-danger { position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0; background: radial-gradient(circle at var(--fu-dx, 50%) var(--fu-dy, 100%), rgba(255, 36, 36, 0.62), rgba(255, 36, 36, 0.18) 22%, rgba(255, 36, 36, 0) 42%); }
@@ -43,12 +43,12 @@
 @keyframes fu-danger { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
 
 /* The colours of the blows: a column at the left in his first fights; a box over the footer when the footer's key asks for it. */
-.fu-legend { display: grid; gap: 4px; font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: #eef0f5; }
-.fu-key { display: flex; align-items: center; gap: 6px; color: #eef0f5; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
-.fu-key i { width: 30px; height: 30px; flex: none; padding: 2px; border-radius: 7px; color: var(--fu-col); background: rgba(10, 12, 18, 0.7); border: 2px solid var(--fu-col); }
-.fu-legend-first { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: 38%; translate: 0 -50%; padding: 8px 10px; border-radius: 12px; background: rgba(10, 12, 18, 0.55); pointer-events: none; animation: fu-legend 7s ease-in-out forwards; }
+.fu-legend { display: grid; gap: 4px; font: 600 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: #fbf1d9; }
+.fu-key { display: flex; align-items: center; gap: 6px; color: #fbf1d9; text-shadow: 0 1px 2px rgba(var(--pit), 0.9); }
+.fu-key i { width: 30px; height: 30px; flex: none; padding: 2px; border-radius: var(--r); color: var(--fu-col); background: rgba(var(--pit), 0.7); border: 2px solid var(--fu-col); }
+.fu-legend-first { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: 38%; translate: 0 -50%; padding: 8px 10px; border-radius: var(--r-plate); background: rgba(var(--pit), 0.55); pointer-events: none; animation: fu-legend 7s ease-in-out forwards; }
 @keyframes fu-legend { 0% { opacity: 0; } 6%, 85% { opacity: 1; } 100% { opacity: 0; } }
-.fu-legend-pop { position: fixed; z-index: 6; left: 50%; bottom: calc(var(--controls-height, 56px) + 10px); translate: -50% 0; grid-template-columns: repeat(3, auto); column-gap: 14px; row-gap: 8px; padding: 10px 14px 12px; border-radius: 14px; background: rgba(12, 14, 22, 0.92); border: 1px solid rgba(255, 255, 255, 0.22); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); cursor: pointer; }
+.fu-legend-pop { position: fixed; z-index: 6; left: 50%; bottom: calc(var(--controls-height, 56px) + 10px); translate: -50% 0; grid-template-columns: repeat(3, auto); column-gap: 14px; row-gap: 8px; padding: 10px 14px 12px; border-radius: var(--r-plate); background: rgba(var(--pit), 0.92); border: 1px solid rgba(var(--ink), 0.22); box-shadow: 0 8px 24px rgba(var(--pit), 0.5); cursor: pointer; }
 .fu-legend-pop > b { grid-column: 1 / -1; font: 700 12px var(--mono); letter-spacing: 0.1em; color: var(--muted); }
 body:not(.playing) .fu-legend-pop { display: none; }
 
@@ -57,21 +57,21 @@ body:not(.playing) .fu-legend-pop { display: none; }
 body:not(.playing) .fu-pick { display: none; }
 .fu-pick-label { display: flex; align-items: center; padding: 0 8px 0 12px; font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .fu-pick button { min-height: 44px; min-width: 44px; }
-.fu-pick button.on { background: var(--gold); color: #191300; }
+.fu-pick button.on { background: var(--gold); color: var(--on-gold); }
 .fu-pick .fu-pick-key { padding-inline: 10px; }
-.fu-pick .fu-pick-key.on { background: rgba(255, 255, 255, 0.18); color: var(--fg); }
+.fu-pick .fu-pick-key.on { background: rgba(var(--ink), 0.18); color: var(--fg); }
 @media (max-width: 520px) { .fu-pick-label { display: none; } }
 
 /* ---- Buttons: one for each kind of blow round the Guard, ringed in its colour ---- */
 .fu-buttons { --fu-s: 1; position: absolute; inset: 0; pointer-events: none; }
-.fu-btn { --fu-col: #ffffff; position: absolute; right: calc(var(--fu-x) * var(--fu-s) + env(safe-area-inset-right, 0px) - 34px); bottom: calc(var(--controls-height, 56px) + var(--fu-raise, 0px) + var(--fu-y) * var(--fu-s) - 34px); width: 68px; height: 68px; padding: 0; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 0; pointer-events: auto; touch-action: none; border: 3px solid var(--fu-col); background: radial-gradient(circle, rgba(10, 12, 18, 0.5) 55%, color-mix(in srgb, var(--fu-col) 22%, rgba(10, 12, 18, 0.6))); color: var(--fg); box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.45); }
-.fu-btn:active { background: color-mix(in srgb, var(--fu-col) 40%, rgba(10, 12, 18, 0.6)); }
-.fu-btn-icon { width: 34px; height: 34px; color: var(--fu-col); filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.8)); }
-.fu-btn-name { max-width: 60px; max-height: 2.1em; overflow: hidden; text-align: center; font: 700 9px/1.05 var(--mono); letter-spacing: 0.02em; text-transform: uppercase; color: #eef0f5; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+.fu-btn { --fu-col: #ffffff; position: absolute; right: calc(var(--fu-x) * var(--fu-s) + env(safe-area-inset-right, 0px) - 34px); bottom: calc(var(--controls-height, 56px) + var(--fu-raise, 0px) + var(--fu-y) * var(--fu-s) - 34px); width: 68px; height: 68px; padding: 0; border-radius: 50%; display: grid; place-items: center; align-content: center; gap: 0; pointer-events: auto; touch-action: none; border: 3px solid var(--fu-col); background: radial-gradient(circle, rgba(var(--pit), 0.5) 55%, color-mix(in srgb, var(--fu-col) 22%, rgba(var(--pit), 0.6))); color: var(--fg); box-shadow: 0 0 0 1.5px rgba(var(--pit), 0.55), 0 2px 10px rgba(var(--pit), 0.45); }
+.fu-btn:active { background: color-mix(in srgb, var(--fu-col) 40%, rgba(var(--pit), 0.6)); }
+.fu-btn-icon { width: 34px; height: 34px; color: var(--fu-col); filter: drop-shadow(0 1px 1px rgba(var(--pit), 0.8)); }
+.fu-btn-name { max-width: 60px; max-height: 2.1em; overflow: hidden; text-align: center; font: 700 9px/1.05 var(--mono); letter-spacing: 0.02em; text-transform: uppercase; color: #fbf1d9; text-shadow: 0 1px 2px rgba(var(--pit), 0.9); }
 .fu-btn-dots { position: absolute; top: 4px; display: flex; gap: 3px; }
-.fu-btn-dots i { width: 4px; height: 4px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
+.fu-btn-dots i { width: 4px; height: 4px; border-radius: 50%; background: rgba(var(--ink), 0.35); }
 .fu-btn-dots i.on { background: var(--fu-col); }
-.fu-btn kbd { display: none; position: absolute; left: -4px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: 5px; background: rgba(10, 12, 18, 0.85); border: 1px solid rgba(255, 255, 255, 0.3); font: 600 10px var(--mono); color: var(--muted); }
+.fu-btn kbd { display: none; position: absolute; left: -4px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: var(--r); background: rgba(var(--pit), 0.85); border: 1px solid rgba(var(--ink), 0.3); font: 600 10px var(--mono); color: var(--muted); }
 .fight-ui[data-device="mouse"] .fu-btn kbd { display: block; }
 .fu-btn.fu-flash[data-fu-flash="asked"] { animation: fu-press 0.45s ease-out; }
 @keyframes fu-press { 0% { scale: 0.9; box-shadow: 0 0 0 0 var(--fu-lit), inset 0 0 0 40px color-mix(in srgb, var(--fu-lit) 70%, transparent); } 35% { scale: 1.12; } 100% { scale: 1; box-shadow: 0 0 0 20px transparent, inset 0 0 0 40px transparent; } }
@@ -117,7 +117,7 @@ body:not(.playing) .fu-pick { display: none; }
 
 /* ---- Body: tap his man himself; a faint ring on his chest is the only sign, lit in the colour of the move chosen, then how it went ---- */
 .fu-reticle { --fu-size: 34px; --fu-lit: #ffffff; position: fixed; left: 0; top: 0; z-index: 1; width: 0; height: 0; pointer-events: none; }
-.fu-reticle svg { position: absolute; left: calc(var(--fu-size) / -2); top: calc(var(--fu-size) / -2); width: var(--fu-size); height: var(--fu-size); fill: none; stroke: #ffffff; stroke-width: 2; stroke-linecap: round; opacity: 0.22; filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.7)); transition: opacity 0.2s, stroke 0.12s; }
+.fu-reticle svg { position: absolute; left: calc(var(--fu-size) / -2); top: calc(var(--fu-size) / -2); width: var(--fu-size); height: var(--fu-size); fill: none; stroke: #ffffff; stroke-width: 2; stroke-linecap: round; opacity: 0.22; filter: drop-shadow(0 0 1px rgba(var(--pit), 0.7)); transition: opacity 0.2s, stroke 0.12s; }
 .fu-reticle.fu-lit svg { stroke: var(--fu-lit); opacity: 0.85; stroke-width: 3; }
 .fu-reticle.fu-tired svg { opacity: 0.1; }
 .fu-reticle.fu-busy::after { content: none; }
@@ -131,18 +131,18 @@ body:not(.playing) .fu-pick { display: none; }
 
 /* ---- Orders to his men, in a battle (fightui/command.js): small pills down the top left, out of the fight's way; the standing order gold ---- */
 .fu-orders { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); display: grid; gap: 6px; justify-items: start; pointer-events: none; }
-.fu-order { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; min-width: 88px; padding: 0 12px 0 10px; border-radius: 18px; pointer-events: auto; touch-action: none; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(10, 12, 18, 0.55); color: var(--fg); font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); cursor: pointer; }
-.fu-order:active { background: rgba(255, 207, 74, 0.35); }
-.fu-order.on { background: var(--gold); border-color: var(--gold); color: #191300; text-shadow: none; }
+.fu-order { position: relative; display: flex; align-items: center; gap: 6px; height: 36px; min-width: 88px; padding: 0 12px 0 10px; border-radius: var(--r-plate); pointer-events: auto; touch-action: none; border: 1px solid rgba(var(--ink), 0.3); background: rgba(var(--pit), 0.55); color: var(--fg); font: 600 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(var(--pit), 0.8); box-shadow: 0 1px 6px rgba(var(--pit), 0.35); cursor: pointer; }
+.fu-order:active { background: rgba(var(--gilt), 0.35); }
+.fu-order.on { background: var(--gold); border-color: var(--gold); color: var(--on-gold); text-shadow: none; }
 .fu-order-icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fu-order kbd { display: none; margin-left: auto; padding-left: 6px; font: 600 10px var(--mono); color: var(--muted); }
 .fu-order.on kbd { color: rgba(25, 19, 0, 0.6); }
 .fight-ui[data-device="mouse"] .fu-order kbd { display: block; }
-.fu-order-said { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px) + 4 * 36px + 3 * 6px + 8px); padding: 3px 10px; border-radius: 999px; background: rgba(10, 12, 18, 0.6); font: 700 13px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; }
+.fu-order-said { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px) + 4 * 36px + 3 * 6px + 8px); padding: 3px 10px; border-radius: var(--r-pill); background: rgba(var(--pit), 0.6); font: 700 13px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); text-shadow: 0 1px 3px rgba(var(--pit), 0.9); pointer-events: none; }
 .fu-orders .fu-order-said { position: static; justify-self: start; margin-top: 2px; }
-.fu-arms { display: flex; gap: 2px; padding: 2px; border-radius: 16px; pointer-events: auto; background: rgba(10, 12, 18, 0.55); border: 1px solid rgba(255, 255, 255, 0.3); }
-.fu-arm { height: 26px; padding: 0 9px; border: 0; border-radius: 13px; background: transparent; color: var(--fg); font: 600 10px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; touch-action: none; cursor: pointer; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
-.fu-arm.on { background: var(--gold); color: #191300; text-shadow: none; }
+.fu-arms { display: flex; gap: 2px; padding: 2px; border-radius: var(--r-plate); pointer-events: auto; background: rgba(var(--pit), 0.55); border: 1px solid rgba(var(--ink), 0.3); }
+.fu-arm { height: 26px; padding: 0 9px; border: 0; border-radius: var(--r-plate); background: transparent; color: var(--fg); font: 600 10px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; touch-action: none; cursor: pointer; text-shadow: 0 1px 2px rgba(var(--pit), 0.8); }
+.fu-arm.on { background: var(--gold); color: var(--on-gold); text-shadow: none; }
 .fu-orders-five ~ .fu-order-said { top: calc(12px + env(safe-area-inset-top, 0px) + 5 * 36px + 4 * 6px + 8px); }
 .fu-order[hidden] { display: none; }
 .fu-order-said-in { animation: fu-order-said 1.6s ease-out forwards; }
@@ -152,12 +152,12 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 
 /* ==== Level Mode: the player (src/levelmode/hud.js) ==== */
 /* The run threshold shows on the stick: past it the ring and the knob go gold, and the Guard button is greyed (a man running does not guard). */
-.stick.running { border-color: var(--gold); background: rgba(255, 207, 74, 0.08); }
+.stick.running { border-color: var(--gold); background: rgba(var(--gilt), 0.08); }
 .guard-button.blocked { opacity: 0.45; }
 /* The context pill: bottom centre, above the controls and the player's status; only where something can be done. */
-.lv-context { position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 66px); display: flex; align-items: center; gap: 8px; height: 46px; min-width: 132px; max-width: calc(100vw - 200px); padding: 0 16px 0 14px; border-radius: 23px; pointer-events: auto; touch-action: none; border: 1px solid rgba(255, 207, 74, 0.7); background: rgba(10, 12, 18, 0.7); color: var(--gold); font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 1px 10px rgba(0, 0, 0, 0.45), 0 0 14px rgba(255, 207, 74, 0.18); cursor: pointer; animation: lv-pill-in 0.18s ease-out; }
-.lv-context:active { background: rgba(255, 207, 74, 0.35); }
-.lv-context.disabled { color: var(--muted); border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 1px 10px rgba(0, 0, 0, 0.45); }
+.lv-context { position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 66px); display: flex; align-items: center; gap: 8px; height: 46px; min-width: 132px; max-width: calc(100vw - 200px); padding: 0 16px 0 14px; border-radius: var(--r-plate); pointer-events: auto; touch-action: none; border: 1px solid rgba(var(--gilt), 0.7); background: rgba(var(--pit), 0.7); color: var(--gold); font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px rgba(var(--pit), 0.8); box-shadow: 0 1px 10px rgba(var(--pit), 0.45), 0 0 14px rgba(var(--gilt), 0.18); cursor: pointer; animation: lv-pill-in 0.18s ease-out; }
+.lv-context:active { background: rgba(var(--gilt), 0.35); }
+.lv-context.disabled { color: var(--muted); border-color: rgba(var(--ink), 0.3); box-shadow: 0 1px 10px rgba(var(--pit), 0.45); }
 .lv-context .lv-label { overflow: hidden; text-overflow: ellipsis; }
 .lv-context kbd { display: none; margin-left: auto; padding-left: 4px; font: 600 10px var(--mono); color: var(--muted); }
 .fight-ui[data-device="mouse"] .lv-context kbd { display: block; }
@@ -165,19 +165,19 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 @keyframes lv-pill-in { from { opacity: 0; translate: -50% 6px; } }
 /* The items: top left, two buttons with their counts and keys. */
 .lv-items { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); display: flex; gap: 8px; pointer-events: none; }
-.lv-item { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 64px; height: 48px; border-radius: 24px; pointer-events: auto; touch-action: none; border: 1px solid rgba(255, 255, 255, 0.3); background: rgba(10, 12, 18, 0.55); color: var(--fg); font: 600 13px var(--mono); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35); cursor: pointer; padding: 0; }
-.lv-item:active { background: rgba(255, 207, 74, 0.35); }
+.lv-item { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; width: 64px; height: 48px; border-radius: var(--r-plate); pointer-events: auto; touch-action: none; border: 1px solid rgba(var(--ink), 0.3); background: rgba(var(--pit), 0.55); color: var(--fg); font: 600 13px var(--mono); text-shadow: 0 1px 2px rgba(var(--pit), 0.8); box-shadow: 0 1px 6px rgba(var(--pit), 0.35); cursor: pointer; padding: 0; }
+.lv-item:active { background: rgba(var(--gilt), 0.35); }
 .lv-item.empty { opacity: 0.35; }
 .lv-item[data-item="bandage"] .lv-icon { color: #f2efe6; }
 .lv-item[data-item="tonic"] .lv-icon { color: #7fb8ff; }
 .lv-item kbd { display: none; position: absolute; right: 9px; top: 2px; font: 600 9px var(--mono); color: var(--muted); }
 .fight-ui[data-device="mouse"] .lv-item kbd { display: block; }
 /* While a bandage goes on or a harness is changed: a bar where the pill would be. */
-.lv-action { position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 66px); display: grid; gap: 5px; width: 168px; pointer-events: none; text-align: center; font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
-.lv-action i { display: block; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.lv-action { position: absolute; left: 50%; translate: -50% 0; bottom: calc(var(--controls-height, 56px) + 66px); display: grid; gap: 5px; width: 168px; pointer-events: none; text-align: center; font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(var(--pit), 0.9); }
+.lv-action i { display: block; height: 6px; border-radius: 3px; background: rgba(var(--ink), 0.18); overflow: hidden; }
 .lv-action b { display: block; height: 100%; width: 0; background: var(--gold); }
 /* What just happened, in a line near the top. */
-.lv-toast { position: absolute; left: 50%; translate: -50% 0; top: calc(72px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 32px); padding: 4px 14px; border-radius: 999px; background: rgba(10, 12, 18, 0.62); font: 600 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); pointer-events: none; text-align: center; }
+.lv-toast { position: absolute; left: 50%; translate: -50% 0; top: calc(72px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 32px); padding: 4px 14px; border-radius: var(--r-pill); background: rgba(var(--pit), 0.62); font: 600 12px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); text-shadow: 0 1px 3px rgba(var(--pit), 0.9); pointer-events: none; text-align: center; }
 .lv-toast-in { animation: lv-toast 2.6s ease-out forwards; }
 @keyframes lv-toast { 0% { opacity: 0; translate: -50% -4px; } 10% { opacity: 1; translate: -50% 0; } 80% { opacity: 1; } 100% { opacity: 0; } }
 /* A phone held upright: the attack buttons fan out over the middle, so the pill and the action bar keep to the left, over the
@@ -193,24 +193,24 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 .banner:not([hidden]) ~ .fight-ui .lv-context, .banner:not([hidden]) ~ .fight-ui .lv-items, .banner:not([hidden]) ~ .fight-ui .lv-action { visibility: hidden; }
 
 /* ---- Level Mode: the team ---- the comrades: names and health, top right (clear of the thumbs and of the pill), and a soft green pip with a name over each one's head. */
-.lv-team { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: min(150px, 30vw); display: grid; gap: 5px; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
+.lv-team { position: absolute; right: calc(12px + env(safe-area-inset-right, 0px)); top: calc(12px + env(safe-area-inset-top, 0px)); width: min(150px, 30vw); display: grid; gap: 5px; pointer-events: none; text-shadow: 0 1px 3px rgba(var(--pit), 0.9); }
 /* A phone on its side: the right edge is the controls' column to its top, so the team goes under the items, top left. */
 @media (max-height: 480px) { .lv-team { right: auto; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(68px + env(safe-area-inset-top, 0px)); } }
-.lv-mate { display: grid; grid-template-columns: 10px 1fr; grid-template-rows: auto 3px; column-gap: 7px; row-gap: 2px; align-items: center; padding: 5px 9px 6px 8px; border-radius: 8px; background: rgba(10, 12, 18, 0.5); border: 1px solid rgba(127, 224, 192, 0.28); }
+.lv-mate { display: grid; grid-template-columns: 10px 1fr; grid-template-rows: auto 3px; column-gap: 7px; row-gap: 2px; align-items: center; padding: 5px 9px 6px 8px; border-radius: var(--r); background: rgba(var(--pit), 0.5); border: 1px solid rgba(127, 224, 192, 0.28); }
 .lv-mate b { font: 600 12px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lv-dot { width: 8px; height: 8px; border-radius: 50%; background: #7fe0c0; box-shadow: 0 0 8px rgba(127, 224, 192, 0.8); }
-.lv-mate-bar { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.lv-mate-bar { grid-column: 1 / -1; display: block; height: 3px; border-radius: 2px; background: rgba(var(--ink), 0.16); overflow: hidden; }
 .lv-mate-bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #4fbf9f, #9be8cc); transition: width 0.2s linear; }
-.lv-mate.fighting .lv-dot { background: #ffcf4a; box-shadow: 0 0 8px rgba(255, 207, 74, 0.8); }
+.lv-mate.fighting .lv-dot { background: var(--gold); box-shadow: 0 0 8px rgba(var(--gilt), 0.8); }
 .lv-mate.down .lv-dot { background: #ff9a48; box-shadow: 0 0 8px rgba(255, 154, 72, 0.8); }
-.lv-mate.fallen { opacity: 0.45; border-color: rgba(255, 255, 255, 0.12); }
+.lv-mate.fallen { opacity: 0.45; border-color: rgba(var(--ink), 0.12); }
 .lv-mate.fallen b { text-decoration: line-through; color: var(--muted); }
-.lv-mate.fallen .lv-dot { background: #555a66; box-shadow: none; }
+.lv-mate.fallen .lv-dot { background: #625c53; box-shadow: none; }
 .lv-pips { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
-.lv-pip { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; will-change: transform; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95); }
-.lv-pip i { width: 11px; height: 11px; border-radius: 50%; background: #7fe0c0; border: 1px solid rgba(255, 255, 255, 0.85); box-shadow: 0 0 10px rgba(127, 224, 192, 0.9), 0 0 2px rgba(0, 0, 0, 0.8); }
+.lv-pip { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; will-change: transform; text-shadow: 0 1px 3px rgba(var(--pit), 0.95); }
+.lv-pip i { width: 11px; height: 11px; border-radius: 50%; background: #7fe0c0; border: 1px solid rgba(var(--ink), 0.85); box-shadow: 0 0 10px rgba(127, 224, 192, 0.9), 0 0 2px rgba(var(--pit), 0.8); }
 .lv-pip b { font: 600 11px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: #cdf6e8; white-space: nowrap; }
-.lv-pip.fighting i { background: #ffcf4a; box-shadow: 0 0 10px rgba(255, 207, 74, 0.9), 0 0 2px rgba(0, 0, 0, 0.8); }
+.lv-pip.fighting i { background: var(--gold); box-shadow: 0 0 10px rgba(var(--gilt), 0.9), 0 0 2px rgba(var(--pit), 0.8); }
 .banner:not([hidden]) ~ .fight-ui .lv-team, .banner:not([hidden]) ~ .fight-ui .lv-pips { visibility: hidden; }
 
 /* With the army orders up (the player has men to command: his comrades), the item row sits beside them, not on top of them; on a narrow screen, under them. */
@@ -220,7 +220,7 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 }
 .lv-item[data-item="kit"] { width: 48px; }
 .lv-item[data-item="kit"] .lv-icon { color: var(--gold); }
-.lv-kit { position: absolute; left: 50%; top: calc(70px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(440px, calc(100% - 32px)); max-height: calc(100% - 160px); overflow: auto; display: grid; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.25); background: rgba(10, 12, 18, 0.88); color: var(--fg); pointer-events: auto; z-index: 20; }
+.lv-kit { position: absolute; left: 50%; top: calc(70px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); width: min(440px, calc(100% - 32px)); max-height: calc(100% - 160px); overflow: auto; display: grid; gap: 8px; padding: 12px; border-radius: var(--r-plate); border: 1px solid rgba(var(--ink), 0.25); background: rgba(var(--pit), 0.88); color: var(--fg); pointer-events: auto; z-index: 20; }
 .lv-kit-title { font: 700 13px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
 .lv-kit .lv-kit-card { grid-template-columns: minmax(0, 1fr); border: 0; padding: 0; background: none; }
 .lv-kit-close { font: 11px var(--mono); color: var(--muted); text-align: center; }
