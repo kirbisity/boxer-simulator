@@ -359,10 +359,12 @@ function soheiDesign(label, { hood, robe, hakama, lacquer, lace, beads }) {
 }
 function roninDesign(label, { kosode, hakama, steel, lace, sash, band, linen, headband }) {
   return {
-    label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama },
+    // The hakama worn long and untied, the sash's ends hanging, and the pair of scabbards thrust through it at the left hip.
+    label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama, long: true },
     armor: { kind: 'roninDo', color: steel, lace, gold: band, cloth: linen, cloth2: sash },
     head: { kind: 'hachimaki', color: headband },
     feet: { kind: 'sandal', color: '#5a3a22' },
+    extras: [{ kind: 'sashEnds', color: sash }, { kind: 'daisho', color: '#15151a', cord: sash }],
   };
 }
 // A hex colour darker (or lighter) by a share.

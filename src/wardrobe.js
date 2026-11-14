@@ -4030,6 +4030,38 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
         tatter.group.add(piece);
         dangles.push(tatter);
       }
+    } else if (extra.kind === 'sashEnds') {
+      // A sash's two ends hanging from its knot at the front of the left hip, one longer than the other.
+      const front = body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.02 * scale;
+      for (const [across, length] of [[0.05, 0.3], [0.085, 0.22]]) {
+        const end = new Dangle(hips, [front, 0.03 * scale, across * scale], [0.15, -1, across], length * scale, { sag: 0.75, damping: 0.2 });
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.006 * scale, length * scale, 0.045 * scale), surface(new THREE.Color(color).getHex(), { roughness: 0.9 }));
+        strip.position.y = (-length * scale) / 2;
+        end.group.add(strip);
+        dangles.push(end);
+      }
+    } else if (extra.kind === 'daisho') {
+      // The pair of scabbards (the katana's and the wakizashi's) thrust through the sash at the left hip, edge up, their
+      // mouths before the belly and their ends behind; lacquered, a cord (sageo) knotted round each. Rigid on the hips.
+      const lacquer = surface(new THREE.Color(color).getHex(), { roughness: 0.3 });
+      const cord = surface(new THREE.Color(extra.cord ?? color).getHex(), { roughness: 0.9 });
+      const side = body.segments.trunk.skinRadius * 1.02 + 0.015 * scale;
+      for (const [length, lift, slope, inward] of [[0.74, 0.05, 0.36, 0], [0.5, 0.075, 0.2, 0.03]]) {
+        const heading = new THREE.Vector3(-1, -slope, 0.12).normalize();
+        const saya = new THREE.Group();
+        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * scale, 0.017 * scale, length * scale, 8), lacquer);
+        tube.scale.z = 0.62;
+        const knot = new THREE.Mesh(new THREE.TorusGeometry(0.019 * scale, 0.005 * scale, 5, 10), cord);
+        knot.rotation.x = Math.PI / 2;
+        knot.scale.y = 0.62;
+        knot.position.y = length * scale * 0.24;
+        saya.add(tube, knot);
+        // Its length (the cylinder's y) along `heading`, a third of it before the hip.
+        saya.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), heading);
+        saya.position.set(0, lift * scale, side - inward * scale).addScaledVector(heading, length * scale * 0.2);
+        hips.add(saya);
+        inkAll(saya, 0.0025);
+      }
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {
         const length = 0.75 * scale;
