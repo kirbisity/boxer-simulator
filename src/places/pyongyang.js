@@ -38,8 +38,10 @@ export const PYONGYANG_PLACE = {
   // The gate: its middle (z), the block's width along the wall and depth through it, its terrace's height; the passage.
   // A town gate's passage of about 4 m, two carts' width; the block deep enough for the pavilion's lower storey.
   gate: { z: -50, wide: 20, deep: 10.5, out: 2.5, high: 6.5, way: 4.2, spring: 2.6, rise: 2.1 },
-  // The gate pavilion's storeys (width along the wall, depth, height), and the corner pavilion's one.
-  pavilion: [{ width: 14.6, depth: 7.2, high: 3.1, fill: 'open' }, { width: 10.4, depth: 4.6, high: 2.6, fill: 'lattice' }],
+  // The gate pavilion's storeys (width along the wall, depth, height), and the corner pavilion's one. Set against the
+  // reference picture of the gate: the lower storey's columns stand nearly to the block's ends, so that its eaves
+  // overhang the block's whole width, and the upper storey is about three quarters of the lower.
+  pavilion: [{ width: 17.2, depth: 7.6, high: 3.1, fill: 'open' }, { width: 12.8, depth: 5.0, high: 2.6, fill: 'lattice' }],
   corner: [{ width: 6.0, depth: 2.9, high: 3.0, fill: 'open' }],
   // Where a walker comes onto the field before the battle (behind the columns' ground, facing the wall), and where he is
   // after it (on the wall's walk, over the middle ladder). The muster point: where his column forms.
@@ -277,6 +279,10 @@ function pyNameBoard(name) {
   return board;
 }
 
+// The road's ribbon: how far above the ground it is laid (m: enough not to flicker against it at the distances it is seen
+// from, too little to show as a step) and its strips' length along the road (half the ground's own cell, so it bends with it).
+const PY_ROAD = { proud: 0.04, step: 2.5 };
+
 /** The place built (a THREE.Group for render.js's places). */
 export function buildPyongyang() {
   const t = PYONGYANG_PLACE;
@@ -335,9 +341,17 @@ export function buildPyongyang() {
   tkPaving(blocks.wide, 'street', wall.x - t.gate.out + t.gate.deep, plan.east - 34, t.gate.z - 2.6, t.gate.z + 2.6, 0.03, [0.86, 0.86, 0.84]);
   tkPaving(blocks.wide, 'street', 58.4, 63.6, t.gate.z + 2.6, -t.strip[0] - 3.5, 0.03, [0.86, 0.86, 0.84]);
   // The trodden ground: the road out from the gate (a ribbon laid on the ground's own heights) and the columns' way to the wall.
-  const track = [];
-  for (let x = wall.x - t.gate.out; x >= t.outside.x[0] + 2; x -= 2.5) track.push([x, tkFieldAt(plan.outside, x, pyRoad(x)) + 0.05, pyRoad(x)]);
-  blocks.wide.sweep('track', track, 4.6, 0.43, { colour: [0.92, 0.78, 0.56], sink: 0.4, under: false });
+  // (Each strip of the ribbon takes the ground's height under its own corners, a finger above it: it has no sides to show
+  // where the ground falls away across the road.)
+  const lane = [-2.3, -0.8, 0.8, 2.3];
+  const trod = (x, across) => [x, tkFieldAt(plan.outside, x, pyRoad(x) + across) + PY_ROAD.proud, pyRoad(x) + across];
+  for (let x = wall.x - t.gate.out; x - PY_ROAD.step >= t.outside.x[0] + 2; x -= PY_ROAD.step) {
+    for (let k = 0; k + 1 < lane.length; k += 1) {
+      const [a, b, c, d] = [trod(x, lane[k]), trod(x, lane[k + 1]), trod(x - PY_ROAD.step, lane[k + 1]), trod(x - PY_ROAD.step, lane[k])];
+      // (Anticlockwise seen from above.)
+      blocks.wide.quad('track', a, d, c, b, { uvs: [a, d, c, b].map((at) => [at[0], at[2]]), colour: [0.92, 0.78, 0.56] });
+    }
+  }
   tkPaving(blocks.wide, 'track', -135, wall.x, -8, 8, 0.03, [0.95, 0.82, 0.6]);
 
   const materials = tkMaterialsFor(tier, { extra: { ice: { sheet: 'plaster', pools: 2, colour: [0.72, 0.8, 0.84], blotch: 0.5, plain: true }, track: { sheet: 'earth', blotch: 1.2, snow: t.trodden }, street: { sheet: 'cobble', snow: t.trodden * 1.3 } } });
