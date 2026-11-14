@@ -238,6 +238,7 @@ function envPostMake(renderer) {
     width: 0,
     height: 0,
     scene: new THREE.Scene(),
+    late: new THREE.Scene(),
     camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
     blur: pass(ENV_POST_BLUR, blur),
     // The same blur, laid over what its target holds: a level of the bloom added to the one above it.
@@ -252,6 +253,7 @@ function envPostMake(renderer) {
   };
   post.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post.blur);
   post.quad.frustumCulled = false;
+  post.late.autoUpdate = false;
   post.scene.add(post.quad);
   return post;
 }
@@ -299,9 +301,15 @@ export function envPostDraw(view, tone, level, shafts, air) {
   const camera = view.camera;
 
   // The scene, as light sums: its materials' own curve stands aside for a negative exposure (air.js).
+  // What falls through the air and is seen through (rain, snow, dust) waits where the air's shade is taken off
+  // the frame: that light is worked out for what stands behind each pixel, and taken off a flake in front of a far
+  // wood or a shaded sky it left the flake black. It is drawn onto the frame after, tested against the scene's depth.
+  const late = air ? (view.env?.group?.userData.envParts?.particles.children ?? []).filter((mesh) => mesh.userData.envLate && mesh.visible) : [];
+  for (const mesh of late) mesh.visible = false;
   renderer.toneMappingExposure = -1;
   renderer.setRenderTarget(post.main);
   renderer.render(view.scene, camera);
+  for (const mesh of late) mesh.visible = true;
 
   const quad = post.quad;
   const run = (material, from, to, x, expose, cut, times) => {
@@ -337,6 +345,25 @@ export function envPostDraw(view, tone, level, shafts, air) {
     renderer.setRenderTarget(post.lit);
     renderer.render(post.scene, post.camera);
     scene = post.lit;
+    if (late.length) {
+      for (const mesh of late) {
+        mesh.material.uniforms.uLate.value.set(1 / post.lit.width, 1 / post.lit.height, 1);
+        mesh.material.uniforms.uLateDepth.value = post.main.depthTexture;
+      }
+      // (Their own scene only to be drawn from: they stay the place's children, and their matrices are the main
+      // scene's.)
+      post.late.children = late;
+      const clears = renderer.autoClear;
+      renderer.autoClear = false;
+      renderer.render(post.late, camera);
+      renderer.autoClear = clears;
+      // (The depth is not left on their materials: a stage torn down frees every texture its materials hold
+      // (toon.js disposeMaterialTextures), and this one is the frame's.)
+      for (const mesh of late) {
+        mesh.material.uniforms.uLate.value.z = 0;
+        mesh.material.uniforms.uLateDepth.value = null;
+      }
+    }
   }
   const levels = post.levels;
   run(post.blur, scene, post.half, 0, tone.exposure, 0, 1);

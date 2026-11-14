@@ -474,6 +474,8 @@ vec3 envSunward(vec3 point) {
 // sky), in mist, where all that is seen stands within a stone's throw, one shade for the view. (Read at the
 // point, a cloud's shadow stood in a low sun's mist as a seam, bright air one side and dark the other.)
 float envAirSunOver(vec3 point, vec3 eye, float spread) {
+  // (Over the cloud sheet nothing shades it.)
+  if (point.y >= uEnvCloud.w) return 1.0;
   vec3 past = envSunwardOver(point, spread);
   return envSunShare(mix(point, eye, uEnvCloudForm.w)) * past.x * past.y * past.z;
 }
