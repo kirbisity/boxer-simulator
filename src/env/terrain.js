@@ -206,6 +206,7 @@ export const ENV_GLSL_MAP = /* glsl */ `
 uniform sampler2D uEnvMap;
 uniform sampler2D uEnvCover;
 uniform vec4 uEnvBodies[${ENV.shadow.bodyCount}];
+uniform vec4 uEnvBodiesAt;
 vec2 envCover(vec2 xz) {
   vec4 over = texture2D(uEnvCover, xz / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5);
   if (over.g < 0.004) return vec2(over.r, 1.0);
@@ -215,6 +216,9 @@ vec2 envCover(vec2 xz) {
   return vec2(over.r, 1.0 - min(over.g * 2.5, 1.0) * (1.0 - smoothstep(least - 0.03, least + 0.05, gaps)));
 }
 vec3 envBodies(vec3 ground) {
+  // Most of a field is far from anyone: only ground within their reach counts them over (a blade of grass asks this).
+  vec3 from = uEnvBodiesAt.xyz - ground;
+  if (dot(from, from) > uEnvBodiesAt.w * uEnvBodiesAt.w) return vec3(0.0, 0.0, 1.0);
   vec3 by = vec3(0.0);
   for (int i = 0; i < ${ENV.shadow.bodyCount}; i++) {
     vec4 body = uEnvBodies[i];

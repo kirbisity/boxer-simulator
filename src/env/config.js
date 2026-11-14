@@ -197,6 +197,10 @@ export const ENV = {
     contact: 1.6,
     // How many spheres the shaders take: three a fighter, the four fighters nearest the camera.
     bodyCount: 12,
+    // How far from the farthest of them the shaders still count them (m): 2.5 m from the hips' sphere a metre up
+    // hides 0.22^2 x 1 / 2.5^3 x contact = half a hundredth of the sky, under what an eye sees; the rest of the
+    // field skips the count, which at a million blades was a third of the frame.
+    bodyReach: 2.5,
     // Grass under a foot: blades within `tread` m of one are pressed over, away from it.
     tread: 0.3,
   },

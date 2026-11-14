@@ -289,6 +289,10 @@ export function envUpdate(view, world) {
       bodies[filled++].set(x[24], x[25], x[26], hips);
     }
   }
+  // Their middle and their reach: past `bodyReach` m from the farthest of them the shade is under a hundredth.
+  const middle = u.uEnvBodiesAt.value.set(0, 0, 0, 0);
+  for (let at = 0; at < filled; at += 1) middle.set(middle.x + bodies[at].x / filled, middle.y + bodies[at].y / filled, middle.z + bodies[at].z / filled, 0);
+  for (let at = 0; at < filled; at += 1) middle.w = Math.max(middle.w, Math.hypot(bodies[at].x - middle.x, bodies[at].y - middle.y, bodies[at].z - middle.z) + ENV.shadow.bodyReach);
   for (; filled < bodies.length; filled += 1) bodies[filled].w = 0;
   envParticlesPixel(state.group.userData.envParts.particles, (view.camera.fov * Math.PI) / 180, view.renderer.domElement.height);
 }

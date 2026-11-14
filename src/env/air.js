@@ -212,6 +212,8 @@ export const ENV_UNIFORMS = {
   uEnvLook: { value: null },
   // What stands on the ground nearest the camera, as spheres: xyz a centre, w its radius (0: none). index.js envUpdate.
   uEnvBodies: { value: [] },
+  // xyz: the middle of those; w: how far from it any of them still presses grass or shades the ground (0: none do).
+  uEnvBodiesAt: { value: null },
 };
 
 /** Fill the uniforms' values in (the first use needs THREE). */
@@ -234,6 +236,7 @@ export function envUniforms() {
   u.uEnvCloudDark.value = new THREE.Vector3(0.5, 0.5, 0.5);
   u.uEnvWet.value = new THREE.Vector2(0, 0);
   u.uEnvLook.value = new THREE.Vector2(0, 0);
+  u.uEnvBodiesAt.value = new THREE.Vector4(0, 0, 0, 0);
   for (let at = 0; at < ENV.shadow.bodyCount; at += 1) u.uEnvBodies.value.push(new THREE.Vector4(0, 0, 0, 0));
   return u;
 }
