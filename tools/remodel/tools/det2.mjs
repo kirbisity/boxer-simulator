@@ -1,0 +1,6 @@
+import { openTab } from './cdp.mjs';
+import { units } from './units.mjs';
+const SP = '/private/tmp/claude-501/-Users-yanlinzhu-Documents-unix-workspace/cb91ac51-ebd4-462b-b4be-1c0ef0c9dfb9/scratchpad/unit-remodel';
+const man = units(`${SP}/casts.json`)[process.argv[2] ?? 'ronin'].cols[0];
+const code = `(() => { boxer.skipIntro(); boxer.adaptiveResolution?.(false); boxer.state.game = 'sandbox'; boxer.state.mode = 'watch'; boxer.fight([${JSON.stringify(man)}], [{ preset: 'light', outfit: { kind: 'commoner', design: 0 }, style: 'unskilled' }], { seed: 5, distance: 7, place: 'field', paused: true }); boxer.finishBuilding(); boxer.state.speed = 1; boxer.state.accumulator = 0; boxer.finishSkins?.(); const out = []; let t = 0; for (const at of [0.6, 1.0, 1.4, 1.9, 2.3]) { boxer.state.paused = false; boxer.playFrames(Math.round((at - t) * 60), 1 / 60); boxer.state.paused = true; t = at; const f = boxer.state.world.fighters[0]; out.push([boxer.state.world.time.toFixed(4), f.x[0].toFixed(5), f.x[1].toFixed(5), f.x[40].toFixed(5)]); } return out; })()`;
+for (const url of ['http://127.0.0.1:8989/index.html', 'http://127.0.0.1:8990/index.html', 'http://127.0.0.1:8989/index.html']) { const tab = await openTab(9336, url); await new Promise((r) => setTimeout(r, 2500)); console.log(url, JSON.stringify(await tab.evaluate(code))); await tab.close(); }
