@@ -268,7 +268,12 @@ const PY_FAR = { reach: 1500, sink: 4 };
 //   spread   a crown's radius over its height, `wide` either way of it by the tree;
 //   colour   under the rock sheet's own grain, a pine wood seen across a valley in winter, nearly black against
 //            the snow; each tree `shade` either way of it, and its upper skirts paler by up to `laden` toward the
-//            snow lying on them (`snow`).
+//            snow lying on them (`snow`);
+//   kinds    not one kind of tree: of every tree `pine` are red pines (a bare stem for `stem` of the height under
+//            rounded crowns `flat` times a fir's width, `crowns` of them near, holding `lying` of a fir's snow, bark `bark`), `bare` are leafless
+//            broadleaves (oak, chestnut: a grey-brown egg of twigs, `twigs`), and `bareEdge` more of those where
+//            the wood thins, since the open edge and the valley floor are where they stand; the rest are firs,
+//            the cones above. A hillside of one cone repeated read as a pattern, not as a wood.
 // Out to `near.to` m from the middle every tree is its own crown on a shaken grid of `every` m; beyond, to the far
 // country's edge, one cone stands for a clump on a grid of `far.every` m. All by eye, against photographs of pine
 // hills in snow. The low tier draws the near trees on a grid half again as wide and the clumps on one twice as wide.
@@ -277,6 +282,7 @@ const PY_WOODS = {
   near: { every: 9, to: 460, high: [6, 14], skirts: 3 }, far: { every: 26, high: [12, 21], skirts: 2 },
   small: 0.55, oldOne: 0.07, old: 1.4, lean: 0.22, spread: 0.23, wide: 0.3,
   colour: [0.2, 0.27, 0.19], shade: 0.3, laden: 0.55, snow: [0.6, 0.65, 0.72],
+  kinds: { pine: 0.38, bare: 0.14, bareEdge: 0.3, stem: 0.4, flat: 1.3, crowns: 2, lying: 0.45, bark: [0.3, 0.21, 0.16], twigs: [0.4, 0.37, 0.35] },
 };
 
 /** The river south of the ground (0..1: 1 on its ice), a few hundred metres wide, running east-west. */
@@ -625,7 +631,7 @@ export function buildPyongyang() {
       for (let z = -to; z < to; z += every) {
         for (let x = -to; x < to; x += every) {
           const [px, pz] = [x + every * woodRandom(), z + every * woodRandom()];
-          const [size, kept, shade, girth, old, laden, turn] = [woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom()];
+          const [size, kept, shade, girth, old, laden, turn, kind] = [woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom()];
           const out = Math.max(Math.abs(px), Math.abs(pz));
           if (out < from || out >= to || (Math.abs(px) < 156 && Math.abs(pz) < 137) || pyRiver(pz) > 0.05) continue;
           const thick = woodThick(px, pz);
@@ -634,13 +640,40 @@ export function buildPyongyang() {
           const wide = tall * w.spread * (1 + w.wide * (2 * girth - 1));
           const foot = drawnHeight(px, pz) - 0.4;
           const tint = w.colour.map((part) => part * (1 + w.shade * (2 * shade - 1)));
+          const sides = 5 + (Math.floor(turn * 3) % 3);
+          const aim = turn * 6.283;
+          const bare = w.kinds.bare + w.kinds.bareEdge * (1 - Math.min(1, thick * 1.5));
+          if (kind < bare) {
+            // A leafless broadleaf: a stem, and its twigs as one grey-brown egg, wider than a fir and a little lower.
+            const round = wide * 1.25;
+            const twigs = w.kinds.twigs.map((part) => part * (1 + w.shade * (2 * shade - 1)));
+            if (skirts > 1) blocks.wide.round('rock', farFrame, px, pz, foot, foot + tall * 0.4, tall * 0.022, tall * 0.016, { sides: 4, caps: '', colour: w.kinds.bark });
+            blocks.wide.round('rock', farFrame, px, pz, foot + tall * 0.34, foot + tall * 0.5, round * 0.6, round, { sides, caps: '', colour: twigs.map((part) => part * 0.86) });
+            blocks.wide.round('rock', farFrame, px, pz, foot + tall * 0.5, foot + tall * 0.9, round, round * 0.3, { sides, caps: 'top', colour: twigs });
+            continue;
+          }
+          if (kind < bare + w.kinds.pine) {
+            // A red pine: the stem bare and leaning, the crown in rounded masses, the upper one paler with its snow.
+            const plates = skirts > 1 ? w.kinds.crowns : 1;
+            const off = tall * 0.12 * (2 * girth - 1);
+            if (skirts > 1) blocks.wide.round('rock', farFrame, px + off * Math.cos(aim) * 0.4, pz + off * Math.sin(aim) * 0.4, foot, foot + tall * 0.8, tall * 0.024, tall * 0.014, { sides: 4, caps: '', colour: w.kinds.bark });
+            for (let k = 0; k < plates; k += 1) {
+              const y0 = foot + tall * (w.kinds.stem + (0.24 * k) / plates + 0.06 * laden);
+              const radius = wide * w.kinds.flat * (1 - 0.3 * k) * (0.8 + 0.4 * size);
+              const lying = (w.laden * w.kinds.lying * laden * (k + 1)) / plates;
+              const [cx, cz] = [px + off * Math.cos(aim) + radius * 0.5 * Math.cos(aim + k * 2.4) * k, pz + off * Math.sin(aim) + radius * 0.5 * Math.sin(aim + k * 2.4) * k];
+              blocks.wide.round('rock', farFrame, cx, cz, y0 - tall * 0.1, y0, radius * 0.5, radius, { sides: sides + 1, caps: '', colour: tint.map((part) => part * 0.8) });
+              blocks.wide.round('rock', farFrame, cx, cz, y0, y0 + tall * 0.3, radius, radius * 0.22, { sides: sides + 1, caps: 'top', colour: tint.map((part, c) => part + (w.snow[c] - part) * lying) });
+            }
+            continue;
+          }
           for (let k = 0; k < skirts; k += 1) {
             // (Each skirt a cone, the lower ones wider, the upper ones paler with what lies on them.)
             const [y0, y1] = [foot + tall * (0.2 + (0.52 * k) / skirts), foot + tall * (skirts === 1 ? 1 : 0.6 + (0.4 * (k + 1)) / skirts)];
             const radius = wide * (1 - (0.38 * k) / skirts);
             const aside = (w.lean * radius * k) / skirts;
             const lying = (w.laden * laden * (k + 1)) / skirts;
-            blocks.wide.round('rock', farFrame, px + aside * Math.cos(turn * 6.283 + k * 2.1), pz + aside * Math.sin(turn * 6.283 + k * 2.1), y0, y1, radius, 0.02, { sides: 5 + ((Math.floor(turn * 3) + k) % 3), caps: '', colour: tint.map((part, c) => part + (w.snow[c] - part) * lying) });
+            blocks.wide.round('rock', farFrame, px + aside * Math.cos(aim + k * 2.1), pz + aside * Math.sin(aim + k * 2.1), y0, y1, radius, 0.02, { sides: 5 + ((Math.floor(turn * 3) + k) % 3), caps: '', colour: tint.map((part, c) => part + (w.snow[c] - part) * lying) });
           }
         }
       }

@@ -342,9 +342,12 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
       const air = view.env.weather;
       const wet = view.env.wet ?? air.wet ?? 0;
       tkSetWeather({ wet, pool: pools * wet * wet, snow: air.snow ?? 0, rain: air.fall?.kind === 'rain' ? view.env.falling ?? 1 : 0, mist: [0, 0, 0.5] });
+      // (The camera's exposure, for what is held under the glare: weather.js TK_WEATHER.glare.)
+      tkWeather.uTkAir.value.w = view.env.tone?.exposure ?? 1;
       const way = view.env.air.sun;
       if (Math.abs(way[0] - dir.x) + Math.abs(way[1] - dir.y) + Math.abs(way[2] - dir.z) > 1e-3) dir.set(way[0], way[1], way[2]);
     } else {
+      tkWeather.uTkAir.value.w = 1;
       if (wanted) tkSetWeather(wanted);
       // (The haze's reach is the weather's too: `fog` [near, far] on the scene's own fog.)
       if (wanted?.fog && view.scene.fog?.isFog) {

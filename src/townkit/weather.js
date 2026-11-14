@@ -42,11 +42,13 @@ export const TK_WEATHER = {
   mirror: [0.05, 0.9],
   // A wet stone that is not under water shows this share of a puddle's mirror.
   sheen: 0.3,
-  // The most a mirror image may show, in the picture's own light units before the camera's curve (a matte white in
-  // full sun is about 1): a wet lane looked down toward a bright haze otherwise shows one burnt-out streak with no
-  // stone left in it. And in a shut-in place the low sky a grazing mirror would show is mostly walls: the image
+  // The most a mirror image, or the sun's own glint on wet stone, may show, as the camera sees it before its curve
+  // (a matte white in full sun is about 1; in the open air the light is divided by the camera's exposure first,
+  // uTkAir.w, since there the scene is lit in the sun's own measure): a wet lane looked down toward a bright haze
+  // otherwise shows one burnt-out streak with no stone left in it. Standing water may glint `glint` times as
+  // bright, which is what blooms. And in a shut-in place the low sky a grazing mirror would show is mostly walls: the image
   // keeps `shut` of itself where the lie's map sees no sky, all of it in the open.
-  glare: 1.4, shut: 0.3,
+  glare: 1.4, glint: 4, shut: 0.3,
   // The damp band at a wall's foot: its height (m; it rises unevenly along the wall, from 0.55 to 1.45 of this) and
   // how dark; how green the moss in it; the mud splashed up the first `splash` m, and its colour.
   foot: { height: 0.9, dark: 0.3, moss: [0.22, 0.29, 0.13], splash: 0.35, mud: [0.3, 0.27, 0.22] },
@@ -88,7 +90,12 @@ export const TK_WEATHER = {
   // the gate passage, on the open air's high tier.
   shade: { most: 0.85, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, street: 1.6 },
   // A way's worn middle is this much paler and smoother than its edges; its edges this much darker.
-  tread: { pale: 0.16, edge: 0.4, patch: 0.3 },
+  tread: { pale: 0.16, edge: 0.4, patch: 0.3, green: { low: 0.7, shade: 0.35, joint: 0.3 } },
+  // (`green`: the moss in the joints gathers where damp does, not only along a wall's foot: `low` is how much the
+  // ground's hollows count toward it (the lie's map, where the puddles stand), `shade` how much the share of sky a
+  // spot is shut off from; `joint`: the joints between untrodden flags are this much darker with the earth that
+  // collects in them. By eye against the canal town's quay, whose flags read as a clean even grid beside its
+  // square.)
   // (`patch`: where no one treads, old damp and dirt lie in patches a few metres across, this much darker at the
   // most; a paving is the colour of its stone only down the worn middle of the way.)
   // Snow's colour, and how level a surface must be to hold it (the normal's y: from none to full). `colour` is for
@@ -162,7 +169,7 @@ function tkWeatherInit() {
   tkWeather.uTkLayB.value = blank;
   tkWeather.uTkLay.value = new THREE.Vector4(0, 0, 1, 1);
   tkWeather.uTkLayH.value = new THREE.Vector3(0, 1, 0);
-  tkWeather.uTkAir.value = new THREE.Vector4(0, 0, -1, 0);
+  tkWeather.uTkAir.value = new THREE.Vector4(0, 0, -1, 1);
   tkWeather.uTkBlow.value = new THREE.Vector4(1, 0, 0, 0);
   ktShadowInit();
 }
@@ -415,7 +422,9 @@ const TK_COLOUR = `
     float tread = tkWear * uTkDirt.w;
     diffuseColor.rgb *= 1.0 + ${TK_WEATHER.tread.pale.toFixed(2)} * tread - ${TK_WEATHER.tread.edge.toFixed(2)} * nearWall * (0.4 + blot) * (1.0 - tread);
     diffuseColor.rgb *= 1.0 - ${TK_WEATHER.tread.patch.toFixed(2)} * smoothstep(0.42, 0.7, tkFbm(vTkPos.xz * 0.33 + 21.0) + 0.25 * (hollow - 0.4)) * (1.0 - 0.7 * tread);
-    float weed = tkJoint * level * smoothstep(0.3, 0.75, nearWall * 0.8 + (fine - 0.5) * 0.7 + (blot - 0.5) * 0.5 - tread) * uTkDirt.y;
+    float damp = ${TK_WEATHER.tread.green.low.toFixed(2)} * max(hollow - 0.45, 0.0) + ${TK_WEATHER.tread.green.shade.toFixed(2)} * (1.0 - tkSky);
+    float weed = tkJoint * level * smoothstep(0.3, 0.75, nearWall * 0.8 + damp + (fine - 0.5) * 0.7 + (blot - 0.5) * 0.5 - tread) * uTkDirt.y;
+    diffuseColor.rgb *= 1.0 - ${TK_WEATHER.tread.green.joint.toFixed(2)} * tkJoint * level * (1.0 - tread) * uTkDirt.y;
     diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.foot.moss)} * (0.55 + 0.5 * fine), weed * 0.85 * (1.0 - 0.6 * uTkSnow));
     // Water stands where the ground is low (the lie's map; the joints first), under open sky.
     float low = hollow + tkNoise(vTkPos.xz * 0.9) * 0.12 + tkJoint * 0.22;
@@ -528,6 +537,8 @@ const TK_SHADE = `
   reflectedLight.indirectSpecular *= tkOpen * (1.0 - tkJoint * (1.0 - smoothstep(0.25, 0.6, abs(normalize(vTkNrm).y))));
   // The light of the lit walls and ground round a shut-in place (TK_WEATHER.shade.street).
   if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.street.toFixed(2)} * (1.0 - tkOpen)) * material.diffuseColor;
+  // The sun's glint on wet stone, held under the glare (TK_WEATHER.glare).
+  reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(${TK_WEATHER.glare.toFixed(2)} / max(uTkAir.w, 1e-4) * mix(1.0, ${TK_WEATHER.glint.toFixed(1)}, tkPoolHere)));
 }
 `;
 
@@ -542,7 +553,7 @@ const TK_MIRROR = `
     float graze = pow(1.0 - clamp(dot(-look, n), 0.0, 1.0), 4.0);
     float fresnel = mix(${TK_WEATHER.mirror[0].toFixed(2)}, ${TK_WEATHER.mirror[1].toFixed(2)}, graze);
     // (What stands under cover mirrors the dark over it, not the sky.)
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, min(tkMirror(reflect(look, n)) * mix(1.0, 0.25, tkUnder) * mix(${TK_WEATHER.shut.toFixed(2)}, 1.0, max(tkSky, tkPoolHere * step(0.5, tkSky))), vec3(${TK_WEATHER.glare.toFixed(2)})), fresnel * share);
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, min(tkMirror(reflect(look, n)) * mix(1.0, 0.25, tkUnder) * mix(${TK_WEATHER.shut.toFixed(2)}, 1.0, max(tkSky, tkPoolHere * step(0.5, tkSky))), vec3(${TK_WEATHER.glare.toFixed(2)} / max(uTkAir.w, 1e-4))), fresnel * share);
   }
   if (uTkAir.x > 0.5) gl_FragColor.rgb = envHazeGrain(gl_FragColor.rgb, cameraPosition, vTkPos, envGrain(gl_FragCoord.xy));
 }
@@ -728,6 +739,10 @@ export const TK_MATERIALS = {
   rubble: { sheet: 'rubble', foot: 1, blotch: 1.7, dirt: [0.9, 1, 1, 0] },
   plaster: { sheet: 'plaster', foot: 1, blotch: 1.3, dirt: [1, 0.9, 0.6, 0], fall: 1 },
   timber: { sheet: 'timber', foot: 0.5, blotch: 0.6, dirt: [0.35, 0.3, 0.7, 0] },
+  // Small made things of fired clay, paper, sacking, ash (jars, lanterns, a cart's load): the plaster sheet's fine
+  // grain under each thing's own colour, with no coat to fall from brick and no damp foot. (On the wall's own
+  // material a jar a pace from the eye showed bricks through fallen plaster.)
+  ware: { sheet: 'plaster', blotch: 0.7, dirt: [0.4, 0, 0.5, 0] },
   rooftile: { sheet: 'rooftile', blotch: 0.9, dirt: [0, 0.8, 0.7, 0], tiles: [TK_TEX.rooftile.rolls, TK_TEX.rooftile.laps] },
   flags: { sheet: 'flags', pools: 1, dirt: [0, 0.9, 0.9, 1] },
   cobble: { sheet: 'cobble', pools: 1, dirt: [0, 1, 0.9, 1] },

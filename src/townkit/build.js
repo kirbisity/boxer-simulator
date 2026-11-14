@@ -291,15 +291,25 @@ export function tkTree(builder, x, y, z, { kind = 'broad', high = 7, seed = 1, s
 /** A round paper lantern hung at world (x, y, z): its red body, its caps and tassel. Lit only by the day (no lamp inside). */
 export function tkLantern(builder, x, y, z, { size = 0.2, colour = [0.82, 0.16, 0.12] } = {}) {
   const frame = tkgFrame(x, y, z);
-  builder.lathe('plaster', frame, 0, 0, [[size * 0.35, -size], [size * 0.85, -size * 0.6], [size, 0], [size * 0.85, size * 0.6], [size * 0.35, size]], { colour, sides: 8 });
+  builder.lathe('ware', frame, 0, 0, [[size * 0.35, -size], [size * 0.85, -size * 0.6], [size, 0], [size * 0.85, size * 0.6], [size * 0.35, size]], { colour, sides: 8 });
   builder.round('timber', frame, 0, 0, size, size * 1.15, size * 0.38, size * 0.38, { colour: [0.2, 0.16, 0.12], sides: 6 });
   builder.round('timber', frame, 0, 0, -size * 1.6, -size, size * 0.06, size * 0.3, { colour: [0.75, 0.6, 0.2], sides: 5, caps: '' });
 }
 
+/**
+ * A storage jar's turning: `sides` round and `rings` up its body. At 10 and 4 a jar a pace from the eye was a
+ * ten-sided lantern with a dark stripe down every side; 18 and 8 read as round at that distance (by eye, the canal
+ * town's quay). A jar is then 18 x 11 x 2 = about 400 triangles, and a place stands a few dozen.
+ */
+export const TK_JAR = { sides: 18, rings: 8 };
+
 /** A glazed storage jar standing at world (x, y, z): `high` m, with a lid or open. */
 export function tkJar(builder, x, y, z, { high = 0.75, colour = [0.42, 0.3, 0.22], lid = true } = {}) {
   const r = high * 0.42;
-  builder.lathe('plaster', tkgFrame(x, y, z), 0, 0, [[r * 0.55, 0], [r * 0.95, high * 0.3], [r, high * 0.55], [r * 0.7, high * 0.88], [r * 0.6, high], ...(lid ? [[r * 0.68, high * 1.02], [r * 0.1, high * 1.1]] : [[r * 0.5, high * 0.97]])], { colour, sides: 10 });
+  // (Turned on a wheel: `TK_JAR.sides` round, and a profile of enough rings that the belly and shoulder are curves.)
+  const ring = (t) => [r * (0.55 + 0.45 * Math.sin(Math.PI * Math.min(1, t / 0.62) / 2) - 0.42 * Math.max(0, (t - 0.62) / 0.38) ** 1.6), high * t];
+  const body = Array.from({ length: TK_JAR.rings + 1 }, (_, k) => ring(k / TK_JAR.rings));
+  builder.lathe('ware', tkgFrame(x, y, z), 0, 0, [...body, [r * 0.64, high * 1.0], ...(lid ? [[r * 0.68, high * 1.02], [r * 0.4, high * 1.07], [r * 0.1, high * 1.1]] : [[r * 0.5, high * 0.97]])], { colour, sides: TK_JAR.sides });
 }
 
 /** A hanging shop signboard, edge on to the street: a board `high` m tall hung from a bracket on the wall at `frame` (z out from the wall). */
@@ -351,8 +361,8 @@ export function tkBoat(builder, x, y, z, yaw, { long = 6.2, beam = 1.5, awning =
     const b = ((k + 1) / hoops) * Math.PI;
     const r = beam * 0.46;
     const p = (angle, lx) => frame(lx, 0.42 + Math.sin(angle) * r, Math.cos(angle) * r);
-    builder.quad('plaster', p(a, -long * 0.2), p(a, long * 0.16), p(b, long * 0.16), p(b, -long * 0.2), { colour: [0.5, 0.42, 0.28] });
-    builder.quad('plaster', p(b, -long * 0.2), p(b, long * 0.16), p(a, long * 0.16), p(a, -long * 0.2), { colour: [0.3, 0.25, 0.18] });
+    builder.quad('ware', p(a, -long * 0.2), p(a, long * 0.16), p(b, long * 0.16), p(b, -long * 0.2), { colour: [0.5, 0.42, 0.28] });
+    builder.quad('ware', p(b, -long * 0.2), p(b, long * 0.16), p(a, long * 0.16), p(a, -long * 0.2), { colour: [0.3, 0.25, 0.18] });
   }
 }
 

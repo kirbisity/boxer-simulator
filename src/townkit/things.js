@@ -12,6 +12,9 @@ import { tkFbm, tkRandom } from './tex.js';
 
 /** Colours of the common stuffs, multiplied into the sheets they are drawn with. */
 export const TK_THINGS = {
+  // How many sides a turned thing has: a jar, basket, tub or heap (`vessel`), a wheel's rim (`wheel`). A person
+  // stands beside these and looks down at them: at 7 to 12 sides their rims were plainly polygons from a metre off.
+  sides: { vessel: 16, wheel: 20 },
   wicker: [0.62, 0.5, 0.32], bamboo: [0.66, 0.6, 0.36], oldWood: [0.42, 0.36, 0.3], splitWood: [0.72, 0.6, 0.42], barkWood: [0.34, 0.28, 0.22],
   hemp: [0.62, 0.56, 0.44], iron: [0.16, 0.15, 0.15], ash: [0.3, 0.29, 0.28], stone: [0.74, 0.73, 0.7], straw: [0.78, 0.68, 0.4],
   // Grass and weeds: in leaf, and winter-dead.
@@ -30,16 +33,16 @@ const tktTone = (colour, random, spread = 0.25) => colour.map((value) => value *
 export function tkBasket(builder, x, y, z, { wide = 0.5, high = 0.36, colour = TK_THINGS.wicker, full = null } = {}) {
   const r = wide / 2;
   const frame = tkgFrame(x, y, z);
-  builder.lathe('timber', frame, 0, 0, [[r * 0.7, 0], [r * 0.95, high * 0.5], [r, high], [r * 0.9, high]], { colour, sides: 9 });
-  builder.round('plaster', frame, 0, 0, high * (full ? 0.8 : 0.12), high * (full ? 1.12 : 0.14), r * 0.9, full ? r * 0.35 : r * 0.7, { colour: full ?? colour.map((value) => value * 0.5), sides: 9 });
+  builder.lathe('timber', frame, 0, 0, [[r * 0.7, 0], [r * 0.84, high * 0.2], [r * 0.94, high * 0.5], [r * 0.99, high * 0.8], [r, high], [r * 0.9, high]], { colour, sides: TK_THINGS.sides.vessel });
+  builder.round('ware', frame, 0, 0, high * (full ? 0.8 : 0.12), high * (full ? 1.12 : 0.14), r * 0.9, full ? r * 0.35 : r * 0.7, { colour: full ?? colour.map((value) => value * 0.5), sides: TK_THINGS.sides.vessel });
 }
 
 /** A coopered tub or bucket standing at world (x, y, z). */
 export function tkTub(builder, x, y, z, { wide = 0.42, high = 0.32, colour = TK_THINGS.oldWood } = {}) {
   const r = wide / 2;
   const frame = tkgFrame(x, y, z);
-  builder.lathe('timber', frame, 0, 0, [[r * 0.82, 0], [r, high], [r * 0.9, high]], { colour, sides: 10 });
-  builder.round('timber', frame, 0, 0, high * 0.2, high * 0.22, r * 0.86, r * 0.86, { colour: colour.map((value) => value * 0.45), sides: 10 });
+  builder.lathe('timber', frame, 0, 0, [[r * 0.82, 0], [r, high], [r * 0.9, high]], { colour, sides: TK_THINGS.sides.vessel });
+  builder.round('timber', frame, 0, 0, high * 0.2, high * 0.22, r * 0.86, r * 0.86, { colour: colour.map((value) => value * 0.45), sides: TK_THINGS.sides.vessel });
 }
 
 /** A stack of split firewood against a wall: `long` m along `frame`'s x, `high` m, the billets `deep` m long lying along its z. */
@@ -71,7 +74,7 @@ export function tkFirewood(builder, frame, { long = 1.6, high = 0.8, deep = 0.42
 
 /** A wheel standing in the plane across `frame`'s x at (x, y, z) in it: a felloe, a nave and spokes. */
 function tktWheel(builder, frame, x, y, z, r, colour) {
-  const cuts = 12;
+  const cuts = TK_THINGS.sides.wheel;
   const ring = (k, radius, off) => frame(x + off, y + Math.sin((k / cuts) * Math.PI * 2) * radius, z + Math.cos((k / cuts) * Math.PI * 2) * radius);
   for (let k = 0; k < cuts; k += 1) {
     for (const side of [-1, 1]) {
@@ -80,7 +83,7 @@ function tktWheel(builder, frame, x, y, z, r, colour) {
       builder.quad('timber', ...(side > 0 ? quad : [...quad].reverse()), { colour });
     }
     builder.quad('timber', ring(k, r, -0.03), ring(k, r, 0.03), ring(k + 1, r, 0.03), ring(k + 1, r, -0.03), { colour: colour.map((value) => value * 0.7) });
-    if (k % 2 === 0) builder.tube('timber', [frame(x, y, z), ring(k, r * 0.86, 0)], 0.018, 0.018, { sides: 4, colour });
+    if (k % Math.round(cuts / 6) === 0) builder.tube('timber', [frame(x, y, z), ring(k, r * 0.86, 0)], 0.018, 0.018, { sides: 4, colour });
   }
   builder.tube('timber', [frame(x - 0.07, y, z), frame(x + 0.07, y, z)], 0.07, 0.07, { sides: 6, colour });
 }
@@ -111,7 +114,7 @@ export function tkCart(builder, frame, { long = 1.7, wide = 0.95, wheel = 0.42, 
   if (load) {
     // A heap on the bed (sacks, straw).
     const at = bed(0, 0.1, -0.1);
-    builder.lathe('plaster', tkgFrame(at[0], at[1], at[2]), 0, 0, [[wide * 0.44, 0], [wide * 0.4, 0.22], [wide * 0.2, 0.36], [0.02, 0.4]], { colour: load, sides: 7 });
+    builder.lathe('ware', tkgFrame(at[0], at[1], at[2]), 0, 0, [[wide * 0.44, 0], [wide * 0.43, 0.12], [wide * 0.38, 0.24], [wide * 0.26, 0.33], [wide * 0.12, 0.385], [0.02, 0.4]], { colour: load, sides: TK_THINGS.sides.vessel });
   }
 }
 
@@ -133,7 +136,7 @@ export function tkSacks(builder, x, y, z, { count = 3, colour = TK_THINGS.hemp, 
   for (let k = 0; k < count; k += 1) {
     const upper = k >= 2 && k % 3 === 2;
     const at = tkgFrame(x + (upper ? 0.2 : (k % 3) * 0.42) + (random() - 0.5) * 0.08, y + (upper ? 0.26 : 0), z + Math.floor(k / 3) * 0.5 + (random() - 0.5) * 0.1, random() * 0.6);
-    builder.lathe('plaster', at, 0, 0, [[0.2, 0], [0.3, 0.1], [0.28, 0.24], [0.12, 0.32], [0.01, 0.33]], { colour: tktTone(colour, random), sides: 7 });
+    builder.lathe('ware', at, 0, 0, [[0.2, 0], [0.27, 0.05], [0.3, 0.11], [0.3, 0.18], [0.27, 0.24], [0.2, 0.29], [0.12, 0.32], [0.01, 0.33]], { colour: tktTone(colour, random), sides: TK_THINGS.sides.vessel });
   }
 }
 
@@ -147,7 +150,7 @@ export function tkBrazier(builder, x, y, z, { high = 0.75, wide = 0.5 } = {}) {
     builder.tube('timber', [frame(Math.cos(a) * r * 0.9, 0, Math.sin(a) * r * 0.9), frame(Math.cos(a) * r * 0.45, high * 0.66, Math.sin(a) * r * 0.45)], 0.016, 0.016, { sides: 4, colour: TK_THINGS.iron });
   }
   // (The coals: dark, heaped; the flames are townkit/stir.js's.)
-  builder.round('plaster', frame, 0, 0, high * 0.86, high * 1.0, r * 0.8, r * 0.3, { colour: [0.12, 0.07, 0.05], sides: 7 });
+  builder.round('ware', frame, 0, 0, high * 0.86, high * 1.0, r * 0.8, r * 0.3, { colour: [0.12, 0.07, 0.05], sides: 7 });
   return [x, y + high * 0.98, z];
 }
 
@@ -155,7 +158,7 @@ export function tkBrazier(builder, x, y, z, { high = 0.75, wide = 0.5 } = {}) {
 export function tkCampfire(builder, x, y, z, { wide = 0.9, seed = 1 } = {}) {
   const random = tkRandom(seed * 17 + 9);
   const frame = tkgFrame(x, y, z);
-  builder.round('plaster', frame, 0, 0, 0, 0.03, wide * 0.62, wide * 0.5, { colour: TK_THINGS.ash, sides: 9 });
+  builder.round('ware', frame, 0, 0, 0, 0.03, wide * 0.62, wide * 0.5, { colour: TK_THINGS.ash, sides: 9 });
   for (let k = 0; k < 8; k += 1) {
     const a = (k / 8) * Math.PI * 2 + random() * 0.3;
     const s = 0.07 + 0.05 * random();
@@ -351,7 +354,10 @@ export const TK_SCATTER = {
   // Stones: loose ones at wall feet (fallen from the wall) and scattered thinly over open earth.
   stone: { chance: 0.05, open: 0.3, wall: 1, size: [0.05, 0.16] },
   // Litter (fallen leaves, straw): gathers in corners and at wall feet out of the wind and the way, under cover too.
-  litter: { chance: 0.3, open: 0.04, wall: 1, size: [0.25, 0.7] },
+  // (`count` scraps to a patch, each `long` m from middle to tip: a fallen leaf is a hand's length at most, and
+  // five scraps of twice that read as cut paper on the canal town's quay. `tone`: lying leaves are darker than
+  // their colour on the tree, damp and half rotted.)
+  litter: { chance: 0.45, open: 0.04, wall: 1, size: [0.25, 0.7], count: 9, long: [0.025, 0.06], tone: 0.7 },
 };
 
 /**
@@ -398,11 +404,11 @@ export function tkScatter(blocks, lay, { box, grows, heightAt = null, colour = T
         const size = s.litter.size[0] + (s.litter.size[1] - s.litter.size[0]) * r1;
         const tint = litter[Math.floor(r3 * litter.length)];
         builder.at('near', () => {
-          for (let k = 0; k < 5; k += 1) {
-            const [ox, oz, turn, long] = [(random() - 0.5) * size, (random() - 0.5) * size, random() * Math.PI, 0.05 + 0.07 * random()];
+          for (let k = 0; k < s.litter.count; k += 1) {
+            const [ox, oz, turn, long] = [(random() - 0.5) * size, (random() - 0.5) * size, random() * Math.PI, s.litter.long[0] + (s.litter.long[1] - s.litter.long[0]) * random()];
             const [cx, cz] = [Math.cos(turn) * long, Math.sin(turn) * long];
-            const lift = y + 0.012 + 0.006 * k;
-            builder.quad('scrap', [px + ox - cx - cz * 0.4, lift, pz + oz - cz + cx * 0.4], [px + ox + cx - cz * 0.4, lift, pz + oz + cz + cx * 0.4], [px + ox + cx + cz * 0.4, lift, pz + oz + cz - cx * 0.4], [px + ox - cx + cz * 0.4, lift, pz + oz - cz - cx * 0.4], { colour: tktTone(tint, random, 0.4), normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]] });
+            const lift = y + 0.012 + 0.003 * k;
+            builder.quad('scrap', [px + ox - cx - cz * 0.4, lift, pz + oz - cz + cx * 0.4], [px + ox + cx - cz * 0.4, lift, pz + oz + cz + cx * 0.4], [px + ox + cx + cz * 0.4, lift, pz + oz + cz - cx * 0.4], [px + ox - cx + cz * 0.4, lift, pz + oz - cz - cx * 0.4], { colour: tktTone(tint, random, 0.4).map((value) => value * s.litter.tone), normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]] });
           }
         });
         laid.litter += 1;

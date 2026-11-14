@@ -318,7 +318,7 @@ const CT_AIR = {
   weathers: { damp: 'canalmist', rain: 'canalshowers', dry: 'canalcloudy' },
   first: 'damp',
   own: {
-    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.2, saturation: 0.95, ev: 0.6 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.7 }],
+    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.2, saturation: 0.95, ev: 0.6 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.8 }],
     // (A showery day's wind: 2.6 times the town's light air, about 3.6 m/s at the ground and 9 aloft, which carries a
     // shower over in a few minutes, so the rain comes and goes within one fight; a little less cloud, for the gaps.)
     canalshowers: ['showers', { label: 'Showers on the town', grade: { contrast: 1.24, saturation: 0.94, ev: 0.45 }, wind: 2.6, cover: 0.6 }],
@@ -340,7 +340,8 @@ const CT_LAY = { box: { x: [-152, 152], z: [-40, 40] }, wind: [1, 0.15] };
 /**
  * Where feet go (lay.js `ways`): the middle of every lane and street, the quay's length, over the bridges, and across
  * the square between its lanes' mouths, the steps and the north lane. `half`: the worn width each side (m); `strength`:
- * how worn (the quay and the square's crossings most).
+ * how worn (the quay and the square's crossings most; the quay's way is narrow, so that its kerb and the foot of its
+ * house fronts keep the damp, the green joints and the litter that no feet clear).
  */
 function ctWays() {
   const t = CANAL_TOWN;
@@ -349,7 +350,7 @@ function ctWays() {
   const quay = mid(t.quayLane.z);
   const north = mid(t.northLane.x);
   const ways = [
-    { line: [[-t.canal.reach, quay], [t.canal.reach, quay]], half: 1.5, kind: 'foot', strength: 1 },
+    { line: [[-t.canal.reach, quay], [t.canal.reach, quay]], half: 1.1, kind: 'foot', strength: 0.85 },
     { line: [[north, t.backStreet.z[1]], [north, t.square.z[0]], [north - 2, 0], [t.steps.x - 1, quay]], half: 1.3, kind: 'foot', strength: 0.9 },
     { line: [[t.square.x[0], quay - 3], [-8, 1], [north, t.square.z[0] + 1]], half: 1.2, kind: 'foot', strength: 0.6 },
     { line: [[t.square.x[1], quay - 2], [10, 2], [north, t.square.z[0] + 1]], half: 1.2, kind: 'foot', strength: 0.6 },

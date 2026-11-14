@@ -15,8 +15,9 @@ export const TK_GEO = {
   tile: { pitch: 0.21, roll: 0.048, lap: 0.21 },
   // An eave's make-up: the thickness of tile and bedding at its edge, the rafters under it (section across and deep, spacing).
   eave: { edge: 0.07, rafter: [0.07, 0.09], spacing: 0.36, board: 0.02 },
-  // How many pieces a curved slope is cut into down its length, and a round thing round its girth.
-  cuts: { slope: 5, round: 10, arch: 16 },
+  // How many pieces a curved slope is cut into down its length, and a round thing round its girth. `crease`: two
+  // rings of a turned shape meeting at less than this (degrees) are lit as one curve, at more as an edge.
+  cuts: { slope: 5, round: 10, arch: 16, crease: 50 },
 };
 
 /** A frame: local (x, y, z) -> world, turned `yaw` about the vertical and set at (x, y, z). Local +x is along a building's front, +z out of its front. */
@@ -125,22 +126,25 @@ export function tkgBuilder() {
      * A round post or drum about the vertical through local (x, z), y0 to y1, radius r0 at its foot and r1 at its head
      * (`sides` round). u runs round it, v is the height. `caps`: 'top', 'bottom' or both.
      */
-    round(material, frame, x, z, y0, y1, r0, r1 = r0, { sides = TK_GEO.cuts.round, colour = TKG_WHITE, caps = 'top' } = {}) {
+    round(material, frame, x, z, y0, y1, r0, r1 = r0, { sides = TK_GEO.cuts.round, colour = TKG_WHITE, caps = 'top', ends = null } = {}) {
       const ring = (radius, y, k) => {
         const angle = (k / sides) * Math.PI * 2;
         return frame(x + Math.cos(angle) * radius, y, z - Math.sin(angle) * radius);
       };
-      const out = (k) => {
+      // (`ends`: the way the face looks at its foot and at its head, [outward, up] each, where a turned shape's
+      // rings are to run into each other as one curve; else the drum's own slope at both.)
+      const out = (k, end = null) => {
         const angle = (k / sides) * Math.PI * 2;
         const lean = (r0 - r1) / Math.max(1e-6, y1 - y0);
-        return tkgUnit(tkgSub(frame(Math.cos(angle), lean, -Math.sin(angle)), frame(0, 0, 0)));
+        const [across, up] = end ?? [1, lean];
+        return tkgUnit(tkgSub(frame(Math.cos(angle) * across, up, -Math.sin(angle) * across), frame(0, 0, 0)));
       };
       const girth = Math.PI * (r0 + r1);
       for (let k = 0; k < sides; k += 1) {
         const u0 = (k / sides) * girth;
         const u1 = ((k + 1) / sides) * girth;
         builder.quad(material, ring(r0, y0, k), ring(r0, y0, k + 1), ring(r1, y1, k + 1), ring(r1, y1, k), {
-          uvs: [[u0, y0], [u1, y0], [u1, y1], [u0, y1]], colour, normals: [out(k), out(k + 1), out(k + 1), out(k)],
+          uvs: [[u0, y0], [u1, y0], [u1, y1], [u0, y1]], colour, normals: [out(k, ends?.[0]), out(k + 1, ends?.[0]), out(k + 1, ends?.[1]), out(k, ends?.[1])],
         });
         if (caps.includes('top') && r1 > 1e-4) builder.tri(material, frame(x, y1, z), ring(r1, y1, k), ring(r1, y1, k + 1), [[0, 0], [r1, 0], [r1, r1]], colour);
         if (caps.includes('bottom')) builder.tri(material, frame(x, y0, z), ring(r0, y0, k + 1), ring(r0, y0, k), [[0, 0], [r0, 0], [r0, r0]], colour);
@@ -148,9 +152,22 @@ export function tkgBuilder() {
     },
     /** A turned shape (a jar, a lantern, a finial) about the vertical through local (x, z): `profile` [[radius, y], …] from foot to head. */
     lathe(material, frame, x, z, profile, options = {}) {
+      // Each ring of the profile is lit as one curve with the next where they meet at less than
+      // TK_GEO.cuts.crease (their faces' ways averaged), and as an edge where they turn more sharply (a rim, a lid).
+      const faces = [];
+      for (let k = 0; k + 1 < profile.length; k += 1) {
+        const [dr, dy] = [profile[k + 1][0] - profile[k][0], profile[k + 1][1] - profile[k][1]];
+        const long = Math.hypot(dr, dy) || 1;
+        faces.push([dy / long, -dr / long]);
+      }
+      const joined = (a, b) => {
+        if (!a || !b || a[0] * b[0] + a[1] * b[1] < Math.cos((TK_GEO.cuts.crease * Math.PI) / 180)) return null;
+        return [a[0] + b[0], a[1] + b[1]];
+      };
       for (let k = 0; k + 1 < profile.length; k += 1) {
         const caps = (k === 0 ? 'bottom' : '') + (k + 2 === profile.length ? 'top' : '');
-        builder.round(material, frame, x, z, profile[k][1], profile[k + 1][1], profile[k][0], profile[k + 1][0], { ...options, caps });
+        const ends = [joined(faces[k - 1], faces[k]) ?? faces[k], joined(faces[k], faces[k + 1]) ?? faces[k]];
+        builder.round(material, frame, x, z, profile[k][1], profile[k + 1][1], profile[k][0], profile[k + 1][0], { ...options, caps, ends });
       }
     },
     /**

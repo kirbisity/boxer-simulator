@@ -38,8 +38,11 @@ export const TK_LAY = {
   // distances (m). A roof is `thick` deep. Twelve metres is as far as a house's height throws its shade of the sky.
   sky: { every: 2, ways: 8, lifts: [14, 35, 62], weights: [0.172, 0.38, 0.448], steps: [0.25, 0.55, 0.95, 1.5, 2.3, 3.4, 5, 7.5, 11], thick: 0.35 },
   // The low places: settlement of laid ground (a slow unevenness `settle` m across, and a finer one), the real dips
-  // of a ground with relief (against its mean over `dip` m; `dipGain` per m), and the worn middle of a way.
-  hollow: { settle: 7, fine: 1.6, spread: 1.9, dip: 3, dipGain: 2.2, wear: 0.22 },
+  // of a ground with relief (against its mean over `dip` m; `dipGain` per m), and the worn middle of a way. `step`:
+  // the most (m) the ground on any one side counts as higher or lower: past that it is a drop or a bank, not a
+  // slope, and the water on a quay does not know the canal is there (without it a quay's whole width, and a
+  // rampart's walk, counted as a crest and never held a puddle or a damp patch).
+  hollow: { settle: 7, fine: 1.6, spread: 1.9, dip: 3, dipGain: 2.2, wear: 0.22, step: 0.12 },
   // Snow in the wind: it piles within `windward` m of the windward foot of what stands at least `stands` high, and
   // is thin for `lee` m behind it.
   drift: { windward: 3.5, lee: 7, stands: 0.8 },
@@ -311,8 +314,9 @@ export function tkLayBake({ batches, box, ground, ways = [], wind = [1, 0], texe
       // Low places: under open sky only.
       let dip = 0;
       if (dipCells > 0) {
-        const around = (groundAt[j * width + Math.max(0, i - dipCells)] + groundAt[j * width + Math.min(width - 1, i + dipCells)] + groundAt[Math.max(0, j - dipCells) * width + i] + groundAt[Math.min(height - 1, j + dipCells) * width + i]) / 4;
-        dip = (around - g) * low.dipGain;
+        // (A sheer drop is not a slope: each side counts for no more than `step` either way.)
+        const side = (at2) => Math.max(-low.step, Math.min(low.step, groundAt[at2] - g));
+        dip = ((side(j * width + Math.max(0, i - dipCells)) + side(j * width + Math.min(width - 1, i + dipCells)) + side(Math.max(0, j - dipCells) * width + i) + side(Math.min(height - 1, j + dipCells) * width + i)) / 4) * low.dipGain;
       }
       // (The slow noise keeps to the middle of its range: spread, so that a tenth of laid ground is low enough to hold water.)
       const settle = layClamp((tkFbm(x / (low.settle * 64) + 0.31, z / (low.settle * 64) + 0.57, 64, 2, seed + 3) - 0.5) * low.spread + 0.5) * 0.72 + tkFbm(x / (low.fine * 256) + 0.11, z / (low.fine * 256) + 0.43, 256, 1, seed + 5) * 0.16;
