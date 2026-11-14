@@ -164,6 +164,24 @@ export const ENV = {
     vignette: 0.3,
   },
 
+  // Sunlight through an opening into a dark space (particles.js envBuildBeams): a gate's mouth seen from inside
+  // the passage, a gap between eaves, a smoke hole. The air the sun reaches through the opening is lit and the
+  // air beside it is not; what is seen is the lit air's own scattering, so the beam is as bright as the air is
+  // thick: next to nothing on a clear day, plain in mist, in falling snow, and in the dust of a trodden passage.
+  beams: {
+    // A beam too thick to see through, seen from the side, as a share of the sun's light on a white card: the
+    // haze throws most of its light forward (air.hazeForward), little sideways. By eye.
+    side: 0.4,
+    // Looking up a beam toward the sun it is brighter by the haze's forward lobe, by no more than this many
+    // times (the lobe's own peak is a glare the bloom already draws).
+    most: 5,
+    // Dust hanging in still, sheltered, trodden air, as extinction per metre, for an opening that does not give
+    // its own: 0.012 is a visibility of about 330 m. By eye.
+    dust: 0.012,
+    // No beam is drawn longer than this (m): past it the opening's light is a patch on the ground, not a shaft.
+    reach: 40,
+  },
+
   // ---- shadows ---------------------------------------------------------------------------------------------------
   shadow: {
     // The sun is a disc, not a point: 1.39 million km across at 149.6 million km, 0.0093 rad. A shadow's edge is
@@ -309,6 +327,20 @@ export const ENV = {
     // roughly half of dry), and takes a sheen of the sky at grazing angles.
     wetDarken: 0.58,
     wetSheen: 0.5,
+    // A wet built surface (stone, tile, planks: air.js envDress) is this share as rough as dry: the film of
+    // water fills its grain and mirrors the sky. By eye.
+    wetRough: 0.4,
+    // Snow lying, as a display colour in full light: new snow throws back eight or nine tenths of what falls on it
+    // (approximate), a little more of the blue. One figure for the land and for a place's own surfaces
+    // (air.js envDress), so a drift against a wall and the ground it lies on agree.
+    snowColour: [0.9, 0.92, 0.96],
+    // How fast the ground takes and loses its wet where the rain comes and goes (seconds to cover 63 % of the
+    // way): a shower darkens stone and earth in well under a minute; drying takes a good part of an hour in
+    // life and is shortened here to a few minutes so that a fight sees the ground lighten (by eye). Under a gap
+    // the ground dries no further than `dryTo` of the weather's wet.
+    wetIn: 25,
+    dryOut: 240,
+    dryTo: 0.45,
     // What counts as standing on the ground (a post, a hut, a rack: no grass through it, no tree on it): a mesh
     // that reaches the ground, at least `standTall` m high and no more than `standWide` m half across (a wider
     // one is ground or a backdrop).
@@ -383,8 +415,19 @@ export const ENV = {
     // the gusts. `fall` m/s is the terminal speed (approximate: 2 mm raindrops about 6.5, large ones 9;
     // snowflakes 1 to 1.5; a leaf 1 to 2), `ride` the share of the wind it takes up, `size` m,
     // `streak` s of exposure a falling drop is smeared over (1/40 s: a drop at 8 m/s draws 0.2 m long).
+    // `gusts`: [the share of the kind in the air whatever the wind, then the wind where it is (m/s, or with
+    // `ofMean` as a multiple of the mean wind) at which the rest begin to come and at which all of it is there]:
+    // the rest ride the gust pattern, so a gust is seen arriving as a thicker curtain of it.
     rain: { box: [28, 16, 28], count: 9000, fall: 8, ride: 1, size: 0.012, streak: 0.028, wander: 0 },
-    snow: { box: [26, 14, 26], count: 7000, fall: 1.2, ride: 1, size: 0.022, streak: 0, wander: 0.35 },
+    // Snow is smeared over the same exposure as rain: at its own fall it stays a flake (3 cm), on a 10 m/s wind
+    // it draws a quarter of a metre long. Six tenths of a snowfall comes in the gusts (by eye, against how a
+    // squall is seen crossing open ground: the fall itself is no thicker there, but the wind brings its curtains
+    // and what it has lifted with them).
+    snow: { box: [26, 14, 26], count: 7000, fall: 1.2, ride: 1, size: 0.022, streak: 0.028, wander: 0.35, gusts: [0.4, 0.85, 1.45], ofMean: true },
+    // Snow lifted off where it lies: loose dry snow begins to drift along the ground at about 5 m/s and blows
+    // in sheets by 9 or 10 (approximate, from memory of the figures for dry new snow; wet or crusted snow needs
+    // much more). Drawn wherever a weather leaves snow lying (particles.js envParticlesSet).
+    spindrift: { box: [44, 3.2, 44], count: 1100, fall: 0.25, ride: 1, size: 0.6, streak: 0, wander: 0.4, gusts: [0, 5, 9.5] },
     leaves: { box: [40, 12, 40], count: 260, fall: 0.9, ride: 0.9, size: 0.07, streak: 0, wander: 0.9 },
     petals: { box: [34, 9, 34], count: 420, fall: 0.5, ride: 0.95, size: 0.028, streak: 0, wander: 0.7 },
     motes: { box: [22, 7, 22], count: 900, fall: 0.02, ride: 1, size: 0.008, streak: 0, wander: 0.25 },
@@ -455,7 +498,14 @@ export const ENV_TREES = {
 // `fine` how fine the haze is (ENV.air.wavelengths),
 // `wind` times the place's speed and `gust` added to its gustiness, `wet` 0..1 of the ground, `fall` what falls
 // (a kind in ENV.particles) and how much of its count, `snow` 0..1 of the ground whitened, `tint` the haze's own
-// colour where it has one (dust), `grade` what the weather's picture differs by from ENV.tone.grade (all by eye:
+// colour where it has one (dust). A `fall` with `under` [from, to] comes only out of thick cloud: none where the
+// sheet overhead (the one drawn, and the one that shades the land) is thinner than `from`, all of it by `to`
+// (air.js envCloudDepth's measure: 0 a cloud's edge, about 0.3 its middle), so it starts and stops as the cloud
+// passes; `least` is the share that falls even under a gap, and `thick` the visibility in the thick of it (m).
+// (Sampled over an hour of drift at covers near 0.65, the depth over one spot has a median near 0.1 and is past
+// 0.25 a tenth of the time: `under` [0.09, 0.17] falls a little under half the time, in spells of one to five
+// minutes at a 9 to 15 m/s wind aloft, which is what a showery day does: approximate.)
+// `grade` what the weather's picture differs by from ENV.tone.grade (all by eye:
 // a clear day a little warm and full; a lid flat light, so the curve is steepened to keep a picture, and cooler
 // and greyer; mist bright and pale, held up half a stop as a camera's meter is fooled by fog, its darks left in).
 export const ENV_WEATHER = {
@@ -472,6 +522,10 @@ export const ENV_WEATHER = {
   mist: { label: 'Mist', grade: { contrast: 1.36, saturation: 0.9 }, fine: 0.15, cover: 0.2, gloom: 0, sun: 0.85, visibility: 260, hazeHeight: 26, wind: 0.3, gust: 0, wet: 0.35, fall: null, snow: 0 },
   // Snow driving on a hard wind: visibility under a km in moderate snow (approximate), the ground white.
   snow: { label: 'Snow', grade: { contrast: 1.3, saturation: 0.85, warmth: -0.02, ev: 0.3 }, fine: 0, cover: 1, gloom: 0.25, sun: 0.05, visibility: 700, hazeHeight: 600, wind: 1.6, gust: 0.15, wet: 0, fall: { kind: 'snow', share: 1 }, snow: 0.85 },
+  // Showers: heavy cloud with gaps, rain out of the thick of it and sun through the gaps, the ground wet between.
+  showers: { label: 'Showers', grade: { contrast: 1.36, saturation: 0.94, ev: -0.15 }, fine: 0.6, cover: 0.66, gloom: 0.6, sun: 0.9, visibility: 14000, hazeHeight: null, wind: 1.4, gust: 0.2, wet: 1, fall: { kind: 'rain', share: 1, under: [0.09, 0.17], least: 0, thick: 3200 }, snow: 0 },
+  // Snow showers on a cold wind: flurries out of each cloud that passes, the sun between them on new snow.
+  flurries: { label: 'Snow showers', grade: { contrast: 1.3, saturation: 0.9, warmth: -0.01, ev: 0.15 }, fine: 0.3, cover: 0.64, gloom: 0.4, sun: 0.85, visibility: 9000, hazeHeight: 900, wind: 1.5, gust: 0.2, wet: 0, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 900 }, snow: 0.85 },
   // Dust lifted off dry ground by a hard wind: an ochre haze near the ground.
   dust: { label: 'Dust', grade: { saturation: 0.95, warmth: 0.03 }, fine: 0.3, cover: 0.15, gloom: 0, sun: 0.7, visibility: 1200, hazeHeight: 120, wind: 1.8, gust: 0.2, wet: 0, fall: { kind: 'dust', share: 1 }, snow: 0, tint: 0xc9ab7a },
 };
@@ -491,6 +545,37 @@ export const ENV_WEATHER = {
 // trees: stands of ENV_TREES kinds, each { kind, count, from, to (m from the centre), clump 0..1 }.
 // woods: 0..1 of the far hills wooded (drawn as colour on the land beyond the last tree), and its colour.
 // drift: what is in the air on its clear day: [{ kind (ENV.particles), share of its count, colours }].
+//
+// A place that draws itself (a town, a length of wall, a yard between halls) joins with `own: true`, at run time
+// (index.js envRegisterPlace(name, description)): no land, grass or trees are built for it and nothing of it is
+// hidden; it is given the sky, the sun and its shadow, the haze, the camera's last passes, the wind, the weather,
+// and what falls and drifts. It may leave out everything but what differs from ENV_PLACE_PLAIN, and may add
+//   height: (x, z) => m, its own ground (what lies on the ground lies on it; level at 0 if left out);
+//   shadowBox: { half, depth } (m): the sun's shadow box is carried with the camera, `half` each way round the
+//     ground it looks at and `depth` deep, for a place whose fighters may stand anywhere on it (left out: the
+//     look's own box round the middle of the floor);
+//   far: m, the camera's far plane (left out: as the place's own lighting set it);
+//   wind: { toward: [x, z], speed m/s, gust 0..1 }, its own wind where wind.js PLACE_WIND has none for it;
+//   cover: what stands over the ground (roofs, a vault, a bridge), so nothing falls through it and blown snow
+//     starts from its top: { at: (x, z) => m, the top of the highest thing over the point, min: [x, z], size:
+//     [w, d], texel: m } sampled here, or a texture the place has baked: { texture, min, size, scale: m per
+//     unit of the texel, base: m at 0, channel: 0..3 };
+//   openings: where the sun comes into a dark space, each { at: [x, y, z] a corner, a: [x, y, z], b: [x, y, z]
+//     the two edges from it (m), floor: m the ground the light lands on, dust: extinction per metre of the air
+//     inside (left out: ENV.beams.dust) }; the light passes the way of a x b (the other way: no beam).
+// Its own materials take the haze, the wet and the snow through air.js envDress.
+export const ENV_PLACE_PLAIN = {
+  weather: 'clear',
+  sun: { azimuth: -2.3, elevation: 35 },
+  air: { visibility: 30000, hazeHeight: 900 },
+  clouds: { cover: 0.4 },
+  // (Nothing is drawn from these two for a place that draws itself: the near map is laid out from them.)
+  ground: { grass: 0x55802c, dry: 0x9a9248, soil: 0x74603e, rock: 0x7d7a70, floor: 0, worn: [] },
+  grass: { height: [0.3, 0.6], floorHeight: 0.3, dry: 0, flowers: 0, flowerColours: [] },
+  trees: [],
+  drift: [],
+};
+
 export const PLACE_ENV = {
   // A village green on the brow of a down, a summer afternoon, the sun over the left shoulder: the grass uncut beyond the fence, the land
   // falling away to wooded hills that fade ridge behind ridge into the haze (the first reference).
