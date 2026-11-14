@@ -23,6 +23,8 @@ export const PHOTO_HAIR = {
   // Beard cards: segments, lift off the skin at the root and the tip (of the head's radius).
   segments: 5,
   lift: [0.025, 0.07],
+  // A moustache's cards: the atlas rows they root between (under the nose, the lip's red edge), and their length (of the head's radius).
+  lip: { rows: [0.612, 0.668], length: 0.055 },
   // The scalp's painted hairline (atlas rows, from the crown), by length.
   hairline: { crop: 0.225, short: 0.215, medium: 0.205, long: 0.2, tied: 0.205 },
   nape: 0.64,
@@ -227,12 +229,14 @@ export function buildPhotoBeard({ group, head, r, facialHair = 'none', colour, r
       const row = rowOf(index);
       const du = duOf(index);
       const inBeard = !lip && row > 0.73 && row < 0.95 && du < 0.16 && !(row < 0.75 && du < 0.04);
-      const inLip = row > 0.655 && row < 0.69 && du < (facialHair === 'handlebar' ? 0.06 : 0.045);
+      // (A moustache grows from under the nose down to the lip's red edge, the atlas's rows 0.61 to 0.67, and ends there: rooted
+      // on the lip itself its cards hung across the mouth as a row of dark stitches.)
+      const inLip = row > PHOTO_HAIR.lip.rows[0] && row < PHOTO_HAIR.lip.rows[1] && du < (facialHair === 'handlebar' ? 0.06 : 0.045);
       if (!(inBeard || inLip) || random() > 0.35) continue;
       const root = at(index);
       const normal = root.clone().sub(centre).normalize();
       const down = new THREE.Vector3(0, -1, 0).addScaledVector(normal, 0.25).normalize();
-      beard.push(cardStrip({ root, direction: down, length: (inLip ? 0.08 : facialHair === 'longBeard' ? 0.5 : 0.16) * r, width: 0.06 * r, surface, centre, random, steps: 3 }));
+      beard.push(cardStrip({ root, direction: down, length: (inLip ? PHOTO_HAIR.lip.length : facialHair === 'longBeard' ? 0.5 : 0.16) * r, width: 0.06 * r, surface, centre, random, steps: 3 }));
     }
     const beardMaterial = cardMaterial(colour);
     add(beard, beardMaterial, 'photoBeard');
