@@ -46,9 +46,10 @@ export const TK_WEATHER = {
   // (a matte white in full sun is about 1; in the open air the light is divided by the camera's exposure first,
   // uTkAir.w, since there the scene is lit in the sun's own measure): a wet lane looked down toward a bright haze
   // otherwise shows one burnt-out streak with no stone left in it. Standing water may glint `glint` times as
-  // bright, which is what blooms. And in a shut-in place the low sky a grazing mirror would show is mostly walls: the image
+  // bright, which is what blooms. (0.8: at 1.4 the sunlit wet slabs of the canal town's square stood at 250 of 255
+  // with no stone left in them, at 0.8 they hold at about 225 and the sky still reads in them.) And in a shut-in place the low sky a grazing mirror would show is mostly walls: the image
   // keeps `shut` of itself where the lie's map sees no sky, all of it in the open.
-  glare: 1.4, glint: 4, shut: 0.3,
+  glare: 0.8, glint: 4, shut: 0.3,
   // The damp band at a wall's foot: its height (m; it rises unevenly along the wall, from 0.55 to 1.45 of this) and
   // how dark; how green the moss in it; the mud splashed up the first `splash` m, and its colour.
   foot: { height: 0.9, dark: 0.3, moss: [0.22, 0.29, 0.13], splash: 0.35, mud: [0.3, 0.27, 0.22] },
