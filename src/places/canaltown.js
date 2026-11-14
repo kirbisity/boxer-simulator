@@ -303,19 +303,26 @@ const CT_LIGHT = { haze: 0xc3cdd0, sun: tkSunWay(CT_SUN.azimuth, CT_SUN.elevatio
  *         air's 'mist'; the figures by eye against the reference photographs of a water town on a wet morning.
  *   rain  'canalshowers', over the open air's 'showers': rain out of the thick of each cloud that passes, the sun between.
  *   dry   'canalcloudy', over its 'cloudy': broken cloud on a dry day.
- * Each is held up by `ev` stops over the open air's own grade: its exposure is metered for open ground in the sun,
- * and a town's ground is wet dark stone between walls, most of it in shade, which a camera opens up for. By eye.
+ * What the open air's meter is told of the town (`meter`): its ground is wet dark stone (about a tenth thrown
+ * back, approximate) that sees about half the sky between its walls (the lie's map's mean over the walked
+ * ground, approximate), where the meter's own ground is a meadow under the whole sky. Each weather is then held
+ * up by `ev` stops over that: half the walked town is lane, arcade and eave shade, three stops and more under
+ * the square, and a camera set for the square leaves them black; held up, the square's wet paving in the sun
+ * rides the curve's shoulder (its glare is capped: townkit/weather.js) and the lanes are dim rooms in which
+ * timber, lattice and a cart still read. Their contrast a little under the open air's own, for the same reason.
+ * By eye, on the open air's high tier, against the lane, the arcade's foot and the square.
  */
+const CT_METER = { albedo: 0.1, sky: 0.55 };
 const CT_AIR = {
-  description: { sun: CT_SUN, air: { visibility: 9000, hazeHeight: 400 }, clouds: { cover: 0.5 } },
+  description: { sun: CT_SUN, air: { visibility: 9000, hazeHeight: 400 }, clouds: { cover: 0.5 }, meter: CT_METER },
   weathers: { damp: 'canalmist', rain: 'canalshowers', dry: 'canalcloudy' },
   first: 'damp',
   own: {
-    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.32, saturation: 0.95, ev: 1.0 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.7 }],
+    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.2, saturation: 0.95, ev: 0.6 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.7 }],
     // (A showery day's wind: 2.6 times the town's light air, about 3.6 m/s at the ground and 9 aloft, which carries a
     // shower over in a few minutes, so the rain comes and goes within one fight; a little less cloud, for the gaps.)
-    canalshowers: ['showers', { label: 'Showers on the town', grade: { contrast: 1.36, saturation: 0.94, ev: 1.2 }, wind: 2.6, cover: 0.6 }],
-    canalcloudy: ['cloudy', { label: 'Broken cloud over the town', grade: { contrast: 1.32, ev: 0.7 } }],
+    canalshowers: ['showers', { label: 'Showers on the town', grade: { contrast: 1.24, saturation: 0.94, ev: 0.45 }, wind: 2.6, cover: 0.6 }],
+    canalcloudy: ['cloudy', { label: 'Broken cloud over the town', grade: { contrast: 1.22, ev: 0.5 } }],
   },
 };
 export const CANAL_TOWN_LIGHT = {

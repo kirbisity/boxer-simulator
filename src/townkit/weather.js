@@ -59,6 +59,14 @@ export const TK_WEATHER = {
   // By eye against the reference photographs of old fortress masonry: a wall's stones are the same stone, and what
   // tells them apart at fifty paces is this, not the block's own grain.
   stain: { dark: 0.34, colour: [0.5, 0.52, 0.4], lichen: 0.5 },
+  // Coursed stone, block by block. A sheet paints a couple of dozen blocks and repeats every few metres, and a long
+  // wall showed it: the same pale block at the same place in every repeat. So each block of each repeat takes a
+  // tone of its own (`tone`: the whole range, as a share of its colour; `warm`: toward rust or toward grey), a few
+  // are newer stone set in a repair (`fresh`: [how many of them, how much paler]) and a few hold the wet and the
+  // soot (`dull`: [how many, how much darker]). `near`: the stretch of the sheet a pixel covers (in repeats) over
+  // which this fades out, a block being by then a pixel or two and its number no longer readable off the sheet.
+  // By eye, against the reference photographs of fortress walls: stones of one quarry differ by about this.
+  block: { tone: 0.34, warm: 0.06, fresh: [0.06, 0.24], dull: [0.09, 0.3], near: [0.03, 0.09] },
   // Plaster fallen from the brick under it: the brick's colour, and how much of a wall has lost it at the foot
   // and a storey up (a threshold on a slow noise: 0 none, 1 all).
   bare: { colour: [0.36, 0.35, 0.34], low: 0.42, high: 0.16 },
@@ -70,19 +78,15 @@ export const TK_WEATHER = {
   // `bounce`: an upright face shut off from the sky still has the light the open ground before it throws back.
   // The lie's sky share is read `reach` m out from the face, and the face has at least `share` of it (the ground's
   // reflectance, damp stone throws back about 0.3 and its wet film mirrors more at a low angle: 0.5 by eye), more over snow.
-  // `fill`: the light lying snow throws back up at what stands on it, in the open air, as a multiple of the
-  // ground light the air already gives (env/air.js: a fifth of what falls on level ground, grass, of which its
-  // light probe shows 1.6 times: 0.32). Snow throws back about 0.8 (the kit's own snow colour): (0.8 - 0.32) / 0.2.
-  // Without it everything that faces down or sideways over a snowfield (the lee of a cart, an eave's underside,
-  // the shaded face of a wall) is lit as if it stood on a meadow, and goes black beside the snow.
-  // WORKAROUND, to be removed when the open air knows a place's ground (shared/env-requests.md R9).
   // `street`: the light that reaches a shut-in place from the lit walls and paving round it (a lane, an arcade, the
   // foot of a wall under its eave), as a multiple of the open air's ground light, given where the sky's own is
   // shut out. Pale plaster and wet flags in sun throw back a fifth to a half of what falls on them and fill about
-  // half of what a shaded face sees: with 0.9 a face wholly shut from the sky keeps about a sixth of the open
-  // ground's light, some two and a half stops under it: a dim interior in which timber and lattice still read,
-  // not a silhouette. By eye against the arcade, the lane and the gate passage.
-  shade: { most: 0.85, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, fill: 2.4, street: 0.9 },
+  // half of what a shaded face sees. 1.6 is more than that sum gives (about 0.9, a sixth of the open ground's
+  // light): the picture's curve has a toe, and with 0.9 a lane came out four and a half stops under the square
+  // on the screen (measured: medians of 21 against 94 of 255), a silhouette. At 1.6 it sits about three and a
+  // half under: a dim interior in which timber and lattice still read. By eye against the arcade, the lane and
+  // the gate passage, on the open air's high tier.
+  shade: { most: 0.85, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, street: 1.6 },
   // A way's worn middle is this much paler and smoother than its edges; its edges this much darker.
   tread: { pale: 0.16, edge: 0.4, patch: 0.3 },
   // (`patch`: where no one treads, old damp and dirt lie in patches a few metres across, this much darker at the
@@ -94,7 +98,8 @@ export const TK_WEATHER = {
   // ENV.terrain.snowColour), new snow throwing back about nine tenths, a little more of the blue. `drift`: how much
   // darker its wind-packed patches are (a few metres across), so a field of it is not one tone. `trodden`: what
   // feet make of it (its colour is multiplied by this where the wear is full). `caught`: the share of an upright
-  // face's joints and ledges the wind plasters with it on the side it blows against.
+  // face's joints and ledges the wind plasters with it on the side it blows against (in patches, about half the
+  // face: a wall wholly pointed in white read as ruled paper).
   // `blown`: the wind's work on lying snow, which is what a low sun draws it by. Low drifts `drift` m across and
   // `stretch` times as long down the wind, their flanks up to about `driftSlope` (rise over run); over them a ripple
   // `ripple` m across of `rippleSlope`, seen out to `rippleTo` m. Wind-packed snow's ridges (sastrugi) run from
@@ -331,6 +336,21 @@ const TK_COLOUR = `
   float high = vTkPos.y - groundY;
 
   diffuseColor.rgb *= 1.0 + uTkKind.w * ((blot - 0.5) * 0.5 + (fine - 0.5) * 0.18);
+  #ifdef USE_ROUGHNESSMAP
+  {
+    // Coursed stone: each block of each repeat its own (TK_WEATHER.block).
+    float cell = texture2D(roughnessMap, vUv).a;
+    if (cell < 0.99) {
+      vec2 one = vec2(floor(cell * 255.0 + 0.5), 3.0) + floor(vUv) * vec2(37.0, 91.0);
+      float keen = (1.0 - tkJoint) * (1.0 - smoothstep(${TK_WEATHER.block.near[0].toFixed(3)}, ${TK_WEATHER.block.near[1].toFixed(3)}, max(fwidth(vUv.x), fwidth(vUv.y))));
+      float own = tkHash(one);
+      float kind = tkHash(one + 5.7);
+      float lift = ${TK_WEATHER.block.tone.toFixed(2)} * (own - 0.5) + ${TK_WEATHER.block.fresh[1].toFixed(2)} * step(1.0 - ${TK_WEATHER.block.fresh[0].toFixed(2)}, kind) - ${TK_WEATHER.block.dull[1].toFixed(2)} * step(kind, ${TK_WEATHER.block.dull[0].toFixed(2)});
+      float warm = ${TK_WEATHER.block.warm.toFixed(2)} * (tkHash(one + 11.3) - 0.5);
+      diffuseColor.rgb *= 1.0 + keen * (lift + vec3(warm, 0.0, -warm));
+    }
+  }
+  #endif
   // Grime: in the joints, and over everything the rain does not wash.
   diffuseColor.rgb *= 1.0 - uTkDirt.z * (tkJoint * 0.3 + ${TK_WEATHER.shade.dirt.toFixed(2)} * (1.0 - tkSky));
 
@@ -420,7 +440,7 @@ const TK_COLOUR = `
   // it blows over, and a face's own stains show between.)
   float faceAlong = vTkPos.x * n.z - vTkPos.z * n.x;
   float holdsHere = mix(0.3, 1.0, smoothstep(0.3, 0.75, tkFbm(vec2(faceAlong * 0.45, vTkPos.y * 0.8) + 23.0) + 0.22 * (1.0 - smoothstep(0.0, 2.0, high)) + 0.18 * (1.0 - smoothstep(0.0, 1.2, max(fall, 0.0))) * step(-0.05, fall)));
-  float caught = uTkSnow * ${TK_WEATHER.snow.caught.toFixed(2)} * upright * smoothstep(0.1, 0.7, -dot(n.xz, uTkBlow.xy)) * smoothstep(0.35, 0.7, tkJoint + 0.5 * (blot - 0.5)) * holdsHere * (1.0 - tkUnder) * step(0.01, uTkKind.x);
+  float caught = uTkSnow * ${TK_WEATHER.snow.caught.toFixed(2)} * upright * smoothstep(0.1, 0.7, -dot(n.xz, uTkBlow.xy)) * smoothstep(0.66, 0.92, tkJoint + 0.8 * (blot - 0.5) + 0.3 * (fine - 0.5)) * holdsHere * (1.0 - tkUnder) * step(0.01, uTkKind.x);
   tkSnowHere = max(tkSnowHere, caught);
   diffuseColor.rgb *= mix(1.0, ${TK_WEATHER.wetDark.toFixed(2)}, max(tkWetHere, tkPoolHere * 0.8));
   vec3 snow = mix(${tkVec(TK_WEATHER.snow.colour)}, ${tkVec(TK_WEATHER.snow.colourAir)}, uTkAir.x) * (1.0 - ${TK_WEATHER.snow.drift.toFixed(2)} * tkFbm(vTkPos.xz * 0.3 + 3.0));
@@ -508,8 +528,6 @@ const TK_SHADE = `
   reflectedLight.indirectSpecular *= tkOpen * (1.0 - tkJoint * (1.0 - smoothstep(0.25, 0.6, abs(normalize(vTkNrm).y))));
   // The light of the lit walls and ground round a shut-in place (TK_WEATHER.shade.street).
   if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.street.toFixed(2)} * (1.0 - tkOpen)) * material.diffuseColor;
-  // Lying snow's light, thrown up (TK_WEATHER.shade.fill): on the half of the world a face sees below the level.
-  if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.fill.toFixed(2)} * uTkSnow * (0.5 - 0.5 * normalize(vTkNrm).y) * max(tkSky, tkBounce)) * material.diffuseColor;
 }
 `;
 
@@ -526,7 +544,7 @@ const TK_MIRROR = `
     // (What stands under cover mirrors the dark over it, not the sky.)
     gl_FragColor.rgb = mix(gl_FragColor.rgb, min(tkMirror(reflect(look, n)) * mix(1.0, 0.25, tkUnder) * mix(${TK_WEATHER.shut.toFixed(2)}, 1.0, max(tkSky, tkPoolHere * step(0.5, tkSky))), vec3(${TK_WEATHER.glare.toFixed(2)})), fresnel * share);
   }
-  if (uTkAir.x > 0.5) gl_FragColor.rgb = envHaze(gl_FragColor.rgb, cameraPosition, vTkPos);
+  if (uTkAir.x > 0.5) gl_FragColor.rgb = envHazeGrain(gl_FragColor.rgb, cameraPosition, vTkPos, envGrain(gl_FragCoord.xy));
 }
 `;
 

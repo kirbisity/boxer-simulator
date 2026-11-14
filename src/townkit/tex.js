@@ -1,7 +1,9 @@
 // The town kit's surfaces: brick, dressed stone, plaster, timber, roof tile, paving, earth and rock, each painted
 // per pixel when the page loads (no image is shipped) as a height field with its colour and its roughness, and
 // finished into three sheets that tile: the colour, a normal map from the height, and a third sheet holding the
-// height (red), the roughness (green, where three.js reads it) and how deep in a joint the pixel lies (blue).
+// height (red), the roughness (green, where three.js reads it), how deep in a joint the pixel lies (blue) and, on
+// coursed stone, which of the sheet's blocks the pixel is of (alpha: the block's number over 255; 1 where a sheet
+// has no blocks), by which a wall gives every block of every repeat its own tone (townkit/weather.js).
 // A place's wet weather reads the height for its puddles (townkit/weather.js).
 //
 // Every sheet is painted at a real size (`metres`): the makers (townkit/geo.js) lay UVs in metres and divide by it,
@@ -152,7 +154,7 @@ function tkxCourses(courses, blocks, seed, uneven = 0) {
   };
 }
 
-/** A sheet's painter: (u, v, pixel) fills pixel.h (0..1), pixel.c ([r, g, b]), pixel.r (roughness) and pixel.j (0 on a face, 1 deep in a joint); `pixel.a` (alpha) where the sheet is cut out. */
+/** A sheet's painter: (u, v, pixel) fills pixel.h (0..1), pixel.c ([r, g, b]), pixel.r (roughness), pixel.j (0 on a face, 1 deep in a joint) and, where it lays blocks, pixel.b (the block's number over 255); `pixel.a` (alpha) where the sheet is cut out. */
 const TKX_PAINTERS = {
   brick(spec) {
     const { courses, perCourse, metres } = spec;
@@ -210,6 +212,8 @@ const TKX_PAINTERS = {
       pixel.h = face * (0.62 + tone * 0.16 + tilt * 0.3 + (grain - 0.5) * 0.12 * (1 + uneven * 4) - pits * 0.3) + (1 - face) * 0.08;
       pixel.r = 0.62 + (1 - face) * 0.3 + (grain - 0.5) * 0.16 + pits;
       pixel.j = 1 - face;
+      // (Its block's number: tkxCourses numbers a course's blocks from 37 times the course, so under 250 for any sheet here.)
+      pixel.b = (block.id % 250) / 255;
     };
   },
 
@@ -463,17 +467,18 @@ export function tkxPaint(name, size = TK_TEX[name].size) {
   const height = new Float32Array(count);
   const colour = new Uint8Array(count * 4);
   const surface = new Uint8Array(count * 4);
-  const pixel = { h: 0, c: [0, 0, 0], r: 1, j: 0, a: 1 };
+  const pixel = { h: 0, c: [0, 0, 0], r: 1, j: 0, a: 1, b: 1 };
   const byte = (value) => Math.max(0, Math.min(255, Math.round(value * 255)));
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const at = y * size + x;
       pixel.a = 1;
+      pixel.b = 1;
       paint((x + 0.5) / size, (y + 0.5) / size, pixel);
       const h = Math.max(0, Math.min(1, pixel.h));
       height[at] = h;
       colour.set([byte(pixel.c[0]), byte(pixel.c[1]), byte(pixel.c[2]), byte(pixel.a)], at * 4);
-      surface.set([byte(h), byte(pixel.r), byte(pixel.j), 255], at * 4);
+      surface.set([byte(h), byte(pixel.r), byte(pixel.j), byte(pixel.b)], at * 4);
     }
   }
   // The normal map: the height's slope, in metres of relief over metres of sheet, by central differences that wrap.
