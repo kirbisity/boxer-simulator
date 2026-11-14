@@ -32,7 +32,7 @@ import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, env
 import { envBuildGrass, envGrassQuality } from './grass.js';
 import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
-import { envMeter, envPostDraw, envToneOf } from './post.js';
+import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { activeLook } from '../looks.js';
 import { hidePaintedSky, setRenderer } from '../looks/kit.js';
 import { probeLiteProject } from '../looks/probe-lite.js';
@@ -59,7 +59,23 @@ function envWeatherOf(view, place) {
       return { name: 'mist', ...ENV_WEATHER.mist, visibility: (midway * ENV.air.koschmieder) / Math.LN2, sun: level.sun ?? ENV_WEATHER.mist.sun };
     }
   }
-  return { name: own.weather, ...ENV_WEATHER[own.weather] };
+  // (The place's own weather, as it is on this place: config.js `weatherHere`.)
+  return { name: own.weather, ...ENV_WEATHER[own.weather], ...(own.weatherHere ?? {}) };
+}
+
+/**
+ * The place as it stands under a weather. Its description is its own day: the sun, the cloud and the air that go
+ * with its own weather. Under any weather but that one (`other.than`), picked by name or brought by a battle, a
+ * place whose own day is a mood (an evening, a dawn) stands as `other` says instead, so that a snow shower or
+ * a mist looks like itself there and not like the evening with snow in it (config.js). One made object a place,
+ * so that the land is made again only when the day changes (envApply).
+ */
+const envPlacesOther = new WeakMap();
+function envPlaceIn(place, weather) {
+  const own = PLACE_ENV[place];
+  if (!own?.other || !weather || weather.name === own.other.than) return own;
+  if (!envPlacesOther.has(own)) envPlacesOther.set(own, { ...own, ...own.other });
+  return envPlacesOther.get(own);
 }
 
 /** Whether `place` is drawn as open air now: it has a description, the look is the realistic one, the weather is one this draws. */
@@ -138,13 +154,12 @@ function envFootprints(group) {
 export function envBuild({ place, view, spec }) {
   const group = new THREE.Group();
   group.userData.env = 'open-air';
-  envFill(group, place, view, spec);
+  envFill(group, place, view, spec, envPlaceIn(place, envWeatherOf(view, place)));
   return group;
 }
 
 /** Make a place's open air into `group` from its description as it is now (again, if the place is described again: envApply). */
-function envFill(group, place, view, spec) {
-  const own = PLACE_ENV[place];
+function envFill(group, place, view, spec, own) {
   const arena = view.floor ?? PLACE_ARENAS[place];
   const sun = envSunWay(own.sun);
   group.userData.envMap?.dispose();
@@ -206,8 +221,8 @@ function envApplyTier(state) {
   const parts = state.group.userData.envParts;
   if (parts.grass) envGrassQuality(parts.grass, quality.grass, quality.far);
   if (parts.trees) envTreesQuality(parts.trees, quality.cards);
-  envParticlesSet(parts.particles, PLACE_ENV[state.place].drift, state.weather, quality.particles);
-  envAirToUniforms(state.air, state.weather, quality, PLACE_ENV[state.place]);
+  envParticlesSet(parts.particles, state.own.drift, state.weather, quality.particles);
+  envAirToUniforms(state.air, state.weather, quality, state.own);
   // Shade in the air: the place's near map for what asks it, and whether each sight line is walked (envUpdate
   // gives the frame its one share where they are not).
   const u = envUniforms();
@@ -219,10 +234,11 @@ function envApplyTier(state) {
 
 /** Take the scene over for the place: the light, the haze, the far plane, the wind, the weather's share of everything. */
 export function envApply({ place, view, spec, group }) {
-  const own = PLACE_ENV[place];
-  // (A place described again since this was made, by envRegisterPlace, is made again.)
-  if (group.userData.envOf !== own) envFill(group, place, view, spec);
   const weather = envWeatherOf(view, place);
+  const own = envPlaceIn(place, weather);
+  // (A place described again since this was made, by envRegisterPlace, is made again; so is one whose day has
+  // changed with the weather: the sun's place is in the shadows laid on its land.)
+  if (group.userData.envOf !== own) envFill(group, place, view, spec, own);
   const air = envAirState(own, weather);
   const lights = view.lights;
   const st = view.lookState?.['probe-lite'];
@@ -293,7 +309,7 @@ export function envApply({ place, view, spec, group }) {
 
   // (The ground stays as wet as it was through a change of light or tier under the same weather.)
   const wet = view.env?.place === place && view.env.weather.name === weather.name ? view.env.wet : undefined;
-  view.env = { on: true, place, group, air, weather, wind, probe, sunPower, tone, shafts: 0, radius, box, fill, wet, falling: 0, time: undefined };
+  view.env = { on: true, place, own, group, air, weather, wind, probe, sunPower, tone, shafts: 0, radius, box, fill, wet, falling: 0, time: undefined };
   envUniforms().uEnvOn.value = 1;
   if (!envChosen.started) {
     // A phone or a tablet starts a tier down; the controller raises it if the frames allow.
@@ -327,7 +343,7 @@ function envDraw(view) {
   if (!state?.on) return false;
   const level = ENV.quality[envChosen.tier].post;
   envMeter(state.tone, state.air, envLookWay.x, envLookWay.z);
-  if (level > 0 && envPostDraw(view, state.tone, level, state.shafts)) return true;
+  if (level > 0 && envPostDraw(view, state.tone, level, state.shafts, state.airWalk === 'frame')) return true;
   view.renderer.toneMappingExposure = state.tone.exposure;
   return false;
 }
@@ -469,7 +485,7 @@ export function envUpdate(view, world) {
   view.camera.getWorldDirection(envLookWay);
   u.uEnvLook.value.set(envLookWay.x, envLookWay.z);
   view.lights.sun.intensity = state.sunPower * envCloudShareAt(state.air, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y);
-  const own = PLACE_ENV[state.place];
+  const own = state.own;
   const parts = state.group.userData.envParts;
   const eye = view.camera.position;
 
@@ -501,8 +517,12 @@ export function envUpdate(view, world) {
   // meter's count of the air's light, and the frame's one share where sight lines are not walked.
   const airShare = envAirShareAt(state, eye, envLookWay, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y, extinction);
   state.airShare = state.tone.airShare = airShare;
-  if (u.uEnvShade.value.w >= 0) u.uEnvShade.value.w = airShare;
-  const fogLight = 1 - ENV.air.shadeBeam * (1 - airShare);
+  // (Where each line is walked: in the frame's own pass where it can be drawn through passes, which then takes
+  // the shade's light off everything, the fighters' fog with the rest, post.js; else in the materials.)
+  const tier = ENV.quality[envChosen.tier];
+  state.airWalk = !tier.airShade ? 'none' : tier.post > 0 && envPostAble(view.renderer) ? 'frame' : 'lines';
+  u.uEnvShade.value.w = state.airWalk === 'frame' ? 1 : state.airWalk === 'lines' ? -1 : airShare;
+  const fogLight = state.airWalk === 'frame' ? 1 : 1 - ENV.air.shadeBeam * (1 - airShare);
   view.scene.fog.color.setRGB(state.air.horizon[0] * fogLight, state.air.horizon[1] * fogLight, state.air.horizon[2] * fogLight);
   // The shafts: the share of light the air scatters toward the eye over the depth of a view (what falls is part
   // of that air), of the sun there is.
