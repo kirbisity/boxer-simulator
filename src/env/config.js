@@ -7,8 +7,9 @@
 // cloud, thicker air, a harder wind, rain or snow falling, the ground wet. `envSetWeather` (index.js) puts one on.
 //
 // Units are metres, seconds, radians unless a name says otherwise. Colours are the game's display values (the
-// renderer does no colour management: looks.js), so every light sum is done in display space and the last step
-// is a shoulder curve (air.js envInstallTone), not a physical exposure.
+// renderer does no colour management: looks.js), so every light sum is done in display space, and may pass 1:
+// the frame is ended by a camera's last steps (post.js: the sums are decoded to light, exposed, bent by one
+// filmic curve and graded), so the sun can be several times the sky and neither clips.
 //
 // Where a figure is physical it says what it is and how it was reached. None of them was looked up for this work:
 // those marked "approximate" are commonly quoted values written from memory, to be checked before anything is
@@ -53,12 +54,19 @@ export const ENV = {
     sunPower: 1.0,
     skyExposure: 2.2,
     skyGamma: 1.1,
-    // The sky's light on the ground beside its picture's brightness: the picture is held down (above), the light
-    // it gives is not, as a graduated filter darkens a photograph's sky and not its land. By eye: 1.6 leaves the
-    // shaded side of a fighter where the game's own ambient light had it.
-    skyFill: 1.6,
+    // The sky's light on the ground beside its picture's brightness. 1: the ground is lit by the sky that is
+    // drawn, no more (it was 1.6 while the frame had no exposure of its own, to hold the shade up by hand). With
+    // `sunGain` this sets how much stronger sunlit ground is than shaded ground: measured outdoors under a clear
+    // sky the whole light on level ground is about 5 times the sky's alone with the sun at 30 degrees and 6 to 8
+    // near noon (approximate figures from memory: direct sun about 100 klx square-on, the clear sky's own 10 to
+    // 20 klx). What these two give here, as luminance (the display sum to the 2.2 power): 5.2 at the meadow's
+    // 30 degrees, 5.7 at the field's 34.
+    skyFill: 1.0,
     // A cloud's shaded base beside the sky's light on the ground (by eye: the slate-blue bases of the references).
     cloudBase: 0.6,
+    // The most a sunlit cloud top is drawn (display; over 1 it is rolled off by the frame's curve and spreads a
+    // little in the lens: a cumulus in the sun is the brightest thing in a landscape but the sun). By eye.
+    cloudMost: 1.6,
     // Under a full overcast the lid's thick parts are this share darker and its thin parts as much lighter
     // than its mean (by eye: a stratus base is nearly even).
     lidGrain: 0.1,
@@ -68,8 +76,8 @@ export const ENV = {
     // colour alike, which is why fog is white and distant hills on a fine day are blue).
     wavelengths: [680, 550, 440],
     // The sun's light on the ground: its colour through the air (per channel, to the 1 / 2.2 power, as a
-    // display value) times this. 1.12 by eye: with the shoulder curve a sunlit white shirt just reaches it.
-    sunGain: 1.12,
+    // display value) times this. Set with `skyFill` against the sun-to-sky ratio above.
+    sunGain: 1.25,
     // The ground's share of light thrown back up (grass and soil reflect about a fifth of what falls on them,
     // approximate): it lights the underside of things.
     bounce: 0.2,
@@ -81,15 +89,104 @@ export const ENV = {
     // (No number here: it is the same integral as the land's haze taken to infinity.)
   },
 
-  // ---- the last step: a shoulder, not a clip -----------------------------------------------------------------
+  // ---- the last steps: exposure, one filmic curve, a grade (post.js) -------------------------------------------
   tone: {
-    // Display values below `knee` are left exactly as authored (fighters, props and the interface read as
-    // before); above it they bend toward 1 and never clip: knee + (1 - knee)(1 - exp(-(x - knee)/(1 - knee))).
-    // 0.72 by eye: sunlit skin and linen sit just below it, so only the sun's glare, the cloud edges and
-    // sunlit pale grass ride the shoulder.
-    knee: 0.72,
-    // The renderer's exposure in an env place (1 = as authored).
-    exposure: 1.0,
+    // The frame's display sums are decoded to light (x ^ 2.2), multiplied by the exposure and bent by
+    //   y = gain L^n / (L^n + sigma^n)
+    // (Naka and Rushton's curve, an S on a logarithmic scale of light: how film and the retina both answer it),
+    // with sigma and gain solved so that `grey` stays where it is and light `white` times a white card's reaches
+    // the display's ceiling. n is the grade's `contrast`: at 1 it is Reinhard's curve; above 1 the darks go
+    // down faster than the lights come up (a toe). Mid-grey is 0.18 of a white card's light (the photographic
+    // convention), so colours near the middle keep their authored values and only the ends are bent.
+    grey: 0.18,
+    // The exposure is metered as a camera does it (post.js envMeter), off what the view holds: the land (a grey
+    // card's worth of the light falling on level ground, sun x sin elevation + sky, as luminance) and, through
+    // thick air, the haze's own light the way the camera looks, by the share of a sight line `view` m long that
+    // the haze fills (60 by eye: about the depth of a view across a floor to the trees; on a clear day that
+    // share is under 1 % and the land alone is metered). `meter`: how many times mid-grey that metered light is
+    // placed at (1 would put a grey card in the sun at mid-grey, where a light meter puts it; grass and earth are
+    // darker than a grey card and the references hold their pictures' middle near 0.3 to 0.4 of full scale,
+    // which 1.7 reaches: by eye). `adapt`: how much of the difference between one light and another the
+    // exposure takes up. At 1 every weather would come out as bright as every other; at 0 an overcast would be
+    // as dark as its light is. 0.7 by eye: a grey day is still a grey day.
+    meter: 1.7,
+    adapt: 0.7,
+    view: 60,
+    // The grade, where a weather does not say otherwise (ENV_WEATHER `grade`): `ev` stops over the metered
+    // exposure, `contrast` the curve's n, `saturation` (1 as the curve leaves it), `white` the light (in white
+    // cards) that just reaches the ceiling, `warmth` moved from blue to red (0.02: 2 % each way). All by eye
+    // against the two reference frames' tone ranges (their darkest 5 % under 0.13 of full scale, their median
+    // near 0.3 to 0.4, measured from the files), and so that a fighter in shade is never under about 0.15.
+    grade: { ev: 0, contrast: 1.28, saturation: 1.06, white: 6, warmth: 0 },
+  },
+
+  // ---- light past the lens: glare, shafts, the lens's own falloff (post.js) -----------------------------------
+  post: {
+    // Bloom: light over `bloomFrom` white cards (after exposure) spreads as a lens and the eye spread it, over
+    // `bloomLevels` halvings of the picture, each added back at `bloomSpread` of the one above; `bloom` of the
+    // sum is added to the frame. Only the sun, its glare, sunlit cloud edges, wet ground toward the sun and
+    // steel pass the threshold: a sunlit white wall is about 1 and does not. By eye.
+    bloomFrom: 1.15,
+    // (No light counts for more than `bloomMost` cards: a glint a pixel wide would otherwise flare and flicker.)
+    bloomMost: 24,
+    bloomLevels: 5,
+    bloomSpread: 0.85,
+    bloom: 0.11,
+    // Sun shafts: the picture's bright parts over `shaftFrom` white cards are drawn out along the lines from
+    // the sun's place on (or beyond) the screen, over `shaftReach` of the way to it in `shaftSteps` samples,
+    // fading by exp(-distance x shaftFade) (distance in picture heights). They are light scattered toward the eye
+    // by lit air, so their strength is the share of light the haze scatters over `shaftPath` m,
+    // 1 - exp(-extinction x path), times the weather's share of sun: 0.6 in the mist, under 0.01 on a clear day.
+    // The path is by eye (about the depth of a view through the trees); the rest follows from the air.
+    shaftFrom: 0.55,
+    shaftReach: 0.85,
+    shaftSteps: 28,
+    shaftFade: 1.5,
+    shaftPath: 60,
+    shafts: 0.9,
+    // The shafts fade as the sun leaves the picture and are gone with it this many half-pictures from the middle.
+    shaftOff: 2.6,
+    // A simple lens lights the film's corners less than its middle, by cos^4 of the angle off its axis (the
+    // cos-fourth law); real lenses correct most of it. This share of that falloff is drawn, by the camera's
+    // own field of view, so a wide view darkens more at the corners than a close-up. By eye.
+    vignette: 0.3,
+  },
+
+  // ---- shadows ---------------------------------------------------------------------------------------------------
+  shadow: {
+    // The sun is a disc, not a point: 1.39 million km across at 149.6 million km, 0.0093 rad. A shadow's edge is
+    // that wide per metre between what casts it and what it falls on: sharp at a foot, 3 cm soft from a head on
+    // level ground under a 30 degree sun. `soften` times that is drawn (2 by eye: the shadow map's own texels,
+    // 9 mm, would otherwise show at the sharp end), never narrower than `least` nor wider than `most` texels
+    // (the filter is 17 taps: wider than that and they show as steps).
+    sunWidth: 0.0093,
+    soften: 2,
+    least: 0.9,
+    most: 4.5,
+    // How far (texels) the map is searched for what stands between a point and the sun.
+    search: 5,
+    // Tree shade: under a crown the near map's shade is broken into flecks of sun the size of the gaps between
+    // leaves' masses (`dapple` m), moving as the crown sways (the gust where it stands, `dappleSway` m per m/s).
+    // The flecks are sharp where the shade is thin and close up as it deepens. By eye.
+    dapple: 0.55,
+    dappleSway: 0.06,
+    // The sky's light under a crown, beside open ground (a broadleaf canopy passes a few per cent of the light
+    // over it; a single tree's shade still sees the sky to its sides: 0.45 by eye), and at the foot of a wall
+    // or a stack, which hides half the sky from the ground beside it (a plane's form factor: exactly one half at
+    // the foot of a tall wall, fading over about the wall's reach; `wallReach` m by eye).
+    underCrown: 0.45,
+    atWall: 0.5,
+    wallReach: 1.4,
+    // What a body hides of the sky from the ground it stands on: each foot and the hips as a sphere of this
+    // radius (m), hiding (r / d)^2 cos(angle from straight up) of the sky's light from a point d away (the form
+    // factor of a small sphere, exact while it is clear of the horizon). `contact` times that: the legs and the
+    // trunk between the spheres hide as much again (by eye).
+    bodies: [0.11, 0.22],
+    contact: 1.6,
+    // How many spheres the shaders take: three a fighter, the four fighters nearest the camera.
+    bodyCount: 12,
+    // Grass under a foot: blades within `tread` m of one are pressed over, away from it.
+    tread: 0.3,
   },
 
   // ---- the sky's picture: a table every part of the system reads ---------------------------------------------
@@ -268,10 +365,13 @@ export const ENV = {
   // The share of each thing drawn at each quality tier (levelmode/quality.js names them; adaptres.js steps
   // down when frames run long). Blades and cards are shuffled when built, so drawing a share leaves an even
   // sprinkle; grass blades widen by 1 / sqrt(share) so the ground stays covered.
+  // `post`: the camera's last passes (post.js): 2 glare and shafts, 1 glare alone, 0 none: the frame is drawn
+  // straight to the screen and each material bends its own light by the same curve at the weather's exposure,
+  // with the default grade (no glare, no shafts, no vignette, and edges smoothed by the screen's own samples).
   quality: {
-    high: { grass: 1, far: 1, cards: 1, particles: 1, cloudShadow: true },
-    medium: { grass: 0.5, far: 0.7, cards: 0.6, particles: 0.6, cloudShadow: true },
-    low: { grass: 0.2, far: 0.4, cards: 0.3, particles: 0.35, cloudShadow: false },
+    high: { grass: 1, far: 1, cards: 1, particles: 1, cloudShadow: true, post: 2 },
+    medium: { grass: 0.5, far: 0.7, cards: 0.6, particles: 0.6, cloudShadow: true, post: 1 },
+    low: { grass: 0.2, far: 0.4, cards: 0.3, particles: 0.35, cloudShadow: false, post: 0 },
   },
 
   // ---- choosing the tier ---------------------------------------------------------------------------------------------
@@ -316,23 +416,25 @@ export const ENV_TREES = {
 // `fine` how fine the haze is (ENV.air.wavelengths),
 // `wind` times the place's speed and `gust` added to its gustiness, `wet` 0..1 of the ground, `fall` what falls
 // (a kind in ENV.particles) and how much of its count, `snow` 0..1 of the ground whitened, `tint` the haze's own
-// colour where it has one (dust).
+// colour where it has one (dust), `grade` what the weather's picture differs by from ENV.tone.grade (all by eye:
+// a clear day a little warm and full; a lid flat light, so the curve is steepened to keep a picture, and cooler
+// and greyer; mist bright and pale, held up half a stop as a camera's meter is fooled by fog, its darks left in).
 export const ENV_WEATHER = {
-  clear: { label: 'Clear', fine: 1.3, cover: null, gloom: 0, sun: 1, visibility: null, hazeHeight: null, wind: 1, gust: 0, wet: 0, fall: null, snow: 0 },
+  clear: { label: 'Clear', grade: { warmth: 0.015 }, fine: 1.3, cover: null, gloom: 0, sun: 1, visibility: null, hazeHeight: null, wind: 1, gust: 0, wet: 0, fall: null, snow: 0 },
   // Broken cloud racing over: the light comes and goes.
-  cloudy: { label: 'Broken cloud', fine: 1.3, cover: 0.62, gloom: 0.35, sun: 0.9, visibility: null, hazeHeight: null, wind: 1.3, gust: 0.1, wet: 0, fall: null, snow: 0 },
+  cloudy: { label: 'Broken cloud', grade: { contrast: 1.32 }, fine: 1.3, cover: 0.62, gloom: 0.35, sun: 0.9, visibility: null, hazeHeight: null, wind: 1.3, gust: 0.1, wet: 0, fall: null, snow: 0 },
   // A low grey lid: no shadows, flat light (the sun's share is what gets through thick stratus, a few per cent direct).
-  overcast: { label: 'Overcast', fine: 0.8, cover: 1, gloom: 0.4, sun: 0.06, visibility: 12000, hazeHeight: null, wind: 1.2, gust: 0.05, wet: 0, fall: null, snow: 0 },
+  overcast: { label: 'Overcast', grade: { contrast: 1.4, saturation: 0.94, warmth: -0.015, ev: -0.3 }, fine: 0.8, cover: 1, gloom: 0.4, sun: 0.06, visibility: 12000, hazeHeight: null, wind: 1.2, gust: 0.05, wet: 0, fall: null, snow: 0 },
   // Steady rain: visibility a few km (approximate for moderate rain), everything wet.
-  rain: { label: 'Rain', fine: 0, cover: 1, gloom: 0.65, sun: 0.03, visibility: 2600, hazeHeight: 900, wind: 1.5, gust: 0.15, wet: 1, fall: { kind: 'rain', share: 1 }, snow: 0 },
+  rain: { label: 'Rain', grade: { contrast: 1.42, saturation: 0.86, warmth: -0.03, ev: -0.5 }, fine: 0, cover: 1, gloom: 0.65, sun: 0.03, visibility: 2600, hazeHeight: 900, wind: 1.5, gust: 0.15, wet: 1, fall: { kind: 'rain', share: 1 }, snow: 0 },
   // Ground mist at dawn: a layer some tens of metres deep, the sun and the sky above it clear, the air near still.
   // (Mist is by definition visibility over 1 km and fog under; a valley's dawn fog is 100-400 m. 260 by eye, so the
   // far side of the floor is soft and the trees beyond are shapes.)
-  mist: { label: 'Mist', fine: 0.15, cover: 0.2, gloom: 0, sun: 0.85, visibility: 260, hazeHeight: 26, wind: 0.3, gust: 0, wet: 0.35, fall: null, snow: 0 },
+  mist: { label: 'Mist', grade: { contrast: 1.36, saturation: 0.9, ev: 0.2 }, fine: 0.15, cover: 0.2, gloom: 0, sun: 0.85, visibility: 260, hazeHeight: 26, wind: 0.3, gust: 0, wet: 0.35, fall: null, snow: 0 },
   // Snow driving on a hard wind: visibility under a km in moderate snow (approximate), the ground white.
-  snow: { label: 'Snow', fine: 0, cover: 1, gloom: 0.25, sun: 0.05, visibility: 700, hazeHeight: 600, wind: 1.6, gust: 0.15, wet: 0, fall: { kind: 'snow', share: 1 }, snow: 0.85 },
+  snow: { label: 'Snow', grade: { contrast: 1.3, saturation: 0.85, warmth: -0.02, ev: 0.3 }, fine: 0, cover: 1, gloom: 0.25, sun: 0.05, visibility: 700, hazeHeight: 600, wind: 1.6, gust: 0.15, wet: 0, fall: { kind: 'snow', share: 1 }, snow: 0.85 },
   // Dust lifted off dry ground by a hard wind: an ochre haze near the ground.
-  dust: { label: 'Dust', fine: 0.3, cover: 0.15, gloom: 0, sun: 0.7, visibility: 1200, hazeHeight: 120, wind: 1.8, gust: 0.2, wet: 0, fall: { kind: 'dust', share: 1 }, snow: 0, tint: 0xc9ab7a },
+  dust: { label: 'Dust', grade: { saturation: 0.95, warmth: 0.03 }, fine: 0.3, cover: 0.15, gloom: 0, sun: 0.7, visibility: 1200, hazeHeight: 120, wind: 1.8, gust: 0.2, wet: 0, fall: { kind: 'dust', share: 1 }, snow: 0, tint: 0xc9ab7a },
 };
 
 // ---- places ----------------------------------------------------------------------------------------------------------

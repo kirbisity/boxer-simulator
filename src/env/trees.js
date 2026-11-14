@@ -56,6 +56,7 @@ export function envTreeShadows(trees, sun) {
         z: tree.z - (sun[2] / flat) * up * slant,
         radius: tree.height * kind.crown.wide * (part === 0 ? 1.15 : 0.9),
         depth: 0.34,
+        over: part === 0 ? { x: tree.x, z: tree.z, radius: tree.height * kind.crown.wide * 1.3 } : null,
       });
     }
   }

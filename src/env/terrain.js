@@ -75,8 +75,11 @@ export function envSunPast(height, sun, x, y, z) {
 /**
  * The near map: a square texture over the middle of the place, ENV.terrain.mapHalf m each way.
  *   r: the land's height (m)   g: how tall grass may grow, 0..1 of the place's tallest
- *   b: the sun reaching the ground past hills, trees and buildings, 0..1   a: bare, worn earth, 0..1
- * `shadows`: [{ x, z, radius }] round shadows to lay (tree crowns, already moved to where they fall);
+ *   b: the sun reaching the ground past the hills, 0..1   a: bare, worn earth, 0..1
+ * and beside it (the texture's `envCover`, 8 bits) what stands over the ground:
+ *   r: the share of the sky a point of the ground sees   g: how much of the sun the crowns over it take
+ * `shadows`: [{ x, z, radius, depth, over }] round shadows to lay (tree crowns, already moved to where they fall;
+ * `over`: the crown itself, { x, z, radius }, on one of a tree's shadows);
  * `footprints`: [{ x, z, halfX, halfZ }] things standing on the ground that grass does not grow through.
  */
 export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, footprints }) {
@@ -151,20 +154,27 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
       }
     }
   };
-  // Crowns and roofs between the ground and the sun.
+  // Crowns between the ground and the sun (what gets past them), and between the ground and the sky.
+  const tune = ENV.shadow;
+  const cover = new Uint8Array(mapSize * mapSize * 4).fill(255);
   for (const shadow of shadows) {
     stamp(shadow.x, shadow.z, shadow.radius, shadow.radius, 0, (at, dx, dz) => {
       const inside = 1 - envSmooth(0.45, 1, Math.hypot(dx, dz) / shadow.radius);
-      values[at + 2] *= 1 - shadow.depth * inside;
+      cover[at + 1] *= 1 - shadow.depth * inside;
+    });
+    const over = shadow.over;
+    if (over) stamp(over.x, over.z, over.radius, over.radius, 0, (at, dx, dz) => {
+      cover[at] *= 1 - (1 - tune.underCrown) * (1 - envSmooth(0.3, 1.1, Math.hypot(dx, dz) / over.radius));
     });
   }
-  // What stands on the ground: no grass through it, the earth bare at its foot.
+  // What stands on the ground: no grass through it, the earth bare at its foot, half the sky hidden beside it.
   for (const print of footprints) {
-    stamp(print.x, print.z, print.halfX, print.halfZ, 1.2, (at, dx, dz) => {
+    stamp(print.x, print.z, print.halfX, print.halfZ, Math.max(1.2, tune.wallReach), (at, dx, dz) => {
       const outside = Math.hypot(Math.max(0, Math.abs(dx) - print.halfX), Math.max(0, Math.abs(dz) - print.halfZ));
       const inside = 1 - envSmooth(0, 1.2, outside);
       values[at + 1] *= 1 - inside;
       values[at + 3] = Math.max(values[at + 3], inside * 0.7);
+      cover[at] = Math.min(cover[at], 255 * (tune.atWall + (1 - tune.atWall) * envSmooth(0, tune.wallReach, outside)));
     });
   }
   const half = new Uint16Array(values.length);
@@ -174,14 +184,49 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
   texture.generateMipmaps = false;
   texture.needsUpdate = true;
+  for (let at = 1; at < cover.length; at += 4) cover[at] = 255 - cover[at];
+  const over = new THREE.DataTexture(cover, mapSize, mapSize, THREE.RGBAFormat);
+  over.magFilter = over.minFilter = THREE.LinearFilter;
+  over.generateMipmaps = false;
+  over.needsUpdate = true;
+  texture.envCover = over;
   return texture;
 }
 
 // ---- shared GLSL: the near map and the lighting every env surface uses ------------------------------------------------
 
-/** Reads of the near map, for the ground and the grass: envMap(xz) -> vec4 (see envBuildNearMap), envInMap(xz) -> 0..1. */
+/**
+ * Reads of the near map, for the ground and the grass: envMap(xz) -> vec4 (see envBuildNearMap), envInMap(xz) -> 0..1,
+ * envCover(xz) -> x: the share of the sky seen from the ground there, y: the sun past the crowns over it, which is
+ * flecks of sun the size of the gaps in the leaves, sharp in thin shade and few in deep, moving as the gust
+ * there moves the crown; envBodies(ground) -> xy: which way and how far grass there is pressed over by what
+ * stands or lies on it, z: the share of the sky the bodies over it leave it (ENV.shadow).
+ */
 export const ENV_GLSL_MAP = /* glsl */ `
 uniform sampler2D uEnvMap;
+uniform sampler2D uEnvCover;
+uniform vec4 uEnvBodies[${ENV.shadow.bodyCount}];
+vec2 envCover(vec2 xz) {
+  vec4 over = texture2D(uEnvCover, xz / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5);
+  if (over.g < 0.004) return vec2(over.r, 1.0);
+  vec2 p = xz + uEnvWind.xy * envGust(xz) * ${ENV.shadow.dappleSway.toFixed(3)};
+  float gaps = texture2D(uEnvNoise, p / ${(ENV.shadow.dapple * 16).toFixed(2)}).g * 0.6 + texture2D(uEnvNoise, p / ${(ENV.shadow.dapple * 5.3).toFixed(2)} + 0.37).a * 0.4;
+  float least = 0.5 + (over.g - 0.5) * 0.62;
+  return vec2(over.r, 1.0 - min(over.g * 2.5, 1.0) * (1.0 - smoothstep(least - 0.03, least + 0.05, gaps)));
+}
+vec3 envBodies(vec3 ground) {
+  vec3 by = vec3(0.0);
+  for (int i = 0; i < ${ENV.shadow.bodyCount}; i++) {
+    vec4 body = uEnvBodies[i];
+    vec3 to = body.xyz - ground;
+    float d2 = dot(to, to) + 1e-4;
+    by.z += body.w * body.w * max(to.y, 0.0) / (d2 * sqrt(d2));
+    float level = length(to.xz);
+    by.xy -= to.xz / max(level, 1e-3) * (1.0 - smoothstep(body.w, body.w + ${ENV.shadow.tread.toFixed(2)}, level)) * (1.0 - smoothstep(0.15, 0.4, to.y));
+  }
+  by.z = 1.0 - min(by.z * ${ENV.shadow.contact.toFixed(2)}, 0.92);
+  return by;
+}
 vec4 envMap(vec2 xz) {
   return texture2D(uEnvMap, xz / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5);
 }
@@ -213,6 +258,36 @@ export const ENV_GLSL_SHADOW_FRAGMENT = /* glsl */ `
 #include <lights_pars_begin>
 #include <shadowmap_pars_fragment>
 #include <shadowmask_pars_fragment>`;
+
+let envShadowInstalled = false;
+
+/**
+ * Teach the renderer's filtered shadow (every material's, by its shader chunk) the sun's width: a light whose
+ * shadow radius is negative has the map searched round each point for what stands between it and the light, and
+ * the filter made as wide as that is far (ENV.shadow): sharp at a foot, soft from a head. -radius is texels of
+ * blur per unit of the map's depth (index.js sets the sun's). Lights with a radius of 0 or more are filtered as
+ * before, so nothing changes in a place that does not ask.
+ */
+export function envInstallShadow() {
+  if (envShadowInstalled) return;
+  envShadowInstalled = true;
+  const tune = ENV.shadow;
+  const at = 'vec2 texelSize = vec2( 1.0 ) / shadowMapSize;';
+  const search = `${at}
+    if ( shadowRadius < 0.0 ) {
+      vec2 envMet = vec2( 0.0 );
+      float envTurn = 6.2832 * fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
+      for ( int i = 0; i < 8; i ++ ) {
+        float envAt = envTurn + float( i ) * 2.4;
+        float envDepth = unpackRGBAToDepth( texture2D( shadowMap, shadowCoord.xy + vec2( cos( envAt ), sin( envAt ) ) * texelSize * ${tune.search.toFixed(1)} * sqrt( ( float( i ) + 0.5 ) / 8.0 ) ) );
+        if ( envDepth < shadowCoord.z ) envMet += vec2( envDepth, 1.0 );
+      }
+      shadowRadius = envMet.y > 0.0 ? clamp( ( shadowCoord.z - envMet.x / envMet.y ) * - shadowRadius, ${tune.least.toFixed(2)}, ${tune.most.toFixed(2)} ) : ${tune.least.toFixed(2)};
+    }`;
+  const chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
+  if (!chunk.includes(at)) console.warn('env: the renderer has no filtered shadow to widen; shadows keep one edge');
+  THREE.ShaderChunk.shadowmap_pars_fragment = chunk.replace(at, search);
+}
 
 /** The uniforms a material needs for that (with `lights: true`), beside its own. */
 export const envShadowUniforms = () => THREE.UniformsUtils.clone(THREE.UniformsLib.lights);
@@ -289,9 +364,10 @@ void main() {
   float wet = uEnvWet.x;
   colour *= 1.0 - wet * (1.0 - ${ENV.terrain.wetDarken.toFixed(2)}) * mix(0.35, 1.0, worn);
 
-  float sunShare = shade * envSunShare(vWorld) * getShadowMask();
+  vec2 over = mix(vec2(1.0), envCover(xz), inMap);
+  float sunShare = shade * over.y * envSunShare(vWorld) * getShadowMask();
   float facing = max(dot(normal, uEnvSunDir), 0.0);
-  vec3 light = uEnvSunColour * facing * sunShare + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * normal.y);
+  vec3 light = uEnvSunColour * facing * sunShare + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * normal.y) * over.x * (near > 0.0 ? envBodies(vWorld).z : 1.0);
   colour *= light;
 
   vec3 view = normalize(vWorld - cameraPosition);
@@ -386,6 +462,7 @@ export function envBuildTerrain({ place, height, sun, map }) {
       ...envShadowUniforms(),
       ...envUniforms(),
       uEnvMap: map,
+      uEnvCover: map.cover,
       uGrass: { value: new THREE.Color(ground.grass) },
       uDry: { value: new THREE.Color(ground.dry) },
       uSoil: { value: new THREE.Color(ground.soil) },

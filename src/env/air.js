@@ -1,5 +1,5 @@
 // The light of an open-air place (src/env/): the sun through the air, the sky that air makes of it, the haze
-// between the eye and the land, and the shoulder curve the frame ends with. One model on the processor
+// between the eye and the land, and the curve a frame without a last pass ends with. One model on the processor
 // (envSkyRadiance) is baked to a small table of sky colour by direction; the dome draws the table, the haze
 // takes its horizon row for the light scattered into a long sight line, and the fighters' light probe is its
 // sum, so sky, haze and ambient light are one thing seen three ways and follow the hour and the weather together.
@@ -8,6 +8,7 @@
 
 import { ENV } from './config.js';
 import { envNoiseTexture } from './noise.js';
+import { ENV_GLSL_FILM, envToneOf } from './post.js';
 
 const ENV_DEG = Math.PI / 180;
 
@@ -130,7 +131,7 @@ export function envAirState(place, weather) {
   // The ground's own light thrown back up, for the underside of things.
   air.bounce = air.skyLight.map((value, channel) => tune.bounce * (value + air.sunColour[channel] * sun[1]));
   // A cloud in the sun and a cloud's shaded base.
-  air.cloudLit = air.sunColour.map((value, channel) => Math.min(1.25, 0.72 * value / Math.max(0.05, weather.sun) * Math.max(weather.sun, 0.45) + 0.42 * air.skyLight[channel]));
+  air.cloudLit = air.sunColour.map((value, channel) => Math.min(tune.cloudMost, 0.72 * value / Math.max(0.05, weather.sun) * Math.max(weather.sun, 0.45) + 0.42 * air.skyLight[channel]));
   // A cloud's base: lit by the sky round it and the land under it, greyer than either.
   const skyMean = (air.skyLight[0] + air.skyLight[1] + air.skyLight[2]) / 3;
   air.cloudDark = air.skyLight.map((value) => (0.55 * skyMean + 0.45 * value) * tune.cloudBase * (1.15 - 0.8 * weather.gloom));
@@ -209,6 +210,8 @@ export const ENV_UNIFORMS = {
   uEnvDry: { value: 0 },
   // The way the camera looks, level (x, z; unit, or zero looking straight down): what follows the camera is laid out ahead of it.
   uEnvLook: { value: null },
+  // What stands on the ground nearest the camera, as spheres: xyz a centre, w its radius (0: none). index.js envUpdate.
+  uEnvBodies: { value: [] },
 };
 
 /** Fill the uniforms' values in (the first use needs THREE). */
@@ -231,6 +234,7 @@ export function envUniforms() {
   u.uEnvCloudDark.value = new THREE.Vector3(0.5, 0.5, 0.5);
   u.uEnvWet.value = new THREE.Vector2(0, 0);
   u.uEnvLook.value = new THREE.Vector2(0, 0);
+  for (let at = 0; at < ENV.shadow.bodyCount; at += 1) u.uEnvBodies.value.push(new THREE.Vector4(0, 0, 0, 0));
   return u;
 }
 
@@ -343,26 +347,26 @@ float envGust(vec2 xz) {
 }
 `;
 
-// ---- the shoulder -----------------------------------------------------------------------------------------------------
+// ---- the curve, where the frame has no last pass ---------------------------------------------------------------------
 
 let envToneInstalled = false;
 
 /**
- * Give the renderer's spare tone-mapping slot (THREE.CustomToneMapping, which nothing else uses) the shoulder curve
- * of ENV.tone. Display values below the knee pass unchanged, so the colours the game is authored in keep their
- * meaning; above it they approach 1 without clipping.
+ * Give the renderer's spare tone-mapping slot (THREE.CustomToneMapping, which nothing else uses) the frame's curve
+ * (post.js ENV_GLSL_FILM) at the default grade, the renderer's exposure the camera's. A negative exposure leaves
+ * the light sums as they are: the frame is then drawn to a target and bent by the last pass (post.js envPostDraw).
  */
 export function envInstallTone() {
   if (envToneInstalled) return;
   envToneInstalled = true;
-  const knee = ENV.tone.knee.toFixed(3);
-  const curve = `vec3 CustomToneMapping( vec3 color ) {
-    color *= toneMappingExposure;
-    vec3 over = max(color - ${knee}, 0.0) / (1.0 - ${knee});
-    return min(color, vec3(${knee})) + (1.0 - ${knee}) * (1.0 - exp(-over));
+  const tone = envToneOf({ sunColour: [1, 1, 1], sun: [0, 1, 0], skyLight: [0, 0, 0], extinction: 0 }, {});
+  const curve = `${ENV_GLSL_FILM}
+  vec3 CustomToneMapping( vec3 color ) {
+    if ( toneMappingExposure < 0.0 ) return color;
+    return envFilm( pow( max( color, 0.0 ), vec3( 2.2 ) ) * toneMappingExposure, vec4( 1.0, ${tone.contrast.toFixed(3)}, ${tone.sigma.toFixed(4)}, ${tone.gain.toFixed(4)} ), vec2( ${tone.saturation.toFixed(3)}, ${tone.warmth.toFixed(3)} ) );
   }`;
   const chunk = THREE.ShaderChunk.tonemapping_pars_fragment;
   const replaced = chunk.replace(/vec3 CustomToneMapping\s*\(\s*vec3 color\s*\)\s*\{[^}]*\}/, curve);
-  if (replaced === chunk) console.warn('env: the renderer has no CustomToneMapping to replace; highlights will clip');
+  if (replaced === chunk) console.warn('env: the renderer has no CustomToneMapping to replace; the picture will be flat');
   THREE.ShaderChunk.tonemapping_pars_fragment = replaced;
 }

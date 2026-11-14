@@ -55,7 +55,9 @@ void main() {
   float shiver = sin(uEnvTime * (3.1 + 2.7 * r3) + r2 * 40.0) * 0.07 * min(speed * 0.35, 1.6);
   float turn = r2 * 6.2831853;
   vec2 rest = vec2(cos(turn), sin(turn)) * ${ENV.grass.lean.toFixed(2)} * (0.4 + r3);
-  vec2 lean = rest + uEnvWind.xy * (bend * (0.75 + 0.5 * r3) + shiver);
+  // What stands on it presses it over, away from the foot.
+  vec3 bodies = envBodies(vec3(xz.x, map.r, xz.y));
+  vec2 lean = rest + uEnvWind.xy * (bend * (0.75 + 0.5 * r3) + shiver) + bodies.xy * 1.2;
   float over = min(length(lean), 0.96);
   lean = lean / max(length(lean), 1e-4) * over;
 
@@ -84,9 +86,10 @@ void main() {
   vec3 view = normalize(world - cameraPosition);
   float facing = 0.35 + 0.65 * max(dot(normal, uEnvSunDir), 0.0);
   float through = pow(max(dot(view, uEnvSunDir), 0.0), 3.0) * ${ENV.grass.through.toFixed(2)} * t;
-  float sunShare = map.b * envSunShare(world);
+  vec2 cover = envCover(xz);
+  float sunShare = map.b * cover.y * envSunShare(world);
   vec3 sunLight = uEnvSunColour * (facing + through) * sunShare;
-  vec3 skyLight = mix(uEnvBounce, uEnvSkyLight, 0.55 + 0.45 * t) + uEnvSkyLight * ${ENV.grass.sheen.toFixed(2)} * over * t;
+  vec3 skyLight = (mix(uEnvBounce, uEnvSkyLight, 0.55 + 0.45 * t) + uEnvSkyLight * ${ENV.grass.sheen.toFixed(2)} * over * t) * cover.x * bodies.z;
 
   // The haze, worked here once a vertex: the lit part and the rest, so the fragment only applies the shadow.
   vec3 ray = world - cameraPosition;
@@ -158,6 +161,7 @@ export function envBuildGrass({ place, map }) {
         ...envShadowUniforms(),
         ...envUniforms(),
         uEnvMap: map,
+        uEnvCover: map.cover,
         uLayer: { value: new THREE.Vector4(layer.tile, layer.width, layer.tall, inner) },
         uBlades: { value: new THREE.Vector4(grass.height[0], grass.height[1], order === 0 ? 0 : grass.flowers, Math.min(0.85, 0.35 + 0.25 * order)) },
         uRoot: { value: layer.root },

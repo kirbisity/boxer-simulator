@@ -21,10 +21,11 @@ import { ENV, ENV_WEATHER, PLACE_ENV } from './config.js';
 import { envAirState, envAirToUniforms, envInstallTone, envSkyAt, envUniforms } from './air.js';
 import { envNoiseAt } from './noise.js';
 import { envBuildSky } from './sky.js';
-import { envBuildNearMap, envBuildTerrain, envHeightField, envSunPast } from './terrain.js';
+import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, envSunPast } from './terrain.js';
 import { envBuildGrass, envGrassQuality } from './grass.js';
 import { envBuildTrees, envPlantTrees, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBuildParticles, envParticlesPixel, envParticlesSet } from './particles.js';
+import { envMeter, envPostDraw, envToneOf } from './post.js';
 import { activeLook } from '../looks.js';
 import { hidePaintedSky, setRenderer } from '../looks/kit.js';
 import { probeLiteProject } from '../looks/probe-lite.js';
@@ -110,6 +111,7 @@ export function envBuild({ place, view, spec }) {
   const footprints = envFootprints(view.places[place]);
   const trees = envPlantTrees({ place: own, height, sun, keepOut, footprints });
   const map = { value: envBuildNearMap({ place: own, height, sun, keepOut, floor: [arena.halfX, arena.halfZ], shadows: envTreeShadows(trees, sun), footprints }) };
+  map.cover = { value: map.value.envCover };
   const group = new THREE.Group();
   const parts = {
     sky: envBuildSky(),
@@ -143,9 +145,12 @@ export function envApply({ place, view, group }) {
   const lights = view.lights;
   const st = view.lookState?.['probe-lite'];
 
-  // The frame ends in the shoulder curve, here only (looks.js resets the renderer when the place is lit again).
+  // The frame ends as a camera's does (post.js), here only (looks.js resets the renderer when the place is lit again).
+  const tone = envToneOf(air, weather);
   envInstallTone();
-  setRenderer(view, { toneMapping: THREE.CustomToneMapping, toneMappingExposure: ENV.tone.exposure });
+  envInstallShadow();
+  setRenderer(view, { toneMapping: THREE.CustomToneMapping });
+  view.drawOver = envDraw;
 
   // One sky: the look's dome and the painted ones stand down, and the fighters' ambient light is this sky's.
   if (st?.dome) st.dome.visible = false;
@@ -165,6 +170,10 @@ export function envApply({ place, view, group }) {
   lights.sun.intensity = sunPower;
   lights.sun.position.set(air.sun[0], air.sun[1], air.sun[2]).multiplyScalar(14);
   lights.sun.target.position.set(0, 0, 0);
+  // The sun's width in its shadow (terrain.js envInstallShadow): texels of blur per unit of the shadow map's depth.
+  const shadow = lights.sun.shadow;
+  const radius = view.env?.on ? view.env.radius : shadow.radius;
+  shadow.radius = -((shadow.camera.far - shadow.camera.near) * ENV.shadow.sunWidth * ENV.shadow.soften) / ((shadow.camera.right - shadow.camera.left) / shadow.mapSize.x);
 
   // What is not drawn by an env shader (fighters, props) is hazed by the renderer's fog: exponential-squared is the
   // one it has, set to agree with the haze at ENV.air.fogMatch m, about the far side of a floor.
@@ -185,7 +194,9 @@ export function envApply({ place, view, group }) {
   view.clothWindBase = null;
   view.windBase = null;
 
-  view.env = { on: true, place, group, air, weather, wind, probe, sunPower };
+  // The shafts: the share of light the haze scatters toward the eye over the depth of a view, of the sun there is.
+  const shafts = ENV.post.shafts * weather.sun * (1 - Math.exp(-air.extinction * ENV.post.shaftPath));
+  view.env = { on: true, place, group, air, weather, wind, probe, sunPower, tone, shafts, radius };
   if (!envChosen.started) {
     // A phone or a tablet starts a tier down; the controller raises it if the frames allow.
     envChosen.started = true;
@@ -199,10 +210,23 @@ export function envApply({ place, view, group }) {
 export function envLeave(view) {
   if (!view.env?.on) return;
   view.env.on = false;
+  view.drawOver = null;
+  view.lights.sun.shadow.radius = view.env.radius;
   view.scene.remove(view.env.probe);
   setWindOver(null);
   view.clothWindBase = null;
   view.windBase = null;
+}
+
+/** The view's frame (looks.js drawFrame asks): through the camera's last passes where the tier has them and the device can. */
+function envDraw(view) {
+  const state = view.env;
+  if (!state?.on) return false;
+  const level = ENV.quality[envChosen.tier].post;
+  envMeter(state.tone, state.air, envLookWay.x, envLookWay.z);
+  if (level > 0 && envPostDraw(view, state.tone, level, state.shafts)) return true;
+  view.renderer.toneMappingExposure = state.tone.exposure;
+  return false;
 }
 
 /** The gust pattern at a point of the ground and a moment (air.js envGust, on the processor): the local speed over the mean. */
@@ -246,6 +270,21 @@ export function envUpdate(view, world) {
   view.camera.getWorldDirection(envLookWay);
   u.uEnvLook.value.set(envLookWay.x, envLookWay.z);
   view.lights.sun.intensity = state.sunPower * envCloudShareAt(state.air, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y);
+  // What stands on the ground, for the shade at its feet and the grass under them: the fighters nearest the camera.
+  const bodies = u.uEnvBodies.value;
+  const [foot, hips] = ENV.shadow.bodies;
+  let filled = 0;
+  if (world?.fighters) {
+    const eye = view.camera.position;
+    const near = world.fighters.filter((fighter) => fighter?.x?.length >= 45).map((fighter) => ({ x: fighter.x, far: Math.hypot(fighter.x[24] - eye.x, fighter.x[26] - eye.z) })).sort((a, b) => a.far - b.far);
+    for (const { x } of near.slice(0, bodies.length / 3)) {
+      // (body.js: the hips are particle 8, the feet 13 and 14.)
+      bodies[filled++].set(x[39], x[40], x[41], foot);
+      bodies[filled++].set(x[42], x[43], x[44], foot);
+      bodies[filled++].set(x[24], x[25], x[26], hips);
+    }
+  }
+  for (; filled < bodies.length; filled += 1) bodies[filled].w = 0;
   envParticlesPixel(state.group.userData.envParts.particles, (view.camera.fov * Math.PI) / 180, view.renderer.domElement.height);
 }
 
