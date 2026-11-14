@@ -1556,7 +1556,7 @@ html:lang(zh) :is(em, i, .set-blurb, .story-line.story-tale, .lg-hero-words smal
 /* ==== The catalogue's shared parts =====================================================================================
    What every screen is made of, set from the tokens at the top: the page, a control, a plate (a choice), a screen's head and
    its rule. They come after the screens' own rules above, which place things; these say how they look. */
-html, body { font-variant-numeric: lining-nums; -webkit-font-smoothing: antialiased; }
+html, body { -webkit-font-smoothing: antialiased; }
 ::selection { background: rgba(var(--gilt), 0.35); }
 * { scrollbar-width: thin; scrollbar-color: rgba(var(--ink), 0.22) transparent; }
 /* The rule under a head: a hairline with a lozenge at its middle (a mask, so it takes any colour). */
@@ -1647,3 +1647,68 @@ html:lang(zh) .replay-intro, html:lang(zh) .screen-head .back, html:lang(zh) .si
   .choices.home-choices .choice { padding: 10px 14px; gap: 12px; }
   .choices.home-choices .choice .note { display: none; }
 }
+
+/* ---- Titles and figures ----
+   A title in the book face is set as a book sets it: mixed case, the semibold, no tracking. The few lines cut like an inscription
+   (the intro's, a death, a boss's name, a wave's toast) keep their capitals. A figure in the book face is a lining one, in columns. */
+.banner p, .sheet h1, .level b, .side h2, .matchup, .wizard-panel h1, .dw-name b, .tutorial-card .title, .side-pick h2, .side-pick .side b, .intro-caption b, .story-note h2, .bench-head h1, .story-info b, .muster-head h1, .custom-head h1, .lg-hero-words b, .lg-menu-board h2, .lg-end-card h2, .style-info b { text-transform: none; letter-spacing: 0.005em; font-weight: 600; }
+/* (The `font` shorthand puts a face's figures back to its own, and the book face's own are old-style: so lining figures are set on
+   everything, for good; a counter that ticks asks for the columns by the feature.) */
+*, ::before, ::after { font-variant-numeric: lining-nums !important; }
+.clock, .lg-hud b, .lg-figure b, .lg-score-figure b, .tutorial-card .tick { font-feature-settings: 'tnum'; }
+html:lang(zh) :is(.banner p, .sheet h1, .level b, .side h2, .matchup, .wizard-panel h1, .dw-name b, .tutorial-card .title, .side-pick h2, .side-pick .side b, .story-info b, .muster-head h1, .custom-head h1, .lg-hero-words b, .lg-menu-board h2, .lg-end-card h2, .style-info b, .screen-head h1, .choice b) { font-weight: 700; letter-spacing: 0.04em; }
+
+/* ---- The fight's head-up display ----
+   Where it was and no larger: nothing behind the cards but the fight. A name in the label face, its corner's colour as a rule
+   beside it; hairline bars; what is measured in the measuring face; the clock a small square plate. */
+.card .top { font: 600 16px/1.2 var(--display); letter-spacing: 0.07em; align-items: baseline; }
+.card.red .top, .card.blue .top { border-left-width: 3px; padding-left: 8px; }
+.card .kd { font: 500 12px var(--mono); letter-spacing: 0.04em; }
+.bar { height: 5px; border-radius: 0; box-shadow: inset 0 0 0 1px rgba(var(--ink), 0.3), 0 1px 3px rgba(var(--pit), 0.6); }
+.meta { font: 10.5px/1.35 var(--mono); letter-spacing: 0.01em; color: rgba(var(--ink), 0.66); }
+.clock { font: 600 26px/1 var(--title); font-feature-settings: 'tnum'; background: rgba(var(--pit), 0.72); border: 1px solid var(--line-strong); border-radius: var(--r); padding: 6px 13px 5px; min-width: 2.6em; text-align: center; }
+.log { gap: 2px; }
+.log li { background: rgba(var(--pit), 0.74); border-radius: 0; border-left: 1px solid var(--line-strong); padding: 3px 9px; color: rgba(var(--ink), 0.82); }
+.log li.big { border-left: 2px solid var(--gold); background: rgba(var(--pit), 0.86); }
+.controls button, .controls .seg button { font: 600 12.5px var(--display); letter-spacing: 0.09em; text-transform: uppercase; }
+.controls > button, .controls .seg { background: rgba(var(--pit), 0.6); }
+.controls button.primary { background: var(--gold); }
+html:lang(zh) .controls button, html:lang(zh) .card .top { letter-spacing: 0.03em; }
+html:lang(zh) .controls button { font-size: 13px; }
+
+/* The verdict: a plate across the middle, ruled above and below in gilt, the line in the book face, the rule, then what next. */
+.banner { background: rgba(var(--pit), 0.88); border: 0; border-top: 1px solid rgba(var(--gilt), 0.7); border-bottom: 1px solid rgba(var(--gilt), 0.7); border-radius: 0; padding: 22px 44px 20px; min-width: min(420px, 86vw); box-shadow: 0 18px 60px rgba(var(--pit), 0.55); }
+.banner p { font: 600 clamp(26px, 3.6vw, 40px)/1.08 var(--title); margin: 0 0 4px; text-wrap: balance; }
+.banner p::after { content: ''; display: block; width: min(220px, 60%); height: 9px; margin: 12px auto 14px; background: var(--gold); opacity: 0.85; -webkit-mask: var(--rule-mask); mask: var(--rule-mask); }
+.banner-actions button { font: 600 13px var(--display); letter-spacing: 0.1em; text-transform: uppercase; min-height: 40px; padding: 8px 18px; }
+html:lang(zh) .banner-actions button { letter-spacing: 0.04em; font-size: 14px; }
+
+/* ---- Deadliest Warrior: the two plates of a spread, one over the other ----
+   Each corner a plate ruled in its colour down the side, its factions as tabs along the top, the man on his card, his name and his
+   kit under him; between them the VS on the fold's rule, and the one gilt button. */
+.dw-side { border-radius: var(--r-plate); border: 1px solid var(--line); }
+.dw-side.red { background: linear-gradient(90deg, rgba(214, 68, 47, 0.16), rgba(var(--pit), 0.5) 42%); border-left: 2px solid var(--red); }
+.dw-side.blue { background: linear-gradient(90deg, rgba(76, 130, 216, 0.17), rgba(var(--pit), 0.5) 42%); border-left: 2px solid var(--blue); }
+.dw-corner { font: 600 12px var(--display); letter-spacing: 0.24em; }
+.dw-side.blue .dw-corner { color: #7ea6ea; }
+.dw-card { border-width: 1px; border-color: var(--line); background: #1d1a15; }
+.dw-name { gap: 3px; }
+.dw-name b { font: 600 clamp(21px, 3vw, 29px)/1.05 var(--title); }
+.dw-name .dw-stars { color: var(--gold); letter-spacing: 3px; font-size: 0.9em; }
+.dw-name span { font-size: 12.5px; }
+.dw-arrow { background: rgba(var(--pit), 0.5); font-family: var(--title); }
+.dw-mount, .dw-own { font: 600 11.5px var(--display); letter-spacing: 0.08em; text-transform: uppercase; }
+.dw-mount.on { background: rgba(var(--gilt), 0.2); color: var(--fg); }
+.dw-middle { position: relative; gap: 22px; }
+.dw-middle::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: linear-gradient(90deg, transparent, rgba(var(--gilt), 0.5) 20%, rgba(var(--gilt), 0.5) 80%, transparent); z-index: -1; }
+.dw-vs { font: italic 600 24px var(--title); letter-spacing: 0.04em; background: var(--bg); padding: 0 12px; }
+.dw-fight { padding: 10px 44px; font: 700 15px var(--display); letter-spacing: 0.16em; text-transform: uppercase; box-shadow: 0 0 0 4px var(--bg); }
+html:lang(zh) .dw-fight, html:lang(zh) .dw-mount, html:lang(zh) .dw-own { letter-spacing: 0.06em; }
+html:lang(zh) .dw-vs { font-style: italic; }
+
+/* ---- The battles: a wall of plates, each a picture, its date in the measuring face and its name in the book face ---- */
+.level-setup { font: 600 11.5px var(--display); letter-spacing: 0.08em; text-transform: uppercase; }
+.info-btn { border-radius: 50%; font: italic 600 15px/1 var(--title); }
+.info-pop-card { border-radius: var(--r-plate); border-color: var(--line-strong); padding: 18px 18px 16px; }
+.info-pop-close { border-radius: var(--r); }
+.info-pop { backdrop-filter: none; background: rgba(var(--pit), 0.8); }
