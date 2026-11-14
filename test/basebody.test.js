@@ -52,13 +52,14 @@ test('the reference build gets the base mesh as modelled: every point where the 
     const { sources } = placeBaseBody(rig, baseParts, () => 1, H, 0, placed.skin, placed.reach);
     let worst = 0;
     // (All but the arms: the upper arm drawn to the game's length, the forearm out to its hand, basebody.js baseBindJoints. The
-    // legs and the neck run at the game's lengths too, a few millimetres off the model's.)
+    // legs and the neck run at the game's lengths too, a few millimetres off the model's: the neck's top 6 mm, the head's joint
+    // standing higher over the neck's than the model's does, body.js NECK_RISE.)
     const arm = (index) => /Upper$|Fore$/.test(data.parts[index]);
     for (let vertex = 0; vertex < data.count; vertex += 1) {
       if (arm(data.part[vertex]) || (data.blend[vertex] > 0 && arm(data.part2[vertex]))) continue;
       worst = Math.max(worst, Math.hypot(...[0, 1, 2].map((axis) => sources[vertex * 3 + axis] - data.positions[vertex * 3 + axis] * H)));
     }
-    assert.ok(worst < 0.004, `${sex}: a point lands ${(worst * 1000).toFixed(2)} mm from where it was modelled`);
+    assert.ok(worst < 0.007, `${sex}: a point lands ${(worst * 1000).toFixed(2)} mm from where it was modelled`);
   }
 });
 

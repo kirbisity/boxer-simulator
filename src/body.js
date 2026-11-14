@@ -44,6 +44,10 @@ const LENGTH = {
   ankle: 0.039, shank: 0.246, thigh: 0.245, trunk: 0.27, neckToHead: 0.115,
   hipSpan: 0.1, headRadius: 0.055,
 };
+// How much higher the head's joint stands over the neck's than that table's neckToHead puts it, a fraction of standing height
+// (10 mm on a man of 1.75 m): a longer neck. A build with a neck of its own (the apes) keeps it. The head's segment is as
+// heavy as it was and as thick as on the table's length (its radii: the neck's capsule).
+const NECK_RISE = 0.0057;
 // The arms and shoulders, fractions of standing height, one table per sex (2026-11-11: "size down the entire
 // shoulder and arm assembly"; set to the numbers given). The figures now are the base models' own (src/basebody-data.js
 // joints): `upperArm` the shoulder joint to the elbow (male 0.1775, female 0.1623); `forearmToFist` the elbow to the point the
@@ -996,6 +1000,8 @@ export function buildBody(rawInputs) {
   const lengths = {};
   const own = { ...LENGTH, ...ARM_LENGTHS[inputs.sex === 'female' ? 'female' : 'male'] };
   for (const [key, fraction] of Object.entries(own)) lengths[key] = (build?.lengths?.[key] ?? fraction) * heightM;
+  const neckRise = build?.lengths?.neckToHead === undefined ? NECK_RISE * heightM : 0;
+  lengths.neckToHead += neckRise;
   lengths.hipSpan *= frame.width;
   lengths.shoulderSpan *= frame.width * (1 + 0.06 * inputs.training);
 
@@ -1020,7 +1026,7 @@ export function buildBody(rawInputs) {
     };
     const length = kind === 'head' ? lengths.neckToHead : kind === 'trunk' ? lengths.trunk : lengths[kind === 'forearm' ? 'forearmToFist' : kind];
     const volume = (tissueKey) => tissue[tissueKey] / DENSITY[tissueKey];
-    const radiusFor = (litres) => Math.sqrt(litres / (Math.PI * length));
+    const radiusFor = (litres) => Math.sqrt(litres / (Math.PI * (kind === 'head' ? length - neckRise : length)));
     segments[key] = {
       kind, length, tissue,
       mass: tissue.muscle + tissue.bone + tissue.fat + tissue.other,
