@@ -161,6 +161,27 @@ html:not(:lang(zh)) #story-layer .sv-line.finale { font-size: clamp(19px, 2.5vw,
 html:not(:lang(zh)) #story-layer .sv-line.letter { font-size: clamp(19px, 2.4vw, 22px); }
 #story-layer .sv-page h2, #story-layer .sv-label, #story-layer .sv-hud b { font-family: var(--display); font-weight: 600; }
 @media (max-width: 520px) { html:not(:lang(zh)) #story-layer .sv-text { font-size: 19px; } html:not(:lang(zh)) #story-layer .sv-seg button { font-size: 15px; } html:not(:lang(zh)) #story-layer .sv-note, html:not(:lang(zh)) #story-layer .sv-hud { font-size: 14px; } }
+#story-layer .sv-screen h1::after { content: ''; display: block; width: min(300px, 62%); height: 9px; margin: 0.28em auto 0; background: var(--gold); opacity: 0.85; -webkit-mask: var(--rule-mask); mask: var(--rule-mask); }
+/* A desk's screen: the page composed for it, the type a step up, the card wider. */
+@media (min-width: 900px) and (min-height: 640px) {
+  #story-layer .sv-screen { gap: 18px; }
+  #story-layer .sv-screen h1 { font-size: clamp(72px, 7.6vw, 116px); }
+  #story-layer .sv-screen p { font-size: 21px; }
+  #story-layer .sv-buttons { width: min(460px, 100%); gap: 12px; margin-top: 22px; }
+  #story-layer button.sv-go { padding: 16px 22px; font-size: 20px; }
+  #story-layer .sv-card { width: min(800px, 100%); padding: 26px 32px 24px; }
+  #story-layer .sv-kicker { font-size: 13.5px; margin-bottom: 12px; }
+  #story-layer .sv-text { font-size: 21.5px; margin-bottom: 18px; }
+  #story-layer .sv-choices { gap: 10px; }
+  #story-layer .sv-page article { width: min(740px, 100%); }
+  #story-layer .sv-page p { font-size: 19px; }
+  #story-layer .sv-lang button { font-size: 15px; padding: 7px 13px; }
+  html:not(:lang(zh)) #story-layer .sv-screen p { font-size: 24px; }
+  html:not(:lang(zh)) #story-layer button.sv-go { font-size: 22.5px; }
+  html:not(:lang(zh)) #story-layer .sv-text { font-size: 25px; line-height: 1.45; }
+  html:not(:lang(zh)) #story-layer .sv-page p { font-size: 21.5px; }
+  html:not(:lang(zh)) #story-layer .sv-lang button { font-size: 17px; }
+}
 `;
 
 const svEl = (tag, { dataset = null, ...props } = {}, ...children) => {
