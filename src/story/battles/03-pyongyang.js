@@ -97,7 +97,9 @@ export const pyongyangBattle = {
   n: 3,
   year: PYONGYANG_1593.year,
   title: { zh: '平壤登城', en: 'The walls of Pyongyang' },
-  view: { scene: 'sengoku', camera: { yaw: -0.9, pitch: 0.38, distance: 22, maxDistance: 30 } },
+  // The place: the wall, its gate and the ground before it (places/pyongyang.js), walked before and after the battle
+  // (`roam`: places/storyplaces.js). It draws the wall and its bank itself (`placeDraws` on the works below).
+  view: { scene: 'pyongyang', roam: 'pyongyang', camera: { yaw: -0.9, pitch: 0.38, distance: 22, maxDistance: 30 } },
   // The march across the approach at the drill's pace, and the storm's three minutes.
   seconds: 180 + PYONGYANG_MARCH,
   setup(life, seed = 1, options = {}) {
@@ -140,7 +142,7 @@ export const pyongyangBattle = {
       fighters: built.fighters,
       options: {
         seed,
-        arena: { ...spec.arena, works },
+        arena: { ...spec.arena, works: { ...works, placeDraws: true } },
         place: 'pyongyang',
         // (Judged on strength left only after the march and the battle's own time: battleend.js.)
         timeLimit: BATTLE_END.timeLimit + PYONGYANG_MARCH,

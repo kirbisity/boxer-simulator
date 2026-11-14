@@ -4,6 +4,7 @@
 // the weathers it is seen in. A battle names its place in its view (`view.roam`: a key here).
 
 import { CANAL_TOWN, CANAL_TOWN_WEATHER, canalTownStage } from './canaltown.js';
+import { PYONGYANG_PLACE, PYONGYANG_WEATHER, pyongyangStage } from './pyongyang.js';
 
 export const STORY_PLACES = {
   // The water town of the wokou chapter (story/battles/02-wokou.js).
@@ -18,6 +19,17 @@ export const STORY_PLACES = {
     odds: { damp: 0.45, rain: 0.35, dry: 0.2 },
     // The follow camera at his arrival (orbit yaw from behind him, as a stage's: main.js enterStage).
     camera: { yaw: 0.3, pitch: 0.22, distance: 5.2 },
+  },
+  // The walls of Pyongyang in the first month of 1593 (story/battles/03-pyongyang.js): always under snow, as the story has it.
+  pyongyang: {
+    place: 'pyongyang',
+    stage: pyongyangStage,
+    muster: PYONGYANG_PLACE.muster,
+    weathers: PYONGYANG_WEATHER,
+    odds: { snow: 1 },
+    camera: { yaw: 0.3, pitch: 0.2, distance: 5.6 },
+    // Where he is after the battle, when that is not the muster point: on the wall he climbed.
+    after: PYONGYANG_PLACE.after,
   },
 };
 

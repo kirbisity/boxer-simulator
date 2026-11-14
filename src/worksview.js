@@ -90,10 +90,11 @@ export function showWorks(view, arena) {
   // Blood falling into its standing water clouds it (blooddye.js); the cloud spreads at most across the water.
   group.userData.bloodDyeWater = [worksBloodWater(works)];
   const water = worksStandingWater(view, works, group);
-  for (const ditch of works.ditches) group.add(ditch.bends ? worksRoughDitch(works, ditch, random) : worksDitchStrip(works, ditch));
+  // (A place that draws its own walls and banks, townkit/works.js, says so: `placeDraws`. The ladders and the rest are still drawn here.)
+  if (!spec.placeDraws) for (const ditch of works.ditches) group.add(ditch.bends ? worksRoughDitch(works, ditch, random) : worksDitchStrip(works, ditch));
   const stakes = worksStakeMeshes(works.stakes);
   group.add(stakes.group);
-  for (const wall of works.walls) group.add(wall.kind === 'wood' ? worksWoodEdge(wall, random, arena) : wall.kind === 'stone' ? worksStoneWall(wall) : worksPalisade(wall));
+  if (!spec.placeDraws) for (const wall of works.walls) group.add(wall.kind === 'wood' ? worksWoodEdge(wall, random, arena) : wall.kind === 'stone' ? worksStoneWall(wall) : worksPalisade(wall));
   if (spec.gatehouse) group.add(worksGatehouse(spec.gatehouse));
   // Siege ladders at the gaps of a wall to storm (story mode: story/ground/walls.js).
   if (spec.ladders?.length) group.add(storyLadders(works, spec.ladders));
