@@ -218,8 +218,11 @@ varying vec3 vColour;
 varying vec3 vAir;
 void main() {
   vec4 leaf = texture2D(uLeaves, vUv);
-  if (leaf.a < uCut) discard;
-  gl_FragColor = vec4(vColour * (leaf.rgb * 1.3) + vAir, 1.0);
+  // The leaf's edge, a pixel wide, handed to the multisampling as coverage (the material's alphaToCoverage): a
+  // crown's outline is leaves, not squares of the picture.
+  float cover = clamp((leaf.a - uCut) / max(fwidth(leaf.a), 1e-4) + 0.5, 0.0, 1.0);
+  if (cover < 0.02) discard;
+  gl_FragColor = vec4(vColour * (leaf.rgb * 1.3) + vAir, cover);
   #include <tonemapping_fragment>
 }`;
 
@@ -400,7 +403,8 @@ export function envBuildTrees({ place, trees }) {
         aShell[at] = point[3];
         aShell[at + 1] = point[4];
         aShell[at + 2] = point[5];
-        aShell[at + 3] = point[6];
+        // A larger card stands for a stretch of the crown's lit surface, not for one spray in its shade.
+        aShell[at + 3] = point[6] + (1 - point[6]) * (1 - 1 / grow);
         const vary = 0.85 + random() * 0.3;
         aTint[at] = colour.r * vary;
         aTint[at + 1] = colour.g * vary;
@@ -420,8 +424,10 @@ export function envBuildTrees({ place, trees }) {
     const crowns = new THREE.Mesh(geometry, new THREE.ShaderMaterial({
       vertexShader: ENV_CROWN_VERTEX,
       fragmentShader: ENV_CROWN_FRAGMENT,
-      uniforms: { ...envUniforms(), uLeaves: { value: envLeafTexture() }, uCut: { value: order === 0 ? 0.5 : 0.38 } },
+      uniforms: { ...envUniforms(), uLeaves: { value: envLeafTexture() }, uCut: { value: ENV.trees.cut[Math.min(order, ENV.trees.cut.length - 1)] } },
       side: THREE.DoubleSide,
+      alphaToCoverage: true,
+      extensions: { derivatives: true },
       fog: false,
     }));
     crowns.frustumCulled = false;

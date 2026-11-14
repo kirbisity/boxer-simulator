@@ -268,7 +268,7 @@ void main() {
   vec3 grass = mix(uGrass, uDry, envDryAt(xz)) * (0.78 + 0.3 * medium);
   grass *= mix(1.0, 0.82 + 0.36 * fine, near);
   // Under blades that are drawn the ground is in their shade; beyond them it is the grass's own colour.
-  grass *= 1.0 - ${(1 - ENV.grass.underShade).toFixed(2)} * sqrt(map.g) * inMap * (1.0 - smoothstep(${(ENV.grass.layers[ENV.grass.layers.length - 1].tile * 0.12).toFixed(1)}, ${(ENV.grass.layers[ENV.grass.layers.length - 1].tile * 0.3).toFixed(1)}, distance));
+  grass *= 1.0 - ${(1 - ENV.grass.underShade).toFixed(2)} * sqrt(map.g) * inMap * (1.0 - smoothstep(${(ENV.grass.layers[0].tile * 0.45).toFixed(1)}, ${(ENV.grass.layers[1].tile * 0.45).toFixed(1)}, distance));
   vec3 soil = uSoil * (0.72 + 0.5 * mix(medium, fine, 0.5 * near));
   vec3 colour = mix(grass, soil, worn);
 

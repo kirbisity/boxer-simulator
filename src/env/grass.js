@@ -17,6 +17,8 @@ ${ENV_GLSL_MAP}
 uniform vec4 uLayer;
 // x, y: the least and most a blade stands (m); z: the share of tufts in flower; w: how much the blade turns to face the camera.
 uniform vec4 uBlades;
+// The root's share of the tip's brightness.
+uniform float uRoot;
 uniform vec3 uGrass;
 uniform vec3 uDry;
 uniform vec3 uFlowerA;
@@ -71,7 +73,7 @@ void main() {
   // Colour: green to straw in broad patches and blade by blade, the root in its neighbours' shade.
   float dry = clamp(envDryAt(xz) + (r1 - 0.5) * 0.5, 0.0, 1.0);
   vec3 colour = mix(uGrass, uDry, dry) * (0.82 + 0.36 * r2);
-  colour *= mix(${ENV.grass.rootShade.toFixed(2)}, 1.08, t);
+  colour *= mix(uRoot, 1.08, t);
   float flower = step(1.0 - uBlades.z, r3) * smoothstep(0.7, 0.9, t);
   colour = mix(colour, mix(uFlowerA, uFlowerB, step(0.5, r1)), flower);
   colour = mix(colour, vec3(0.92, 0.94, 0.97), snow * smoothstep(0.25, 0.8, t) * 0.85);
@@ -158,6 +160,7 @@ export function envBuildGrass({ place, map }) {
         uEnvMap: map,
         uLayer: { value: new THREE.Vector4(layer.tile, layer.width, layer.tall, inner) },
         uBlades: { value: new THREE.Vector4(grass.height[0], grass.height[1], order === 0 ? 0 : grass.flowers, Math.min(0.85, 0.35 + 0.25 * order)) },
+        uRoot: { value: layer.root },
         uGrass: { value: new THREE.Color(place.ground.grass) },
         uDry: { value: new THREE.Color(place.ground.dry) },
         uFlowerA: { value: new THREE.Color(flowers[0] ?? 0xffffff) },

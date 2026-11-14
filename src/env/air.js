@@ -35,7 +35,8 @@ export function envSkyRadiance(air, x, y, z, out) {
   const g = tune.hazeForward;
   const mie = (1 - g * g) / Math.pow(1 + g * g - 2 * g * cosine, 1.5);
   const share = tune.skyPathShare[0] + (tune.skyPathShare[1] - tune.skyPathShare[0]) * sine;
-  const lid = (1 + 2 * sine) / 3;
+  // (The CIE ratio is of luminance; the lid's colour is a display value, so the ratio goes through the display's power.)
+  const lid = Math.pow((1 + 2 * sine) / 3, 1 / 2.2);
   for (let channel = 0; channel < 3; channel += 1) {
     const depthR = tune.rayleighDepth[channel];
     const depth = depthR + air.hazeDepth;
@@ -133,6 +134,12 @@ export function envAirState(place, weather) {
   // A cloud's base: lit by the sky round it and the land under it, greyer than either.
   const skyMean = (air.skyLight[0] + air.skyLight[1] + air.skyLight[2]) / 3;
   air.cloudDark = air.skyLight.map((value) => (0.55 * skyMean + 0.45 * value) * tune.cloudBase * (1.15 - 0.8 * weather.gloom));
+  // Under a lid there is no sky round the cloud to be darker than: its base is the sky, and what lights the
+  // ground. Its thick and thin parts differ by `lidGrain` either way.
+  for (let channel = 0; channel < 3; channel += 1) {
+    air.cloudLit[channel] += (air.overcast[channel] * (1 + tune.lidGrain) - air.cloudLit[channel]) * air.lid;
+    air.cloudDark[channel] += (air.overcast[channel] * (1 - tune.lidGrain) - air.cloudDark[channel]) * air.lid;
+  }
   return air;
 }
 
