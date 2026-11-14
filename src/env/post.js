@@ -48,7 +48,8 @@ const envSeen = [0, 0, 0];
  * Meter the camera for the way it looks (x, z: level, unit or zero) and set `tone.exposure`: what it sees is the
  * land, a grey card's worth of the light on the ground, and through thick air the haze's own light that way (the
  * sky table's horizon row, as the haze shader draws it), each by its share of the view. Looking into the sun
- * through mist the meter closes down and what stands in the mist goes to shapes; looking away it opens.
+ * through mist the meter closes down, as far as ENV.tone.hazeMost lets the air's light count (past it the air
+ * round the sun burns out and what stands in the mist is still seen); looking away it opens.
  */
 export function envMeter(tone, air, x, z) {
   const tune = ENV.tone;
@@ -65,7 +66,7 @@ export function envMeter(tone, air, x, z) {
     }
     haze = Math.pow(envLuma(envSeen), 2.2);
   }
-  const seen = tone.ground + (haze - tone.ground) * tone.hazed;
+  const seen = tone.ground + (Math.min(haze, tone.ground * tune.hazeMost) - tone.ground) * tone.hazed;
   tone.exposure = Math.pow((tune.grey * tune.meter) / seen, tune.adapt) * tone.stops;
   return tone.exposure;
 }

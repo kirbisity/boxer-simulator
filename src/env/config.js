@@ -124,6 +124,13 @@ export const ENV = {
     meter: 1.7,
     adapt: 0.7,
     view: 60,
+    // The haze's light is metered at no more than this many times the land's. Looking up the sun through mist
+    // the air itself is some twenty times the land's light (measured in the Sengoku valley's mist: 0.9 against
+    // 0.044), and an exposure set off it left a fighter nine metres off a murky shape, two stops under the same
+    // fighter seen with the sun behind the camera. A camera's operator holds a backlit mist up and lets the air
+    // round the sun burn out, as the wood-in-mist reference does. By eye on that view, between the fighters
+    // going under (8 and over) and the whole frame going milky (3).
+    hazeMost: 5,
     // The grade, where a weather does not say otherwise (ENV_WEATHER `grade`): `ev` stops over the metered
     // exposure, `contrast` the curve's n, `saturation` (1 as the curve leaves it), `white` the light (in white
     // cards) that just reaches the ceiling, `warmth` moved from blue to red (0.02: 2 % each way). All by eye
