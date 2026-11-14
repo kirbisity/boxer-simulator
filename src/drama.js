@@ -5,6 +5,7 @@
 
 import { P } from './body.js';
 import { t } from './i18n.js';
+import { uiIconMarkup } from './uiicons.js';
 
 export const DRAMA = {
   // Simulated seconds per real second at the slowest, how long the moment
@@ -152,7 +153,11 @@ export function addIcon(drama, moment, now) {
   if (!spec || !holder) return;
   const element = document.createElement('div');
   element.className = `event-icon ${spec.tone}`;
-  element.innerHTML = `<span class="glyph">${moment.icon ?? spec.glyph}</span><b>${t(`drama.${moment.kind}`)}</b>`;
+  // Drawn in the interface's own line (uiicons.js). A thing knocked off keeps the one drawing whatever it was
+  // (a crown, a plume, a cap: the outfit's own picture is an emoji, and reads as another game's sticker here).
+  const glyph = moment.kind === 'accessory' ? spec.glyph : moment.icon ?? spec.glyph;
+  const drawn = uiIconMarkup(glyph);
+  element.innerHTML = `<span class="glyph ${drawn ? 'drawn' : 'emoji'}">${drawn ?? glyph}</span><b>${t(`drama.${moment.kind}`)}</b>`;
   holder.append(element);
   drama.icons.push({ element, fighter: moment.fighter, particle: moment.particle, start: now });
 }

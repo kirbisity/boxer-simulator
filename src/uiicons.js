@@ -51,6 +51,29 @@ const UI_ICON_PATHS = {
   '🏹': '<path d="M7 3c6.5 3 6.5 15 0 18"/><path d="M7 3v18"/><path d="M3.5 12h16.500M17 9l3 3-3 3"/>',
   // The blade.
   '🗡': '<path d="M12 2.500l2 3.500v8h-4V6z"/><path d="M8 14h8M12 14v5"/><circle cx="12" cy="20.2" r="1.2"/>',
+  // The Last Stand's levels: a torii, and a patrol's beacon.
+  '⛩': '<path d="M3.500 6c5.500 1.500 11.500 1.500 17 0"/><path d="M5 10h14"/><path d="M7.500 7v13.500M16.500 7v13.500M12 7.300V10"/>',
+  '🚓': '<path d="M7.500 16v-3.500a4.500 4.500 0 0 1 9 0V16"/><path d="M5 16h14v3.500H5z"/><path d="M12 3v2M5.200 5.800l1.400 1.400M18.800 5.800l-1.400 1.400"/>',
+  // The fight's moments (drama.js), over the man they happen to. A knockout: a burst.
+  '💥': '<path d="M12.0 2.5L13.8 7.8L18.7 5.3L16.2 10.2L21.5 12.0L16.2 13.8L18.7 18.7L13.8 16.2L12.0 21.5L10.2 16.2L5.3 18.7L7.8 13.8L2.5 12.0L7.8 10.2L5.3 5.3L10.2 7.8z"/>',
+  // Down: driven to the ground.
+  '💫': '<path d="M7 5.500l5 5 5-5M7 11.500l5 5 5-5"/><path d="M5 20.500h14"/>',
+  // Broken: a snapped shaft.
+  '🦴': '<path d="M3 16l7-2 1-3.500"/><path d="M13 14.500l1-3.500 7-2"/><path d="M11.500 5v2.200M8 6l1 1.900M15.500 6l-1 1.900"/>',
+  // Blood: a drop.
+  '🩸': '<path d="M12 3.500c3 4 5.500 6.800 5.500 10a5.500 5.500 0 0 1-11 0c0-3.200 2.500-6 5.500-10z"/>',
+  // Staggered: reeling.
+  '🌀': '<path d="M12 12.200a1.200 1.200 0 1 0-1.200-1.200c0 2 1.600 3.400 3.600 3.400a4 4 0 0 0 4-4c0-3.400-2.800-5.900-6.200-5.900a6.800 6.800 0 0 0-6.800 6.800c0 4.600 3.800 8.200 8.400 8.200"/>',
+  // Panic: a face, mouth open.
+  '😱': '<circle cx="12" cy="12" r="8.500"/><path d="M8.500 9.500h1.200M14.300 9.500h1.200"/><ellipse cx="12" cy="15" rx="1.800" ry="2.600"/>',
+  // Fights on: a flame.
+  '🔥': '<path d="M12 3c.5 3.500 4.500 5.500 4.500 10.500a4.500 4.500 0 0 1-9 0c0-2 1-3.500 2-4.500.2 1.500.8 2.300 1.500 2.800C11 9 10.500 5.500 12 3z"/>',
+  // Rage: the four corners drawn in.
+  '💢': '<path d="M9.500 4.500V8A1.500 1.500 0 0 1 8 9.500H4.500M14.500 4.500V8A1.500 1.500 0 0 0 16 9.500h3.500M9.500 19.500V16A1.500 1.500 0 0 0 8 14.500H4.500M14.500 19.500V16a1.500 1.500 0 0 1 1.500-1.500h3.500"/>',
+  // A hold: two rings locked.
+  '🤼': '<circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/>',
+  // Knocked off: a cap, off the head.
+  '🎧': '<path d="M5.500 15a6.500 6.500 0 0 1 13 0v1.500h-13z"/><path d="M4 20h16"/><path d="M12 4v2.200M6.200 6l1.300 1.700M17.800 6l-1.300 1.700"/>',
 };
 
 /** The drawn icon for a glyph, or null if it has none. */
@@ -96,7 +119,9 @@ export function dressLabels(root = document.body, selector = 'button, [data-glyp
 // The page's own labels (index.html, worded by translatePage) are dressed once the page's script has run and after each change of
 // language; the few places whose buttons are worded again later (the side pick, the banner's row, home's links) are watched, so a
 // label set there is dressed as it lands. Nothing here runs in a frame: a watch fires only when one of those labels is rewritten.
-const WATCHED = ['#side-pick', '.banner-actions', '#home', '.controls'];
+const WATCHED = ['#side-pick', '.banner-actions', '#home', '.controls', '#lastgate-screen'];
+// The Last Stand names its levels and factions picture first, in headings as well as buttons.
+const WATCHED_LABELS = { '#lastgate-screen': 'button, h1, h2, h3, b, [data-glyph-label]' };
 if (typeof document !== 'undefined' && typeof queueMicrotask === 'function') {
   const dressPage = () => queueMicrotask(() => dressLabels());
   dressPage();
@@ -105,7 +130,7 @@ if (typeof document !== 'undefined' && typeof queueMicrotask === 'function') {
     if (typeof MutationObserver !== 'function') return;
     for (const selector of WATCHED) {
       const place = document.querySelector(selector);
-      if (place) new MutationObserver(() => dressLabels(place)).observe(place, { childList: true, subtree: true });
+      if (place) new MutationObserver(() => dressLabels(place, WATCHED_LABELS[selector])).observe(place, { childList: true, subtree: true });
     }
   });
 }
