@@ -4,6 +4,12 @@
 # 3.5 cm higher than the base's; the tape fits spread the wrist's cut ring 9 thousandths sideways), so each chain is moved back:
 # a correction that is nothing at its root (the trunk is left alone), the joint's own miss at the joint and the open ring's
 # miss at the limb's end, straight between.
+# The emaciated build is drawn on a sculpt, and its shoulders are the sculpt's: set 4 cm behind the base's shoulder joints and
+# 1 cm inside them, so an arm raised about the joint swung the whole shoulder up and back with it (in the guard
+# the emaciated shoulder stood too high, a round tube). A wasted arm is its bone and little else: its section's middle runs
+# beside the bone's line as the base's does at the elbow. So that build's arms and shoulder girdles are first moved whole onto
+# the joints (root_field), by the model's own bone-heat weights: the arm all of it, the collarbone's share by how far out along
+# it, the trunk none.
 import sys, numpy as np, bodylib as bl
 from centre2 import middle
 from borders import loops
@@ -11,6 +17,22 @@ from borders import loops
 CHAINS = {'arm': ('Shoulder', 'Elbow', 'Hand', 'Upper', 'Fore'), 'leg': ('Hip', 'Knee', 'Foot', 'Thigh', 'Shin')}
 # Where the joint's section is read: this share of the way down the upper part and into the lower one.
 NEAR = (0.9, 0.1)
+# The builds drawn on a sculpt (their shoulders set on the joints first), and where down the upper arm its section is read for
+# that: the first closed ring under the armpit.
+SCULPTED = ('E',)
+ROOT = 0.3
+
+def root_field(b, V, X, T, side):
+    """Each point's move to set one arm's root on its shoulder joint (zeros off the arm and its girdle), and the miss."""
+    J = b['J']; a, m = J[side + 'Shoulder'], J[side + 'Elbow']; L = np.linalg.norm(m - a); ax = (m - a) / L
+    on = (b['part'] == b['parts'].index(side + 'Upper')) | (b['part'] == b['parts'].index(side + 'Fore'))
+    across = lambda d: d - ax * (d @ ax)
+    own = across(middle(bl.ring_at(X, T, a + ax * ROOT * L, ax), ax)[0] - a)
+    bone = across(middle(bl.section(V, T, a + ax * NEAR[0] * L, ax, on), ax)[0] - a)
+    W = b['W']; at = b['bones'].index
+    out = np.clip(V[:, 2] / a[2], 0, 1)
+    share = W[:, at(side + 'UpperArm')] + W[:, at(side + 'Forearm')] + W[:, at(side + 'Clavicle')] * out
+    return -share[:, None] * (own - bone), own - bone
 
 def chain_field(b, V, X, T, side, kind, ring):
     """Each point's correction for one limb (zeros off it)."""
@@ -46,6 +68,10 @@ if __name__ == '__main__':
             c = V[l].mean(0); name = min(('head', 'lHand', 'rHand', 'lFoot', 'rFoot'), key=lambda n: np.linalg.norm(b['J'][n] - c)); rings[name] = np.flatnonzero(np.isin(w, l))
         for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
             X = np.load(f'{name}-{sex}.npy'); C = np.zeros_like(X); notes = []
+            if name in SCULPTED:
+                for side in 'lr':
+                    c, d = root_field(b, V, X, T, side); X = X + c[w]
+                    if side == 'l': notes.append(f'arm root {np.round(d * 1000).astype(int).tolist()}')
             for side in 'lr':
                 for kind in CHAINS:
                     c, d_mid, d_end = chain_field(b, V, X, T, side, kind, rings[side + CHAINS[kind][2]]); C += c

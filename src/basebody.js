@@ -132,7 +132,9 @@ export const BASE_BODY = {
   // are the game's own, drawn to the game's rings there, and the border's cut ring was made to sit under them (a build's own
   // ring stood 1.4 times as wide as the base's at the wrist, the emaciated one's 0.6). A forearm's and a shin's lower third is
   // bone and tendon, which a build hardly changes; the neck's skin ends 0.6 of the way to the head's middle.
-  family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.2, 0.5] } },
+  // `hold`: the builds' skin about the neck's top is kept inside the game's head (headHold), none of the hold below the first
+  // t of the neck and all of it from the second: the trapezius' points, the trunk's, climb the nape to 0.55 of the neck.
+  family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.2, 0.5] }, hold: [0.3, 0.55] },
   // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
   headHold: 0.85,
   // PROOF OF CONCEPT, round 11 (the user: D is better, but the shoulders and arms smaller still, the neck longer, the woman's
@@ -852,9 +854,11 @@ export function baseBindJoints(rig, joints, height) {
  * is on its trunk. It takes the place of everything placed before it (his girth ratios on the base model, D+2's shoulders, the
  * starved contour): the builds are whole bodies, bone, muscle and fat as they lie on a body of that kind, where a ratio only
  * swells or shrinks the one model's own forms; but for the open borders, where it eases back into that placing
- * (BASE_BODY.family.ease). `along(name, t, distance)` the arms' stretch to the game's length (placeBaseBody).
+ * (BASE_BODY.family.ease), and for the skin about the neck's top, the neck's own and the trapezius' that climbs the nape as
+ * the trunk's, which is kept inside the game's head `head` as that placing's is (headHold). `along(name, t, distance)` the
+ * arms' stretch to the game's length (placeBaseBody).
  */
-function baseFamily(rig, frames, placed, height, weights, along) {
+function baseFamily(rig, frames, placed, height, weights, along, head = null) {
   const { names, sources } = rig;
   const size = height / rig.height;
   const at = (name, c, k, out) => {
@@ -866,6 +870,10 @@ function baseFamily(rig, frames, placed, height, weights, along) {
   const used = weights.map((weight, build) => [weight, sources.builds[build]]).filter(([weight]) => weight !== 0);
   // (Each part's ease to the placing already there, towards its open border: BASE_BODY.family.ease, by the part's name's end.)
   const eases = names.map((name) => Object.entries(BASE_BODY.family.ease).find(([end]) => name.endsWith(end))?.[1] ?? null);
+  // (The builds' napes are their own bodies', 9 cm behind the neck's line at its top where the game's head reaches 5: the
+  // neck's own points ease to the placing under the head, and the trapezius' beside them, the trunk's, stood off behind it in
+  // two horns up to the ears.)
+  const underHead = head ? names.map((name) => name === 'neck' || name === 'trunk') : [];
   const one = [0, 0, 0];
   const other = [0, 0, 0];
   const c = [0, 0, 0, 0, 0, 0];
@@ -884,6 +892,13 @@ function baseFamily(rig, frames, placed, height, weights, along) {
     if (blend > 0 && sources.part2[vertex] !== sources.part[vertex]) {
       at(names[sources.part2[vertex]], c, 3, other);
       for (let axis = 0; axis < 3; axis += 1) one[axis] += (other[axis] - one[axis]) * blend;
+    }
+    if (underHead[sources.part[vertex]]) {
+      const [t, x, y] = axisCoords(frames.neck, one);
+      if (t > BASE_BODY.family.hold[0]) {
+        const move = headHold(one, head, height, t, x, y, BASE_BODY.family.hold);
+        for (let axis = 0; axis < 3; axis += 1) one[axis] += move[axis];
+      }
     }
     if (share < 1) for (let axis = 0; axis < 3; axis += 1) one[axis] = placed[vertex * 3 + axis] + (one[axis] - placed[vertex * 3 + axis]) * share;
     placed.set(one, vertex * 3);
@@ -1086,7 +1101,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     }
     if (!BASE_BODY.shoulderPlus[design]) shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
   }
-  if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf);
+  if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf, joints.gameHead ?? joints.head);
   // (PROOF OF CONCEPT: the widths ANSUR II measures, when asked for (globalThis.BASE_WIDTHS, a list): biacromial (across the
   // shoulders' tops, from 1 cm above the shoulder joints up), chest breadth (the trunk's own skin across at the nipples, 0.72 of
   // height) and bideltoid (everything across, arms included, from 12 cm under the joints to them), in the bind pose.)
@@ -1280,6 +1295,32 @@ function shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKe
 }
 
 /**
+ * The skin about the neck's top kept inside the game's head: the move that brings `point` within BASE_BODY.headHold of the
+ * head's radius (0.055 of height, body.js headRadius) of the head's centre `head`, none of it below `from` of the way up the
+ * neck and all of it from `to`. `t`, `x`, `y` the point's place on the neck's line (axisCoords): the hold is for what lies
+ * behind the line and at its sides, and the throat's sides beside the jaw (seen from behind, they rose past the narrower jaw
+ * in a fin); only the throat's middle under the chin is the neck's own, and nothing is held that stands more than the head's
+ * radius out from the line (none of it from 1.5 radii).
+ */
+function headHold(point, head, height, t, x, y, [from, to] = [0.3, 0.7]) {
+  const rise = (from, to, value) => {
+    const u = Math.min(1, Math.max(0, (value - from) / (to - from)));
+    return u * u * (3 - 2 * u);
+  };
+  const off = vec.sub(point, head);
+  const reach = vec.length(off);
+  const radius = 0.055 * height;
+  const hold = BASE_BODY.headHold * radius;
+  if (reach <= hold) return [0, 0, 0];
+  const r0 = Math.hypot(x, y) || 1;
+  const behind = Math.max(1 - rise(-0.2, 0.3, x / r0), rise(0.35, 0.7, Math.abs(y) / r0));
+  // (Under the head: what stands farther out from the neck's line than the head is wide, the trapezius' slope to the
+  // shoulder, is not the head's to hold.)
+  const under = 1 - rise(radius, 1.5 * radius, r0);
+  return vec.scale(off, -((reach - hold) / reach) * behind * under * rise(from, to, t));
+}
+
+/**
  * PROOF OF CONCEPT, round 11: D's rest shape made smaller and sharper (BASE_BODY.shoulderPlus, `spec`), on the placed points
  * (changed in place). Each point's moves are worked out on its own, then smoothed over the surface as the round 10 designs' are.
  */
@@ -1345,15 +1386,7 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
       // centre. Its cut top stood above the head's underside behind and at the sides, and its far wall's inside showed through
       // the open top in a fin.)
       const head = joints.gameHead ?? joints.head;
-      const tucked = vec.add(p, shift);
-      const off = vec.sub(tucked, head);
-      const reach = vec.length(off);
-      const hold = BASE_BODY.headHold * 0.055 * height;
-      // (Behind and at the sides, and the throat's sides beside the jaw (seen from behind, they rose past the narrower jaw in a
-      // fin); only the throat's middle under the chin is the neck's own.)
-      const r0 = Math.hypot(xN, yN) || 1;
-      const behind = Math.max(1 - ease(-0.2, 0.3, xN / r0), ease(0.35, 0.7, Math.abs(yN) / r0));
-      if (head && reach > hold) shift = vec.add(shift, vec.scale(off, -((reach - hold) / reach) * behind * ease(0.3, 0.7, tN)));
+      if (head) shift = vec.add(shift, headHold(vec.add(p, shift), head, height, tN, xN, yN));
       // (Its top ring trimmed to the head's underside: nothing of it above `neckCut` of the head's radius under the head's
       // centre, along the neck, pushed down to that plane. Its sides beside the jaw rose past the game's narrower jaw and showed
       // from behind in a fin.)

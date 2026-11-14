@@ -3677,7 +3677,8 @@ function designSheet(kind, row = 0, closeUp = null, turn = 0, pick = null) {
   // Option A on the left as the camera sees it (+z is screen left).
   state.world.fighters.forEach((fighter, index) => {
     placeFighter(fighter, 0, (middle - entries[index].column) * spacing);
-    fighter.handsDown = true;
+    // A sheet stands at ease unless it asks for the guard (the shoulders are judged with the arms up).
+    fighter.handsDown = !sheet.guard;
     // Turn the bladed stance so the face, not the hips, points at the camera.
     fighter.yaw = -0.5 + turn;
   });

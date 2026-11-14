@@ -13,7 +13,7 @@ directory they run from):
 
     <work>/emac/      what they read of the game and of the emaciated reference
     <work>/ansur/     MALE.csv, FEMALE.csv: ANSUR II's public tables (the tape measures the fits are solved to)
-    <work>/remodel/   what they make; run them from here, with reg/ and even/ made in it
+    <work>/remodel/   what they make; run them from here, with reg/, even/ and shaped/ made in it
 
 ## What they read
 
@@ -35,8 +35,9 @@ From `<work>/remodel`, with `F=<repo>/tools/blender/family`:
     python3 $F/famE.py                       # E: the emaciated man, her tape by the sexes' ratio at the lean end
     python3 $F/register.py                   # reg/: each build's limbs set back on the base's bones
     python3 $F/relax.py                      # even/: each build's points set evenly on its own surface
+    python3 $F/girdle.py                     # shaped/: the emaciated build's shoulders held to the girdle's bone
     python3 $F/composition.py                # each build's [fat, fat-free mass index], for LOFT.family
-    python3 $F/dump.py family-even.json even
+    python3 $F/dump.py family-even.json shaped
     node <repo>/tools/basebody-family.js family-even.json
 
 `centre2.py` and `borders.py` are register.py's measures (run alone they report each build's miss from the base's bones);
