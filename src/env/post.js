@@ -18,7 +18,7 @@ import { ENV_GLSL, envUniforms } from './air.js';
 /**
  * The curve for an air state (air.js envAirState) under a weather, its constants solved so mid-grey keeps its value
  * and `white` reaches the ceiling (config.js), and what the camera's meter needs: `ground`, the light the place's
- * ground (a grey card, where neither the place's `meter` nor lying snow says otherwise) on the level sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
+ * ground (a grey card, where neither the place's `meter`, the wet nor lying snow says otherwise) on the level sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
  * power as light), and `hazed`, the share of a view that is the haze's own light and not the land's.
  */
 export function envToneOf(air, weather, place) {
@@ -28,7 +28,9 @@ export function envToneOf(air, weather, place) {
   // card's worth unless the place says, and moved toward snow's by the weather's lying snow.
   const open = place?.meter?.sky ?? 1;
   const bare = place?.meter?.albedo ?? tune.grey;
-  const card = tune.grey + (bare + (ENV.air.snowBounce - bare) * (weather.snow || 0) - tune.grey) * tune.groundSeen;
+  // (Wet, it throws back less: the same share the land's shader darkens it by.)
+  const soaked = bare * (1 - (1 - ENV.terrain.wetDarken) * (weather.wet || 0));
+  const card = tune.grey + (soaked + (ENV.air.snowBounce - soaked) * (weather.snow || 0) - tune.grey) * tune.groundSeen;
   const level = [0, 1, 2].map((channel) => air.sunColour[channel] * air.sun[1] + air.skyLight[channel] * open);
   const n = grade.contrast;
   const grey = Math.pow(tune.grey, n);
@@ -55,12 +57,14 @@ const envSeen = [0, 0, 0];
  * land, a grey card's worth of the light on the ground, and through thick air the haze's own light that way (the
  * sky table's horizon row, as the haze shader draws it), each by its share of the view. Looking into the sun
  * through mist the meter closes down, as far as ENV.tone.hazeMost lets the air's light count (past it the air
- * round the sun burns out and what stands in the mist is still seen); looking away it opens.
+ * round the sun burns out and what stands in the mist is still seen); looking away it opens. A sky far brighter
+ * than the land (a low sun's) closes it too, by the share of a frame the sky fills.
  */
 export function envMeter(tone, air, x, z) {
   const tune = ENV.tone;
   let haze = 0;
-  if (tone.hazed > 0.01) {
+  let sky = 0;
+  {
     const { across } = ENV.sky;
     const flat = Math.hypot(x, z);
     const cosine = flat > 1e-4 ? Math.min(1, Math.max(-1, (x * air.sun[0] + z * air.sun[2]) / (flat * Math.hypot(air.sun[0], air.sun[2])))) : 0;
@@ -70,9 +74,14 @@ export function envMeter(tone, air, x, z) {
       const a = air.table[left * 4 + channel];
       envSeen[channel] = (a + (air.table[left * 4 + 4 + channel] - a) * (column - left)) / 255 * ENV.sky.most;
     }
-    haze = Math.pow(envLuma(envSeen) * (1 - ENV.air.shadeBeam * (1 - (tone.airShare ?? 1))), 2.2);
+    sky = Math.pow(envLuma(envSeen), 2.2);
+    if (tone.hazed > 0.01) haze = Math.pow(envLuma(envSeen) * (1 - ENV.air.shadeBeam * (1 - (tone.airShare ?? 1))), 2.2);
   }
-  const seen = tone.ground + (Math.min(haze, tone.ground * tune.hazeMost) - tone.ground) * tone.hazed;
+  // The sky that way is in the frame too, and counts where it outshines the land past what the curve's shoulder
+  // holds (ENV.tone.skyOver): toward a low sun the camera closes down for it and lets the land go dark, as an
+  // evening is photographed, where an exposure set by the land alone burnt the whole sky out.
+  const land = tone.ground + (Math.min(haze, tone.ground * tune.hazeMost) - tone.ground) * tone.hazed;
+  const seen = land + Math.max(0, sky - tone.ground * tune.skyOver) * tune.skyShare * (1 - tone.hazed);
   tone.exposure = Math.pow((tune.grey * tune.meter) / seen, tune.adapt) * tone.stops;
   return tone.exposure;
 }

@@ -185,6 +185,17 @@ export const ENV = {
     // round the sun burn out, as the wood-in-mist reference does. By eye on that view, between the fighters
     // going under (8 and over) and the whole frame going milky (3).
     hazeMost: 5,
+    // The sky in the frame. `skyOver`: how many times the land's light the sky toward the view (the sky
+    // table's horizon row) may be before the meter counts it. An ordinary day's sky is 3 to 6 times the
+    // metered land (measured here: the meadow's broken cloud 3.3 to 5.6 off the sun, 8 at it) and the curve's
+    // shoulder holds that with its structure; a 7 degree sun's is 11 at a right angle to the sun and 35 toward
+    // it, which an exposure set by the land burnt to one yellow-white. `skyShare`: the share of a level frame
+    // the sky fills, about a quarter to a third at the heights the camera works at (approximate): the excess
+    // is metered by it, so toward an evening sun the camera closes one to two stops and the land goes to
+    // silhouette under a sky that keeps its glow and cloud bars. Through thick air the haze's own term above
+    // stands for the sky, and this one fades by the haze's share.
+    skyOver: 8,
+    skyShare: 0.25,
     // The grade, where a weather does not say otherwise (ENV_WEATHER `grade`): `ev` stops over the metered
     // exposure, `contrast` the curve's n, `saturation` (1 as the curve leaves it), `white` the light (in white
     // cards) that just reaches the ceiling, `warmth` moved from blue to red (0.02: 2 % each way). All by eye
@@ -721,8 +732,10 @@ export const ENV_WEATHER = {
   heavy: { label: 'Heavy cloud', grade: { contrast: 1.08, saturation: 1.25, warmth: -0.27, ev: 0.5 }, fine: 1.1, cover: 0.72, deck: 1, gloom: 0.85, sun: 1, visibility: 4500, hazeHeight: 300, wind: 1.25, gust: 0.12, wet: 0, fall: null, snow: 0 },
   // A low grey lid: no shadows, flat light (the sun's share is what gets through thick stratus, a few per cent direct).
   overcast: { label: 'Overcast', grade: { contrast: 1.4, saturation: 0.94, warmth: -0.015, ev: -0.3 }, fine: 0.8, cover: 1, gloom: 0.4, sun: 0.06, visibility: 12000, hazeHeight: null, wind: 1.2, gust: 0.05, wet: 0, fall: null, snow: 0 },
-  // Steady rain: visibility a few km (approximate for moderate rain), everything wet.
-  rain: { label: 'Rain', grade: { contrast: 1.42, saturation: 0.86, warmth: -0.03, ev: -0.5 }, fine: 0, cover: 1, gloom: 0.65, sun: 0.03, visibility: 2600, hazeHeight: 900, wind: 1.5, gust: 0.15, wet: 1, fall: { kind: 'rain', share: 1 }, snow: 0 },
+  // Steady rain: visibility a few km (approximate for moderate rain), everything wet. (`ev`: a third of a stop
+  // under, by eye; at half a stop, with the ground wet and the lid's gloom, a wood in rain measured a median
+  // of 0.12 of full scale and its fighters were lost.)
+  rain: { label: 'Rain', grade: { contrast: 1.42, saturation: 0.86, warmth: -0.03, ev: -0.3 }, fine: 0, cover: 1, gloom: 0.65, sun: 0.03, visibility: 2600, hazeHeight: 900, wind: 1.5, gust: 0.15, wet: 1, fall: { kind: 'rain', share: 1 }, snow: 0 },
   // Ground mist at dawn: a layer some tens of metres deep, the sun and the sky above it clear, the air near still.
   // (Mist is by definition visibility over 1 km and fog under; a valley's dawn fog is 100-400 m. 150, set against
   // a wood: at 260 trees 40 and 120 m off stood at nearly one tone and the wood read as a wash; at 150 each
@@ -734,7 +747,7 @@ export const ENV_WEATHER = {
   // Snow driving on a hard wind: visibility under a km in moderate snow (approximate), the ground white.
   snow: { label: 'Snow', grade: { contrast: 1.3, saturation: 0.85, warmth: -0.02, ev: 0.3 }, fine: 0, cover: 1, gloom: 0.25, sun: 0.05, visibility: 700, hazeHeight: 600, wind: 1.6, gust: 0.15, wet: 0, fall: { kind: 'snow', share: 1 }, snow: 0.85 },
   // Showers: heavy cloud with gaps, rain out of the thick of it and sun through the gaps, the ground wet between.
-  showers: { label: 'Showers', grade: { contrast: 1.36, saturation: 0.94, ev: -0.15 }, fine: 0.6, cover: 0.66, gloom: 0.6, sun: 0.9, visibility: 14000, hazeHeight: null, wind: 1.4, gust: 0.2, wet: 1, fall: { kind: 'rain', share: 1, under: [0.09, 0.17], least: 0, thick: 3200 }, snow: 0 },
+  showers: { label: 'Showers', grade: { contrast: 1.36, saturation: 0.94, ev: 0.1 }, fine: 0.6, cover: 0.66, gloom: 0.6, sun: 0.9, visibility: 14000, hazeHeight: null, wind: 1.4, gust: 0.2, wet: 1, fall: { kind: 'rain', share: 1, under: [0.09, 0.17], least: 0, thick: 3200 }, snow: 0 },
   // Snow showers on a cold wind: flurries out of each cloud that passes, the sun between them on new snow.
   flurries: { label: 'Snow showers', grade: { contrast: 1.3, saturation: 0.9, warmth: -0.01, ev: 0.15 }, fine: 0.3, cover: 0.64, gloom: 0.4, sun: 0.85, visibility: 9000, hazeHeight: 900, wind: 1.5, gust: 0.2, wet: 0, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 900 }, snow: 0.85 },
   // Dust lifted off dry ground by a hard wind: an ochre haze near the ground.
