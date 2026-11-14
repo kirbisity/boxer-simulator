@@ -63,24 +63,30 @@ export function envAirState(place, weather) {
   const azimuth = place.sun.azimuth;
   const sun = [Math.cos(azimuth) * Math.cos(elevation), Math.sin(elevation), Math.sin(azimuth) * Math.cos(elevation)];
   const cover = weather.cover ?? place.clouds.cover;
+  const visibility = weather.visibility ?? place.air.visibility;
+  const hazeHeight = weather.hazeHeight ?? place.air.hazeHeight;
   const air = {
     sun,
     sunMass: envAirMass(sun[1]),
     sunShare: weather.sun,
-    hazeDepth: tune.hazeDepth * weather.turbidity,
+    // The haze looked straight up through: its extinction at the ground times the height it thins over, so the
+    // air that hides the hills is the air that whitens the sky and reddens and dims the sun.
+    hazeDepth: (tune.koschmieder / visibility) * hazeHeight,
     cover,
     gloom: weather.gloom,
     // The sky turns from blue with clouds on it to a lid as the last gaps close.
     lid: Math.min(1, Math.max(0, (cover - 0.7) / 0.3)),
     overcast: [0.8, 0.83, 0.88].map((value) => value * ENV.sky.overcast * (1 - 0.55 * weather.gloom)),
-    hazeHeight: weather.hazeHeight ?? place.air.hazeHeight,
-    visibility: weather.visibility ?? place.air.visibility,
+    hazeHeight,
+    visibility,
     tint: weather.tint ?? null,
   };
   // The sun on the ground: what the air leaves of it, as a display value.
   air.sunColour = [0, 1, 2].map((channel) => tune.sunGain * weather.sun
     * Math.pow(tune.sunPower * Math.exp(-(tune.rayleighDepth[channel] + air.hazeDepth) * air.sunMass), 1 / 2.2));
   air.extinction = tune.koschmieder / air.visibility;
+  // Fine haze dims blue more than red (extinction ~ wavelength ^ -fine); droplets dim all alike.
+  air.hazeHue = tune.wavelengths.map((nm) => Math.pow(tune.wavelengths[1] / nm, weather.fine));
   air.rayleigh = tune.rayleighPerMetre.slice();
   // The table, and from it the light of the whole sky on level ground and the horizon's mean colour.
   const { across, up } = ENV.sky;
@@ -118,13 +124,15 @@ export function envAirState(place, weather) {
   air.table = table;
   // Broken cloud between the ground and the sky greys and dims the sky's light a little.
   const clouded = 1 - 0.25 * cover * (0.4 + weather.gloom);
-  air.skyLight = skyLight.map((value) => (value / weight) * clouded);
+  air.skyLight = skyLight.map((value) => Math.min(1, (value / weight) * clouded * tune.skyFill));
   air.horizon = horizon;
   // The ground's own light thrown back up, for the underside of things.
   air.bounce = air.skyLight.map((value, channel) => tune.bounce * (value + air.sunColour[channel] * sun[1]));
   // A cloud in the sun and a cloud's shaded base.
   air.cloudLit = air.sunColour.map((value, channel) => Math.min(1.25, 0.72 * value / Math.max(0.05, weather.sun) * Math.max(weather.sun, 0.45) + 0.42 * air.skyLight[channel]));
-  air.cloudDark = air.skyLight.map((value, channel) => (0.5 * value + 0.32 * air.horizon[channel]) * (1.25 - 0.85 * weather.gloom));
+  // A cloud's base: lit by the sky round it and the land under it, greyer than either.
+  const skyMean = (air.skyLight[0] + air.skyLight[1] + air.skyLight[2]) / 3;
+  air.cloudDark = air.skyLight.map((value) => (0.55 * skyMean + 0.45 * value) * tune.cloudBase * (1.15 - 0.8 * weather.gloom));
   return air;
 }
 
@@ -175,9 +183,9 @@ export const ENV_UNIFORMS = {
   uEnvSunColour: { value: null },
   uEnvSkyLight: { value: null },
   uEnvBounce: { value: null },
-  // xyz: the haze's extinction per metre for red, green, blue at the ground (Rayleigh + haze); w: 1 / haze height.
+  // xyz: the haze's own extinction per metre for red, green, blue at the ground; w: 1 / haze height.
   uEnvHaze: { value: null },
-  // xyz: Rayleigh alone (it does not thin over the heights the game sees); w: the haze part alone.
+  // xyz: the air's own (Rayleigh: it does not thin over the heights the game sees); w: the haze's for green light.
   uEnvRayleigh: { value: null },
   // x, z: the wind's unit way; z: its speed now (m/s); w: gustiness 0..1.
   uEnvWind: { value: null },
@@ -190,6 +198,8 @@ export const ENV_UNIFORMS = {
   uEnvCloudDark: { value: null },
   // x: wet 0..1; y: snow lying 0..1.
   uEnvWet: { value: null },
+  // The share of the place's grass gone to straw, 0..1.
+  uEnvDry: { value: 0 },
   // The way the camera looks, level (x, z; unit, or zero looking straight down): what follows the camera is laid out ahead of it.
   uEnvLook: { value: null },
 };
@@ -218,19 +228,20 @@ export function envUniforms() {
 }
 
 /** Write an air state into the shared uniforms. */
-export function envAirToUniforms(air, weather, quality) {
+export function envAirToUniforms(air, weather, quality, place) {
   const u = envUniforms();
   envSkyTexture(air);
   u.uEnvSunDir.value.fromArray(air.sun);
   u.uEnvSunColour.value.fromArray(air.sunColour);
   u.uEnvSkyLight.value.fromArray(air.skyLight);
   u.uEnvBounce.value.fromArray(air.bounce);
-  u.uEnvHaze.value.set(air.rayleigh[0] + air.extinction, air.rayleigh[1] + air.extinction, air.rayleigh[2] + air.extinction, 1 / air.hazeHeight);
+  u.uEnvHaze.value.set(air.extinction * air.hazeHue[0], air.extinction * air.hazeHue[1], air.extinction * air.hazeHue[2], 1 / air.hazeHeight);
   u.uEnvRayleigh.value.set(air.rayleigh[0], air.rayleigh[1], air.rayleigh[2], air.extinction);
   u.uEnvCloud.value.set(air.cover, quality.cloudShadow ? ENV.clouds.shadow * (1 - air.lid) : 0, 1 / ENV.clouds.scale, ENV.clouds.height);
   u.uEnvCloudLit.value.fromArray(air.cloudLit);
   u.uEnvCloudDark.value.fromArray(air.cloudDark);
   u.uEnvWet.value.set(weather.wet, weather.snow);
+  u.uEnvDry.value = place.grass.dry;
 }
 
 /**
@@ -238,7 +249,7 @@ export function envAirToUniforms(air, weather, quality) {
  *   envSky(dir)            the sky's colour toward a unit direction (the table)
  *   envAirlight(dir)       the light the air scatters into a long level sight line that way (its horizon row)
  *   envHaze(colour, from, to)   `colour` at world point `to` seen from `from` through the haze
- *   envCloud(xz)           the cloud sheet's density 0..1 over sheet point xz (sheet units)
+ *   envCloud(xz)           the cloud sheet's cover 0..1 over sheet point xz (sheet units); envCloudDepth(xz) how thick
  *   envSunShare(world)     how much of the sun reaches a point on the land under the clouds, 0..1
  *   envGust(xz)            the wind's local speed at a point on the ground (m/s), the gusts riding the air's travel
  */
@@ -259,6 +270,7 @@ uniform vec2 uEnvCloudTravel;
 uniform vec3 uEnvCloudLit;
 uniform vec3 uEnvCloudDark;
 uniform vec2 uEnvWet;
+uniform float uEnvDry;
 uniform vec2 uEnvLook;
 
 vec3 envSky(vec3 dir) {
@@ -282,17 +294,20 @@ float envHazeColumn(float fromY, float toY) {
 vec3 envHaze(vec3 colour, vec3 from, vec3 to) {
   vec3 ray = to - from;
   float distance = length(ray);
-  vec3 depth = (uEnvRayleigh.rgb + uEnvRayleigh.a * envHazeColumn(max(from.y, 0.0), max(to.y, 0.0))) * distance;
+  vec3 depth = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(from.y, 0.0), max(to.y, 0.0))) * distance;
   vec3 through = exp(-depth);
   return colour * through + envAirlight(ray / max(distance, 1e-3)) * (1.0 - through);
 }
 
-float envCloud(vec2 sheet) {
+// How far inside a cloud a sheet point is: below 0 clear sky, 0 the cloud's edge, about 0.3 its thick middle.
+float envCloudDepth(vec2 sheet) {
   float broad = texture2D(uEnvNoise, sheet * 0.125).b;
   float fine = texture2D(uEnvNoise, sheet * 0.53 + vec2(0.37, 0.11)).a;
-  float n = broad * 0.68 + fine * 0.32;
-  float edge = mix(0.74, 0.26, uEnvCloud.x);
-  return smoothstep(edge - 0.07, edge + 0.11, n);
+  return broad * 0.68 + fine * 0.32 - mix(0.74, 0.26, uEnvCloud.x);
+}
+
+float envCloud(vec2 sheet) {
+  return smoothstep(-0.07, 0.11, envCloudDepth(sheet));
 }
 
 // The sheet point straight up the sun's ray from a point on the land.

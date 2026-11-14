@@ -132,7 +132,7 @@ function envApplyTier(state) {
   envGrassQuality(parts.grass, quality.grass, quality.far);
   envTreesQuality(parts.trees, quality.cards);
   envParticlesSet(parts.particles, PLACE_ENV[state.place].drift, state.weather, quality.particles);
-  envAirToUniforms(state.air, state.weather, quality);
+  envAirToUniforms(state.air, state.weather, quality, PLACE_ENV[state.place]);
 }
 
 /** Take the scene over for the place: the light, the haze, the far plane, the wind, the weather's share of everything. */

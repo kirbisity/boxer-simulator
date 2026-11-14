@@ -93,7 +93,7 @@ void main() {
   float toward = max(dot(-toEye, uEnvSunDir), 0.0);
   float twinkle = 0.55 + 0.45 * sin(uEnvTime * (2.0 + 5.0 * r) + r2 * 60.0);
   colour *= uEnvSunColour * sunShare * (0.12 + 1.6 * pow(toward, 5.0)) * twinkle;
-  vec3 gone = exp(-(uEnvRayleigh.rgb + uEnvRayleigh.a * envHazeColumn(max(cameraPosition.y, 0.0), max(middle.y, 0.0))) * away);
+  vec3 gone = exp(-(uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(middle.y, 0.0))) * away);
   vColour = vec4(colour * gone, alpha);
 #else
   vColour = vec4(envHaze(colour * light, cameraPosition, middle), alpha);

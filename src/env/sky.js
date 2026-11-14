@@ -34,15 +34,18 @@ void main() {
   vec3 cloud = vec3(0.0);
   if (dir.y > 0.0) {
     vec2 sheet = (cameraPosition.xz + dir.xz / (up + 0.05) * uEnvCloud.w) * uEnvCloud.z - uEnvCloudTravel;
-    density = envCloud(sheet);
-    // Its depth toward the sun shades it: thick cloud between here and the sun is dark, an edge facing the sun bright.
+    float depth = envCloudDepth(sheet);
+    density = smoothstep(-0.07, 0.11, depth);
+    // A cloud is seen from below: where it is thick the sun does not come through and the base is dark, and its
+    // thin edges are bright. The side toward the sun is brighter again: less cloud that way to shade it.
     vec2 sunward = normalize(uEnvSunDir.xz + vec2(1e-4, 0.0)) * ${ENV.clouds.selfShadow.toFixed(3)};
     float behind = envCloud(sheet + sunward);
     float beyond = envCloud(sheet + sunward * 2.6);
-    float lit = clamp(1.0 - 0.55 * behind - 0.35 * beyond, 0.0, 1.0);
+    float thick = smoothstep(0.02, ${ENV.clouds.baseAt.toFixed(2)}, depth);
+    float lit = (1.0 - thick) * (1.0 - 0.3 * behind) + 0.3 * (1.0 - behind) * (1.0 - 0.6 * beyond);
     // The grain of the cloud itself.
     float grain = texture2D(uEnvNoise, sheet * 1.9).a;
-    lit *= 0.82 + 0.36 * grain;
+    lit = clamp(lit * (0.8 + 0.4 * grain), 0.0, 1.0);
     cloud = mix(uEnvCloudDark, uEnvCloudLit, lit);
     // Thin cloud near the sun glows with it (forward scattering): the silver lining.
     float lining = pow(max(toSun, 0.0), 24.0) * (1.0 - density * 0.7);

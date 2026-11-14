@@ -1,6 +1,6 @@
-// Trees (src/env/): planted where the place's stands say and the woods noise allows, each a tapering trunk and a
-// crown of leaf cards filling the kind's envelope (config.js ENV_TREES), shaded as a mass (lit on the sun's side,
-// dark inside and beneath, glowing at the rim against the sun). The whole tree leans with the gust at its foot and
+// Trees (src/env/): planted where the place's stands say and the woods noise allows, each a tapering trunk dividing
+// into limbs and a crown of leaf cards on the masses of foliage those limbs carry (config.js ENV_TREES), shaded as
+// a mass (lit on the sun's side, dark inside and beneath, glowing at the rim against the sun). The whole tree leans with the gust at its foot and
 // its leaves flutter in it (air.js envGust): a front crossing the field is seen to reach the trees and pass.
 
 /* global THREE */
@@ -80,31 +80,33 @@ function envLeafTexture() {
     const cy = Math.floor(cell / atlas) * tile + tile / 2;
     if (cell < 2) {
       // Broad leaves: a loose spray, the ones drawn last (nearest) lightest.
-      for (let leaf = 0; leaf < 46; leaf += 1) {
+      const leaves = ENV.trees.leaves;
+      for (let leaf = 0; leaf < leaves; leaf += 1) {
         const angle = random() * Math.PI * 2;
-        const out = Math.sqrt(random()) * tile * 0.4;
-        const shade = Math.round(150 + (leaf / 46) * 70 + random() * 35);
+        const out = Math.pow(random(), 0.62) * tile * 0.43;
+        const shade = Math.round(120 + (leaf / leaves) * 95 + random() * 40);
         g.fillStyle = `rgb(${shade},${shade},${shade})`;
         g.beginPath();
-        g.ellipse(cx + Math.cos(angle) * out, cy + Math.sin(angle) * out, tile * (0.05 + random() * 0.035), tile * (0.028 + random() * 0.02), random() * Math.PI, 0, Math.PI * 2);
+        g.ellipse(cx + Math.cos(angle) * out, cy + Math.sin(angle) * out, tile * (0.03 + random() * 0.02), tile * (0.015 + random() * 0.012), random() * Math.PI, 0, Math.PI * 2);
         g.fill();
       }
     } else {
       // Needles: boughs fanning from the middle, each a spine with strokes along it.
-      for (let bough = 0; bough < 9; bough += 1) {
-        const angle = (bough / 9) * Math.PI * 2 + random() * 0.5;
-        const reach = tile * (0.3 + random() * 0.14);
-        for (let step = 2; step < 14; step += 1) {
-          const at = (step / 14) * reach;
+      for (let bough = 0; bough < 13; bough += 1) {
+        const angle = (bough / 13) * Math.PI * 2 + random() * 0.5;
+        const from = tile * random() * 0.12;
+        const reach = tile * (0.26 + random() * 0.18);
+        for (let step = 1; step < 20; step += 1) {
+          const at = from + (step / 20) * (reach - from);
           const px = cx + Math.cos(angle) * at;
           const py = cy + Math.sin(angle) * at;
-          const shade = Math.round(140 + random() * 100);
+          const shade = Math.round(115 + random() * 125);
           g.strokeStyle = `rgb(${shade},${shade},${shade})`;
-          g.lineWidth = tile * 0.035;
+          g.lineWidth = tile * 0.014;
           for (const side of [-1, 1]) {
             g.beginPath();
             g.moveTo(px, py);
-            g.lineTo(px + Math.cos(angle + side * 1.0) * tile * 0.085, py + Math.sin(angle + side * 1.0) * tile * 0.085);
+            g.lineTo(px + Math.cos(angle + side * 0.9) * tile * 0.07, py + Math.sin(angle + side * 0.9) * tile * 0.07);
             g.stroke();
           }
         }
@@ -151,7 +153,7 @@ const ENV_GLSL_HAZE_SPLIT = /* glsl */ `
 void envHazeSplit(vec3 world, out vec3 through_, out vec3 air_) {
   vec3 ray = world - cameraPosition;
   float distance_ = length(ray);
-  through_ = exp(-(uEnvRayleigh.rgb + uEnvRayleigh.a * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_);
+  through_ = exp(-(uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_);
   air_ = envAirlight(ray / max(distance_, 1e-3)) * (1.0 - through_);
 }`;
 
@@ -226,23 +228,26 @@ ${ENV_GLSL}
 ${ENV_GLSL_SWAY}
 ${ENV_GLSL_HAZE_SPLIT}
 attribute vec4 aTree;
-// x: the trunk's radius at the foot (m); y: how high it runs (m); z: the sun past the hills; w: unused.
-attribute vec4 aTrunk;
-attribute vec3 aBark;
+// A length of wood (the trunk, or a limb): where it starts and ends from the tree's foot (m), w its radius there (m).
+attribute vec4 aFrom;
+attribute vec4 aTo;
+// The bark's colour; w: the sun reaching the tree past the hills.
+attribute vec4 aBark;
 varying vec3 vColour;
 varying vec3 vAir;
 void main() {
-  float up = position.y * aTrunk.y;
-  // A flare at the foot, a taper to the crown.
-  float radius = aTrunk.x * (1.0 - 0.55 * position.y + 0.5 * pow(1.0 - position.y, 6.0));
-  vec3 world = aTree.xyz + vec3(position.x * radius, up - 0.15, position.z * radius) + envSway(aTree.xyz, aTree.w, up);
+  float t = position.y;
+  // A limb goes out before it goes up; the trunk (which starts in the ground) flares at its foot.
+  vec3 along = vec3(mix(aFrom.xz, aTo.xz, pow(t, 0.7)), mix(aFrom.y, aTo.y, t)).xzy;
+  float radius = mix(aFrom.w, aTo.w, t) + aFrom.w * 0.5 * pow(1.0 - t, 6.0) * step(aFrom.y, 0.0);
+  vec3 world = aTree.xyz + along + vec3(position.x * radius, 0.0, position.z * radius) + envSway(aTree.xyz, aTree.w, along.y);
   vec3 normal = normalize(vec3(position.x, 0.0, position.z));
   // Under its own crown: little sun, the sky's light cut by the leaves above.
-  float shade = mix(0.9, 0.45, position.y);
-  vec3 light = uEnvSunColour * max(dot(normal, uEnvSunDir), 0.0) * aTrunk.z * envSunShare(world) * shade + mix(uEnvBounce, uEnvSkyLight, 0.5) * shade;
+  float shade = mix(0.9, 0.4, clamp(along.y / aTree.w * 1.6, 0.0, 1.0));
+  vec3 light = uEnvSunColour * max(dot(normal, uEnvSunDir), 0.0) * aBark.w * envSunShare(world) * shade + mix(uEnvBounce, uEnvSkyLight, 0.5) * shade;
   vec3 through_;
   envHazeSplit(world, through_, vAir);
-  vColour = aBark * (1.0 - 0.3 * uEnvWet.x) * light * through_;
+  vColour = aBark.rgb * (1.0 - 0.3 * uEnvWet.x) * light * through_;
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
 }`;
 
@@ -256,29 +261,61 @@ void main() {
 
 // ---- building --------------------------------------------------------------------------------------------------------
 
-/** A point in a kind's crown envelope: into `out` [x, y, z from the foot (shares of the height), nx, ny, nz, depth]. */
-function envCrownPoint(kind, random, blobs, out) {
+/**
+ * The masses of foliage one tree carries, as shares of its height from its foot: [{ x, y, z: the mass's middle,
+ * radius, flat: its height beside its width, from: [x, y, z] where the limb that carries it leaves the trunk }].
+ * 'round' (a broadleaf): a ring of masses on spreading limbs and one or two on top. 'boughs' (a conifer): a spire of
+ * boughs, each a flat fan, longest low down, with gaps between them the sky shows through.
+ */
+function envCrownMasses(kind, random) {
   const crown = kind.crown;
-  if (kind.shape === 'cone') {
-    const u = Math.pow(random(), 0.8);
-    const angle = random() * Math.PI * 2;
-    // Tiers of boughs: the spire is stepped, wider at each whorl.
-    const whorl = 0.72 + 0.28 * Math.abs(Math.sin(u * Math.PI * 5));
-    const depth = 0.5 + 0.5 * Math.sqrt(random());
-    const radius = crown.wide * Math.pow(1 - u, 0.85) * whorl * depth;
-    out[0] = Math.cos(angle) * radius;
-    out[1] = crown.at - crown.tall + 2 * crown.tall * u;
-    out[2] = Math.sin(angle) * radius;
-    const lift = 0.35 + 0.5 * u;
-    const length = Math.hypot(1, lift);
-    out[3] = Math.cos(angle) / length;
-    out[4] = lift / length;
-    out[5] = Math.sin(angle) / length;
-    out[6] = depth;
+  const masses = [];
+  if (kind.shape === 'boughs') {
+    for (let bough = 0; bough < kind.limbs; bough += 1) {
+      const u = (bough + 0.2 + 0.6 * random()) / kind.limbs;
+      // The golden angle between one bough and the next: no two stand over each other.
+      const angle = bough * 2.39996 + random() * 0.8;
+      const reach = crown.wide * (0.08 + Math.pow(1 - u, 0.8) * (0.7 + 0.5 * random()));
+      const y = crown.at - crown.tall + 2 * crown.tall * u;
+      masses.push({ x: Math.cos(angle) * reach, y: y - 0.05 * (1 - u), z: Math.sin(angle) * reach, radius: reach, flat: 0.16, from: [0, y, 0] });
+    }
+    return masses;
+  }
+  const fork = crown.at - crown.tall * kind.fork;
+  for (let limb = 0; limb < kind.limbs; limb += 1) {
+    const angle = limb * 2.39996 + random() * 0.9;
+    // Low limbs reach furthest out; the ones that go up stay nearer the middle.
+    const up = limb < 2 ? 0.55 + 0.3 * random() : random() * 1.1 - 0.5;
+    const out = (0.32 + 0.4 * random()) * Math.sqrt(Math.max(0.15, 1 - up * up * 0.9));
+    const radius = (0.36 + 0.24 * random()) * (limb < 2 ? 1.15 : 1);
+    masses.push({ x: Math.cos(angle) * out * crown.wide, y: crown.at + up * crown.tall * 0.62, z: Math.sin(angle) * out * crown.wide, radius: radius * crown.wide, flat: 0.8, from: [0, fork * (0.8 + 0.3 * random()), 0] });
+  }
+  return masses;
+}
+
+/** A leaf card's place on one of a tree's masses: into `out` [x, y, z from the foot (shares of the height), nx, ny, nz, depth]. */
+function envCrownPoint(kind, random, masses, out) {
+  const crown = kind.crown;
+  const mass = masses[Math.floor(random() * masses.length)];
+  if (kind.shape === 'boughs') {
+    // Along the bough from the trunk to its tip, fanning wider as it goes, drooping a little.
+    const t = 0.15 + 0.85 * Math.sqrt(random());
+    const side = (random() - 0.5) * 0.7 * t;
+    const length = Math.hypot(mass.x, mass.z) || 1e-3;
+    const ax = mass.x / length;
+    const az = mass.z / length;
+    out[0] = (ax * t - az * side) * length;
+    out[1] = mass.from[1] + (mass.y - mass.from[1]) * t * t + (random() - 0.5) * mass.radius * mass.flat;
+    out[2] = (az * t + ax * side) * length;
+    const lift = 0.9;
+    const norm = Math.hypot(1, lift);
+    out[3] = ax / norm;
+    out[4] = lift / norm;
+    out[5] = az / norm;
+    out[6] = 0.35 + 0.65 * t;
     return out;
   }
-  // Round: a few overlapping masses of foliage, the cards on their outsides.
-  const blob = blobs[Math.floor(random() * blobs.length)];
+  // On the outside of the mass.
   let nx = random() * 2 - 1;
   let ny = random() * 2 - 1;
   let nz = random() * 2 - 1;
@@ -286,23 +323,23 @@ function envCrownPoint(kind, random, blobs, out) {
   nx /= length;
   ny /= length;
   nz /= length;
-  const shell = 0.6 + 0.4 * Math.sqrt(random());
-  const px = blob[0] + nx * blob[3] * shell;
-  const py = blob[1] + ny * blob[3] * shell * 0.85;
-  const pz = blob[2] + nz * blob[3] * shell;
-  out[0] = px * crown.wide;
-  out[1] = crown.at + py * crown.tall;
-  out[2] = pz * crown.wide;
+  const shell = 0.55 + 0.45 * Math.sqrt(random());
+  out[0] = mass.x + nx * mass.radius * shell;
+  out[1] = mass.y + ny * mass.radius * shell * mass.flat;
+  out[2] = mass.z + nz * mass.radius * shell;
   // The surface faces out from the whole crown more than from its own mass: the crown shades as one.
+  const px = out[0] / crown.wide;
+  const py = (out[1] - crown.at) / crown.tall;
+  const pz = out[2] / crown.wide;
   const whole = Math.hypot(px, py, pz) || 1;
-  const fx = nx * 0.4 + (px / whole) * 0.6;
-  const fy = ny * 0.4 + (py / whole) * 0.6;
-  const fz = nz * 0.4 + (pz / whole) * 0.6;
+  const fx = nx * 0.45 + (px / whole) * 0.55;
+  const fy = ny * 0.45 + (py / whole) * 0.55;
+  const fz = nz * 0.45 + (pz / whole) * 0.55;
   const facing = Math.hypot(fx, fy, fz) || 1;
   out[3] = fx / facing;
   out[4] = fy / facing;
   out[5] = fz / facing;
-  out[6] = Math.min(1, whole);
+  out[6] = Math.min(1, 0.25 + 0.75 * whole) * (0.55 + 0.45 * shell);
   return out;
 }
 
@@ -343,17 +380,13 @@ export function envBuildTrees({ place, trees }) {
     let written = 0;
     for (const tree of members) {
       const kind = ENV_TREES[tree.kind];
-      const blobs = [[0, 0, 0, 0.72]];
-      for (let blob = 0; blob < 5; blob += 1) {
-        const angle = random() * Math.PI * 2;
-        const lift = random() * 1.3 - 0.45;
-        blobs.push([Math.cos(angle) * 0.52, lift * 0.55, Math.sin(angle) * 0.52, 0.42 + random() * 0.2]);
-      }
+      const masses = envCrownMasses(kind, random);
+      tree.masses = masses;
       // A tree's own colour between the kind's, and each card a little off it.
       colour.set(kind.leaf[0]).lerp(other.set(kind.leaf[1]), random()).lerp(other.set(kind.leaf[2]), random() * 0.5);
       const picture = kind.picture === 'needle' ? 2 : 0;
       for (let card = 0; card < band.cards; card += 1) {
-        envCrownPoint(kind, random, blobs, point);
+        envCrownPoint(kind, random, masses, point);
         const at = order_[written] * 4;
         written += 1;
         aTree[at] = tree.x;
@@ -403,20 +436,37 @@ export function envBuildTrees({ place, trees }) {
     const trunks = new THREE.InstancedBufferGeometry();
     trunks.setAttribute('position', trunk.attributes.position);
     trunks.setIndex(trunk.index);
-    const bTree = new Float32Array(members.length * 4);
-    const bTrunk = new Float32Array(members.length * 4);
-    const bBark = new Float32Array(members.length * 3);
-    members.forEach((tree, index) => {
+    // The wood of each tree: its trunk, and (near enough to be seen) the limb that carries each mass of its crown.
+    const bTree = [];
+    const bFrom = [];
+    const bTo = [];
+    const bBark = [];
+    for (const tree of members) {
       const kind = ENV_TREES[tree.kind];
-      bTree.set([tree.x, tree.y, tree.z, tree.height], index * 4);
-      bTrunk.set([kind.trunk * tree.height, tree.height * (kind.shape === 'cone' ? kind.crown.at + kind.crown.tall * 0.8 : kind.crown.at), tree.lit, 0], index * 4);
+      const tall = tree.height;
+      const radius = kind.trunk * tall;
+      const conifer = kind.shape === 'boughs';
       colour.set(kind.bark);
-      bBark.set([colour.r, colour.g, colour.b], index * 3);
-    });
-    trunks.setAttribute('aTree', new THREE.InstancedBufferAttribute(bTree, 4));
-    trunks.setAttribute('aTrunk', new THREE.InstancedBufferAttribute(bTrunk, 4));
-    trunks.setAttribute('aBark', new THREE.InstancedBufferAttribute(bBark, 3));
-    trunks.instanceCount = members.length;
+      const wood = (from, to) => {
+        bTree.push(tree.x, tree.y, tree.z, tall);
+        bFrom.push(...from);
+        bTo.push(...to);
+        bBark.push(colour.r, colour.g, colour.b, tree.lit);
+      };
+      // A conifer's trunk runs to its tip; a broadleaf's to where its limbs have all left it.
+      const top = conifer ? kind.crown.at + kind.crown.tall * 0.96 : Math.max(...tree.masses.map((mass) => mass.from[1]));
+      wood([0, -0.15, 0, radius], [0, top * tall, 0, radius * (conifer ? 0.12 : 0.6)]);
+      if (!band.limbs) continue;
+      for (const mass of tree.masses) {
+        const thick = radius * (conifer ? 0.16 : 0.5);
+        wood([mass.from[0] * tall, mass.from[1] * tall, mass.from[2] * tall, thick], [mass.x * tall, mass.y * tall, mass.z * tall, thick * 0.3]);
+      }
+    }
+    trunks.setAttribute('aTree', new THREE.InstancedBufferAttribute(new Float32Array(bTree), 4));
+    trunks.setAttribute('aFrom', new THREE.InstancedBufferAttribute(new Float32Array(bFrom), 4));
+    trunks.setAttribute('aTo', new THREE.InstancedBufferAttribute(new Float32Array(bTo), 4));
+    trunks.setAttribute('aBark', new THREE.InstancedBufferAttribute(new Float32Array(bBark), 4));
+    trunks.instanceCount = bTree.length / 4;
     const stems = new THREE.Mesh(trunks, new THREE.ShaderMaterial({
       vertexShader: ENV_TRUNK_VERTEX,
       fragmentShader: ENV_TRUNK_FRAGMENT,

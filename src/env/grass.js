@@ -89,7 +89,7 @@ void main() {
   // The haze, worked here once a vertex: the lit part and the rest, so the fragment only applies the shadow.
   vec3 ray = world - cameraPosition;
   float distance_ = length(ray);
-  vec3 through_ = exp(-(uEnvRayleigh.rgb + uEnvRayleigh.a * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_);
+  vec3 through_ = exp(-(uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_);
   vLit = colour * sunLight * through_;
   vBase = colour * skyLight * through_ + envAirlight(ray / max(distance_, 1e-3)) * (1.0 - through_);
 
@@ -157,7 +157,7 @@ export function envBuildGrass({ place, map }) {
         ...envUniforms(),
         uEnvMap: map,
         uLayer: { value: new THREE.Vector4(layer.tile, layer.width, layer.tall, inner) },
-        uBlades: { value: new THREE.Vector4(grass.height[0], grass.height[1], order === 0 ? 0 : grass.flowers, order === 0 ? 0.35 : 0.85) },
+        uBlades: { value: new THREE.Vector4(grass.height[0], grass.height[1], order === 0 ? 0 : grass.flowers, Math.min(0.85, 0.35 + 0.25 * order)) },
         uGrass: { value: new THREE.Color(place.ground.grass) },
         uDry: { value: new THREE.Color(place.ground.dry) },
         uFlowerA: { value: new THREE.Color(flowers[0] ?? 0xffffff) },
@@ -180,10 +180,10 @@ export function envBuildGrass({ place, map }) {
   return group;
 }
 
-/** Draw `share` (0..1) of the near ring's blades and `far` of the others', each widened to cover the same ground. */
+/** Draw `share` (0..1) of the two nearest rings' blades and `far` of the others', each widened to cover the same ground. */
 export function envGrassQuality(group, share, far) {
   for (const mesh of group.children) {
-    const part = mesh.userData.envRing === 0 ? share : far;
+    const part = mesh.userData.envRing < 2 ? share : far;
     mesh.geometry.instanceCount = Math.max(1, Math.floor(mesh.userData.envFull * part));
     mesh.material.uniforms.uLayer.value.y = mesh.userData.envWidth / Math.sqrt(part);
   }

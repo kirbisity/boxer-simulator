@@ -189,11 +189,12 @@ float envInMap(vec2 xz) {
   vec2 edge = abs(xz) / ${ENV.terrain.mapHalf.toFixed(1)};
   return 1.0 - smoothstep(0.86, 0.98, max(edge.x, edge.y));
 }
-// Where grass has gone to straw, 0..1: broad patches, the same for the blades and the ground under them.
+// Where grass has gone to straw, 0..1: broad patches, the same for the blades and the ground under them; the
+// place's share of straw (uEnvDry) is how much of the noise counts as a patch.
 float envDryAt(vec2 xz) {
   float broad = texture2D(uEnvNoise, xz / 620.0).b;
   float fine = texture2D(uEnvNoise, xz / 61.0 + vec2(0.13, 0.57)).a;
-  return smoothstep(0.3, 0.72, broad * 0.6 + fine * 0.4);
+  return smoothstep(-0.2, 0.2, broad * 0.6 + fine * 0.4 - 0.75 + 0.5 * uEnvDry);
 }`;
 
 /** The renderer's own shadow map, read from an env shader. Vertex: declare, then call with a world position and normal. */
@@ -266,6 +267,8 @@ void main() {
   // Grass as it looks from above: its tips' colour, a little shaded by its own depth.
   vec3 grass = mix(uGrass, uDry, envDryAt(xz)) * (0.78 + 0.3 * medium);
   grass *= mix(1.0, 0.82 + 0.36 * fine, near);
+  // Under blades that are drawn the ground is in their shade; beyond them it is the grass's own colour.
+  grass *= 1.0 - ${(1 - ENV.grass.underShade).toFixed(2)} * sqrt(map.g) * inMap * (1.0 - smoothstep(${(ENV.grass.layers[ENV.grass.layers.length - 1].tile * 0.12).toFixed(1)}, ${(ENV.grass.layers[ENV.grass.layers.length - 1].tile * 0.3).toFixed(1)}, distance));
   vec3 soil = uSoil * (0.72 + 0.5 * mix(medium, fine, 0.5 * near));
   vec3 colour = mix(grass, soil, worn);
 
