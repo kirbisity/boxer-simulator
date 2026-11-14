@@ -791,11 +791,14 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
  *   - `bind`: the same skeleton with every chain moved onto the rig's own root (pelvis, hips, shoulders, neck), which is where
  *     the physics holds them: the skin is bound to it, so in play a limb's skin keeps its place beside the trunk's however the
  *     bones turn (bound on the model's roots, a thigh would be carried 2 cm in to the rig's hip).
+ *   - `apart`: how far apart the shoulders and the hips are set against the rig's own (loftbody.js baseFrame: the frame as
+ *     drawn over the rig's, and a body's weight under the ordinary build, which draws its skeleton in a little), the loft's
+ *     and the skin's; the rig's stay, and the skin is bound to them.
  * Returns { loft, skin, bind } (joints by name; `skin` has the forearm end at the modelled wrist, not the hand point) and
  * `reach` (each arm part's length against the model's: a forearm's `extra` out to the hand, BASE_BODY.handSeat; an upper arm's
  * `within` its game-length frame).
  */
-export function baseBindJoints(rig, joints, height) {
+export function baseBindJoints(rig, joints, height, apart = 1) {
   const moved = Object.fromEntries(Object.keys(rig.joints).map((name) => [name, vec.add(rig.joints[name], vec.sub(joints[name], rig.refJoints[name]))]));
   const loft = { ...moved };
   const skin = {};
@@ -811,7 +814,8 @@ export function baseBindJoints(rig, joints, height) {
   // rig's shoulder, the model's own height and depth kept; the shoulder's cap, on the trunk, eases into it across the joint.)
   for (const side of ['l', 'r']) {
     const name = `${side}Shoulder`;
-    loft[name] = [moved[name][0], moved[name][1], joints[name][2]];
+    loft[name] = [moved[name][0], moved[name][1], joints[name][2] * apart];
+    loft[`${side}Hip`] = [moved[`${side}Hip`][0], moved[`${side}Hip`][1], moved[`${side}Hip`][2] * apart];
   }
   chain(['neck', 'head']);  // (the skin's; the loft's head is set below)
   for (const side of ['l', 'r']) {
@@ -859,15 +863,19 @@ export function baseBindJoints(rig, joints, height) {
  * swells or shrinks the one model's own forms; but for the open borders, where it eases back into that placing
  * (BASE_BODY.family.ease), and for the skin about the neck's top, the neck's own and the trapezius' that climbs the nape as
  * the trunk's, which is kept inside the game's head `head` as that placing's is (headHold). `along(name, t, distance)` the
- * arms' stretch to the game's length (placeBaseBody).
+ * arms' stretch to the game's length (placeBaseBody). `across`: how broad his skeleton is against the builds' own (loftbody.js
+ * baseFrame): the trunk's points that much further apart across and no deeper, a limb's that much further from its bone
+ * both ways, the neck's as they are.
  */
-function baseFamily(rig, frames, placed, height, weights, along, head = null) {
+function baseFamily(rig, frames, placed, height, weights, along, head = null, across = 1) {
   const { names, sources } = rig;
   const size = height / rig.height;
+  const broad = Object.fromEntries(names.map((name) => [name, name === 'neck' ? [1, 1] : name === 'trunk' ? [1, across] : [across, across]]));
   const at = (name, c, k, out) => {
     const frame = frames[name];
+    const [deep, wide] = broad[name];
     const distance = along(name, c[k], c[k] * frame.length);
-    for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * distance + (frame.depthAxis[axis] * c[k + 1] + frame.widthAxis[axis] * c[k + 2]) * size;
+    for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * distance + (frame.depthAxis[axis] * c[k + 1] * deep + frame.widthAxis[axis] * c[k + 2] * wide) * size;
     return out;
   };
   const used = weights.map((weight, build) => [weight, sources.builds[build]]).filter(([weight]) => weight !== 0);
@@ -915,10 +923,10 @@ function baseFamily(rig, frames, placed, height, weights, along, head = null) {
  * starved he is (baseStarvation: the emaciated reference's contour, each point's delta out along its line, laid on by it),
  * `foreReach` each arm part's length against the model's ({ extra, within }, baseBindJoints), `muscle(name, t, angle)` a
  * form to add out along each point's line (m), or null; `family` the family's weights (baseFamily), or null for the base
- * model by his ratios alone.
+ * model by his ratios alone, and `across` how broad the family is drawn on him (baseFamily).
  * Returns the drawn points' positions (render order) and the sources', and how much of the emaciated build it took (`herShare`).
  */
-export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}, muscle = null, shoulderKeep = 0, waste = 0, neckGirth = 0, family = null) {
+export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}, muscle = null, shoulderKeep = 0, waste = 0, neckGirth = 0, family = null, across = 1) {
   const { names, sources, render } = rig;
   const frames = {};
   const ratios = {};
@@ -1104,7 +1112,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     }
     if (!BASE_BODY.shoulderPlus[design]) shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
   }
-  if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf, joints.gameHead ?? joints.head);
+  if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf, joints.gameHead ?? joints.head, across);
   // (PROOF OF CONCEPT: the widths ANSUR II measures, when asked for (globalThis.BASE_WIDTHS, a list): biacromial (across the
   // shoulders' tops, from 1 cm above the shoulder joints up), chest breadth (the trunk's own skin across at the nipples, 0.72 of
   // height) and bideltoid (everything across, arms included, from 12 cm under the joints to them), in the bind pose.)

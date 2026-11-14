@@ -4,6 +4,8 @@
 # Deurenberg, Weststrate and Seidell's 1991 line at age 30 (1.2 BMI + 0.23 age - 10.8 male - 5.4) for the ordinary and the fat
 # builds, and stated for the muscular (the man's the game's reference build's own 11%; an athletic woman's 20%) and the
 # emaciated (5% and 9%: essential fat nearly gone).
+# python3 composition.py <builds' directory>: the builds as the game draws them, dump.py's (shaped).
+import sys
 import numpy as np
 import bodylib as bl
 HEIGHT = {'male': 1.80, 'female': 1.68}
@@ -32,7 +34,7 @@ if __name__ == '__main__':
         b = bl.load(sex)
         row = {}
         for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
-            v = closed_volume(np.load(f'{name}-{sex}.npy'), b['T'])
+            v = closed_volume(np.load(f'{sys.argv[1]}/{name}-{sex}.npy'), b['T'])
             fat = STATED[sex].get(name, 0.2)
             for _ in range(30):
                 bmi = v * HEIGHT[sex] * 1000 / (fat / 0.9 + (1 - fat) / 1.1) + REST

@@ -10,6 +10,8 @@
 # girdle like the acromion: the skin hangs between it and the trapezius' border behind (the hollow over the collarbone), so
 # the bone stands as its rim.
 # The other builds keep their cover over the bone, and less of the trapezius over it (TRAPEZIUS, top_line).
+# The emaciated build's waist is drawn in between its ribs and its hip bones (WAIST) and its arms thinned to a wasted arm's
+# girth (ARMS).
 # Reads even/<build>-<sex>.npy, writes shaped/: dump.py's last argument.
 import os, shutil, numpy as np, bodylib as bl, relax
 
@@ -235,6 +237,33 @@ def waist(V, part, own=WAIST):
     X = V.copy(); X[:, 0] -= share * (V[:, 0] - middle); X[:, 2] -= share * V[:, 2]
     return X
 
+ARMS = dict(
+    # The emaciated build's arms. The sculpt's keep an arm's flesh a body that thin has lost (21 and 22 cm round the upper
+    # arm at 1.75 m, a woman's and a man's): the girth round the middle of the upper arm is one of the measures adult wasting
+    # is graded by, some 20 cm at a BMI of 13 and 16 to 17 at 10 by relief work's cut-offs, 18.5 at 14 by a hospital's line
+    # of the one on the other (figures as commonly quoted, of people 1.55 to 1.75 m tall; not re-read here). `girth`: what
+    # the build's upper arm is brought to round its middle, of stature (18.5 cm at 1.75 m), every section of the arm drawn in
+    # towards its bone by the share that takes; the forearm's belly by the same share (its flesh goes with the arm's).
+    # `elbow`: how much of that share the elbow takes, which is bone under skin already, and the wrist none.
+    # `shoulder`: along the upper arm (from the joint, of its length), none of it down to the first, where the girdle's bone
+    # is the outline (GIRDLE), all of it from the second; `wrist`: along the forearm, all to the first and none from the second.
+    girth=0.106, elbow=0.3, shoulder=(0.12, 0.42), belly=(0.2, 0.8), wrist=(0.45, 0.85),
+)
+
+def arms(V, b, own=ARMS):
+    J, part, parts = b['J'], np.asarray(b['part']), b['parts']
+    draw = max(0.0, 1 - own['girth'] / bl.measure(b, V, quick=True)['bicepscircumference'])
+    ease = lambda t, a, c: (lambda u: u * u * (3 - 2 * u))(np.clip((t - a) / (c - a), 0, 1))
+    upper = lambda t: ease(t, *own['shoulder']) * (1 - (1 - own['elbow']) * ease(t, own['belly'][1], 1))
+    fore = lambda t: (own['elbow'] + (1 - own['elbow']) * ease(t, 0, own['belly'][0])) * (1 - ease(t, *own['wrist']))
+    X = V.copy()
+    for side in 'lr':
+        for name, a, c, share in (('Upper', 'Shoulder', 'Elbow', upper), ('Fore', 'Elbow', 'Hand', fore)):
+            m = part == parts.index(side + name); A = J[side + a]; axis = J[side + c] - A; length = np.linalg.norm(axis); axis = axis / length
+            along = (V[m] - A) @ axis; foot = A + along[:, None] * axis
+            X[m] = foot + (V[m] - foot) * (1 - draw * share(along / length))[:, None]
+    return X
+
 def top_line(V, J, T, rest, spec=GIRDLE, own=TRAPEZIUS):
     # A build's trapezius lessened: the neck's wall its own, the collar line the bone's.
     weld = bl.weld_map(rest); TW = weld[T]; TW = TW[(TW[:, 0] != TW[:, 1]) & (TW[:, 1] != TW[:, 2]) & (TW[:, 0] != TW[:, 2])]
@@ -256,7 +285,7 @@ if __name__ == '__main__':
         b = bl.load(sex)
         for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
             V = np.load(f'even/{name}-{sex}.npy'); X = (girdle if name == 'E' else top_line)(V, b['J'], np.asarray(b['T']), b['V'])
-            if name == 'E': X = waist(X, np.asarray(b['part']) == b['parts'].index('trunk'))
+            if name == 'E': X = arms(waist(X, np.asarray(b['part']) == b['parts'].index('trunk')), b)
             moved = np.linalg.norm(X - V, axis=1)
             print(f'{sex} {name}: {int((moved > 1e-4).sum())} points brought in, most {moved.max() * 1750:.0f} mm')
             np.save(f'shaped/{name}-{sex}.npy', X)

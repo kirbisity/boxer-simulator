@@ -5,7 +5,7 @@
 // whole body, and no lumps: every ring is a clean ellipse. 'faceted' drops to
 // seven sides and flat normals, for a low-poly art look.
 
-import { buildBody, P } from './body.js';
+import { buildBody, FRAMES, P } from './body.js';
 import { BASE_BODY, baseBindJoints, baseBodyAvailable, baseHeatBones, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
 import { relax, skinWeights, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
@@ -162,7 +162,8 @@ export const LOFT = {
   // fat-free mass index, kg/m², at the model's own height. Its BMI is by its own volume (tools/blender/family/composition.py:
   // the mesh's openings capped, a density from its fat share by Siri's two compartments, fat 0.9 and lean 1.1 kg/L, and 2.2
   // for the head, hands and feet the mesh has not: a tenth of an ordinary body, Winter 2009's segment table), which comes out
-  // at the BMI each was fitted to within 3% (a man's 14.2, 22.4, 26.7, 32.4 and 39.0 for 14, 22.5, 27, 33 and 40). Its fat share:
+  // at the BMI each fed build was fitted to within 2% (a man's 22.7, 27.0, 32.8 and 39.4 for 22.5, 27, 33 and 40); the
+  // emaciated builds, fitted at 14, weigh 13.3 as drawn (their waists drawn in and their arms thinned since). Its fat share:
   // an ordinary and a fat build's from Deurenberg, Weststrate and Seidell's line at age 30 (1991, Br J Nutr 65:105: 1.2 BMI +
   // 0.23 age − 10.8 for a man − 5.4, %); the muscular man's the reference build's own 11%, an athletic woman's 20%; an
   // emaciated body's 5% and 9%, its essential fat nearly gone.
@@ -178,14 +179,32 @@ export const LOFT = {
   // further and the model's forms turn inside out). That least fades to nothing at the emaciated build, which has no muscle
   // left to take off (less the muscular build's gain it was a shape of its own, not her: notched under the collarbones, its
   // shoulders sunk): the lean such a body lacks is taken as wasting along the line instead, mass for mass. `wasteMost`: the
-  // most of the emaciated build's loss from the ordinary one (1.55: the game's thinnest body, a BMI of 10, drawn at the
-  // volume it weighs, its limbs thinned towards the bone).
+  // most of the emaciated build's loss from the ordinary one (1.55: what the game's thinnest body, a BMI of 10, took of that
+  // build as first fitted, at 14, its limbs thinned towards the bone. Of the build as it stands, 13.3, and drawn in by its
+  // weight (frame, below), such a body takes 1.25 on a medium frame and 1.4 on a large one: the bound is past the game's range).
   family: {
-    male: { E: [0.69, 13.19], N: [4.11, 18.67], M: [2.87, 23.22], F1: [6.29, 20.8], F2: [9.93, 22.97], F3: [15.11, 24.46] },
-    female: { E: [1.27, 12.84], N: [5.98, 15.73], M: [4.74, 18.95], F1: [9.18, 17.86], F2: [13.74, 19.48], F3: [19.34, 20.19] },
+    male: { E: [0.66, 12.62], N: [4.07, 18.62], M: [2.85, 23.08], F1: [6.22, 20.75], F2: [9.83, 22.93], F3: [14.94, 24.43] },
+    female: { E: [1.2, 12.11], N: [5.91, 15.67], M: [4.71, 18.83], F1: [9.08, 17.81], F2: [13.62, 19.45], F3: [19.14, 20.18] },
     muscleMost: 2, muscleLeast: 0.5, wasteMost: 1.55,
     swell: { male: [0.02345, 0.01071, 0.001684], female: [0.02607, 0.01163, 0.001549] }, density: { fat: 900, lean: 1100 }, rest: 2.2,
   },
+  // How broad a body's skeleton is drawn (baseFrame): by its frame, and under the ordinary build a little by its weight.
+  // `widths`: a small and a large frame's, against a medium one's. At a given stature and BMI ANSUR II's breadths between the
+  // acromia spread by 3.5% (4082 men) and 4.0% (1986 women): a tenth either way is two and a half of those, the narrowest and
+  // the broadest of some hundred and fifty people, frames told apart at a glance (the rig's own, body.js FRAMES, stand 0.94
+  // and 1.07 apart: the skin's joints are set in or out of the rig's by the difference, baseBindJoints).
+  // `weight`: the power of BMI a bone breadth goes by at a given stature in that survey (BMIs 19 to 37): 0.12 and 0.07 between
+  // the acromia, 0.11 and 0.10 across the ankle, 0.12 and 0.11 across the hand; where the breadths that are flesh go by 0.36
+  // (across the deltoids, the hips). The fed builds were fitted to that survey's breadths at their own weights and carry it
+  // in their skin; the emaciated one is a sculpt set on the ordinary skeleton, so it is from the ordinary build down that
+  // the rule draws it in (the survey has nobody that thin: its slope is carried on down as it stands, 5% at a BMI of 13).
+  // `section`: the power of that breadth a body's volume goes by at its build: the trunk, half of it, broadens across and not
+  // in depth, the limbs, two fifths, both ways, the head, hands and feet not at all: 0.5 + 2 × 0.4. A body is looked up
+  // among the builds at its mass over that, so at one weight a broad frame is a leaner build drawn wider: as in the survey,
+  // where at a given stature and BMI 1% more between the acromia goes with 0.4 to 0.5% more across the deltoids and 0.2 to
+  // 0.4% more across the chest (the builds drawn so give 0.6 and 0.4), and with a chest 0.2% shallower and a waist 0.2%
+  // narrower.
+  frame: { widths: { small: 0.9, medium: 1, large: 1.1 }, weight: 0.1, section: 1.3 },
   // What lies over the emaciated build's bones on a fuller body (baseBoneRelief), m of soft tissue at the model's height for
   // each kg/m² more than that build has. `fat`: an ordinary man's fold of skin pinched at the chest or under the shoulder blade
   // is some 12 mm, two layers, 3 to 4 mm of it skin: 4 mm of fat a layer for his 3.4 kg/m² over the emaciated build's.
@@ -195,8 +214,10 @@ export const LOFT = {
   // build was drawn with a rib cage on his chest. Estimates from typical figures, not one study's table. `spacing`: from one
   // rib to the next at the side, m. `bucket`: bodies share skin maps (skintex.js compositionKey, 6 mm of fat to a bucket) only
   // where the relief they show is within this of each other (a 20th of it, 0.5 mm of a hip bone's 10 mm crest): the relief
-  // fades over a few kg/m², and a man of BMI 22 wore the ribs made for one of 19.
-  boneCover: { fat: 0.0012, lean: 0.002, spacing: 0.028, bucket: 0.05 },
+  // fades over a few kg/m², and a man of BMI 22 wore the ribs made for one of 19. `sculpt`: that build's indices as its relief
+  // was baked over it, a BMI of 14.2: before its waist was drawn in and its arms thinned (tools/blender/family girdle.py),
+  // which took mass off it and nothing off its ribs (composition.py even).
+  boneCover: { fat: 0.0012, lean: 0.002, spacing: 0.028, bucket: 0.05, sculpt: { male: [0.71, 13.53], female: [1.28, 12.89] } },
   // The neck's girth (baseNeckGirth), m: at BMI 22, per unit of BMI, for full training (exercise 1: the trapezius and
   // sternocleidomastoid grown), at this height (scaled with the body's). `lean`: per unit of BMI under 22. The published line
   // is of the fed, whose necks differ by their fat; a wasting body loses the neck's muscle with the rest, and its neck is a
@@ -2009,6 +2030,23 @@ export function baseNeckGirth(body) {
 }
 
 /**
+ * How broad a body's skeleton is drawn against the builds' own (LOFT.frame), and what that makes of its mass. `across`: its
+ * frame's width, and under the ordinary build its weight's part (the body's BMI over that build's own, both at the model's
+ * height `modelHeight`, to the power `weight`): what the trunk's breadths and the limbs' sections are drawn by (basebody.js
+ * baseFamily). `apart`: the same over the width the rig's shoulders and hips are set apart by already (body.js FRAMES): what
+ * the skin's joints move by from the rig's (baseBindJoints). `section`: the volume a build holds drawn that broad, over its
+ * own: a body is looked up among the builds at its mass indices over it (baseFamilyWeights), so the same weight on a broad
+ * frame is a leaner build drawn wider, and still weighs what the body weighs.
+ */
+export function baseFrame(body, modelHeight) {
+  const { frame, family } = LOFT;
+  const ordinary = family[body.inputs.sex === 'female' ? 'female' : 'male'].N;
+  const bmi = (body.massKg / (body.heightM * body.heightM)) * (modelHeight / body.heightM);
+  const across = (frame.widths[body.inputs.frame] ?? 1) * Math.min(1, bmi / (ordinary[0] + ordinary[1])) ** frame.weight;
+  return { across, apart: across / (FRAMES[body.inputs.frame] ?? FRAMES.medium).width, section: across ** frame.section };
+}
+
+/**
  * The family of builds' weights for a body (basebody.js baseFamily: one a build, in BASE_BODY.family.builds' order, summing to
  * one), by where its fat and its lean mass put it among them (LOFT.family), so the blend weighs what the body weighs. The
  * emaciated, the ordinary and the fat builds lie along one line in that plane, how well fed a body is (each step its own mix
@@ -2017,12 +2055,13 @@ export function baseNeckGirth(body) {
  * lean mass is over the line's there (or under: a little of that gain taken off; towards the emaciated build, which has none
  * to take off, the lean it lacks is wasting further along the line instead). One rule for every body, with no step
  * anywhere. `modelHeight` the model's standing height (m): a shape's mass goes by the cube of its height, so its mass indices
- * by the height itself, and a body is looked up at the model's.
+ * by the height itself, and a body is looked up at the model's; and at what it weighs a unit of its frame's section
+ * (baseFrame), the builds being drawn as broad as its frame after.
  */
 export function baseFamilyWeights(body, modelHeight) {
   const spec = LOFT.family;
   const at = spec[body.inputs.sex === 'female' ? 'female' : 'male'];
-  const scale = modelHeight / body.heightM;
+  const scale = modelHeight / body.heightM / baseFrame(body, modelHeight).section;
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
   const point = [(body.fatKg / (body.heightM * body.heightM)) * scale, body.ffmi * scale];
   const muscular = sub(at.M, at.N);
@@ -2079,19 +2118,20 @@ export function baseFamilyWeights(body, modelHeight) {
  * muscle by its mass indices (LOFT.boneCover). A soft layer `d` thick over a relief that repeats every `L` shows it at its own
  * surface by exp(−2π d / L): a disturbance of that wavelength dies away so with distance from where it is made (Laplace's
  * equation in the layer), which is why a rib cage is gone under a centimetre and a half of cover while the cage's own broad
- * shape is not. `modelHeight` as in baseFamilyWeights.
+ * shape is not. `modelHeight` as in baseFamilyWeights, and the indices over the body's frame as there: on a narrower skeleton
+ * the same mass lies thicker.
  */
 export function baseBoneRelief(body, modelHeight) {
-  const { boneCover: cover, family } = LOFT;
-  const emaciated = family[body.inputs.sex === 'female' ? 'female' : 'male'].E;
-  const scale = modelHeight / body.heightM;
+  const cover = LOFT.boneCover;
+  const emaciated = cover.sculpt[body.inputs.sex === 'female' ? 'female' : 'male'];
+  const scale = modelHeight / body.heightM / baseFrame(body, modelHeight).section;
   const fat = (body.fatKg / (body.heightM * body.heightM)) * scale - emaciated[0];
   const lean = body.ffmi * scale - emaciated[1];
   const over = Math.max(0, cover.fat * fat + cover.lean * lean);
   return Math.exp((-2 * Math.PI * over) / cover.spacing);
 }
 
-function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach }, rules = null, waste = 0, neckGirth = 0, family = null) {
+function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach }, rules = null, waste = 0, neckGirth = 0, family = null, across = 1) {
   const relief = (name) => {
     const key = BASE_TRAIT[name] ?? BASE_TRAIT[name.slice(1)];
     const modelled = definedBy(rig.refTraits[key].fat);
@@ -2100,7 +2140,7 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
   // (PROOF OF CONCEPT, BASE_BODY.shoulder 'E': the share of the model's shoulder bulk this body keeps, its arm's muscle showing
   // as baseArmForms reads it: development × leanness × definition through the fat.)
   const shoulderKeep = rules ? Math.min(1, rules.dev * rules.traits.arm.lean * Math.min(1, Math.max(0, (0.016 - rules.traits.arm.fat) / 0.011))) : 0;
-  const { positions, herShare } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null, shoulderKeep, waste, neckGirth, family);
+  const { positions, herShare } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null, shoulderKeep, waste, neckGirth, family, across);
   const uvs = uv ? baseBodyUvs(rig) : null;
   const start = mesh.positions.length / 3;
   const { render } = rig;
@@ -3310,7 +3350,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // On the base mesh the rings (and the skin) are built on the model's own joints, and the skin bound to the same skeleton moved
   // onto the rig's roots (basebody.js baseBindJoints): `bindAt`, `bindFrames` what is returned for the renderer to bind to.
   const rigPoints = bindPoints(body);
-  const baseJoints = baseRig ? baseBindJoints(baseRig, jointsByName(rigPoints), body.heightM) : null;
+  const baseBreadth = baseRig && !lowDetail && BASE_BODY.family.use ? baseFrame(body, baseRig.height) : { apart: 1, across: 1 };
+  const baseJoints = baseRig ? baseBindJoints(baseRig, jointsByName(rigPoints), body.heightM, baseBreadth.apart) : null;
   const byIndex = (named) => Object.keys(P).map((name) => named[name]);
   const points = baseJoints ? byIndex(baseJoints.loft) : rigPoints;
   const frames = boneFrames(points, body);
@@ -4033,7 +4074,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
 
   if (base?.measure) return { baseParts };
   if (baseRig) {
-    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints, lowDetail ? null : rulesTraits(body), baseWasting(body), lowDetail ? 0 : baseNeckGirth(body), lowDetail || !BASE_BODY.family.use ? null : baseFamilyWeights(body, baseRig.height));
+    addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints, lowDetail ? null : rulesTraits(body), baseWasting(body), lowDetail ? 0 : baseNeckGirth(body), lowDetail || !BASE_BODY.family.use ? null : baseFamilyWeights(body, baseRig.height), baseBreadth.across);
     fitClothToBase(mesh, baseParts, armoured);
   }
   // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.

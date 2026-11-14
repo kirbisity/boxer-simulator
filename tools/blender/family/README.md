@@ -35,10 +35,11 @@ From `<work>/remodel`, with `F=<repo>/tools/blender/family`:
     python3 $F/famE.py                       # E: the emaciated man, her tape by the sexes' ratio at the lean end
     python3 $F/register.py                   # reg/: each build's limbs set back on the base's bones
     python3 $F/relax.py                      # even/: each build's points set evenly on its own surface
-    python3 $F/girdle.py                     # shaped/: the emaciated build's shoulders held to the girdle's bone and its
-                                             # waist drawn in, the others' top line lowered towards that bone
+    python3 $F/girdle.py                     # shaped/: the emaciated build's shoulders held to the girdle's bone, its waist
+                                             # drawn in and its arms thinned, the others' top line lowered towards that bone
     python3 $F/swell.py                      # shaped/F4: F3 grown as fat grows to a BMI of 100; prints LOFT.family.swell
-    python3 $F/composition.py                # each build's [fat, fat-free mass index], for LOFT.family
+    python3 $F/composition.py shaped         # each build's [fat, fat-free mass index] as drawn, for LOFT.family
+                                             # (and `even`: the emaciated build before girdle.py, LOFT.boneCover.sculpt)
     python3 $F/dump.py family-even.json shaped
     node <repo>/tools/basebody-family.js family-even.json
 

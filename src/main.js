@@ -3658,8 +3658,10 @@ function sheetInputs(sheet, row, value) {
   const inputs = normaliseInputs(structuredClone(sheet.rows[row]));
   if (sheet.field) return { ...inputs, look: { ...inputs.look, [sheet.field]: value } };
   if (value.outfit) return { ...inputs, outfit: value.outfit, accessories: value.accessories ?? defaultHeadgear(value.outfit.kind) };
-  const height = inputs.heightCm / 100;
-  return { ...inputs, calories: Math.round(caloriesForWeight(inputs, value.bmi * height * height, FRAMES[inputs.frame].lean)) };
+  // (A body option may name its frame too: the same weight on a small frame and a large one, side by side.)
+  const framed = value.frame ? { ...inputs, frame: value.frame } : inputs;
+  const height = framed.heightCm / 100;
+  return { ...framed, calories: Math.round(caloriesForWeight(framed, value.bmi * height * height, FRAMES[framed.frame].lean)) };
 }
 
 /** Line up every option of a sheet for one build (`row`), labelled, and frame them. */

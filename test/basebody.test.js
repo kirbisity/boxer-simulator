@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBody, P } from '../src/body.js';
+import { buildBody, FRAMES, P } from '../src/body.js';
 import { BONE, bindPoints } from '../src/rig.js';
 import { buildSkinMesh, skinTextureKey } from '../src/bodystyles.js';
 import { BASE_BODY, baseBindJoints, baseBodyMesh, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
-import { baseBoneRelief, baseFamilyWeights, baseLoftOptions, baseRigOf, buildLoftBody } from '../src/loftbody.js';
+import { LOFT, baseBoneRelief, baseFamilyWeights, baseFrame, baseLoftOptions, baseRigOf, buildLoftBody } from '../src/loftbody.js';
 import { FLAT_UV } from '../src/skindetail.js';
 import { caloriesForWeight } from '../src/physiology.js';
 import { progression } from '../tools/bodysheet-cast.js';
@@ -135,13 +135,17 @@ test('the family of builds: a body is a mix of them summing to one, the emaciate
     const builds = BASE_BODY.family.builds;
     const at = (bmi) => baseFamilyWeights(buildBody({ ...average.inputs, calories: caloriesForWeight(average.inputs, bmi * average.heightM ** 2) }), height);
     const [wasted, fat, fattest] = [10, 60, 100].map(at);
-    assert.ok(wasted[builds.indexOf('E')] > 1.3 && Math.abs(wasted[builds.indexOf('M')]) < 1e-9, `${sex}: a BMI of 10 past the emaciated build (${wasted.map((weight) => weight.toFixed(2))})`);
+    assert.ok(wasted[builds.indexOf('E')] > 1.15 && Math.abs(wasted[builds.indexOf('M')]) < 1e-9, `${sex}: a BMI of 10 past the emaciated build (${wasted.map((weight) => weight.toFixed(2))})`);
     assert.ok(fat[builds.indexOf('F4')] > 0.2 && fat[builds.indexOf('F4')] < 0.8 && fat[builds.indexOf('F3')] > 0.2, `${sex}: a BMI of 60 between the fat builds (${fat.map((weight) => weight.toFixed(2))})`);
     assert.ok(fattest[builds.indexOf('F4')] > 0.95, `${sex}: a BMI of 100 the fattest build (${fattest.map((weight) => weight.toFixed(2))})`);
     for (const weights of [wasted, fat, fattest]) assert.ok(Math.abs(weights.reduce((sum, weight) => sum + weight, 0) - 1) < 1e-9);
     // (The relief fades with the body's cover, faster than the build's share: LOFT.boneCover.)
     const shows = [starved, thin, average, obese].map((body) => baseBoneRelief(body, height));
-    assert.ok(shows[0] > 0.9 && shows[1] > 0.1 && shows[1] < 0.5 && shows[2] < 0.1 && shows[3] < 0.01, `${sex}: bones through a starved body's skin, faintly a thin one's, not an average one's (${shows.map((show) => show.toFixed(2))})`);
+    // (A starved body of the cast, a BMI of 14, is drawn 5% narrower than the skeleton the relief's build was sculpted on,
+    // LOFT.frame: a millimetre and a half more over its ribs. Under a BMI of 13 the relief is whole.)
+    assert.ok(shows[0] > 0.7 && shows[1] > 0.1 && shows[1] < 0.5 && shows[2] < 0.1 && shows[3] < 0.01, `${sex}: bones through a starved body's skin, faintly a thin one's, not an average one's (${shows.map((show) => show.toFixed(2))})`);
+    const wasting = buildBody({ ...average.inputs, calories: caloriesForWeight(average.inputs, 12.5 * average.heightM ** 2) });
+    assert.ok(baseBoneRelief(wasting, height) > 0.95, `${sex}: all of it through a body of BMI 12.5`);
     const detail = baseStarvedDetail(starved, shows[0]);
     assert.equal(detail.heights.length, detail.width * detail.height, `${sex}: a height a texel of the relief's tile`);
     const most = detail.heights.reduce((m, value) => Math.max(m, Math.abs(value)), 0);
@@ -149,5 +153,42 @@ test('the family of builds: a body is a mix of them summing to one, the emaciate
     assert.equal(detail.weight, shows[0]);
     // (Bodies a composition bucket apart in nothing else do not share maps where the relief they show differs.)
     assert.notEqual(skinTextureKey(starved, 'base', buildSkinMesh(starved, 'base')), skinTextureKey(thin, 'base', buildSkinMesh(thin, 'base')));
+  }
+});
+
+test('the frame: a body is drawn as broad as its skeleton, a thin one a little narrower, and at one weight a broad frame is a leaner build', (t) => {
+  t.after(() => {
+    delete globalThis.BASE_WIDTHS;
+  });
+  for (const sex of ['male', 'female']) {
+    const height = baseRigOf(sex, false).height;
+    const average = progression(sex).find((row) => row.key === 'average').inputs;
+    const of = (frame, bmi) => {
+      const inputs = { ...average, frame };
+      return buildBody({ ...inputs, calories: caloriesForWeight(inputs, bmi * (inputs.heightCm / 100) ** 2, FRAMES[frame].lean) });
+    };
+    // (From the ordinary build up a frame's own width, and the skin's joints off the rig's by what the rig lacks of it.)
+    for (const frame of ['small', 'medium', 'large']) {
+      const { across, apart, section } = baseFrame(of(frame, 26), height);
+      assert.ok(Math.abs(across - LOFT.frame.widths[frame]) < 1e-9, `${sex} ${frame}: drawn ${across.toFixed(3)} of the builds' breadth`);
+      assert.ok(Math.abs(apart * FRAMES[frame].width - across) < 1e-9 && Math.abs(section - across ** LOFT.frame.section) < 1e-9);
+    }
+    // (Under it a little narrower by its weight: 5% at a BMI of 13.)
+    const thin = baseFrame(of('medium', 13), height).across;
+    assert.ok(thin > 0.93 && thin < 0.96, `${sex}: a BMI of 13 drawn ${thin.toFixed(3)} as broad`);
+    // (The same weight on a broader frame is a leaner build: more of the emaciated one at a BMI of 16.)
+    const emaciated = (frame) => baseFamilyWeights(of(frame, 16), height)[BASE_BODY.family.builds.indexOf('E')];
+    assert.ok(emaciated('small') < emaciated('medium') && emaciated('medium') < emaciated('large'), `${sex}: leaner on a broader frame`);
+    // (As drawn, at one BMI: across the deltoids half of the skeleton's fifth between a small and a large frame, as ANSUR II
+    // has it, LOFT.frame; the chest broader too.)
+    const drawn = (frame) => {
+      globalThis.BASE_WIDTHS = [];
+      buildSkinMesh(of(frame, 22), 'base');
+      return globalThis.BASE_WIDTHS.at(-1);
+    };
+    const [small, medium, large] = ['small', 'medium', 'large'].map(drawn);
+    const shoulders = large.bideltoid / small.bideltoid;
+    assert.ok(small.bideltoid < medium.bideltoid && medium.bideltoid < large.bideltoid && shoulders > 1.08 && shoulders < 1.15, `${sex}: a large frame's shoulders ${shoulders.toFixed(3)} of a small one's`);
+    assert.ok(small.chest < medium.chest && medium.chest < large.chest, `${sex}: its chest broader`);
   }
 });
