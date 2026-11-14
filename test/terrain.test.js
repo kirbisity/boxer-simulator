@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { advance, createWorld, floorUnder, legShare, placeOnFloor } from '../src/physics.js';
 import { WORLD } from '../src/physics/config.js';
-import { awayFromEdges, ceilingAt, ceilingOf, createTerrain, floorAt, pushOut, rampOf, rayBlocked, slabOf, stairsOf, wallLine, wallOf, windingStairs, windingTread } from '../src/physics/terrain.js';
+import { awayFromEdges, ceilingAt, ceilingOf, createTerrain, fieldHeight, fieldOf, floorAt, pushOut, rampOf, rayBlocked, slabOf, stairsOf, wallLine, wallOf, windingStairs, windingTread } from '../src/physics/terrain.js';
 import { createStageWorld, updateStage } from '../src/levelmode/stage.js';
 import { TESTYARD } from '../src/levelmode/stages/testyard.js';
 import { footErrors, hipsAt, walk } from './walker.js';
@@ -401,4 +401,27 @@ test('the sea: a terrain with none loses nobody', () => {
 test('WORLD.terrain is the one place the tuning lives', () => {
   for (const key of ['cell', 'margin', 'stepUp', 'stepDown', 'bodyRadius', 'bodyHeight', 'liftRate', 'sag', 'fall']) assert.ok(WORLD.terrain[key] !== undefined, key);
   for (const key of ['safe', 'legs', 'bodyFrom', 'body', 'stumble', 'ankleFrom', 'ankleTo', 'compress', 'compressFrom']) assert.ok(WORLD.terrain.fall[key] !== undefined, key);
+});
+
+test('a field is rolling ground: the floor is its grid of heights, cell by cell, and it never pushes a body sideways', () => {
+  // A 20 x 10 m field of 10 x 5 cells, centred on (4, -3): a hill of 3 m in the middle of a plain.
+  const cells = [10, 5];
+  const hill = (x, z) => 3 * Math.exp(-((x - 4) ** 2 + (z + 3) ** 2) / 18);
+  const heights = [];
+  for (let j = 0; j <= cells[1]; j += 1) for (let i = 0; i <= cells[0]; i += 1) heights.push(hill(4 - 10 + i * 2, -3 - 5 + j * 2));
+  const terrain = createTerrain([fieldOf([4, -3], [20, 10], cells, heights)]);
+  // At the grid's corners the floor is the height given; inside a cell it is the flat triangle's.
+  assert.ok(Math.abs(floorAt(terrain, 4, -4) - hill(4, -4)) < 1e-9);
+  assert.ok(Math.abs(floorAt(terrain, 0, -2) - hill(0, -2)) < 1e-9);
+  assert.ok(Math.abs(floorAt(terrain, 5, -3) - (hill(4, -4) + hill(6, -2)) / 2) < 1e-9, 'the diagonal runs from a cell\'s (i, j) corner to its (i + 1, j + 1) corner');
+  assert.ok(Math.abs(fieldHeight(heights, 10, 5, (5 + 6) / 20, (-3 + 8) / 10) - floorAt(terrain, 5, -3)) < 1e-12, 'what draws the field asks the same function');
+  assert.equal(floorAt(terrain, 15, -3), -Infinity, 'off the field there is no floor');
+  // A man low on its flank is not shoved out through its edge: the field is walked, not a block.
+  const at = [3, -3];
+  assert.equal(pushOut(terrain, at, 0.3, 0, 1.7), false);
+  assert.deepEqual(at, [3, -3]);
+  // The hill hides what is behind it; over its top the line is clear.
+  assert.equal(rayBlocked(terrain, [-4, -3], [12, -3], 1.5), true);
+  assert.equal(rayBlocked(terrain, [-4, -7.5], [12, -7.5], 1.5), false);
+  assert.throws(() => createTerrain([fieldOf([0, 0], [4, 4], [2, 2], [0, 0, 0])]), /heights/);
 });

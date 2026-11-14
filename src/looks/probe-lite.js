@@ -116,7 +116,7 @@ function probeLiteBakeCube(size, radiance) {
 }
 
 /** Project a radiance function onto the nine SH coefficients of a LightProbe. */
-function probeLiteProject(sh, radiance) {
+export function probeLiteProject(sh, radiance) {
   const rgb = [0, 0, 0];
   const nTheta = 12;
   const nPhi = 24;
@@ -208,8 +208,12 @@ const PROBE_LITE_PLACES = {
   night: ['port'],
   storm: ['dunnottar'],
   hall: ['ring', 'subway', 'stadium'],
+  // Places that draw their own sky and aim their own sun (the town kit's: townkit/place.js tkKeep): the ambient is baked
+  // from the place's light (render.js PLACE_LIGHT `sky`: zenith, haze, sunColour, ground over the day's; its horizon the
+  // place's fog), one probe each, and the look's dome is left out.
+  own: ['canaltown', 'pyongyang'],
 };
-const probeLiteKind = (place) => (PROBE_LITE_PLACES.storm.includes(place) ? 'storm' : PROBE_LITE_PLACES.night.includes(place) ? 'night' : PROBE_LITE_PLACES.hall.includes(place) ? 'hall' : 'day');
+const probeLiteKind = (place) => (PROBE_LITE_PLACES.own.includes(place) ? 'own' : PROBE_LITE_PLACES.storm.includes(place) ? 'storm' : PROBE_LITE_PLACES.night.includes(place) ? 'night' : PROBE_LITE_PLACES.hall.includes(place) ? 'hall' : 'day');
 
 // Indoor lighting description per hall place: base ambient, the warm panels,
 // and keyGain on the overhead key. A fight-night ring sits under a bank of
@@ -229,7 +233,7 @@ const PROBE_LITE_HALLS = {
 function probeLiteBuild(st, place, view) {
   st.baked ??= {};
   const kind = probeLiteKind(place);
-  const key = kind === 'hall' ? place : kind;
+  const key = kind === 'hall' || kind === 'own' ? place : kind;
   if (st.baked[key]) return st.baked[key];
   const tune = PROBE_LITE_TUNE;
   const sun = new THREE.Vector3(...tune.sunDirection).normalize();
@@ -243,7 +247,7 @@ function probeLiteBuild(st, place, view) {
     probe.intensity = hall.probe * tune.hallProbeIntensity;
   } else {
     // The sky colours follow the place's own horizon (its fog/background), so each place keeps its weather.
-    const base = PROBE_LITE_SKIES[kind];
+    const base = kind === 'own' ? { ...PROBE_LITE_SKIES.day, ...view.light.sky } : PROBE_LITE_SKIES[kind];
     const bg = new THREE.Color(view.light.background);
     const sky = { ...base, horizon: kind === 'night' || kind === 'storm' ? base.horizon : [bg.r, bg.g, bg.b] };
     st.skies ??= {};
@@ -291,6 +295,19 @@ export const PROBE_LITE_LOOK = defineLook({
       setShadowMapSize(lights.key, PROBE_LITE_TUNE.shadowSize);
       setRenderer(view, { shadowMapType: SHADOW_MAP.pcf });
       if (st.dome) st.dome.visible = false;
+      return;
+    }
+
+    // A place with its own sky: its fog's colour for the haze, its own sun (it aims the light itself, each frame).
+    if (record.kind === 'own') {
+      if (st.dome) st.dome.visible = false;
+      view.scene.background = new THREE.Color(view.light.background);
+      view.scene.fog.color.set(view.light.background);
+      lights.key.visible = false;
+      lights.rim.visible = false;
+      lights.sun.visible = true;
+      lights.sun.color.fromArray(st.skies[place].sunColour);
+      setShadowMapSize(lights.sun, PROBE_LITE_TUNE.shadowSize);
       return;
     }
 

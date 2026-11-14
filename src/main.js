@@ -58,7 +58,8 @@ import { awarenessReport, freePrisoner, gatherFollowers } from './levelmode/awar
 import { installFade, paintStamina } from './overdraftview.js';
 import { createAwarenessOverlay } from './levelmode/awarenessview.js';
 import { travelPlaces } from './levelmode/travel.js';
-import { cameraTerrain, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
+import { floorAt } from './physics/terrain.js';
+import { cameraTerrain, createStageWorld, mechanismsOf, pullLever, setMechanism, updateStage } from './levelmode/stage.js';
 import { attemptCount, attemptLog, attemptStory, bossFightOn, contextFor, createLevelWorld, drainRebuilds, drainUi, dropDown, endingDone, endingOf, interact, interactions, killBoss, killNoname, levelBusy, levelOpponent, levelThink, respawnPlayer, restAtPoint, restartFromRest, useItem } from './levelmode/level.js';
 import { feetFloor, holdPlayer } from './levelmode/items.js';
 import { snapshotGear } from './levelmode/checkpoints.js';
@@ -92,7 +93,11 @@ import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
+import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
 import { installStory } from './story/storyview.js';
+import { STORY_MUSTER_RADIUS, STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
+import { tkSetTier } from './townkit/place.js';
+import { tkWeatherNow } from './townkit/weather.js';
 import { createStoryPlaceMark } from './story/placemark.js';
 import { mountCameraTuner } from './camtuner.js';
 
@@ -164,6 +169,14 @@ const shortName = (name) => {
 // The look (looks.js): ?look= over the one remembered. One that needs nothing loaded is in force before the scene is made; the others are switched to once the page is up.
 const startingLookId = lookIdFromSearch(location.search) ?? rememberedLookId() ?? OFFICIAL_LOOK_ID;
 activateLookNow(startingLookId);
+
+// The open air (env/): ?env=off draws every place as it was before it; ?weather=<name> (env/config.js ENV_WEATHER:
+// clear, cloudy, overcast, rain, mist, snow, dust) puts that weather on every place it draws. Before the scene is made, so the first place has them.
+{
+  const asked = new URLSearchParams(location.search);
+  if (asked.get('env') === 'off') envSetEnabled(null, false);
+  if (asked.get('weather')) envSetWeather(null, asked.get('weather'));
+}
 
 const scene = createScene($('#stage'));
 if (activeLook().id !== DEFAULT_LOOK_ID) reapplyPlace(scene);
@@ -770,7 +783,11 @@ let qualityMode = readQuality(typeof localStorage === 'undefined' ? null : local
 const holdQuality = (view = null) => resolution.pin(qualityMode === 'auto' ? null : pinnedRung(qualityMode, Infinity), view);
 holdQuality();
 // The tier a rung gives goes to the stage's drawing (and, there being none yet, to the one made next: enterStage).
-resolution.onTier = (tier) => stageView?.setQuality?.(tier);
+// (And to the town kit's places, which drop their near detail on the low tier: townkit/place.js.)
+resolution.onTier = (tier) => {
+  stageView?.setQuality?.(tier);
+  tkSetTier(tier);
+};
 function frame(now) {
   // The next frame is asked for first: an error in this one must never stop the game.
   requestAnimationFrame(frame);
@@ -780,6 +797,8 @@ function frame(now) {
   last = now;
   try {
     resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)), { tiered: Boolean(state.world?.stage) });
+    // The open air's own tier (env/index.js): how much grass, leaf and drift this device draws in time.
+    envAdapt(scene, interval, qualityMode);
     // A V7 skin's maps by the stage's tier (render.js setSkinQuality): on 'low', no normal or roughness map.
     setSkinQuality(state.views, state.world?.stage ? resolution.tier ?? 'high' : 'high');
     // A big moment slows the simulation, not the drawing.
@@ -1342,6 +1361,7 @@ function drawWorld(dt, drawIt = true) {
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
   updateClothWind(scene, world);
+  envUpdate(scene, world);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
@@ -2911,7 +2931,10 @@ function enterStoryWorld(setup, { paused = false } = {}) {
   state.world = createWorld(setup.fighters, setup.options);
   // (The scene is the view's; a battle's `options.place` may be only its climate's key.)
   const place = setup.view?.scene ?? setup.options.place ?? 'field';
-  presentWorld(place, setup.options.arena, setup.view ?? null);
+  // (A place that can be walked has its weather by the day: the same in the battle as on the walk before and after it.)
+  const { view } = setup;
+  const town = view?.roam && STORY_PLACES[view.roam] && !view.weather?.town ? storyPlaceWeather(view.roam, storyDayRoll(view.day ?? state.seed)) : null;
+  presentWorld(place, setup.options.arena, town ? { ...view, weather: { ...view.weather, town } } : view ?? null);
   state.sideAsked = true;
   takeSide(corner);
   boxer.finishBuilding();
@@ -2919,9 +2942,69 @@ function enterStoryWorld(setup, { paused = false } = {}) {
   return state.world;
 }
 
+/**
+ * A story place walked freely (places/storyplaces.js: `key`), before or after its battle: the hero alone in the place's
+ * stage world (levelmode/stage.js, as the Dunnottar stage: its floors, stairs and walls; nobody to fight), drawn by the
+ * place's own builder, played on foot with the follow camera. `inputs`: the walker (the battle's hero); `weather`: the
+ * place's weather for the day (the kit's values: townkit/weather.js); `at`, `facing`: where he starts, else the stage's.
+ */
+function enterStoryRoam(key, { inputs, weather = null, day = null, after = false, at = null, facing = null } = {}) {
+  const entry = STORY_PLACES[key];
+  if (!entry) throw new Error(`no story place called ${key}`);
+  if (state.game !== 'story') setGame('story');
+  leaveStage();
+  state.scenario = null;
+  state.muster = null;
+  state.playSide = 'red';
+  state.lead = { red: 0, blue: 0 };
+  const stage = entry.stage();
+  // (After the battle he is where it was fought, on the muster point; before it, where the place is entered.)
+  if (after && !at) {
+    at = [...(entry.after?.at ?? entry.muster)];
+    facing ??= entry.after?.facing ?? null;
+  }
+  if (!weather && day !== null) weather = storyPlaceWeather(key, storyDayRoll(day));
+  const start = at ? { ...stage.start, at, facing: facing ?? stage.start.facing } : stage.start;
+  state.world = createStageWorld({ ...stage, start }, normaliseInputs(structuredClone(inputs)), { seed: state.seed, awareness: false });
+  clearGore(scene);
+  setPlace(scene, entry.place, PLACE_ARENAS[entry.place], weather ? { town: weather } : null);
+  fightMarks.reset();
+  fightMarks.warm();
+  cameraWalls = stageCameraRoom(() => state.world.arena.terrain);
+  followCam.reset();
+  // (Behind him as he arrives: the orbit's yaw is the world's, his facing the stage's.)
+  Object.assign(scene.orbit, { ...entry.camera, yaw: (start.facing ?? 0) + Math.PI + entry.camera.yaw });
+  watchCam = createWatchCam();
+  cameraNote = '';
+  document.body.dataset.place = entry.place;
+  $('#place').closest('label').hidden = true;
+  rebuildViews({ progressive: true });
+  state.eventCursor = 0;
+  state.finishedAt = null;
+  resetDrama(state.drama);
+  resetChargeFeel();
+  $('#log').replaceChildren();
+  $('#banner').hidden = true;
+  state.orders = newOrders();
+  fightControls.reset();
+  state.sideAsked = true;
+  $('#side-pick').hidden = true;
+  $('#modes button[data-value="play"]:not([data-side])').click();
+  state.walkRunning = false;
+  renderHud();
+  boxer.finishBuilding();
+  state.paused = false;
+  const { terrain } = state.world.arena;
+  return { world: state.world, muster: [entry.muster[0], entry.muster[2]], radius: STORY_MUSTER_RADIUS, floor: (x, z) => Math.max(0, floorAt(terrain, x, z)) };
+}
+
+/** A day's number (a battle's seed: runner.js storyBattleSetup) as a roll in [0, 1) for the day's weather. */
+const storyDayRoll = (day) => (Math.imul(day >>> 0, 2654435761) >>> 0) / 2 ** 32;
+
 const story = installStory({
   storage: browserStorage,
   stage: enterStoryWorld,
+  roam: enterStoryRoam,
   world: () => state.world,
   pause: (on) => {
     state.paused = Boolean(on);
@@ -3860,6 +3943,17 @@ const boxer = window.boxer = {
     if (on !== undefined) resolution.set(on, scene);
     return resolution.info(scene);
   },
+  // The open air (env/): put a weather on ('clear', 'cloudy', 'overcast', 'rain', 'mist', 'snow', 'dust'; null: each place's own), or with no
+  // argument say what is in force ({ on, place, weather, tier, weathers, wind }).
+  weather: (name) => {
+    if (name !== undefined) envSetWeather(scene, name);
+    return envInfo(scene);
+  },
+  // The open air on or off (off: every place as it was before it); no argument: what is in force.
+  env: (on) => {
+    if (on !== undefined) envSetEnabled(scene, on);
+    return envInfo(scene);
+  },
   // The quality of the stage's picture: 'auto' (a ladder of pixels and tiers walked by the frame times), 'high' (everything, full pixels) or 'low' (the cheapest
   // picture, the fewest pixels); remembered. No argument: what it is doing now ({ mode, tier, ratio, ... }).
   quality: (mode) => {
@@ -3909,6 +4003,25 @@ const boxer = window.boxer = {
     boxer.finishBuilding();
     return state.world.stage.active;
   },
+  // A story place walked freely, outside any chapter (places/storyplaces.js: 'canaltown', 'pyongyang'): `weather` a name of
+  // the place's weathers ('damp', 'rain', 'dry'...) or the kit's values. `?place=<key>&weather=<name>` in the address opens one.
+  roam: (key = 'canaltown', { weather = null, at = null, facing = null } = {}) => {
+    skipIntro();
+    menus.close();
+    document.body.classList.remove('sheet');
+    const entry = STORY_PLACES[key];
+    if (!entry) throw new Error(`no story place called ${key} (${Object.keys(STORY_PLACES).join(', ')})`);
+    const { world } = enterStoryRoam(key, { inputs: story.heroInputs(), weather: typeof weather === 'string' && entry.weathers[weather] ? { name: weather, ...entry.weathers[weather] } : weather, at, facing });
+    return { place: entry.place, terrain: world.arena.terrain.solids?.length ?? null };
+  },
+  // The weather of the town kit's place now (townkit/weather.js: wet, pool, snow, rain 0..1, mist, fog [near, far]): `placeWeather({ wet: 1, pool: 0.8, rain: 1 })`
+  // sets the view's (the place follows it each frame); nothing given, what is drawn now.
+  placeWeather: (values = null) => {
+    if (values) scene.weather = { ...scene.weather, town: { ...scene.weather?.town, ...values } };
+    return values ? scene.weather.town : tkWeatherNow();
+  },
+  storyPlaces: STORY_PLACES,
+  storyPlaceWeather,
   // The look of the Dunnottar stage (levelmode/stagelooks.js): `stageLook()` says which (and the names); `stageLook(name)` changes it now; `stageLook(undefined, { still: true })` stops the lightning.
   // A strike now (`stageStrike(true)` holds it at its first crack, for a picture; `stageStrike(null)` lets go).
   stageStrike: (hold = false) => { stormStrikeNow(hold); return true; },
@@ -4125,3 +4238,8 @@ const boxer = window.boxer = {
 };
 // `#flame` in the address: the flamethrower's demo (boxer.flameDemo).
 if (/^#(.*&)?flame(&|$)/.test(location.hash)) setTimeout(() => boxer.flameDemo(), 0);
+// `?place=canaltown` (a key of places/storyplaces.js) opens that story place to walk; `&weather=rain` (a name of its weathers) sets its day.
+{
+  const wanted = new URLSearchParams(location.search);
+  if (STORY_PLACES[wanted.get('place')]) setTimeout(() => boxer.roam(wanted.get('place'), { weather: wanted.get('weather') }), 0);
+}

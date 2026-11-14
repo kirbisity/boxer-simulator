@@ -130,7 +130,7 @@ const EMPTY_KEYS = (object) => Object.keys(object.userData).length === 0;
 const hasOwnHook = (object) => Object.prototype.hasOwnProperty.call(object, 'onBeforeRender') || Object.prototype.hasOwnProperty.call(object, 'onAfterRender');
 
 /** Userdata that other code reads off a mesh: such a mesh is left as built. */
-const PINNED_KEYS = ['scenery', 'sceneryVariant', 'seeThrough', 'tick', 'heightAt', 'fogHalo', 'paintedSky', 'shared', 'battleFx'];
+const PINNED_KEYS = ['scenery', 'sceneryVariant', 'seeThrough', 'tick', 'heightAt', 'fogHalo', 'paintedSky', 'shared', 'battleFx', 'env'];
 
 /**
  * Cheapen the place now shown (setPlace, reapplyPlace): everything visible in it

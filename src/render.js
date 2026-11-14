@@ -54,6 +54,10 @@ import { plainsCamelTrain, plainsRidge } from './props/plains.js';
 import { buildStormPlace, stormRelease } from './levelmode/storm.js';
 import { showWorks, updateWorksView } from './worksview.js';
 import { worksOf } from './physics/fieldworks.js';
+import { buildCanalTown, CANAL_TOWN_LIGHT } from './places/canaltown.js';
+import { buildPyongyang, PYONGYANG_LIGHT } from './places/pyongyang.js';
+// (The kit's door to the open air: townkit/air.js puts env/'s registration where the kit's places find it.)
+import './townkit/air.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };
@@ -125,6 +129,8 @@ export function createScene(canvas, { alpha = false } = {}) {
  * scene is built the first time it is needed; lighting goes with it.
  */
 export function setPlace(view, place, arena, weather = null) {
+  // Whether the level brought this weather (the open air of env/ honours a level's, and puts its own in place of PLACE_WEATHER's).
+  const brought = weather !== null;
   // A place with weather of its own whenever a level brings none (PLACE_WEATHER: the open field's driven grey sky).
   weather ??= PLACE_WEATHER[place] ?? null;
   // A battle's fieldworks (its arena's `works`: stakes, palisades, woods, ditches, mud), over whatever place it is fought in.
@@ -132,14 +138,16 @@ export function setPlace(view, place, arena, weather = null) {
   // A battle map's floor, much wider than the place's own, has the place built for it (scenery.js sceneryFor
   // pushes the backdrop out); the place's own floor and that one are kept side by side, each shown by turns.
   const home = PLACE_ARENAS[place];
-  const floor = home && arena && arena.halfX >= home.halfX * WIDE_FLOOR ? arena : null;
+  // (A place that is a whole town or a length of wall, `own`, is built once whatever is fought in it: its ground is its own.)
+  const floor = home && !home.own && arena && arena.halfX >= home.halfX * WIDE_FLOOR ? arena : null;
   // A place whose ground is dug for a ditch (the works' ditches: Qi Jiguang's trench in the water town's square) is built for
   // that battle too, apart from the place the other levels there share.
-  const dug = arena?.works?.ditches?.length ? arena : null;
+  const dug = !home?.own && arena?.works?.ditches?.length ? arena : null;
   const swapped = swapFloor(view, place, floor ?? dug);
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  view.weatherBrought = brought;
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, canaltown: buildCanalTown, pyongyang: buildPyongyang, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -154,6 +162,8 @@ export function setPlace(view, place, arena, weather = null) {
     view.places[place].userData.bind?.(view);
   }
   if (view.place === 'dunnottar' && place !== 'dunnottar') stormRelease(view);
+  // A place that took something of the view's for itself (the town kit's: the sun's shadow box) gives it back.
+  if (view.place !== place) view.places[view.place]?.userData.leave?.(view);
   for (const [key, group] of Object.entries(view.places)) if (group) group.visible = key === place;
   view.place = place;
   releaseOldPlaces(view, place);
@@ -304,7 +314,8 @@ const WEATHER_TREE_REACH = 30;
 const WEATHER_MIST_COLOUR = new THREE.Color(0xdde2e2);
 
 function applyWeather(view) {
-  const weather = view.weather;
+  // A place drawn as open air (env/index.js) has its weather from there: sun, fog and sky are already its own.
+  const weather = view.env?.on ? null : view.weather;
   const group = view.places?.[view.place];
   if (!group) return;
   const mist = weather?.sky ?? 0;
@@ -419,6 +430,9 @@ const PLACE_LIGHT = {
   coastVillage: { background: 0xc8dcee, fog: [35, 120], key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.95 },
   // A water town south of the Yangtze: soft bright sky, damp air, the wooded hills 50–80 m out in the haze.
   jiangnan: { background: 0xc6d6e0, fog: [30, 110], far: 112, key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 1.0 },
+  // The story's places built by the town kit (src/places): each brings its own light.
+  canaltown: CANAL_TOWN_LIGHT,
+  pyongyang: PYONGYANG_LIGHT,
   // A highland valley at 2,700 m late in the afternoon: thin clear air, the haze warm toward evening, the hills 90 m out and more.
   cajamarca: { background: 0xd8d0bc, fog: [60, 190], far: 200, key: 0xffe2b8, keyIntensity: 0.12, rim: 0xffd6a0, sun: 0.95 },
   // Agincourt: a low grey October sky after rain, the light flat, the woods dark.
@@ -453,6 +467,10 @@ export const PLACE_ARENAS = {
   coastVillage: { halfX: 12, halfZ: 8 },
   // The square between the shops and the canal: room for the wokou raid's formations.
   jiangnan: { halfX: 14, halfZ: 9 },
+  // (`own`: one built copy whatever the arena, setPlace.)
+  canaltown: { halfX: 18, halfZ: 9, own: true },
+  // (The wall's stretch that chapter 3 storms: story/battles/03-pyongyang.js PYONGYANG_1593.arena.)
+  pyongyang: { halfX: 135, halfZ: 9, own: true },
   // The square of Cajamarca between its long halls (props/cajamarca.js CAJAMARCA_PLAN).
   cajamarca: { halfX: 16, halfZ: 11 },
   // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).
@@ -823,11 +841,14 @@ function buildField(arena = PLACE_ARENAS.field) {
   // Rough grass over it, bowing and swaying in the wind (clothwind.js), and a few stones.
   const litter = fieldLitter(59, arena, { grass: 0x5e7a3a, stone: 0x6e6a62, tufts: 1400, stones: 90, half: [arena.halfX + 12, arena.halfZ + 10] });
   swayGrass(litter[0].material, 0.38);
+  // (Tagged, with the track below, so the open air's own grass and worn earth can stand in for them: env/index.js ENV_REPLACES.)
+  for (const mesh of litter) mesh.userData.scenery = 'litter';
   place.add(...litter);
   // Hoof-churned earth down the middle of the ground.
   const track = new THREE.Mesh(new THREE.PlaneGeometry(arena.halfX * 1.7, arena.halfZ * 0.9), lit(0x7a6a48, { transparent: true, opacity: 0.35 }));
   track.rotation.x = -Math.PI / 2;
   track.position.y = 0.004;
+  track.userData.scenery = 'groundmarks';
   place.add(track);
   // The rail round the ground: post-and-rail, posts every 4 m (src/props/rural.js).
   place.add(ruralFieldRail(arena));
@@ -1210,7 +1231,9 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
     palisadeSpan: arena.halfX,
   }));
   // Autumn grass in tufts and field stones beyond the trampled ground.
-  place.add(...fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] }));
+  const litter = fieldLitter(47, arena, { grass: 0x8a7a3a, stone: 0x86827a, tufts: 900, stones: 140, half: [45, 38] });
+  for (const mesh of litter) mesh.userData.scenery = 'litter';
+  place.add(...litter);
   return place;
 }
 

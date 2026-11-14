@@ -15,7 +15,7 @@
 
 import { CHAPTERS, COMRADES, FLASHBACKS, STORY_FAMILY, STORY_HERO } from './chapters/index.js';
 import { STORY_BATTLES } from './battles/index.js';
-import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
+import { STORY, storyApplyEffects, storyBeginAnew, storyEnterChapter, storyHeroInputs, storyLoad, storyLuck, storyLuckText, storyMarkDead, storyNewLife, storyRetry, storySave, storyText } from './life.js';
 import { storyGetLang, storyOnLang, storySetLang } from './language.js';
 import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyBattleSetup, storyCommandMen, storyCurrent, storyDeploy, storyFinaleDone, storyHeadsIn, storyLifeLived, storyNextChapter, storyPlaceOf, storyReadOutcome, storySceneDone, storyWatch, storyWatchStep, STORY_RUN } from './runner.js';
 import { knockOut } from '../physics.js';
@@ -37,6 +37,10 @@ export const STORY_WORDS = {
   back: { zh: '返回', en: 'Back' },
   menu: { zh: '主菜单', en: 'Menu' },
   next: { zh: '继续', en: 'Continue' },
+  // A place walked before and after its battle (startRoam): what the HUD says, and the button that goes on at once.
+  roamBefore: { zh: '四处走走；到圈里去，就列阵', en: 'Walk where you like; step into the ring to fall in' },
+  roamAfter: { zh: '仗打完了，四处走走', en: 'The fighting is over: walk where you like' },
+  roamGo: { zh: '列阵', en: 'Fall in' },
   chapterOf: { zh: (n) => `第 ${n} 章`, en: (n) => `Chapter ${n}` },
   year: { zh: (year) => `${year} 年`, en: (year) => String(year) },
   age: { zh: (age) => `${age} 岁`, en: (age) => `aged ${age}` },
@@ -181,6 +185,8 @@ export function installStory(hooks) {
   // A scene playing: its play (scenes/stage.js) and its nodes; the finale (scenes/finale.js) as it plays.
   let scene = null;
   let finale = null;
+  // A place walked freely before or after its battle: { when: 'before' | 'after', muster: [x, z] | null, radius, floor }.
+  let roam = null;
   let autoplay = false;
   // What is on: 'screen' | 'card' | 'battle' | 'scene' | 'ending' | null; and how to draw it again (a language switch).
   let redraw = null;
@@ -247,6 +253,7 @@ export function installStory(hooks) {
     if (fight && !fight.done && fight.speed !== STORY_PACE.speeds[0]) hooks.speed?.(STORY_PACE.speeds[0]);
     scene = null;
     fight = null;
+    roam = null;
     run = null;
     redraw = null;
     show(null);
@@ -264,6 +271,9 @@ export function installStory(hooks) {
   }
 
   // ---- A chapter ---------------------------------------------------------------------------------------------------------
+
+  // m: the place mark's outer radius at size 1 (placemark.js STORY_PLACE_MARK.ring), which a muster ring is scaled from.
+  const STORY_MUSTER_RING = 0.55;
 
   /** A seed for this battle: the man, the chapter and the try (a retry is a new day's fighting, not the same one replayed). */
   const battleSeed = (chapter) => ((life.seed ^ Math.imul(chapter.n + 1, 2654435761) ^ Math.imul(life.attempts[chapter.n] ?? 1, 40503) ^ Math.imul(life.lives, 97)) >>> 0) || 1;
@@ -288,6 +298,10 @@ export function installStory(hooks) {
   function flow() {
     const current = storyCurrent(run);
     if (current.kind === 'card') return showCard(current.card);
+    // The place walked first (the cards read, the line not yet formed), and again when the fighting is done: before a scene
+    // on a set of its own or the next chapter, whichever comes first (a scene played on the field itself plays first).
+    if ((current.kind === 'deploy' || current.kind === 'battle') && roamDue('before')) return startRoam('before');
+    if ((current.kind === 'done' || (current.kind === 'scene' && current.scene.set)) && fight?.done && roamDue('after')) return startRoam('after');
     // Drawn up as the battle's defaults say, unasked, when the hero is the AI's (autoplay: tests and shots).
     if (current.kind === 'deploy') return autoplay ? deployDone(null) : beginDeploy(current.offer);
     if (current.kind === 'battle') return startBattle();
@@ -420,6 +434,61 @@ export function installStory(hooks) {
     drawHud();
   }
 
+  // ---- The place walked, before and after the battle ---------------------------------------------------------------------
+
+  /** Whether the chapter's place is to be walked now: its battle's view names one (`roam`), once each side of the battle; never when the hero is the AI's. */
+  const roamView = () => run?.setup?.view ?? run?.battle?.view ?? null;
+
+  function roamDue(when) {
+    return Boolean(!autoplay && hooks.roam && roamView()?.roam && !run.roamed?.[when]);
+  }
+
+  /**
+   * The man who walks the place: dressed and armed as the battle has him (its setup's own man: the one already made after
+   * the battle, the one it would make before it), so he does not change clothes at the muster ring; as his life has him where
+   * the battle makes none.
+   */
+  function roamHero() {
+    const setup = run.setup ?? run.battle?.setup?.(run.life, battleSeed(run.chapter));
+    return setup?.fighters?.[setup.player ?? 0]?.inputs ?? storyHeroInputs(life);
+  }
+
+  /**
+   * The hero alone in the place (main.js enterStoryRoam: a stage world drawn by the place), the HUD saying what ends it:
+   * before the battle the muster ring on the square (walked into) or the button; after it the button.
+   */
+  function startRoam(when) {
+    run.roamed = { ...run.roamed, [when]: true };
+    hooks.speed?.(STORY_PACE.speeds[0]);
+    const shown = roamView();
+    const place = hooks.roam(shown.roam, { inputs: roamHero(), day: shown.day ?? battleSeed(run.chapter), after: when === 'after' });
+    roam = { when, muster: when === 'before' ? place?.muster ?? null : null, radius: place?.radius ?? 0, floor: place?.floor ?? null };
+    hooks.pause(false);
+    redraw = drawRoam;
+    drawRoam();
+  }
+
+  function drawRoam() {
+    const before = roam.when === 'before';
+    const go = svEl('button', { type: 'button', className: 'sv-speed on', textContent: word(before ? 'roamGo' : 'next'), onclick: endRoam });
+    show('roam', svEl('div', { className: 'sv-hud' }, svEl('b', { textContent: say(run.chapter.title) }), word(before ? 'roamBefore' : 'roamAfter'), go));
+    layer.querySelector('.sv-lang').style.pointerEvents = 'auto';
+  }
+
+  /** The walk over: the battle's field drawn up again behind what comes next (its deploy screen or the battle), or on to the scene or chapter after it. */
+  function endRoam() {
+    if (!roam) return null;
+    const { when } = roam;
+    roam = null;
+    if (when === 'before') {
+      const setup = storyBattleSetup(run, battleSeed(run.chapter));
+      hooks.stage(setup, { paused: true });
+      storyCommandMen(hooks.world(), setup, life);
+      fight = { setup, watch: storyWatch(setup), last: null, done: false };
+    }
+    return flow();
+  }
+
   /** The speed button: the next of STORY_PACE.speeds (1×, 3×). */
   function toggleSpeed() {
     if (!fight || fight.done) return null;
@@ -463,6 +532,12 @@ export function installStory(hooks) {
   function tick(world) {
     if (finale) return finaleTick(world);
     if (scene) return sceneTick(world);
+    if (roam) {
+      // Stood in the muster ring: the line forms.
+      const hero = world.fighters[0];
+      const off = roam.muster && view === 'roam' ? Math.hypot(hero.x[P.pelvis * 3] - roam.muster[0], hero.x[P.pelvis * 3 + 2] - roam.muster[1]) : Infinity;
+      return off < roam.radius ? endRoam() : null;
+    }
     if (!fight || fight.done || !run || storyCurrent(run).kind !== 'battle' || view !== 'battle') return null;
     const dt = world.time - (fight.last ?? world.time);
     fight.last = world.time;
@@ -510,6 +585,7 @@ export function installStory(hooks) {
 
   /** His place on the field now ({ place: [x, z], hero, corner, away }), while he is up in the battle; else null. */
   function placeMark() {
+    if (roam) return roam.muster && view === 'roam' ? { place: roam.muster, hero: hooks.world().fighters[0], corner: 'red', away: true, size: roam.radius / STORY_MUSTER_RING, floor: roam.floor } : null;
     if (!fight || fight.done || !run || view !== 'battle' || scene || finale || storyCurrent(run).kind !== 'battle') return null;
     const world = hooks.world();
     const hero = world?.fighters[fight.setup.player];
@@ -813,7 +889,14 @@ export function installStory(hooks) {
       return { chapter: chapter.id, comrades: life.comrades.map((comrade) => `${comrade.id}${comrade.alive ? '' : ' (dead)'}`) };
     },
     // On to what the chapter asks for now (after `stand`: its deploy screen where it has one, then its battle).
-    go: () => flow(),
+    go: ({ roam: walk = false } = {}) => {
+      // (Straight to the deploy screen or the battle, as before the places could be walked, unless the walk is asked for.)
+      if (!walk && run) run.roamed = { before: true, after: true };
+      return flow();
+    },
+    // The place walked now ('before' | 'after'), and the walk ended (as its button does).
+    roam: (when = 'before') => (roamView()?.roam && hooks.roam ? (startRoam(when), roam) : null),
+    endRoam: () => endRoam(),
     // The deploy screen answered (`chosen`: { formation, post }; null or nothing, the battle's defaults), or a pick on it
     // (`pick`: true: shown on the screen and the field, not yet gone on).
     deploy: (chosen = null, { pick = false } = {}) => {
@@ -911,6 +994,8 @@ export function installStory(hooks) {
   return {
     open, tick, think, steer, close,
     hooks: testHooks,
+    /** The hero's inputs as his life has him now (a stand-in man where no life is begun): the walker of a story place opened by itself (main.js boxer.roam). */
+    heroInputs: () => storyHeroInputs(life ?? storyNewLife(null, { family: STORY_FAMILY, hero: STORY_HERO })),
     /** The hero is the scene's (not the player's) while a scene or the finale plays. */
     holding: () => Boolean(scene || finale),
     /** The men a scene holds still (they think nothing of their own): main.js leaves them out of the AI's thinking. */

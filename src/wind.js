@@ -60,6 +60,11 @@ export const PLACE_WIND = {
   coastFort: { toward: [0.3, -0.95], speed: 4.5, gust: 0.3 },
   coastVillage: { toward: [0.3, -0.95], speed: 4.5, gust: 0.3 },
   jiangnan: { toward: [0.94, 0.34], speed: 1.2, gust: 0.3 },
+  // The water town walked (places/canaltown.js): light air drawn along the canal between the houses.
+  canaltown: { toward: [0.99, 0.15], speed: 1.4, gust: 0.3 },
+  // Pyongyang in the first month (places/pyongyang.js): that country's winter wind, out of the north-west and gusty
+  // (a fresh breeze near the ground, about 4 m/s; -x is west and -z north there, so it blows on the wall's outer face).
+  pyongyang: { toward: [0.8, 0.6], speed: 4, gust: 0.5 },
   cajamarca: { toward: [-0.8, 0.6], speed: 2.5, gust: 0.35 },
   // Mobei: the fighting ran on to dusk with a wind getting up off the Gobi.
   mobei: { toward: [0.94, 0.34], speed: 6, gust: 0.45 },
@@ -76,11 +81,23 @@ export const PLACE_WIND = {
   dunnottar: { toward: DUNNOTTAR_TOWARD, speed: 6, gust: 0.4 },
 };
 
+// A wind put in force over a place's own (the open air's weather: env/index.js), for everything that asks placeWind.
+let windOver = null;
+
+/**
+ * Put `wind` ({ x, z, speed, gust } as placeWind returns, and optionally `swell(time)`: the local speed over the mean
+ * at the floor's middle, in place of windNow's own gusts) in force at `place`; with no place, lift it.
+ */
+export function setWindOver(place = null, wind = null) {
+  windOver = place && wind ? { place, wind } : null;
+}
+
 /**
  * The air of a place: `place` (render.js's key), the level's `weather` (or null), and at Dunnottar the stage `look`'s name.
  * Returns { x, z: the unit way it blows, speed: m/s, gust: 0..1 } (a new object: call it when these change, not every frame).
  */
 export function placeWind(place, weather = null, look = null) {
+  if (windOver && windOver.place === place) return windOver.wind;
   const own = PLACE_WIND[place] ?? PLACE_WIND.ring;
   let { speed, gust } = own;
   if (place === 'dunnottar' && look) ({ speed, gust } = stageLookOf(look).wind ?? own);
@@ -108,6 +125,14 @@ function windSines(rates, weights, time, seed) {
  * The gusts are the same at the same moment of the fight however it is stepped, and stand still with it.
  */
 export function windNow(base, time, out = { x: 0, z: 0, speed: 0 }) {
+  if (base.swell) {
+    // A wind with a gust field of its own (the open air's, crossing the ground): what that field is at the floor.
+    const speed = base.speed * base.swell(time);
+    out.x = base.x * speed;
+    out.z = base.z * speed;
+    out.speed = speed;
+    return out;
+  }
   const swell = Math.exp(WIND.swing * base.gust * windSines(WIND.gustRates, WIND.gustWeights, time, 1));
   const speed = base.speed * swell;
   const turn = base.gust * WIND.turn * windSines(WIND.turnRates, null, time, 2);

@@ -17,6 +17,7 @@ import { activeLook } from './looks.js';
 import { PAINTED_GROUND } from './ground/painted.js';
 import { LIVING_GROUND } from './ground/living.js';
 import { PLACE_ARENAS } from './render.js';
+import { envApply, envBuild, envLeave, envOwnDrawn, envWanted } from './env/index.js';
 
 /**
  * What each open-air place has beyond its ground, for a variant to draw in
@@ -135,7 +136,12 @@ export function sceneryFor(place, floor) {
 const CURRENT = { id: 'current', label: 'Current (as built)', replaces: [] };
 // The default: the photograph over generated foothills in the realistic looks; the classic cartoon look keeps its painted hills.
 const DEFAULT_SCENERY = { id: 'default', label: 'Default for the look' };
-const sceneryForLook = () => (activeLook().id === 'toon' ? 'current' : 'photo-foothills');
+// A place with an open-air description (env/config.js PLACE_ENV) is drawn from it in the realistic look: its own sky,
+// land, grass and trees in place of the photograph and the foothills.
+const sceneryForLook = (view, place) => (activeLook().id === 'toon' ? 'current' : envWanted(view, place) ? 'open-air' : 'photo-foothills');
+// (Its two halves are function declarations, so this can name them whichever of the two modules is evaluated first.
+// `litter` and `groundmarks` are the tufts, stones and painted tracks render.js tags for it: its own grass and worn earth stand in.)
+const OPEN_AIR = { id: 'open-air', label: 'Open air (sky, land, grass, trees, weather: env/)', replaces: ['hills', 'mountains', 'trees', 'plants', 'litter', 'groundmarks'], build: envBuild, apply: envApply };
 
 const SCENERY_COMPOSITES = [
   // The pick: the photograph for the far mountains and sky, gentle generated hills in front of it, trees on them.
@@ -143,7 +149,7 @@ const SCENERY_COMPOSITES = [
 ];
 
 /** Every variant: current, then each method's own, then the composites. */
-export const SCENERY_VARIANTS = [DEFAULT_SCENERY, CURRENT, ...SKYBALL_VARIANTS, ...GENERATED_VARIANTS, ...TREE_VARIANTS, ...SCENERY_COMPOSITES];
+export const SCENERY_VARIANTS = [DEFAULT_SCENERY, CURRENT, ...SKYBALL_VARIANTS, ...GENERATED_VARIANTS, ...TREE_VARIANTS, OPEN_AIR, ...SCENERY_COMPOSITES];
 
 let sceneryInForce = 'default';
 
@@ -174,10 +180,15 @@ function partsOf(variant) {
 export function applyScenery(view, place) {
   const group = view.places?.[place];
   const spec = sceneryFor(place, view.floor);
+  // The open air hands back what it took over (light probe, wind) before anything else is shown; it takes it again below if it is chosen.
+  envLeave(view);
   if (!group) return;
-  const chosen = sceneryInForce === 'default' ? sceneryForLook() : sceneryInForce;
-  const parts = spec ? partsOf(sceneryById(chosen)) : [CURRENT];
-  const replaced = new Set(parts.flatMap((part) => part.replaces ?? []));
+  const chosen = sceneryInForce === 'default' ? sceneryForLook(view, place) : sceneryInForce;
+  // A place that draws itself (env/config.js `own`) joins the open air whole: nothing of it is replaced, its ground
+  // stays, and with the open air off it is shown exactly as it is built.
+  const own = chosen === OPEN_AIR.id && envOwnDrawn(place);
+  const parts = own ? [OPEN_AIR] : spec ? partsOf(sceneryById(chosen)) : [CURRENT];
+  const replaced = new Set(own ? [] : parts.flatMap((part) => part.replaces ?? []));
   const wanted = new Set(parts.map((part) => part.id));
   group.traverse((object) => {
     if (object.userData.scenery) object.visible = !replaced.has(object.userData.scenery);
@@ -197,7 +208,7 @@ export function applyScenery(view, place) {
     built.visible = true;
     part.apply?.({ place, view, spec, group: built });
   }
-  applyGround(view, place, group);
+  applyGround(view, place, group, wanted.has(OPEN_AIR.id) && !own);
 }
 
 // ---- ground styles ---------------------------------------------------------
@@ -233,11 +244,13 @@ export const PLACE_GROUND = {
 const CURRENT_GROUND = { id: 'current', label: 'Current ground', hidesGround: false };
 // The default: painted ground with the living layer on it in the realistic looks; the classic cartoon look keeps its flat painted ground.
 const DEFAULT_GROUND = { id: 'default', label: 'Default for the look' };
-const groundForLook = () => (activeLook().id === 'toon' ? 'current' : 'painted-living');
+// (Under the open air the ground is its land: the place's own ground mesh is hidden and nothing is laid in its place.)
+const groundForLook = (openAir) => (activeLook().id === 'toon' ? 'current' : openAir ? OPEN_AIR_GROUND.id : 'painted-living');
+const OPEN_AIR_GROUND = { id: 'ground-open-air', label: 'Open air (the land itself)', hidesGround: true };
 const GROUND_COMPOSITES = [
   { id: 'painted-living', label: 'Painted ground + living ground', parts: ['ground-painted', 'ground-living'] },
 ];
-export const GROUND_STYLES = [DEFAULT_GROUND, CURRENT_GROUND, ...PAINTED_GROUND, ...LIVING_GROUND, ...GROUND_COMPOSITES];
+export const GROUND_STYLES = [DEFAULT_GROUND, CURRENT_GROUND, ...PAINTED_GROUND, ...LIVING_GROUND, OPEN_AIR_GROUND, ...GROUND_COMPOSITES];
 let groundInForce = 'default';
 export const groundById = (id) => GROUND_STYLES.find((style) => style.id === id);
 export const activeGround = () => groundInForce;
@@ -252,9 +265,9 @@ export function setGround(id) {
   return id;
 }
 
-function applyGround(view, place, group) {
+function applyGround(view, place, group, openAir = false) {
   const info = PLACE_GROUND[place];
-  const chosen = info ? groundById(groundInForce === 'default' ? groundForLook() : groundInForce) : CURRENT_GROUND;
+  const chosen = info ? groundById(groundInForce === 'default' ? groundForLook(openAir) : groundInForce) : CURRENT_GROUND;
   // A composite style is a list of styles laid one on another (a surface, then life on it).
   const styles = chosen.parts ? chosen.parts.map(groundById) : [chosen];
   const wanted = new Set(styles.map((style) => style.id));

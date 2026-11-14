@@ -262,6 +262,9 @@ export function storyBattleSetup(run, seed = 1, deploy = run.deploy) {
   }
   // How it is shown ({ scene, weather, camera }): the setup's, else the battle's own (a battle may give it once for all setups).
   run.setup.view ??= run.battle.view ?? null;
+  // A place that can be walked (`view.roam`: places/storyplaces.js) takes its weather for the day from this battle's seed, so
+  // the walk before, the battle and the walk after are one day's weather and a retry is another day's.
+  if (run.setup.view?.roam) run.setup.view = { ...run.setup.view, day: seed };
   run.seed = seed;
   return run.setup;
 }

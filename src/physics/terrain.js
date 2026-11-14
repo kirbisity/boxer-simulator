@@ -22,6 +22,15 @@
 //                 (at the -u end) has its top at `from + rise`, the last at
 //                 `from + steps * rise`; `from` is the floor at the foot of the flight.
 //                 The treads are discrete (a foot plants on a tread, not on a slope).
+//   field     { kind: 'field', at, size, yaw, cells: [nu, nv], heights, bottom }
+//                 Rolling ground: a grid of nu x nv cells over the rectangle, `heights` the
+//                 (nu + 1) * (nv + 1) heights at its corners (index i + j * (nu + 1), i along
+//                 u from the -u edge, j along v from the -v edge). Each cell is two flat
+//                 triangles, split on the diagonal from its (i, j) corner to its (i + 1, j + 1)
+//                 corner: what is drawn from the same grid, split the same way, is exactly
+//                 where feet land (fieldHeight is the one function for both). A field is
+//                 walked wherever it goes and never pushes a body out sideways: a face too
+//                 steep to climb (a crag, a bank's revetment) is a wall set on it.
 //   wall      { kind: 'wall', at, size: [length, thickness], yaw, bottom, top }
 //                 A box that blocks. Never stood on (put a slab on top for a wall walk).
 //   ceiling   { kind: 'ceiling', at, size, yaw, bottom, top }
@@ -45,7 +54,10 @@
 
 import { WORLD } from './config.js';
 
-const SHAPES = new Set(['slab', 'ramp', 'stairs', 'wall', 'ceiling']);
+const SHAPES = new Set(['slab', 'ramp', 'stairs', 'field', 'wall', 'ceiling']);
+
+/** The floor shapes whose top is not one height: asked of topAt. */
+const GRADED = new Set(['ramp', 'stairs', 'field']);
 
 /** m: a wall no taller than this is low: no higher than a man's waist, the camera looks over it. */
 const LOW_WALL = 1.3;
@@ -62,7 +74,7 @@ function compile(source) {
   const yaw = source.yaw ?? 0;
   const part = {
     id: source.id ?? null, shape, cx: at[0], cz: at[1], hu: size[0] / 2, hv: size[1] / 2, cos: Math.cos(yaw), sin: Math.sin(yaw),
-    bottom: source.bottom ?? -Infinity, top: 0, lo: 0, hi: 0, steps: 1, rise: 0, ex: 0, ez: 0, stamp: 0, low: false, rail: false,
+    bottom: source.bottom ?? -Infinity, top: 0, lo: 0, hi: 0, steps: 1, rise: 0, ex: 0, ez: 0, stamp: 0, low: false, rail: false, nu: 0, nv: 0, heights: null,
   };
   const need = (...names) => {
     for (const name of names) if (!Number.isFinite(source[name])) throw new Error(`terrain: ${shape} ${source.id ?? ''} needs a number for "${name}"`);
@@ -82,6 +94,21 @@ function compile(source) {
     part.lo = source.from;
     part.hi = source.from + part.steps * source.rise;
     part.top = Math.max(part.lo, part.hi);
+  } else if (shape === 'field') {
+    const [nu, nv] = source.cells ?? [];
+    if (!(nu >= 1) || !(nv >= 1) || source.heights?.length !== (nu + 1) * (nv + 1)) throw new Error(`terrain: field ${source.id ?? ''} needs cells: [nu, nv] and (nu + 1) * (nv + 1) heights`);
+    part.nu = nu;
+    part.nv = nv;
+    part.heights = source.heights;
+    part.lo = Infinity;
+    part.hi = -Infinity;
+    for (let index = 0; index < source.heights.length; index += 1) {
+      const height = source.heights[index];
+      if (!Number.isFinite(height)) throw new Error(`terrain: field ${source.id ?? ''} has a height that is not a number`);
+      if (height < part.lo) part.lo = height;
+      if (height > part.hi) part.hi = height;
+    }
+    part.top = part.hi;
   } else if (shape === 'wall') {
     need('bottom', 'top');
     part.top = source.top;
@@ -97,9 +124,33 @@ function compile(source) {
   return part;
 }
 
-/** The top of a floor part at local u (clamped into the part): constant, sloped, or the tread's. */
-function topAt(part, u) {
+/**
+ * The height of a grid of heights (`nu` x `nv` cells, heights at their corners: index i + j * (nu + 1)) at the point `su`, `sv` of the
+ * way across it (0..1 each, clamped): each cell two flat triangles split on the diagonal from its (i, j) corner. The one function
+ * for a field solid's floor and for whatever draws it.
+ */
+export function fieldHeight(heights, nu, nv, su, sv) {
+  const fu = Math.max(0, Math.min(1, su)) * nu;
+  const fv = Math.max(0, Math.min(1, sv)) * nv;
+  const i = Math.min(nu - 1, Math.floor(fu));
+  const j = Math.min(nv - 1, Math.floor(fv));
+  const a = fu - i;
+  const b = fv - j;
+  const row = nu + 1;
+  const h00 = heights[i + j * row];
+  const h11 = heights[i + 1 + (j + 1) * row];
+  if (a >= b) {
+    const h10 = heights[i + 1 + j * row];
+    return h00 + (h10 - h00) * a + (h11 - h10) * b;
+  }
+  const h01 = heights[i + (j + 1) * row];
+  return h00 + (h11 - h01) * a + (h01 - h00) * b;
+}
+
+/** The top of a floor part at local u (and v, which only a field heeds), clamped into the part: constant, sloped, the tread's, or the field's. */
+function topAt(part, u, v = 0) {
   if (part.shape === 'slab') return part.top;
+  if (part.shape === 'field') return fieldHeight(part.heights, part.nu, part.nv, (u + part.hu) / (2 * part.hu), (v + part.hv) / (2 * part.hv));
   const share = part.hu > 0 ? Math.max(0, Math.min(1, (u + part.hu) / (2 * part.hu))) : 0;
   if (part.shape === 'ramp') return part.lo + (part.hi - part.lo) * share;
   // Stairs: tread index, the last tread taking the far edge.
@@ -154,7 +205,7 @@ export function floorAt(terrain, x, z, y = Infinity, tolerance = 0.02) {
     if (u > part.hu || u < -part.hu) continue;
     const v = dx * part.sin + dz * part.cos;
     if (v > part.hv || v < -part.hv) continue;
-    const top = topAt(part, u);
+    const top = topAt(part, u, v);
     if (top <= limit && top > best) best = top;
   }
   return best;
@@ -223,7 +274,8 @@ export function pushOut(terrain, at, radius, low, high, stepUp = WORLD.terrain.s
     let moved = false;
     for (let index = 0; index < list.length; index += 1) {
       const part = list[index];
-      if (part.shape === 'ceiling' || high <= part.bottom) continue;
+      // (A field is walked wherever it goes: it never pushes a body sideways.)
+      if (part.shape === 'ceiling' || part.shape === 'field' || high <= part.bottom) continue;
       if (part.shape === 'wall' && wallLow >= part.top) continue;
       const dx = at[0] - part.cx;
       const dz = at[1] - part.cz;
@@ -371,6 +423,16 @@ function segmentHits(part, a, b, heightA, heightB) {
   if (lineHigh <= part.bottom) return false;
   if (part.shape === 'wall') return true;
   // A floor part: the line must be below its top at one end or other of the stretch inside it.
+  if (part.shape === 'field') {
+    // Rolling ground: the line against the ground under it, every metre or so of the stretch inside.
+    const length = Math.hypot(u1 - u0, v1 - v0) * (leave - enter);
+    const count = Math.max(1, Math.ceil(length));
+    for (let sample = 0; sample <= count; sample += 1) {
+      const s = enter + ((leave - enter) * sample) / count;
+      if (heightA + (heightB - heightA) * s < topAt(part, u0 + (u1 - u0) * s, v0 + (v1 - v0) * s)) return true;
+    }
+    return false;
+  }
   const topIn = topAt(part, u0 + (u1 - u0) * enter);
   const topOut = topAt(part, u0 + (u1 - u0) * leave);
   return lineLow < Math.max(topIn, topOut);
@@ -386,7 +448,7 @@ function distanceToPart(part, x, y, z) {
   const v = dx * part.sin + dz * part.cos;
   const gapU = Math.max(0, Math.abs(u) - part.hu);
   const gapV = Math.max(0, Math.abs(v) - part.hv);
-  const top = part.shape === 'stairs' || part.shape === 'ramp' ? topAt(part, u) : part.top;
+  const top = GRADED.has(part.shape) ? topAt(part, u, v) : part.top;
   const gapY = y > top ? y - top : y < part.bottom ? part.bottom - y : 0;
   return Math.max(gapU, gapV, gapY);
 }
@@ -425,13 +487,13 @@ function partReach(part, from, dir, length, radius) {
     leave = Math.min(leave, far);
     if (enter > leave) return length;
   }
-  if (part.shape !== 'stairs' && part.shape !== 'ramp') return enter;
+  if (!GRADED.has(part.shape)) return enter;
   // A ramp or a flight: its top is not the box's top; walk the stretch inside the box in short steps.
   for (let s = enter; s <= leave + 1e-9; s += 0.1) {
     const u = u0 + du * s;
     const clamped = u > part.hu ? part.hu : u < -part.hu ? -part.hu : u;
     const y = from[1] + dir[1] * s;
-    if (y - r < topAt(part, clamped) && y + r > part.bottom) return Math.max(0, s - 0.1);
+    if (y - r < topAt(part, clamped, v0 + dv * s) && y + r > part.bottom) return Math.max(0, s - 0.1);
   }
   return length;
 }
@@ -478,7 +540,7 @@ export function solidAt(terrain, x, y, z, grow = 0) {
     const u = dx * part.cos - dz * part.sin;
     const v = dx * part.sin + dz * part.cos;
     if (Math.abs(u) > part.hu + grow || Math.abs(v) > part.hv + grow) continue;
-    const top = part.shape === 'stairs' || part.shape === 'ramp' ? topAt(part, u) : part.top;
+    const top = GRADED.has(part.shape) ? topAt(part, u, v) : part.top;
     if (y < top + grow && y > part.bottom - grow) return part;
   }
   return null;
@@ -510,6 +572,8 @@ export const terrainWorld = (terrain) => ({
 export const slabOf = (at, size, top, { yaw = 0, bottom, id } = {}) => ({ kind: 'slab', at, size, yaw, top, bottom, id });
 
 /** A ramp rising along its length from `from` to `to`. */
+/** Rolling ground: `heights` at the corners of `cells` [nu, nv] over the rectangle (see the head of this file). */
+export const fieldOf = (at, size, cells, heights, { yaw = 0, bottom, id } = {}) => ({ kind: 'field', at, size, yaw, cells, heights, bottom, id });
 export const rampOf = (at, size, from, to, { yaw = 0, bottom, id } = {}) => ({ kind: 'ramp', at, size, yaw, from, to, bottom, id });
 
 /** A straight flight of `steps` treads of `rise` each, up from the floor at `from`. */
