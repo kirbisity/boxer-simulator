@@ -191,76 +191,94 @@ export const tkFieldAt = (field, x, z) => fieldHeight(field.heights, field.cells
 // ---- trees --------------------------------------------------------------------------------------------------------
 
 /**
- * A tree at world (x, y, z). `kind`: 'broad' (a round crown of leaf cards: camphor, elm), 'willow' (the crown's cards hang
- * in curtains), 'bare' (winter: branches only), 'pine' (a leaning red pine: flat tiers of needles on a bent trunk).
- * `high`: its height (m). The trunk and boughs are swept bars of bark (the timber sheet, tinted); the crown is cards of
- * the leaf sheets, cut out by alpha, set at all angles.
+ * How each kind of tree is made (tkTree), as shares of its height unless said: `trunk` where the crown's boughs
+ * begin and how far up the trunk runs; `lean` how far it bends; `boughs` how many, between which heights of the trunk
+ * they leave it, how far they `reach` and `rise`; `forks` side boughs off each; `cards` sprays of leaf on each bough
+ * and fork, their half size, and `flat` how level they lie (1: a pad, as a pine's tiers; 0: any way up, as a round
+ * crown). Shapes by eye from the references: a camphor's broad dome on a short bole, a willow's curtains, a Korean
+ * red pine's bent trunk with a few flat pads and a flat top.
+ */
+export const TK_TREES = {
+  broad: { bark: [0.56, 0.5, 0.43], lean: 0.06, top: 0.5, boughs: [7, 0.55, 1], reach: [0.55, 1], rise: [0.2, 0.5], forks: 2, cards: [5, 0.11], flat: 0.25, sheet: 'foliage' },
+  willow: { bark: [0.5, 0.46, 0.4], lean: 0.08, top: 0.55, boughs: [7, 0.6, 1], reach: [0.5, 0.9], rise: [0.25, 0.45], forks: 1, cards: [4, 0.1], flat: 0.2, sheet: 'foliage', curtain: [0.3, 0.5] },
+  bare: { bark: [0.5, 0.45, 0.4], lean: 0.06, top: 0.5, boughs: [7, 0.5, 1], reach: [0.5, 1], rise: [0.25, 0.55], forks: 3, cards: [0, 0], flat: 0, sheet: null },
+  pine: { bark: [0.78, 0.5, 0.38], lean: 0.2, top: 0.86, boughs: [8, 0.45, 1], reach: [0.5, 0.9], rise: [0.02, 0.1], forks: 2, cards: [4, 0.085], flat: 0.9, sheet: 'needles' },
+};
+
+/**
+ * A tree at world (x, y, z). `kind`: 'broad' (a round crown: camphor, elm), 'willow' (curtains hanging from the crown),
+ * 'bare' (winter: branches only), 'pine' (a bent red pine with flat pads of needles). `high`: its height (m). The trunk
+ * and boughs are swept bars of bark; the crown is sprays of the leaf sheets (tex.js: each sheet one ragged spray),
+ * many and small, lit as one mass.
  */
 export function tkTree(builder, x, y, z, { kind = 'broad', high = 7, seed = 1, spread = 0.5, tint = [1, 1, 1] } = {}) {
   const random = tkRandom(seed * 31 + 7);
+  const form = TK_TREES[kind];
   const frame = tkgFrame(x, y, z, random() * Math.PI * 2);
-  const bark = kind === 'pine' ? [0.78, 0.5, 0.38] : [0.56, 0.5, 0.43];
-  const lean = kind === 'pine' ? 0.22 : 0.06;
-  const trunkTop = high * (kind === 'pine' ? 0.8 : kind === 'willow' ? 0.5 : 0.45);
+  const trunkTop = high * form.top;
   const girth = high * 0.028 + 0.06;
-  const bend = (t) => [Math.sin(t * 2.2) * lean * high * 0.4, t * trunkTop, Math.cos(t * 1.7) * lean * high * 0.25 - lean * high * 0.25];
-  const cuts = 5;
+  const bend = (t) => [Math.sin(t * 2.2) * form.lean * high * 0.4, t * trunkTop, Math.cos(t * 1.7) * form.lean * high * 0.25 - form.lean * high * 0.25];
+  const cuts = 6;
   for (let k = 0; k < cuts; k += 1) {
-    const a = bend(k / cuts);
-    const b = bend((k + 1) / cuts);
-    const ra = girth * (1 - (0.55 * k) / cuts);
-    builder.tube('bark', [frame(...a), frame(...b)], ra * (k ? 1 : 1.25), girth * (1 - (0.55 * (k + 1)) / cuts), { colour: bark });
+    const ra = girth * (1 - (0.6 * k) / cuts);
+    builder.tube('bark', [frame(...bend(k / cuts)), frame(...bend((k + 1) / cuts))], ra * (k ? 1 : 1.3), girth * (1 - (0.6 * (k + 1)) / cuts), { colour: form.bark });
   }
-  const card = (material, centre, size, colour) => {
-    // A card of leaves at its own angle, seen from both sides.
-    const yaw = random() * Math.PI;
-    const tilt = (random() - 0.5) * 1.2;
+  const spray = (centre, size, colour) => {
+    // A spray of leaves: a card of the whole sheet, turned and flipped at random, level by the kind's `flat`.
+    const yaw = random() * Math.PI * 2;
+    const tilt = (1 - form.flat) * (random() - 0.5) * 2.4 + form.flat * (Math.PI / 2 + (random() - 0.5) * 0.5);
     const ex = [Math.cos(yaw) * size, 0, Math.sin(yaw) * size];
     const ey = [-Math.sin(yaw) * Math.sin(tilt) * size, Math.cos(tilt) * size, Math.cos(yaw) * Math.sin(tilt) * size];
     const at = (sx, sy) => [centre[0] + ex[0] * sx + ey[0] * sy, centre[1] + ex[1] * sx + ey[1] * sy, centre[2] + ex[2] * sx + ey[2] * sy];
-    const u = random() * 3;
-    const v = random() * 3;
+    const [u0, u1] = random() < 0.5 ? [0, 1] : [1, 0];
     // (Lit as if facing up and outward, so the crown shades as one mass and not card by card.)
     const out = [centre[0] - x, (centre[1] - y - trunkTop) * 1.5 + size, centre[2] - z];
     const length = Math.hypot(...out) || 1;
     const normal = out.map((value) => value / length);
-    builder.quad(material, at(-1, -1), at(1, -1), at(1, 1), at(-1, 1), { uvs: [[u, v], [u + 2 * size, v], [u + 2 * size, v + 2 * size], [u, v + 2 * size]], colour, normals: [normal, normal, normal, normal] });
+    builder.quad(form.sheet, at(-1, -1), at(1, -1), at(1, 1), at(-1, 1), { uvs: [[u0, 0], [u1, 0], [u1, 1], [u0, 1]], colour, normals: [normal, normal, normal, normal] });
   };
-  const boughs = kind === 'pine' ? 5 : 6;
-  for (let k = 0; k < boughs; k += 1) {
-    const from = bend(kind === 'pine' ? 0.5 + (0.5 * k) / boughs : 0.75 + 0.25 * random());
-    const angle = (k / boughs) * Math.PI * 2 + random();
-    const reach = high * spread * (0.55 + 0.45 * random()) * (kind === 'pine' ? 0.7 : 1);
-    const up = kind === 'pine' ? high * 0.06 : high * (0.25 + 0.3 * random());
-    const to = [from[0] + Math.cos(angle) * reach, from[1] + up, from[2] + Math.sin(angle) * reach];
-    const mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + up * 0.25, (from[2] + to[2]) / 2];
-    builder.tube('bark', [frame(...from), frame(...mid), frame(...to)], girth * 0.42, girth * 0.16, { colour: bark, sides: 5 });
-    if (kind === 'bare') {
-      // Winter: the bough forks twice more and ends in twigs.
-      for (let twig = 0; twig < 4; twig += 1) {
-        const tip = [to[0] + (random() - 0.5) * reach * 0.9, to[1] + random() * high * 0.22, to[2] + (random() - 0.5) * reach * 0.9];
-        builder.tube('bark', [frame(...(twig % 2 ? mid : to)), frame(...tip)], girth * 0.14, girth * 0.04, { colour: bark, sides: 4 });
-      }
-      continue;
-    }
-    const cards = kind === 'pine' ? 5 : 7;
-    for (let c = 0; c < cards; c += 1) {
-      const share = 0.45 + 0.6 * random();
-      const size = high * (kind === 'pine' ? 0.1 : 0.13) * (0.8 + 0.5 * random());
-      const centre = frame(from[0] + (to[0] - from[0]) * share + (random() - 0.5) * size * 2, from[1] + (to[1] - from[1]) * share + (random() - 0.2) * size * (kind === 'pine' ? 0.4 : 1.6), from[2] + (to[2] - from[2]) * share + (random() - 0.5) * size * 2);
-      const shade = tkbScale(tint, 0.7 + 0.5 * random());
-      if (kind === 'willow') {
-        // A curtain: a tall card hanging from the bough.
-        const drop = high * (0.3 + 0.2 * random());
+  const leafed = (from, to, count) => {
+    for (let c = 0; c < count; c += 1) {
+      const share = 0.35 + 0.75 * random();
+      const size = high * form.cards[1] * (0.75 + 0.5 * random());
+      const wander = size * (form.flat > 0.5 ? 0.5 : 1.3);
+      const centre = frame(from[0] + (to[0] - from[0]) * share + (random() - 0.5) * size * 1.6, from[1] + (to[1] - from[1]) * share + (random() - 0.3) * wander, from[2] + (to[2] - from[2]) * share + (random() - 0.5) * size * 1.6);
+      const shade = tkbScale(tint, 0.68 + 0.5 * random());
+      if (form.curtain) {
+        // A curtain: a tall card hanging from the bough, its leaves drawn long by the stretch.
+        const drop = high * (form.curtain[0] + (form.curtain[1] - form.curtain[0]) * random());
         const yaw = random() * Math.PI;
-        const half = [Math.cos(yaw) * size, Math.sin(yaw) * size];
+        const half = [Math.cos(yaw) * size * 0.8, Math.sin(yaw) * size * 0.8];
         builder.quad('foliage', [centre[0] - half[0], centre[1] - drop, centre[2] - half[1]], [centre[0] + half[0], centre[1] - drop, centre[2] + half[1]], [centre[0] + half[0], centre[1] + size * 0.4, centre[2] + half[1]], [centre[0] - half[0], centre[1] + size * 0.4, centre[2] - half[1]], {
-          uvs: [[0, 0], [size, 0], [size, drop * 0.5], [0, drop * 0.5]], colour: tkbScale(shade, 1.15), normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]],
+          uvs: [[0, 0], [1, 0], [1, 1], [0, 1]], colour: tkbScale(shade, 1.15), normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]],
         });
       }
-      card(kind === 'pine' ? 'needles' : 'foliage', centre, size, shade);
+      spray(centre, size, shade);
+    }
+  };
+  const [boughs, low, top] = form.boughs;
+  for (let k = 0; k < boughs; k += 1) {
+    const from = bend(low + ((top - low) * (k + random() * 0.6)) / boughs);
+    const angle = k * 2.4 + random();
+    // (Boughs shorten up the tree: the lowest reach furthest.)
+    const reach = high * spread * (form.reach[0] + (form.reach[1] - form.reach[0]) * random()) * (1 - 0.45 * (k / boughs));
+    const up = high * (form.rise[0] + (form.rise[1] - form.rise[0]) * random());
+    const to = [from[0] + Math.cos(angle) * reach, from[1] + up, from[2] + Math.sin(angle) * reach];
+    const mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2 + up * 0.25, (from[2] + to[2]) / 2];
+    builder.tube('bark', [frame(...from), frame(...mid), frame(...to)], girth * 0.42, girth * 0.14, { colour: form.bark, sides: 5 });
+    leafed(from, to, form.cards[0]);
+    for (let fork = 0; fork < form.forks; fork += 1) {
+      const root = fork % 2 ? mid : to;
+      const tip = [root[0] + (random() - 0.5) * reach * 0.9, root[1] + (random() - 0.2) * Math.max(up, high * 0.06) * 0.9, root[2] + (random() - 0.5) * reach * 0.9];
+      builder.tube('bark', [frame(...root), frame(...tip)], girth * 0.14, girth * 0.04, { colour: form.bark, sides: 4 });
+      if (!form.sheet) {
+        // Winter: each fork ends in twigs.
+        for (let twig = 0; twig < 3; twig += 1) builder.tube('bark', [frame(...tip), frame(tip[0] + (random() - 0.5) * reach * 0.5, tip[1] + random() * high * 0.12, tip[2] + (random() - 0.5) * reach * 0.5)], girth * 0.05, girth * 0.02, { colour: form.bark, sides: 3 });
+      } else leafed(root, tip, Math.ceil(form.cards[0] / 2));
     }
   }
+  // The leader: the crown's own top.
+  if (form.sheet) leafed(bend(0.92), [bend(1)[0], bend(1)[1] + high * (form.flat > 0.5 ? 0.04 : 0.22), bend(1)[2]], form.cards[0]);
 }
 
 // ---- street furniture -----------------------------------------------------------------------------------------------

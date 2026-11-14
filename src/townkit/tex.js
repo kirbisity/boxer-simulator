@@ -46,8 +46,11 @@ export const TK_TEX = {
   lattice: { size: 256, metres: 0.48, relief: 0.012, bars: 4, bar: 0.24, face: [0.8, 0.76, 0.7] },
   // Leaves, cut out by alpha, for the cards a tree's crown is made of: `count` leaves a sheet, each `long` by `wide` of the sheet
   // (a broadleaf's in summer; a pine's needles in bundles). Colours typical of camphor and willow, and of red pine in winter.
-  foliage: { size: 256, metres: 1.5, relief: 0.03, count: 110, long: 0.07, wide: 0.034, face: [0.33, 0.45, 0.22] },
-  needles: { size: 256, metres: 1.2, relief: 0.02, count: 300, long: 0.085, wide: 0.007, face: [0.2, 0.3, 0.19] },
+  // Each sheet is one spray, not a tiling field: the leaves stand thick at its middle and thin out to nothing `spray`
+  // of the way to its edge, so a card of it has a ragged leafy outline and no square one. A broadleaf's leaves lie
+  // any way; a pine's needles stand in `bundles` fans, each fan's needles spreading from its twig's end.
+  foliage: { size: 256, metres: 1, relief: 0.03, count: 150, long: 0.062, wide: 0.03, face: [0.33, 0.45, 0.22], spray: 0.9 },
+  needles: { size: 256, metres: 1, relief: 0.02, count: 520, long: 0.085, wide: 0.0055, face: [0.2, 0.3, 0.19], spray: 0.86, bundles: 30 },
 };
 
 /** A seeded generator, 0..1 (mulberry32). */
@@ -342,19 +345,37 @@ const TKX_PAINTERS = {
 
   leaves(spec, seed) {
     const random = tkRandom(seed);
+    // Where a spray's leaves stand: thick at the middle, none past `spray` of the half sheet (the square root of a
+    // random number spreads points evenly over a disc; a power under that crowds them inward).
+    const inSpray = () => {
+      const radius = 0.5 * spec.spray * Math.pow(random(), 0.62);
+      const turn = random() * Math.PI * 2;
+      return [0.5 + Math.cos(turn) * radius, 0.5 + Math.sin(turn) * radius];
+    };
+    const twigs = spec.bundles ? Array.from({ length: spec.bundles }, () => ({ at: inSpray(), way: random() * Math.PI * 2, tone: 0.75 + 0.5 * random() })) : null;
     const leaves = Array.from({ length: spec.count }, () => {
+      const long = spec.long * (0.7 + 0.6 * random());
+      if (twigs) {
+        // A needle of a fan: from its twig's end, within a third of a turn of the twig's own way.
+        const twig = twigs[Math.floor(random() * twigs.length)];
+        const angle = twig.way + (random() - 0.5) * 2.1;
+        return { x: twig.at[0] + Math.cos(angle) * long * 0.9, y: twig.at[1] + Math.sin(angle) * long * 0.9, cos: Math.cos(angle), sin: Math.sin(angle), long, wide: spec.wide * (0.7 + 0.6 * random()), tone: twig.tone * (0.85 + 0.3 * random()) };
+      }
       const angle = random() * Math.PI;
-      return { x: random(), y: random(), cos: Math.cos(angle), sin: Math.sin(angle), long: spec.long * (0.7 + 0.6 * random()), wide: spec.wide * (0.7 + 0.6 * random()), tone: 0.7 + 0.6 * random() };
+      const [x, y] = spec.spray ? inSpray() : [random(), random()];
+      return { x, y, cos: Math.cos(angle), sin: Math.sin(angle), long, wide: spec.wide * (0.7 + 0.6 * random()), tone: 0.7 + 0.6 * random() };
     });
     return (u, v, pixel) => {
-      // The leaf this point is deepest inside (leaves overlap; the sheet wraps).
+      // The leaf this point is deepest inside (leaves overlap; a tiling sheet wraps, a spray does not).
       let depth = 0;
       let tone = 1;
       for (const leaf of leaves) {
         let dx = u - leaf.x;
         let dy = v - leaf.y;
-        dx -= Math.round(dx);
-        dy -= Math.round(dy);
+        if (!spec.spray) {
+          dx -= Math.round(dx);
+          dy -= Math.round(dy);
+        }
         const along = (dx * leaf.cos + dy * leaf.sin) / leaf.long;
         const across = (dy * leaf.cos - dx * leaf.sin) / leaf.wide;
         const inside = 1 - along * along - across * across;

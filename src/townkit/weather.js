@@ -71,6 +71,24 @@ export const TK_WEATHER = {
   snow: { colour: [0.76, 0.79, 0.84], colourAir: ENV.terrain.snowColour, holds: [0.45, 0.8], drift: 0.1, trodden: [0.7, 0.64, 0.56], caught: 0.55, blown: { drift: 4.5, stretch: 2.6, driftSlope: 0.17, ripple: 0.42, rippleSlope: 0.13, rippleTo: [22, 55] } },
 };
 
+/**
+ * What the wind moves, in the vertex stage, by one rule: the wind at a point (the open air's gusts where it is on,
+ * the place's own wind and a slow swell where it is off) and what the thing is.
+ *  - `tree` [bend, flutter] (a material: bark, leaves): a point `h` m over the ground under it (the lie map's ground)
+ *    goes downwind by bend x h^2 x U^2 m, a cantilever's deflection under drag. bend 6e-5 puts an 8 m crown's top
+ *    0.14 m over in a 6 m/s wind; a mature tree's top moves some decimetres in a fresh breeze, approximate.
+ *    Leaves shiver besides by `flutter` m per m/s.
+ *  - hung things (townkit/stir.js: lanterns, cloth on a line, banners) carry their own pivot and figures as vertex
+ *    attributes: `aTkPivot` where each vertex hangs from or is tied, `aTkStir` (catch, flutter, phase, swing rate).
+ *    catch > 0: it leans downwind about the pivot by atan(catch x U^2), drag over weight (catch = rho Cd A / 2mg:
+ *    a 0.3 kg paper lantern of 0.07 m^2 face is 0.014, 13 degrees at 4 m/s; a wet shirt 0.05; dry light cloth 0.2),
+ *    and swings on about that at its pendulum's own rate. catch < 0: tied down one side to a pole (a banner): it
+ *    streams round the pole to lie downwind, drooping by atan(-catch / U^2).
+ *    flutter: a wave runs down the cloth from where it is held, its height `flutter` x the distance from there, at
+ *    its fullest from `fullAt` m/s (TK_STIR.flap: its wave number rad/m, its rate rad/s).
+ */
+export const TK_STIR_RULE = { tree: { bend: 6e-5, flutter: 0.004 }, flap: { wave: 4.5, rate: 7, fullAt: 6 }, swing: 0.35, swell: [0.35, 0.7] };
+
 /** The uniforms every kit material shares: the weather (tkSetWeather), the mirror's sources, the clock, the place's lie, the open air. */
 export const tkWeather = {
   uTkWet: { value: 0 }, uTkPool: { value: 0 }, uTkSnow: { value: 0 }, uTkRain: { value: 0 }, uTkTime: { value: 0 },
@@ -436,6 +454,84 @@ const TK_FOG = `
 #endif
 `;
 
+// The vertex stage of what the wind moves (TK_STIR_RULE): its uniforms and the wind at a point.
+const TK_STIR_PARS = `
+uniform float uTkTime;
+uniform sampler2D uTkLayB;
+uniform vec4 uTkLay;
+uniform vec3 uTkLayH;
+uniform vec4 uTkAir;
+uniform vec4 uTkBlow;
+uniform vec4 uTkSway;
+${ENV_GLSL}
+#ifdef TK_HUNG
+attribute vec3 aTkPivot;
+attribute vec4 aTkStir;
+#endif
+float tkWindAt(vec2 xz) {
+  return uTkAir.x > 0.5 ? envGust(xz) : uTkBlow.z * (1.0 + ${TK_STIR_RULE.swell[0].toFixed(2)} * sin(uTkTime * ${TK_STIR_RULE.swell[1].toFixed(2)} + xz.x * 0.05 + xz.y * 0.07));
+}
+// \`r\` turned about the unit \`axis\` by the angle whose sine and cosine are given.
+vec3 tkTurn(vec3 r, vec3 axis, float sine, float cosine) { return r * cosine + cross(axis, r) * sine + axis * dot(axis, r) * (1.0 - cosine); }
+`;
+
+// Before three's own normal: a hung thing's lean and stream, worked out once for its normal and its place.
+const TK_STIR_NORMAL = `
+#ifdef TK_HUNG
+  float tkU = tkWindAt(aTkPivot.xz);
+  vec3 tkDown = vec3(uTkBlow.x, 0.0, uTkBlow.y);
+  vec3 tkAxis = vec3(-uTkBlow.y, 0.0, uTkBlow.x);
+  vec3 tkArm = position - aTkPivot;
+  float tkFree = length(tkArm);
+  float tkSine = 0.0;
+  float tkCosine = 1.0;
+  vec3 tkStream = vec3(0.0, 1.0, 0.0);
+  if (aTkStir.x > 0.0) {
+    float lean = atan(aTkStir.x * tkU * tkU);
+    lean *= 1.0 + ${TK_STIR_RULE.swing.toFixed(2)} * sin(uTkTime * aTkStir.w + aTkStir.z);
+    tkSine = sin(lean);
+    tkCosine = cos(lean);
+    objectNormal = tkTurn(objectNormal, tkAxis, tkSine, tkCosine);
+  } else if (aTkStir.x < 0.0) {
+    // Round the pole to lie downwind: the turn that takes the cloth's own way out from the pole onto the wind's.
+    vec2 out2 = normalize(tkArm.xz + vec2(1e-5, 0.0));
+    tkSine = out2.x * tkDown.z - out2.y * tkDown.x;
+    tkCosine = dot(out2, tkDown.xz);
+    objectNormal = tkTurn(objectNormal, tkStream, -tkSine, tkCosine);
+  }
+#endif
+`;
+
+// After three's own start of the vertex: the thing moved.
+const TK_STIR_VERTEX = `
+#ifdef TK_HUNG
+  {
+    vec3 arm = tkArm;
+    if (aTkStir.x > 0.0) arm = tkTurn(arm, tkAxis, tkSine, tkCosine);
+    else if (aTkStir.x < 0.0) {
+      arm = tkTurn(arm, tkStream, -tkSine, tkCosine);
+      float droop = atan(-aTkStir.x / max(tkU * tkU, 0.05));
+      float reach = length(arm.xz);
+      arm.xz *= cos(droop);
+      arm.y -= reach * sin(droop);
+    }
+    float flap = aTkStir.y * tkFree * sin(tkFree * ${TK_STIR_RULE.flap.wave.toFixed(2)} - uTkTime * ${TK_STIR_RULE.flap.rate.toFixed(2)} + aTkStir.z) * clamp(tkU / ${TK_STIR_RULE.flap.fullAt.toFixed(1)}, 0.06, 1.3);
+    transformed = aTkPivot + arm + objectNormal * flap;
+  }
+#endif
+#ifdef TK_TREE
+  {
+    vec3 at = (modelMatrix * vec4(transformed, 1.0)).xyz;
+    float ground = uTkLayH.z > 0.5 ? texture2D(uTkLayB, (at.xz - uTkLay.xy) * uTkLay.zw).g * uTkLayH.y + uTkLayH.x : 0.0;
+    float high = max(at.y - ground, 0.0);
+    float blow = tkWindAt(at.xz);
+    vec2 push = uTkBlow.xy * uTkSway.x * high * high * blow * blow * (1.0 + 0.3 * sin(uTkTime * 1.3 + at.x * 0.11 + at.z * 0.13));
+    push += uTkSway.y * blow * vec2(sin(uTkTime * 5.3 + at.x * 3.1 + at.y * 2.3), cos(uTkTime * 4.7 + at.z * 2.9 + at.y * 1.7));
+    transformed.xz += push;
+  }
+#endif
+`;
+
 let tkSunChunk = null;
 /** three's lights chunk with the sun's light (the directional light pointing where the baked shadow's sun is) taken off what stands in the baked shadow. */
 function tkSunShaded() {
@@ -455,11 +551,19 @@ function tkSunShaded() {
  * says; less: trodden, it shows through in patches); `dirt`: [streaks, moss, grime, treading] 0..1 each; `laid`:
  * [tiles across the sheet, along it, how much plaster may fall, 0].
  */
-export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1, dirt = [0, 0, 0, 0], laid = [0, 0, 0, 0]) {
+export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1, dirt = [0, 0, 0, 0], laid = [0, 0, 0, 0], stir = null) {
   tkWeatherInit();
-  const own = { uTkKind: { value: new THREE.Vector4(...kind) }, uTkHold: { value: hold }, uTkDirt: { value: new THREE.Vector4(...dirt) }, uTkLaid: { value: new THREE.Vector4(...laid) } };
+  const own = { uTkKind: { value: new THREE.Vector4(...kind) }, uTkHold: { value: hold }, uTkDirt: { value: new THREE.Vector4(...dirt) }, uTkLaid: { value: new THREE.Vector4(...laid) }, uTkSway: { value: new THREE.Vector4(...(stir?.tree ?? [0, 0]), 0, 0) } };
+  // (`stir`: what the wind does with it, TK_STIR_RULE: { tree: [bend, flutter] } or { hung: true }.)
+  if (stir) material.defines = { ...material.defines, ...(stir.hung ? { TK_HUNG: 1 } : { TK_TREE: 1 }) };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, envUniforms(), tkWeather, ktShadow, own);
+    if (stir) {
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>\n${TK_STIR_PARS}`)
+        .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\n${TK_STIR_NORMAL}`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>\n${TK_STIR_VERTEX}`);
+    }
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vTkPos;\nvarying vec3 vTkNrm;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvTkPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvTkNrm = normalize(mat3(modelMatrix) * objectNormal);');
@@ -473,7 +577,7 @@ export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1, dirt = [0, 0, 0
       .replace('#include <tonemapping_fragment>', `${TK_MIRROR}\n#include <tonemapping_fragment>`)
       .replace('#include <fog_fragment>', TK_FOG);
   };
-  material.customProgramCacheKey = () => 'townkit';
+  material.customProgramCacheKey = () => (stir ? (stir.hung ? 'townkit-hung' : 'townkit-tree') : 'townkit');
   material.userData.tkKind = own.uTkKind.value;
   // (The open air leaves a material so marked alone: this one takes its haze, sky and cloud shade itself.)
   material.userData.envOwn = true;
@@ -501,10 +605,14 @@ export const TK_MATERIALS = {
   earth: { sheet: 'earth', pools: 1, blotch: 1.2, dirt: [0, 0.5, 0.3, 1] },
   rock: { sheet: 'rock', blotch: 1.2, dirt: [0, 0.4, 0.5, 0] },
   // Bark: the rock's rough sheet under a trunk's own colour (a tree is seen from a few metres at the nearest).
-  bark: { sheet: 'rock', blotch: 1.1, dirt: [0, 0, 0.5, 0] },
+  // (`sway`: the wind moves it as a tree, TK_STIR_RULE.tree: its bend and, for leaves, their shiver.)
+  bark: { sheet: 'rock', blotch: 1.1, dirt: [0, 0, 0.5, 0], sway: [TK_STIR_RULE.tree.bend, 0] },
   lattice: { sheet: 'lattice', cutout: true, blotch: 0.4 },
-  foliage: { sheet: 'foliage', cutout: true, blotch: 0.8 },
-  needles: { sheet: 'needles', cutout: true, blotch: 0.8 },
+  foliage: { sheet: 'foliage', cutout: true, blotch: 0.8, sway: [TK_STIR_RULE.tree.bend, TK_STIR_RULE.tree.flutter] },
+  needles: { sheet: 'needles', cutout: true, blotch: 0.8, sway: [TK_STIR_RULE.tree.bend, TK_STIR_RULE.tree.flutter * 0.5] },
+  // Cloth and paper that hang and fly (townkit/stir.js): the plaster sheet's fine grain under each piece's own
+  // colour, seen from both sides, holding no snow.
+  cloth: { sheet: 'plaster', plain: true, twoSided: true, snow: 0, blotch: 0.5, hung: true },
   // Open water: the canal. Silted green-brown water, nearly all mirror at the angles it is seen from: it shows the
   // sky pale and the houses dark, as the reference's does.
   water: { sheet: 'plaster', pools: 2, colour: [0.2, 0.25, 0.2], blotch: 0.3, plain: true },
@@ -539,7 +647,7 @@ export function tkMaterials({ size = 512, ground = 0, anisotropy = 8, extra = {}
       });
       if (spec.normalScale) material.normalScale.set(spec.normalScale, spec.normalScale);
       material.name = `townkit:${name}`;
-      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1], spec.snow ?? 1, spec.dirt ?? [0, 0, 0, 0], [spec.tiles?.[0] ?? 0, spec.tiles?.[1] ?? 0, spec.fall ?? 0, 0]);
+      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1], spec.snow ?? 1, spec.dirt ?? [0, 0, 0, 0], [spec.tiles?.[0] ?? 0, spec.tiles?.[1] ?? 0, spec.fall ?? 0, 0], spec.hung ? { hung: true } : spec.sway ? { tree: spec.sway } : null);
       made.set(name, material);
       return material;
     },
