@@ -30,6 +30,7 @@ import { getLang, LANG_NAMES, LANGS, onLangChange, pick, SEP, setLang, t, tname 
 import { LAST_GATE, LAST_GATE_MODES, LAST_GATE_MODE_KEYS } from './lastgate.js';
 import { lastGateBoardList, lastStandBuilder } from './lastgateview.js';
 import { lastStandLevel } from './squad.js';
+import { dressLabels, uiIcon } from './uiicons.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
 export const EVENTS = {
@@ -118,8 +119,8 @@ function screen(id, title, subtitle, onBack) {
 function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
   const open = Boolean(onClick);
   return el('button', { className: `choice ${tone}${open ? '' : ' soon'}`, type: 'button', title: text ?? '', onclick: onClick ?? null, ariaDisabled: open ? null : 'true' },
-    el('span', { className: 'glyph', textContent: glyph, ariaHidden: 'true' }),
-    el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title })));
+    uiIcon(glyph),
+    el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), text ? el('span', { className: 'note', textContent: text }) : null));
 }
 
 /** A choice with its story (`title`, `kicker`, the paragraphs of `lines`) a tap away behind its ⓘ (infopop.js). */
@@ -143,6 +144,7 @@ export function installMenus(game) {
     if (!id) redraw = null;
     for (const other of ['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'custom-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
     document.body.dataset.overlay = id ?? '';
+    if (id) dressLabels(document.getElementById(id));
   };
   const close = () => show(null);
 
