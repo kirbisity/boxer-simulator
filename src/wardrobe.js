@@ -3487,24 +3487,39 @@ const KAWARI_CRESTS = {
  * it shades the eyes. Worn as a helmet would be, or as a loose hat (a prop
  * that a blow or a fall can knock off).
  */
+// A sugegasa: a cone of woven sedge on a bamboo frame, `wide` head radii at its rim and `tall` from rim to point, the rim
+// `rim` above the head's middle (below it: the brim comes down over the brow and shades the face); `ribs` ribs, `hoops` rows.
+const KASA = { wide: 2.75, tall: 1.75, rim: -0.12, ribs: 16, hoops: 7 };
 function buildKasa(group, r, color, head = {}) {
+  const { wide, tall, rim: rimAt, ribs: ribCount, hoops } = KASA;
   const straw = surface(color, { roughness: 0.95 });
   straw.flatShading = true;
   straw.side = THREE.DoubleSide;
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(3.3 * r, 1.15 * r, 40, 1, true), straw);
-  cone.position.y = 0.62 * r;
-  const ribs = surface(new THREE.Color(color).multiplyScalar(0.72).getHex(), { roughness: 1 });
-  for (let rib = 0; rib < 16; rib += 1) {
-    const angle = (rib / 16) * Math.PI * 2;
-    const line = new THREE.Mesh(new THREE.BoxGeometry(3.4 * r, 0.025 * r, 0.04 * r), ribs);
-    line.position.set(Math.cos(angle) * 1.65 * r, 0.64 * r, Math.sin(angle) * 1.65 * r);
-    line.rotation.set(0, -angle, -Math.atan2(1.15, 3.3));
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(wide * r, tall * r, 40, 1, true), straw);
+  cone.position.y = (rimAt + tall / 2) * r;
+  const dark = surface(new THREE.Color(color).multiplyScalar(0.72).getHex(), { roughness: 1 });
+  // The frame's ribs down the slope, and the rows of the weave round it.
+  const slope = Math.hypot(wide, tall);
+  for (let rib = 0; rib < ribCount; rib += 1) {
+    const angle = (rib / ribCount) * Math.PI * 2;
+    const line = new THREE.Mesh(new THREE.BoxGeometry(slope * 1.01 * r, 0.025 * r, 0.04 * r), dark);
+    line.position.set(Math.cos(angle) * (wide / 2) * r, (rimAt + tall / 2 + 0.02) * r, Math.sin(angle) * (wide / 2) * r);
+    line.rotation.set(0, -angle, -Math.atan2(tall, wide));
     line.userData.noOutline = true;
     group.add(line);
   }
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(3.3 * r, 0.06 * r, 5, 40), surface(head.rim ?? 0x1c1a18, { roughness: 0.8 }));
+  for (let hoop = 1; hoop < hoops; hoop += 1) {
+    const share = hoop / hoops;
+    const row = new THREE.Mesh(new THREE.TorusGeometry(wide * share * r, 0.016 * r, 4, 36), dark);
+    row.rotation.x = Math.PI / 2;
+    row.position.y = (rimAt + tall * (1 - share) + 0.012) * r;
+    row.userData.noOutline = true;
+    group.add(row);
+  }
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(wide * r, 0.06 * r, 5, 40), surface(head.rim ?? 0x1c1a18, { roughness: 0.8 }));
   rim.rotation.x = Math.PI / 2;
-  rim.position.y = 0.05 * r;
+  rim.position.y = rimAt * r;
+  // The padded ring inside that sits on the head, and the chin cords from it.
   const band = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.08 * r, 0.32 * r, 18, 1, true), surface(0x2a2420));
   band.position.y = 0.22 * r;
   for (const side of [1, -1]) {
