@@ -2933,7 +2933,7 @@ function buildKabuto(group, head, r, steel, color, lowDetail = false) {
   // `own`: the kit's own mask design (`maskDesign`; an oni somen for `mask: 'oni'`, else the commoner ressei-men).
   const maskDesign = HELM_STYLE.masks === 'own' ? head.maskDesign ?? (head.mask === 'oni' ? 'oni' : 'ressei') : HELM_STYLE.masks;
   const maskTint = head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : MENPO.black;
-  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, maskTint, steel.envMap)) {
+  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, maskTint, steel.envMap, null, Boolean(head.maskPlain))) {
     // The throat guard (yodare-kake): three laced lames hung from the mask's chin, each wider than the one above, a cord at
     // the foot of each.
     for (let tier = 0; tier < 3; tier += 1) {
@@ -2950,7 +2950,7 @@ function buildKabuto(group, head, r, steel, color, lowDetail = false) {
       group.add(lame, cord);
     }
     // A half mask (the ressei-men) made an oni's: a scowling brow over the eyes and tusks at the corners of the mouth.
-    if (MENPO.scowled.includes(maskDesign)) oniScowl(group, r, metal(steel, maskTint));
+    if (MENPO.scowled.includes(maskDesign)) oniScowl(group, r, metal(steel, maskTint), !head.maskPlain);
   } else if (head.mask === 'oni') {
   // An oni somen: the whole face in black iron, heavy brows, glaring eye
   // holes, a snarl with fangs, and two short horns at the brow.
@@ -3024,8 +3024,8 @@ const MASK_THROAT_Y = -1.5;
 // `brow` [inner, outer] (z, y) of each brow on the face, head radii; `tusks` (z, y, height) on the lower lip.
 const MENPO = { scowled: ['ressei'], black: 0x2c2b2f, iron: 0x4a3830, throat: 0x1b1a1d, brow: [[0.06, -0.01], [0.46, 0.13]], stand: 0.1, thick: 0.065, tusks: [0.15, -0.86, 0.2] };
 
-/** The scowl and tusks on a half mask (MENPO), in `iron` the mask's own metal, on the face as the mask is (helmforms.js headRadiusAt). */
-function oniScowl(group, r, iron) {
+/** The scowl and (`tusked`) tusks on a half mask (MENPO), in `iron` the mask's own metal, on the face as the mask is (helmforms.js headRadiusAt). */
+function oniScowl(group, r, iron, tusked = true) {
   const onFace = (z, y, stand) => {
     const azimuth = Math.asin(Math.max(-0.95, Math.min(0.95, z / 1.05)));
     const radius = headRadiusAt(azimuth, y) + stand;
@@ -3044,6 +3044,7 @@ function oniScowl(group, r, iron) {
     const furrow = [onFace(side * 0.03, -0.06, MENPO.stand - 0.02), onFace(side * 0.045, 0.06, MENPO.stand - 0.01), onFace(side * 0.05, 0.13, MENPO.stand - 0.02)];
     group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(furrow), 6, 0.022 * r, 4, false), iron));
     // A tusk up from the corner of the mouth.
+    if (!tusked) continue;
     const [tuskZ, tuskY, tall] = MENPO.tusks;
     const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, tall * r, 6), bone);
     tusk.position.copy(onFace(side * tuskZ, tuskY + tall / 2, 0.17));

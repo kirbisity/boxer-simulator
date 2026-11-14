@@ -65,13 +65,13 @@ export function maskGeometry(grid, r, fit = null) {
 /**
  * A war mask in style `style` (MASK_SHEETS), added to `group` (head coordinates); `tint` the lacquer's (or the metal's)
  * colour, `envMap` the steel's reflections; `span` the helmet's drawn span (helmforms.js HELM_SPAN), undone for the mask
- * so it stays fitted to the face. Returns the mask's mesh, or null when its sheet is not there (draw the old one).
+ * so it stays fitted to the face; `plain`, without its hair and gilding (maskMaterial). Returns the mask's mesh, or null when its sheet is not there (draw the old one).
  */
-export function buildWarMask(group, style, r, tint, envMap, span = null) {
+export function buildWarMask(group, style, r, tint, envMap, span = null, plain = false) {
   const name = MASK_SHEETS[style];
   const sheet = name && helmMapSheet(name);
   if (!sheet?.grid) return null;
-  const material = maskMaterial(name, tint, envMap);
+  const material = maskMaterial(name, tint, envMap, plain);
   const mask = new THREE.Mesh(maskGeometry(sheet.grid, r, MASK_FITS[style]), material);
   mask.userData.noOutline = true;
   mask.castShadow = true;
