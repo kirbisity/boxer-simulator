@@ -268,6 +268,10 @@ export const LOFT = {
   // cannon keeps to its own bone and a cop over a joint to both); a skirt's rows are stiff panel by panel, `panels` round it; a cloth coat
   // of plates keeps `coat` of the body's own give.
   stiff: { sharpen: 3, panels: 8, coat: 0.5 },
+  // Loose cloth (looseness): cloth lying on the body moves with it, cloth standing `from` m off the skin begins to hang free
+  // and at `full` m is wholly loose (a skirt's hem, a hanging sleeve, a trouser leg of hakama): what the air and his own
+  // movement then swing (clothsway.js). `cell` (m): the grid the skin's points are sorted into for the search.
+  sway: { from: 0.022, full: 0.12, cell: 0.13 },
   // A plate breastplate (`plate`, or a kit's `rigidBreastplate`: [waist, top]
   // up the trunk) is one rigid shell on the chest bone from its lower edge at
   // the waist to its top: the trunk under it, and whatever is worn between
@@ -406,6 +410,48 @@ function bodyAt(mesh, ring, angle) {
   if (!Array.isArray(ring.body)) return ring.body ?? 0;
   const turn = angle / (Math.PI * 2);
   return ring.body[Math.floor((turn - Math.floor(turn)) * ring.body.length) % ring.body.length];
+}
+
+/**
+ * How loose each point of the cloth hangs (0 lying on the body .. 1 free; null when none does): by how far it stands off the
+ * nearest skin (LOFT.sway). Skin, steel, shells and every stiff body's points are 0: nothing rigid sways.
+ */
+function looseness(positions, regions, stiff) {
+  const { from, full, cell } = LOFT.sway;
+  const count = regions.length;
+  const key = (x, y, z) => `${x},${y},${z}`;
+  const at = (vertex, axis) => Math.floor(positions[vertex * 3 + axis] / cell);
+  const grid = new Map();
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    if (regions[vertex] !== 'skin') continue;
+    const k = key(at(vertex, 0), at(vertex, 1), at(vertex, 2));
+    let list = grid.get(k);
+    if (!list) grid.set(k, (list = []));
+    list.push(vertex);
+  }
+  if (!grid.size) return null;
+  const sway = new Float32Array(count);
+  let any = false;
+  for (let vertex = 0; vertex < count; vertex += 1) {
+    const role = regions[vertex];
+    if (role === 'skin' || stiff[vertex] || STEEL_ROLES.has(role) || SHELL_ROLES.has(role)) continue;
+    const [x, y, z] = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
+    const [cx, cy, cz] = [at(vertex, 0), at(vertex, 1), at(vertex, 2)];
+    let nearest = full * full;
+    for (let i = cx - 1; i <= cx + 1; i += 1) for (let j = cy - 1; j <= cy + 1; j += 1) for (let k = cz - 1; k <= cz + 1; k += 1) {
+      const list = grid.get(key(i, j, k));
+      if (!list) continue;
+      for (const other of list) {
+        const [dx, dy, dz] = [positions[other * 3] - x, positions[other * 3 + 1] - y, positions[other * 3 + 2] - z];
+        const d = dx * dx + dy * dy + dz * dz;
+        if (d < nearest) nearest = d;
+      }
+    }
+    const share = Math.min(1, Math.max(0, (Math.sqrt(nearest) - from) / (full - from)));
+    sway[vertex] = share * share * (3 - 2 * share);
+    if (sway[vertex] > 0) any = true;
+  }
+  return any ? sway : null;
 }
 
 /**
@@ -4273,6 +4319,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     uvs = new Float32Array((positionArray.length / 3) * 2);
     for (let vertex = 0; vertex < positionArray.length / 3; vertex += 1) uvs.set(mesh.uvs.get(vertex) ?? FLAT_UV, vertex * 2);
   }
+  // How loose the cloth hangs, point by point (measured while the skin under it is still here); not on a crowd's body.
+  let sway = lowDetail ? null : looseness(positionArray, colors, stiff);
   // Under armour (`hideCovered`): the skin the pieces cover is left out (every triangle of it), and the points no triangle uses.
   let hidden = 0;
   if (hideCovered && covered) {
@@ -4337,6 +4385,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       colors = Array.from(order, (from) => colors[from]);
       bones = Array.from(order, (from) => bones[from]);
       stiff = Array.from(order, (from) => stiff[from]);
+      if (sway) sway = pick(sway, 1);
       if (heat) heat = Array.from(order, (from) => heat[from]);
       indexArray = Uint32Array.from(kept, (vertex) => used[vertex]);
     }
@@ -4378,6 +4427,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     ...(covered ? { covered } : {}), ...(hidden ? { hiddenTriangles: hidden } : {}), ...(tint ? { tint } : {}), ...(slosh ? { slosh } : {}),
     // (A base-mesh body, not a crowd's, is drawn skinned by dual quaternions: render.js SKIN_DQ, dqskin.js.)
     ...(baseRig && !lowDetail ? { dualQuaternion: true } : {}),
+    ...(sway ? { sway } : {}),
   };
 }
 

@@ -145,6 +145,26 @@ test('steel is stiff: a plate\'s points all carry the same weights, so no plate 
   assert.ok(distinct(buildLoftBody(body, { lowDetail: true })) > 0.5, 'the crowd\'s harness follows the body point by point');
 });
 
+test('loose cloth sways and stiff steel does not: looseness is on cloth standing off the body only, never in a crowd; a swing lags its bone and comes to rest', async () => {
+  const { buildLoftBody } = await import('../src/loftbody.js');
+  const { ClothSwing, CLOTH_SWAY } = await import('../src/clothsway.js');
+  const body = buildBody({ ...PRESETS.light, outfit: { kind: 'ronin', design: 2 } });
+  const mesh = buildLoftBody(body);
+  assert.ok(mesh.sway.some((share) => share > 0.05), 'a kimono hangs loose somewhere');
+  mesh.regions.forEach((region, vertex) => {
+    if (region === 'skin' || region === 'steel') assert.equal(mesh.sway[vertex], 0, `${region} does not sway`);
+  });
+  assert.equal(buildLoftBody(body, { lowDetail: true }).sway, undefined);
+  const frames = (x) => BONES.map(() => ({ origin: [x, 1, 0] }));
+  const swing = new ClothSwing(BONES.length);
+  swing.update(frames(0), 1 / 60);
+  for (let step = 1; step <= 12; step += 1) swing.update(frames(step * 0.05), 1 / 60);
+  assert.ok(swing.uniform.value[0] < -0.01, 'the cloth hangs behind a bone moving off');
+  assert.ok(Math.abs(swing.uniform.value[0]) <= CLOTH_SWAY.reach + 1e-6);
+  for (let step = 0; step < 600; step += 1) swing.update(frames(0.6), 1 / 60);
+  assert.ok(Math.abs(swing.uniform.value[0]) < 1e-3, 'and comes to rest when the bone does');
+});
+
 test('the horse peoples\' kit and the armies that met them loft whole: every design of each new outfit, its armour drawn', async () => {
   const { buildLoftBody, ARMOR_KINDS } = await import('../src/loftbody.js');
   const { OUTFITS } = await import('../src/outfits.js');
