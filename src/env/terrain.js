@@ -403,7 +403,10 @@ void main() {
   colour *= light;
 
   vec3 view = normalize(vWorld - cameraPosition);
-  float puddle = wet * smoothstep(0.42, 0.6, worn * 0.5 + fine * 0.5 + 0.12 * medium) * near * step(0.97, normal.y);
+  // Water stands only in the hollows of worn, level ground: dips about a metre across (one smooth noise, a cell
+  // 0.9 m), filled up to a level (ENV.terrain.puddles), their shores drawn by the ground's grain.
+  float hollow = texture2D(uEnvNoise, xz / 14.0 + vec2(0.71, 0.29)).r + (fine - 0.5) * 0.05;
+  float puddle = wet * (1.0 - smoothstep(${(ENV.terrain.puddles - 0.02).toFixed(3)}, ${(ENV.terrain.puddles + 0.02).toFixed(3)}, hollow)) * smoothstep(0.3, 0.6, worn) * near * step(0.97, normal.y);
   float fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(-view, normal), 0.0), 5.0);
   // What the water mirrors: the sky over what stands round the floor, and under that line the wood itself.
   vec3 back = reflect(view, normal);

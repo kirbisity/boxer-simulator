@@ -38,6 +38,15 @@ export const ENV = {
     // How forward the haze throws light (Henyey-Greenstein g): 0.76 is the usual figure for haze, approximate.
     // It is what makes the glow round a low sun.
     hazeForward: 0.76,
+    // Thick haze glows on every side, not only round the sun: the light it throws wide of the beam (1 - g^2 of
+    // its depth along the sun's path, the share that dims the sun on the ground) is scattered again and again
+    // and comes from everywhere. As a source beside the sun's beam (whose phase function averages 1): the flux
+    // strewn, sun x sin(elevation) x (1 - exp(-wide depth)), spread over the sphere is 4 / pi x pi = 4 times
+    // itself in those units, of which about half is still in the layer and not gone out of its top or into the
+    // ground (approximate; the half is a guess at a layer one or two depths thick). Without it a mist seen away
+    // from a low sun was near black beside a white glow, where a real one is pale grey all round and brighter
+    // sunward. On a clear day the term is a tenth of the sun and whitens the low sky a little.
+    hazeStrewn: 2,
     // The haze's light is tabled along the horizon only (the sky table's lowest row), but the sun stands over
     // it: a sight line nearer the sun than the level line under it is brighter by the ratio of the phase
     // function at the two angles, which is the bright patch of mist round a low sun. `aureole`: the share of
@@ -315,11 +324,21 @@ export const ENV = {
     // How much of the sheet's shape is small lumps (of about a third of `scale`) and how much the broad masses:
     // 0.32 by eye for a field of cumulus, which is all lumps.
     ragged: 0.32,
-    // A deck of stratocumulus is another form of the same sheet: broad slabs with smooth bases, a few hundred
-    // metres deep right to their edges, so dark from below all over but for a thin rim. A weather's `deck` (0 a
-    // field of cumulus, 1 a deck) takes `ragged` and `baseAt` down to this share of themselves. By eye against the
-    // first reference, whose sky is slate slabs with pale breaks, not grey lumps with dark middles.
+    // The lumps stand in fields with clear lanes between (cloud streets, the back of a front): how much a second,
+    // slower reading of the noise (features about 3 km across at `scale`) adds to or takes from the lumps. It is
+    // also what keeps the sky from repeating: the noise picture alone comes round every 12 km and the sheet is
+    // seen for 16 km each way. 0.3 by eye: at 0.5 a view was all cloud or none for minutes on end.
+    fields: 0.3,
+    // A deck of stratocumulus is another form of the same sheet: broad soft slabs. A weather's `deck` (0 a field
+    // of cumulus, 1 a deck) takes `ragged` down to `deck` of itself (few small lumps), `baseAt` to `deckBase` of
+    // itself (a slab is deep nearly to its edge, so slate from below almost all over) and makes the edge itself
+    // `deckEdge` times wider (it trails off in a veil the sky's light comes through, where a cumulus has an
+    // outline). By eye against the first reference, whose sky is soft graded slate with a bright break: with a
+    // cumulus's narrow edge the deck read as a two-tone cut-out, and with the base dark only in the middle
+    // (deckBase 1.7) as an even pale grey.
     deck: 0.35,
+    deckBase: 0.9,
+    deckEdge: 3,
     // A cumulus is as deep as it is broad or less (fair-weather ones a few hundred metres to a kilometre:
     // approximate). The sheet is drawn at `levels` heights from its base to `deep` m over it, each level's
     // clouds narrower by `taper` of the noise (a cloud's top is smaller than its base). By eye.
@@ -397,7 +416,11 @@ export const ENV = {
     // Wet ground: soil darkens to about this share of its dry colour (approximate: wet soil albedo is
     // roughly half of dry), and takes a sheen of the sky at grazing angles.
     wetDarken: 0.58,
-    wetSheen: 0.5,
+    wetSheen: 0.25,
+    // Water stands where the worn ground's hollows lie under this level (of a smooth noise, 0..1: under 0.4 is
+    // about a third of the ground; by eye, against a trodden ring after rain: separate pools, not a sheet. With
+    // every worn patch one pool and a sheen of 0.5 a rained-on floor was a single dark mirror).
+    puddles: 0.4,
     // What standing water mirrors: the sky only above what stands round the floor (trees.js envBuildSkyline:
     // `skyline` texels round the compass, tangents up to `skylineMost`, 63 degrees); below that line the wood,
     // at `mirrorWood` of the sky's light on its colour (a crown seen from below and the side is mostly its own
@@ -639,18 +662,20 @@ export const ENV_WEATHER = {
   // Broken cloud racing over: the light comes and goes.
   cloudy: { label: 'Broken cloud', grade: { contrast: 1.32 }, fine: 1.3, cover: 0.62, gloom: 0.35, sun: 0.9, visibility: null, hazeHeight: null, wind: 1.3, gust: 0.1, wet: 0, fall: null, snow: 0 },
   // Heavy broken cloud: a deck of stratocumulus in broad slate slabs (`deck`) with a few breaks, the land
-  // in its shade with patches of sun crossing it. `cover` is the sheet's threshold, not an area: 0.68 leaves about
+  // in its shade with patches of sun crossing it. `cover` is the sheet's threshold, not an area: 0.72 leaves about
   // a tenth of the sky open, and is just short of where the sky turns to a lid (air.js). The air under such a deck
-  // is damp and shallow: a visibility of 7 km in a layer 400 m deep (both approximate, in the range given for
-  // moist haze) dissolves the ridges one behind another yet leaves the sky above 10 degrees clear of it, so the
-  // cloud keeps its form; a deep layer of the same air turned the whole sky one flat slate. The picture is a
+  // is damp and shallow: a visibility of 4.5 km in a layer 300 m deep (both approximate, in the range given for
+  // moist haze) dissolves the ridges one behind another into blue, a wood at 2 km already a silhouette, yet
+  // leaves the sky above 10 degrees clear of it, so the cloud keeps its form; a deep layer of the same air
+  // turned the whole sky one flat slate, and 7 km left the far land green and crisp to the skyline. The picture is a
   // low-key one: the curve is left nearly straight (a steep one drove the shaded land to black under a mid-grey
   // sky) and the frame held up half a stop, so the land sits at a third of the way up and the breaks are
   // the brightest thing in it; cooled, as light through deep cloud and blue air is, and as a camera left on
   // its daylight balance under it draws it. All against the first reference's measured values (luminance
   // percentiles, sky top, horizon, mid-ground, foreground; its mean saturation 0.45 and its greens at a hue of
-  // 110 degrees, where a warmth of -0.04 and a saturation of 0.96 gave 0.31 and 102, and these 0.40 and 106).
-  heavy: { label: 'Heavy cloud', grade: { contrast: 1.08, saturation: 1.15, warmth: -0.11, ev: 0.5 }, fine: 1.1, cover: 0.68, deck: 1, gloom: 0.7, sun: 1, visibility: 7000, hazeHeight: 400, wind: 1.25, gust: 0.12, wet: 0, fall: null, snow: 0 },
+  // 110 degrees, where a warmth of -0.04 and a saturation of 0.96 gave 0.31 and 102, and these 0.44 to 0.47
+  // and 110 to 112 over three views).
+  heavy: { label: 'Heavy cloud', grade: { contrast: 1.08, saturation: 1.25, warmth: -0.27, ev: 0.5 }, fine: 1.1, cover: 0.72, deck: 1, gloom: 0.85, sun: 1, visibility: 4500, hazeHeight: 300, wind: 1.25, gust: 0.12, wet: 0, fall: null, snow: 0 },
   // A low grey lid: no shadows, flat light (the sun's share is what gets through thick stratus, a few per cent direct).
   overcast: { label: 'Overcast', grade: { contrast: 1.4, saturation: 0.94, warmth: -0.015, ev: -0.3 }, fine: 0.8, cover: 1, gloom: 0.4, sun: 0.06, visibility: 12000, hazeHeight: null, wind: 1.2, gust: 0.05, wet: 0, fall: null, snow: 0 },
   // Steady rain: visibility a few km (approximate for moderate rain), everything wet.
@@ -758,20 +783,30 @@ export const PLACE_ENV = {
       { kind: 'bracken', count: 26, from: 20, to: 140, clump: 0.6 },
       { kind: 'broadleaf', count: 26, from: 24, to: 120, clump: 0.6 },
       { kind: 'shrub', count: 16, from: 24, to: 110, clump: 0.75 },
-      { kind: 'broadleaf', count: 260, from: 120, to: 520, clump: 0.8 },
-      { kind: 'broadleaf', count: 2600, from: 480, to: 2600, clump: 0.97 },
+      { kind: 'broadleaf', count: 260, from: 120, to: 520, clump: 0.95 },
+      { kind: 'broadleaf', count: 9000, from: 480, to: 2600, clump: 0.995 },
+      { kind: 'broadleaf', count: 900, from: 260, to: 640, clump: 0.995 },
     ],
-    woods: { cover: 0.6, colour: 0x34502a },
+    // The far slopes are wooded: the land is painted the wood's colour wherever trees may stand (`cover` 1) and
+    // the trees keep to it (`clump` above), so a hillside reads as a dark wood with a broken edge. At 0.6 with a
+    // fifth of the trees in the open the vale was green down with single dark crowns dotted over it. Its colour
+    // is a canopy's seen from outside, which is the leaf's (ENV_TREES.broadleaf) in the shade of the crowns'
+    // own depth: about 0.6 of it. Painted the leaf's own colour the wood was as light as the grass round it and
+    // the crowns standing on it showed as dots.
+    woods: { cover: 1, colour: 0x24381a },
     drift: [{ kind: 'motes', share: 1, colours: [0xfff4d0] }, { kind: 'petals', share: 0.5, colours: [0xf4f0e2, 0xe8d77a] }, { kind: 'litter', share: 0.5, colours: [0x8a7a3a, 0x6a6a2c, 0x9a8a52] }],
   },
-  // Open pasture for horsemen under a driven sky an hour before sunset: a wide level floor, long low swells, a
-  // scarp far off, the grass running in waves before a fresh breeze, the sun low under the cloud so the sky is
-  // the bright thing, the land darker under it and every figure throws a shadow several times its height.
+  // Open pasture for horsemen half an hour before sunset: a wide level floor, long low swells, a scarp far off,
+  // the grass running in waves before a breeze. The sun stands 7 degrees up in a sky with a few soft bars of
+  // evening cloud (`deck`: the place's own cloud takes the slab form), so the light is warm and comes in level:
+  // the blades glow against it, every figure throws a shadow eight times its height, and the day's dust (18 km:
+  // approximate, a dry summer evening) hangs gold toward the sun. Under broken cloud at 12 degrees, the earlier
+  // setting, the sun seldom reached the floor and the place was an evenly lit green lawn under a white sky.
   field: {
-    weather: 'cloudy',
-    sun: { azimuth: -2.3, elevation: 12 },
-    air: { visibility: 32000, hazeHeight: 900 },
-    clouds: { cover: 0.55 },
+    weather: 'clear',
+    sun: { azimuth: -2.3, elevation: 7 },
+    air: { visibility: 18000, hazeHeight: 900 },
+    clouds: { cover: 0.36, deck: 1 },
     terrain: {
       seed: 23,
       layers: [
@@ -806,6 +841,11 @@ export const PLACE_ENV = {
     sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },
+    // The floor is a clearing some 16 m across each way in a wood 20 m tall: a solid wall of that height would
+    // leave its middle 0.4 to 0.6 of the sky's light (the cosine-weighted share above 40 to 50 degrees), and
+    // crowns pass some and the ride is open, so about three quarters (approximate). The meter is told, and
+    // opens up under a lid of cloud, where the fighters stood near black against a black wood.
+    meter: { sky: 0.75 },
     terrain: {
       seed: 37,
       layers: [

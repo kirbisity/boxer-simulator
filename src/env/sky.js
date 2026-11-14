@@ -28,15 +28,18 @@ vec4 envSkyCloud(vec3 dir, float lift) {
   float depth = envCloudDepth(sheet) - lift * ${ENV.clouds.taper.toFixed(3)};
   // A cloud is seen from below: where it is thick the sun does not come through and the base is dark, and its
   // thin edges are bright. The side toward the sun is brighter again: less cloud that way to shade it. Above the
-  // base it is the cloud's flank that is seen, in the sun but for the cloud between.
+  // base it is the cloud's flank that is seen, in the sun but for the cloud between, and only as far as it is the
+  // sunlit side that faces the eye: the lit share of a lump's face goes as the moon's does with its phase, all
+  // of it with the sun behind the eye and none looking into the sun, where a cloud is dark with a bright rim.
+  float phase = smoothstep(0.0, 0.8, 0.5 - 0.5 * dot(dir, uEnvSunDir));
   vec2 sunward = normalize(uEnvSunDir.xz + vec2(1e-4, 0.0)) * ${ENV.clouds.selfShadow.toFixed(3)};
   float behind = envCloud(sheet + sunward);
   float beyond = envCloud(sheet + sunward * 2.6);
-  float thick = smoothstep(0.02, uEnvCloudForm.y, depth) * (1.0 - lift);
+  float thick = smoothstep(0.02, uEnvCloudForm.y, depth) * (1.0 - lift * phase);
   float lit = (1.0 - thick) * (1.0 - 0.3 * behind) + 0.3 * (1.0 - behind) * (1.0 - 0.6 * beyond);
   // The grain of the cloud itself.
   lit = clamp(lit * (1.0 + 1.25 * uEnvCloudForm.x * (texture2D(uEnvNoise, sheet * 1.9).a - 0.5)), 0.0, 1.0);
-  return vec4(mix(uEnvCloudDark, uEnvCloudLit, lit), smoothstep(-0.07, 0.11, depth));
+  return vec4(mix(uEnvCloudDark, uEnvCloudLit, lit), smoothstep(-0.07 * uEnvCloudForm.z, 0.11 * uEnvCloudForm.z, depth));
 }
 
 void main() {
