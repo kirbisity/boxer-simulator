@@ -222,8 +222,8 @@ function tileTexel(tile, column, row, dc, dr) {
  * tangent plane, and the metres one texel spans each way.
  */
 /**
- * A row of the trunk tile's added slopes (`starved`, see skinTextureSteps): `(column) => [round, along]`, read bilinearly from its
- * own grid at the row's place along the trunk and the column's round it, by its weight.
+ * A row of the trunk tile's added relief (`starved`, see skinTextureSteps): `(column) => height` in units of stature, read
+ * bilinearly from its own grid at the row's place along the trunk and the column's round it, by its weight.
  */
 function starvedRow(starved, tile, row) {
   const t = tile.from + (tile.to - tile.from) * texClamp((row - GUTTER) / (tile.tall - 1));
@@ -231,16 +231,13 @@ function starvedRow(starved, tile, row) {
   const y = texClamp((t - from) / (to - from)) * (starved.height - 1);
   const y0 = Math.min(starved.height - 2, Math.floor(y));
   const fy = y - y0;
+  const at = (yy, xx) => starved.heights[yy * starved.width + xx];
   return (column) => {
     const share = (((column - GUTTER) / (tile.inner - 1)) % 1 + 1) % 1;
     const x = share * (starved.width - 1);
     const x0 = Math.min(starved.width - 2, Math.floor(x));
     const fx = x - x0;
-    const read = (channel) => {
-      const at = (yy, xx) => starved.slopes[(yy * starved.width + xx) * 2 + channel];
-      return (at(y0, x0) * (1 - fx) + at(y0, x0 + 1) * fx) * (1 - fy) + (at(y0 + 1, x0) * (1 - fx) + at(y0 + 1, x0 + 1) * fx) * fy;
-    };
-    return [read(0) * starved.weight, read(1) * starved.weight];
+    return ((at(y0, x0) * (1 - fx) + at(y0, x0 + 1) * fx) * (1 - fy) + (at(y0 + 1, x0) * (1 - fx) + at(y0 + 1, x0 + 1) * fx) * fy) * starved.weight;
   };
 }
 
@@ -367,8 +364,11 @@ export function texNoise(x, y, seed) {
  * `layers`: which maps; `share`: how much of the rules' fine height the mesh already has (the maps carry the rest).
  */
 /**
- * `starved`: slopes to add on the trunk tile ({ width, height, span, slopes: round and along per texel, weight }: the base style's
- * emaciated reference, basebody.js baseStarvedDetail), read at each texel's place along and round the trunk.
+ * `starved`: the trunk's bones as a relief for its tile ({ width, height, span, heights: units of stature, weight }: the base
+ * style's emaciated reference, basebody.js baseStarvedDetail), read at each texel's place along and round the trunk and drawn
+ * by its weight (how much of it shows through the body's own fat and muscle: loftbody.js baseBoneRelief). With one,
+ * the rules' own ribs and bony marks are left out of the trunk at every weight (hers and the rules' are not at the same
+ * places, and both drawn are two rib cages), and the rest of the rules' height there gives way to it by the weight.
  */
 // `folds`: false for a mesh that models its own folds and creases (the base style's): the rules' fat folds, navel and armpit are
 // left out, and no crease is painted dark in the albedo or the occlusion (they are placed by the loft's landmarks, and on a
@@ -396,11 +396,13 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
   const stretch = new Float32Array(size);
   const flush = new Float32Array(size);
   for (const tile of TILES) {
-    const rule = ruleForTile(R, tile);
+    // (Where a relief stands for the trunk's bones, the rules' own are left out: see `starved`.)
+    const rule = ruleForTile(starved && tile.name === 'trunk' ? { ...R, bony: 0, ribs: 0 } : R, tile);
     for (let row = 0; row < tile.h; row += 1) {
       if (row % SKINTEX.sliceRuleRows === 0) yield `rules ${tile.name}`;
       if (hiddenRow(tile, row)) continue;
       const t = tile.from + (tile.to - tile.from) * texClamp((row - GUTTER) / (tile.tall - 1));
+      const relief = starved?.weight > 0 && tile.name === 'trunk' ? starvedRow(starved, tile, row) : null;
       for (let column = 0; column < tile.w; column += 1) {
         const angle = ((column - GUTTER) / (tile.inner - 1)) * Math.PI * 2;
         const at = (tile.y + row) * ATLAS_WIDTH + tile.x + column;
@@ -410,7 +412,7 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
         // (`armFade` { side: [t0, t1], sideFrom }: the trunk's anatomy eased out over the shoulder's cap at the sides, where the
         // base mesh draws its triangles in the arm's tile (basebody.js armTile): a thin man's ribs ended there in a hard edge.)
         if (armFade && tile.span === 'trunk') reach *= 1 - texSmooth(armFade.sideFrom, 1, Math.abs(Math.sin(angle))) * texSmooth(armFade.side[0], armFade.side[1], t);
-        height[at] = mark.h * (1 - share) * reach;
+        height[at] = (relief ? mark.h * (1 - share) * (1 - starved.weight) + relief(column) * body.heightM : mark.h * (1 - share)) * reach;
         crease[at] = mark.crease * reach;
         vein[at] = mark.vein;
         stretch[at] = mark.stretch * reach;
@@ -435,16 +437,10 @@ export function* skinTextureSteps(body, { mesh, source = 'rules', field = null, 
           for (let column = 0; column < tile.w; column += 1) normal[((tile.y + row) * ATLAS_WIDTH + tile.x + column) * 3 + 2] = 1;
           continue;
         }
-        const extra = starved && tile.name === 'trunk' ? starvedRow(starved, tile, row) : null;
         for (let column = 0; column < tile.w; column += 1) {
           const at = (tile.y + row) * ATLAS_WIDTH + tile.x + column;
-          let slopeT = (height[tileTexel(tile, column, row, 1, 0)] - height[tileTexel(tile, column, row, -1, 0)]) / (2 * frames[at * 8 + 6]);
-          let slopeB = (height[tileTexel(tile, column, row, 0, 1)] - height[tileTexel(tile, column, row, 0, -1)]) / (2 * frames[at * 8 + 7]);
-          if (extra) {
-            const [round, along] = extra(column);
-            slopeT += round;
-            slopeB += along;
-          }
+          const slopeT = (height[tileTexel(tile, column, row, 1, 0)] - height[tileTexel(tile, column, row, -1, 0)]) / (2 * frames[at * 8 + 6]);
+          const slopeB = (height[tileTexel(tile, column, row, 0, 1)] - height[tileTexel(tile, column, row, 0, -1)]) / (2 * frames[at * 8 + 7]);
           const length = Math.hypot(slopeT, slopeB, 1);
           normal[at * 3] = -slopeT / length;
           normal[at * 3 + 1] = -slopeB / length;

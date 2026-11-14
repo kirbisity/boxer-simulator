@@ -37,7 +37,8 @@ export const CUSTOM_BUDGET = 15_000_000;
 // open field only custom mode"): the sandbox's scene is the field and its picker hidden (CUSTOM_PLACE), so only the field's
 // tiles are kept: its earth under the hoof-churned strip (ground/painted.js: field `b` 'mud:hoof' → earth). Its grass (2.4 MB)
 // would take the page past the budget, and stays painted; the Colosseum's sand goes, as the field never shows it.
-export const CUSTOM_GROUND_TILES = ['earth'];
+// With the family of builds (2026-11-13: basebody-data's `family`, about 0.2 MB more) the earth goes as well: the strip is painted.
+export const CUSTOM_GROUND_TILES = [];
 // The one place the custom page shows (custombattle.js maps, render.js places): the open field.
 export const CUSTOM_PLACE = 'field';
 // The sky photographs kept (scenery/skyball.js SKYBALL_PHOTO_PLACES: the field wears the meadow's); the plain's and the valley's

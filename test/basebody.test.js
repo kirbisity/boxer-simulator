@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBody, P } from '../src/body.js';
 import { BONE, bindPoints } from '../src/rig.js';
-import { buildSkinMesh } from '../src/bodystyles.js';
-import { BASE_BODY, baseBindJoints, baseBodyMesh, baseStarvation, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
-import { baseLoftOptions, buildLoftBody } from '../src/loftbody.js';
+import { buildSkinMesh, skinTextureKey } from '../src/bodystyles.js';
+import { BASE_BODY, baseBindJoints, baseBodyMesh, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
+import { baseBoneRelief, baseFamilyWeights, baseLoftOptions, baseRigOf, buildLoftBody } from '../src/loftbody.js';
 import { FLAT_UV } from '../src/skindetail.js';
 import { progression } from '../tools/bodysheet-cast.js';
 
@@ -114,17 +114,30 @@ test('fat masses: only overweight and up, not in a crowd; firmer and quicker whe
   assert.ok(huge.masses.some((mass) => mass.name === 'belly'), 'a very obese body has a belly mass');
 });
 
-test('starvation: the emaciated contour and detail only on a starved body, none on a normal one', () => {
+test('the family of builds: a body is a mix of them summing to one, the emaciated build and its bone relief the thin\'s alone', () => {
   for (const sex of ['male', 'female']) {
     const rows = progression(sex);
-    const starved = buildBody(rows.find((row) => row.key === 'starved').inputs);
-    const average = buildBody(rows.find((row) => row.key === 'average').inputs);
-    assert.ok(baseStarvation(starved) > 0.9, `${sex}: the starved build is starved`);
-    assert.equal(baseStarvation(average), 0, `${sex}: an average build is not`);
-    assert.equal(baseStarvedDetail(average), null, `${sex}: no rib detail on an average build`);
-    assert.ok(baseStarvedDetail(starved)?.slopes.length > 0, `${sex}: rib detail on a starved build`);
-    const delta = baseBodyMesh(sex).starved;
-    const most = delta.reduce((m, value) => Math.max(m, Math.abs(value)), 0);
-    assert.ok(most > 0.003 && most <= 0.0151, `${sex}: a contour of up to 2.5 cm (${(most * 170).toFixed(1)} cm at 1.7 m)`);
+    const height = baseRigOf(sex, false).height;
+    const of = (key) => buildBody(rows.find((row) => row.key === key).inputs);
+    for (const row of rows) {
+      const weights = baseFamilyWeights(buildBody(row.inputs), height);
+      assert.equal(weights.length, BASE_BODY.family.builds.length);
+      assert.ok(Math.abs(weights.reduce((sum, weight) => sum + weight, 0) - 1) < 1e-9, `${sex} ${row.key}: the builds' weights sum to one`);
+    }
+    const [starved, thin, average, obese] = ['starved', 'thin', 'average', 'obese'].map(of);
+    const emaciated = (body) => baseFamilyWeights(body, height)[BASE_BODY.family.builds.indexOf('E')];
+    assert.ok(emaciated(starved) > 0.9, `${sex}: a starved body is the emaciated build`);
+    assert.ok(emaciated(thin) > 0.3 && emaciated(thin) < 0.8, `${sex}: a thin one part of it`);
+    assert.ok(Math.abs(emaciated(average)) < 0.1 && emaciated(obese) === 0, `${sex}: an average or a fat one none of it`);
+    // (The relief fades with the body's cover, faster than the build's share: LOFT.boneCover.)
+    const shows = [starved, thin, average, obese].map((body) => baseBoneRelief(body, height));
+    assert.ok(shows[0] > 0.9 && shows[1] > 0.1 && shows[1] < 0.5 && shows[2] < 0.1 && shows[3] < 0.01, `${sex}: bones through a starved body's skin, faintly a thin one's, not an average one's (${shows.map((show) => show.toFixed(2))})`);
+    const detail = baseStarvedDetail(starved, shows[0]);
+    assert.equal(detail.heights.length, detail.width * detail.height, `${sex}: a height a texel of the relief's tile`);
+    const most = detail.heights.reduce((m, value) => Math.max(m, Math.abs(value)), 0);
+    assert.ok(most > 0.003 && most <= 0.006 + 1e-6, `${sex}: a relief of up to 1 cm (${(most * 1680).toFixed(1)} mm at 1.68 m)`);
+    assert.equal(detail.weight, shows[0]);
+    // (Bodies a composition bucket apart in nothing else do not share maps where the relief they show differs.)
+    assert.notEqual(skinTextureKey(starved, 'base', buildSkinMesh(starved, 'base')), skinTextureKey(thin, 'base', buildSkinMesh(thin, 'base')));
   }
 });

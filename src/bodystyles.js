@@ -30,7 +30,7 @@
 // Every round-two style also morphs the face with the body (the `face` flag; the head is built in face.js).
 
 import { buildBodyMesh } from './bodymesh.js';
-import { baseLoftOptions, buildLoftBody, buildLoftBodySteps, runSteps } from './loftbody.js';
+import { baseBoneRelief, baseLoftOptions, baseRigOf, buildLoftBody, buildLoftBodySteps, LOFT, runSteps } from './loftbody.js';
 import { BASE_BODY, baseStarvedDetail } from './basebody.js';
 import { outfitOf } from './outfits.js';
 import { buildFleshBody, fleshAnatomy, fleshField } from './fleshbody.js';
@@ -125,11 +125,18 @@ export function* buildSkinMeshSteps(body, style) {
   }
 }
 
+/** How much of the base style's emaciated relief a body shows, 1 to 0 (loftbody.js baseBoneRelief: through its own cover). */
+function boneRelief(body) {
+  if (!BASE_BODY.family.use) return 0;
+  return baseBoneRelief(body, baseRigOf(body.inputs.sex === 'female' ? 'female' : 'male', false).height);
+}
+
 /** The slices of work that make a style's maps for a built body (see skintex.js). */
 function stepsFor(body, style, built) {
   const spec = styleSpec(style).tex;
-  // (The base style's starved trunk also takes the emaciated reference's rib and spine detail.)
-  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built), starved: style === 'base' ? baseStarvedDetail(body) : null, folds: style !== 'base', armFade: style === 'base' ? BASE_BODY.starveDetail : null });
+  // (The base style's trunk takes its bones from the emaciated reference's relief, by how much of it the body's cover shows.)
+  const starved = style === 'base' ? baseStarvedDetail(body, boneRelief(body)) : null;
+  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built), starved, folds: style !== 'base', armFade: style === 'base' ? BASE_BODY.starveDetail : null });
 }
 
 /** A built body's maps made now, not looked up or kept (the skin worker's: it hands them over). */
@@ -141,8 +148,8 @@ export function makeSkinTextures(body, style, built) {
 /** What a built body leaves out under armour (its maps leave it blank too), or null. */
 const coverOf = (built) => (built.hiddenTriangles ? built.covered : null);
 
-/** The cache key of a built body's maps. */
-export const skinTextureKey = (body, style, built) => compositionKey(body, style, coverOf(built));
+/** The cache key of a built body's maps (the base style's also by how much of its bone relief shows: LOFT.boneCover.bucket). */
+export const skinTextureKey = (body, style, built) => compositionKey(body, style, coverOf(built)) + (style === 'base' ? `|r${Math.round(boneRelief(body) / LOFT.boneCover.bucket)}` : '');
 
 /** A built body's maps if its bucket's are made (or it has none to make: true), without making them. */
 export function readySkinTextures(body, style, built) {

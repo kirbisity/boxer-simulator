@@ -75,13 +75,10 @@ export const BASE_BODY = {
   // the user: a starved shoulder still had the model's thickness. With the arms lowered by D's rest shape the lumps are gone,
   // and the fade now runs from 0.3 to 0.8 of the arm's ring radius: her bony cap, 1 cm lower over a starved man's joint.)
   starveArm: [0.3, 0.8],
-  // Her rib and spine detail (baseStarvedDetail) is faded where it is her pose, not her wasting: above the collarbones (`top`,
-  // t of the trunk: her shrugged shoulders and turned neck printed as ridges over a starved man's shoulders), and over the
-  // shoulder's cap at the sides (`side`, t, where |sin| of the angle passes `sideFrom`: those triangles are drawn in the arm's
-  // tile, which has none, so a patch of ribs ended in a polygon on the back). Her free side is read mirrored for the other, so
-  // the round slope flips sign across the midlines: it is eased to nothing within `midline` (|sin| of the angle, about 7 degrees,
-  // 1.5 cm on a trunk) of them, where it met itself turned over as a seam down the belly.
-  starveDetail: { top: [0.84, 0.95], side: [0.66, 0.8], sideFrom: 0.55, midline: 0.12 },
+  // The trunk's drawn anatomy (the rules', and her bone relief: baseStarvedDetail) is faded over the shoulder's cap at the sides
+  // (`side`, t of the trunk, where |sin| of the angle passes `sideFrom`): those triangles are drawn in the arm's tile, which has
+  // none, so a patch of ribs would end in a polygon on the back.
+  starveDetail: { side: [0.66, 0.8], sideFrom: 0.55 },
   // Each limb's parent at its root, and where on the parent the joint is (its t): the upper arm on the trunk at the shoulders
   // (the shoulder joint stands 0.91 of the way up the trunk: rig.js bindPoints, 0.025 of height under the neck's foot on a
   // 0.27 trunk), the forearm on the upper arm at the elbow, the thigh on the trunk at the hip joint, the shin on the thigh at the
@@ -125,6 +122,17 @@ export const BASE_BODY = {
   // The shoulder's cap the trunk carries takes the arm's ratio (by its muscle) within the first of these of the shoulder joint
   // (m per 1.8 m), none past the second (placeBaseBody: round 18).
   capReach: [0.12, 0.22],
+  // The family of builds a fighter's skin is blended from (baseFamily; the remodel of 2026-11, tools/blender/family): each
+  // sex's base mesh refitted, point for point, to an emaciated body (E: the user's emaciated reference, and her frame refitted
+  // to a man's), an ordinary one (N: ANSUR II's means at a BMI of 21.5, hers, and 22.5, his), a muscular one (M: the man's
+  // the base model itself) and three fat ones (F1 to F3: ANSUR II's means at 27, 33 and 40). `use`: off, a fighter's skin is
+  // the base model placed by his girth ratios alone, as it was before the family.
+  // `ease`: towards each open border (wrist, ankle, the neck's top) the family's placing gives way to the one by his girth
+  // ratios, all of the family's up to the first t of the part and none of it from the second: the hand, the foot and the head
+  // are the game's own, drawn to the game's rings there, and the border's cut ring was made to sit under them (a build's own
+  // ring stood 1.4 times as wide as the base's at the wrist, the emaciated one's 0.6). A forearm's and a shin's lower third is
+  // bone and tendon, which a build hardly changes; the neck's skin ends 0.6 of the way to the head's middle.
+  family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.2, 0.5] } },
   // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
   headHold: 0.85,
   // PROOF OF CONCEPT, round 11 (the user: D is better, but the shoulders and arms smaller still, the neck longer, the woman's
@@ -321,6 +329,8 @@ export function baseBodyMesh(sex, crowd = false) {
     part2: baseBytes(packed.part2),
     blend: Float32Array.from(baseBytes(packed.blend), (value) => value / 255),
     starved: packed.starved ? Float32Array.from(new Int16Array(baseBytes(packed.starved).buffer), (value) => value / BASE_BODY_DATA.deltaScale) : new Float32Array(packed.count),
+    // (A fighter's mesh: each point's place on each of the family's builds, as an offset in its own part's frame: baseFamily.)
+    family: packed.family ? baseFamilyOffsets(packed.family, packed.count) : null,
     ...baseHeat(packed),
   };
   mesh.triangles = closeSlits(mesh.positions, new Uint16Array(baseBytes(packed.triangles).buffer));
@@ -330,45 +340,45 @@ export function baseBodyMesh(sex, crowd = false) {
 }
 
 /**
- * How starved a body is, 0 to 1, for the emaciated reference's contour and its rib and spine detail (tools/blender/emaciated.py):
- * the game's own measure, the face's gaunt weight (facemorph.js: from BMI and body fat), so a normal body is untouched.
+ * The family's builds decoded (tools/basebody-family.js: ten bits a number, three to a Uint32, each (n − 512) × the build's
+ * scale): one Float32Array a build, in BASE_BODY.family.builds' order, three a point (along, fore and aft, across its part),
+ * units of height. A build left out is the base mesh itself: all zeros.
+ */
+function baseFamilyOffsets(packed, count) {
+  return BASE_BODY.family.builds.map((name) => {
+    const offsets = new Float32Array(count * 3);
+    if (!packed[name]) return offsets;
+    const words = new Uint32Array(baseBytes(packed[name].offsets).buffer);
+    for (let vertex = 0; vertex < count; vertex += 1) {
+      for (let axis = 0; axis < 3; axis += 1) offsets[vertex * 3 + axis] = (((words[vertex] >>> (10 * axis)) & 1023) - 512) * packed[name].scale;
+    }
+    return offsets;
+  });
+}
+
+/**
+ * How starved a body is, 0 to 1: the game's own measure, the face's gaunt weight (facemorph.js: from BMI and body fat), so a
+ * normal body is untouched.
  */
 export const baseStarvation = (body) => faceMorphWeights(body).gaunt;
 
-let starvedSlopes = null;
+const starvedReliefs = {};
 /**
- * The emaciated reference's rib and spine slopes for the skin map's trunk tile (skintex.js adds them by `weight`), or null where
- * the body is not starved: { width, height, span, slopes (round, along per texel), weight }.
+ * The emaciated reference's bone relief for the skin map's trunk tile (tools/blender/family/emaciateddetail.py; skintex.js
+ * draws the trunk's bones from it), or null where there is none: { width, height, span, heights (units of stature, row by row
+ * from the span's foot), weight }. One tile a sex: each is baked through that sex's own emaciated build. `weight`: how much of
+ * it to draw, 0 to 1 (how much of it shows through the body's own fat and muscle: loftbody.js baseBoneRelief). A man's tile
+ * has the skin rules' own ribs where his chest was remade of her (tools/basebody-detail.js).
  */
-export function baseStarvedDetail(body) {
-  const weight = baseStarvation(body);
-  const packed = BASE_BODY_DATA?.starvedSlopes;
-  if (weight <= 0 || !packed) return null;
-  if (!starvedSlopes) {
-    const bytes = new Int8Array(baseBytes(packed.slopes).buffer);
-    const slopes = Float32Array.from(bytes, (value) => (value / 127) * packed.steepest);
-    const { width, height, span } = packed;
-    const fade = BASE_BODY.starveDetail;
-    const smooth = (from, to, x) => {
-      const u = Math.min(1, Math.max(0, (x - from) / (to - from)));
-      return u * u * (3 - 2 * u);
-    };
-    for (let row = 0; row < height; row += 1) {
-      const t = span[0] + ((span[1] - span[0]) * row) / (height - 1);
-      for (let column = 0; column < width; column += 1) {
-        const angle = (Math.PI * 2 * column) / (width - 1);
-        const side = Math.abs(Math.sin(angle));
-        const keep = (1 - smooth(fade.top[0], fade.top[1], t)) * (1 - smooth(fade.sideFrom, 1, side) * smooth(fade.side[0], fade.side[1], t));
-        // (The round slope eased to nothing at the midlines, front and back: Math.abs(sin) the distance off them.)
-        const midline = smooth(0, fade.midline, side);
-        const at = (row * width + column) * 2;
-        slopes[at] *= keep * midline;
-        slopes[at + 1] *= keep;
-      }
-    }
-    starvedSlopes = { width, height, span, slopes };
+export function baseStarvedDetail(body, weight) {
+  const sex = body.inputs.sex === 'female' ? 'female' : 'male';
+  const packed = BASE_BODY_DATA?.starvedRelief?.[sex];
+  if (!packed) return null;
+  if (!starvedReliefs[sex]) {
+    const bytes = new Int8Array(baseBytes(packed.heights).buffer);
+    starvedReliefs[sex] = { width: packed.width, height: packed.height, span: packed.span, heights: Float32Array.from(bytes, (value) => (value / 127) * packed.deepest) };
   }
-  return { ...starvedSlopes, weight };
+  return { ...starvedReliefs[sex], weight };
 }
 
 /** A part's frame: its axis from `a` to `b`, the ring's depth axis (the loft's: `forward` square to the axis) and width axis. */
@@ -555,7 +565,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
   // The sources: the mesh's own points, and the points added where a triangle is split at a seam (below).
   // (Each source's coordinates on each of its two parts, on the part's own axis line: t, out fore and aft, out across; then the
   // same for the smoothed surface.)
-  const src = { part: [], part2: [], blend: [], coords: [], position: [], relief: [], starved: [], normal: [], facing: [], heat: [] };
+  const src = { between: [], part: [], part2: [], blend: [], coords: [], position: [], relief: [], starved: [], normal: [], facing: [], heat: [], builds: [], buildCoords: mesh.family ? mesh.family.map(() => []) : null };
   // (Each point's surface normal on the model, and on each of its two parts in that part's frame: along, fore and aft, across.)
   // (Of the surface low-passed first, BASE_BODY.normalPasses: offset along the modelled surface's own normals, the faces of a
   // groove (between the pecs, under them) turn to each other and a fat man's offsets crossed there in folds.)
@@ -567,8 +577,13 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     for (let slot = 0; slot < 4; slot += 1) if (mesh.heatWeight[vertex * 4 + slot] > 0) weights.set(mesh.heatIndex[vertex * 4 + slot], mesh.heatWeight[vertex * 4 + slot]);
     return weights;
   };
-  const addSource = (part, part2, blend, position, smooth, starved, normal, heat = null) => {
+  // (`builds`: the point's place on each of the family's builds, and so its coordinates on each of its two parts there.)
+  const addSource = (part, part2, blend, position, smooth, starved, normal, heat = null, builds = null) => {
     src.heat.push(heat);
+    if (mesh.family) {
+      src.builds.push(builds);
+      builds.forEach((place, build) => src.buildCoords[build].push(...axisCoords(frames[names[part]], place), ...axisCoords(frames[names[part2]], place)));
+    }
     const on = (index, point) => axisCoords(frames[names[index]], point);
     const facing = (index) => {
       const frame = frames[names[index]];
@@ -600,7 +615,18 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     }
     return keep;
   };
-  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex] * starveKeep(point(scaled, vertex)), point(normals, vertex), heatOf(vertex));
+  // (A point's place on each of the family's builds: moved by its offset there, turned out of its part's frame on the mesh's
+  // joints, forward +x: baseFamily.)
+  const familyFrames = mesh.family ? Object.fromEntries(names.map((name) => [name, partFrame(joint(BASE_BODY.axes[name][0]), joint(BASE_BODY.axes[name][1]), [1, 0, 0])])) : null;
+  const buildsOf = (vertex) => {
+    if (!mesh.family) return null;
+    const frame = familyFrames[names[mesh.part[vertex]]];
+    return mesh.family.map((offsets) => {
+      const [along, fore, across] = [0, 1, 2].map((axis) => offsets[vertex * 3 + axis] * height);
+      return vec.add(point(scaled, vertex), vec.add(vec.scale(frame.axis, along), vec.add(vec.scale(frame.depthAxis, fore), vec.scale(frame.widthAxis, across))));
+    });
+  };
+  for (let vertex = 0; vertex < mesh.count; vertex += 1) addSource(mesh.part[vertex], mesh.part2[vertex], mesh.blend[vertex], point(scaled, vertex), point(relief, vertex), mesh.starved[vertex] * starveKeep(point(scaled, vertex)), point(normals, vertex), heatOf(vertex), buildsOf(vertex));
 
   // The drawn points: one per source and tile (and seam side).
   const render = { source: [], part: [], t: [], angle: [], u: [] };
@@ -626,7 +652,9 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     const near = s < 0.5 ? i : j;
     const same = src.part[i] === src.part[j] && src.part2[i] === src.part2[j];
     const blend = same ? src.blend[i] + (src.blend[j] - src.blend[i]) * s : src.blend[near];
-    const made = addSource(src.part[near], src.part2[near], blend, lerp(src.position[i], src.position[j]), lerp(src.relief[i], src.relief[j]), src.starved[i] + (src.starved[j] - src.starved[i]) * s, vec.normalize(lerp(src.normal[i], src.normal[j])), mixHeat(src.heat[i], src.heat[j], s));
+    const made = addSource(src.part[near], src.part2[near], blend, lerp(src.position[i], src.position[j]), lerp(src.relief[i], src.relief[j]), src.starved[i] + (src.starved[j] - src.starved[i]) * s, vec.normalize(lerp(src.normal[i], src.normal[j])), mixHeat(src.heat[i], src.heat[j], s), mesh.family ? src.builds[i].map((place, build) => lerp(place, src.builds[j][build])) : null);
+    // (For the tools that follow a drawn point back onto the model: basebody-trunk.js.)
+    src.between.push([i, j, s]);
     splits.set(key, made);
     return made;
   };
@@ -740,7 +768,7 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
     joints: Object.fromEntries(Object.keys(mesh.joints).map((name) => [name, joint(name)])),
     refJoints,
     refRows: Object.fromEntries(names.map((name) => [name, ringRows(refParts[name], span[name][0], span[name][1])])),
-    sources: { count: src.part.length, part: Uint8Array.from(src.part), part2: Uint8Array.from(src.part2), blend: Float32Array.from(src.blend), coords: Float32Array.from(src.coords), starved: Float32Array.from(src.starved), facing: Float32Array.from(src.facing), heat: src.heat },
+    sources: { count: src.part.length, part: Uint8Array.from(src.part), part2: Uint8Array.from(src.part2), blend: Float32Array.from(src.blend), coords: Float32Array.from(src.coords), starved: Float32Array.from(src.starved), facing: Float32Array.from(src.facing), heat: src.heat, between: src.between, builds: mesh.family ? src.buildCoords.map((coords) => Float32Array.from(coords)) : null },
     render: { count: order.length, source: pick(render.source, Int32Array), part: drawnPart, t: pick(render.t, Float32Array), angle: pick(render.angle, Float32Array), u: pick(render.u, Float32Array) },
     triangles: Uint32Array.from(triangles, (index) => remap[index]),
     ranges,
@@ -818,18 +846,66 @@ export function baseBindJoints(rig, joints, height) {
 }
 
 /**
+ * The family of builds (BASE_BODY.family): a fighter's points put where the blend of the builds has them, `weights` one a
+ * build and summing to one (loftbody.js baseFamilyWeights: by his fat and his lean mass), each on the fighter's own skeleton:
+ * along each part at the blend's share of its length, across at its size by his height, the shoulder girdle where the blend's
+ * is on its trunk. It takes the place of everything placed before it (his girth ratios on the base model, D+2's shoulders, the
+ * starved contour): the builds are whole bodies, bone, muscle and fat as they lie on a body of that kind, where a ratio only
+ * swells or shrinks the one model's own forms; but for the open borders, where it eases back into that placing
+ * (BASE_BODY.family.ease). `along(name, t, distance)` the arms' stretch to the game's length (placeBaseBody).
+ */
+function baseFamily(rig, frames, placed, height, weights, along) {
+  const { names, sources } = rig;
+  const size = height / rig.height;
+  const at = (name, c, k, out) => {
+    const frame = frames[name];
+    const distance = along(name, c[k], c[k] * frame.length);
+    for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * distance + (frame.depthAxis[axis] * c[k + 1] + frame.widthAxis[axis] * c[k + 2]) * size;
+    return out;
+  };
+  const used = weights.map((weight, build) => [weight, sources.builds[build]]).filter(([weight]) => weight !== 0);
+  // (Each part's ease to the placing already there, towards its open border: BASE_BODY.family.ease, by the part's name's end.)
+  const eases = names.map((name) => Object.entries(BASE_BODY.family.ease).find(([end]) => name.endsWith(end))?.[1] ?? null);
+  const one = [0, 0, 0];
+  const other = [0, 0, 0];
+  const c = [0, 0, 0, 0, 0, 0];
+  for (let vertex = 0; vertex < sources.count; vertex += 1) {
+    const ease = eases[sources.part[vertex]];
+    let share = 1;
+    if (ease) {
+      const u = Math.min(1, Math.max(0, (sources.coords[vertex * 12] - ease[0]) / (ease[1] - ease[0])));
+      share = 1 - u * u * (3 - 2 * u);
+      if (share <= 0) continue;
+    }
+    c.fill(0);
+    for (const [weight, coords] of used) for (let k = 0; k < 6; k += 1) c[k] += weight * coords[vertex * 6 + k];
+    at(names[sources.part[vertex]], c, 0, one);
+    const blend = sources.blend[vertex];
+    if (blend > 0 && sources.part2[vertex] !== sources.part[vertex]) {
+      at(names[sources.part2[vertex]], c, 3, other);
+      for (let axis = 0; axis < 3; axis += 1) one[axis] += (other[axis] - one[axis]) * blend;
+    }
+    if (share < 1) for (let axis = 0; axis < 3; axis += 1) one[axis] = placed[vertex * 3 + axis] + (one[axis] - placed[vertex * 3 + axis]) * share;
+    placed.set(one, vertex * 3);
+  }
+}
+
+/**
  * A fighter's base skin: each source point placed on his parts and blended across its joint. `parts` the loft's description of
  * his rings (see measureBaseBody), `joints` the joints it is placed on (baseBindJoints' `skin`), `relief(name)` how much of the
  * modelled muscle relief his part shows (1 all of it, 0 the smoothed surface), `height` his standing height (m), `starve` how
  * starved he is (baseStarvation: the emaciated reference's contour, each point's delta out along its line, laid on by it),
  * `foreReach` each arm part's length against the model's ({ extra, within }, baseBindJoints), `muscle(name, t, angle)` a
- * form to add out along each point's line (m), or null.
- * Returns the drawn points' positions (render order) and the sources'.
+ * form to add out along each point's line (m), or null; `family` the family's weights (baseFamily), or null for the base
+ * model by his ratios alone.
+ * Returns the drawn points' positions (render order) and the sources', and how much of the emaciated build it took (`herShare`).
  */
-export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}, muscle = null, shoulderKeep = 0, waste = 0, neckGirth = 0) {
+export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = rig.joints, foreReach = {}, muscle = null, shoulderKeep = 0, waste = 0, neckGirth = 0, family = null) {
   const { names, sources, render } = rig;
   const frames = {};
   const ratios = {};
+  // (How much of the emaciated build this body takes (baseFamily): the first of the family's.)
+  const herShare = family && sources.builds ? Math.min(1, Math.max(0, family[0])) : 0;
   const count = BASE_BODY.stops;
   for (const name of names) {
     const part = parts[name];
@@ -951,12 +1027,17 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     const add = starved + swell + (muscle ? muscle(name, t, Math.atan2(y, x)) : 0);
     px += (px / length) * add;
     py += (py / length) * add;
-    // (An arm's length against the model's (BASE_BODY.stretch): a forearm drawn out `extra` m past its modelled wrist, laid on up
-    // to the mesh's own end, its wrist's cut ring, a little short of the joint (`end` of the part), so the cut lands under the
-    // palm's heel; an upper arm's frame at the game's length, `within` m more than modelled, taken up in its shaft.)
+    const along = alongOf(name, t, t * frame.length - hang + lift);
+    for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * px + frame.widthAxis[axis] * py;
+    return out;
+  };
+  // (An arm's length against the model's (BASE_BODY.stretch): a forearm drawn out `extra` m past its modelled wrist, laid on up
+  // to the mesh's own end, its wrist's cut ring, a little short of the joint (`end` of the part), so the cut lands under the
+  // palm's heel; an upper arm's frame at the game's length, `within` m more than modelled, taken up in its shaft.)
+  function alongOf(name, t, along) {
     const arm = foreReach[name];
-    let along = t * frame.length - hang + lift;
     if (arm) {
+      const frame = frames[name];
       const end = arm.extra ? rig.spans[name][1] - BASE_BODY.spanMargin : 1;
       const extra = arm.extra ? arm.extra + (1 - end) * frame.length : 0;
       const [a, b] = BASE_BODY.stretch;
@@ -965,9 +1046,8 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
       const shaft = x - Math.sin(2 * Math.PI * x) / (2 * Math.PI);
       along += extra * shaft + (arm.within ?? 0) * (shaft - Math.min(1, Math.max(0, u)));
     }
-    for (let axis = 0; axis < 3; axis += 1) out[axis] = frame.a[axis] + frame.axis[axis] * along + frame.depthAxis[axis] * px + frame.widthAxis[axis] * py;
-    return out;
-  };
+    return along;
+  }
   const one = [0, 0, 0];
   const other = [0, 0, 0];
   for (let vertex = 0; vertex < sources.count; vertex += 1) {
@@ -984,7 +1064,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     placed.set(one, vertex * 3);
   }
   if (BASE_BODY.shoulder && BASE_BODY.shoulder !== 'D') {
-    if (BASE_BODY.shoulderPlus[BASE_BODY.shoulder]) shoulderPlus(BASE_BODY.shoulderPlus[BASE_BODY.shoulder], { rig, parts, frames, placed, shoulderKeep, height, joints, waste, neckGirth });
+    if (BASE_BODY.shoulderPlus[BASE_BODY.shoulder]) shoulderPlus(BASE_BODY.shoulderPlus[BASE_BODY.shoulder], { rig, parts, frames, placed, shoulderKeep, height, joints, waste: waste * (1 - herShare), neckGirth });
     // (The smoothed surface placed too, for the designs that drive it and carry the detail along: C and E.)
     const design = BASE_BODY.shoulder;
     let smooth = null;
@@ -1006,6 +1086,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     }
     if (!BASE_BODY.shoulderPlus[design]) shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
   }
+  if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf);
   // (PROOF OF CONCEPT: the widths ANSUR II measures, when asked for (globalThis.BASE_WIDTHS, a list): biacromial (across the
   // shoulders' tops, from 1 cm above the shoulder joints up), chest breadth (the trunk's own skin across at the nipples, 0.72 of
   // height) and bideltoid (everything across, arms included, from 12 cm under the joints to them), in the bind pose.)
@@ -1090,7 +1171,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
   }
   const positions = new Float32Array(render.count * 3);
   for (let index = 0; index < render.count; index += 1) positions.set(placed.subarray(render.source[index] * 3, render.source[index] * 3 + 3), index * 3);
-  return { positions, sources: placed };
+  return { positions, sources: placed, herShare };
 }
 
 /**
