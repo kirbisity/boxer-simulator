@@ -17,7 +17,7 @@ import {
   tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLantern, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
   tkSlabBridgeSolids, tkTree, tkWaterSteps, tkWaterStepsSolids, tkYardWall, tkYardWallSolid,
 } from '../townkit/build.js';
-import { tkBlocks, tkKeep, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkTier } from '../townkit/place.js';
+import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkTier } from '../townkit/place.js';
 
 /** The town's plan (m). Every figure is a choice for the game's ground, set against the battle's court and a walker's reach; none is a measurement of a real town. */
 export const CANAL_TOWN = {
@@ -260,6 +260,33 @@ export const CANAL_TOWN_LIGHT = {
   sky: { zenith: [0.66, 0.7, 0.74], haze: [0.82, 0.84, 0.84], sunColour: [1, 0.96, 0.88], ground: [0.27, 0.27, 0.26] },
 };
 
+// The town's lie (townkit/lay.js): the ground it maps (the walked town and a row beyond: what is further is seen only
+// over roofs), and the way the air moves for what the wind lays (toward [x, z]: along the canal, a light air from the west).
+const CT_LAY = { box: { x: [-152, 152], z: [-40, 40] }, wind: [1, 0.15] };
+
+/**
+ * Where feet go (lay.js `ways`): the middle of every lane and street, the quay's length, over the bridges, and across
+ * the square between its lanes' mouths, the steps and the north lane. `half`: the worn width each side (m); `strength`:
+ * how worn (the quay and the square's crossings most).
+ */
+function ctWays() {
+  const t = CANAL_TOWN;
+  const mid = ([a, b]) => (a + b) / 2;
+  const [cz0, cz1] = t.canal.z;
+  const quay = mid(t.quayLane.z);
+  const north = mid(t.northLane.x);
+  const ways = [
+    { line: [[-t.canal.reach, quay], [t.canal.reach, quay]], half: 1.5, kind: 'foot', strength: 1 },
+    { line: [[north, t.backStreet.z[1]], [north, t.square.z[0]], [north - 2, 0], [t.steps.x - 1, quay]], half: 1.3, kind: 'foot', strength: 0.9 },
+    { line: [[t.square.x[0], quay - 3], [-8, 1], [north, t.square.z[0] + 1]], half: 1.2, kind: 'foot', strength: 0.6 },
+    { line: [[t.square.x[1], quay - 2], [10, 2], [north, t.square.z[0] + 1]], half: 1.2, kind: 'foot', strength: 0.6 },
+    { line: [[-t.backStreet.reach, mid(t.backStreet.z)], [t.backStreet.reach, mid(t.backStreet.z)]], half: 1.2, kind: 'foot', strength: 0.8 },
+    { line: [[-t.southStreet.reach, mid(t.southStreet.z)], [t.southStreet.reach, mid(t.southStreet.z)]], half: 1.2, kind: 'foot', strength: 0.8 },
+  ];
+  for (const lane of t.crossLanes) ways.push({ line: [[mid(lane), t.backStreet.z[1]], [mid(lane), cz0], [mid(lane), cz1], [mid(lane), t.southStreet.z[0]]], half: 1.1, kind: 'foot', strength: 0.9 });
+  return ways;
+}
+
 /** The town built (a THREE.Group for render.js's places): its meshes, sky, rain and keeping. */
 export function buildCanalTown() {
   const t = CANAL_TOWN;
@@ -324,6 +351,10 @@ export function buildCanalTown() {
   tkPaving(ground, 'water', -reach, reach, cz0, cz1, t.canal.water);
   tkPaving(ground, 'earth', -reach, reach, cz0, cz1, t.canal.bed, [0.4, 0.42, 0.36]);
 
+  // The town's lie (townkit/lay.js): what is under a roof or a bridge, the shade of the lanes, the low places, and
+  // where feet go (the ways below: the lanes' middles, the quay, the bridges, the square's crossings).
+  const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2 });
+
   const materials = tkMaterialsFor(tier, { extra: { quay: { sheet: 'ashlar', foot: 1.6, ground: t.canal.water, blotch: 1.3 } } });
   const meshes = tkMeshes(blocks, materials, { tier });
   const root = new THREE.Group();
@@ -332,9 +363,14 @@ export function buildCanalTown() {
   const rain = tkRain({ count: tier === 'low' ? 1300 : 2600 });
   root.add(meshes, sky, rain);
   tkKeep(root, meshes, {
-    sun: CT_LIGHT.sun, shadow: 0.55, sky, rain, key: 'canaltown', tier, mirrorAt: [0, 1.5, 4],
+    sun: CT_LIGHT.sun, shadow: 0.55, sky, rain, key: 'canaltown', tier, mirrorAt: [0, 1.5, 4], lay, north: [0, -1],
     weather: (view) => ({ ...CANAL_TOWN_WEATHER.damp, ...(view.weather?.town ?? null) }),
   });
-  root.userData.dispose = () => materials.dispose();
+  root.userData.lay = lay.lay;
+  root.userData.dispose = () => {
+    materials.dispose();
+    lay.textures.a.dispose();
+    lay.textures.b.dispose();
+  };
   return root;
 }

@@ -18,7 +18,7 @@ import { STORY_WALL } from '../story/ground/walls.js';
 import { tkgFrame } from '../townkit/geo.js';
 import { tkFbm, tkRandom } from '../townkit/tex.js';
 import { tkFieldAt, tkFieldMesh, tkHouse, tkHouseSolid, tkPaving, tkRow, tkTree } from '../townkit/build.js';
-import { tkBlocks, tkKeep, tkMaterialsFor, tkMeshes, tkSky, tkTier } from '../townkit/place.js';
+import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
 import { tkGatehouse, tkGatehouseSolids, tkPavilion, tkPavilionSolids, tkRampart, tkRampartSolids, tkRock, tkWorksStair, tkWorksStairSolid } from '../townkit/works.js';
 
 /** The place's plan (m). Choices for the game's ground, set against the battle's field and a walker's reach; none is a measurement of the real town. */
@@ -229,8 +229,18 @@ export const PYONGYANG_WEATHER = {
   bare: { wet: 0.15, pool: 0, rain: 0, snow: 0, mist: [0.001, 0, 0.5], fog: PYONGYANG_PLACE.fog },
 };
 
-/** The place's light (render.js PLACE_LIGHT's entry): a low winter sun from the south and a little west (on the wall's outer face) in a pale clear sky. */
-const PY_LIGHT = { haze: 0xd3dbe2, sun: [-0.36, 0.4, 0.74] };
+// The sun of the day: the afternoon of 8 February at Pyongyang. Worked from the date and the place, not looked up:
+// the town lies at about 39.0 N (approximate); day 39 of the year gives the sun's declination by the usual cosine,
+// -23.44 x cos(360 / 365 x (39 + 10)) = -15.6 degrees; at three in the afternoon by the sun (an hour angle of 45
+// degrees) sin(height) = sin 39.0 sin -15.6 + cos 39.0 cos -15.6 cos 45 = 0.360, a height of 21.1 degrees, and its
+// bearing is 46.9 degrees west of south. (At noon it stands 35.4 degrees high, due south; the afternoon is chosen
+// because the wall's outer face looks west and the storming went on through the day: the low sun lies on the face
+// the ladders climb and throws the wall's shadow long into the town.) `azimuth` is the open air's measure (rad: 0
+// toward +x east, a quarter turn toward +z south).
+const PY_SUN = { azimuth: Math.PI / 2 + (46.9 * Math.PI) / 180, elevation: 21.1 };
+
+/** The place's light (render.js PLACE_LIGHT's entry): the low winter sun of PY_SUN in a pale clear sky. */
+const PY_LIGHT = { haze: 0xd3dbe2, sun: tkSunWay(PY_SUN.azimuth, PY_SUN.elevation) };
 export const PYONGYANG_LIGHT = {
   background: PY_LIGHT.haze, fog: PYONGYANG_PLACE.fog, far: 2400, key: 0xfff0dc, keyIntensity: 0.1, rim: 0xcfe0ff, sun: 1.0, hemi: 0.62,
   sky: { zenith: [0.5, 0.62, 0.8], haze: [0.84, 0.87, 0.9], sunColour: [1, 0.93, 0.82], ground: [0.62, 0.64, 0.68] },
@@ -282,6 +292,33 @@ function pyNameBoard(name) {
 // The road's ribbon: how far above the ground it is laid (m: enough not to flicker against it at the distances it is seen
 // from, too little to show as a step) and its strips' length along the road (half the ground's own cell, so it bends with it).
 const PY_ROAD = { proud: 0.04, step: 2.5 };
+
+// The place's lie (townkit/lay.js): the ground it maps (the walked ground: the field, the wall, the town), a texel's
+// side (m: coarser than a town's lanes need, the ground being four times a town's; null on the low tier, which takes
+// the kit's own), and the wind of the day for what it lays: out of the north-west, as that country's winter wind is
+// (toward [x, z]), so the wall's outer face is the windward one and the snow piles at its foot.
+const PY_LAY = { box: { x: [-150, 116], z: [-130, 130] }, texel: 0.2, wind: [0.8, 0.6] };
+
+/**
+ * Where feet and wheels went (lay.js `ways`): the road out from the gate and through it (carts), the street in the
+ * town, the columns' way over the field to the ladders (a wide trampled front), along the wall's foot, and the walk.
+ */
+function pyWays(plan) {
+  const t = PYONGYANG_PLACE;
+  const { wall } = plan;
+  const road = [];
+  for (let x = t.outside.x[0] + 2; x < wall.x - t.gate.out; x += 5) road.push([x, pyRoad(x)]);
+  road.push([wall.x - t.gate.out, t.gate.z], [plan.east - 34, t.gate.z]);
+  const walk = wall.x + wall.face + wall.thick + (wall.walk - wall.thick) / 2;
+  return [
+    { line: road, half: 1.9, kind: 'cart', strength: 1 },
+    { line: [[61, t.gate.z], [61, -t.strip[0] - 3.5]], half: 1.6, kind: 'foot', strength: 0.8 },
+    // (The columns: three files' breadth each to the three ladders, and the ground before the wall where they massed.)
+    ...t.wall.ladders.map((z) => ({ line: [[-135, z * 1.3], [-30, z], [wall.x - 0.5, z]], half: 2.6, kind: 'foot', strength: 0.85 })),
+    { line: [[wall.x - 2.2, -t.strip[0]], [wall.x - 2.2, t.strip[0]]], half: 2.4, kind: 'foot', strength: 1 },
+    { line: [[walk, t.wall.z[0] + 6], [walk, t.wall.z[1]]], half: 0.9, kind: 'foot', strength: 0.7 },
+  ];
+}
 
 /** The place built (a THREE.Group for render.js's places). */
 export function buildPyongyang() {
@@ -354,6 +391,14 @@ export function buildPyongyang() {
   }
   tkPaving(blocks.wide, 'track', -135, wall.x, -8, 8, 0.03, [0.95, 0.82, 0.6]);
 
+  // The place's lie (townkit/lay.js): the gate's passage and the eaves' shade, the ground's low places, where the
+  // columns and the town's people trod, and how the wind laid the snow against the wall.
+  const head = plan.head;
+  const lay = tkLayOf(blocks, tier, {
+    box: PY_LAY.box, ways: pyWays(plan), wind: PY_LAY.wind, seed: 3, ...(tier === 'low' ? null : { texel: PY_LAY.texel }),
+    ground: (x, z) => (x <= wall.x ? tkFieldAt(plan.outside, x, z) : x < head ? pyFoot(z) : tkFieldAt(plan.inside, x, z)),
+  });
+
   const materials = tkMaterialsFor(tier, { extra: { ice: { sheet: 'plaster', pools: 2, colour: [0.72, 0.8, 0.84], blotch: 0.5, plain: true }, track: { sheet: 'earth', blotch: 1.2, snow: t.trodden }, street: { sheet: 'cobble', snow: t.trodden * 1.3 } } });
   const meshes = tkMeshes(blocks, materials, { tier });
   const root = new THREE.Group();
@@ -364,9 +409,12 @@ export function buildPyongyang() {
   board.position.set(...pavilions.gate(0, eave - 1.04, t.pavilion[1].depth / 2 + 0.41));
   board.rotation.y = -Math.PI / 2;
   root.add(meshes, sky, board);
-  tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
+  tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
+  root.userData.lay = lay.lay;
   root.userData.dispose = () => {
     materials.dispose();
+    lay.textures.a.dispose();
+    lay.textures.b.dispose();
     board.material.map.dispose();
     board.material.dispose();
     board.geometry.dispose();

@@ -4,8 +4,10 @@
 // the buildings' own shadow baked once, the mirror the puddles show taken once).
 
 import { ktShadow, ktShadowBake } from '../levelmode/kitshadow.js';
+import { placeWind } from '../wind.js';
 import { tkgBuilder } from './geo.js';
-import { tkMaterials, tkSetWeather, tkWeather } from './weather.js';
+import { TK_LAY, tkLayBake, tkLayTextures } from './lay.js';
+import { tkMaterials, tkSetAir, tkSetLay, tkSetWeather, tkWeather } from './weather.js';
 
 /** Tuning for the assembly. */
 export const TK_PLACE = {
@@ -106,6 +108,22 @@ export function tkMeshes(blocks, materials, { tier = 'high' } = {}) {
   return group;
 }
 
+/** The unit vector toward a sun at `azimuth` (rad: 0 toward +x, a quarter turn toward +z) and `elevation` (degrees over the horizon): the open air's own measure (env/air.js envSunWay). */
+export const tkSunWay = (azimuth, elevation) => {
+  const lift = (elevation * Math.PI) / 180;
+  return [Math.cos(azimuth) * Math.cos(lift), Math.sin(lift), Math.sin(azimuth) * Math.cos(lift)];
+};
+
+/**
+ * The lie of a place (lay.js), baked from everything `blocks` holds, at the tier's texel: `options` as tkLayBake's
+ * (box, ground, ways, wind, seed). Returns { lay, textures } for tkKeep.
+ */
+export function tkLayOf(blocks, tier, options) {
+  const batches = [...blocks.all(), blocks.wide].flatMap((builder) => builder.batches());
+  const lay = tkLayBake({ batches, texel: tier === 'low' ? TK_LAY.texel.low : TK_LAY.texel.high, ...options });
+  return { lay, textures: tkLayTextures(lay) };
+}
+
 /**
  * The sky: a dome that goes with the camera, painted in the shader from the horizon's colour to the zenith's with cloud
  * drifting across it (`cloud` 0..1: how much of it is covered; 1 is an overcast with no blue). Out of the fog; behind all.
@@ -187,11 +205,18 @@ export function tkRain({ count = TK_PLACE.rain.count, slant = [0.12, 0.05] } = {
 /**
  * A kit place's keeping. `root`: the place's group; `meshes`: tkMeshes's group in it; `sun`: the unit vector toward the sun;
  * `shadow`: how much of the sun the baked shadow takes (0..1); `weather`: () => the weather wanted now (tkSetWeather's
- * argument, and `fog` [near, far] for the haze), asked each frame, so whatever drives it (the story's view, a hook, a weather system) is followed.
+ * argument, and `fog` [near, far] for the haze), asked each frame, so whatever drives it (the story's view, a hook, a weather system) is followed;
+ * `lay`: the place's lie (tkLayOf) and `north` the way north lies on its ground [x, z]; `stir`: (time, wind) => void,
+ * the place's own moving things (townkit/stir.js), called each frame with the one wind.
+ *
+ * In the open air (env/: the place is joined to it by townkit/air.js, and `view.env` says so) the sky, what falls
+ * and the haze are the open air's: the kit's own dome, streaks and mist stand aside, the weather's wet, rain and
+ * snow are read from the open air's state (`pools`: how much water stands on a soaked ground), the baked shadow is
+ * thrown the way its sun stands, and the mirror is taken with its sky in it, in light's own measure.
  * Sets `root.userData.bind`, `.tick` and `.leave` (render.js calls them).
  */
-export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = null, weather = () => null, mirrorAt = [0, 1.6, 0], key = 'townkit', tier = 'high' }) {
-  const state = { view: null, saved: null, mirror: null, mirrored: false, checked: 0 };
+export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = null, weather = () => null, mirrorAt = [0, 1.6, 0], key = 'townkit', tier = 'high', lay = null, north = [0, -1], pools = 0.8, stir = null }) {
+  const state = { view: null, saved: null, mirror: null, mirrored: null, checked: 0, baked: null };
   const dir = new THREE.Vector3(...sun).normalize();
   const focus = new THREE.Vector3();
   const ahead = new THREE.Vector3();
@@ -207,16 +232,38 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
       Object.assign(camera, { left: -half, right: half, top: half, bottom: -half, near: distance - 30, far: distance + 30 });
       camera.updateProjectionMatrix();
     }
-    light.target.position.copy(focus);
-    light.position.copy(focus).addScaledVector(dir, TK_PLACE.sun.distance);
+    // The box goes with the camera's focus a whole texel of the shadow's map at a time, along the light's own
+    // right and up, so a shadow's edge does not crawl as the camera moves.
+    const level = Math.hypot(dir.x, dir.z) || 1;
+    const right = [dir.z / level, 0, -dir.x / level];
+    const up = [dir.y * right[2], dir.z * right[0] - dir.x * right[2], -dir.y * right[0]];
+    const texel = (2 * TK_PLACE.sun.half) / light.shadow.mapSize.x;
+    const along = focus.x * right[0] + focus.z * right[2];
+    const over = focus.x * up[0] + focus.y * up[1] + focus.z * up[2];
+    const [da, db] = [Math.round(along / texel) * texel - along, Math.round(over / texel) * texel - over];
+    light.target.position.set(focus.x + right[0] * da + up[0] * db, focus.y + up[1] * db, focus.z + right[2] * da + up[2] * db);
+    light.position.copy(light.target.position).addScaledVector(dir, TK_PLACE.sun.distance);
     light.target.updateMatrixWorld();
   };
-  const takeMirror = (view) => {
-    state.mirrored = true;
+  const takeMirror = (view, open) => {
+    state.mirrored = open ? `air:${view.env.weather.name}` : 'own';
+    tkWeather.uTkEnvOn.value = 0;
     if (tier === 'low') return;
-    // The place alone (and its lights), seen all round from a man's height where the fight is: what the puddles show.
-    const target = new THREE.WebGLCubeRenderTarget(TK_PLACE.mirror, { format: THREE.RGBFormat, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
-    const camera = new THREE.CubeCamera(0.3, 600, target);
+    // In the open air the mirror holds light itself (the sky's bright parts well over 1), so it needs a target that can.
+    const float = open && view.renderer.capabilities.isWebGL2 && !!view.renderer.extensions.get('EXT_color_buffer_float');
+    if (open && !float) return;
+    // The place alone (and its lights, and the open air's sky), seen all round from a man's height where the fight is: what the puddles show.
+    if (state.mirror && state.mirror.userData.float !== float) {
+      state.mirror.dispose();
+      state.mirror = null;
+    }
+    if (!state.mirror) {
+      state.mirror = new THREE.WebGLCubeRenderTarget(TK_PLACE.mirror, float
+        ? { format: THREE.RGBAFormat, type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter }
+        : { format: THREE.RGBFormat, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      state.mirror.userData = { float };
+    }
+    const camera = new THREE.CubeCamera(0.3, 600, state.mirror);
     camera.position.set(...mirrorAt);
     const hidden = [];
     for (const child of view.scene.children) {
@@ -225,24 +272,45 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
         child.visible = false;
       }
     }
-    if (rain) rain.visible = false;
-    tkWeather.uTkEnvOn.value = 0;
+    // (What falls and drifts, and the shafts, are not in a puddle's picture: they are drawn for the eye's own place.)
+    root.traverse((object) => {
+      if (object.visible && (object === rain || object.userData.tkAir || ['particles', 'beams'].includes(object.userData.env))) {
+        hidden.push(object);
+        object.visible = false;
+      }
+    });
+    const exposure = view.renderer.toneMappingExposure;
+    // (The open air's camera curve passes light through untouched at an exposure under 0: env/air.js envInstallTone.)
+    if (open) view.renderer.toneMappingExposure = -1;
     camera.update(view.renderer, view.scene);
-    for (const child of hidden) child.visible = true;
-    state.mirror = target;
-    tkWeather.uTkEnv.value = target.texture;
+    view.renderer.toneMappingExposure = exposure;
+    for (const object of hidden) object.visible = true;
+    tkWeather.uTkEnv.value = state.mirror.texture;
     tkWeather.uTkEnvOn.value = 1;
   };
   root.userData.tick = (time) => {
     const view = state.view;
     if (!view) return;
+    const open = !!view.env?.on && view.env.place === key;
     tkWeather.uTkTime.value = time % 3600;
+    if (lay) tkSetLay(lay.lay, lay.textures, north);
+    const wind = open ? view.env.wind : placeWind(key);
+    tkSetAir(open, [wind.x, wind.z, wind.speed]);
     const wanted = weather(view);
-    if (wanted) tkSetWeather(wanted);
-    // (The haze's reach is the weather's too: `fog` [near, far] on the scene's own fog.)
-    if (wanted?.fog && view.scene.fog) {
-      view.scene.fog.near = wanted.fog[0];
-      view.scene.fog.far = wanted.fog[1];
+    if (open) {
+      // One weather: the open air's. Its ground's wetness now, what is falling now, the snow it leaves lying.
+      const air = view.env.weather;
+      const wet = view.env.wet ?? air.wet ?? 0;
+      tkSetWeather({ wet, pool: pools * wet * wet, snow: air.snow ?? 0, rain: air.fall?.kind === 'rain' ? view.env.falling ?? 1 : 0, mist: [0, 0, 0.5] });
+      const way = view.env.air.sun;
+      if (Math.abs(way[0] - dir.x) + Math.abs(way[1] - dir.y) + Math.abs(way[2] - dir.z) > 1e-3) dir.set(way[0], way[1], way[2]);
+    } else {
+      if (wanted) tkSetWeather(wanted);
+      // (The haze's reach is the weather's too: `fog` [near, far] on the scene's own fog.)
+      if (wanted?.fog && view.scene.fog?.isFog) {
+        view.scene.fog.near = wanted.fog[0];
+        view.scene.fog.far = wanted.fog[1];
+      }
     }
     const camera = view.camera;
     // The camera's focus: the point on the ground it looks at, no further than the fine detail reaches.
@@ -250,24 +318,32 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
     const reach = Math.min(30, ahead.y < -0.05 ? camera.position.y / -ahead.y : 30);
     focus.copy(camera.position).addScaledVector(ahead, reach);
     meshes.userData.detail(focus);
-    if (sky) sky.position.copy(camera.position);
+    if (sky) {
+      sky.visible = !open;
+      sky.position.copy(camera.position);
+    }
     if (rain) {
-      rain.visible = tkWeather.uTkRain.value > 0.01;
+      rain.visible = !open && tkWeather.uTkRain.value > 0.01;
       rain.userData.eye.copy(camera.position);
     }
     takeSun(view);
-    // The baked shadow is one map shared with the castle stage: taken again if another place's bake replaced it.
-    if (ktShadow.uKitShadowInfo.value?.x !== shadow || state.checked !== view.renderer.info.render.frame >> 6) {
+    stir?.(time, wind, view, open);
+    // The baked shadow is one map shared with the castle stage: taken again if another place's bake replaced it
+    // (looked for every 64 frames) or the sun has moved (the bake knows the sun it was thrown from).
+    if (ktShadow.uKitShadowInfo.value?.x !== shadow || state.checked !== view.renderer.info.render.frame >> 6 || state.baked !== dir.x + dir.z) {
       state.checked = view.renderer.info.render.frame >> 6;
+      state.baked = dir.x + dir.z;
       ktShadowBake(view.renderer, root, meshes.userData.casters, [dir.x, dir.y, dir.z], shadow, key);
     }
-    if (!state.mirrored) takeMirror(view);
-    else if (state.mirror) {
+    if (state.mirrored !== (open ? `air:${view.env.weather.name}` : 'own')) takeMirror(view, open);
+    else if (state.mirror && tkWeather.uTkEnv.value !== state.mirror.texture && (open ? state.mirror.userData.float : true) && tier !== 'low') {
       tkWeather.uTkEnv.value = state.mirror.texture;
       tkWeather.uTkEnvOn.value = 1;
     }
   };
   root.userData.leave = (view) => {
+    tkSetLay(null);
+    tkSetAir(false);
     if (!state.saved) return;
     const light = view.lights.sun;
     light.position.copy(state.saved.position);
