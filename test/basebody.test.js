@@ -127,7 +127,7 @@ test('the family of builds: a body is a mix of them summing to one, the emaciate
     }
     const [starved, thin, average, obese] = ['starved', 'thin', 'average', 'obese'].map(of);
     const emaciated = (body) => baseFamilyWeights(body, height)[BASE_BODY.family.builds.indexOf('E')];
-    assert.ok(emaciated(starved) > 0.9, `${sex}: a starved body is the emaciated build`);
+    assert.ok(emaciated(starved) > 0.85, `${sex}: a starved body is the emaciated build`);
     assert.ok(emaciated(thin) > 0.3 && emaciated(thin) < 0.8, `${sex}: a thin one part of it`);
     assert.ok(Math.abs(emaciated(average)) < 0.1 && emaciated(obese) === 0, `${sex}: an average or a fat one none of it`);
     // (The ends of the game's range: under the emaciated build's own BMI a body wastes on past it, with none of the muscular

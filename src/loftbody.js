@@ -185,10 +185,10 @@ export const LOFT = {
   // build as first fitted, at 14, its limbs thinned towards the bone. Of the build as it stands, 13.3, and drawn in by its
   // weight (frame, below), such a body takes 1.25 on a medium frame and 1.4 on a large one: the bound is past the game's range).
   family: {
-    male: { E: [0.66, 12.62], N: [4.07, 18.62], M: [2.85, 23.08], F1: [6.22, 20.75], F2: [9.83, 22.93], F3: [14.94, 24.43] },
-    female: { E: [1.2, 12.11], N: [5.91, 15.67], M: [4.71, 18.83], F1: [9.08, 17.81], F2: [13.62, 19.45], F3: [19.14, 20.18] },
+    male: { E: [0.65, 12.36], N: [3.89, 18.4], M: [2.74, 22.19], F1: [5.91, 20.49], F2: [9.25, 22.66], F3: [13.9, 24.23] },
+    female: { E: [1.18, 11.91], N: [5.67, 15.45], M: [4.57, 18.28], F1: [8.66, 17.59], F2: [12.82, 19.25], F3: [17.99, 20.11] },
     muscleMost: 2, muscleLeast: 0.5, wasteMost: 1.55,
-    swell: { male: [0.02345, 0.01071, 0.001684], female: [0.02607, 0.01163, 0.001549] }, density: { fat: 900, lean: 1100 }, rest: 2.2,
+    swell: { male: [0.02346, 0.0112, 0.00192], female: [0.02619, 0.01219, 0.001664] }, density: { fat: 900, lean: 1100 }, rest: 2.2,
   },
   // How broad a body's skeleton is drawn (baseFrame): by its frame, and under the ordinary build a little by its weight.
   // `widths`: a small and a large frame's, against a medium one's. At a given stature and BMI ANSUR II's breadths between the
@@ -225,7 +225,9 @@ export const LOFT = {
   // is of the fed, whose necks differ by their fat; a wasting body loses the neck's muscle with the rest, and its neck is a
   // column on the spine: the line from the ordinary neck to the emaciated build's at its BMI of 14, drawn 6% under the
   // emaciated reference's own (27 cm round at 1.68 m, and a man's by the builds' ratio, 300 mm to 270).
-  neck: { male: { at22: 0.375, perBmi: 0.005, lean: 0.012, trained: 0.025, height: 1.78 }, female: { at22: 0.325, perBmi: 0.0033, lean: 0.0094, trained: 0.012, height: 1.65 } },
+  // `slim`: the share of that girth the neck is drawn at, the builds' own columns under it drawn in by the same share
+  // (tools/blender/family girdle.py NECK.slim: the two are one dial); 1 the survey's neck.
+  neck: { slim: 0.85, male: { at22: 0.375, perBmi: 0.005, lean: 0.012, trained: 0.025, height: 1.78 }, female: { at22: 0.325, perBmi: 0.0033, lean: 0.0094, trained: 0.012, height: 1.65 } },
   heat: { reach: 0.06, bones: { trunk: ['trunk', 'lThigh', 'rThigh'], neck: ['neck', 'trunk'], '*Upper': ['*UpperArm', '*Clavicle', 'trunk'], '*Fore': ['*Forearm', '*UpperArm'], '*Thigh': ['*Thigh', 'trunk'], '*Shin': ['*Shin', '*Thigh'] } },
   // PROOF OF CONCEPT (shoulder-poc): the armpit's hand-over from the trunk's bones to the upper arm's made narrow. Below the
   // shoulder's cap (t of the upper arm from `from` to `to`, eased) and on the arm's inner side, facing the trunk, the arm's share of
@@ -2462,7 +2464,7 @@ export function baseWasting(body) {
 export function baseNeckGirth(body) {
   const spec = LOFT.neck[body.inputs.sex === 'female' ? 'female' : 'male'];
   const bmi = body.massKg / (body.heightM * body.heightM);
-  return (spec.at22 + (bmi < 22 ? spec.lean : spec.perBmi) * (bmi - 22) + spec.trained * (body.inputs.exercise ?? 0)) * (body.heightM / spec.height);
+  return LOFT.neck.slim * (spec.at22 + (bmi < 22 ? spec.lean : spec.perBmi) * (bmi - 22) + spec.trained * (body.inputs.exercise ?? 0)) * (body.heightM / spec.height);
 }
 
 /**

@@ -103,7 +103,7 @@ const SHEET = {
   distance: 6.1,
   target: [0, 0.97, 0],
   // Camera bearings from the fighter's front (+x), degrees.
-  views: { front: 0, rear: 215, side: 90, face: 0, face3q: 38, front3q: 35, high: 145 },
+  views: { front: 0, rear: 215, back: 180, side: 90, face: 0, face3q: 38, front3q: 35, high: 145 },
   // Views seen from above (m the camera is raised over the target, at the full-body distance): the shoulders' tops.
   raised: { high: 1.6 },
   header: 78,

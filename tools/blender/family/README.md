@@ -37,6 +37,8 @@ From `<work>/remodel`, with `F=<repo>/tools/blender/family`:
     python3 $F/relax.py                      # even/: each build's points set evenly on its own surface
     python3 $F/girdle.py                     # shaped/: the emaciated build's shoulders held to the girdle's bone, its waist
                                              # drawn in and its arms thinned, the others' top line lowered towards that bone
+                                             # (TRAPEZIUS.keep) and their shoulder caps lessened (DELTOID.keep), every neck
+                                             # drawn slimmer (NECK.slim, with src/loftbody.js LOFT.neck.slim)
     python3 $F/swell.py                      # shaped/F4: F3 grown as fat grows to a BMI of 100; prints LOFT.family.swell
     python3 $F/composition.py shaped         # each build's [fat, fat-free mass index] as drawn, for LOFT.family
                                              # (and `even`: the emaciated build before girdle.py, LOFT.boneCover.sculpt)
