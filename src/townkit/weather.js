@@ -71,6 +71,7 @@ varying vec3 vTkNrm;
 uniform float uTkWet;
 uniform float uTkPool;
 uniform float uTkSnow;
+uniform float uTkHold;
 uniform float uTkRain;
 uniform float uTkTime;
 uniform vec3 uTkMist;
@@ -81,8 +82,8 @@ uniform vec3 uTkSkyHigh;
 uniform vec4 uTkKind;
 ${KT_SHADOW_PARS}
 // (The castle's shadow function asks its own material's tier and soft-edge distance: here the fuller tier, soft within 30 m.)
-const vec4 uKitFlags = vec4(0.0, 2.0, 0.0, 0.0);
-const vec4 uKitLod = vec4(0.0, 0.0, 0.0, 30.0);
+  const vec4 uKitFlags = vec4(0.0, 2.0, 0.0, 0.0);
+  const vec4 uKitLod = vec4(0.0, 0.0, 0.0, 30.0);
 float tkHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float tkNoise(vec2 p) {
   vec2 i = floor(p);
@@ -135,7 +136,8 @@ const TK_COLOUR = `
     // (The rim of a puddle is soaked.)
     tkWetHere = max(tkWetHere, uTkPool * smoothstep(0.9 - uTkPool * 0.62, 1.02 - uTkPool * 0.62, hollow) * level);
   }
-  tkSnowHere = uTkSnow * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(0.25, 0.55, blot * 0.6 + fine * 0.4 + uTkSnow * 0.45) * (1.0 - tkPoolHere);
+  // (Lying snow is white wherever it holds; less of it leaves bare patches, a few metres and a few tens of metres across.)
+  tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(0.25, 0.55, blot * 0.42 + fine * 0.28 + tkFbm(vTkPos.xz * 0.045 + 7.0) * 0.3 + uTkSnow * uTkHold * 0.45) * (1.0 - tkPoolHere);
   diffuseColor.rgb *= mix(1.0, ${TK_WEATHER.wetDark.toFixed(2)}, max(tkWetHere, tkPoolHere * 0.8));
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(${TK_WEATHER.snow.colour.join(', ')}), tkSnowHere);
 }
@@ -161,6 +163,11 @@ if (tkPoolHere > 0.0) {
   ripple += normalize(p - centre + 1e-4) * ring * 0.35 * uTkRain;
   tkUp = normalize(vec3(ripple.x, 1.0, ripple.y));
   normal = normalize(mix(normal, normalize((viewMatrix * vec4(tkUp, 0.0)).xyz), tkPoolHere));
+}
+// Snow lies smooth over whatever is under it: the sheet's own relief is buried.
+if (tkSnowHere > 0.0) {
+  vec3 tkLie = normalize((viewMatrix * vec4(normalize(vTkNrm), 0.0)).xyz) * (gl_FrontFacing ? 1.0 : -1.0);
+  normal = normalize(mix(normal, tkLie, tkSnowHere * 0.85));
 }
 `;
 
@@ -203,10 +210,10 @@ function tkSunShaded() {
   return tkSunChunk;
 }
 
-/** Patch a standard material with the kit's shader. `kind`: [wall foot 0|1, puddles 0|1|2 (water), the ground's height, blotch strength]. */
-export function tkPatch(material, kind = [0, 0, 0, 1]) {
+/** Patch a standard material with the kit's shader. `kind`: [wall foot 0|1, puddles 0|1|2 (water), the ground's height, blotch strength]; `hold`: how well snow lies on it (1: as the weather says; less: trodden, it shows through in patches). */
+export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1) {
   tkWeatherInit();
-  const own = { uTkKind: { value: new THREE.Vector4(...kind) } };
+  const own = { uTkKind: { value: new THREE.Vector4(...kind) }, uTkHold: { value: hold } };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, tkWeather, ktShadow, own);
     shader.vertexShader = shader.vertexShader
@@ -279,7 +286,7 @@ export function tkMaterials({ size = 512, ground = 0, anisotropy = 8, extra = {}
       });
       if (spec.normalScale) material.normalScale.set(spec.normalScale, spec.normalScale);
       material.name = `townkit:${name}`;
-      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1]);
+      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1], spec.snow ?? 1);
       made.set(name, material);
       return material;
     },

@@ -321,11 +321,12 @@ export function tkgVault(builder, frame, { material, x = 0, width, spring, rise,
     const [xa, ya] = curve[k];
     const [xb, yb] = curve[k + 1];
     const next = run + radius * (curve[k + 1][2] - curve[k][2]);
-    builder.quad(material, frame(xb, yb, z0), frame(xa, ya, z0), frame(xa, ya, z1), frame(xb, yb, z1), { uvs: [[z0, next], [z0, run], [z1, run], [z1, next]], colour: [dim, dim, colour, colour] });
+    // (Wound to face down and inward: the soffit is seen from under it.)
+    builder.quad(material, frame(xb, yb, z1), frame(xa, ya, z1), frame(xa, ya, z0), frame(xb, yb, z0), { uvs: [[z1, next], [z1, run], [z0, run], [z0, next]], colour: [colour, colour, dim, dim] });
     run = next;
   }
-  builder.quad(material, frame(x - half, y0, z0), frame(x - half, y0, z1), frame(x - half, spring, z1), frame(x - half, spring, z0), { uvs: [[z0, y0], [z1, y0], [z1, spring], [z0, spring]], colour: [dim, colour, colour, dim] });
-  builder.quad(material, frame(x + half, y0, z1), frame(x + half, y0, z0), frame(x + half, spring, z0), frame(x + half, spring, z1), { uvs: [[z1, y0], [z0, y0], [z0, spring], [z1, spring]], colour: [colour, dim, dim, colour] });
+  builder.quad(material, frame(x - half, spring, z0), frame(x - half, spring, z1), frame(x - half, y0, z1), frame(x - half, y0, z0), { uvs: [[z0, spring], [z1, spring], [z1, y0], [z0, y0]], colour: [dim, colour, colour, dim] });
+  builder.quad(material, frame(x + half, spring, z1), frame(x + half, spring, z0), frame(x + half, y0, z0), frame(x + half, y0, z1), { uvs: [[z1, spring], [z0, spring], [z0, y0], [z1, y0]], colour: [colour, dim, dim, colour] });
 }
 
 // ---- a tiled roof -----------------------------------------------------------------------------------------------
