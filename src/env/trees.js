@@ -28,9 +28,10 @@ export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
       const z = Math.sin(angle) * radius;
       const chance = random();
       const size = random();
-      // (A tree is kept a crown's reach off the level ground; a plant of the ground grows to its edge.)
+      // (A tree is kept a crown's reach off the level ground; a plant of the ground grows to its edge, and one
+      // low enough to be trodden through grows on it as anywhere: ENV.trees.underfoot.)
       const clear = kind.height[1] > 4 ? 4 : 1;
-      if (Math.abs(x) < keepOut[0] + clear && Math.abs(z) < keepOut[1] + clear) continue;
+      if (kind.height[1] > ENV.trees.underfoot && Math.abs(x) < keepOut[0] + clear && Math.abs(z) < keepOut[1] + clear) continue;
       // A ride: nothing stands in the lane, whose edge is as ragged as a wood's (by a third of its width).
       if (rides.some((ride) => x * ride.cos + z * ride.sin > 0 && x * ride.cos + z * ride.sin < ride.length && Math.abs(z * ride.cos - x * ride.sin) < ride.width * (0.5 + 0.33 * (size - 0.5)))) continue;
       if (chance > 1 - stand.clump + stand.clump * envWoodsAt(x, z, place.terrain.seed)) continue;
@@ -67,10 +68,13 @@ export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
  */
 export function envPlantRocks({ place, height, sun, keepOut, footprints }) {
   const random = envRandom(place.terrain.seed * 1553 + 11);
+  // (Stones small enough to step over are laid from a stream of their own, so scattering them moves no boulder a view is framed by.)
+  const small = envRandom(place.terrain.seed * 1553 + 57);
   const rocks = [];
   const forms = ENV.rocks.forms.length;
   const lay = (x, z, size) => {
-    if (Math.abs(x) < keepOut[0] + 1 + size && Math.abs(z) < keepOut[1] + 1 + size) return false;
+    // (A stone small enough to be stepped over lies on the level ground as anywhere: ENV.rocks.underfoot.)
+    if (size > ENV.rocks.underfoot && Math.abs(x) < keepOut[0] + 1 + size && Math.abs(z) < keepOut[1] + 1 + size) return false;
     if (footprints.some((print) => Math.abs(x - print.x) < print.halfX + 1 + size && Math.abs(z - print.z) < print.halfZ + 1 + size)) return false;
     const y = height(x, z);
     rocks.push({ x, y, z, size, form: Math.floor(random() * forms), turn: random() * Math.PI * 2, lit: envSunPast(height, sun, x, y + size, z) });
@@ -78,14 +82,15 @@ export function envPlantRocks({ place, height, sun, keepOut, footprints }) {
   };
   for (const stand of place.rocks ?? []) {
     let laid = 0;
+    const next = stand.size[1] <= ENV.rocks.underfoot ? small : random;
     for (let tries = 0; laid < stand.count && tries < stand.count * 30; tries += 1) {
-      const angle = random() * Math.PI * 2;
-      const radius = Math.sqrt(stand.from * stand.from + random() * (stand.to * stand.to - stand.from * stand.from));
+      const angle = next() * Math.PI * 2;
+      const radius = Math.sqrt(stand.from * stand.from + next() * (stand.to * stand.to - stand.from * stand.from));
       const x = Math.cos(angle) * radius;
       const z = Math.sin(angle) * radius;
-      const chance = random();
+      const chance = next();
       // Most are small: a few large ones among many a man could sit on.
-      const size = stand.size[0] + (stand.size[1] - stand.size[0]) * Math.pow(random(), 2.2);
+      const size = stand.size[0] + (stand.size[1] - stand.size[0]) * Math.pow(next(), 2.2);
       if (chance > 1 - stand.clump + stand.clump * envWoodsAt(x + 311, z - 173, place.terrain.seed)) continue;
       if (lay(x, z, size)) laid += 1;
     }
@@ -745,7 +750,9 @@ export function envBuildTrees({ place, trees }) {
   bands.forEach((members, order) => {
     if (!members.length) return;
     const band = ENV.trees.bands[order];
-    const total = members.length * band.cards;
+    // A plant of the ground has a handful of leaves, not a crown's hundreds (its kind's `cards`, thinned as the band's are).
+    const cardsOf = (tree) => (ENV_TREES[tree.kind].cards ? Math.max(2, Math.round((ENV_TREES[tree.kind].cards * band.cards) / ENV.trees.bands[0].cards)) : band.cards);
+    const total = members.reduce((sum, tree) => sum + cardsOf(tree), 0);
     const aTree = new Float32Array(total * 4);
     const aCard = new Float32Array(total * 4);
     const aShell = new Float32Array(total * 4);
@@ -767,9 +774,8 @@ export function envBuildTrees({ place, trees }) {
       // A tree's own colour between the kind's, and each card a little off it.
       colour.set(kind.leaf[0]).lerp(other.set(kind.leaf[1]), random()).lerp(other.set(kind.leaf[2]), random() * 0.5);
       const picture = ENV_LEAF_TILES[kind.picture];
-      // A plant of the ground has a handful of leaves, not a crown's hundreds: the rest of its cards are left empty.
-      const filled = kind.cards ? Math.max(2, Math.round((kind.cards * band.cards) / ENV.trees.bands[0].cards)) : band.cards;
-      for (let card = 0; card < band.cards; card += 1) {
+      const filled = cardsOf(tree);
+      for (let card = 0; card < filled; card += 1) {
         envCrownPoint(kind, random, masses, point);
         const at = order_[written] * 4;
         written += 1;
@@ -780,7 +786,7 @@ export function envBuildTrees({ place, trees }) {
         aCard[at] = point[0] * tree.height;
         aCard[at + 1] = point[1] * tree.height;
         aCard[at + 2] = point[2] * tree.height;
-        aCard[at + 3] = card < filled ? kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5) : 0;
+        aCard[at + 3] = kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5);
         aShell[at] = point[3];
         aShell[at + 1] = point[4];
         aShell[at + 2] = point[5];

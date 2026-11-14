@@ -109,32 +109,56 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
     const d = shade[(z0 + 1) * coarse + x0 + 1];
     return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fz;
   };
+  // How the land is used (ENV.grass.mosaic): one rule over the whole map, the fought ground with the rest.
   const ground = place.ground;
   const grass = place.grass;
-  const floorShare = grass.floorHeight / grass.height[1];
+  const use = ENV.grass;
+  const keptShare = Math.min(1, (grass.kept ?? grass.floorHeight ?? grass.height[1]) / ((grass.height[0] + grass.height[1]) / 2));
+  const wear = ground.wear ?? 0;
+  // The lawns are where the mosaic's noise is lowest: the level under which `grazed` of the land lies, counted.
+  const lawnOf = (x, z) => envFbm(x / use.mosaic, z / use.mosaic, 79, 3, false);
+  const counted = [];
+  for (let at = 0; at < 2048; at += 1) counted.push(lawnOf(((at * 0.618034) % 1) * 2 * mapHalf - mapHalf, ((at * 0.754878) % 1) * 2 * mapHalf - mapHalf));
+  counted.sort((a, b) => a - b);
+  const grazed = Math.min(1, Math.max(0, grass.grazed ?? 0));
+  const lawnUnder = grazed > 0 ? counted[Math.floor(grazed * (counted.length - 1))] : -1;
+  const paths = [];
+  for (const path of ground.paths ?? []) {
+    for (let at = 1; at < path.points.length; at += 1) {
+      const [ax, az] = path.points[at - 1];
+      const [bx, bz] = path.points[at];
+      paths.push({ ax, az, dx: bx - ax, dz: bz - az, long: (bx - ax) * (bx - ax) + (bz - az) * (bz - az) || 1, half: path.width / 2, by: path.by });
+    }
+  }
   for (let row = 0; row < mapSize; row += 1) {
     const z = (row + 0.5) * texel - mapHalf;
     for (let column = 0; column < mapSize; column += 1) {
       const x = (column + 0.5) * texel - mapHalf;
       const at = (row * mapSize + column) * 4;
       values[at] = height(x, z);
-      // The floor is grazed and trodden short; beyond its edge the grass comes up to its height over a few metres.
-      const outside = Math.hypot(Math.max(0, Math.abs(x) - floor[0]), Math.max(0, Math.abs(z) - floor[1]));
       const ragged = envValueNoise(x / 2.3, z / 2.3, 77);
-      const wild = envSmooth(0.4, 3.6, outside + (ragged - 0.5) * 2.2);
-      let tall = floorShare + (1 - floorShare) * wild;
-      // Worn earth: the floor's own wear in patches, and the description's tracks.
       const patch = envFbm(x / 5.5, z / 5.5, 78, 3, false);
-      let worn = (1 - wild) * envSmooth(0.62 - 0.5 * ground.floor, 0.86 - 0.4 * ground.floor, patch);
-      for (const track of ground.worn ?? []) {
-        const cos = Math.cos(track.turn);
-        const sin = Math.sin(track.turn);
-        const along = ((x - track.x) * cos + (z - track.z) * sin) / track.rx;
-        const across = (-(x - track.x) * sin + (z - track.z) * cos) / track.rz;
-        const inside = 1 - envSmooth(0.55, 1.15, Math.hypot(along, across) + (ragged - 0.5) * 0.5);
-        worn = Math.max(worn, inside * track.by * (0.55 + 0.9 * patch));
+      // Where people walk: the yards and the paths, their edges ragged and broken by the ground's own patches.
+      let trodden = 0;
+      for (const yard of ground.worn ?? []) {
+        const cos = Math.cos(yard.turn);
+        const sin = Math.sin(yard.turn);
+        const along = ((x - yard.x) * cos + (z - yard.z) * sin) / yard.rx;
+        const across = (-(x - yard.x) * sin + (z - yard.z) * cos) / yard.rz;
+        trodden = Math.max(trodden, yard.by * (1 - envSmooth(0.3, 1.3, Math.hypot(along, across) + (ragged - 0.5) * 0.5 * use.ragged + (patch - 0.5) * use.ragged)));
       }
-      worn = Math.min(1, worn);
+      for (const path of paths) {
+        if (Math.abs(x - path.ax - path.dx / 2) > Math.abs(path.dx) / 2 + 4 * path.half || Math.abs(z - path.az - path.dz / 2) > Math.abs(path.dz) / 2 + 4 * path.half) continue;
+        const along = Math.min(1, Math.max(0, ((x - path.ax) * path.dx + (z - path.az) * path.dz) / path.long));
+        const off = Math.hypot(x - path.ax - path.dx * along, z - path.az - path.dz * along) / path.half;
+        trodden = Math.max(trodden, path.by * (1 - envSmooth(0.45, 1.5, off + (ragged - 0.5) * 2 * use.ragged)));
+      }
+      // The sward: short in the lawns of the mosaic and where it is trodden, at its height in the rank patches.
+      const lawn = Math.max(grazed > 0 ? 1 - envSmooth(lawnUnder - 0.025, lawnUnder + 0.025, lawnOf(x, z)) : 0, Math.min(1, trodden * 1.5));
+      let tall = (1 - (1 - keptShare) * lawn) * (1 - 0.45 * trodden);
+      // Bare earth: in the ground's own patches, more of them the more the land is worn and trodden.
+      const bare = Math.min(1, wear + trodden);
+      const worn = Math.min(1, envSmooth(0.62 - 0.5 * bare, 0.86 - 0.4 * bare, patch) * (0.4 + 0.6 * envSmooth(0, 0.35, bare)));
       tall *= 1 - 0.85 * worn;
       values[at + 1] = tall;
       values[at + 2] = shadeAt((column + 0.5) / mapSize, (row + 0.5) / mapSize);
