@@ -17,8 +17,10 @@ import { fieldOf, slabOf, wallLine, wallOf } from '../physics/terrain.js';
 import { STORY_WALL } from '../story/ground/walls.js';
 import { tkgFrame } from '../townkit/geo.js';
 import { tkFbm, tkRandom } from '../townkit/tex.js';
-import { tkFieldAt, tkFieldMesh, tkHouse, tkHouseSolid, tkPaving, tkRow, tkTree } from '../townkit/build.js';
+import { TK_HOUSE, tkFieldAt, tkFieldMesh, tkHouse, tkHouseSolid, tkPaving, tkRow, tkTree } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
+import { tkStir } from '../townkit/stir.js';
+import { TK_THINGS, tkArrows, tkBrazier, tkCampfire, tkCart, tkDrift, tkFirewood, tkIcicles, tkLadder, tkMantlet, tkSacks, tkScatter, tkStack } from '../townkit/things.js';
 import { tkGatehouse, tkGatehouseSolids, tkPavilion, tkPavilionSolids, tkRampart, tkRampartSolids, tkRock, tkWorksStair, tkWorksStairSolid } from '../townkit/works.js';
 
 /** The place's plan (m). Choices for the game's ground, set against the battle's field and a walker's reach; none is a measurement of the real town. */
@@ -320,6 +322,199 @@ function pyWays(plan) {
   ];
 }
 
+// The siege's litter and the garrison's gear, laid by rule (seeded) along the wall and over the columns' ground.
+// None of it is from a record of the day: what an assaulted wall and a winter camp have about them, typical.
+//   clear      |z| inside which nothing is laid: the battle's own ground and works (its strip is |z| <= 10).
+//   banners    the garrison's standing banners on the walk's inner edge: one about every `every` m of wall, a
+//              `share` of the places taken, `high` m of pole. (The town was held by a Japanese army, whose tall
+//              laced banners are the nobori; white fields with dark bands: typical, no house's own device.)
+//   braziers   watch fires on the walk, one about every `every` m; `shot`: heaps of stones for throwing down.
+//   ladders, mantlets, arrows   how many broken ladders lie or lean at the wall's foot, how many siege shields
+//              stand or lie on the field within bowshot of it, how many clusters of spent arrows.
+//   camps      the attackers' fires behind the columns' ground: [x, z] each, with `fires` fires, `flags` flags
+//              (red and yellow squares and pennons: the usual run of Ming field flags, approximate), carts and
+//              stacks of timber for ladders.
+//   hearths    the share of the town's houses with a fire lit (smoke from a clay stack at the house's end).
+//   icicles    the share of each near house's eaves that carry them; the pavilion's eaves have them too.
+//   drift      the snow the north-west wind has piled against the windward feet: the wall's outer face (its
+//              head `high` m up the face, lying out `run` m) and the houses' windward walls (less: they stand in
+//              the wall's lee). Drifted snow against a 4.5 m wall in open country stands from a few decimetres
+//              to a metre: by eye inside that.
+//   grows      how well dead grass stands through the snow on the open ground and in the town's yards, and
+//              `thick`: how much thicker than a paved town's weeds (things.js TK_SCATTER) a winter field's stand.
+const PY_SIEGE = {
+  clear: 13,
+  banners: { every: 17, share: 0.75, high: 3.8 }, braziers: { every: 34 }, shot: { every: 13, share: 0.6 },
+  ladders: 6, mantlets: 11, arrows: 28,
+  camps: [{ at: [-122, 31], fires: 3, flags: 5 }, { at: [-116, -27], fires: 2, flags: 4 }],
+  hearths: 0.34, icicles: 0.6,
+  drift: { wall: { high: [0.3, 0.95], run: 2.8 }, house: { high: [0.08, 0.34], run: 1.1 } },
+  grows: { field: 0.5, town: 0.7, thick: 3 },
+};
+
+/**
+ * Dress the place (after its lie is baked: the drifts and the scatter are laid by it): the garrison's banners,
+ * fires and stones on the wall, the siege's litter before it, the camps, the town's hearths and icicles, the
+ * drifts, and what stands through the snow. `stir`: the kit's moving things (townkit/stir.js).
+ */
+function pyDress(blocks, stir, plan, lay, eave, tier) {
+  const t = PYONGYANG_PLACE;
+  const s = PY_SIEGE;
+  const { wall, head } = plan;
+  const random = tkRandom(15930208);
+  const outside = (x, z) => tkFieldAt(plan.outside, Math.max(t.outside.x[0], Math.min(wall.x, x)), Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)));
+  const gated = (z, room = 2) => Math.abs(z - t.gate.z) < t.gate.wide / 2 + room;
+  const walkTop = (z) => pyFoot(z) + wall.high;
+  const inner = head - 0.3;
+  const behind = wall.x + wall.face + wall.thick + 0.55;
+
+  // On the wall: banners, watch fires, heaps of shot. (Each on its own grid along the wall, a little off it.)
+  const along = (every, work) => {
+    for (let z = t.wall.z[0] + 9; z < t.wall.z[1] - 2; z += every) {
+      const at = z + (random() - 0.5) * every * 0.5;
+      if (!gated(at) && Math.abs(at) > s.clear) work(at);
+    }
+  };
+  along(s.banners.every, (z) => {
+    if (random() > s.banners.share) return;
+    const dark = [0.1, 0.1, 0.12];
+    const bands = random() < 0.5 ? [[0.08, 0.2, dark], [0.26, 0.38, dark]] : [[0.1, 0.34, dark]];
+    stir.nobori(blocks.at(inner, z), inner, z, walkTop(z), walkTop(z) + s.banners.high * (0.9 + 0.2 * random()), { yaw: Math.PI / 2, long: 2.7, wide: 0.62, bands });
+  });
+  along(s.braziers.every, (z) => stir.fire(...tkBrazier(blocks.at(inner, z), inner - 0.35, walkTop(z), z)));
+  along(s.shot.every, (z) => {
+    if (random() < s.shot.share) tkStack(blocks.at(behind, z), tkgFrame(behind, walkTop(z), z, Math.PI / 2), { kind: 'shot', long: 1.1 + random(), high: 0.4, deep: 0.6, seed: Math.round(z) });
+  });
+  // The gate's terrace: a banner at each outer corner, a fire by each stair's head.
+  for (const side of [-1, 1]) {
+    const z = t.gate.z + side * (t.gate.wide / 2 - 0.9);
+    const x = wall.x - t.gate.out + 0.7;
+    stir.nobori(blocks.at(x, z), x, z, t.gate.high, t.gate.high + 4.6, { yaw: Math.PI / 2, long: 3.4, wide: 0.75, bands: [[0.1, 0.3, [0.1, 0.1, 0.12]]] });
+    stir.fire(...tkBrazier(blocks.at(x, z), wall.x - t.gate.out + t.gate.deep - 0.9, t.gate.high, z));
+  }
+  // Snow blowing off the wall's top (its parapet's crest, in lengths) and off the gate pavilion's ridge.
+  const crest = wall.x + wall.face + wall.thick / 2;
+  for (const run of plan.runs) {
+    for (let k = 0; k + 4 < run.length; k += 4) stir.spindrift([crest, run[k][3] + wall.parapet, run[k][1]], [crest, run[k + 4][3] + wall.parapet, run[k + 4][1]]);
+  }
+  const pavilion = pyPavilions().gate;
+  stir.spindrift(pavilion(-t.pavilion[1].width / 2, eave + 1.9, 0), pavilion(t.pavilion[1].width / 2, eave + 1.9, 0));
+
+  // Before the wall: broken ladders at its foot, shields on the field, spent arrows; all off the battle's strip.
+  const off = () => (random() < 0.5 ? -1 : 1) * (s.clear + random() * 46);
+  for (let k = 0; k < s.ladders; k += 1) {
+    const z = off();
+    if (gated(z, 4)) continue;
+    const x = wall.x - 1.2 - 2.2 * random();
+    const builder = blocks.at(x, z);
+    if (k % 2) tkLadder(builder, [x, outside(x, z), z], [wall.x - 0.04, outside(wall.x, z) + 2.4 + 1.6 * random(), z + (random() - 0.5) * 1.2], { wide: 0.55 });
+    else {
+      const turn = random() * Math.PI;
+      const far = [x - 3.6 * Math.abs(Math.cos(turn)), z + 3.6 * Math.sin(turn)];
+      tkLadder(builder, [x, outside(x, z) + 0.07, z], [far[0], outside(...far) + 0.07, far[1]], { wide: 0.55 });
+    }
+  }
+  for (let k = 0; k < s.mantlets; k += 1) {
+    const [x, z] = [-14 - 60 * random() * random(), off()];
+    if (Math.abs(z - pyRoad(x)) < 4) continue;
+    tkMantlet(blocks.at(x, z), tkgFrame(x, outside(x, z), z, -Math.PI / 2 + (random() - 0.5) * 0.7), { wide: 1.3 + 0.5 * random(), seed: k + 1, fallen: k % 3 === 0 });
+  }
+  for (let k = 0; k < s.arrows; k += 1) {
+    // (Most where the columns stood under the wall's bows; some over the wall, on the bank and the first yards.)
+    const over = k % 5 === 0;
+    const [x, z] = over ? [head + wall.bank + 2 + 12 * random(), off()] : [-3 - 50 * random() * random(), off() * 0.8];
+    if (gated(z, 1) && over) continue;
+    tkArrows(blocks.at(x, z), x, over ? tkFieldAt(plan.inside, x, z) : outside(x, z), z, { count: 3 + Math.floor(6 * random()), spread: 1.2 + random(), from: over ? 0 : Math.PI, seed: k + 1 });
+  }
+  // The camps behind the columns' ground: fires, flags, carts, timber for ladders, sacks.
+  const red = [0.72, 0.1, 0.08];
+  const yellow = [0.86, 0.66, 0.14];
+  for (const [index, camp] of s.camps.entries()) {
+    const [cx, cz] = camp.at;
+    const place = (reach) => { const a = random() * Math.PI * 2; const d = reach * (0.35 + 0.65 * random()); return [cx + Math.cos(a) * d, cz + Math.sin(a) * d * 0.8]; };
+    for (let k = 0; k < camp.fires; k += 1) {
+      const [x, z] = place(9);
+      stir.fire(...tkCampfire(blocks.at(x, z), x, outside(x, z), z, { seed: index * 10 + k }), 1.3);
+    }
+    for (let k = 0; k < camp.flags; k += 1) {
+      const [x, z] = place(13);
+      const foot = outside(x, z);
+      stir.flag(blocks.at(x, z), x, z, foot, foot + 3.2 + 1.2 * random(), k % 3 === 2 ? { cut: 'pennon', fly: 1.9, hoist: 0.7, colour: yellow } : { fly: 1.3, hoist: 1.2, colour: k % 2 ? yellow : red });
+    }
+    for (let k = 0; k < 2; k += 1) {
+      const [x, z] = place(12);
+      tkCart(blocks.at(x, z), tkgFrame(x, outside(x, z), z, random() * 6.28), { tipped: k === 1, load: k ? null : TK_THINGS.hemp });
+      const [tx, tz] = place(11);
+      tkStack(blocks.at(tx, tz), tkgFrame(tx, outside(tx, tz), tz, random() * 3.14), { kind: 'timber', long: 3.6, high: 0.5, deep: 0.9, seed: index * 4 + k });
+      const [fx, fz] = place(8);
+      tkFirewood(blocks.at(fx, fz), tkgFrame(fx, outside(fx, fz), fz, random() * 3.14), { long: 1.4, high: 0.6, seed: index * 6 + k });
+      const [sx, sz] = place(7);
+      tkSacks(blocks.at(sx, sz), sx, outside(sx, sz), sz, { count: 3 + k, seed: index * 8 + k });
+    }
+  }
+  // Dressed stone for mending the wall, stacked inside by the gate; sacks under the passage's inner mouth.
+  for (const side of [-1, 1]) tkStack(blocks.at(head + 13, t.gate.z), tkgFrame(head + 13, 0, t.gate.z + side * 6.5, 0.2 * side), { kind: 'stone', long: 2.2, high: 0.9, deep: 1.1, seed: 5 + side });
+
+  // The town: a clay stack and its smoke at the end of each house with a fire lit; icicles along the near eaves.
+  for (const house of plan.houses) {
+    const dice = tkRandom(house.seed * 31 + 5);
+    const frame = tkgFrame(house.at[0], 0, house.at[1], house.yaw ?? 0);
+    if (dice() < s.hearths) {
+      const [x, , z] = frame(house.width / 2 + 0.45, 0, -house.depth / 2 + 0.8);
+      blocks.at(house.at[0], house.at[1], house.far).round('plaster', tkgFrame(x, 0, z), 0, 0, 0, 2.3, 0.2, 0.15, { colour: [0.5, 0.44, 0.38], sides: 7 });
+      stir.smoke(x, 2.4, z, house.far ? 1.5 : 1.1);
+    }
+    if (house.far) continue;
+    const h = house.heights?.[0] ?? 3;
+    const reach = house.depth / 2 + (house.roof?.overhang ?? TK_HOUSE.overhang) - 0.03;
+    for (const side of [-1, 1]) {
+      if (dice() > s.icicles) continue;
+      const [from, to] = [-house.width * (0.15 + 0.3 * dice()), house.width * (0.15 + 0.3 * dice())];
+      blocks.at(house.at[0], house.at[1]).at('near', () => tkIcicles(blocks.at(house.at[0], house.at[1]), frame(from, h - 0.05, side * reach), frame(to, h - 0.05, side * reach), { seed: house.seed + side, long: 0.5 }));
+    }
+  }
+
+  // The drifts: against the wall's outer face (not where the columns trod it away, nor in the gate's mouth), and
+  // against each near house's windward walls.
+  const unworn = (x, z) => Math.max(0, 1 - 1.6 * lay.lay.at(x, z).wear);
+  const [wx, wz] = PY_LAY.wind;
+  for (const run of plan.runs) {
+    for (let k = 0; k + 1 < run.length; k += 1) {
+      const [z0, z1] = [run[k][1], run[k + 1][1]];
+      // (Walked south to north, the windward side, the west, is on the left.)
+      tkDrift(blocks.at(wall.x, (z0 + z1) / 2), [wall.x, z1], [wall.x, z0], { ...s.drift.wall, heightAt: outside, share: (x, z) => unworn(wall.x - 1.5, z) * pySmooth(t.strip[0] + 0.5, t.strip[0] + 5, Math.abs(z)), seed: 1, taper: false });
+    }
+  }
+  for (const house of plan.houses) {
+    if (house.far) continue;
+    const frame = tkgFrame(house.at[0], 0, house.at[1], house.yaw ?? 0);
+    const [w, d] = [house.width / 2, house.depth / 2];
+    const corners = [[-w, -d], [w, -d], [w, d], [-w, d]].map(([x, z]) => frame(x, 0, z));
+    for (let k = 0; k < 4; k += 1) {
+      const [p, q] = [corners[k], corners[(k + 1) % 4]];
+      // (This side's outward way, to the left of the walk p to q: a drift only where the wind blows onto it.)
+      const length = Math.hypot(q[0] - p[0], q[2] - p[2]);
+      const out = [(q[2] - p[2]) / length, -(q[0] - p[0]) / length];
+      const mid = frame(0, 0, 0);
+      const outward = ((p[0] + q[0]) / 2 - mid[0]) * out[0] + ((p[2] + q[2]) / 2 - mid[2]) * out[1] > 0;
+      const [a, b] = outward ? [p, q] : [q, p];
+      const way = outward ? out : [-out[0], -out[1]];
+      if (way[0] * wx + way[1] * wz > -0.4) continue;
+      tkDrift(blocks.at(house.at[0], house.at[1]), [a[0], a[2]], [b[0], b[2]], { ...s.drift.house, heightAt: (x, z) => tkFieldAt(plan.inside, x, z), share: (x, z) => unworn(x + way[0] * 0.8, z + way[1] * 0.8), seed: house.seed + k });
+    }
+  }
+
+  // What stands through the snow and lies in it: dead grass at the wall feet and in the hollows, loose stones,
+  // straw trodden about the camps and the yards. (Not drawn on the low tier.)
+  if (tier === 'low') return null;
+  const straw = [TK_THINGS.straw, TK_THINGS.straw.map((value) => value * 0.75), [0.5, 0.42, 0.3]];
+  return tkScatter(blocks, lay.lay, {
+    box: { x: [t.outside.x[0] + 2, plan.edge], z: [t.outside.z[0] + 2, t.outside.z[1] - 2] }, seed: 3, colour: TK_THINGS.dead, litter: straw, thick: s.grows.thick,
+    heightAt: (x, z) => (x <= wall.x ? outside(x, z) : x < head ? pyFoot(z) : tkFieldAt(plan.inside, x, z)),
+    grows: (x, z) => (x > wall.x - 0.2 && x < head + 0.2 ? null : gated(z, -6) && x < head + 14 && x > wall.x - 4 ? null : x <= wall.x ? s.grows.field : s.grows.town),
+  });
+}
+
 /** The place built (a THREE.Group for render.js's places). */
 export function buildPyongyang() {
   const t = PYONGYANG_PLACE;
@@ -399,6 +594,9 @@ export function buildPyongyang() {
     ground: (x, z) => (x <= wall.x ? tkFieldAt(plan.outside, x, z) : x < head ? pyFoot(z) : tkFieldAt(plan.inside, x, z)),
   });
 
+  const stir = tkStir(3);
+  const scattered = pyDress(blocks, stir, plan, lay, eave, tier);
+
   const materials = tkMaterialsFor(tier, { extra: { ice: { sheet: 'plaster', pools: 2, colour: [0.72, 0.8, 0.84], blotch: 0.5, plain: true }, track: { sheet: 'earth', blotch: 1.2, snow: t.trodden }, street: { sheet: 'cobble', snow: t.trodden * 1.3 } } });
   const meshes = tkMeshes(blocks, materials, { tier });
   const root = new THREE.Group();
@@ -408,7 +606,8 @@ export function buildPyongyang() {
   const board = pyNameBoard('含毬門');
   board.position.set(...pavilions.gate(0, eave - 1.04, t.pavilion[1].depth / 2 + 0.41));
   board.rotation.y = -Math.PI / 2;
-  root.add(meshes, sky, board);
+  const moved = stir.make(materials, tier);
+  root.add(meshes, moved.group, sky, board);
   // The open air (env/): the day's sun, a continental winter's clear cold air (a visibility of about 25 km:
   // approximate), a third of the sky in cloud; in snow, the open air's snow showers ('flurries': a flurry out of each
   // cloud that passes, the low sun between them on the new snow); without it, its clear day. The ground's own
@@ -430,8 +629,9 @@ export function buildPyongyang() {
     first: 'snow',
     own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.75 }, cover: 0.5, sun: 1, gloom: 0.6, visibility: 16000 }] },
   };
-  tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
+  tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;
+  root.userData.scattered = scattered;
   root.userData.dispose = () => {
     materials.dispose();
     lay.textures.a.dispose();

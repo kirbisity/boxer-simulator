@@ -20,6 +20,10 @@ export const TK_THINGS = {
   leafLitter: [[0.5, 0.36, 0.18], [0.42, 0.4, 0.2], [0.58, 0.46, 0.22]],
 };
 
+// A slow unevenness along a run or over the ground: fractal noise 0..1 with a grain of about one unit of (x, z)
+// (the kit's tiling noise, tex.js tkFbm, over a repeat of 256 units: far wider than anything it is used along).
+const tktRough = (x, z) => tkFbm(x / 256 + 0.5, z / 256 + 0.5, 256, 3, 7);
+
 const tktTone = (colour, random, spread = 0.25) => colour.map((value) => value * (1 - spread / 2 + spread * random()));
 
 /** A wicker basket standing at world (x, y, z): `wide` m across its mouth, `high` m; `full`: heaped with something of that colour. */
@@ -272,9 +276,51 @@ export function tkIcicles(builder, a, b, { every = 0.22, long = 0.55, material =
     if (random() > share) continue;
     const s = (k + random()) / count;
     // (Runs of long ones and gaps: a slow unevenness along the eave.)
-    const l = long * (0.15 + 0.85 * Math.pow(random(), 1.6)) * (0.35 + 0.65 * tkFbm(s * run * 0.35 + seed, seed * 0.7));
+    const l = long * (0.15 + 0.85 * Math.pow(random(), 1.6)) * (0.35 + 0.65 * tktRough(s * run * 0.35 + seed, seed * 0.7));
     const at = [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
     builder.round(material, tkgFrame(at[0], at[1] - l, at[2]), 0, 0, 0, l, 0.002, 0.012 + 0.03 * l, { sides: 4, colour: [1, 1, 1], caps: '' });
+  }
+}
+
+/**
+ * A drift of snow laid by the wind against the foot of what stands in its way: along the foot from world [x, z]
+ * `a` to `b`, lying out to the left of that walk (the windward side) `run` m, its head `high` [least, most] m up
+ * the face (uneven along the foot: a slow noise), none where `share(x, z)` says the ground is trodden or swept
+ * (0..1). `heightAt(x, z)`: the ground. A concave bank in three strips, on the material 'drift' (snow at any
+ * depth of fall; bare ground's colour without it).
+ */
+export function tkDrift(builder, a, b, { run = 2.4, high = [0.25, 0.8], heightAt = () => 0, share = () => 1, seed = 1, every = 1.25, taper = true } = {}) {
+  const long = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const along = [(b[0] - a[0]) / long, (b[1] - a[1]) / long];
+  const out = [along[1], -along[0]];
+  const count = Math.max(1, Math.round(long / every));
+  // (The bank's section: its height at each share of its run, falling fast from the face and running out thin.)
+  const section = [[0, 1], [0.3, 0.52], [0.65, 0.16], [1, -0.04]];
+  const ring = (k) => {
+    const s = k / count;
+    const [x, z] = [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s];
+    // (Run out at its two ends where `taper`; its unevenness is the ground's own, so two lengths laid end to end meet.)
+    const lies = share(x, z) * (taper ? Math.min(1, Math.min(s, 1 - s) * long * 0.8 + 0.15) : 1);
+    const h = (high[0] + (high[1] - high[0]) * tktRough((x + z) * 0.11 + seed * 3.1, (x - z) * 0.11)) * lies;
+    const reach = run * (0.6 + 0.8 * tktRough((x + z) * 0.07 + 9 + seed, (x - z) * 0.07)) * (0.4 + 0.6 * lies);
+    return section.map(([d, up]) => {
+      const [px, pz] = [x + out[0] * (d * reach - 0.06), z + out[1] * (d * reach - 0.06)];
+      return [px, heightAt(px, pz) + h * up, pz];
+    });
+  };
+  let before = ring(0);
+  for (let k = 1; k <= count; k += 1) {
+    const here = ring(k);
+    for (let j = 0; j + 1 < section.length; j += 1) {
+      const [p0, p1, p2, p3] = [before[j], before[j + 1], here[j + 1], here[j]];
+      // (Each strip's own slope for its light: up, and out from the face.)
+      const slope = (p0[1] - p1[1]) / (Math.hypot(p1[0] - p0[0], p1[2] - p0[2]) || 1);
+      const n = [out[0] * slope, 1, out[1] * slope];
+      const length = Math.hypot(...n);
+      const normal = n.map((value) => value / length);
+      builder.quad('drift', p0, p1, p2, p3, { uvs: [p0, p1, p2, p3].map((point) => [point[0] / 3, point[2] / 3]), normals: [normal, normal, normal, normal] });
+    }
+    before = here;
   }
 }
 
@@ -329,7 +375,7 @@ export function tkScatter(blocks, lay, { box, grows, heightAt = null, colour = T
       const y = heightAt ? heightAt(px, pz) : here.ground;
       const builder = blocks.at(px, pz);
       const wallShare = (rule) => rule.open + (rule.wall - rule.open) * here.wall * here.wall;
-      const clump = 0.35 + 1.3 * tkFbm(px * 0.21 + seed, pz * 0.21 - seed);
+      const clump = 0.35 + 1.3 * tktRough(px * 0.21 + seed, pz * 0.21 - seed);
       const quiet = Math.max(0, 1 - here.wear / s.tuft.wearTo);
       if (!covered && grow > 0) {
         const chance = s.tuft.chance * thick * grow * wallShare(s.tuft) * quiet * (1 + s.tuft.hollow * here.hollow) * (s.tuft.shade + (1 - s.tuft.shade) * here.sky) * clump;
@@ -353,7 +399,7 @@ export function tkScatter(blocks, lay, { box, grows, heightAt = null, colour = T
             const [ox, oz, turn, long] = [(random() - 0.5) * size, (random() - 0.5) * size, random() * Math.PI, 0.05 + 0.07 * random()];
             const [cx, cz] = [Math.cos(turn) * long, Math.sin(turn) * long];
             const lift = y + 0.012 + 0.006 * k;
-            builder.quad('scrap', [px + ox - cx - cz * 0.4, lift, pz + oz - cz + cx * 0.4], [px + ox - cx + cz * 0.4, lift, pz + oz - cz - cx * 0.4], [px + ox + cx + cz * 0.4, lift, pz + oz + cz - cx * 0.4], [px + ox + cx - cz * 0.4, lift, pz + oz + cz + cx * 0.4], { colour: tktTone(tint, random, 0.4), normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]] });
+            builder.quad('scrap', [px + ox - cx - cz * 0.4, lift, pz + oz - cz + cx * 0.4], [px + ox + cx - cz * 0.4, lift, pz + oz + cz + cx * 0.4], [px + ox + cx + cz * 0.4, lift, pz + oz + cz - cx * 0.4], [px + ox - cx + cz * 0.4, lift, pz + oz - cz - cx * 0.4], { colour: tktTone(tint, random, 0.4), normals: [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]] });
           }
         });
         laid.litter += 1;

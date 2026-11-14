@@ -56,7 +56,13 @@ export const TK_WEATHER = {
   // `bounce`: an upright face shut off from the sky still has the light the open ground before it throws back.
   // The lie's sky share is read `reach` m out from the face, and the face has at least `share` of it (the ground's
   // reflectance, damp stone throws back about 0.3 and its wet film mirrors more at a low angle: 0.5 by eye), more over snow.
-  shade: { most: 0.9, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 } },
+  // `fill`: the light lying snow throws back up at what stands on it, in the open air, as a multiple of the
+  // ground light the air already gives (env/air.js: a fifth of what falls on level ground, grass, of which its
+  // light probe shows 1.6 times: 0.32). Snow throws back about 0.8 (the kit's own snow colour): (0.8 - 0.32) / 0.2.
+  // Without it everything that faces down or sideways over a snowfield (the lee of a cart, an eave's underside,
+  // the shaded face of a wall) is lit as if it stood on a meadow, and goes black beside the snow.
+  // WORKAROUND, to be removed when the open air knows a place's ground (shared/env-requests.md R9).
+  shade: { most: 0.9, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, fill: 2.4 },
   // A way's worn middle is this much paler and smoother than its edges; its edges this much darker.
   tread: { pale: 0.1, edge: 0.24 },
   // Snow's colour, and how level a surface must be to hold it (the normal's y: from none to full). `colour` is for
@@ -421,6 +427,8 @@ const TK_SHADE = `
   float tkOpen = mix(1.0, max(tkSky, tkBounce), ${TK_WEATHER.shade.most.toFixed(2)}) * (1.0 - ${TK_WEATHER.shade.joint.toFixed(2)} * tkJoint * (1.0 - tkSnowHere) * step(0.01, uTkDirt.z));
   reflectedLight.indirectDiffuse *= tkOpen;
   reflectedLight.indirectSpecular *= tkOpen;
+  // Lying snow's light, thrown up (TK_WEATHER.shade.fill): on the half of the world a face sees below the level.
+  if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.fill.toFixed(2)} * uTkSnow * (0.5 - 0.5 * normalize(vTkNrm).y) * max(tkSky, tkBounce)) * material.diffuseColor;
 }
 `;
 
@@ -623,6 +631,9 @@ export const TK_MATERIALS = {
   // and blue as the sky they show.
   scrap: { sheet: 'plaster', plain: true, twoSided: true, snow: 0.4, blotch: 0.5 },
   icicle: { sheet: 'plaster', plain: true, colour: [0.8, 0.9, 0.97], snow: 0, blotch: 0.2 },
+  // A drift the wind has laid against a wall's foot (townkit/things.js tkDrift): the ground's earth under snow that
+  // holds on it whatever its slope and at the lightest fall.
+  drift: { sheet: 'earth', blotch: 0.8, snow: 2.2, dirt: [0, 0, 0.2, 0.6] },
   // Cloth and paper that hang and fly (townkit/stir.js): the plaster sheet's fine grain under each piece's own
   // colour, seen from both sides, holding no snow.
   cloth: { sheet: 'plaster', plain: true, twoSided: true, snow: 0, blotch: 0.5, hung: true },

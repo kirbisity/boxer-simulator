@@ -13,7 +13,8 @@ export const TK_HOUSE = {
   // Storey heights (m): the shop floor, the upper floor; the stone plinth; a bay's width between posts; a post's radius.
   storeys: [3.0, 2.5], plinth: 0.32, bay: 2.3, post: 0.1,
   // The roof: its rise as a share of its run (about 27 degrees), the eave's overhang front and back, how hollow the slope is.
-  pitch: 0.52, overhang: 0.8, sag: 0.18,
+  // `plate`: how much of the roof's rise over the wall's line is closed under it (tkHouse: the wall plate and its boards).
+  pitch: 0.52, overhang: 0.8, sag: 0.18, plate: 0.6,
   // Finishes (multiplied into the sheets): dark oiled timber, limewashed plaster, grey brick, grey tile.
   timber: [0.42, 0.3, 0.23], plaster: [0.93, 0.92, 0.88], brick: [0.78, 0.8, 0.8], tile: [0.8, 0.82, 0.84],
   // A fire wall (the stepped gable wall standing above the roof between houses): its thickness and how far it stands above the tiles.
@@ -107,6 +108,10 @@ export function tkHouse(builder, spec) {
   const beam = (y, high, proud) => builder.box('timber', front, -w / 2, w / 2, y, y + high, -0.12, proud, { colour: tkbScale(timber, 0.95), skip: 'back' });
   beam(h0 - 0.24, 0.26, 0.05);
   beam(eave - 0.2, 0.2, 0.05);
+  // Between the wall's head and the roof above it (the roof stands `eave` up at its edge and has risen by the wall's
+  // line): closed, as a house's is by its wall plate and the boards between the rafters. `TK_HOUSE.plate` of the
+  // straight slope's rise there, the rest being the slope's own hollow (its sag), so the block stays under the tiles.
+  builder.box('timber', frame, -w / 2 + 0.02, w / 2 - 0.02, eave - 0.02, eave + TK_HOUSE.plate * rise * (roof.overhang / (d / 2 + roof.overhang)), -d / 2 + 0.02, d / 2 - 0.02, { colour: tkbScale(timber, 0.55), skip: 'top bottom' });
   if (storeys > 1 && pent) tkgRoof(builder, front, { kind: 'lean', width: w, depth: 0.45, overhang: 0.5, verge: 0, eave: h0 - 0.34, rise: 0.46, sag: 0, tint: roof.tint, timber, ridge: { high: 0.1, wide: 0.12, lift: 0 }, soffit: true });
   tkgRoof(builder, frame, { ...roof, width: w, depth: d, eave, rise, ridge: { lift: firewall ? 0 : 0.14, ...roof.ridge } });
   return eave;

@@ -44,7 +44,7 @@ export const TK_LAY = {
   // is thin for `lee` m behind it.
   drift: { windward: 3.5, lee: 7, stands: 0.8 },
   // Materials that are not built things: left out of the map.
-  skip: ['water', 'ice', 'foliage', 'needles', 'lattice', 'bark', 'tuft', 'scrap', 'icicle', 'cloth'],
+  skip: ['water', 'ice', 'foliage', 'needles', 'lattice', 'bark', 'tuft', 'scrap', 'icicle', 'cloth', 'drift'],
 };
 
 const layClamp = (value) => Math.max(0, Math.min(1, value));

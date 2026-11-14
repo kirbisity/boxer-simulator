@@ -34,14 +34,16 @@ export const TK_STIR = {
   // Smoke from a small fire: `count` puffs each living `life` s, rising at `rise` m/s and taken up to the wind's
   // speed over `drag` s, growing from `size[0]` to `size[1]` m across; a wood fire's plume leaves at about 1 m/s
   // and is bent flat within a few metres in a fresh wind, approximate. `colour`: its own (wood smoke, blue-grey).
-  smoke: { count: 22, life: 9, rise: 1.0, drag: 1.4, size: [0.3, 3.2], colour: [0.5, 0.5, 0.52], alpha: 0.42 },
+  smoke: { count: 22, life: 9, rise: 1.0, drag: 1.4, size: [0.3, 3.2], colour: [0.62, 0.62, 0.65], alpha: 0.24 },
   // Flames: `count` tongues each living `life` s, rising `rise` m/s from `size` m across to nothing; `light`: how
   // bright (a multiple of the display's white: a flame is far over it, and blooms).
-  fire: { count: 9, life: 0.55, rise: 1.3, size: 0.32, light: 7, colours: [[1, 0.78, 0.3], [1, 0.3, 0.06]] },
+  fire: { count: 9, life: 0.55, rise: 1.3, size: 0.32, light: 3.2, colours: [[1, 0.78, 0.3], [1, 0.3, 0.06]] },
   // Snow blown off an edge: `perMetre` wisps along it, each living `life` s; it starts once the gust there passes
   // `from` m/s and is at its fullest at `full` (snow is lifted from about 5 m/s at the surface, more when fresh and
   // loose, approximate); it rides at `ride` of the wind, sinks `fall` m/s, spreads from `size[0]` to `size[1]` m.
-  spindrift: { perMetre: 1.6, life: 2.6, from: 3.6, full: 6.5, ride: 0.8, fall: 0.35, size: [0.5, 2.4], alpha: 0.5 },
+  // `alpha`: a wisp's own thickness at its thickest (it is white on a white land: it shows as a veil over what is
+  // darker behind it and as a bright streak against the sun, so it is drawn thick: by eye).
+  spindrift: { perMetre: 2.4, life: 2.6, from: 3.6, full: 6.5, ride: 0.8, fall: 0.35, size: [0.5, 2.4], alpha: 1.1 },
   // Drips from an eave: `perMetre` along it; each lets a drop go every `every` s (a range) when the roof is soaked,
   // fewer of them as it dries (none under `wetFrom`); a drop is `wide` m across and drawn `long` s of its fall long.
   drip: { perMetre: 2.2, every: [0.5, 3.5], wetFrom: 0.12, wide: 0.014, long: 0.035, alpha: 0.55 },
@@ -124,7 +126,8 @@ void main() {
   alpha *= step(t, fall) * step(r3, wet * 1.2) * min(1.0, uSize.x / least);
 #endif
   vec3 world = middle + (right * aCorner.x * size.x + up * aCorner.y * size.y) * 0.5;
-  vec3 light = uEnvSunColour * envSunShare(middle) + uEnvSkyLight;
+  // (Lit as the land is, env/terrain.js: the sun by how a face meets it, here a puff's half, and the whole sky.)
+  vec3 light = uEnvSunColour * envSunShare(middle) * 0.5 + uEnvSkyLight;
 #if KIND == 2
   // (Blown snow against the sun is lit through.)
   light += uEnvSunColour * envSunShare(middle) * 1.5 * pow(max(dot(normalize(middle - cameraPosition), uEnvSunDir), 0.0), 6.0);
@@ -134,7 +137,7 @@ void main() {
   colour = envSky(vec3(0.0, 1.0, 0.0)) * 0.9;
   lit = 0.0;
 #endif
-  colour *= mix(vec3(1.0), light * 0.3183, lit);
+  colour *= mix(vec3(1.0), light, lit);
   vColour = vec4(lit > 0.5 || KIND == 3 ? envHaze(colour, cameraPosition, middle) : colour, alpha);
   vUv = aCorner;
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
