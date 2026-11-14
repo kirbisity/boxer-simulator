@@ -1747,3 +1747,51 @@ html:lang(zh) .replay-intro { font-size: 14.5px; }
 html:lang(zh) .home .screen-head h1 { letter-spacing: 0.06em; font-size: clamp(40px, 6.4vw, 92px); line-height: 1.05; }
 html:lang(zh) .home .screen-head .lede { font-size: clamp(16px, 1.6vw, 20px); font-style: normal; letter-spacing: 0.08em; }
 @media (max-height: 760px) and (min-width: 761px) { .home .screen-head h1 { font-size: clamp(34px, 9vh, 68px); } }
+
+/* ---- What is chosen, the army's setup, the stage list, the fight's tags and thumb buttons ----
+   Chosen is gilt on its own tint (a filled gilt is kept for the one thing to press). The setup's map lies on a drafting ground
+   with its panel a plate beside it. The stages stand centred under their head. A moment's tag over a man is a small plate and
+   its word, red kept for a man out of the fight. The thumb buttons are dials in bone on the dark; the lock's rose is now
+   vermilion, the seal's red, still its own colour among them. */
+:root { --lock: #f2603f; }
+button.on { background: rgba(var(--gilt), 0.16); color: var(--gold); border-color: rgba(var(--gilt), 0.75); }
+
+.screen.muster { background: linear-gradient(180deg, #1d1912, #110f0b 62%); gap: 10px; }
+.muster-head { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.muster-head .lede { color: var(--soft); font-size: 13.5px; }
+.muster-map { border-color: var(--line-strong); box-shadow: inset 0 0 70px rgba(var(--pit), 0.6);
+  background: linear-gradient(rgba(var(--ink), 0.05) 1px, transparent 1px) 0 0 / 36px 36px, linear-gradient(90deg, rgba(var(--ink), 0.05) 1px, transparent 1px) 0 0 / 36px 36px, radial-gradient(ellipse at 50% 45%, #2b261c, #17140f 88%); }
+.muster-hint { font: 500 11.5px var(--mono); color: rgba(var(--ink), 0.82); }
+.muster-aside { padding: 10px; background: var(--plate); border: 1px solid var(--line); border-top-color: rgba(var(--gilt), 0.6); border-radius: var(--r-plate); }
+.muster-tabs button { font: 600 12.5px var(--display); letter-spacing: 0.1em; text-transform: uppercase; }
+.muster-tabs button.on { border-color: var(--gold); }
+.muster-note { color: var(--soft); }
+html:lang(zh) .muster-tabs button { letter-spacing: 0.04em; font-size: 13.5px; }
+@media (min-width: 1100px) and (min-height: 521px) { .muster-body { grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 440px); gap: 12px; } .screen.muster { padding-left: 18px; padding-right: 18px; } }
+
+.choices.stages { grid-template-columns: repeat(auto-fit, minmax(0, 330px)); justify-content: center; max-width: 720px; gap: 16px; }
+.choices.stages .choice.soon { opacity: 1; background: rgba(var(--pit), 0.82); color: var(--muted); }
+.choices.stages .choice.soon:hover, .choices.stages .choice.soon:focus-visible { background: rgba(var(--pit), 0.82); }
+.choices.stages .choice.soon strong { color: var(--muted); }
+
+.event-icon { gap: 3px; }
+.event-icon .glyph { display: grid; place-items: center; width: 34px; height: 34px; font-size: 22px; color: var(--fg); background: rgba(var(--pit), 0.82); border: 1px solid rgba(var(--ink), 0.5); border-radius: var(--r-plate); }
+.event-icon .glyph.drawn { filter: none; }
+.event-icon .glyph.emoji { font-size: 19px; }
+.event-icon b { font: 700 11.5px/1 var(--display); letter-spacing: 0.14em; padding: 4px 7px 3px; color: var(--fg); background: rgba(var(--pit), 0.86); border: 1px solid rgba(var(--ink), 0.3); }
+.event-icon.ko .glyph { width: 44px; height: 44px; font-size: 30px; color: #fff; background: #b5301e; border-color: rgba(255, 255, 255, 0.55); }
+.event-icon.ko .glyph.emoji { font-size: 24px; }
+.event-icon.ko b { background: #b5301e; color: #fff; border-color: transparent; font-size: 14px; }
+.event-icon.bone .glyph, .event-icon.bone b { background: rgba(var(--pit), 0.86); color: #ffb9ab; border-color: var(--red); }
+.event-icon.down .glyph, .event-icon.down b { background: rgba(var(--pit), 0.86); color: var(--gold); border-color: rgba(var(--gilt), 0.7); }
+html:lang(zh) .event-icon b { letter-spacing: 0.08em; font-size: 12.5px; }
+html:lang(zh) .event-icon.ko b { font-size: 15px; }
+
+.fight-button { border: 1.5px solid rgba(var(--ink), 0.5); background: rgba(var(--pit), 0.42); }
+.fight-button span { font: 600 10px var(--display); letter-spacing: 0.14em; text-shadow: 0 1px 2px rgba(var(--pit), 0.9); }
+.guard-button.on, .jump-button.on { background: rgba(var(--ink), 0.3); border-color: var(--fg); }
+.crawl-button.on { background: rgba(var(--gilt), 0.42); border-color: var(--gold); color: var(--fg); }
+.lock-button { border: 1.5px dashed var(--lock); background: rgba(var(--pit), 0.55); color: var(--lock); }
+.lock-button.on { border: 2px solid #ffd9cc; background: #c03a22; color: #fff; text-shadow: 0 1px 2px rgba(60, 10, 0, 0.6); box-shadow: 0 0 0 4px rgba(242, 96, 63, 0.28), 0 0 22px rgba(242, 96, 63, 0.8); }
+.lock-button kbd { border-color: rgba(242, 96, 63, 0.6); color: #ffd9cc; }
+@keyframes lock-on { 50% { box-shadow: 0 0 0 7px rgba(242, 96, 63, 0.12), 0 0 28px rgba(242, 96, 63, 0.9); } }
