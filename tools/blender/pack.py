@@ -4,6 +4,7 @@
 #   python3 tools/blender/pack.py <bake dir> [--preview]
 #
 # A tile not in the bake dir keeps its images from the current src/detailmaps-data.js (so one family can be baked again alone).
+# An armour tile goes through wear.py on the way (`worn`): the used look of its material is part of the packed maps.
 #
 # Every map is resampled to a power of two (`size`; the bakes are rendered larger and filtered down, which is also what keeps
 # a normal map from sparkling), and is one of two kinds:
@@ -20,6 +21,9 @@ import sys
 
 import numpy as np
 from PIL import Image
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import wear  # noqa: E402
 
 ARMOUR = {
     'mail': {'size': 1024, 'quality': 90},
@@ -86,6 +90,7 @@ def pack(folder, name, spec, kind, preview):
     o = resample(orm, size)
     out = {}
     if kind == 'armour':
+        colour, n, o = wear.worn(name, colour, n, o)
         if spec.get('masks'):
             mask = resample(load(folder, name, 'mask'), size)
             out['albedo'] = webp(to8(np.concatenate([colour, mask[:, :, 0:1]], axis=2)), spec['quality'])
