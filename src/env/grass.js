@@ -93,12 +93,16 @@ void main() {
   vec3 sunLight = uEnvSunColour * (facing + through) * sunShare;
   vec3 skyLight = (mix(uEnvBounce, uEnvSkyLight, 0.55 + 0.45 * t) + uEnvSkyLight * ${ENV.grass.sheen.toFixed(2)} * over * t) * cover.x * bodies.z;
 
-  // The haze, worked here once a vertex: the lit part and the rest, so the fragment only applies the shadow.
+  // The haze, worked here once a vertex: the lit part and the rest, so the fragment only applies the shadow. The
+  // shade on the air before a blade is read at one point of its sight line, a different one for each blade (the
+  // grain is the blade's own), so a sward takes the mean among its blades as a pixel of the land does among its steps.
+  // Far off, where the blades are few and large and each would show as a fleck, all read the middle of the line.
   vec3 ray = world - cameraPosition;
   float distance_ = length(ray);
-  vec3 through_ = exp(-(uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_);
+  vec3 depth_ = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_;
+  vec3 through_ = exp(-depth_);
   vLit = colour * sunLight * through_;
-  vBase = colour * skyLight * through_ + envAirlight(ray / max(distance_, 1e-3)) * (1.0 - through_);
+  vBase = colour * skyLight * through_ + envAirlightIn(ray / max(distance_, 1e-3), envAirShare(cameraPosition, ray, depth_.g, mix(fract(sin(dot(xz, vec2(12.9898, 78.233))) * 43758.5453), 0.5, smoothstep(${ENV.grass.shadeOwn[0].toFixed(1)}, ${ENV.grass.shadeOwn[1].toFixed(1)}, distance_)), ${ENV.air.shadeSteps[2]})) * (1.0 - through_);
 
   envShadowCoords(world, vec3(0.0, 1.0, 0.0));
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);

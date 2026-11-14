@@ -32,10 +32,10 @@ vec4 envSkyCloud(vec3 dir, float lift) {
   vec2 sunward = normalize(uEnvSunDir.xz + vec2(1e-4, 0.0)) * ${ENV.clouds.selfShadow.toFixed(3)};
   float behind = envCloud(sheet + sunward);
   float beyond = envCloud(sheet + sunward * 2.6);
-  float thick = smoothstep(0.02, ${ENV.clouds.baseAt.toFixed(2)}, depth) * (1.0 - lift);
+  float thick = smoothstep(0.02, uEnvCloudForm.y, depth) * (1.0 - lift);
   float lit = (1.0 - thick) * (1.0 - 0.3 * behind) + 0.3 * (1.0 - behind) * (1.0 - 0.6 * beyond);
   // The grain of the cloud itself.
-  lit = clamp(lit * (0.8 + 0.4 * texture2D(uEnvNoise, sheet * 1.9).a), 0.0, 1.0);
+  lit = clamp(lit * (1.0 + 1.25 * uEnvCloudForm.x * (texture2D(uEnvNoise, sheet * 1.9).a - 0.5)), 0.0, 1.0);
   return vec4(mix(uEnvCloudDark, uEnvCloudLit, lit), smoothstep(-0.07, 0.11, depth));
 }
 
@@ -73,7 +73,23 @@ void main() {
 
   // The ground haze looked up through: all of it along the horizon, little of it overhead.
   float column = uEnvRayleigh.a / uEnvHaze.w * exp(-max(cameraPosition.y, 0.0) * uEnvHaze.w) / max(dir.y, 0.004);
-  colour = mix(envAirlight(dir), colour, dir.y > 0.0 ? exp(-column) : 0.0);
+  // Its light is the sun's scattered in it, so it is dim where cloud or crowns stand between it and the sun: the
+  // share of it in the sun is taken along the sight line as the land's haze takes it (air.js), at steps even in
+  // what each adds (not jittered: over the sky's width a grain shows, and cloud shade is too broad to band). The
+  // haze thins with height, so a depth t of the column lies -ln(1 - t / column) scale heights up; over the cloud
+  // sheet nothing shades it.
+  float share = uEnvShade.w;
+  if (share < 0.0 && dir.y > 0.0) {
+    float gone = 1.0 - exp(-column);
+    float rise = max(dir.y, 0.004) * uEnvHaze.w;
+    share = 0.0;
+    for (int i = 0; i < 4; i++) {
+      float depth = -log(1.0 - (float(i) + 0.5) * 0.25 * gone);
+      vec3 point = cameraPosition + dir * (-log(max(1.0 - depth / column, 1e-4)) / rise);
+      share += point.y < uEnvCloud.w ? envAirSun(point) * 0.25 : 0.25;
+    }
+  }
+  colour = mix(envAirlightIn(dir, max(share, 0.0)), colour, dir.y > 0.0 ? exp(-column) : 0.0);
 
   gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>

@@ -87,9 +87,39 @@ export const ENV = {
     // The ground's share of light thrown back up (grass and soil reflect about a fifth of what falls on them,
     // approximate): it lights the underside of things.
     bounce: 0.2,
+    // The same over lying snow (new snow throws back eight or nine tenths, approximate): what lights a face in
+    // shade on a snowfield. A place may say what it stands on (`ground.albedo` in its description).
+    snowBounce: 0.85,
     // Fighters and props are hazed by the renderer's own fog, which is exponential-squared where the haze here is
     // exponential: the two are made to agree at this distance (m), about the far side of a fighting floor.
     fogMatch: 40,
+    // Shade in the air. The light a stretch of air sends the eye is the sun's on that stretch, so air in the shade
+    // of a cloud, a crown or a trunk sends less: land under cloud goes dark together with the air before it, and
+    // mist is bright only where the sun gets down into it, in shafts, with what stands sunward cut out of them
+    // (air.js envAirShare, which walks each sight line on the high tier; below it the frame has one share, that
+    // of the air before the camera). `shadeBeam`: of the air's light across the sun's way, the share that is the
+    // beam scattered once, which shade takes away; the rest has been scattered about first and fills the shade
+    // (toward the sun the once-scattered share rises to all of what the aureole adds). In thin haze nearly all
+    // the light is scattered once, in fog well under half: 0.7 is by eye against the second reference, whose
+    // shaded mist is about a third as bright as its shafts. Approximate, not from a measurement.
+    shadeBeam: 0.7,
+    // Steps along a sight line: for a pixel of the land, the sky or a place's own material; for what is worked
+    // once a corner or once a fleck (trees, what falls and drifts); for a blade of grass, where each blade takes
+    // its one step at its own depth and the sward averages them (three steps a blade were half the walk's whole
+    // cost, 3 ms of 6 at 1600 x 900 in mist on the bench machine, a blade having many corners and a field many blades).
+    shadeSteps: [8, 4, 1],
+    // Fewer steps where the haze has taken little by then (the share of the light behind it that it has put its
+    // own in place of): under `shadeFrom` one step, under `shadeFull` half of them. On a clear day that is all the
+    // land within a few hundred metres; in mist everything past the fighters is walked in full. (At 1600 x 900 the
+    // full walk on every pixel cost 5 to 6 ms a frame on the bench machine; set so no step is seen in the picture.)
+    shadeFrom: 0.04,
+    shadeFull: 0.25,
+    // The share of a step's stretch of the line that its read of the shade is spread over (a round on the
+    // ground, where the true mean is along the line only: the whole stretch would take away the shafts seen
+    // end on, toward the sun, with the grain). By eye: the least at which the far land seen through the wood in
+    // mist shows no grain; a shaft 10 m off is softened by about a third of a metre, which mist's own
+    // scattering of the light about does to a real one.
+    shadeSpread: 0.3,
     // Looking up out of mist: the layer above the eye is `height` thick (e-folding), so the sky shows through
     // exp(-extinction x height / sin(elevation)): blue overhead, white at the horizon.
     // (No number here: it is the same integral as the land's haze taken to infinity.)
@@ -124,6 +154,13 @@ export const ENV = {
     meter: 1.7,
     adapt: 0.7,
     view: 60,
+    // The meter averages what the frame holds, and about this share of a frame is the ground itself. Where the
+    // ground is far from a grey card (lying snow, at ENV.air.snowBounce; a place's own `meter.albedo`) the
+    // metered light moves that share of the way from the card's to the ground's, so a snowfield closes the
+    // camera about a stop and sunlit snow sits under the curve's shoulder with its shadows told from it. (A
+    // meter that took the snow whole would draw it grey, which is why a photographer opens up over snow: a half
+    // leaves it white. By eye.) A place among walls says how much of the sky its ground sees (`meter.sky`).
+    groundSeen: 0.5,
     // The haze's light is metered at no more than this many times the land's. Looking up the sun through mist
     // the air itself is some twenty times the land's light (measured in the Sengoku valley's mist: 0.9 against
     // 0.044), and an exposure set off it left a fighter nine metres off a murky shape, two stops under the same
@@ -156,6 +193,9 @@ export const ENV = {
     // fading by exp(-distance x shaftFade) (distance in picture heights). They are light scattered toward the eye
     // by lit air, so their strength is the share of light the haze scatters over `shaftPath` m,
     // 1 - exp(-extinction x path), times the weather's share of sun: 0.6 in the mist, under 0.01 on a clear day.
+    // They are drawn only where the air's shade is not walked sight line by sight line (quality.airShade): where
+    // it is, the shafts are in the air itself, in their places in depth, and these on top of them counted the
+    // same light twice, as thin streaks fanned from the sun's place across whatever stood in front.
     // The path is by eye (about the depth of a view through the trees); the rest follows from the air.
     shaftFrom: 0.55,
     shaftReach: 0.85,
@@ -207,6 +247,16 @@ export const ENV = {
     // The flecks are sharp where the shade is thin and close up as it deepens. By eye.
     dapple: 0.55,
     dappleSway: 0.06,
+    // A crown's shadow on the near map is three rounds up its height, each taking `crown` of the sun at its
+    // middle: a tree in leaf lets a tenth or less of the direct sun through its whole depth (approximate; canopy
+    // gap fractions of 5 to 15 per cent are the usual figures quoted), which three rounds of 0.55 one behind
+    // another leave (0.45^3 = 0.09). `slantMost`: a shadow is drawn no longer than this many times the height
+    // of what casts it (a sun under 7 degrees), so a setting sun does not shade the whole map from one tree.
+    crown: 0.55,
+    slantMost: 8,
+    // What stands over the ground (crowns, trunks, walls) is kept `coverFine` times finer than the near map
+    // itself: 0.375 m a texel, so the shadow of a trunk half a metre through is a band and not a smear.
+    coverFine: 2,
     // The sky's light under a crown, beside open ground (a broadleaf canopy passes a few per cent of the light
     // over it; a single tree's shade still sees the sky to its sides: 0.45 by eye), and at the foot of a wall
     // or a stack, which hides half the sky from the ground beside it (a plane's form factor: exactly one half at
@@ -256,10 +306,20 @@ export const ENV = {
 
   // ---- clouds: one sheet of noise, drifting with the wind ------------------------------------------------------
   clouds: {
-    // The sheet's height (m) and the size of its largest masses (m). Fair-weather cumulus base is 600-2000 m
-    // (approximate); 1500 and 2600 by eye give cumulus that reads the size it does in the reference frames.
+    // The sheet's height (m) and the size of its largest masses (m). Fair-weather cumulus base is 600-2000 m and a
+    // cumulus or a roll of stratocumulus is one to two kilometres across (both approximate). At 2600 m one shadow
+    // covered everything a view takes in and the light never changed inside a round; at 1500 a view holds lit and
+    // shaded land together and the patches are seen to cross it.
     height: 1500,
-    scale: 2600,
+    scale: 1500,
+    // How much of the sheet's shape is small lumps (of about a third of `scale`) and how much the broad masses:
+    // 0.32 by eye for a field of cumulus, which is all lumps.
+    ragged: 0.32,
+    // A deck of stratocumulus is another form of the same sheet: broad slabs with smooth bases, a few hundred
+    // metres deep right to their edges, so dark from below all over but for a thin rim. A weather's `deck` (0 a
+    // field of cumulus, 1 a deck) takes `ragged` and `baseAt` down to this share of themselves. By eye against the
+    // first reference, whose sky is slate slabs with pale breaks, not grey lumps with dark middles.
+    deck: 0.35,
     // A cumulus is as deep as it is broad or less (fair-weather ones a few hundred metres to a kilometre:
     // approximate). The sheet is drawn at `levels` heights from its base to `deep` m over it, each level's
     // clouds narrower by `taper` of the noise (a cloud's top is smaller than its base). By eye.
@@ -275,8 +335,12 @@ export const ENV = {
     // How far inside a cloud (in the sheet's noise, 0 its edge, about 0.35 the middle of a large one) its base is
     // wholly dark: seen from below a cumulus is a grey base with bright edges. 0.2 by eye against the references.
     baseAt: 0.2,
-    // A cloud's shadow on the land: how much of the sun the thickest cloud takes.
-    shadow: 0.75,
+    // A cloud's shadow on the land: how much of the sun the thickest cloud takes. A cumulus a few hundred metres
+    // deep passes next to none of the direct beam (its optical depth is in the tens: approximate, from memory of
+    // the textbooks, not checked); what it does pass comes down as sky light, which the land keeps (uEnvSkyLight).
+    // The few per cent left here are the thin veil such a cloud trails. At 0.75 the shaded land was three quarters
+    // as bright as the lit and a broken sky read as an even one.
+    shadow: 0.95,
     // Below this elevation (sine) the sheet fades into the haze: no cloud is seen edge-on at the horizon.
     horizonFade: 0.09,
   },
@@ -334,6 +398,17 @@ export const ENV = {
     // roughly half of dry), and takes a sheen of the sky at grazing angles.
     wetDarken: 0.58,
     wetSheen: 0.5,
+    // What standing water mirrors: the sky only above what stands round the floor (trees.js envBuildSkyline:
+    // `skyline` texels round the compass, tangents up to `skylineMost`, 63 degrees); below that line the wood,
+    // at `mirrorWood` of the sky's light on its colour (a crown seen from below and the side is mostly its own
+    // shade: by eye). The line is the one seen from the centre, used out to `mirrorNear` m and let go by
+    // `mirrorFar`. (Without it a rained-on floor in a wood mirrored the bright horizon behind the trunks and
+    // came out a white sheet.)
+    skyline: 32,
+    skylineMost: 2,
+    mirrorWood: 0.5,
+    mirrorNear: 25,
+    mirrorFar: 70,
     // A wet built surface (stone, tile, planks: air.js envDress) is this share as rough as dry: the film of
     // water fills its grain and mirrors the sky. By eye.
     wetRough: 0.4,
@@ -371,6 +446,10 @@ export const ENV = {
       { tile: 150, count: 90000, width: 0.15, segments: 1, tall: 1.08, root: 0.75 },
       { tile: 460, count: 50000, width: 0.55, segments: 1, tall: 1.2, root: 0.9 },
     ],
+    // The shade on the air before a blade is read at a point of its sight line that is the blade's own out to
+    // the first of these (m), and the line's middle for every blade past the second (grass.js): the second and
+    // third rings' tufts are few and wide, and each with its own point showed as a fleck against lit mist.
+    shadeOwn: [10, 30],
     // A blade's lean at rest (rad, random way) and how much each differs in height (share).
     lean: 0.32,
     vary: 0.45,
@@ -396,24 +475,57 @@ export const ENV = {
     // A crown is a cloud of leaf cards; how many by distance band (m from the centre): full near, fewer and
     // larger far off, the far woods a handful each.
     // `limbs`: the limbs under the crown are drawn too (near, where they are seen between the leaves).
+    // (The full count only out to 70 m: past that a card is under ten pixels of a 900-line picture and a third
+    // as many, larger, draw the same crown, which is what lets a wood stand as close as a wood does.)
     bands: [
-      { to: 140, cards: 340, trunk: true, limbs: true },
+      { to: 70, cards: 340, trunk: true, limbs: true },
+      { to: 140, cards: 120, trunk: true, limbs: true },
       { to: 520, cards: 44, trunk: true, limbs: false },
       { to: 2600, cards: 6, trunk: false, limbs: false },
     ],
-    // The leaf-card picture: `atlas` x `atlas` tiles of `tile` px (two sprays of broad leaves, two of needles), and
-    // how many leaves a spray holds: a card on a 13 m tree is 1.7 m across, so a leaf drawn 7 % of it is 12 cm.
-    atlas: 2,
-    tile: 256,
+    // The leaf-card picture: `atlas` x `atlas` tiles of `tile` px (two sprays of broad leaves, two of needles, two
+    // plants of the ground: a rosette of broad blades and a fan of fronds, two twigs seen leaf by leaf, one spare),
+    // and how many leaves a spray holds: a card on a 13 m tree is 1.7 m across, so a leaf drawn 7 % of it is 12 cm.
+    atlas: 3,
+    tile: 512,
     leaves: 130,
-    // The share of a spray's opacity below which a pixel of a card is open air, by band: half near, where a
-    // card is seen leaf by leaf; lower far off, where the picture is shrunk to a blur of leaf and gap and a
-    // crown must still close (by eye: at a half the hill woods fell to tatters).
-    cut: [0.5, 0.3, 0.2],
+    // Up close a crown's outside is twigs whose leaves are seen one by one: this share of the outer cards of the
+    // nearest band's broadleaves carry the twig pictures (a dozen leaves each, three times the size of a spray's:
+    // a card 1.7 m across then shows 0.3 m of leaf, large for an oak's 0.1 m; by eye, and what a stylised crown
+    // bears). Further off the picture is shrunk past telling them apart, so only the nearest band has them.
+    twigs: 0.3,
+    // The share of a spray's opacity below which a pixel of a card is open air, one for each band above: half
+    // near, where a card is seen leaf by leaf; lower far off, where the picture is shrunk to a blur of leaf and
+    // gap and a crown must still close (by eye: at a half the hill woods fell to tatters).
+    cut: [0.5, 0.42, 0.3, 0.2],
     // Shading inside a crown: the inside and the underside are darker (leaves shade leaves) by up to this share.
     inner: 0.55,
     // Light through the leaves when the sun is behind the crown.
     through: 0.6,
+  },
+
+  // ---- rocks ----------------------------------------------------------------------------------------------------
+  // Boulders and outcrop: a few lumps of the country's rock standing out of the grass, the dark near things a
+  // wide view sits behind. Each is one of `forms`, made once: a ball pushed about by three slow waves (`lump` of
+  // its radius each) and then cut flat by `cuts` planes `keep` (and up to a quarter more) of the radius out from
+  // its middle, which is what gives rock its faces and edges; `scale` its width, height and depth beside its
+  // size. A block, a weathered round, a slab lying flat and a shard on end. By eye throughout.
+  rocks: {
+    forms: [
+      { cuts: 7, keep: 0.62, lump: 0.1, scale: [1, 0.72, 0.82] },
+      { cuts: 3, keep: 0.8, lump: 0.14, scale: [1, 0.62, 0.9] },
+      { cuts: 6, keep: 0.58, lump: 0.08, scale: [1.5, 0.3, 1.15] },
+      { cuts: 6, keep: 0.56, lump: 0.1, scale: [0.7, 1.05, 0.56] },
+    ],
+    // How much of its height is in the ground (a boulder sits in the soil, it does not rest on the grass).
+    sink: 0.3,
+    // Its colour, the lichen that blotches it and the moss on its top (display values). A grey gneiss or granite
+    // throws back 0.1 to 0.3 of the light (approximate, from memory, not checked); 0x5e5a52 squares to 0.10.
+    colour: 0x5e5a52,
+    lichen: 0x9a9880,
+    moss: 0x34481f,
+    // At its foot the grass and the ground hide the sky from it: the sky's light there is this share.
+    foot: 0.45,
   },
 
   // ---- what falls and drifts --------------------------------------------------------------------------------------
@@ -455,7 +567,7 @@ export const ENV = {
   // straight to the screen and each material bends its own light by the same curve at the weather's exposure,
   // with the default grade (no glare, no shafts, no vignette, and edges smoothed by the screen's own samples).
   quality: {
-    high: { grass: 1, far: 1, cards: 1, particles: 1, cloudShadow: true, post: 2 },
+    high: { grass: 1, far: 1, cards: 1, particles: 1, cloudShadow: true, post: 2, airShade: true },
     medium: { grass: 0.5, far: 0.7, cards: 0.6, particles: 0.6, cloudShadow: true, post: 1 },
     low: { grass: 0.2, far: 0.4, cards: 0.3, particles: 0.35, cloudShadow: false, post: 0 },
   },
@@ -491,16 +603,23 @@ export const ENV_TREES = {
   broadleaf: { height: [9, 17], crown: { wide: 0.44, tall: 0.36, at: 0.62 }, shape: 'round', limbs: 7, fork: 0.85, card: 0.125, leaf: [0x3a5a26, 0x4f7030, 0x2a4520], bark: 0x4b3d2c, trunk: 0.027, picture: 'leaf' },
   // Japanese cedar and red pine on a valley side: 15-25 m, a narrow dark spire of boughs, bare at the foot.
   pine: { height: [12, 22], crown: { wide: 0.21, tall: 0.37, at: 0.61 }, shape: 'boughs', limbs: 17, fork: 0, card: 0.085, leaf: [0x25402c, 0x335034, 0x1b3022], bark: 0x4a3626, trunk: 0.018, picture: 'needle' },
-  // Autumn broadleaf among the pines (maple, zelkova): the valley's colour in October.
   // What grows at a wood's edge and along a fence where nothing grazes it: hawthorn, bramble, hazel, a few
   // metres high and as broad, leafy to the ground.
   shrub: { height: [1.3, 3.4], crown: { wide: 0.6, tall: 0.46, at: 0.5 }, shape: 'round', limbs: 4, fork: 1.0, card: 0.3, leaf: [0x41602a, 0x56702e, 0x2e4a22], bark: 0x40352a, trunk: 0.02, picture: 'leaf' },
+  // The big-leaved plants of a damp bank and a wood's floor, a metre or so high and as wide, a handful of leaves each
+  // (`cards`: how many leaf cards one plant has in the nearest band, where a tree has the band's own count). Dock and
+  // burdock in an English meadow, butterbur (fuki) under Japanese cedar: blades 0.3-0.6 m long (approximate).
+  dock: { height: [0.6, 1.2], crown: { wide: 0.5, tall: 0.42, at: 0.48 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 0.95, cards: 7, leaf: [0x33501f, 0x44642a, 0x26401c], bark: 0x3a4a26, trunk: 0.012, picture: 'blade' },
+  // Bracken and fern: fronds fanning from the foot, to a man's waist or chest.
+  bracken: { height: [0.7, 1.5], crown: { wide: 0.55, tall: 0.45, at: 0.5 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 0.9, cards: 8, leaf: [0x3a5622, 0x4c6a2a, 0x2c441e], bark: 0x3a4a26, trunk: 0.01, picture: 'frond' },
+  // Autumn broadleaf among the pines (maple, zelkova): the valley's colour in October.
   autumn: { height: [8, 14], crown: { wide: 0.42, tall: 0.34, at: 0.62 }, shape: 'round', limbs: 6, fork: 0.85, card: 0.125, leaf: [0xa8642a, 0xb8862e, 0x8a3a22], bark: 0x43352a, trunk: 0.027, picture: 'leaf' },
 };
 
 // ---- weathers --------------------------------------------------------------------------------------------------------
 // Each is laid over the place's own description. `cover` 0..1 of the sky in cloud, `gloom` how dark the cloud's
-// underside (0 white cumulus .. 1 slate), `sun` the share of direct sun reaching the ground, `visibility` m (null:
+// underside (0 white cumulus .. 1 slate), `deck` 0..1 from a field of cumulus to a deck of slabs (ENV.clouds.deck;
+// none: 0), `sun` the share of direct sun reaching the ground, `visibility` m (null:
 // the place's own), `hazeHeight` m the haze thins by 1/e (null: the place's),
 // `fine` how fine the haze is (ENV.air.wavelengths),
 // `wind` times the place's speed and `gust` added to its gustiness, `wet` 0..1 of the ground, `fall` what falls
@@ -519,14 +638,31 @@ export const ENV_WEATHER = {
   clear: { label: 'Clear', grade: { warmth: 0.015 }, fine: 1.3, cover: null, gloom: 0, sun: 1, visibility: null, hazeHeight: null, wind: 1, gust: 0, wet: 0, fall: null, snow: 0 },
   // Broken cloud racing over: the light comes and goes.
   cloudy: { label: 'Broken cloud', grade: { contrast: 1.32 }, fine: 1.3, cover: 0.62, gloom: 0.35, sun: 0.9, visibility: null, hazeHeight: null, wind: 1.3, gust: 0.1, wet: 0, fall: null, snow: 0 },
+  // Heavy broken cloud: a deck of stratocumulus in broad slate slabs (`deck`) with a few breaks, the land
+  // in its shade with patches of sun crossing it. `cover` is the sheet's threshold, not an area: 0.68 leaves about
+  // a tenth of the sky open, and is just short of where the sky turns to a lid (air.js). The air under such a deck
+  // is damp and shallow: a visibility of 7 km in a layer 400 m deep (both approximate, in the range given for
+  // moist haze) dissolves the ridges one behind another yet leaves the sky above 10 degrees clear of it, so the
+  // cloud keeps its form; a deep layer of the same air turned the whole sky one flat slate. The picture is a
+  // low-key one: the curve is left nearly straight (a steep one drove the shaded land to black under a mid-grey
+  // sky) and the frame held up half a stop, so the land sits at a third of the way up and the breaks are
+  // the brightest thing in it; cooled, as light through deep cloud and blue air is, and as a camera left on
+  // its daylight balance under it draws it. All against the first reference's measured values (luminance
+  // percentiles, sky top, horizon, mid-ground, foreground; its mean saturation 0.45 and its greens at a hue of
+  // 110 degrees, where a warmth of -0.04 and a saturation of 0.96 gave 0.31 and 102, and these 0.40 and 106).
+  heavy: { label: 'Heavy cloud', grade: { contrast: 1.08, saturation: 1.15, warmth: -0.11, ev: 0.5 }, fine: 1.1, cover: 0.68, deck: 1, gloom: 0.7, sun: 1, visibility: 7000, hazeHeight: 400, wind: 1.25, gust: 0.12, wet: 0, fall: null, snow: 0 },
   // A low grey lid: no shadows, flat light (the sun's share is what gets through thick stratus, a few per cent direct).
   overcast: { label: 'Overcast', grade: { contrast: 1.4, saturation: 0.94, warmth: -0.015, ev: -0.3 }, fine: 0.8, cover: 1, gloom: 0.4, sun: 0.06, visibility: 12000, hazeHeight: null, wind: 1.2, gust: 0.05, wet: 0, fall: null, snow: 0 },
   // Steady rain: visibility a few km (approximate for moderate rain), everything wet.
   rain: { label: 'Rain', grade: { contrast: 1.42, saturation: 0.86, warmth: -0.03, ev: -0.5 }, fine: 0, cover: 1, gloom: 0.65, sun: 0.03, visibility: 2600, hazeHeight: 900, wind: 1.5, gust: 0.15, wet: 1, fall: { kind: 'rain', share: 1 }, snow: 0 },
   // Ground mist at dawn: a layer some tens of metres deep, the sun and the sky above it clear, the air near still.
-  // (Mist is by definition visibility over 1 km and fog under; a valley's dawn fog is 100-400 m. 260 by eye, so the
-  // far side of the floor is soft and the trees beyond are shapes.)
-  mist: { label: 'Mist', grade: { contrast: 1.36, saturation: 0.9 }, fine: 0.15, cover: 0.2, gloom: 0, sun: 0.85, visibility: 260, hazeHeight: 26, wind: 0.3, gust: 0, wet: 0.35, fall: null, snow: 0 },
+  // (Mist is by definition visibility over 1 km and fog under; a valley's dawn fog is 100-400 m. 150, set against
+  // a wood: at 260 trees 40 and 120 m off stood at nearly one tone and the wood read as a wash; at 150 each
+  // rank of trunks steps a clear tone back from the one before, and the far side of the floor is still plain.)
+  // The grade: under a warm low sun a camera balanced for the mist's light draws the shade cool and the greens
+  // quiet (saturation and warmth by measurement against a reference frame of a misted wood: mean saturation
+  // 0.19 there, 0.32 here at 0.9 and 0.25 at 0.8).
+  mist: { label: 'Mist', grade: { contrast: 1.36, saturation: 0.8, warmth: -0.03 }, fine: 0.15, cover: 0.2, gloom: 0, sun: 0.85, visibility: 150, hazeHeight: 26, wind: 0.3, gust: 0, wet: 0.35, fall: null, snow: 0 },
   // Snow driving on a hard wind: visibility under a km in moderate snow (approximate), the ground white.
   snow: { label: 'Snow', grade: { contrast: 1.3, saturation: 0.85, warmth: -0.02, ev: 0.3 }, fine: 0, cover: 1, gloom: 0.25, sun: 0.05, visibility: 700, hazeHeight: 600, wind: 1.6, gust: 0.15, wet: 0, fall: { kind: 'snow', share: 1 }, snow: 0.85 },
   // Showers: heavy cloud with gaps, rain out of the thick of it and sun through the gaps, the ground wet between.
@@ -550,6 +686,11 @@ export const ENV_WEATHER = {
 // grass: `height` m (least, most) outside the floor, `floorHeight` m on it, `dry` 0..1 share gone to straw,
 //   `flowers` 0..1 share of far tufts in flower and their colours.
 // trees: stands of ENV_TREES kinds, each { kind, count, from, to (m from the centre), clump 0..1 }.
+// rocks: stands of boulders, each { count, from, to (m from the middle), clump 0..1, size: [least, most] (m, half a
+// rock's width) }, laid as trees are planted; outcrops: knots of rock at a point, each { at: [x, z], radius (m),
+// rocks, plants (how many of each), size, kinds (the plants: ENV_TREES names; dock and bracken if left out) }.
+// rides: lanes through the trees from the floor outward, each { azimuth (rad, as the sun's), width, length (m) }:
+//   no tree stands in one. Where the sun comes down a ride the floor at its end is lit and the wood either side is not.
 // woods: 0..1 of the far hills wooded (drawn as colour on the land beyond the last tree), and its colour.
 // drift: what is in the air on its clear day: [{ kind (ENV.particles), share of its count, colours }].
 //
@@ -584,11 +725,16 @@ export const ENV_PLACE_PLAIN = {
 };
 
 export const PLACE_ENV = {
-  // A village green on the brow of a down, a summer afternoon, the sun over the left shoulder: the grass uncut beyond the fence, the land
-  // falling away to wooded hills that fade ridge behind ridge into the haze (the first reference).
+  // A village green on the brow of a down late on a summer afternoon under heavy broken cloud, the sun low over the
+  // left shoulder: the grass uncut beyond the fence, the land in shade with light crossing it and falling away to
+  // wooded hills that fade ridge behind ridge into the haze (the first reference).
+  // (Grass colours, here and below: green vegetation reflects about a tenth of visible light, some 0.05 in the red,
+  // 0.10 to 0.15 in the green and 0.04 in the blue; straw about a quarter. Approximate, from memory of published
+  // reflectance curves and not checked against one. The colours are display values that square to those, a
+  // luminance of 0.09 to 0.10 for green; they were 0.14 to 0.18, which is why a lawn in full sun glared.)
   meadow: {
-    weather: 'clear',
-    sun: { azimuth: 2.75, elevation: 30 },
+    weather: 'heavy',
+    sun: { azimuth: 2.75, elevation: 22 },
     air: { visibility: 42000, hazeHeight: 1000 },
     clouds: { cover: 0.42 },
     terrain: {
@@ -601,9 +747,15 @@ export const PLACE_ENV = {
         { from: 2600, full: 5200, height: 520, length: 3600, shape: 'ridge' },
       ],
     },
-    ground: { grass: 0x4a7326, dry: 0x8c8c40, soil: 0x6b5638, rock: 0x7d7a70, floor: 0.2, worn: [{ x: 0, z: 0, rx: 8, rz: 2, turn: 0.2, by: 0.55 }] },
+    ground: { grass: 0x425c2c, dry: 0x86843e, soil: 0x6b5638, rock: 0x7d7a70, floor: 0.2, worn: [{ x: 0, z: 0, rx: 8, rz: 2, turn: 0.2, by: 0.55 }] },
     grass: { height: [0.3, 0.62], floorHeight: 0.09, dry: 0.2, flowers: 0.1, flowerColours: [0xf2efe0, 0xe8c83a, 0xc58ad0] },
+    // Stones lie about a chalk-and-flint down thinly; on the brow to the east the rock comes out of the turf,
+    // with dock and bracken in its cracks: the near things the long view over the vale sits behind.
+    rocks: [{ count: 16, from: 30, to: 320, clump: 0.5, size: [0.3, 1.4] }],
+    outcrops: [{ at: [87, 13], radius: 6, rocks: 9, plants: 12, size: [0.4, 1.7] }],
     trees: [
+      { kind: 'dock', count: 34, from: 13, to: 120, clump: 0.5 },
+      { kind: 'bracken', count: 26, from: 20, to: 140, clump: 0.6 },
       { kind: 'broadleaf', count: 26, from: 24, to: 120, clump: 0.6 },
       { kind: 'shrub', count: 16, from: 24, to: 110, clump: 0.75 },
       { kind: 'broadleaf', count: 260, from: 120, to: 520, clump: 0.8 },
@@ -612,11 +764,12 @@ export const PLACE_ENV = {
     woods: { cover: 0.6, colour: 0x34502a },
     drift: [{ kind: 'motes', share: 1, colours: [0xfff4d0] }, { kind: 'petals', share: 0.5, colours: [0xf4f0e2, 0xe8d77a] }, { kind: 'litter', share: 0.5, colours: [0x8a7a3a, 0x6a6a2c, 0x9a8a52] }],
   },
-  // Open pasture for horsemen under a driven sky: a wide level floor, long low swells, a scarp far off, the
-  // grass running in waves before a fresh breeze.
+  // Open pasture for horsemen under a driven sky an hour before sunset: a wide level floor, long low swells, a
+  // scarp far off, the grass running in waves before a fresh breeze, the sun low under the cloud so the sky is
+  // the bright thing, the land darker under it and every figure throws a shadow several times its height.
   field: {
     weather: 'cloudy',
-    sun: { azimuth: -2.3, elevation: 34 },
+    sun: { azimuth: -2.3, elevation: 12 },
     air: { visibility: 32000, hazeHeight: 900 },
     clouds: { cover: 0.55 },
     terrain: {
@@ -627,9 +780,11 @@ export const PLACE_ENV = {
         { from: 1500, full: 4200, height: 440, length: 3000, shape: 'ridge' },
       ],
     },
-    ground: { grass: 0x55802c, dry: 0x9a9248, soil: 0x74603e, rock: 0x7d7a70, floor: 0.22, worn: [{ x: 0, z: 0, rx: 30, rz: 8, turn: 0, by: 0.35 }] },
+    ground: { grass: 0x48622e, dry: 0x8e8844, soil: 0x74603e, rock: 0x7d7a70, floor: 0.22, worn: [{ x: 0, z: 0, rx: 30, rz: 8, turn: 0, by: 0.35 }] },
     grass: { height: [0.32, 0.7], floorHeight: 0.1, dry: 0.4, flowers: 0.03, flowerColours: [0xf2efe0, 0xe8c83a] },
+    rocks: [{ count: 6, from: 30, to: 200, clump: 0.3, size: [0.3, 0.8] }],
     trees: [
+      { kind: 'dock', count: 24, from: 14, to: 120, clump: 0.5 },
       { kind: 'broadleaf', count: 34, from: 62, to: 240, clump: 0.85 },
       { kind: 'shrub', count: 14, from: 40, to: 200, clump: 0.85 },
       { kind: 'broadleaf', count: 300, from: 240, to: 700, clump: 0.9 },
@@ -639,10 +794,16 @@ export const PLACE_ENV = {
     drift: [{ kind: 'motes', share: 0.4, colours: [0xe8e4d0] }, { kind: 'litter', share: 0.8, colours: [0xb0a060, 0x8a7a3a, 0xa09050] }],
   },
   // Sekigahara at first light, 21 October 1600: a valley floor shut in by steep wooded mountains, the night's fog
-  // still lying in it (the battle opened in fog), the sun low through the pines (the second reference).
+  // still lying in it (the battle opened in fog), the sun low through the pines (the second reference). The floor
+  // is a clearing at the end of a ride the sun comes down: the fighters stand in its light with the dark of the
+  // wood behind them, and the wood either side is shade cut by the shafts that get between the crowns. The sun
+  // stands well to the right of where a fight is first watched from (the camera looks along -z, azimuth -1.57), so
+  // the fighters are lit from the side and their shadows and the trunks' lie across the picture; with the sun
+  // nearly ahead (-1.15) they were two dark shapes on bright mist at any exposure. The reference's own view, into
+  // the sun past black trunks, is the one from the wood behind the floor looking up the ride.
   sengoku: {
     weather: 'mist',
-    sun: { azimuth: -1.15, elevation: 15 },
+    sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },
     terrain: {
@@ -656,15 +817,28 @@ export const PLACE_ENV = {
         { from: 2600, full: 7000, height: 1250, length: 4600, shape: 'ridge' },
       ],
     },
-    ground: { grass: 0x6a7836, dry: 0xa08c46, soil: 0x6a553a, rock: 0x77756e, floor: 0.6, worn: [{ x: 0, z: 0, rx: 12, rz: 6, turn: 0, by: 0.7 }] },
-    grass: { height: [0.35, 0.8], floorHeight: 0.05, dry: 0.6, flowers: 0, flowerColours: [] },
+    ground: { grass: 0x3e5a2a, dry: 0x8a7c40, soil: 0x5a4832, rock: 0x77756e, floor: 0.6, worn: [{ x: 0, z: 0, rx: 12, rz: 6, turn: 0, by: 0.7 }] },
+    // (Little dry grass: a damp valley floor in a wood's shade stays green; at 0.2 the lit grass measured a
+    // hue of 73 degrees, olive, against 88 in the reference wood; at 0.06, 78.)
+    grass: { height: [0.35, 0.8], floorHeight: 0.05, dry: 0.06, flowers: 0, flowerColours: [] },
+    // The valley's own rock shows through the wood's floor, mossed; butterbur and fern grow under the cedars.
+    rocks: [{ count: 36, from: 16, to: 120, clump: 0.5, size: [0.3, 1.4] }],
+    // The wood stands close: 490 stems between 19 and 90 m is about 200 to the hectare, against several hundred
+    // in a planted cedar wood and one to three hundred in old mixed forest (both approximate), so trunks rank
+    // behind trunks into the mist; thinner past 90 m, where the mist has taken the gaps anyway. The ride is the
+    // one opening, cut toward the default sun so the low light comes down it.
     trees: [
-      { kind: 'pine', count: 46, from: 21, to: 110, clump: 0.5 },
-      { kind: 'autumn', count: 12, from: 24, to: 110, clump: 0.3 },
-      { kind: 'shrub', count: 18, from: 22, to: 110, clump: 0.4 },
-      { kind: 'pine', count: 420, from: 110, to: 520, clump: 0.6 },
+      { kind: 'dock', count: 70, from: 12, to: 100, clump: 0.45 },
+      { kind: 'bracken', count: 60, from: 13, to: 110, clump: 0.5 },
+      { kind: 'pine', count: 330, from: 19, to: 90, clump: 0.4 },
+      { kind: 'broadleaf', count: 130, from: 19, to: 90, clump: 0.4 },
+      { kind: 'autumn', count: 26, from: 22, to: 110, clump: 0.3 },
+      { kind: 'shrub', count: 30, from: 20, to: 110, clump: 0.4 },
+      { kind: 'pine', count: 300, from: 90, to: 150, clump: 0.5 },
+      { kind: 'pine', count: 420, from: 150, to: 520, clump: 0.6 },
       { kind: 'pine', count: 2600, from: 480, to: 2400, clump: 0.5 },
     ],
+    rides: [{ azimuth: -0.4, width: 12, length: 130 }],
     woods: { cover: 0.9, colour: 0x2c4430 },
     drift: [{ kind: 'leaves', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }, { kind: 'motes', share: 0.6, colours: [0xfff0c8] }, { kind: 'litter', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }],
   },
