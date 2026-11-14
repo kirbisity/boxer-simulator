@@ -286,8 +286,9 @@ function mingGarrisonDesign(label, vest, sash, wrap) {
 // `look`: the same protection drawn as lamellar (`kind: 'mingLamellar'`, its `lace`).
 // `helm`: the hat's design and finish (chinahelms.js MING_HELMS, CHINA_FINISHES).
 // The vest's (no `look.kind`) arms in the quilted cotton sleeves of the coat under it, undyed; the lamellar's and the scale's under their arm guards in the coat's cloth.
+// The vest's man wears a head cloth of the same undyed cotton under the iron hat, round the head and the neck (wardrobe.js mingHat `hood`).
 function mingBrigandineDesign(label, cloth, iron, look = {}, helm = {}, extra = {}) {
-  return { label, ...extra, top: { kind: 'longsleeve', color: look.kind ? shade(cloth, 0.7) : '#d6cbb2' }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
+  return { label, ...extra, top: { kind: 'longsleeve', color: look.kind ? shade(cloth, 0.7) : '#d6cbb2' }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...(look.kind ? null : { hood: '#d6cbb2' }), ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Qi Jiguang's elite infantry: the coat's cloth (its binding a shade of it, or `bind`), brass studs, the bright riveted kettle
 // hat over a cream cloth hood (chinahelms.js MING_HELMS rivetedTube; wardrobe.js mingHat `hood`). The sleeves are the coat's
