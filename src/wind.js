@@ -60,6 +60,11 @@ export const PLACE_WIND = {
   coastFort: { toward: [0.3, -0.95], speed: 4.5, gust: 0.3 },
   coastVillage: { toward: [0.3, -0.95], speed: 4.5, gust: 0.3 },
   jiangnan: { toward: [0.94, 0.34], speed: 1.2, gust: 0.3 },
+  // The water town walked (places/canaltown.js): light air drawn along the canal between the houses.
+  canaltown: { toward: [0.99, 0.15], speed: 1.4, gust: 0.3 },
+  // Pyongyang in the first month (places/pyongyang.js): that country's winter wind, out of the north-west and gusty
+  // (a fresh breeze near the ground, about 4 m/s; -x is west and -z north there, so it blows on the wall's outer face).
+  pyongyang: { toward: [0.8, 0.6], speed: 4, gust: 0.5 },
   cajamarca: { toward: [-0.8, 0.6], speed: 2.5, gust: 0.35 },
   // Mobei: the fighting ran on to dusk with a wind getting up off the Gobi.
   mobei: { toward: [0.94, 0.34], speed: 6, gust: 0.45 },

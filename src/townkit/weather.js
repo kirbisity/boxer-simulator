@@ -25,6 +25,7 @@
 // (levelmode/kitshadow.js, the castle's own shadow map, reused).
 
 import { ENV_GLSL, envUniforms } from '../env/air.js';
+import { ENV } from '../env/config.js';
 import { ktShadow, ktShadowInit, KT_SHADOW_FUNCTION, KT_SHADOW_PARS } from '../levelmode/kitshadow.js';
 import { TK_TEX, tkxTextures } from './tex.js';
 
@@ -63,7 +64,11 @@ export const TK_WEATHER = {
   // darker its wind-packed patches are (a few metres across), so a field of it is not one tone. `trodden`: what
   // feet make of it (its colour is multiplied by this where the wear is full). `caught`: the share of an upright
   // face's joints and ledges the wind plasters with it on the side it blows against.
-  snow: { colour: [0.76, 0.79, 0.84], colourAir: [0.9, 0.92, 0.96], holds: [0.45, 0.8], drift: 0.1, trodden: [0.7, 0.64, 0.56], caught: 0.55 },
+  // `blown`: the wind's work on lying snow, which is what a low sun draws it by. Low drifts `drift` m across and
+  // `stretch` times as long down the wind, their flanks up to about `driftSlope` (rise over run); over them a ripple
+  // `ripple` m across of `rippleSlope`, seen out to `rippleTo` m. Wind-packed snow's ridges (sastrugi) run from
+  // centimetres to a few decimetres high and lie along the wind; the sizes are by eye inside that, approximate.
+  snow: { colour: [0.76, 0.79, 0.84], colourAir: ENV.terrain.snowColour, holds: [0.45, 0.8], drift: 0.1, trodden: [0.7, 0.64, 0.56], caught: 0.55, blown: { drift: 4.5, stretch: 2.6, driftSlope: 0.17, ripple: 0.42, rippleSlope: 0.13, rippleTo: [22, 55] } },
 };
 
 /** The uniforms every kit material shares: the weather (tkSetWeather), the mirror's sources, the clock, the place's lie, the open air. */
@@ -365,6 +370,21 @@ if (tkSnowHere > 0.0) {
     vec2 p = vTkPos.xz * 3.6;
     float here = tkNoise(p);
     tkLie = normalize(tkLie + vec3(here - tkNoise(p + vec2(0.35, 0.0)), 0.0, here - tkNoise(p + vec2(0.0, 0.35))) * 1.6 * clamp(tkWear * 1.5, 0.0, 1.0));
+  }
+  {
+    // Blown: drifts lying along the wind and a ripple over them (TK_WEATHER.snow.blown), flatter where feet have
+    // packed it and in the lee under a wall, where it settles instead.
+    vec2 along = uTkBlow.xy;
+    vec2 across = vec2(-along.y, along.x);
+    vec2 q = vec2(dot(vTkPos.xz, along) / ${TK_WEATHER.snow.blown.stretch.toFixed(2)}, dot(vTkPos.xz, across));
+    vec2 qa = q / ${TK_WEATHER.snow.blown.drift.toFixed(2)};
+    vec2 qb = q / ${TK_WEATHER.snow.blown.ripple.toFixed(2)};
+    float ha = tkNoise(qa);
+    float hb = tkNoise(qb);
+    vec2 ga = vec2(tkNoise(qa + vec2(0.3, 0.0)) - ha, tkNoise(qa + vec2(0.0, 0.3)) - ha) * ${(TK_WEATHER.snow.blown.driftSlope / 0.3).toFixed(3)};
+    vec2 gb = vec2(tkNoise(qb + vec2(0.3, 0.0)) - hb, tkNoise(qb + vec2(0.0, 0.3)) - hb) * ${(TK_WEATHER.snow.blown.rippleSlope / 0.3).toFixed(3)} * (1.0 - smoothstep(${TK_WEATHER.snow.blown.rippleTo[0].toFixed(1)}, ${TK_WEATHER.snow.blown.rippleTo[1].toFixed(1)}, length(vViewPosition)));
+    vec2 g = (ga + gb) * (0.35 + 0.65 * tkSky) * (1.0 - clamp(tkWear * 1.5, 0.0, 1.0)) * smoothstep(0.7, 0.95, tkLie.y);
+    tkLie = normalize(tkLie - vec3(along.x * g.x / ${TK_WEATHER.snow.blown.stretch.toFixed(2)} + across.x * g.y, 0.0, along.y * g.x / ${TK_WEATHER.snow.blown.stretch.toFixed(2)} + across.y * g.y));
   }
   tkLie = normalize((viewMatrix * vec4(tkLie, 0.0)).xyz) * (gl_FrontFacing ? 1.0 : -1.0);
   normal = normalize(mix(normal, tkLie, tkSnowHere * 0.85));

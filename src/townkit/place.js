@@ -19,10 +19,21 @@ export const TK_PLACE = {
   low: { near: 0, size: 256, mirror: false, rain: 0.5 },
   // The sun's own shadow camera while a kit place is shown: its half width round the camera's focus (m) and how far off
   // it stands. The arena's is 9 m round the origin; here the fighters may be anywhere.
-  sun: { half: 16, distance: 60 },
+  // `openShadow`: how much of the sun the baked shadow takes in the open air, all of it: there the sky's light is the
+  // lit probe and the lie map's share, not a flat fill the shadow has to leave room for (a place's own `shadow`
+  // share is for the flat light of the open air off).
+  sun: { half: 16, distance: 60, openShadow: 1 },
   // The cube mirror's side (px) and the rain's streaks: how many, the box they fall in round the camera (m), their length and speed.
   mirror: 128, rain: { count: 2600, box: [34, 16, 34], length: 0.55, speed: 13 },
 };
+
+/**
+ * The open air's doors (env/index.js), put here by townkit/air.js where the page has the open air: `place(key,
+ * description)` describes a place to it, `weather(view, key, name)` puts one of its weathers on the place, and
+ * `newWeather(name, over, values)` makes a weather of the place's own. All null where there is no open air (the
+ * tests' node, the custom page): a kit place is then drawn by the kit alone, as it is with the open air switched off.
+ */
+export const TK_AIR = { place: null, weather: null, newWeather: null };
 
 // The quality tier now ('high' | 'low'): the page's own measure of the machine (adaptres.js, told through tkSetTier) once it
 // has one; until then a guess from the pointer (a touch screen is taken for a phone).
@@ -207,7 +218,10 @@ export function tkRain({ count = TK_PLACE.rain.count, slant = [0.12, 0.05] } = {
  * `shadow`: how much of the sun the baked shadow takes (0..1); `weather`: () => the weather wanted now (tkSetWeather's
  * argument, and `fog` [near, far] for the haze), asked each frame, so whatever drives it (the story's view, a hook, a weather system) is followed;
  * `lay`: the place's lie (tkLayOf) and `north` the way north lies on its ground [x, z]; `stir`: (time, wind) => void,
- * the place's own moving things (townkit/stir.js), called each frame with the one wind.
+ * the place's own moving things (townkit/stir.js), called each frame with the one wind; `air`: how the place joins
+ * the open air: { description: what env/config.js lets a place that draws itself say (sun, air, clouds, far, height,
+ * openings), weathers: { the kit's weather name: the open air's }, first: the kit's name when nothing says, own:
+ * { name: [the open air's weather it is laid over, what differs] } }.
  *
  * In the open air (env/: the place is joined to it by townkit/air.js, and `view.env` says so) the sky, what falls
  * and the haze are the open air's: the kit's own dome, streaks and mist stand aside, the weather's wet, rain and
@@ -215,9 +229,25 @@ export function tkRain({ count = TK_PLACE.rain.count, slant = [0.12, 0.05] } = {
  * thrown the way its sun stands, and the mirror is taken with its sky in it, in light's own measure.
  * Sets `root.userData.bind`, `.tick` and `.leave` (render.js calls them).
  */
-export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = null, weather = () => null, mirrorAt = [0, 1.6, 0], key = 'townkit', tier = 'high', lay = null, north = [0, -1], pools = 0.8, stir = null }) {
-  const state = { view: null, saved: null, mirror: null, mirrored: null, checked: 0, baked: null };
+export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = null, weather = () => null, mirrorAt = [0, 1.6, 0], key = 'townkit', tier = 'high', lay = null, north = [0, -1], pools = 0.8, stir = null, air = null }) {
+  const state = { view: null, saved: null, mirror: null, mirrored: null, checked: 0, baked: null, aired: null };
   const dir = new THREE.Vector3(...sun).normalize();
+  if (air && TK_AIR.place) {
+    // The place described to the open air: itself drawn (`own`), the sun's shadow box carried with the camera as the
+    // kit carries its own, and what stands over the ground read from the lie's sheet (lay.js: B's red is the top's
+    // height), so that nothing falls through a roof and blown snow starts from the roofs' and the wall's tops.
+    for (const [name, [over, values]] of Object.entries(air.own ?? {})) TK_AIR.newWeather(name, over, values);
+    state.aired = air.weathers[air.first];
+    TK_AIR.place(key, {
+      own: true,
+      shadowBox: { half: TK_PLACE.sun.half, depth: TK_PLACE.sun.distance },
+      ...air.description,
+      weather: state.aired,
+      ...(lay ? { cover: { texture: lay.textures.b, min: lay.lay.min, size: lay.lay.size, scale: lay.lay.range, base: lay.lay.base, channel: 0 } } : null),
+    });
+  }
+  // (The sky dome is a painted one to the looks: the open air hides it while it draws its own, and the look shows it again after.)
+  if (sky) sky.userData.paintedSky = true;
   const focus = new THREE.Vector3();
   const ahead = new THREE.Vector3();
   root.userData.bind = (view) => {
@@ -291,12 +321,20 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
   root.userData.tick = (time) => {
     const view = state.view;
     if (!view) return;
+    const wanted = weather(view);
+    // The day's weather by the kit's name (the story's draw, a hook) is put on the place in the open air's terms.
+    const named = air?.weathers[wanted?.name ?? air.first];
+    if (named && TK_AIR.weather && state.aired !== named) {
+      state.aired = named;
+      // (After this frame: the change dresses the whole place again, and this clock is also read from inside that
+      // dressing, by the scenery's sorting of what moves.)
+      Promise.resolve().then(() => TK_AIR.weather(view, key, named));
+    }
     const open = !!view.env?.on && view.env.place === key;
     tkWeather.uTkTime.value = time % 3600;
     if (lay) tkSetLay(lay.lay, lay.textures, north);
     const wind = open ? view.env.wind : placeWind(key);
     tkSetAir(open, [wind.x, wind.z, wind.speed]);
-    const wanted = weather(view);
     if (open) {
       // One weather: the open air's. Its ground's wetness now, what is falling now, the snow it leaves lying.
       const air = view.env.weather;
@@ -318,22 +356,21 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
     const reach = Math.min(30, ahead.y < -0.05 ? camera.position.y / -ahead.y : 30);
     focus.copy(camera.position).addScaledVector(ahead, reach);
     meshes.userData.detail(focus);
-    if (sky) {
-      sky.visible = !open;
-      sky.position.copy(camera.position);
-    }
+    if (sky) sky.position.copy(camera.position);
     if (rain) {
       rain.visible = !open && tkWeather.uTkRain.value > 0.01;
       rain.userData.eye.copy(camera.position);
     }
-    takeSun(view);
+    // (In the open air the sun's box is carried by it: the description's `shadowBox`.)
+    if (!open) takeSun(view);
     stir?.(time, wind, view, open);
     // The baked shadow is one map shared with the castle stage: taken again if another place's bake replaced it
     // (looked for every 64 frames) or the sun has moved (the bake knows the sun it was thrown from).
-    if (ktShadow.uKitShadowInfo.value?.x !== shadow || state.checked !== view.renderer.info.render.frame >> 6 || state.baked !== dir.x + dir.z) {
+    const taken = open ? TK_PLACE.sun.openShadow : shadow;
+    if (ktShadow.uKitShadowInfo.value?.x !== taken || state.checked !== view.renderer.info.render.frame >> 6 || state.baked !== dir.x + dir.z) {
       state.checked = view.renderer.info.render.frame >> 6;
       state.baked = dir.x + dir.z;
-      ktShadowBake(view.renderer, root, meshes.userData.casters, [dir.x, dir.y, dir.z], shadow, key);
+      ktShadowBake(view.renderer, root, meshes.userData.casters, [dir.x, dir.y, dir.z], taken, key);
     }
     if (state.mirrored !== (open ? `air:${view.env.weather.name}` : 'own')) takeMirror(view, open);
     else if (state.mirror && tkWeather.uTkEnv.value !== state.mirror.texture && (open ? state.mirror.userData.float : true) && tier !== 'low') {
@@ -345,6 +382,9 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
     tkSetLay(null);
     tkSetAir(false);
     if (!state.saved) return;
+    // (The open air, joined after the kit had put its own box on, noted that box as the one to hand back: it is
+    // given the look's.)
+    if (view.env?.on && view.env.place === key) view.env.box = [state.saved.box[0], state.saved.box[1], state.saved.box[2], state.saved.box[3], state.saved.box[4], state.saved.box[5]];
     const light = view.lights.sun;
     light.position.copy(state.saved.position);
     light.target.position.copy(state.saved.target);

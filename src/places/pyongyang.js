@@ -409,7 +409,28 @@ export function buildPyongyang() {
   board.position.set(...pavilions.gate(0, eave - 1.04, t.pavilion[1].depth / 2 + 0.41));
   board.rotation.y = -Math.PI / 2;
   root.add(meshes, sky, board);
-  tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
+  // The open air (env/): the day's sun, a continental winter's clear cold air (a visibility of about 25 km:
+  // approximate), a third of the sky in cloud; in snow, the open air's snow showers ('flurries': a flurry out of each
+  // cloud that passes, the low sun between them on the new snow); without it, its clear day. The ground's own
+  // heights for what lies and blows on it, and the gate passage's outer mouth, through which the afternoon sun
+  // slants into the dark of the vault (an upright opening the passage's width and the arch's height to about its
+  // haunches; a x b points in through it; `dust`: the air of a trodden passage, env/config.js's own range for one).
+  const mouth = wall.x - t.gate.out;
+  const air = {
+    description: {
+      sun: PY_SUN, air: { visibility: 25000, hazeHeight: 900 }, clouds: { cover: 0.35 },
+      height: (x, z) => { const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)); return x <= wall.x ? tkFieldAt(plan.outside, Math.max(t.outside.x[0], x), zc) : x < head ? pyFoot(zc) : tkFieldAt(plan.inside, Math.min(plan.east, x), zc); },
+      openings: [{ at: [mouth, 0, t.gate.z - t.gate.way / 2], a: [0, t.gate.spring + t.gate.rise * 0.6, 0], b: [0, 0, t.gate.way], floor: 0, dust: 0.06 }],
+    },
+    // 'siegesnow', over the open air's snow showers: the cloud broken wider (the sun between the showers is what
+    // draws the wall and the long shadows), and held `ev` stops under its grade: the open air's meter reads a grey
+    // card and its own snow lies on grass, where here the whole frame is snow, which must stay under white to keep
+    // its shading. By eye against the sunlit snow holding the drifts' forms.
+    weathers: { snow: 'siegesnow', bare: 'clear' },
+    first: 'snow',
+    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.75 }, cover: 0.5, sun: 1, gloom: 0.6, visibility: 16000 }] },
+  };
+  tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;
   root.userData.dispose = () => {
     materials.dispose();

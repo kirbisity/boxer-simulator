@@ -56,6 +56,8 @@ import { showWorks, updateWorksView } from './worksview.js';
 import { worksOf } from './physics/fieldworks.js';
 import { buildCanalTown, CANAL_TOWN_LIGHT } from './places/canaltown.js';
 import { buildPyongyang, PYONGYANG_LIGHT } from './places/pyongyang.js';
+// (The kit's door to the open air: townkit/air.js puts env/'s registration where the kit's places find it.)
+import './townkit/air.js';
 
 const LAYERS = ['skin', 'muscle', 'bone', 'physics'];
 const CORNER_COLORS = { red: 0xc8262c, blue: 0x2457c5 };

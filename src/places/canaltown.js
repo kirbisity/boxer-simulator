@@ -17,7 +17,7 @@ import {
   tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLantern, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
   tkSlabBridgeSolids, tkTree, tkWaterSteps, tkWaterStepsSolids, tkYardWall, tkYardWallSolid,
 } from '../townkit/build.js';
-import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkTier } from '../townkit/place.js';
+import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
 
 /** The town's plan (m). Every figure is a choice for the game's ground, set against the battle's court and a walker's reach; none is a measurement of a real town. */
 export const CANAL_TOWN = {
@@ -253,7 +253,37 @@ export const CANAL_TOWN_WEATHER = {
  * The town's light (render.js PLACE_LIGHT's entry): a high thin overcast, the sun a pale disc to the south-east; the haze's
  * colour is the sky's at the horizon, so the far roofs go into it. `far`: the camera's reach, past the sky's dome.
  */
-const CT_LIGHT = { haze: 0xc3cdd0, sun: [0.42, 0.74, 0.52] };
+// The sun of the day: early on a May morning (the raids the chapter draws on came in the fourth and fifth months:
+// approximate), at about 28.7 N (Taizhou's latitude: approximate). Worked, not looked up: the sun's declination
+// about +18 degrees; at half past seven by the sun (an hour angle of 67.5 degrees) sin(height) = sin 28.7 sin 18 +
+// cos 28.7 cos 18 cos 67.5 = 0.467, a height of 27.9 degrees, standing 6.3 degrees north of east. The canal runs
+// east and west (+x is east, -z north), so the sun looks along the water and rakes across the lanes' eaves.
+// (`azimuth`: the open air's measure, rad from +x toward +z.)
+const CT_SUN = { azimuth: (-6.3 * Math.PI) / 180, elevation: 27.9 };
+const CT_LIGHT = { haze: 0xc3cdd0, sun: tkSunWay(CT_SUN.azimuth, CT_SUN.elevation) };
+
+/**
+ * The town in the open air (env/: townkit/place.js tkKeep's `air`). Its own air: the damp of that country, a
+ * visibility of about 9 km on its clear day (approximate), half the sky in cloud. Its weathers, by the kit's names:
+ *   damp  'canalmist', its own: the morning after rain, the sky breaking (half in cloud, the sun through the gaps),
+ *         a mist lying on the water and in the lanes to about the eaves (`hazeHeight` m; `visibility` m in the
+ *         thick of it: the far end of a 150 m reach of canal is a shape), the stone still wet. Laid over the open
+ *         air's 'mist'; the figures by eye against the reference photographs of a water town on a wet morning.
+ *   rain  'canalshowers', over the open air's 'showers': rain out of the thick of each cloud that passes, the sun between.
+ *   dry   'canalcloudy', over its 'cloudy': broken cloud on a dry day.
+ * Each is held up by `ev` stops over the open air's own grade: its exposure is metered for open ground in the sun,
+ * and a town's ground is wet dark stone between walls, most of it in shade, which a camera opens up for. By eye.
+ */
+const CT_AIR = {
+  description: { sun: CT_SUN, air: { visibility: 9000, hazeHeight: 400 }, clouds: { cover: 0.5 } },
+  weathers: { damp: 'canalmist', rain: 'canalshowers', dry: 'canalcloudy' },
+  first: 'damp',
+  own: {
+    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.32, saturation: 0.95, ev: 0.8 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.7 }],
+    canalshowers: ['showers', { label: 'Showers on the town', grade: { contrast: 1.36, saturation: 0.94, ev: 0.6 } }],
+    canalcloudy: ['cloudy', { label: 'Broken cloud over the town', grade: { contrast: 1.32, ev: 0.7 } }],
+  },
+};
 export const CANAL_TOWN_LIGHT = {
   background: CT_LIGHT.haze, fog: CANAL_TOWN_WEATHER.damp.fog, far: 520, key: 0xfff4e0, keyIntensity: 0.1, rim: 0xd6e6ff, sun: 0.85, hemi: 0.7,
   // The ambient the realistic look bakes (looks/probe-lite.js, kind 'own'): a grey-white overcast overhead, wet stone below.
@@ -363,7 +393,7 @@ export function buildCanalTown() {
   const rain = tkRain({ count: tier === 'low' ? 1300 : 2600 });
   root.add(meshes, sky, rain);
   tkKeep(root, meshes, {
-    sun: CT_LIGHT.sun, shadow: 0.55, sky, rain, key: 'canaltown', tier, mirrorAt: [0, 1.5, 4], lay, north: [0, -1],
+    sun: CT_LIGHT.sun, shadow: 0.55, sky, rain, key: 'canaltown', tier, mirrorAt: [0, 1.5, 4], lay, north: [0, -1], air: CT_AIR,
     weather: (view) => ({ ...CANAL_TOWN_WEATHER.damp, ...(view.weather?.town ?? null) }),
   });
   root.userData.lay = lay.lay;

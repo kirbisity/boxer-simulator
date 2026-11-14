@@ -4011,7 +4011,7 @@ const boxer = window.boxer = {
     document.body.classList.remove('sheet');
     const entry = STORY_PLACES[key];
     if (!entry) throw new Error(`no story place called ${key} (${Object.keys(STORY_PLACES).join(', ')})`);
-    const { world } = enterStoryRoam(key, { inputs: story.heroInputs(), weather: typeof weather === 'string' ? entry.weathers[weather] : weather, at, facing });
+    const { world } = enterStoryRoam(key, { inputs: story.heroInputs(), weather: typeof weather === 'string' && entry.weathers[weather] ? { name: weather, ...entry.weathers[weather] } : weather, at, facing });
     return { place: entry.place, terrain: world.arena.terrain.solids?.length ?? null };
   },
   // The weather of the town kit's place now (townkit/weather.js: wet, pool, snow, rain 0..1, mist, fog [near, far]): `placeWeather({ wet: 1, pool: 0.8, rain: 1 })`
