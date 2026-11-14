@@ -255,6 +255,10 @@ export const LOFT = {
   // over the next (`overlap` of a band beneath it), a dark edge line `edge`
   // of a band deep, and rivets (`rivets` round, `rivet` rad across) on each.
   lames: { lift: 0.03, tilt: 0.06, overlap: 0.25, edge: 0.14, steps: 18, rivets: 4, rivet: 0.05 },
+  // Splints sewn to a cloth guard (splintsOn): spread through `over` (rad either side of the piece's front), each `wide` of its
+  // share of that across and `lift` proud of the cloth (a share of the piece's radius); the cords that tie the guard on, bands
+  // round it at `ties` (shares down the piece), each `tie` of the piece deep and `tieLift` proud.
+  splints: { over: 2.2, wide: 0.55, lift: 0.045, ties: [0.1, 0.9], tie: 0.025, tieLift: 0.07, steps: 14 },
   // A plate harness's edges with the detail maps (harnessEdgesOn): a band `depth` (m; at most `most` of a short piece) at each
   // end of a piece, `lift` (share of the radius) proud of it; a couter's and a poleyn's `copLames` articulating lames.
   harnessEdge: { depth: 0.025, most: 0.3, lift: 0.012, copLames: 2 },
@@ -937,6 +941,9 @@ function computeNormals(positions, indices) {
 const MAIL = { mail: true };
 // Japanese laced rows (kozane in kebiki-odoshi): drawn with the kozane's maps where those are drawn (`kozane`).
 const LACED = { rows: ['steel', 'lace'], kozane: true };
+// Suneate and kote (the Japanese shin guard and armoured sleeve): cloth with iron splints down it (shino), tied on with cords.
+const SPLINTED_SHIN = { splints: 7, base: 'top', tie: 'lace' };
+const SPLINTED_SLEEVE = { splints: 5, base: 'top' };
 const MANICA = { rows: ['steel', 'lace'] };
 // The Ming elite's neck guard: steel lames lying over the shoulders and the
 // top of the chest, each stepping out over the one below, with a steel band
@@ -975,7 +982,7 @@ export const ARMOR_KINDS = {
   // skirt and sleeves, the war mask on the kabuto.
   toseiDo: {
     trunk: [-0.1, 1.02, 1.19, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.5, 0.45, 1.24, LACED], collar: 'steel',
-    upperArm: [-0.2, 0.62, 1.5, { ...LACED, board: { wide: 0.24 } }], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
+    upperArm: [-0.2, 0.62, 1.5, { ...LACED, board: { wide: 0.24 } }], forearm: [-0.04, -0.04, 1.3, SPLINTED_SLEEVE], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.3, SPLINTED_SHIN],
   },
   // A rōnin on a private errand, his armour hidden under the kosode: only the manchira's mail showing at the collar, the
   // kusari-kote's dark linen sleeves with an iron splint along each forearm, a sash of two colours, the kyahan's linen
@@ -990,7 +997,7 @@ export const ARMOR_KINDS = {
   // cloth sleeves and simple shin guards.
   okegawa: {
     trunk: [-0.05, 0.96, 1.17, { mon: [0.68, 0.07, 'gold'], base: 'armor' }], skirt: [0.3, 0.4, 1.2, { rows: ['armor', 'lace'], kozane: true }],
-    forearm: [-0.04, -0.04, 1.22, 'top'], shin: [0.1, 0.8, 1.3, 'armor'],
+    forearm: [-0.04, -0.04, 1.22, 'top'], shin: [0.1, 0.8, 1.3, { ...SPLINTED_SHIN, splints: 5 }],
   },
   // A sea raider's dō-maru: laced lames round the trunk and a laced skirt,
   // nothing on the arms or legs (often a captured or cast-off piece).
@@ -2051,6 +2058,32 @@ function breastplateOn(mesh, rings, inflate, shape, range, { lanceRest = false, 
     const [angle, at, across, high, stand] = spec.lanceRest;
     const place = from + (to - from) * at;
     addPatch(mesh, rings, [[place - high * 10, angle - across, out(place, angle, stand)], [place - high * 10, angle + across, out(place, angle, stand)], [place + high * 10, angle + across, out(place, angle, stand)], [place + high * 10, angle - across, out(place, angle, stand)]], 'steel2', bones);
+  }
+}
+
+/**
+ * Splints (`paint.splints`: shino, the long iron splints of a Japanese shin guard or sleeve, sewn to its cloth): that many narrow
+ * strips down the piece over its front and sides (LOFT.splints), each its own faces a little proud of the cloth, and the cords
+ * that tie the guard on round it near its head and its foot (`paint.tie`: their paint).
+ */
+function splintsOn(mesh, rings, inflate, paint, bones) {
+  const spec = LOFT.splints;
+  const last = rings.length - 1;
+  const pitch = (2 * spec.over) / paint.splints;
+  const half = (pitch * spec.wide) / 2;
+  const out = inflate + spec.lift;
+  for (let splint = 0; splint < paint.splints; splint += 1) {
+    const angle = -spec.over + (splint + 0.5) * pitch;
+    for (let index = 0; index < last; index += 1) addPatch(mesh, rings, [[index, angle - half, out], [index, angle + half, out], [index + 1, angle + half, out], [index + 1, angle - half, out]], 'steel', bones);
+  }
+  if (!paint.tie) return;
+  const tied = inflate + spec.tieLift;
+  for (const share of spec.ties) {
+    const [from, to] = [(share - spec.tie) * last, (share + spec.tie) * last];
+    for (let step = 0; step < spec.steps; step += 1) {
+      const [a, b] = [(step / spec.steps) * Math.PI * 2 - Math.PI, ((step + 1) / spec.steps) * Math.PI * 2 - Math.PI];
+      addPatch(mesh, rings, [[from, a, tied], [from, b, tied], [to, b, tied], [to, a, tied]], paint.tie, bones);
+    }
   }
 }
 
@@ -3994,6 +4027,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     // Laminated plate: each lame its own band of faces (not in a crowd).
     if (paint?.lames && !lowDetail) lamesOn(mesh, rings, inflate, paint, boned);
+    // A splinted guard's splints and its cords (not in a crowd).
+    if (paint?.splints && !lowDetail) splintsOn(mesh, rings, inflate, paint, boned);
     // A brigandine's rivet heads, each its own small square (not in a crowd); its apron's binding and its skirt's steel bands.
     if (paint?.studded && !lowDetail) studsOn(mesh, rings, inflate, paint, boned);
     if (paint?.apron && !lowDetail) apronOn(mesh, rings, inflate, paint, boned);
@@ -4375,7 +4410,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     if (lamellar) {
       // Sode: the great laced shoulder boards, hung beside the arm; kote: armoured cloth sleeves.
       boardOn(mesh, upperArmRings(-0.22, 0.72, count(4)), side === 'l' ? 1 : -1, 1.5, { rows: ['steel', 'lace'], board: { wide: 0.3, bow: 0.012 } }, kozane ? 'kozane' : null, armor.sode ?? 1);
-      armorPiece(forearmRings(-0.04, wrist - 0.04, count(4)), 1.3, 'top');
+      tablePiece(forearmRings(-0.04, wrist - 0.04, count(4)), 1.3, SPLINTED_SLEEVE, null, null, 'forearm');
     } else if (hoplomachus) {
       // The manica: a segmented guard down the sword arm only.
       if (side === 'r') {
@@ -4492,7 +4527,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     if (lamellar) {
       // Suneate: splinted shin guards.
-      armorPiece(shinRings(0.04, 0.86, count(5)), 1.34, 'steel');
+      tablePiece(shinRings(0.04, 0.86, count(5)), 1.3, SPLINTED_SHIN, null, null, 'shin');
     } else if (hoplomachus) {
       armorPiece(shinRings(-0.14, 0.9, count(6)), 1.32, (ring, angle, index) => (index === 0 ? 'gold' : 'steel'));
     } else if (kit) {

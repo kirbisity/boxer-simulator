@@ -2932,13 +2932,13 @@ function buildKabuto(group, head, r, steel, color, lowDetail = false) {
   // MASK_FITS); the gorget under it, hanging from under the chin.
   // `own`: the kit's own mask design (`maskDesign`; an oni somen for `mask: 'oni'`, else the commoner ressei-men).
   const maskDesign = HELM_STYLE.masks === 'own' ? head.maskDesign ?? (head.mask === 'oni' ? 'oni' : 'ressei') : HELM_STYLE.masks;
-  const maskTint = head.mask === 'red' ? color : MENPO.black;
+  const maskTint = head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : MENPO.black;
   if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, maskTint, steel.envMap)) {
     // The throat guard (yodare-kake): three laced lames hung from the mask's chin, each wider than the one above, a cord at
     // the foot of each.
     for (let tier = 0; tier < 3; tier += 1) {
       const [top, bottom] = [0.75 + tier * 0.075, 0.83 + tier * 0.075];
-      const lame = new THREE.Mesh(new THREE.CylinderGeometry(top * r, bottom * r, 0.15 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : bowlSteel);
+      const lame = new THREE.Mesh(new THREE.CylinderGeometry(top * r, bottom * r, 0.15 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : head.mask === 'iron' ? metal(steel, MENPO.throat) : bowlSteel);
       lame.material = lame.material.clone();
       lame.material.side = THREE.DoubleSide;
       lame.position.y = (MASK_THROAT_Y + 0.14 - tier * 0.14) * r;
@@ -2993,7 +2993,7 @@ function buildKabuto(group, head, r, steel, color, lowDetail = false) {
     group.add(face, brow, ...eyes, nose, mouth, ...fangs, ...horns, throat);
   } else if (head.mask) {
   // Menpo: the lower face guard, with a nose and a bristling moustache.
-    const maskSteel = metal(steel, head.mask === 'red' ? color : 0x141416);
+    const maskSteel = metal(steel, head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : 0x141416);
     // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
     const menpo = new THREE.Mesh(new THREE.SphereGeometry(1.06 * r, 18, 10, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.52, Math.PI * 0.36), maskSteel);
     menpo.material = maskSteel.clone();
@@ -3019,9 +3019,10 @@ const MASK_THROAT_Y = -1.5;
 // The samurai's half masks read as an oni's face (the menpo of the 16th-17th c. were made to frighten: the Met's 13.112.15,
 // the British Museum's menpo with their hooked noses, open snarls and moustaches): `scowled`, the mask designs (menpo.js) given
 // a heavy scowling brow of iron over the eyes (its inner ends drawn down to the nose, two furrows between) and tusks at the
-// mouth's corners. `black`: black-lacquered iron, drawn a little lighter than black so the mask's relief reads.
+// mouth's corners. `black`: black-lacquered iron, drawn a little lighter than black so the mask's relief reads; `iron`: russet
+// iron (sabi-nuri: the bare iron rusted brown and lacquered clear, the commonest finish of a menpo), its throat lames `throat`.
 // `brow` [inner, outer] (z, y) of each brow on the face, head radii; `tusks` (z, y, height) on the lower lip.
-const MENPO = { scowled: ['ressei'], black: 0x2c2b2f, brow: [[0.06, -0.01], [0.46, 0.13]], stand: 0.1, thick: 0.065, tusks: [0.15, -0.86, 0.2] };
+const MENPO = { scowled: ['ressei'], black: 0x2c2b2f, iron: 0x4a3830, throat: 0x1b1a1d, brow: [[0.06, -0.01], [0.46, 0.13]], stand: 0.1, thick: 0.065, tusks: [0.15, -0.86, 0.2] };
 
 /** The scowl and tusks on a half mask (MENPO), in `iron` the mask's own metal, on the face as the mask is (helmforms.js headRadiusAt). */
 function oniScowl(group, r, iron) {
