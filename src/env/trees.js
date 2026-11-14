@@ -17,6 +17,7 @@ import { envSunPast, envWoodsAt } from './terrain.js';
 export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
   const random = envRandom(place.terrain.seed * 977 + 3);
   const trees = [];
+  const rides = (place.rides ?? []).map((ride) => ({ ...ride, cos: Math.cos(ride.azimuth), sin: Math.sin(ride.azimuth) }));
   for (const stand of place.trees) {
     const kind = ENV_TREES[stand.kind];
     let planted = 0;
@@ -27,7 +28,11 @@ export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
       const z = Math.sin(angle) * radius;
       const chance = random();
       const size = random();
-      if (Math.abs(x) < keepOut[0] + 4 && Math.abs(z) < keepOut[1] + 4) continue;
+      // (A tree is kept a crown's reach off the level ground; a plant of the ground grows to its edge.)
+      const clear = kind.height[1] > 4 ? 4 : 1;
+      if (Math.abs(x) < keepOut[0] + clear && Math.abs(z) < keepOut[1] + clear) continue;
+      // A ride: nothing stands in the lane, whose edge is as ragged as a wood's (by a third of its width).
+      if (rides.some((ride) => x * ride.cos + z * ride.sin > 0 && x * ride.cos + z * ride.sin < ride.length && Math.abs(z * ride.cos - x * ride.sin) < ride.width * (0.5 + 0.33 * (size - 0.5)))) continue;
       if (chance > 1 - stand.clump + stand.clump * envWoodsAt(x, z, place.terrain.seed)) continue;
       if (footprints.some((print) => Math.abs(x - print.x) < print.halfX + 2.5 && Math.abs(z - print.z) < print.halfZ + 2.5)) continue;
       const y = height(x, z);
@@ -36,18 +41,92 @@ export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
       planted += 1;
     }
   }
+  // What grows among the rocks of an outcrop.
+  for (const outcrop of place.outcrops ?? []) {
+    const kinds = outcrop.kinds ?? ['dock', 'bracken'];
+    for (let plant = 0; plant < (outcrop.plants ?? 0); plant += 1) {
+      const kind = ENV_TREES[kinds[plant % kinds.length]];
+      const angle = random() * Math.PI * 2;
+      const radius = Math.sqrt(random()) * outcrop.radius;
+      const x = outcrop.at[0] + Math.cos(angle) * radius;
+      const z = outcrop.at[1] + Math.sin(angle) * radius;
+      const tall = kind.height[0] + (kind.height[1] - kind.height[0]) * random();
+      if (Math.abs(x) < keepOut[0] + 1 && Math.abs(z) < keepOut[1] + 1) continue;
+      const y = height(x, z);
+      trees.push({ kind: kinds[plant % kinds.length], x, y, z, height: tall, lit: envSunPast(height, sun, x, y + tall, z) });
+    }
+  }
   return trees;
 }
 
-/** The round shadows a place's trees lay on the near map (terrain.js envBuildNearMap): crowns, moved to where the sun puts them. */
+/**
+ * Where a place's rocks lie: [{ x, y, z, size (m, half its width), form, turn, lit }], from its `rocks` (stands, as
+ * trees are planted) and its `outcrops` (each a knot of them at a point).
+ */
+export function envPlantRocks({ place, height, sun, keepOut, footprints }) {
+  const random = envRandom(place.terrain.seed * 1553 + 11);
+  const rocks = [];
+  const forms = ENV.rocks.forms.length;
+  const lay = (x, z, size) => {
+    if (Math.abs(x) < keepOut[0] + 1 + size && Math.abs(z) < keepOut[1] + 1 + size) return false;
+    if (footprints.some((print) => Math.abs(x - print.x) < print.halfX + 1 + size && Math.abs(z - print.z) < print.halfZ + 1 + size)) return false;
+    const y = height(x, z);
+    rocks.push({ x, y, z, size, form: Math.floor(random() * forms), turn: random() * Math.PI * 2, lit: envSunPast(height, sun, x, y + size, z) });
+    return true;
+  };
+  for (const stand of place.rocks ?? []) {
+    let laid = 0;
+    for (let tries = 0; laid < stand.count && tries < stand.count * 30; tries += 1) {
+      const angle = random() * Math.PI * 2;
+      const radius = Math.sqrt(stand.from * stand.from + random() * (stand.to * stand.to - stand.from * stand.from));
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const chance = random();
+      // Most are small: a few large ones among many a man could sit on.
+      const size = stand.size[0] + (stand.size[1] - stand.size[0]) * Math.pow(random(), 2.2);
+      if (chance > 1 - stand.clump + stand.clump * envWoodsAt(x + 311, z - 173, place.terrain.seed)) continue;
+      if (lay(x, z, size)) laid += 1;
+    }
+  }
+  for (const outcrop of place.outcrops ?? []) {
+    const size = outcrop.size ?? [0.4, 1.6];
+    for (let rock = 0; rock < (outcrop.rocks ?? 0); rock += 1) {
+      const angle = random() * Math.PI * 2;
+      const radius = Math.sqrt(random()) * outcrop.radius;
+      lay(outcrop.at[0] + Math.cos(angle) * radius, outcrop.at[1] + Math.sin(angle) * radius, size[0] + (size[1] - size[0]) * Math.pow(random(), 1.5));
+    }
+  }
+  return rocks;
+}
+
+/** The shadows rocks lay on the near map: each a band from its foot away from the sun, as a trunk's is (envTreeShadows). */
+export function envRockShadows(rocks, sun) {
+  const reach = ENV.terrain.mapHalf * 1.2;
+  const flat = Math.hypot(sun[0], sun[2]) || 1;
+  const slant = Math.min(ENV.shadow.slantMost, 1 / Math.max(0.05, sun[1] / flat));
+  const shadows = [];
+  for (const rock of rocks) {
+    if (Math.abs(rock.x) > reach || Math.abs(rock.z) > reach || rock.lit <= 0) continue;
+    const tall = rock.size * ENV.rocks.forms[rock.form].scale[1] * 2 * (1 - ENV.rocks.sink);
+    shadows.push({ x: rock.x, z: rock.z, toX: rock.x - (sun[0] / flat) * tall * slant, toZ: rock.z - (sun[2] / flat) * tall * slant, half: rock.size * 0.75 });
+  }
+  return shadows;
+}
+
+/**
+ * The shadows a place's trees lay on the near map (terrain.js envBuildNearMap): crowns as rounds moved to where the
+ * sun puts them, and each trunk below its crown as a band `half` m to each side from its foot to (toX, toZ).
+ */
 export function envTreeShadows(trees, sun) {
   const shadows = [];
   const reach = ENV.terrain.mapHalf * 1.2;
-  const slant = Math.min(8, 1 / Math.max(0.05, sun[1] / Math.hypot(sun[0], sun[2])));
   const flat = Math.hypot(sun[0], sun[2]) || 1;
+  const slant = Math.min(ENV.shadow.slantMost, 1 / Math.max(0.05, sun[1] / flat));
   for (const tree of trees) {
     if (Math.abs(tree.x) > reach || Math.abs(tree.z) > reach || tree.lit <= 0) continue;
     const kind = ENV_TREES[tree.kind];
+    const bare = tree.height * Math.max(0, kind.crown.at - kind.crown.tall * 0.8);
+    if (bare > 0.5) shadows.push({ x: tree.x, z: tree.z, toX: tree.x - (sun[0] / flat) * bare * slant, toZ: tree.z - (sun[2] / flat) * bare * slant, half: tree.height * kind.trunk });
     // Three rounds up the crown: a low sun draws them out into the long shadow it casts.
     for (const part of [-0.6, 0, 0.6]) {
       const up = tree.height * (kind.crown.at + kind.crown.tall * part);
@@ -55,7 +134,7 @@ export function envTreeShadows(trees, sun) {
         x: tree.x - (sun[0] / flat) * up * slant,
         z: tree.z - (sun[2] / flat) * up * slant,
         radius: tree.height * kind.crown.wide * (part === 0 ? 1.15 : 0.9),
-        depth: 0.34,
+        depth: ENV.shadow.crown,
         over: part === 0 ? { x: tree.x, z: tree.z, radius: tree.height * kind.crown.wide * 1.3 } : null,
       });
     }
@@ -68,6 +147,9 @@ export function envTreeShadows(trees, sun) {
 let envLeafTextureMade = null;
 
 /** The leaf cards' atlas (made once): two sprays of broad leaves, two of needles, white with shading, to be tinted. */
+// The first tile of each leaf-card drawing in the atlas (a spray, a bough and a twig have two tiles each).
+const ENV_LEAF_TILES = { leaf: 0, needle: 2, blade: 4, frond: 5, twig: 6 };
+
 function envLeafTexture() {
   if (envLeafTextureMade) return envLeafTextureMade;
   const { atlas, tile } = ENV.trees;
@@ -79,7 +161,7 @@ function envLeafTexture() {
   for (let cell = 0; cell < atlas * atlas; cell += 1) {
     const cx = (cell % atlas) * tile + tile / 2;
     const cy = Math.floor(cell / atlas) * tile + tile / 2;
-    if (cell < 2) {
+    if (cell < 2 || cell === 8) {
       // Broad leaves: a loose spray, the ones drawn last (nearest) lightest.
       const leaves = ENV.trees.leaves;
       for (let leaf = 0; leaf < leaves; leaf += 1) {
@@ -91,27 +173,126 @@ function envLeafTexture() {
         g.ellipse(cx + Math.cos(angle) * out, cy + Math.sin(angle) * out, tile * (0.03 + random() * 0.02), tile * (0.015 + random() * 0.012), random() * Math.PI, 0, Math.PI * 2);
         g.fill();
       }
-    } else {
-      // Needles: boughs fanning from the middle, each a spine with strokes along it.
-      for (let bough = 0; bough < 13; bough += 1) {
-        const angle = (bough / 13) * Math.PI * 2 + random() * 0.5;
-        const from = tile * random() * 0.12;
-        const reach = tile * (0.26 + random() * 0.18);
-        for (let step = 1; step < 20; step += 1) {
-          const at = from + (step / 20) * (reach - from);
-          const px = cx + Math.cos(angle) * at;
-          const py = cy + Math.sin(angle) * at;
-          const shade = Math.round(115 + random() * 125);
-          g.strokeStyle = `rgb(${shade},${shade},${shade})`;
-          g.lineWidth = tile * 0.014;
+    } else if (cell === 4 || cell === 5 || cell === 6 || cell === 7) {
+      // One leaf at a time, from the middle outward: a blade with a midrib and veins, light along its edge.
+      const blade = (angle, from, length, wide, shade) => {
+        const ax = Math.cos(angle);
+        const ay = Math.sin(angle);
+        const x0 = cx + ax * from;
+        const y0 = cy + ay * from;
+        const x1 = cx + ax * (from + length);
+        const y1 = cy + ay * (from + length);
+        g.fillStyle = `rgb(${shade},${shade},${shade})`;
+        g.beginPath();
+        g.moveTo(x0, y0);
+        g.quadraticCurveTo(x0 + ax * length * 0.4 - ay * wide, y0 + ay * length * 0.4 + ax * wide, x1, y1);
+        g.quadraticCurveTo(x0 + ax * length * 0.4 + ay * wide, y0 + ay * length * 0.4 - ax * wide, x0, y0);
+        g.fill();
+        const rib = Math.max(60, shade - 55);
+        g.strokeStyle = `rgb(${rib},${rib},${rib})`;
+        g.lineWidth = Math.max(1, tile * 0.006);
+        g.beginPath();
+        g.moveTo(x0, y0);
+        g.lineTo(x1, y1);
+        for (let vein = 1; vein < 5; vein += 1) {
+          const px = x0 + ax * length * vein * 0.18;
+          const py = y0 + ay * length * vein * 0.18;
           for (const side of [-1, 1]) {
-            g.beginPath();
             g.moveTo(px, py);
-            g.lineTo(px + Math.cos(angle + side * 0.9) * tile * 0.07, py + Math.sin(angle + side * 0.9) * tile * 0.07);
-            g.stroke();
+            g.lineTo(px + (ax * 0.5 - ay * side * 0.6) * wide * 0.7, py + (ay * 0.5 + ax * side * 0.6) * wide * 0.7);
+          }
+        }
+        g.stroke();
+      };
+      if (cell === 4) {
+        // A rosette of broad blades (dock, butterbur): the lower ones darker, under the upper.
+        for (let leaf = 0; leaf < 9; leaf += 1) blade(leaf * 2.39996 + random() * 0.4, tile * 0.02, tile * (0.3 + random() * 0.14), tile * (0.13 + random() * 0.05), Math.round(105 + leaf * 14 + random() * 25));
+      } else if (cell === 5) {
+        // A fan of fronds (bracken, fern): each a stalk with leaflets in pairs, shorter toward its tip.
+        for (let frond = 0; frond < 7; frond += 1) {
+          const angle = frond * 2.39996 + random() * 0.5;
+          const reach = tile * (0.34 + random() * 0.1);
+          const shade = Math.round(110 + frond * 16 + random() * 25);
+          for (let pair = 2; pair < 12; pair += 1) {
+            const at = (pair / 12) * reach;
+            const long = tile * 0.085 * (1.15 - pair / 12);
+            for (const side of [-1, 1]) {
+              g.save();
+              g.translate(cx + Math.cos(angle) * at, cy + Math.sin(angle) * at);
+              g.translate(-cx, -cy);
+              blade(angle + side * 1.15, 0, long, long * 0.3, shade);
+              g.restore();
+            }
+          }
+          g.strokeStyle = `rgb(${shade - 40},${shade - 40},${shade - 40})`;
+          g.lineWidth = tile * 0.008;
+          g.beginPath();
+          g.moveTo(cx, cy);
+          g.lineTo(cx + Math.cos(angle) * reach, cy + Math.sin(angle) * reach);
+          g.stroke();
+        }
+      } else {
+        // A twig seen close: a dozen leaves along three shoots.
+        for (let shoot = 0; shoot < 3; shoot += 1) {
+          const angle = shoot * 2.1 + random() * 0.8;
+          for (let leaf = 0; leaf < 5; leaf += 1) {
+            const at = tile * (0.05 + leaf * 0.075);
+            g.save();
+            g.translate(Math.cos(angle) * at, Math.sin(angle) * at);
+            blade(angle + (leaf % 2 ? 1 : -1) * (0.7 + random() * 0.4), 0, tile * (0.13 + random() * 0.05), tile * (0.05 + random() * 0.02), Math.round(125 + leaf * 18 + random() * 35));
+            g.restore();
           }
         }
       }
+    } else {
+      // Needles: a branch lying across the card, boughs leaving it to either side and shorter toward its tip,
+      // each bough bearing branchlets and each branchlet its needles: seen close, and from under, a card is
+      // a flat spray of a conifer's branch with air between its boughs, and shrunk by distance the same picture
+      // is a dark mass. (Japanese cedar and pine carry needles 1 to 10 cm long on branchlets a few tens of cm:
+      // on a card 1.5 m across a needle here is 4 cm; approximate.)
+      const turn = random() * Math.PI * 2;
+      const bend = (random() - 0.5) * 0.5;
+      const spray = (x, y, way, long, tone) => {
+        const needles = Math.max(3, Math.round(long / (tile * 0.008)));
+        for (let needle = 0; needle <= needles; needle += 1) {
+          const along = (needle / needles) * long;
+          const nx = x + Math.cos(way) * along;
+          const ny = y + Math.sin(way) * along;
+          const shade = Math.round(tone + random() * 100);
+          g.strokeStyle = `rgb(${shade},${shade},${shade})`;
+          g.lineWidth = tile * 0.007;
+          for (const side of [-1, 1]) {
+            const lean = way + side * (0.5 + random() * 0.5);
+            const length = tile * (0.018 + random() * 0.014);
+            g.beginPath();
+            g.moveTo(nx, ny);
+            g.lineTo(nx + Math.cos(lean) * length, ny + Math.sin(lean) * length);
+            g.stroke();
+          }
+        }
+      };
+      for (let bough = 0; bough < 18; bough += 1) {
+        // Where the bough leaves the branch, which side, and how far it reaches: longest a third of the way along.
+        const share = (bough + random() * 0.6) / 18;
+        const stem = (share - 0.5) * tile * 0.84;
+        const way = turn + bend * (share - 0.5);
+        const bx = cx + Math.cos(way) * stem;
+        const by = cy + Math.sin(way) * stem;
+        const side = bough % 2 ? 1 : -1;
+        const out = way + side * (0.85 + random() * 0.4);
+        const reach = tile * (0.36 - 0.26 * Math.abs(share - 0.35)) * (0.75 + random() * 0.4);
+        const tone = 100 + random() * 45;
+        for (let step = 1; step <= 9; step += 1) {
+          const at = (step / 9) * reach;
+          const px = bx + Math.cos(out) * at;
+          const py = by + Math.sin(out) * at;
+          // Kept inside the tile: a spray cut off square at a card's edge shows as a card.
+          if (Math.hypot(px - cx, py - cy) > tile * 0.44) break;
+          for (const hand of [-1, 1]) spray(px, py, out + hand * (0.7 + random() * 0.4), tile * 0.075 * (1.15 - step / 9) * (0.7 + random() * 0.5), tone);
+        }
+        spray(bx, by, out, Math.min(reach, tile * 0.3), tone - 10);
+      }
+      spray(cx - Math.cos(turn) * tile * 0.42, cy - Math.sin(turn) * tile * 0.42, turn, tile * 0.84, 95);
     }
   }
   // A canvas keeps no colour where it is clear, and the smaller mips would fringe dark: give the clear texels the leaves' grey.
@@ -154,8 +335,9 @@ const ENV_GLSL_HAZE_SPLIT = /* glsl */ `
 void envHazeSplit(vec3 world, out vec3 through_, out vec3 air_) {
   vec3 ray = world - cameraPosition;
   float distance_ = length(ray);
-  through_ = exp(-(uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_);
-  air_ = envAirlight(ray / max(distance_, 1e-3)) * (1.0 - through_);
+  vec3 depth_ = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_;
+  through_ = exp(-depth_);
+  air_ = envAirlightIn(ray / max(distance_, 1e-3), envAirShare(cameraPosition, ray, depth_.g, 0.5, ${ENV.air.shadeSteps[1]})) * (1.0 - through_);
 }`;
 
 const ENV_CROWN_VERTEX = /* glsl */ `
@@ -248,7 +430,8 @@ void main() {
   vec3 normal = normalize(vec3(position.x, 0.0, position.z));
   // Under its own crown: little sun, the sky's light cut by the leaves above.
   float shade = mix(0.9, 0.4, clamp(along.y / aTree.w * 1.6, 0.0, 1.0));
-  vec3 light = uEnvSunColour * max(dot(normal, uEnvSunDir), 0.0) * aBark.w * envSunShare(world) * shade + mix(uEnvBounce, uEnvSkyLight, 0.5) * shade;
+  // (The crowns sunward of it shade a trunk; its own band on the map is not asked, which it would always stand in.)
+  vec3 light = uEnvSunColour * max(dot(normal, uEnvSunDir), 0.0) * aBark.w * envSunShare(world) * envSunward(world).x * shade + mix(uEnvBounce, uEnvSkyLight, 0.5) * shade;
   vec3 through_;
   envHazeSplit(world, through_, vAir);
   vColour = aBark.rgb * (1.0 - 0.3 * uEnvWet.x) * light * through_;
@@ -262,6 +445,185 @@ void main() {
   gl_FragColor = vec4(vColour + vAir, 1.0);
   #include <tonemapping_fragment>
 }`;
+
+// A rock is lit facet by facet: the sun on the faces turned to it (where cloud and the crowns sunward let it
+// through), the sky by how much of it a face sees, less at the foot where the grass stands round it.
+const ENV_ROCK_VERTEX = /* glsl */ `
+${ENV_GLSL}
+${ENV_GLSL_HAZE_SPLIT}
+// Its colour; w: the sun reaching it past the hills.
+attribute vec4 aRock;
+// How far up the rock from the ground the point is (0..1).
+attribute float aUp;
+varying vec3 vLight;
+varying vec3 vAir;
+varying vec3 vWorld;
+varying vec3 vFace;
+varying vec3 vTone;
+void main() {
+  vec3 world = position;
+  vec3 face = normalize(normal);
+  float foot = mix(${ENV.rocks.foot.toFixed(2)}, 1.0, smoothstep(0.0, 0.5, aUp));
+  vec3 light = uEnvSunColour * max(dot(face, uEnvSunDir), 0.0) * aRock.w * envSunShare(world) * envSunward(world).x
+    + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * face.y) * foot;
+  vec3 through_;
+  envHazeSplit(world, through_, vAir);
+  vLight = light * through_;
+  vWorld = world;
+  vFace = face;
+  vTone = aRock.rgb;
+  gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
+}`;
+
+const ENV_ROCK_FRAGMENT = /* glsl */ `
+${ENV_GLSL}
+varying vec3 vLight;
+varying vec3 vAir;
+varying vec3 vWorld;
+varying vec3 vFace;
+varying vec3 vTone;
+void main() {
+  // The stone's grain, read on the level and on the upright as the face lies; lichen in blotches; moss on what
+  // faces up. Wet stone is darker, and snow lies on its top.
+  float grit = mix(texture2D(uEnvNoise, vec2(vWorld.x + vWorld.z, vWorld.y) * 0.83).a, texture2D(uEnvNoise, vWorld.xz * 0.83).a, abs(vFace.y));
+  float blotch = texture2D(uEnvNoise, vWorld.xz * 0.19 + vWorld.y * 0.11).b;
+  float damp = texture2D(uEnvNoise, vWorld.xz * 0.31 + 0.4).b;
+  vec3 colour = vTone * (0.74 + 0.52 * grit);
+  colour = mix(colour, vec3(${envRockHue(ENV.rocks.lichen)}), smoothstep(0.52, 0.66, blotch) * 0.55);
+  colour = mix(colour, vec3(${envRockHue(ENV.rocks.moss)}) * (0.8 + 0.4 * grit), smoothstep(0.35, 0.85, vFace.y) * smoothstep(0.42, 0.6, damp) * 0.8);
+  colour *= 1.0 - 0.35 * uEnvWet.x;
+  colour = mix(colour, vec3(0.9, 0.92, 0.96), uEnvWet.y * smoothstep(0.25, 0.75, vFace.y));
+  gl_FragColor = vec4(colour * vLight + vAir, 1.0);
+  #include <tonemapping_fragment>
+}`;
+
+/** One of the rock forms (config.js ENV.rocks.forms) as positions round its middle, three to a face, of unit size. */
+function envRockForm(form, random) {
+  const ball = new THREE.IcosahedronGeometry(1, 2);
+  const at = ball.attributes.position.array;
+  const waves = [0, 1, 2].map(() => [random() * 4 - 2, random() * 4 - 2, random() * 4 - 2, random() * 6.28]);
+  const cuts = [];
+  for (let cut = 0; cut < form.cuts; cut += 1) {
+    const x = random() * 2 - 1;
+    const y = random() * 2 - 1;
+    const z = random() * 2 - 1;
+    const length = Math.hypot(x, y, z) || 1;
+    cuts.push([x / length, y / length, z / length, form.keep + random() * 0.25]);
+  }
+  for (let index = 0; index < at.length; index += 3) {
+    let x = at[index];
+    let y = at[index + 1];
+    let z = at[index + 2];
+    let radius = 1;
+    for (const wave of waves) radius += form.lump * Math.sin(x * wave[0] + y * wave[1] + z * wave[2] + wave[3]);
+    x *= radius;
+    y *= radius;
+    z *= radius;
+    for (const cut of cuts) {
+      const over = x * cut[0] + y * cut[1] + z * cut[2] - cut[3];
+      if (over > 0) {
+        x -= cut[0] * over;
+        y -= cut[1] * over;
+        z -= cut[2] * over;
+      }
+    }
+    at[index] = x * form.scale[0];
+    at[index + 1] = y * form.scale[1];
+    at[index + 2] = z * form.scale[2];
+  }
+  return at;
+}
+
+/** A display colour as the three numbers of a GLSL vec3. */
+function envRockHue(hex) {
+  return [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255].map((value) => (value / 255).toFixed(3)).join(', ');
+}
+
+/**
+ * What stands round the floor, as the floor's standing water sees it: for each way round the compass, how high the
+ * crowns and the roofs stand over the horizon from the place's centre (a strip ENV.terrain.skyline texels round,
+ * the tangent of that height over ENV.terrain.skylineMost in r, from +x toward +z starting at -pi). Each texel is
+ * the mean of four sight lines, so a wood with gaps reads as partly open. A sheet of water mirrors the sky only
+ * above this line: below it, the wood (terrain.js).
+ */
+export function envBuildSkyline(trees, footprints) {
+  const { skyline, skylineMost } = ENV.terrain;
+  const lines = skyline * 4;
+  const tangent = new Float32Array(lines);
+  const stand = (x, z, halfWide, top) => {
+    const distance = Math.hypot(x, z);
+    if (distance < 1 || top <= 0) return;
+    const reach = Math.atan(halfWide / distance);
+    const middle = Math.atan2(z, x);
+    const first = Math.ceil(((middle - reach + Math.PI) / (Math.PI * 2)) * lines - 0.5);
+    const last = Math.floor(((middle + reach + Math.PI) / (Math.PI * 2)) * lines - 0.5);
+    for (let line = first; line <= last; line += 1) {
+      const slot = ((line % lines) + lines) % lines;
+      tangent[slot] = Math.max(tangent[slot], top / distance);
+    }
+  };
+  for (const tree of trees) {
+    const { crown } = ENV_TREES[tree.kind];
+    stand(tree.x, tree.z, tree.height * crown.wide, tree.y + tree.height * (crown.at + crown.tall));
+  }
+  for (const print of footprints) stand(print.x, print.z, Math.max(print.halfX, print.halfZ), print.top ?? 0);
+  const data = new Uint8Array(skyline * 4);
+  for (let texel = 0; texel < skyline; texel += 1) {
+    const mean = (tangent[texel * 4] + tangent[texel * 4 + 1] + tangent[texel * 4 + 2] + tangent[texel * 4 + 3]) / 4;
+    data[texel * 4] = Math.round(Math.min(1, mean / skylineMost) * 255);
+    data[texel * 4 + 3] = 255;
+  }
+  const texture = new THREE.DataTexture(data, skyline, 1, THREE.RGBAFormat);
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearFilter;
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/** A place's rocks (envPlantRocks) as one mesh, each face flat. */
+export function envBuildRocks({ place, rocks, height }) {
+  const random = envRandom(place.terrain.seed * 811 + 5);
+  const forms = ENV.rocks.forms.map((form) => envRockForm(form, random));
+  const total = rocks.reduce((sum, rock) => sum + forms[rock.form].length, 0);
+  const position = new Float32Array(total);
+  const aRock = new Float32Array((total / 3) * 4);
+  const aUp = new Float32Array(total / 3);
+  const colour = new THREE.Color();
+  let written = 0;
+  for (const rock of rocks) {
+    const form = forms[rock.form];
+    const tall = ENV.rocks.forms[rock.form].scale[1] * rock.size;
+    const cos = Math.cos(rock.turn);
+    const sin = Math.sin(rock.turn);
+    const tone = 0.82 + random() * 0.36;
+    colour.set(ENV.rocks.colour);
+    for (let index = 0; index < form.length; index += 3) {
+      const x = rock.x + (form[index] * cos - form[index + 2] * sin) * rock.size;
+      const z = rock.z + (form[index] * sin + form[index + 2] * cos) * rock.size;
+      const y = rock.y + tall * (1 - 2 * ENV.rocks.sink) + form[index + 1] * rock.size;
+      position[written] = x;
+      position[written + 1] = y;
+      position[written + 2] = z;
+      const vertex = written / 3;
+      aRock[vertex * 4] = colour.r * tone;
+      aRock[vertex * 4 + 1] = colour.g * tone;
+      aRock[vertex * 4 + 2] = colour.b * tone;
+      aRock[vertex * 4 + 3] = Math.min(1, Math.max(0, rock.lit));
+      aUp[vertex] = Math.min(1, Math.max(0, (y - height(x, z)) / Math.max(0.1, tall * 2 * (1 - ENV.rocks.sink))));
+      written += 3;
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(position, 3));
+  geometry.setAttribute('aRock', new THREE.BufferAttribute(aRock, 4));
+  geometry.setAttribute('aUp', new THREE.BufferAttribute(aUp, 1));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geometry, new THREE.ShaderMaterial({ vertexShader: ENV_ROCK_VERTEX, fragmentShader: ENV_ROCK_FRAGMENT, uniforms: envUniforms(), fog: false }));
+  mesh.userData.env = 'rocks';
+  return mesh;
+}
 
 // ---- building --------------------------------------------------------------------------------------------------------
 
@@ -283,6 +645,11 @@ function envCrownMasses(kind, random) {
       const y = crown.at - crown.tall + 2 * crown.tall * u;
       masses.push({ x: Math.cos(angle) * reach, y: y - 0.05 * (1 - u), z: Math.sin(angle) * reach, radius: reach, flat: 0.16, from: [0, y, 0] });
     }
+    return masses;
+  }
+  // A plant of the ground: its leaves in one low mound from the foot.
+  if (kind.shape === 'tuft') {
+    masses.push({ x: 0, y: crown.at, z: 0, radius: crown.wide * 0.55, flat: crown.tall / crown.wide, from: [0, 0.05, 0] });
     return masses;
   }
   const fork = crown.at - crown.tall * kind.fork;
@@ -388,7 +755,9 @@ export function envBuildTrees({ place, trees }) {
       tree.masses = masses;
       // A tree's own colour between the kind's, and each card a little off it.
       colour.set(kind.leaf[0]).lerp(other.set(kind.leaf[1]), random()).lerp(other.set(kind.leaf[2]), random() * 0.5);
-      const picture = kind.picture === 'needle' ? 2 : 0;
+      const picture = ENV_LEAF_TILES[kind.picture];
+      // A plant of the ground has a handful of leaves, not a crown's hundreds: the rest of its cards are left empty.
+      const filled = kind.cards ? Math.max(2, Math.round((kind.cards * band.cards) / ENV.trees.bands[0].cards)) : band.cards;
       for (let card = 0; card < band.cards; card += 1) {
         envCrownPoint(kind, random, masses, point);
         const at = order_[written] * 4;
@@ -400,7 +769,7 @@ export function envBuildTrees({ place, trees }) {
         aCard[at] = point[0] * tree.height;
         aCard[at + 1] = point[1] * tree.height;
         aCard[at + 2] = point[2] * tree.height;
-        aCard[at + 3] = kind.card * tree.height * grow * (0.8 + random() * 0.5);
+        aCard[at + 3] = card < filled ? kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5) : 0;
         aShell[at] = point[3];
         aShell[at + 1] = point[4];
         aShell[at + 2] = point[5];
@@ -410,7 +779,8 @@ export function envBuildTrees({ place, trees }) {
         aTint[at] = colour.r * vary;
         aTint[at + 1] = colour.g * vary;
         aTint[at + 2] = colour.b * vary;
-        aTint[at + 3] = picture + Math.floor(random() * 2) + 0.99 * Math.min(1, Math.max(0, tree.lit)) * 0.999;
+        const twig = order === 0 && kind.picture === 'leaf' && point[6] > 0.8 && random() < ENV.trees.twigs;
+        aTint[at + 3] = (twig ? ENV_LEAF_TILES.twig : picture) + (kind.cards ? 0 : Math.floor(random() * 2)) + 0.99 * Math.min(1, Math.max(0, tree.lit)) * 0.999;
       }
     }
     const geometry = new THREE.InstancedBufferGeometry();

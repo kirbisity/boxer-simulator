@@ -80,6 +80,8 @@ export function envAirState(place, weather) {
     // air that hides the hills is the air that whitens the sky and reddens and dims the sun.
     hazeDepth: (tune.koschmieder / visibility) * hazeHeight,
     cover,
+    // The sheet's form, from a field of cumulus to a deck (ENV.clouds.deck): [the share of small lumps, how far in a base is dark].
+    form: [ENV.clouds.ragged, ENV.clouds.baseAt].map((value) => value * (1 - (weather.deck ?? 0) * (1 - ENV.clouds.deck))),
     gloom: weather.gloom,
     // The sky turns from blue with clouds on it to a lid as the last gaps close.
     lid: Math.min(1, Math.max(0, (cover - 0.7) / 0.3)),
@@ -88,9 +90,15 @@ export function envAirState(place, weather) {
     visibility,
     tint: weather.tint ?? null,
   };
-  // The sun on the ground: what the air leaves of it, as a display value.
+  // The sun on the ground: what the air leaves of it, as a display value. Haze throws most of what it scatters
+  // forward, into the few degrees round the sun, and that light comes down with the beam and casts the beam's
+  // shadows: only what is thrown wide is lost to the sun on the ground, 1 - g^2 of the haze's depth for a lobe
+  // of asymmetry g (the delta-Eddington scaling of radiative transfer; approximate, as g itself is). Without it
+  // a 15 degree sun through 26 m of mist came down at a fifth of itself and lit nothing: no shadow under a
+  // fighter and none from a trunk, under a mist that showed shafts.
+  const wide = 1 - tune.hazeForward * tune.hazeForward;
   air.sunColour = [0, 1, 2].map((channel) => tune.sunGain * weather.sun
-    * Math.pow(tune.sunPower * Math.exp(-(tune.rayleighDepth[channel] + air.hazeDepth) * air.sunMass), 1 / 2.2));
+    * Math.pow(tune.sunPower * Math.exp(-(tune.rayleighDepth[channel] + air.hazeDepth * wide) * air.sunMass), 1 / 2.2));
   air.extinction = tune.koschmieder / air.visibility;
   // Fine haze dims blue more than red (extinction ~ wavelength ^ -fine); droplets dim all alike.
   air.hazeHue = tune.wavelengths.map((nm) => Math.pow(tune.wavelengths[1] / nm, weather.fine));
@@ -133,8 +141,11 @@ export function envAirState(place, weather) {
   const clouded = 1 - 0.25 * cover * (0.4 + weather.gloom);
   air.skyLight = skyLight.map((value) => Math.min(1, (value / weight) * clouded * tune.skyFill));
   air.horizon = horizon;
-  // The ground's own light thrown back up, for the underside of things.
-  air.bounce = air.skyLight.map((value, channel) => tune.bounce * (value + air.sunColour[channel] * sun[1]));
+  // The ground's own light thrown back up, for the underside of things: by what the place stands on (its
+  // ground.albedo; grass and soil where it does not say), whitened by the weather's lying snow.
+  const bare = place.ground?.albedo ?? tune.bounce;
+  const thrown = bare + (tune.snowBounce - bare) * (weather.snow || 0);
+  air.bounce = air.skyLight.map((value, channel) => thrown * (value + air.sunColour[channel] * sun[1]));
   // A cloud in the sun and a cloud's shaded base.
   air.cloudLit = air.sunColour.map((value, channel) => Math.min(tune.cloudMost, 0.72 * value / Math.max(0.05, weather.sun) * Math.max(weather.sun, 0.45) + 0.42 * air.skyLight[channel]));
   // A cloud's base: lit by the sky round it and the land under it, greyer than either.
@@ -207,6 +218,8 @@ export const ENV_UNIFORMS = {
   // x: cover 0..1; y: shadow strength on the land; z: 1 / the sheet's scale (1/m); w: the sheet's height (m).
   uEnvCloud: { value: null },
   uEnvCloudTravel: { value: null },
+  // x: how much of the sheet's shape is its small lumps; y: how far inside a cloud its base is wholly dark.
+  uEnvCloudForm: { value: null },
   uEnvCloudLit: { value: null },
   uEnvCloudDark: { value: null },
   // x: wet 0..1; y: snow lying 0..1.
@@ -223,6 +236,19 @@ export const ENV_UNIFORMS = {
   uEnvOn: { value: 0 },
   // How much of what the weather lets fall is falling at the camera now, 0..1 (a shower passing: index.js envUpdate).
   uEnvFall: { value: 0 },
+  // The near map and what stands over it (terrain.js envBuildNearMap), of the place now shown: what draws the land
+  // carries its own; these are for what only asks how much sun reaches the air (the sky, a tree, a place's own
+  // material). index.js envApply.
+  uEnvMap: { value: null },
+  uEnvCover: { value: null },
+  // Shade in the air (ENV.air.shadeBeam). x: the share of the air's light that shade takes away; y, z: the height
+  // over the ground (m) where the place's crowns begin and where a point is over most of them, between which
+  // the near map stops telling what shades the air; w: under 0, each sight line is walked for its own shade
+  // (the high tier), else the share of the sun on the air before the camera, worked once a frame for all of them.
+  uEnvShade: { value: null },
+  // How far (m, x and z) the gust over the floor has carried the crowns' shade: the flecks on the ground move by
+  // it where they lie (terrain.js envCover), and the shafts in the air with them.
+  uEnvShadeSway: { value: null },
 };
 
 /** Fill the uniforms' values in (the first use needs THREE). */
@@ -242,8 +268,11 @@ export function envUniforms() {
   u.uEnvCloud.value = new THREE.Vector4(0, 0, 1 / ENV.clouds.scale, ENV.clouds.height);
   u.uEnvCloudTravel.value = new THREE.Vector2(0, 0);
   u.uEnvCloudLit.value = new THREE.Vector3(1, 1, 1);
+  u.uEnvCloudForm.value = new THREE.Vector2(ENV.clouds.ragged, ENV.clouds.baseAt);
   u.uEnvCloudDark.value = new THREE.Vector3(0.5, 0.5, 0.5);
   u.uEnvWet.value = new THREE.Vector2(0, 0);
+  u.uEnvShade.value = new THREE.Vector4(0, 0, 1, 1);
+  u.uEnvShadeSway.value = new THREE.Vector2(0, 0);
   u.uEnvLook.value = new THREE.Vector2(0, 0);
   u.uEnvBodiesAt.value = new THREE.Vector4(0, 0, 0, 0);
   for (let at = 0; at < ENV.shadow.bodyCount; at += 1) u.uEnvBodies.value.push(new THREE.Vector4(0, 0, 0, 0));
@@ -261,6 +290,7 @@ export function envAirToUniforms(air, weather, quality, place) {
   u.uEnvHaze.value.set(air.extinction * air.hazeHue[0], air.extinction * air.hazeHue[1], air.extinction * air.hazeHue[2], 1 / air.hazeHeight);
   u.uEnvRayleigh.value.set(air.rayleigh[0], air.rayleigh[1], air.rayleigh[2], air.extinction);
   u.uEnvCloud.value.set(air.cover, quality.cloudShadow ? ENV.clouds.shadow * (1 - air.lid) : 0, 1 / ENV.clouds.scale, ENV.clouds.height);
+  u.uEnvCloudForm.value.fromArray(air.form);
   u.uEnvCloudLit.value.fromArray(air.cloudLit);
   u.uEnvCloudDark.value.fromArray(air.cloudDark);
   u.uEnvWet.value.set(weather.wet, weather.snow);
@@ -274,6 +304,9 @@ export function envAirToUniforms(air, weather, quality, place) {
  *   envHaze(colour, from, to)   `colour` at world point `to` seen from `from` through the haze
  *   envCloud(xz)           the cloud sheet's cover 0..1 over sheet point xz (sheet units); envCloudDepth(xz) how thick
  *   envSunShare(world)     how much of the sun reaches a point on the land under the clouds, 0..1
+ *   envAirSun(point)       how much reaches a point in the air: the clouds, and below the crowns what stands sunward
+ *   envAirShare(from, ray, depth, grain, steps)   the mean of that along a sight line, each stretch by what it sends the eye
+ *   envHazeGrain(colour, from, to, grain)   envHaze with the walk started `grain` of a step in (envGrain(gl_FragCoord.xy))
  *   envGust(xz)            the wind's local speed at a point on the ground (m/s), the gusts riding the air's travel
  */
 export const ENV_GLSL = /* glsl */ `
@@ -290,6 +323,7 @@ uniform vec4 uEnvWind;
 uniform vec2 uEnvWindTravel;
 uniform vec4 uEnvCloud;
 uniform vec2 uEnvCloudTravel;
+uniform vec2 uEnvCloudForm;
 uniform vec3 uEnvCloudLit;
 uniform vec3 uEnvCloudDark;
 uniform vec2 uEnvWet;
@@ -297,6 +331,10 @@ uniform float uEnvDry;
 uniform vec2 uEnvLook;
 uniform float uEnvOn;
 uniform float uEnvFall;
+uniform sampler2D uEnvMap;
+uniform sampler2D uEnvCover;
+uniform vec4 uEnvShade;
+uniform vec2 uEnvShadeSway;
 
 vec3 envSky(vec3 dir) {
   vec2 level = normalize(dir.xz + vec2(1e-5, 0.0));
@@ -304,12 +342,20 @@ vec3 envSky(vec3 dir) {
   return texture2D(uEnvSky, vec2(across, sqrt(clamp(dir.y, 0.0, 1.0)))).rgb * ${ENV.sky.most.toFixed(1)};
 }
 
-vec3 envAirlight(vec3 dir) {
+// The air's light into a sight line, share of the sun on the air along it (envAirShare). What shade takes is the
+// light scattered once: ENV.air.shadeBeam of the level light, and all that the forward lobe adds toward the sun.
+vec3 envAirlightIn(vec3 dir, float share) {
   // The horizon row that way, brighter toward the sun itself as the haze throws its light forward (config.js aureole).
   vec3 sun = uEnvSunDir;
   float level = dot(normalize(dir.xz + vec2(1e-5, 0.0)), sun.xz);
   float lobe = pow((${(1 + ENV.air.hazeForward * ENV.air.hazeForward).toFixed(4)} - ${(2 * ENV.air.hazeForward).toFixed(4)} * level) / (${(1 + ENV.air.hazeForward * ENV.air.hazeForward).toFixed(4)} - ${(2 * ENV.air.hazeForward).toFixed(4)} * dot(normalize(dir), sun)), 1.5);
-  return envSky(vec3(dir.x, 0.0, dir.z)) * (1.0 + ${ENV.air.aureole.toFixed(2)} * (lobe - 1.0));
+  float fore = ${ENV.air.aureole.toFixed(2)} * max(lobe - 1.0, 0.0);
+  float once = (uEnvShade.x + fore) / (1.0 + fore);
+  return envSky(vec3(dir.x, 0.0, dir.z)) * (1.0 + ${ENV.air.aureole.toFixed(2)} * (lobe - 1.0)) * (1.0 - once * (1.0 - share));
+}
+
+vec3 envAirlight(vec3 dir) {
+  return envAirlightIn(dir, 1.0);
 }
 
 // The haze's density falls off with height as exp(-y / H); along a straight sight line that integrates exactly.
@@ -320,19 +366,11 @@ float envHazeColumn(float fromY, float toY) {
   return abs(d) < 1e-3 ? exp(-a) : (exp(-a) - exp(-b)) / d;
 }
 
-vec3 envHaze(vec3 colour, vec3 from, vec3 to) {
-  vec3 ray = to - from;
-  float distance = length(ray);
-  vec3 depth = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(from.y, 0.0), max(to.y, 0.0))) * distance;
-  vec3 through = exp(-depth);
-  return colour * through + envAirlight(ray / max(distance, 1e-3)) * (1.0 - through);
-}
-
 // How far inside a cloud a sheet point is: below 0 clear sky, 0 the cloud's edge, about 0.3 its thick middle.
 float envCloudDepth(vec2 sheet) {
   float broad = texture2D(uEnvNoise, sheet * 0.125).b;
   float fine = texture2D(uEnvNoise, sheet * 0.53 + vec2(0.37, 0.11)).a;
-  return broad * 0.68 + fine * 0.32 - mix(0.74, 0.26, uEnvCloud.x);
+  return broad * 0.68 + (0.16 + (fine - 0.5) * uEnvCloudForm.x) - mix(0.74, 0.26, uEnvCloud.x);
 }
 
 float envCloud(vec2 sheet) {
@@ -351,6 +389,105 @@ float envSunShare(vec3 world) {
   float broad = texture2D(uEnvNoise, sheet * 0.125).b;
   float edge = mix(0.74, 0.26, uEnvCloud.x);
   return 1.0 - uEnvCloud.y * smoothstep(edge - 0.12, edge + 0.16, broad * 0.68 + 0.16);
+}
+
+// What stands over the ground (terrain.js envBuildNearMap's cover), read as made (level 0) or as the mean over
+// a round 2^level texels across: the texture's own smaller copies. (Before WebGL 2 a shader cannot ask for one.)
+vec4 envCoverRead(vec2 at, float level) {
+#if __VERSION__ >= 300
+  return textureLod(uEnvCover, at, level);
+#else
+  return texture2D(uEnvCover, at);
+#endif
+}
+
+// What gets past the crowns (g: how deep their shade lies, terrain.js envBuildNearMap) taken as a whole, the flecks
+// of sun in it (terrain.js envCover) not told apart.
+float envPastCrowns(float deep) {
+  return 1.0 - min(deep * 2.5, 1.0) * smoothstep(0.3, 0.72, 0.5 + (deep - 0.5) * 0.62);
+}
+
+// What stands sunward of a point in the air, read off the near map where the point's sun ray comes to the ground:
+// the share of the sun past the crowns (x), past the trunks (y) and past the land itself (z). Off the map all is
+// open, and over the crowns the map no longer tells (a point there is above the shade it is drawn in).
+// (spread: the read is the mean over a round of the cover 2^spread of its texels across; 0 the cover as made.)
+vec3 envSunwardOver(vec3 point, float spread) {
+  vec2 at = point.xz / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5;
+  vec2 out_ = abs(at - 0.5);
+  if (max(out_.x, out_.y) > 0.49) return vec3(1.0);
+  vec4 land = texture2D(uEnvMap, at);
+  float above = max(point.y - land.r, 0.0);
+  float level = length(uEnvSunDir.xz);
+  vec2 lean = uEnvSunDir.xz / max(level, 1e-4) * min(${ENV.shadow.slantMost.toFixed(1)}, level / max(uEnvSunDir.y, 1e-3));
+  vec4 over = envCoverRead((point.xz - lean * above + uEnvShadeSway) / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5, spread);
+  float open = smoothstep(uEnvShade.y, uEnvShade.z, above);
+  return vec3(mix(envPastCrowns(over.g), 1.0, open), mix(over.b, 1.0, open), land.b);
+}
+
+vec3 envSunward(vec3 point) {
+  return envSunwardOver(point, 0.0);
+}
+
+// The share of the sun on a point in the air: the cloud over it and what stands sunward of it.
+float envAirSunOver(vec3 point, float spread) {
+  vec3 past = envSunwardOver(point, spread);
+  return envSunShare(point) * past.x * past.y * past.z;
+}
+
+float envAirSun(vec3 point) {
+  return envAirSunOver(point, 0.0);
+}
+
+// The mean share of the sun on the air along a sight line (from from along ray, depth what the haze takes
+// over it), each stretch counted by the light it sends the eye: the steps are even in what the haze has taken by
+// then, and start grain of a step in, which differs between neighbouring pixels so that a few steps draw the
+// edge of a shaft and not as many bands.
+float envAirShare(vec3 from, vec3 ray, float depth, float grain, int steps) {
+  if (uEnvShade.w >= 0.0) return uEnvShade.w;
+  float gone = 1.0 - exp(-depth);
+  // The haze thins with height, so on a line that climbs out of it most of what it takes is taken low down, near
+  // the line's lower end: a share of the depth lies that share of the way along in exp(-y / H), not in distance.
+  float low = max(from.y, 0.0) * uEnvHaze.w;
+  float high = max(from.y + ray.y, 0.0) * uEnvHaze.w;
+  float lowThin = exp(-low);
+  float highThin = exp(-high);
+  // Where the haze has taken next to nothing its light is next to nothing too and how much of it is in shade
+  // cannot be seen: one step there, half of them up to ENV.air.shadeFull, all of them past it.
+  int count = gone < ${ENV.air.shadeFrom.toFixed(3)} ? 1 : (gone < ${ENV.air.shadeFull.toFixed(3)} ? (steps + 1) / 2 : steps);
+  // A step stands for a stretch of the line, and the shade at one point of it is not the stretch's: a far
+  // stretch crosses many shadows, and read at a point it came out all lit or all dark, pixel by pixel, as a
+  // grain on everything seen through a wood. The cover is read spread over ENV.air.shadeSpread of the stretch.
+  float spread = log2(max(length(ray.xz) / float(count) * ${(ENV.air.shadeSpread * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)).toFixed(4)}, 1.0));
+  float sum = 0.0;
+  for (int i = 0; i < ${ENV.air.shadeSteps[0]}; i++) {
+    if (i >= count) break;
+    float u = (float(i) + grain) / float(count);
+    float along = depth > 1e-3 ? -log(1.0 - u * gone) / depth : u;
+    if (abs(high - low) > 1e-3) along = (-log(max(mix(lowThin, highThin, along), 1e-6)) - low) / (high - low);
+    sum += envAirSunOver(from + ray * along, spread);
+  }
+  return sum / float(count);
+}
+
+float envGrain(vec2 pixel) {
+  return fract(52.9829189 * fract(dot(pixel, vec2(0.06711056, 0.00583715))));
+}
+
+vec3 envHazeWalk(vec3 colour, vec3 from, vec3 to, float grain, int steps) {
+  vec3 ray = to - from;
+  float distance = length(ray);
+  vec3 depth = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(from.y, 0.0), max(to.y, 0.0))) * distance;
+  vec3 through = exp(-depth);
+  float share = envAirShare(from, ray, depth.g, grain, steps);
+  return colour * through + envAirlightIn(ray / max(distance, 1e-3), share) * (1.0 - through);
+}
+
+vec3 envHazeGrain(vec3 colour, vec3 from, vec3 to, float grain) {
+  return envHazeWalk(colour, from, to, grain, ${ENV.air.shadeSteps[0]});
+}
+
+vec3 envHaze(vec3 colour, vec3 from, vec3 to) {
+  return envHazeWalk(colour, from, to, 0.5, ${ENV.air.shadeSteps[1]});
 }
 
 float envGust(vec2 xz) {
@@ -399,7 +536,7 @@ export function envDress(material, { wet = 0, snow = 0 } = {}) {
       vEnvWorld = ( modelMatrix * envAt ).xyz;`);
     // (The renderer hazes after its tone curve; the open air's haze is light like the rest and goes before it.)
     let fragment = `varying vec3 vEnvWorld;\nvarying float vEnvUp;\n${ENV_GLSL}\n${shader.fragmentShader}`
-      .replace('#include <tonemapping_fragment>', 'if ( uEnvOn > 0.5 ) gl_FragColor.rgb = envHaze( gl_FragColor.rgb, cameraPosition, vEnvWorld );\n#include <tonemapping_fragment>')
+      .replace('#include <tonemapping_fragment>', 'if ( uEnvOn > 0.5 ) gl_FragColor.rgb = envHazeGrain( gl_FragColor.rgb, cameraPosition, vEnvWorld, envGrain( gl_FragCoord.xy ) );\n#include <tonemapping_fragment>')
       .replace('#include <fog_fragment>', 'if ( uEnvOn < 0.5 ) {\n#include <fog_fragment>\n}');
     // Snow lies on what faces up, first in the lee of the grain (as on the land: terrain.js); under it nothing is wet.
     const after = corners ? '#include <emissivemap_fragment>' : '#include <normal_fragment_maps>';

@@ -16,20 +16,25 @@ import { ENV } from './config.js';
 
 /**
  * The curve for an air state (air.js envAirState) under a weather, its constants solved so mid-grey keeps its value
- * and `white` reaches the ceiling (config.js), and what the camera's meter needs: `ground`, the light a grey card
- * on level ground sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
+ * and `white` reaches the ceiling (config.js), and what the camera's meter needs: `ground`, the light the place's
+ * ground (a grey card, where neither the place's `meter` nor lying snow says otherwise) on the level sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
  * power as light), and `hazed`, the share of a view that is the haze's own light and not the land's.
  */
-export function envToneOf(air, weather) {
+export function envToneOf(air, weather, place) {
   const tune = ENV.tone;
   const grade = { ...tune.grade, ...weather.grade };
-  const level = [0, 1, 2].map((channel) => air.sunColour[channel] * air.sun[1] + air.skyLight[channel]);
+  // What the place's ground sees of the sky (among walls less than all of it) and what it throws back: a grey
+  // card's worth unless the place says, and moved toward snow's by the weather's lying snow.
+  const open = place?.meter?.sky ?? 1;
+  const bare = place?.meter?.albedo ?? tune.grey;
+  const card = tune.grey + (bare + (ENV.air.snowBounce - bare) * (weather.snow || 0) - tune.grey) * tune.groundSeen;
+  const level = [0, 1, 2].map((channel) => air.sunColour[channel] * air.sun[1] + air.skyLight[channel] * open);
   const n = grade.contrast;
   const grey = Math.pow(tune.grey, n);
   const white = Math.pow(grade.white, n);
   const sigma = (grey * (1 - tune.grey)) / (tune.grey - grey / white);
   return {
-    ground: tune.grey * Math.pow(envLuma(level), 2.2),
+    ground: card * Math.pow(envLuma(level), 2.2),
     hazed: air.extinction ? 1 - Math.exp(-air.extinction * tune.view) : 0,
     stops: Math.pow(2, grade.ev),
     exposure: 1,
@@ -64,7 +69,7 @@ export function envMeter(tone, air, x, z) {
       const a = air.table[left * 4 + channel];
       envSeen[channel] = (a + (air.table[left * 4 + 4 + channel] - a) * (column - left)) / 255 * ENV.sky.most;
     }
-    haze = Math.pow(envLuma(envSeen), 2.2);
+    haze = Math.pow(envLuma(envSeen) * (1 - ENV.air.shadeBeam * (1 - (tone.airShare ?? 1))), 2.2);
   }
   const seen = tone.ground + (Math.min(haze, tone.ground * tune.hazeMost) - tone.ground) * tone.hazed;
   tone.exposure = Math.pow((tune.grey * tune.meter) / seen, tune.adapt) * tone.stops;

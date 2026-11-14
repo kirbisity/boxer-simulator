@@ -154,27 +154,54 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
       }
     }
   };
-  // Crowns between the ground and the sun (what gets past them), and between the ground and the sky.
+  // What stands over the ground, kept finer than the map (ENV.shadow.coverFine). r: the share of the sky seen from
+  // the ground; g: how deep the crowns' shade lies between the ground and the sun; b: the sun past the trunks.
   const tune = ENV.shadow;
-  const cover = new Uint8Array(mapSize * mapSize * 4).fill(255);
+  const fine = mapSize * tune.coverFine;
+  const fineTexel = texel / tune.coverFine;
+  const cover = new Uint8Array(fine * fine * 4).fill(255);
+  const stampFine = (x, z, halfX, halfZ, soft, write) => {
+    const c0 = Math.max(0, Math.floor((x - halfX - soft + mapHalf) / fineTexel));
+    const c1 = Math.min(fine - 1, Math.ceil((x + halfX + soft + mapHalf) / fineTexel));
+    const r0 = Math.max(0, Math.floor((z - halfZ - soft + mapHalf) / fineTexel));
+    const r1 = Math.min(fine - 1, Math.ceil((z + halfZ + soft + mapHalf) / fineTexel));
+    for (let row = r0; row <= r1; row += 1) {
+      for (let column = c0; column <= c1; column += 1) write((row * fine + column) * 4, (column + 0.5) * fineTexel - mapHalf - x, (row + 0.5) * fineTexel - mapHalf - z);
+    }
+  };
   for (const shadow of shadows) {
-    stamp(shadow.x, shadow.z, shadow.radius, shadow.radius, 0, (at, dx, dz) => {
+    if (shadow.half) {
+      // A trunk's band: each texel loses the share of it the band covers.
+      const ax = shadow.toX - shadow.x;
+      const az = shadow.toZ - shadow.z;
+      const long = ax * ax + az * az || 1;
+      stampFine((shadow.x + shadow.toX) / 2, (shadow.z + shadow.toZ) / 2, Math.abs(ax) / 2 + shadow.half, Math.abs(az) / 2 + shadow.half, fineTexel, (at, dx, dz) => {
+        const along = Math.min(1, Math.max(0, ((dx + ax / 2) * ax + (dz + az / 2) * az) / long));
+        const off = Math.hypot(dx + ax / 2 - ax * along, dz + az / 2 - az * along);
+        const covered = Math.min(1, Math.min(2 * shadow.half, fineTexel) / fineTexel) * Math.min(1, Math.max(0, (shadow.half + fineTexel / 2 - off) / fineTexel));
+        cover[at + 2] *= 1 - covered;
+      });
+      continue;
+    }
+    stampFine(shadow.x, shadow.z, shadow.radius, shadow.radius, 0, (at, dx, dz) => {
       const inside = 1 - envSmooth(0.45, 1, Math.hypot(dx, dz) / shadow.radius);
       cover[at + 1] *= 1 - shadow.depth * inside;
     });
     const over = shadow.over;
-    if (over) stamp(over.x, over.z, over.radius, over.radius, 0, (at, dx, dz) => {
+    if (over) stampFine(over.x, over.z, over.radius, over.radius, 0, (at, dx, dz) => {
       cover[at] *= 1 - (1 - tune.underCrown) * (1 - envSmooth(0.3, 1.1, Math.hypot(dx, dz) / over.radius));
     });
   }
   // What stands on the ground: no grass through it, the earth bare at its foot, half the sky hidden beside it.
   for (const print of footprints) {
-    stamp(print.x, print.z, print.halfX, print.halfZ, Math.max(1.2, tune.wallReach), (at, dx, dz) => {
-      const outside = Math.hypot(Math.max(0, Math.abs(dx) - print.halfX), Math.max(0, Math.abs(dz) - print.halfZ));
-      const inside = 1 - envSmooth(0, 1.2, outside);
+    const outsideOf = (dx, dz) => Math.hypot(Math.max(0, Math.abs(dx) - print.halfX), Math.max(0, Math.abs(dz) - print.halfZ));
+    stamp(print.x, print.z, print.halfX, print.halfZ, 1.2, (at, dx, dz) => {
+      const inside = 1 - envSmooth(0, 1.2, outsideOf(dx, dz));
       values[at + 1] *= 1 - inside;
       values[at + 3] = Math.max(values[at + 3], inside * 0.7);
-      cover[at] = Math.min(cover[at], 255 * (tune.atWall + (1 - tune.atWall) * envSmooth(0, tune.wallReach, outside)));
+    });
+    stampFine(print.x, print.z, print.halfX, print.halfZ, tune.wallReach, (at, dx, dz) => {
+      cover[at] = Math.min(cover[at], 255 * (tune.atWall + (1 - tune.atWall) * envSmooth(0, tune.wallReach, outsideOf(dx, dz))));
     });
   }
   const half = new Uint16Array(values.length);
@@ -185,9 +212,11 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
   texture.generateMipmaps = false;
   texture.needsUpdate = true;
   for (let at = 1; at < cover.length; at += 4) cover[at] = 255 - cover[at];
-  const over = new THREE.DataTexture(cover, mapSize, mapSize, THREE.RGBAFormat);
-  over.magFilter = over.minFilter = THREE.LinearFilter;
-  over.generateMipmaps = false;
+  const over = new THREE.DataTexture(cover, fine, fine, THREE.RGBAFormat);
+  // (With its smaller copies: a sight line's walk reads it spread over a stretch, air.js envAirShare.)
+  over.magFilter = THREE.LinearFilter;
+  over.minFilter = THREE.LinearMipmapLinearFilter;
+  over.generateMipmaps = true;
   over.needsUpdate = true;
   texture.envCover = over;
   return texture;
@@ -203,17 +232,15 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
  * stands or lies on it, z: the share of the sky the bodies over it leave it (ENV.shadow).
  */
 export const ENV_GLSL_MAP = /* glsl */ `
-uniform sampler2D uEnvMap;
-uniform sampler2D uEnvCover;
 uniform vec4 uEnvBodies[${ENV.shadow.bodyCount}];
 uniform vec4 uEnvBodiesAt;
 vec2 envCover(vec2 xz) {
-  vec4 over = texture2D(uEnvCover, xz / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5);
-  if (over.g < 0.004) return vec2(over.r, 1.0);
+  vec4 over = envCoverRead(xz / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5, 0.0);
+  if (over.g < 0.004) return vec2(over.r, over.b);
   vec2 p = xz + uEnvWind.xy * envGust(xz) * ${ENV.shadow.dappleSway.toFixed(3)};
   float gaps = texture2D(uEnvNoise, p / ${(ENV.shadow.dapple * 16).toFixed(2)}).g * 0.6 + texture2D(uEnvNoise, p / ${(ENV.shadow.dapple * 5.3).toFixed(2)} + 0.37).a * 0.4;
   float least = 0.5 + (over.g - 0.5) * 0.62;
-  return vec2(over.r, 1.0 - min(over.g * 2.5, 1.0) * (1.0 - smoothstep(least - 0.03, least + 0.05, gaps)));
+  return vec2(over.r, over.b * (1.0 - min(over.g * 2.5, 1.0) * (1.0 - smoothstep(least - 0.03, least + 0.05, gaps))));
 }
 vec3 envBodies(vec3 ground) {
   // Most of a field is far from anyone: only ground within their reach counts them over (a blade of grass asks this).
@@ -323,6 +350,7 @@ uniform vec3 uDry;
 uniform vec3 uSoil;
 uniform vec3 uRock;
 uniform vec3 uWoodsColour;
+uniform sampler2D uEnvSkyline;
 varying vec3 vWorld;
 varying vec3 vNormal;
 varying float vShade;
@@ -377,10 +405,15 @@ void main() {
   vec3 view = normalize(vWorld - cameraPosition);
   float puddle = wet * smoothstep(0.42, 0.6, worn * 0.5 + fine * 0.5 + 0.12 * medium) * near * step(0.97, normal.y);
   float fresnel = 0.04 + 0.96 * pow(1.0 - max(dot(-view, normal), 0.0), 5.0);
-  vec3 mirrored = envSky(reflect(view, normal));
+  // What the water mirrors: the sky over what stands round the floor, and under that line the wood itself.
+  vec3 back = reflect(view, normal);
+  float line = texture2D(uEnvSkyline, vec2(atan(back.z, back.x) / 6.2832 + 0.5, 0.5)).r * ${ENV.terrain.skylineMost.toFixed(1)};
+  float clearSky = smoothstep(line * 0.7, line * 1.1 + 0.02, back.y / max(length(back.xz), 1e-3));
+  clearSky = mix(clearSky, 1.0, smoothstep(${ENV.terrain.mirrorNear.toFixed(1)}, ${ENV.terrain.mirrorFar.toFixed(1)}, length(xz)));
+  vec3 mirrored = mix(uWoodsColour * uEnvSkyLight * ${ENV.terrain.mirrorWood.toFixed(2)}, envSky(back), clearSky);
   colour = mix(colour, mirrored, clamp(fresnel * (puddle + wet * ${ENV.terrain.wetSheen.toFixed(2)} * (0.3 + 0.7 * worn)), 0.0, 1.0));
 
-  colour = envHaze(colour, cameraPosition, vWorld);
+  colour = envHazeGrain(colour, cameraPosition, vWorld, envGrain(gl_FragCoord.xy));
   gl_FragColor = vec4(colour, 1.0);
   #include <tonemapping_fragment>
 }`;
@@ -467,6 +500,7 @@ export function envBuildTerrain({ place, height, sun, map }) {
       ...envUniforms(),
       uEnvMap: map,
       uEnvCover: map.cover,
+      uEnvSkyline: map.skyline,
       uGrass: { value: new THREE.Color(ground.grass) },
       uDry: { value: new THREE.Color(ground.dry) },
       uSoil: { value: new THREE.Color(ground.soil) },

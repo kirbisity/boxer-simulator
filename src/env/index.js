@@ -24,13 +24,13 @@
 
 /* global THREE */
 
-import { ENV, ENV_PLACE_PLAIN, ENV_WEATHER, PLACE_ENV } from './config.js';
+import { ENV, ENV_PLACE_PLAIN, ENV_TREES, ENV_WEATHER, PLACE_ENV } from './config.js';
 import { envAirState, envAirToUniforms, envInstallTone, envSkyAt, envSunWay, envUniforms } from './air.js';
 import { envNoiseAt } from './noise.js';
 import { envBuildSky } from './sky.js';
 import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, envSunPast } from './terrain.js';
 import { envBuildGrass, envGrassQuality } from './grass.js';
-import { envBuildTrees, envPlantTrees, envTreeShadows, envTreesQuality } from './trees.js';
+import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostDraw, envToneOf } from './post.js';
 import { activeLook } from '../looks.js';
@@ -108,7 +108,7 @@ function envFootprints(group) {
     const halfX = (box.max.x - box.min.x) / 2;
     const halfZ = (box.max.z - box.min.z) / 2;
     if (halfX > standWide || halfZ > standWide) return;
-    prints.push({ x: (box.max.x + box.min.x) / 2, z: (box.max.z + box.min.z) / 2, halfX, halfZ });
+    prints.push({ x: (box.max.x + box.min.x) / 2, z: (box.max.z + box.min.z) / 2, halfX, halfZ, top: box.max.y });
   };
   group.updateMatrixWorld(true);
   const visit = (object) => {
@@ -149,6 +149,7 @@ function envFill(group, place, view, spec) {
   const sun = envSunWay(own.sun);
   group.userData.envMap?.dispose();
   group.userData.envMap?.envCover?.dispose();
+  group.userData.envMap?.envSkyline?.dispose();
   group.traverse((object) => {
     object.geometry?.dispose();
     object.material?.dispose();
@@ -166,6 +167,7 @@ function envFill(group, place, view, spec) {
     group.userData.envParts = parts;
     group.userData.envHeight = height;
     group.userData.envMap = map.value;
+    group.userData.envCrowns = [0, 1];
     return;
   }
   // The level ground: the scenery's own, and never less than the floor fought on (a battle's is wider than the place's).
@@ -173,20 +175,29 @@ function envFill(group, place, view, spec) {
   const height = envHeightField(own.terrain, keepOut);
   const footprints = envFootprints(view.places[place]);
   const trees = envPlantTrees({ place: own, height, sun, keepOut, footprints });
-  const map = { value: envBuildNearMap({ place: own, height, sun, keepOut, floor: [arena.halfX, arena.halfZ], shadows: envTreeShadows(trees, sun), footprints }) };
+  const rocks = envPlantRocks({ place: own, height, sun, keepOut, footprints });
+  const map = { value: envBuildNearMap({ place: own, height, sun, keepOut, floor: [arena.halfX, arena.halfZ], shadows: envTreeShadows(trees, sun).concat(envRockShadows(rocks, sun)), footprints }) };
   map.cover = { value: map.value.envCover };
+  map.value.envSkyline = envBuildSkyline(trees, footprints);
+  map.skyline = { value: map.value.envSkyline };
   const parts = {
     sky: envBuildSky(),
     terrain: envBuildTerrain({ place: own, height, sun, map }),
     grass: envBuildGrass({ place: own, map }),
     trees: envBuildTrees({ place: own, trees }),
+    rocks: envBuildRocks({ place: own, rocks, height }),
     particles: envBuildParticles(map, own.cover),
     beams: envBuildBeams(own.openings ?? [], sun),
   };
-  group.add(parts.sky, parts.terrain, parts.grass, parts.trees, parts.particles, parts.beams);
+  group.add(parts.sky, parts.terrain, parts.grass, parts.trees, parts.rocks, parts.particles, parts.beams);
   group.userData.envParts = parts;
   group.userData.envHeight = height;
   group.userData.envMap = map.value;
+  // Where the near crowns begin and where a point is over most of them (m over the ground): between the two the
+  // near map stops telling what shades the air (air.js envSunward). A quarter of them begin below the first.
+  const near = trees.filter((tree) => tree.height > 4 && Math.abs(tree.x) < ENV.terrain.mapHalf && Math.abs(tree.z) < ENV.terrain.mapHalf);
+  const part = (share, of) => (near.length ? near.map(of).sort((a, b) => a - b)[Math.floor(share * (near.length - 1))] : 0);
+  group.userData.envCrowns = [part(0.25, (tree) => tree.height * (ENV_TREES[tree.kind].crown.at - ENV_TREES[tree.kind].crown.tall)), 1 + part(0.5, (tree) => tree.height * (ENV_TREES[tree.kind].crown.at + ENV_TREES[tree.kind].crown.tall))];
 }
 
 /** Draw the tier in force: what share of the blades, the leaf cards and the drift, and whether clouds shade the land. */
@@ -197,6 +208,13 @@ function envApplyTier(state) {
   if (parts.trees) envTreesQuality(parts.trees, quality.cards);
   envParticlesSet(parts.particles, PLACE_ENV[state.place].drift, state.weather, quality.particles);
   envAirToUniforms(state.air, state.weather, quality, PLACE_ENV[state.place]);
+  // Shade in the air: the place's near map for what asks it, and whether each sight line is walked (envUpdate
+  // gives the frame its one share where they are not).
+  const u = envUniforms();
+  const [from, to] = state.group.userData.envCrowns;
+  u.uEnvMap.value = state.group.userData.envMap;
+  u.uEnvCover.value = state.group.userData.envMap.envCover;
+  u.uEnvShade.value.set(ENV.air.shadeBeam, from, to, quality.airShade ? -1 : state.airShare ?? 1);
 }
 
 /** Take the scene over for the place: the light, the haze, the far plane, the wind, the weather's share of everything. */
@@ -210,7 +228,7 @@ export function envApply({ place, view, spec, group }) {
   const st = view.lookState?.['probe-lite'];
 
   // The frame ends as a camera's does (post.js), here only (looks.js resets the renderer when the place is lit again).
-  const tone = envToneOf(air, weather);
+  const tone = envToneOf(air, weather, own);
   envInstallTone();
   envInstallShadow();
   setRenderer(view, { toneMapping: THREE.CustomToneMapping });
@@ -331,7 +349,7 @@ function envGustAt(wind, time, x, z) {
  * `grain` the broad masses alone, the fine grain at its mean (what shades a whole floor at once).
  */
 function envCloudDepthAt(air, sheetX, sheetZ, grain = false) {
-  const fine = grain ? envNoiseAt(sheetX * 0.53 + 0.37, sheetZ * 0.53 + 0.11, 3) : 0.5;
+  const fine = grain ? 0.5 + (envNoiseAt(sheetX * 0.53 + 0.37, sheetZ * 0.53 + 0.11, 3) - 0.5) * (air.form[0] / 0.32) : 0.5;
   return envNoiseAt(sheetX * 0.125, sheetZ * 0.125, 2) * 0.68 + fine * 0.32 - (0.74 + (0.26 - 0.74) * air.cover);
 }
 
@@ -340,11 +358,48 @@ const envEase = (from, to, value) => {
   return t * t * (3 - 2 * t);
 };
 
-/** How much of the sun the clouds leave at the floor's middle (air.js envSunShare, on the processor). */
-function envCloudShareAt(air, travelX, travelZ, strength) {
+/** How much of the sun the clouds leave at a point (the floor's middle if none is given; air.js envSunShare, on the processor). */
+function envCloudShareAt(air, travelX, travelZ, strength, x = 0, y = 0, z = 0) {
   if (strength <= 0) return 1;
-  const slant = (ENV.clouds.height / ENV.clouds.scale) / Math.max(air.sun[1], 0.12);
-  return 1 - strength * envEase(-0.12, 0.16, envCloudDepthAt(air, air.sun[0] * slant - travelX, air.sun[2] * slant - travelZ));
+  const slant = (ENV.clouds.height - y) / Math.max(air.sun[1], 0.12);
+  return 1 - strength * envEase(-0.12, 0.16, envCloudDepthAt(air, (x + air.sun[0] * slant) / ENV.clouds.scale - travelX, (z + air.sun[2] * slant) / ENV.clouds.scale - travelZ));
+}
+
+/**
+ * The share of the sun on the air before the camera (air.js envAirShare, on the processor): the mean along the
+ * first ENV.tone.view m of the way it looks, each stretch by the light it sends the eye. The meter counts the
+ * air's light by it, the fighters' fog is coloured by it, and below the high tier it is the whole frame's share.
+ */
+function envAirShareAt(state, eye, look, travelX, travelZ, strength, extinction) {
+  const { mapHalf } = ENV.terrain;
+  const air = state.air;
+  const cover = state.group.userData.envMap.envCover.image;
+  const height = state.group.userData.envHeight;
+  const [from, to] = state.group.userData.envCrowns;
+  const flat = Math.hypot(air.sun[0], air.sun[2]) || 1;
+  const lean = Math.min(ENV.shadow.slantMost, flat / Math.max(air.sun[1], 1e-3)) / flat;
+  const depth = extinction * ENV.tone.view;
+  const gone = 1 - Math.exp(-depth);
+  const steps = ENV.air.shadeSteps[0];
+  let sum = 0;
+  for (let step = 0; step < steps; step += 1) {
+    const u = (step + 0.5) / steps;
+    const along = (depth > 1e-3 ? -Math.log(1 - u * gone) / depth : u) * ENV.tone.view;
+    const x = eye.x + look.x * along;
+    const z = eye.z + look.z * along;
+    let share = envCloudShareAt(air, travelX, travelZ, strength, x, eye.y + look.y * along, z);
+    if (Math.abs(x) < mapHalf * 0.98 && Math.abs(z) < mapHalf * 0.98) {
+      const above = Math.max(0, eye.y + look.y * along - height(x, z));
+      const column = Math.min(cover.width - 1, Math.max(0, Math.floor(((x - air.sun[0] * lean * above) / (2 * mapHalf) + 0.5) * cover.width)));
+      const row = Math.min(cover.height - 1, Math.max(0, Math.floor(((z - air.sun[2] * lean * above) / (2 * mapHalf) + 0.5) * cover.height)));
+      const at = (row * cover.width + column) * 4;
+      const deep = cover.data[at + 1] / 255;
+      const past = (1 - Math.min(deep * 2.5, 1) * envEase(0.3, 0.72, 0.5 + (deep - 0.5) * 0.62)) * (cover.data[at + 2] / 255);
+      share *= past + (1 - past) * envEase(from, to, above);
+    }
+    sum += share;
+  }
+  return sum / steps;
 }
 
 /**
@@ -399,6 +454,8 @@ export function envUpdate(view, world) {
   u.uEnvWindTravel.value.set(wind.x * wind.speed * time, wind.z * wind.speed * time);
   const aloft = (wind.speed * ENV.clouds.aloft * time) / ENV.clouds.scale;
   u.uEnvCloudTravel.value.set(wind.x * aloft, wind.z * aloft);
+  const sway = wind.speed * envGustAt(wind, time, 0, 0) * ENV.shadow.dappleSway;
+  u.uEnvShadeSway.value.set(wind.x * sway, wind.z * sway);
   envLookWay ??= new THREE.Vector3();
   view.camera.getWorldDirection(envLookWay);
   u.uEnvLook.value.set(envLookWay.x, envLookWay.z);
@@ -431,9 +488,16 @@ export function envUpdate(view, world) {
   u.uEnvHaze.value.set(extinction * state.air.hazeHue[0], extinction * state.air.hazeHue[1], extinction * state.air.hazeHue[2], u.uEnvHaze.value.w);
   u.uEnvRayleigh.value.w = extinction;
   view.scene.fog.density = Math.sqrt(extinction / ENV.air.fogMatch);
+  // Shade in the air before the camera: the light of the fog on what the renderer hazes (fighters, props), the
+  // meter's count of the air's light, and the frame's one share where sight lines are not walked.
+  const airShare = envAirShareAt(state, eye, envLookWay, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y, extinction);
+  state.airShare = state.tone.airShare = airShare;
+  if (u.uEnvShade.value.w >= 0) u.uEnvShade.value.w = airShare;
+  const fogLight = 1 - ENV.air.shadeBeam * (1 - airShare);
+  view.scene.fog.color.setRGB(state.air.horizon[0] * fogLight, state.air.horizon[1] * fogLight, state.air.horizon[2] * fogLight);
   // The shafts: the share of light the air scatters toward the eye over the depth of a view (what falls is part
   // of that air), of the sun there is.
-  state.shafts = ENV.post.shafts * state.weather.sun * (1 - Math.exp(-extinction * ENV.post.shaftPath));
+  state.shafts = ENV.quality[envChosen.tier].airShade ? 0 : ENV.post.shafts * state.weather.sun * (1 - Math.exp(-extinction * ENV.post.shaftPath));
 
   // The sun's shadow: its box carried where the place asks, and its width in the edge (terrain.js
   // envInstallShadow): texels of blur per unit of the map's depth, of the box as it is now.
