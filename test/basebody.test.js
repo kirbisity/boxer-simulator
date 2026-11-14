@@ -31,11 +31,15 @@ test('the base style builds for every body of the progression: finite, about a f
 });
 
 test('the reference build gets the base mesh as modelled: every point where the tool put it, scaled to its height (the arms aside)', (t) => {
-  // (The model as it is: no shoulder design (BASE_BODY.shoulder null). The default, D2, reshapes the shoulders on purpose.)
+  // (The model as it is: no shoulder design (BASE_BODY.shoulder null), and the head drawn where and as large as the model has
+  // it. The default, D2, reshapes the shoulders on purpose, and the head's lift draws the neck's top up after it.)
   const design = BASE_BODY.shoulder;
+  const head = BASE_BODY.head;
   BASE_BODY.shoulder = null;
+  BASE_BODY.head = { ...head, lift: 0, smaller: 0 };
   t.after(() => {
     BASE_BODY.shoulder = design;
+    BASE_BODY.head = head;
   });
   for (const sex of ['male', 'female']) {
     const data = baseBodyMesh(sex);
@@ -127,7 +131,7 @@ test('the family of builds: a body is a mix of them summing to one, the emaciate
     }
     const [starved, thin, average, obese] = ['starved', 'thin', 'average', 'obese'].map(of);
     const emaciated = (body) => baseFamilyWeights(body, height)[BASE_BODY.family.builds.indexOf('E')];
-    assert.ok(emaciated(starved) > 0.85, `${sex}: a starved body is the emaciated build`);
+    assert.ok(emaciated(starved) > 0.9, `${sex}: a starved body is the emaciated build`);
     assert.ok(emaciated(thin) > 0.3 && emaciated(thin) < 0.8, `${sex}: a thin one part of it`);
     assert.ok(Math.abs(emaciated(average)) < 0.1 && emaciated(obese) === 0, `${sex}: an average or a fat one none of it`);
     // (The ends of the game's range: under the emaciated build's own BMI a body wastes on past it, with none of the muscular

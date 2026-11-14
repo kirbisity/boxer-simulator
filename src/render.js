@@ -11,6 +11,7 @@ import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { dualQuaternionSkinning } from './dqskin.js';
 import { ClothSwing, swayCloth } from './clothsway.js';
+import { BASE_BODY } from './basebody.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps, cachedSkinMesh, readySkinTextures, skinTextureKey, skinTexturesNow, skinTexturesSteps, storeSkinMesh, styleSpec } from './bodystyles.js';
 import { bodyCheck } from './skinworker.js';
@@ -67,8 +68,9 @@ const skinHex = (look) => (look.skinColor ? new THREE.Color(look.skinColor).getH
 
 // Drawn characters carry slightly large heads; it is what makes them read
 // as characters rather than as small-headed mannequins.
-const HEAD_SCALE = 1.12;
-const HEAD_SEAT = 0.18; // head radii the head sits lower than the physics head
+// (Less by BASE_BODY.head.smaller, and seated higher by BASE_BODY.head.lift: more neck under the jaw.)
+const HEAD_SCALE = BASE_BODY.head.size * (1 - BASE_BODY.head.smaller);
+const HEAD_SEAT = BASE_BODY.head.seat - BASE_BODY.head.lift; // head radii the head sits lower than the physics head
 const HEAD_SCALES = new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE);
 const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 

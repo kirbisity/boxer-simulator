@@ -184,11 +184,16 @@ export const LOFT = {
   // most of the emaciated build's loss from the ordinary one (1.55: what the game's thinnest body, a BMI of 10, took of that
   // build as first fitted, at 14, its limbs thinned towards the bone. Of the build as it stands, 13.3, and drawn in by its
   // weight (frame, below), such a body takes 1.25 on a medium frame and 1.4 on a large one: the bound is past the game's range).
+  // (The places and the swell are the builds' as they weighed before their necks were slimmed and their shoulders lowered and
+  // lightened (girdle.py NECK.slim, GIRDLE.rise, TRAPEZIUS.keep, DELTOID.keep), not composition.py's and swell.py's printout of
+  // them since, which reads each 1 to 4% lighter (an ordinary man's [3.89, 18.4]): placed by that, a body of a given weight
+  // took more of the fatter builds and came out fuller below the shoulders. What was taken off the neck and shoulders is taken
+  // off the picture, not given back to the trunk.)
   family: {
-    male: { E: [0.65, 12.36], N: [3.89, 18.4], M: [2.74, 22.19], F1: [5.91, 20.49], F2: [9.25, 22.66], F3: [13.9, 24.23] },
-    female: { E: [1.18, 11.91], N: [5.67, 15.45], M: [4.57, 18.28], F1: [8.66, 17.59], F2: [12.82, 19.25], F3: [17.99, 20.11] },
+    male: { E: [0.66, 12.62], N: [4.07, 18.62], M: [2.85, 23.08], F1: [6.22, 20.75], F2: [9.83, 22.93], F3: [14.94, 24.43] },
+    female: { E: [1.2, 12.11], N: [5.91, 15.67], M: [4.71, 18.83], F1: [9.08, 17.81], F2: [13.62, 19.45], F3: [19.14, 20.18] },
     muscleMost: 2, muscleLeast: 0.5, wasteMost: 1.55,
-    swell: { male: [0.02346, 0.0112, 0.00192], female: [0.02619, 0.01219, 0.001664] }, density: { fat: 900, lean: 1100 }, rest: 2.2,
+    swell: { male: [0.02345, 0.01071, 0.001684], female: [0.02607, 0.01163, 0.001549] }, density: { fat: 900, lean: 1100 }, rest: 2.2,
   },
   // How broad a body's skeleton is drawn (baseFrame): by its frame, and under the ordinary build a little by its weight.
   // `widths`: a small and a large frame's, against a medium one's. At a given stature and BMI ANSUR II's breadths between the
