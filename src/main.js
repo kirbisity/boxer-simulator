@@ -93,6 +93,7 @@ import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
+import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
 import { installStory } from './story/storyview.js';
 import { STORY_MUSTER_RADIUS, STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
 import { tkSetTier } from './townkit/place.js';
@@ -168,6 +169,14 @@ const shortName = (name) => {
 // The look (looks.js): ?look= over the one remembered. One that needs nothing loaded is in force before the scene is made; the others are switched to once the page is up.
 const startingLookId = lookIdFromSearch(location.search) ?? rememberedLookId() ?? OFFICIAL_LOOK_ID;
 activateLookNow(startingLookId);
+
+// The open air (env/): ?env=off draws every place as it was before it; ?weather=<name> (env/config.js ENV_WEATHER:
+// clear, cloudy, overcast, rain, mist, snow, dust) puts that weather on every place it draws. Before the scene is made, so the first place has them.
+{
+  const asked = new URLSearchParams(location.search);
+  if (asked.get('env') === 'off') envSetEnabled(null, false);
+  if (asked.get('weather')) envSetWeather(null, asked.get('weather'));
+}
 
 const scene = createScene($('#stage'));
 if (activeLook().id !== DEFAULT_LOOK_ID) reapplyPlace(scene);
@@ -788,6 +797,8 @@ function frame(now) {
   last = now;
   try {
     resolution.frame(scene, interval, adaptiveSize(state.world?.fighters.length ?? 0, Boolean(state.world?.stage)), { tiered: Boolean(state.world?.stage) });
+    // The open air's own tier (env/index.js): how much grass, leaf and drift this device draws in time.
+    envAdapt(scene, interval, qualityMode);
     // A V7 skin's maps by the stage's tier (render.js setSkinQuality): on 'low', no normal or roughness map.
     setSkinQuality(state.views, state.world?.stage ? resolution.tier ?? 'high' : 'high');
     // A big moment slows the simulation, not the drawing.
@@ -1350,6 +1361,7 @@ function drawWorld(dt, drawIt = true) {
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
   updateClothWind(scene, world);
+  envUpdate(scene, world);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
@@ -1774,6 +1786,13 @@ $('#camera-feel').addEventListener('click', (event) => {
   event.currentTarget.setAttribute('aria-expanded', String(!tuner.hidden));
 });
 $('#real-walk').addEventListener('click', () => enterSandboxLevel('real'));
+// The body picker (the game's base-mesh bodies, basebody.js, or V7 before them, to compare): fighters rebuilt in it at once.
+$('#body-style').value = BODY_STYLE;
+$('#body-style').addEventListener('change', (event) => {
+  if (!BODY_STYLES.includes(event.target.value)) return;
+  setBodyStyle(event.target.value);
+  newBout();
+});
 
 // An in-page question (no alert/confirm: a sandboxed page may not have them): `yes` runs when it is said yes to.
 function askConfirm(text, yesLabel, yes) {
@@ -3738,8 +3757,10 @@ function sheetInputs(sheet, row, value) {
   const inputs = normaliseInputs(structuredClone(sheet.rows[row]));
   if (sheet.field) return { ...inputs, look: { ...inputs.look, [sheet.field]: value } };
   if (value.outfit) return { ...inputs, outfit: value.outfit, accessories: value.accessories ?? defaultHeadgear(value.outfit.kind) };
-  const height = inputs.heightCm / 100;
-  return { ...inputs, calories: Math.round(caloriesForWeight(inputs, value.bmi * height * height, FRAMES[inputs.frame].lean)) };
+  // (A body option may name its frame too: the same weight on a small frame and a large one, side by side.)
+  const framed = value.frame ? { ...inputs, frame: value.frame } : inputs;
+  const height = framed.heightCm / 100;
+  return { ...framed, calories: Math.round(caloriesForWeight(framed, value.bmi * height * height, FRAMES[framed.frame].lean)) };
 }
 
 /** Line up every option of a sheet for one build (`row`), labelled, and frame them. */
@@ -3757,7 +3778,8 @@ function designSheet(kind, row = 0, closeUp = null, turn = 0, pick = null) {
   // Option A on the left as the camera sees it (+z is screen left).
   state.world.fighters.forEach((fighter, index) => {
     placeFighter(fighter, 0, (middle - entries[index].column) * spacing);
-    fighter.handsDown = true;
+    // A sheet stands at ease unless it asks for the guard (the shoulders are judged with the arms up).
+    fighter.handsDown = !sheet.guard;
     // Turn the bladed stance so the face, not the hips, points at the camera.
     fighter.yaw = -0.5 + turn;
   });
@@ -3911,7 +3933,7 @@ const boxer = window.boxer = {
   finishSkins: () => pumpSkinBuilds(scene, Infinity),
   // How skins are built (render.js SKIN_BUILD: workers, slice ms, reach), to tune or compare.
   skinBuild: SKIN_BUILD,
-  // The body style fighters are drawn in from the next build on (bodystyles.js: 'v7' the default, 'lofted' the old one); no argument: the one in force.
+  // The body style fighters are drawn in from the next build on (bodystyles.js: 'base' the default, 'v7' and 'lofted' the ones before it); no argument: the one in force.
   bodyStyle: (style) => {
     if (BODY_STYLES.includes(style)) setBodyStyle(style);
     return BODY_STYLE;
@@ -3920,6 +3942,17 @@ const boxer = window.boxer = {
   adaptiveResolution: (on) => {
     if (on !== undefined) resolution.set(on, scene);
     return resolution.info(scene);
+  },
+  // The open air (env/): put a weather on ('clear', 'cloudy', 'overcast', 'rain', 'mist', 'snow', 'dust'; null: each place's own), or with no
+  // argument say what is in force ({ on, place, weather, tier, weathers, wind }).
+  weather: (name) => {
+    if (name !== undefined) envSetWeather(scene, name);
+    return envInfo(scene);
+  },
+  // The open air on or off (off: every place as it was before it); no argument: what is in force.
+  env: (on) => {
+    if (on !== undefined) envSetEnabled(scene, on);
+    return envInfo(scene);
   },
   // The quality of the stage's picture: 'auto' (a ladder of pixels and tiers walked by the frame times), 'high' (everything, full pixels) or 'low' (the cheapest
   // picture, the fewest pixels); remembered. No argument: what it is doing now ({ mode, tier, ratio, ... }).

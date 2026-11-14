@@ -39,10 +39,25 @@ const SHARE = {
 };
 const DENSITY = { muscle: 1060, bone: 1850, fat: 900, other: 1050 };
 
-// Lengths as fractions of standing height (Drillis & Contini 1966).
+// Lengths as fractions of standing height (Drillis & Contini 1966); the arms and shoulders are ARM_LENGTHS', by sex.
 const LENGTH = {
   ankle: 0.039, shank: 0.246, thigh: 0.245, trunk: 0.27, neckToHead: 0.115,
-  upperArm: 0.186, forearmToFist: 0.19, hipSpan: 0.1, shoulderSpan: 0.2, headRadius: 0.055,
+  hipSpan: 0.1, headRadius: 0.055,
+};
+// The arms and shoulders, fractions of standing height, one table per sex (2026-11-11: "size down the entire
+// shoulder and arm assembly"; set to the numbers given). The figures now are the base models' own (src/basebody-data.js
+// joints): `upperArm` the shoulder joint to the elbow (male 0.1775, female 0.1623); `forearmToFist` the elbow to the point the
+// game's hand is drawn on, the model's elbow to wrist (male 0.1422, female 0.1300) and the hand's heel to its point
+// (basebody.js BASE_BODY.handSeat, 0.0117); `shoulderSpan` between the shoulder joints, narrower than the models' (male
+// 0.2022, female 0.1914) as asked. Were Drillis & Contini's 0.186 and 0.19 for both, and 0.2 (x 0.92 for a woman).
+// The arm's reach (upper arm and forearm to the fist, a share of height) the game's blows were timed and its fights spaced
+// at: Drillis & Contini's 0.186 + 0.19. A body's `reachScale` is its own reach over this at its height: a shorter arm straightens
+// in less time (an arm's blow is timed by its length, not its build: physics.js advances it 1 / reachScale as fast), and the
+// distances a fight was measured at are this much shorter for it.
+export const REACH_REFERENCE = 0.376;
+export const ARM_LENGTHS = {
+  male: { upperArm: 0.1775, forearmToFist: 0.1539, shoulderSpan: 0.19 },
+  female: { upperArm: 0.1623, forearmToFist: 0.1417, shoulderSpan: 0.17 },
 };
 
 export const FRAMES = {
@@ -979,9 +994,10 @@ export function buildBody(rawInputs) {
 
   // A build's own proportions (`lengths`, shares of height) over a man's.
   const lengths = {};
-  for (const [key, fraction] of Object.entries(LENGTH)) lengths[key] = (build?.lengths?.[key] ?? fraction) * heightM;
+  const own = { ...LENGTH, ...ARM_LENGTHS[inputs.sex === 'female' ? 'female' : 'male'] };
+  for (const [key, fraction] of Object.entries(own)) lengths[key] = (build?.lengths?.[key] ?? fraction) * heightM;
   lengths.hipSpan *= frame.width;
-  lengths.shoulderSpan *= frame.width * (inputs.sex === 'female' ? 0.92 : 1) * (1 + 0.06 * inputs.training);
+  lengths.shoulderSpan *= frame.width * (1 + 0.06 * inputs.training);
 
   // Training grows the arms (and shoulders) disproportionately; starvation
   // strips the limbs before the trunk. Shares are renormalised to sum to the
@@ -1116,6 +1132,7 @@ export function buildBody(rawInputs) {
     // His own skill, as far as his kit lets him use it (a helm bolted to the breast: half; OUTFITS skillFactor).
     skill: (inputs.skill ?? 0.5) * gear.skillFactor,
     reach: lengths.upperArm + lengths.forearmToFist,
+    reachScale: (lengths.upperArm + lengths.forearmToFist) / (REACH_REFERENCE * heightM),
     headMass,
     // Effective head mass at impact: a strong neck braces the head to the
     // trunk, and a trained fighter tucks the chin and tenses it in time; a

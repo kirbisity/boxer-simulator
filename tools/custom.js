@@ -17,9 +17,7 @@ export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KE
   || /^story\/(?!ground\/)/.test(name)
   // (The story's places and the kit they are built with: walked through level mode's stage and lit by its baked shadow, neither of them here.)
   || /^(townkit|places)\//.test(name)
-  || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name)
-  // (The base-model head's table: its head is off, PHOTO_HEAD.model.on.)
-  || name === 'headmodel-data';
+  || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
 const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];
@@ -33,7 +31,9 @@ export const CUSTOM_BUDGET = 15_000_000;
 // into; every other baked picture (the armour's, the cloth atlas, the helmets', the sky photograph, the photo faces) is kept whole.
 // The earth (0.7 MB: the green, the field, Sengoku) left out too on 2026-11-10, when the recorded ambience (every bed and one-shot
 // the synth made: ~0.8 MB of samples) took the page past the budget.
-export const CUSTOM_GROUND_TILES = ['sand', 'concrete', 'beach'];
+// With the base meshes the game's body (2026-11-14: basebody-data and the head lattices, about 1.4 MB on the page), the port's
+// concrete (0.5 MB) left out as well: the port is painted. About 0.1 MB of the budget is left.
+export const CUSTOM_GROUND_TILES = ['sand', 'beach'];
 
 /** Data modules cut down (as tools/bundle.js LITE does), by module: its one exported const → what is kept. */
 export const CUSTOM_DATA = {
@@ -57,9 +57,20 @@ const missing = (what) => `() => { throw new Error('${what}: not in the custom b
 
 /** Stand-ins for the excluded modules that kept code imports, by module (ES module source, as a module file would be). */
 export const CUSTOM_STUBS = {
-  // The base-model head is off (photohead.js PHOTO_HEAD.model.on): its table not carried.
-  'headmodel-data': `
-export const HEAD_MODEL_DATA = { polars: 0, azimuths: 0, male: {}, female: {} };
+  // (Unused here: the custom page carries the base meshes, the game's body, and the code that places them.)
+  'basebody-data': `
+export const BASE_BODY_DATA = null;
+`,
+  basebody: `
+export const baseBodyAvailable = () => false;
+export const baseHeatBones = () => null;
+export const baseStarvation = () => 0;
+export const baseStarvedDetail = () => null;
+export const baseBodyMesh = ${missing('the base meshes')};
+export const baseBodyUvs = ${missing('the base meshes')};
+export const measureBaseBody = ${missing('the base meshes')};
+export const placeBaseBody = ${missing('the base meshes')};
+export const baseBindJoints = ${missing('the base meshes')};
 `,
   // The story's places (src/places/, src/townkit/): not here; each an empty place under a plain light, should anything ask for one.
   'places/canaltown': `

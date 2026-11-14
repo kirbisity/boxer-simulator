@@ -10,13 +10,16 @@
 // cols, crop (torso, chest, legs), mat (standard, lambert, toon, physical: how
 // the skin is lit: the game's probe-lite look uses lambert), tone (clay or a
 // key of SKIN_TONES), pose (rest: arms lowered; bind: the A-pose the skin is
-// built in), cell (the flesh grid), relief (bump strength), perf (soft-shell
+// built in; game: arms lowered on the physics' own skeleton; stance: that on bent knees turned out; bend90, bend130, raised: the
+// elbows bent or the arms raised), dqs (off: a base-mesh body skinned by linear blending, not dual quaternions), cell (the flesh grid), relief (bump strength), perf (soft-shell
 // cost), fighter (knight, gambeson, helmet-fat, helmet-thin: one dressed
-// fighter instead of the progression).
+// fighter instead of the progression), motion (run, land, side: each chosen
+// build's fat masses through a move, fatslosh.js, a column per moment), outfit
+// (an outfits.js kind: the progression dressed in it), mark (roles drawn in loud colours).
 
 /* global THREE */
 import { buildBody, P, PRESETS } from '../src/body.js';
-import { BONES, BONE, boneFrames, frameMatrix } from '../src/rig.js';
+import { BONES, BONE, bindPoints, boneFrames, frameMatrix } from '../src/rig.js';
 import { buildSkinMesh, skinTexturesNow, styleSpec } from '../src/bodystyles.js';
 import { compositionKey, skinTextureCache } from '../src/skintex.js';
 import { buildHead } from '../src/face.js';
@@ -28,7 +31,14 @@ import { SKIN_TONES } from '../src/skintones.js';
 import { FLESH } from '../src/fleshbody.js';
 import { FACE_MORPH } from '../src/facemorph.js';
 import { SoftShell } from '../src/soft.js';
+import { FatSlosh } from '../src/fatslosh.js';
 import { surface } from '../src/toon.js';
+import { dualQuaternionSkinning } from '../src/dqskin.js';
+import { BASE_BODY } from '../src/basebody.js';
+import { elbowClearOfTrunk, restArmAngle } from '../src/pose.js';
+import { trunkAxes } from '../src/joints.js';
+// `shoulder` (A..E, D1, D2, none) picks a base-body shoulder design (basebody.js BASE_BODY.shoulder; D2 by default).
+if (new URLSearchParams(location.search).get('shoulder')) BASE_BODY.shoulder = new URLSearchParams(location.search).get('shoulder') === 'none' ? null : new URLSearchParams(location.search).get('shoulder');
 
 const query = new URLSearchParams(location.search);
 const STYLE = query.get('style') ?? 'lofted';
@@ -41,6 +51,40 @@ const CROP = query.get('crop');
 const MAT = query.get('mat') ?? 'standard';
 const TONE = query.get('tone') ?? 'clay';
 const POSE = query.get('pose') ?? 'rest';
+// `motion`: the fat masses through a move (fatslosh.js), the trunk's frame carried along a path; each build a run of columns.
+const MOTION = query.get('motion');
+// The moves, as the frame's path (m, from where it stands) and the moments drawn (s). Stepped at `rate` Hz.
+//   run   a running stride: the body's middle rising and falling 4 cm either way at the step rate, 2.8 Hz (170 steps a minute;
+//         a runner's centre of mass travels 6-10 cm up and down, Cavagna 1976), swaying 1.5 cm side to side at half of it
+//   land  a jump's fall from its height (0.5 m: 3.1 m/s at touchdown) stopped in 0.12 s by the knees, then standing
+//   side  a sidestep: 8 m/s² sideways for 0.15 s, the same back, then standing
+const MOVES = {
+  run: { path: (t) => [0, 0.04 * Math.sin(2 * Math.PI * 2.8 * t), 0.015 * Math.sin(Math.PI * 2.8 * t)], from: 2, moments: [0, 0.09, 0.18, 0.27, 0.36, 0.45, 0.54, 0.63] },
+  land: {
+    path: (t) => {
+      const g = 9.81;
+      const fall = 0.32;
+      const stop = 0.12;
+      const v = g * fall;
+      if (t < 0) return [0, 0.5, 0];
+      if (t < fall) return [0, 0.5 - 0.5 * g * t * t, 0];
+      const s = Math.min(t - fall, stop);
+      const a = v / stop;
+      return [0, 0.5 - 0.5 * g * fall * fall - (v * s - 0.5 * a * s * s), 0];
+    },
+    from: -0.5, moments: (query.get('moments') ?? '0.2,0.32,0.38,0.44,0.52,0.62,0.76,0.95').split(',').map(Number),
+  },
+  side: {
+    path: (t) => {
+      const a = 8;
+      const push = 0.15;
+      const z = t < 0 ? 0 : t < push ? 0.5 * a * t * t : t < 2 * push ? 0.5 * a * push * push + a * push * (t - push) - 0.5 * a * (t - push) ** 2 : a * push * push;
+      return [0, 0, z];
+    },
+    from: -0.5, moments: [0.05, 0.15, 0.25, 0.32, 0.4, 0.5, 0.65, 0.85],
+  },
+};
+const MOTION_RATE = 240;
 // `ruler`: the landmark heights measured on the emaciated reference (fractions of standing height), drawn over every cell.
 const RULER = query.get('ruler') !== null;
 const RULER_MARKS = [[1, 'crown'], [0.81, 'clavicles / notch'], [0.69, 'xiphoid'], [0.64, 'rib margin'], [0.6, 'waist'], [0.58, 'iliac crest'], [0.49, 'crotch']];
@@ -66,6 +110,8 @@ const SHEET = {
   labels: 62,
   // How far from the vertical the arms hang in the rest pose (degrees; the skin is built at 25).
   armRest: 11,
+  // The stance pose (pose=stance): sunk 8 cm on the knees, which turn out by half as much again sideways as forward.
+  stance: { sink: 0.08, out: 0.5 },
 };
 
 const stats = [];
@@ -98,8 +144,12 @@ function paint(built, body) {
   const roles = built.regions ? roleColors(dressFor(body.inputs, 0x888888), clay) : null;
   const plain = { skin: clay, kit: new THREE.Color(SHEET.trunks), top: new THREE.Color(SHEET.trunks), band: new THREE.Color(SHEET.waistband), trim2: new THREE.Color(SHEET.trunks), trim: new THREE.Color(SHEET.trunks) };
   const clothed = body.inputs.outfit.kind !== 'mma';
+  // `mark`: these roles (comma-separated) drawn in loud debugging colours, to see which layer is where.
+  const marked = (query.get('mark') ?? '').split(',').filter(Boolean);
+  const loud = [0xff00ff, 0x00ffff, 0xffff00, 0x00ff00].map((hex) => new THREE.Color(hex));
   built.regions?.forEach((region, vertex) => {
-    const color = (clothed ? roles[region] : plain[region] ?? roles[region]) ?? clay;
+    const mark = marked.indexOf(region);
+    const color = mark >= 0 ? loud[mark % loud.length] : (clothed ? roles[region] : plain[region] ?? roles[region]) ?? clay;
     colors.set([color.r, color.g, color.b], vertex * 3);
   });
   if (!built.regions) for (let vertex = 0; vertex < count; vertex += 1) colors.set([clay.r, clay.g, clay.b], vertex * 3);
@@ -134,7 +184,8 @@ function geometryOf(built, colors) {
 /** The particles with the arms lowered to `angle` degrees from the vertical (hanging, hands at the sides). */
 function restPoints(points, body, degrees) {
   const posed = points.map((point) => [...point]);
-  const angle = (degrees * Math.PI) / 180;
+  // (PROOF OF CONCEPT, shoulder-poc: the game's own rest hang, the angle that just clears his trunk's side: pose.js restArmAngle.)
+  const angle = degrees === SHEET.armRest ? restArmAngle(body) : (degrees * Math.PI) / 180;
   for (const [side, sign] of [['l', 1], ['r', -1]]) {
     const shoulder = points[P[`${side}Shoulder`]];
     const upper = body.lengths.upperArm;
@@ -144,6 +195,84 @@ function restPoints(points, body, degrees) {
     const unit = down.map((value) => value / length);
     posed[P[`${side}Elbow`]] = shoulder.map((value, axis) => value + unit[axis] * upper);
     posed[P[`${side}Hand`]] = shoulder.map((value, axis) => value + unit[axis] * (upper + fore));
+  }
+  return posed;
+}
+
+/**
+ * The arms posed on the physics' own skeleton (rig.js bindPoints), for the skinning's joints: `bend90`, `bend130` the upper
+ * arms hanging (SHEET.armRest) and the elbows bent forward by that many degrees; `raised` the arms straight out in front.
+ */
+function armPoints(points, body, kind) {
+  const posed = points.map((point) => [...point]);
+  const unit = (v) => {
+    const length = Math.hypot(...v);
+    return v.map((value) => value / length);
+  };
+  const rest = restArmAngle(body);
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    const shoulder = points[P[`${side}Shoulder`]];
+    const upper = body.lengths.upperArm;
+    const fore = body.lengths.forearmToFist;
+    const down = unit([0.04, -Math.cos(rest), sign * Math.sin(rest)]);
+    const upperDir = kind === 'raised' ? unit([1, -0.05, sign * 0.15]) : down;
+    const bend = kind === 'raised' ? 0 : (Number(kind.slice(4)) * Math.PI) / 180;
+    // (Bent forward in the plane of the hanging arm and the forward axis: down turned towards +x by `bend`.)
+    const foreDir = unit(down.map((value, axis) => value * Math.cos(bend) + [1, 0, 0][axis] * Math.sin(bend)));
+    const elbow = shoulder.map((value, axis) => value + upperDir[axis] * upper);
+    posed[P[`${side}Elbow`]] = elbow;
+    posed[P[`${side}Hand`]] = elbow.map((value, axis) => value + (kind === 'raised' ? upperDir : foreDir)[axis] * fore);
+  }
+  return posed;
+}
+
+/**
+ * A fight stance with the guard up (pose=guard): the stance's legs, each upper arm forward, down and a little out, each forearm
+ * up and in, the fists before the chin.
+ */
+function guardPoints(points, body) {
+  const posed = stancePoints(points, body);
+  const unit = (v) => {
+    const length = Math.hypot(...v);
+    return v.map((value) => value / length);
+  };
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    const shoulder = posed[P[`${side}Shoulder`]];
+    const upperDir = unit([0.55, -0.75, sign * 0.3]);
+    const foreDir = unit([0.35, 0.9, -sign * 0.3]);
+    let elbow = shoulder.map((value, axis) => value + upperDir[axis] * body.lengths.upperArm);
+    const hand = elbow.map((value, axis) => value + foreDir[axis] * body.lengths.forearmToFist);
+    // (The elbow clear of the trunk's side, as the game holds a guard: pose.js elbowClearOfTrunk.)
+    elbow = elbowClearOfTrunk(body, trunkAxes(posed[P.pelvis], posed[P.neck], posed[P.lShoulder], posed[P.rShoulder]), posed[P.pelvis], shoulder, elbow, hand);
+    posed[P[`${side}Elbow`]] = elbow;
+    posed[P[`${side}Hand`]] = hand;
+  }
+  return posed;
+}
+
+/**
+ * A fighter's stance on the physics' own skeleton (rig.js bindPoints), arms lowered: the body sunk `stance.sink` (m) on bent knees,
+ * each knee pushed forward and turned out by `stance.out` (its share sideways against forward), the feet where they stood; the
+ * legs' lengths kept. A stance shows how the skin follows the bones where they bend and turn (the knee and the thigh's roll).
+ */
+function stancePoints(points, body) {
+  const posed = restPoints(points, body, SHEET.armRest);
+  const sink = SHEET.stance.sink;
+  for (const name of Object.keys(P)) if (!/Foot$/.test(name)) posed[P[name]] = [posed[P[name]][0], posed[P[name]][1] - sink, posed[P[name]][2]];
+  for (const [side, sign] of [['l', 1], ['r', -1]]) {
+    const hip = posed[P[`${side}Hip`]];
+    const foot = posed[P[`${side}Foot`]];
+    const [upper, lower] = [body.lengths.thigh, body.lengths.shank];
+    const span = foot.map((value, axis) => value - hip[axis]);
+    const reach = Math.hypot(...span);
+    const unit = span.map((value) => value / reach);
+    const a = (upper * upper - lower * lower + reach * reach) / (2 * reach);
+    const h = Math.sqrt(Math.max(0, upper * upper - a * a));
+    const bend = [1, 0, sign * SHEET.stance.out];
+    const dot = bend.reduce((sum, value, axis) => sum + value * unit[axis], 0);
+    const across = bend.map((value, axis) => value - dot * unit[axis]);
+    const size = Math.hypot(...across);
+    posed[P[`${side}Knee`]] = hip.map((value, axis) => value + unit[axis] * a + (across[axis] / size) * h);
   }
   return posed;
 }
@@ -193,7 +322,8 @@ function addExtremities(group, body, built, frames, points, { helmet = null, hai
     // Skin-coloured parts are lit as the body is; the face's own features keep their tones.
     else if (object.material === skullSkin) object.material = faceMaterial;
   });
-  group.add(head.group);
+  // (`head=off`: the body alone, to tell the head's own neck from the body's.)
+  if (query.get('head') !== 'off') group.add(head.group);
   const dress = dressFor(body.inputs, 0x888888);
   const colors = { ...roleColors(dress, new THREE.Color(hex)), accent: dress.feet.accent };
   const plain = plainMaterial();
@@ -233,7 +363,8 @@ async function subjectFor(inputs, extras = {}) {
   // The maps made all at once (a background tab throttles the timers a sliced build would wait on); timed alone.
   const hitsBefore = skinTextureCache.hits;
   const textureStart = performance.now();
-  const maps = skinTexturesNow(body, STYLE, built);
+  // (`tex=off`: the skin without its maps, to tell their shading from the mesh's.)
+  const maps = query.get('tex') === 'off' ? null : skinTexturesNow(body, STYLE, built);
   const textured = maps ? { textures: maps, ms: performance.now() - textureStart, report: { key: compositionKey(body, STYLE), cached: skinTextureCache.hits > hitsBefore, bytes: maps.bytes } } : null;
   const coldMs = performance.now() - first;
   for (let run = 0; run < 2; run += 1) {
@@ -247,7 +378,11 @@ async function subjectFor(inputs, extras = {}) {
   let material = skinMaterial();
   if (textured) material = applySkinTextures(material, textured.textures, { relief: Number(query.get('relief') ?? 1), upgrade: Boolean(styleSpec(STYLE).tex.upgrade) });
   else if (built.detail) detailMaterial(material, built.detail, Number(query.get('relief') ?? 1));
-  const points = POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
+  // (`game`: the arms lowered on the physics' own skeleton, rig.js bindPoints, as the game holds a standing body; `rest` on the
+  // skeleton the skin was bound to, which the base style builds on the model's own joints.)
+  // (A base-mesh body skins by dual quaternions, as in the game (render.js SKIN_DQ); `dqs=off` draws it by linear blending.)
+  if (built.dualQuaternion && query.get('dqs') !== 'off') dualQuaternionSkinning(material);
+  const points = POSE === 'guard' ? guardPoints(bindPoints(body), body) : ['bend90', 'bend130', 'raised'].includes(POSE) ? armPoints(bindPoints(body), body, POSE) : POSE === 'stance' ? stancePoints(bindPoints(body), body) : POSE === 'game' ? restPoints(bindPoints(body), body, SHEET.armRest) : POSE === 'rest' ? restPoints(built.bindPoints, body, SHEET.armRest) : built.bindPoints;
   const frames = boneFrames(points, body);
   const skin = skinnedMesh(built, geometryOf(built, colors), material, frames);
   group.add(skin);
@@ -264,7 +399,27 @@ async function subjectFor(inputs, extras = {}) {
     for (let frame = 0; frame < 60; frame += 1) shell.update(1 / 60);
     softMs = { dent, update: (performance.now() - begin) / 60 };
   }
-  return { group, body, built, ms, texMs, coldMs, triangles, softMs, headY: points[P.head][1], textures: textured?.report ?? null, head };
+  return { group, body, built, ms, texMs, coldMs, triangles, softMs, headY: points[P.head][1], textures: textured?.report ?? null, head, skin, frames };
+}
+
+/** A subject's fat masses through the move (MOVES[MOTION]): a frame subject per moment, each carrying the skin's offsets then. */
+function motionFrames(subject) {
+  const move = MOVES[MOTION];
+  const { skin, frames, built } = subject;
+  if (!built.slosh) return [{ ...subject, moment: null }];
+  const shell = new SoftShell(null, null, 0.5, { mesh: skin, recomputeNormals: false });
+  const slosh = new FatSlosh(built.slosh, shell, built.bindFrames, BONES);
+  const out = [];
+  const dt = 1 / MOTION_RATE;
+  const wanted = [...move.moments];
+  for (let t = move.from; wanted.length; t += dt) {
+    const offset = move.path(t);
+    slosh.update(dt, frames.map((frame) => ({ ...frame, origin: frame.origin.map((value, axis) => value + offset[axis]) })));
+    if (t >= wanted[0] - dt / 2) {
+      out.push({ ...subject, moment: wanted.shift(), extra: Float32Array.from(shell.extra) });
+    }
+  }
+  return out;
 }
 
 // ---- Scene ---------------------------------------------------------------
@@ -299,6 +454,13 @@ function pointCamera(view, crop, subject) {
 }
 
 function shoot(subject, view) {
+  // A moment of a move: the skin at rest plus the masses' offsets then.
+  if (subject.extra) {
+    const positions = subject.skin.geometry.attributes.position;
+    const rest = subject.built.positions;
+    for (let index = 0; index < positions.array.length; index += 1) positions.array[index] = rest[index] + subject.extra[index];
+    positions.needsUpdate = true;
+  }
   scene.add(subject.group);
   pointCamera(view, CROP, subject);
   renderer.render(scene, camera);
@@ -332,10 +494,16 @@ function dressedFighters() {
 }
 
 async function main() {
-  const rows = query.get('fighter') ? dressedFighters() : progression(SEX);
+  // `outfit`: the progression dressed in an outfit (outfits.js kind, its first design), to see the clothes on every build.
+  const outfit = query.get('outfit');
+  const rows = query.get('fighter') ? dressedFighters() : progression(SEX).map((row) => (outfit ? { ...row, label: `${outfit} · ${row.label}`, inputs: { ...row.inputs, outfit: { kind: outfit, design: 0 } } } : row));
   const columns = rows.filter((row) => !ONLY || ONLY.includes(row.key));
   const subjects = [];
-  for (const column of columns) subjects.push({ column, ...(await subjectFor(column.inputs, column.extras)) });
+  for (const column of columns) {
+    const subject = { column, ...(await subjectFor(column.inputs, column.extras)) };
+    if (MOTION) subjects.push(...motionFrames(subject).map((frame) => ({ ...frame, column: { ...column, label: frame.moment === null ? `${column.label} (no masses)` : `${column.label} · ${MOTION} ${frame.moment.toFixed(2)} s` } })));
+    else subjects.push(subject);
+  }
   const width = CELL_W * SCALE;
   const height = CELL_H * SCALE;
   const sheet = document.createElement('canvas');

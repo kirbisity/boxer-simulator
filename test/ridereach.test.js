@@ -183,7 +183,9 @@ test('steering himself, a tap readies the blow for the pass: the reins stay his 
         const at = point(man.x, P.pelvis);
         const to = [at[0] - horse.at[0], at[2] - horse.at[1]];
         const distance = Math.hypot(to[0], to[1]);
-        const pass = [at[0] - (to[1] / distance) * 1.2 - horse.at[0], at[2] + (to[0] / distance) * 1.2 - horse.at[1]];
+        // (1.2 m at the reference reach, at his own: body.js REACH_REFERENCE.)
+        const off = 1.2 * me.body.reachScale;
+        const pass = [at[0] - (to[1] / distance) * off - horse.at[0], at[2] + (to[0] / distance) * off - horse.at[1]];
         orders.stick = { dir: vec.normalize([pass[0], 0, pass[1]]).filter((_, index) => index !== 1), amount: 1 };
         if (!tapped && distance < 8) {
           orders.requests.push({ move: 'gladiusCut', zone: 'head', strength: 'quick', at: world.time });

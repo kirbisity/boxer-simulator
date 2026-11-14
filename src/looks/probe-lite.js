@@ -116,7 +116,7 @@ function probeLiteBakeCube(size, radiance) {
 }
 
 /** Project a radiance function onto the nine SH coefficients of a LightProbe. */
-function probeLiteProject(sh, radiance) {
+export function probeLiteProject(sh, radiance) {
   const rgb = [0, 0, 0];
   const nTheta = 12;
   const nPhi = 24;

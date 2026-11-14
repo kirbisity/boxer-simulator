@@ -23,6 +23,7 @@
 import { hasOrigin, nearestRegion, regionGroup, regionShape, regionsFor, REGION_DETAIL, toneShift } from './faceregions.js';
 import { luminance, shadeColor } from './skintones.js';
 import { SCALP_GLSL } from './photohair.js';
+import { PHOTO_HEAD } from './photohead.js';
 
 /**
  * Where the landmarks sit in the atlas: u from the face's centre (eyes, ears); rows from the crown (eye line, lip line, chin, and
@@ -38,6 +39,11 @@ export const PHOTO_FACES = {
   vary: { blend: [0.15, 0.45], bright: 0.06, warm: 0.03, width: 0.06, eyeRow: 0.008, mouthRow: 0.012, region: 0.8, shape: 0.25, measured: 0.35 },
   // The face's ambient light, scaled: a fill, so a face under an overhead key is not darker and muddier than the chest beside it.
   fill: 1.8,
+  // Skin lets a light through it: the sun's light reaches this far past where a surface turns from it (as a share of the
+  // turn: lit to a cosine of -scatter), the whole no brighter for it (the lit side gives up what the turned side gains).
+  // Approximate, set by eye against the men's brow: its underside, turned just past the sun (the sockets are 8 to 9 mm
+  // deep under it), was a fifth of the cheek's light and a brown mask over the eyes; it is a third of it at 0.5.
+  scatter: 0.5,
   normalScale: 1,
 };
 
@@ -237,8 +243,9 @@ ${SCALP_GLSL}`;
  * The head's material for a face: lit (standard), the two faces' albedos blended in the shader with the fighter's detail painted
  * over them (shared masks: detail.png, wrinkles.png, pores.png; avg_shared.py), the first face's normal map with age lines and
  * pores, the shared roughness map, the body's marks and the face's shadow per vertex (photohead.js), a blink (the eyelids drawn
- * down over the eyes: `userData.lid`, 0 open to 1 shut), and a fill on the face's ambient light (PHOTO_FACES.fill). Its colour is
- * the fighter's skin (over the atlas' neutral). In a crowd (`painted`) its colours are per vertex instead (paintFromFace).
+ * down over the eyes: `userData.lid`, 0 open to 1 shut), a fill on the face's ambient light (PHOTO_FACES.fill) and the sun's
+ * light let a way through the skin (PHOTO_FACES.scatter). Its colour is the fighter's skin (over the atlas' neutral). In a crowd
+ * (`painted`) its colours are per vertex instead (paintFromFace).
  */
 export function photoSkinMaterial(cast, { painted = false } = {}) {
   const colour = new THREE.Color(cast.skin).multiplyScalar(1 / photoManifest.neutral);
@@ -250,13 +257,16 @@ export function photoSkinMaterial(cast, { painted = false } = {}) {
   const material = new THREE.MeshStandardMaterial({
     color: colour,
     map: photoTexture(`${cast.primary.key}-albedo.jpg`),
-    normalMap: photoTexture(`${cast.primary.key}-normal.png`),
+    // (On the head model its own relief, baked over its lattice: tools/blender/head/grid.py. Each face's own map is the drawn head's.)
+    normalMap: photoTexture(PHOTO_HEAD.model.on ? `relief-${cast.primary.sex}.png` : `${cast.primary.key}-normal.png`),
     roughnessMap: photoTexture('rough.png'),
     roughness: 1,
     metalness: 0,
     vertexColors: true,
   });
   material.normalScale.set(PHOTO_FACES.normalScale, PHOTO_FACES.normalScale);
+  // (The head model's map is baked in its lattice's own tangents, which its meshes carry: headlattice.js gridTangents.)
+  material.vertexTangents = PHOTO_HEAD.model.on;
   const pores = photoTexture('pores.png');
   pores.wrapT = THREE.RepeatWrapping;
   const skin = new THREE.Color(cast.skin);
@@ -280,6 +290,9 @@ export function photoSkinMaterial(cast, { painted = false } = {}) {
 	mapN.xy += ( texture2D( facePores, vUv * vec2( 40.0, 20.0 ) ).xy * 2.0 - 1.0 ) * 0.5 * faceMask.a;
 	float scalpN = faceScalp( vUv );
 	mapN.x += ( faceNoise( vec2( vUv.x * 900.0, ( 1.0 - vUv.y ) * 45.0 + faceHairSeed ) ) - 0.5 ) * 1.2 * scalpN;`);
+  const scatter = PHOTO_FACES.scatter.toFixed(3);
+  const lights = THREE.ShaderChunk.lights_physical_pars_fragment.replace('irradiance * BRDF_Diffuse_Lambert( material.diffuseColor )',
+    `( PI * directLight.color * saturate( ( dot( geometry.normal, directLight.direction ) + ${scatter} ) / ( ( 1.0 + ${scatter} ) * ( 1.0 + ${scatter} ) ) ) ) * BRDF_Diffuse_Lambert( material.diffuseColor )`);
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.fragmentShader = shader.fragmentShader
@@ -314,12 +327,13 @@ for (int side = -1; side <= 1; side += 2) {
 }
 diffuseColor *= texelColor;`)
       .replace('#include <normal_fragment_maps>', normals)
+      .replace('#include <lights_physical_pars_fragment>', lights)
       .replace('#include <lights_fragment_begin>', `#include <lights_fragment_begin>
 #if defined( RE_IndirectDiffuse )
 	irradiance *= faceFill;
 #endif`);
   };
-  material.customProgramCacheKey = () => 'photoface3';
+  material.customProgramCacheKey = () => 'photoface4';
   material.userData.photoFace = cast.id;
   material.userData.lid = uniforms.faceLid;
   material.userData.fill = uniforms.faceFill;
