@@ -516,15 +516,17 @@ export function envUpdate(view, world) {
   if (parts.beams) envBeamsLook(parts.beams, eye);
   // What stands on the ground, for the shade at its feet and the grass under them: the fighters nearest the camera.
   const bodies = u.uEnvBodies.value;
-  const [foot, hips] = ENV.shadow.bodies;
+  const [foot, hips, chest, head] = ENV.shadow.bodies;
   let filled = 0;
   if (world?.fighters) {
     const near = world.fighters.filter((fighter) => fighter?.x?.length >= 45).map((fighter) => ({ x: fighter.x, far: Math.hypot(fighter.x[24] - eye.x, fighter.x[26] - eye.z) })).sort((a, b) => a.far - b.far);
-    for (const { x } of near.slice(0, bodies.length / 3)) {
-      // (body.js: the hips are particle 8, the feet 13 and 14.)
+    for (const { x } of near.slice(0, bodies.length / 5)) {
+      // (body.js: the head is particle 0, the neck 1, the hips 8, the feet 13 and 14.)
       bodies[filled++].set(x[39], x[40], x[41], foot);
       bodies[filled++].set(x[42], x[43], x[44], foot);
       bodies[filled++].set(x[24], x[25], x[26], hips);
+      bodies[filled++].set(x[3], x[4], x[5], chest);
+      bodies[filled++].set(x[0], x[1], x[2], head);
     }
   }
   // Their middle and their reach: past `bodyReach` m from the farthest of them the shade is under a hundredth.

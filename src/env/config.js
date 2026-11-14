@@ -277,10 +277,12 @@ export const ENV = {
     // radius (m), hiding (r / d)^2 cos(angle from straight up) of the sky's light from a point d away (the form
     // factor of a small sphere, exact while it is clear of the horizon). `contact` times that: the legs and the
     // trunk between the spheres hide as much again (by eye).
-    bodies: [0.11, 0.22],
+    bodies: [0.11, 0.22, 0.2, 0.11],
     contact: 1.6,
-    // How many spheres the shaders take: three a fighter, the four fighters nearest the camera.
-    bodyCount: 12,
+    // `bodies`' third and fourth: the chest (at the neck's joint) and the head, which hide the sky from the
+    // ground only when a man is down on it (standing, they are a metre and a half up and count for nothing).
+    // How many spheres the shaders take: five a fighter, the four fighters nearest the camera.
+    bodyCount: 20,
     // How far from the farthest of them the shaders still count them (m): 2.5 m from the hips' sphere a metre up
     // hides 0.22^2 x 1 / 2.5^3 x contact = half a hundredth of the sky, under what an eye sees; the rest of the
     // field skips the count, which at a million blades was a third of the frame.
@@ -491,10 +493,20 @@ export const ENV = {
     // patches, wetter hollows), `taller` by this share of the place's grass and `darker` (greener, less gone
     // to straw). By eye against the first reference's mixed long grass.
     rank: { size: 3.4, share: 0.3, taller: 0.55, darker: 0.14 },
+    // How the land is used (terrain.js envBuildNearMap), the same rule over the whole place, the fought ground
+    // included. A grazed or trodden sward is a mosaic: lawns kept short among patches left rank, each `mosaic` m
+    // across (a place's `grass.grazed` is the lawns' share of the land, `grass.kept` their height). Where people
+    // walk (a place's `ground.paths` and `ground.worn`) the sward is shorter still and the earth shows: a path's
+    // or a yard's edge is ragged by `ragged` of its width, never a line.
+    mosaic: 11,
+    ragged: 0.8,
   },
 
   // ---- trees ----------------------------------------------------------------------------------------------------
   trees: {
+    // What grows no higher than this (m) is trodden through and stands on the fought ground as anywhere; a taller
+    // plant, a bush or a tree would stand in the fight with no solid in the physics, and is kept off the level ground.
+    underfoot: 0.4,
     // A crown is a cloud of leaf cards; how many by distance band (m from the centre): full near, fewer and
     // larger far off, the far woods a handful each.
     // `limbs`: the limbs under the crown are drawn too (near, where they are seen between the leaves).
@@ -549,6 +561,9 @@ export const ENV = {
     moss: 0x34481f,
     // At its foot the grass and the ground hide the sky from it: the sky's light there is this share.
     foot: 0.45,
+    // A stone no bigger than this (m, half its width) is set in the turf and stepped over: it lies on the fought
+    // ground as anywhere. A larger one would trip a man and has no solid in the physics: kept off the level ground.
+    underfoot: 0.13,
   },
 
   // ---- what falls and drifts --------------------------------------------------------------------------------------
@@ -633,6 +648,10 @@ export const ENV_TREES = {
   // (`cards`: how many leaf cards one plant has in the nearest band, where a tree has the band's own count). Dock and
   // burdock in an English meadow, butterbur (fuki) under Japanese cedar: blades 0.3-0.6 m long (approximate).
   dock: { height: [0.6, 1.2], crown: { wide: 0.5, tall: 0.42, at: 0.48 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 0.95, cards: 7, leaf: [0x33501f, 0x44642a, 0x26401c], bark: 0x3a4a26, trunk: 0.012, picture: 'blade' },
+  // The weeds of a grazed or trodden sward, a rosette of broad leaves flat to the ground that beasts leave and
+  // feet do not kill (plantain, dandelion, young dock and thistle: a hand to a forearm across, approximate). Low
+  // enough to be trodden through (ENV.trees.underfoot), so it grows on the fought ground as anywhere.
+  rosette: { height: [0.14, 0.34], crown: { wide: 0.8, tall: 0.4, at: 0.42 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 1.1, cards: 6, leaf: [0x3a5a22, 0x4a6a2c, 0x2c481e], bark: 0x3a4a26, trunk: 0.02, picture: 'blade' },
   // Bracken and fern: fronds fanning from the foot, to a man's waist or chest.
   bracken: { height: [0.7, 1.5], crown: { wide: 0.55, tall: 0.45, at: 0.5 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 0.9, cards: 8, leaf: [0x3a5622, 0x4c6a2a, 0x2c441e], bark: 0x3a4a26, trunk: 0.01, picture: 'frond' },
   // Autumn broadleaf among the pines (maple, zelkova): the valley's colour in October.
@@ -706,10 +725,16 @@ export const ENV_WEATHER = {
 // terrain: `seed`; `fall` the floor stands on a height and the land drops `drop` m between `from` and `to` m out;
 //   `layers` of relief, each { from, full: where it begins and is whole (m from the floor's edge), height, length
 //   (m: the size of a hill), shape: 'roll' (soft) | 'ridge' (crested) }, added together.
-// ground: `grass` and `dry` the two colours grass varies between, `soil`, `rock`; `floor` 0..1 how worn the fighting
-//   floor is (1 bare earth); `worn` extra bare patches [{ x, z, rx, rz, turn, by }].
-// grass: `height` m (least, most) outside the floor, `floorHeight` m on it, `dry` 0..1 share gone to straw,
-//   `flowers` 0..1 share of far tufts in flower and their colours.
+// ground: `grass` and `dry` the two colours grass varies between, `soil`, `rock`; `wear` 0..1 how much of the
+//   land is bare earth in patches, everywhere on the place (0: a patch here and there; 1: mostly earth); where
+//   people walk, by rule: `paths` [{ points: [[x, z], ...], width (m), by 0..1 }] trodden lines, and `worn`
+//   [{ x, z, rx, rz, turn, by }] trodden yards, both ragged-edged and broken by the ground's own patches.
+//   Nothing is cleared for the fight: the fought ground is the same land as the rest.
+// grass: `height` m (least, most) where it is left to grow, `grazed` 0..1 the share of the land kept short (by
+//   beasts, a scythe or feet) in lawns among the rank patches, `kept` m its height there and where it is trodden,
+//   `dry` 0..1 share gone to straw, `flowers` 0..1 share of far tufts in flower and their colours.
+//   (Before the fought ground was made one with the land these were `ground.floor` and `grass.floorHeight`, the
+//   wear and the height of a cleared floor: still read where the new ones are left out.)
 // trees: stands of ENV_TREES kinds, each { kind, count, from, to (m from the centre), clump 0..1 }.
 // rocks: stands of boulders, each { count, from, to (m from the middle), clump 0..1, size: [least, most] (m, half a
 // rock's width) }, laid as trees are planted; outcrops: knots of rock at a point, each { at: [x, z], radius (m),
@@ -743,8 +768,8 @@ export const ENV_PLACE_PLAIN = {
   air: { visibility: 30000, hazeHeight: 900 },
   clouds: { cover: 0.4 },
   // (Nothing is drawn from these two for a place that draws itself: the near map is laid out from them.)
-  ground: { grass: 0x55802c, dry: 0x9a9248, soil: 0x74603e, rock: 0x7d7a70, floor: 0, worn: [] },
-  grass: { height: [0.3, 0.6], floorHeight: 0.3, dry: 0, flowers: 0, flowerColours: [] },
+  ground: { grass: 0x55802c, dry: 0x9a9248, soil: 0x74603e, rock: 0x7d7a70, wear: 0, paths: [], worn: [] },
+  grass: { height: [0.3, 0.6], grazed: 0, kept: 0.3, dry: 0, flowers: 0, flowerColours: [] },
   trees: [],
   drift: [],
 };
@@ -772,11 +797,15 @@ export const PLACE_ENV = {
         { from: 2600, full: 5200, height: 520, length: 3600, shape: 'ridge' },
       ],
     },
-    ground: { grass: 0x425c2c, dry: 0x86843e, soil: 0x6b5638, rock: 0x7d7a70, floor: 0.2, worn: [{ x: 0, z: 0, rx: 8, rz: 2, turn: 0.2, by: 0.55 }] },
-    grass: { height: [0.3, 0.62], floorHeight: 0.09, dry: 0.2, flowers: 0.1, flowerColours: [0xf2efe0, 0xe8c83a, 0xc58ad0] },
+    // A pasture: about half of it grazed to a lawn a hand high among rank patches the beasts leave (round dung
+    // and in the wet), earth showing where they tread it, and a footpath across it that the fight happens to
+    // stand on: nothing is cleared for the fight. (The lawn's height is set where a boot's top still shows in
+    // it, so a planted foot and a man down are read; in the rank patches he parts the grass instead.)
+    ground: { grass: 0x425c2c, dry: 0x86843e, soil: 0x6b5638, rock: 0x7d7a70, wear: 0.2, paths: [{ points: [[-90, 15], [-34, 8], [-10, 4.6], [10, 3.2], [40, -3], [100, -9]], width: 1.1, by: 0.8 }], worn: [] },
+    grass: { height: [0.3, 0.62], grazed: 0.5, kept: 0.1, dry: 0.2, flowers: 0.1, flowerColours: [0xf2efe0, 0xe8c83a, 0xc58ad0] },
     // Stones lie about a chalk-and-flint down thinly; on the brow to the east the rock comes out of the turf,
     // with dock and bracken in its cracks: the near things the long view over the vale sits behind.
-    rocks: [{ count: 16, from: 30, to: 320, clump: 0.5, size: [0.3, 1.4] }],
+    rocks: [{ count: 16, from: 30, to: 320, clump: 0.5, size: [0.3, 1.4] }, { count: 260, from: 0, to: 70, clump: 0.5, size: [0.03, 0.12] }],
     outcrops: [{ at: [87, 13], radius: 6, rocks: 9, plants: 12, size: [0.4, 1.7] }],
     trees: [
       { kind: 'dock', count: 34, from: 13, to: 120, clump: 0.5 },
@@ -786,6 +815,7 @@ export const PLACE_ENV = {
       { kind: 'broadleaf', count: 260, from: 120, to: 520, clump: 0.95 },
       { kind: 'broadleaf', count: 9000, from: 480, to: 2600, clump: 0.995 },
       { kind: 'broadleaf', count: 900, from: 260, to: 640, clump: 0.995 },
+      { kind: 'rosette', count: 150, from: 0, to: 60, clump: 0.5 },
     ],
     // The far slopes are wooded: the land is painted the wood's colour wherever trees may stand (`cover` 1) and
     // the trees keep to it (`clump` above), so a hillside reads as a dark wood with a broken edge. At 0.6 with a
@@ -815,15 +845,18 @@ export const PLACE_ENV = {
         { from: 1500, full: 4200, height: 440, length: 3000, shape: 'ridge' },
       ],
     },
-    ground: { grass: 0x48622e, dry: 0x8e8844, soil: 0x74603e, rock: 0x7d7a70, floor: 0.22, worn: [{ x: 0, z: 0, rx: 30, rz: 8, turn: 0, by: 0.35 }] },
-    grass: { height: [0.32, 0.7], floorHeight: 0.1, dry: 0.4, flowers: 0.03, flowerColours: [0xf2efe0, 0xe8c83a] },
-    rocks: [{ count: 6, from: 30, to: 200, clump: 0.3, size: [0.3, 0.8] }],
+    // Horse pasture at the end of summer: grazed close over a little more than half of it, the rest standing
+    // in seed and gone to straw, and a ridden track across it worn to the earth by hooves.
+    ground: { grass: 0x48622e, dry: 0x8e8844, soil: 0x74603e, rock: 0x7d7a70, wear: 0.16, paths: [{ points: [[-170, 16], [-60, 1], [-14, -4.4], [26, -6], [90, -7], [180, -24]], width: 1.8, by: 0.65 }], worn: [] },
+    grass: { height: [0.32, 0.7], grazed: 0.55, kept: 0.11, dry: 0.4, flowers: 0.03, flowerColours: [0xf2efe0, 0xe8c83a] },
+    rocks: [{ count: 6, from: 30, to: 200, clump: 0.3, size: [0.3, 0.8] }, { count: 160, from: 0, to: 80, clump: 0.4, size: [0.03, 0.1] }],
     trees: [
       { kind: 'dock', count: 24, from: 14, to: 120, clump: 0.5 },
       { kind: 'broadleaf', count: 34, from: 62, to: 240, clump: 0.85 },
       { kind: 'shrub', count: 14, from: 40, to: 200, clump: 0.85 },
       { kind: 'broadleaf', count: 300, from: 240, to: 700, clump: 0.9 },
       { kind: 'broadleaf', count: 1800, from: 650, to: 2600, clump: 0.97 },
+      { kind: 'rosette', count: 110, from: 0, to: 70, clump: 0.5 },
     ],
     woods: { cover: 0.4, colour: 0x38522c },
     drift: [{ kind: 'motes', share: 0.4, colours: [0xe8e4d0] }, { kind: 'litter', share: 0.8, colours: [0xb0a060, 0x8a7a3a, 0xa09050] }],
@@ -857,12 +890,23 @@ export const PLACE_ENV = {
         { from: 2600, full: 7000, height: 1250, length: 4600, shape: 'ridge' },
       ],
     },
-    ground: { grass: 0x3e5a2a, dry: 0x8a7c40, soil: 0x5a4832, rock: 0x77756e, floor: 0.6, worn: [{ x: 0, z: 0, rx: 12, rz: 6, turn: 0, by: 0.7 }] },
+    // A camp, not a ring: nothing is grazed, and what is short is what the camp treads. The way between the two
+    // curtained camps (they stand at either end, along x), the way out through the palisade toward the wood,
+    // and the middle, where men gather: worn by rule, ragged at the edges, grass standing in what nobody crosses.
+    ground: {
+      grass: 0x3e5a2a, dry: 0x8a7c40, soil: 0x5a4832, rock: 0x77756e, wear: 0.24,
+      paths: [
+        { points: [[-46, 5], [-15, 0.8], [0, 0], [15, -0.8], [46, -6]], width: 3.4, by: 0.9 },
+        { points: [[0, 0], [1.5, -9.5], [5, -22], [3, -42]], width: 1.8, by: 0.75 },
+        { points: [[-1, 0], [-3, 9.5], [-9, 30]], width: 1.4, by: 0.6 },
+      ],
+      worn: [{ x: 0, z: 0, rx: 7.5, rz: 4.5, turn: 0.1, by: 0.45 }],
+    },
     // (Little dry grass: a damp valley floor in a wood's shade stays green; at 0.2 the lit grass measured a
     // hue of 73 degrees, olive, against 88 in the reference wood; at 0.06, 78.)
-    grass: { height: [0.35, 0.8], floorHeight: 0.05, dry: 0.06, flowers: 0, flowerColours: [] },
+    grass: { height: [0.35, 0.8], grazed: 0.2, kept: 0.08, dry: 0.06, flowers: 0, flowerColours: [] },
     // The valley's own rock shows through the wood's floor, mossed; butterbur and fern grow under the cedars.
-    rocks: [{ count: 36, from: 16, to: 120, clump: 0.5, size: [0.3, 1.4] }],
+    rocks: [{ count: 36, from: 16, to: 120, clump: 0.5, size: [0.3, 1.4] }, { count: 380, from: 0, to: 60, clump: 0.5, size: [0.03, 0.13] }],
     // The wood stands close: 490 stems between 19 and 90 m is about 200 to the hectare, against several hundred
     // in a planted cedar wood and one to three hundred in old mixed forest (both approximate), so trunks rank
     // behind trunks into the mist; thinner past 90 m, where the mist has taken the gaps anyway. The ride is the
@@ -877,6 +921,7 @@ export const PLACE_ENV = {
       { kind: 'pine', count: 300, from: 90, to: 150, clump: 0.5 },
       { kind: 'pine', count: 420, from: 150, to: 520, clump: 0.6 },
       { kind: 'pine', count: 2600, from: 480, to: 2400, clump: 0.5 },
+      { kind: 'rosette', count: 160, from: 0, to: 50, clump: 0.5 },
     ],
     rides: [{ azimuth: -0.4, width: 12, length: 130 }],
     woods: { cover: 0.9, colour: 0x2c4430 },
