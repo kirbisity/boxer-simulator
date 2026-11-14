@@ -15,6 +15,8 @@ export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KE
   || /^audio\/music\/data\//.test(name)
   // (Story mode's ground, its walls and ladders, is kept: worksview.js draws ladders on any battle's works.)
   || /^story\/(?!ground\/)/.test(name)
+  // (The story's places and the kit they are built with: walked through level mode's stage and lit by its baked shadow, neither of them here.)
+  || /^(townkit|places)\//.test(name)
   || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name)
   // (The base-model head's table: its head is off, PHOTO_HEAD.model.on.)
   || name === 'headmodel-data';
@@ -58,6 +60,32 @@ export const CUSTOM_STUBS = {
   // The base-model head is off (photohead.js PHOTO_HEAD.model.on): its table not carried.
   'headmodel-data': `
 export const HEAD_MODEL_DATA = { polars: 0, azimuths: 0, male: {}, female: {} };
+`,
+  // The story's places (src/places/, src/townkit/): not here; each an empty place under a plain light, should anything ask for one.
+  'places/canaltown': `
+export const CANAL_TOWN_LIGHT = { background: 0x9aa4aa, fog: [60, 400], far: 520, key: 0xffffff, keyIntensity: 0.1, rim: 0xffffff, sun: 0.85, hemi: 0.7 };
+export function buildCanalTown() {
+  return new THREE.Group();
+}
+`,
+  'places/pyongyang': `
+export const PYONGYANG_LIGHT = { background: 0xd3dbe2, fog: [150, 1500], far: 2400, key: 0xffffff, keyIntensity: 0.1, rim: 0xffffff, sun: 1, hemi: 0.62 };
+export function buildPyongyang() {
+  return new THREE.Group();
+}
+`,
+  'places/storyplaces': `
+export const STORY_PLACES = {};
+export const STORY_MUSTER_RADIUS = 0;
+export function storyPlaceWeather() {
+  return null;
+}
+`,
+  'townkit/place': `
+export function tkSetTier() {}
+`,
+  'townkit/weather': `
+export const tkWeatherNow = () => ({});
 `,
   // Story mode (src/story/): not here; the page's hooks into it inert.
   'story/storyview': `
@@ -183,6 +211,7 @@ export const travelTo = () => false;
 `,
   'levelmode/stage': `
 export const cameraTerrain = () => null;
+export const createStageWorld = ${missing('a stage to walk')};
 export const interiorAt = () => false;
 export const mechanismsOf = () => [];
 export const pullLever = () => false;
