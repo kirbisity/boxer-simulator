@@ -1778,6 +1778,13 @@ $('#camera-feel').addEventListener('click', (event) => {
   event.currentTarget.setAttribute('aria-expanded', String(!tuner.hidden));
 });
 $('#real-walk').addEventListener('click', () => enterSandboxLevel('real'));
+// The body picker (the game's base-mesh bodies, basebody.js, or V7 before them, to compare): fighters rebuilt in it at once.
+$('#body-style').value = BODY_STYLE;
+$('#body-style').addEventListener('change', (event) => {
+  if (!BODY_STYLES.includes(event.target.value)) return;
+  setBodyStyle(event.target.value);
+  newBout();
+});
 
 // An in-page question (no alert/confirm: a sandboxed page may not have them): `yes` runs when it is said yes to.
 function askConfirm(text, yesLabel, yes) {
@@ -3679,8 +3686,10 @@ function sheetInputs(sheet, row, value) {
   const inputs = normaliseInputs(structuredClone(sheet.rows[row]));
   if (sheet.field) return { ...inputs, look: { ...inputs.look, [sheet.field]: value } };
   if (value.outfit) return { ...inputs, outfit: value.outfit, accessories: value.accessories ?? defaultHeadgear(value.outfit.kind) };
-  const height = inputs.heightCm / 100;
-  return { ...inputs, calories: Math.round(caloriesForWeight(inputs, value.bmi * height * height, FRAMES[inputs.frame].lean)) };
+  // (A body option may name its frame too: the same weight on a small frame and a large one, side by side.)
+  const framed = value.frame ? { ...inputs, frame: value.frame } : inputs;
+  const height = framed.heightCm / 100;
+  return { ...framed, calories: Math.round(caloriesForWeight(framed, value.bmi * height * height, FRAMES[framed.frame].lean)) };
 }
 
 /** Line up every option of a sheet for one build (`row`), labelled, and frame them. */
@@ -3698,7 +3707,8 @@ function designSheet(kind, row = 0, closeUp = null, turn = 0, pick = null) {
   // Option A on the left as the camera sees it (+z is screen left).
   state.world.fighters.forEach((fighter, index) => {
     placeFighter(fighter, 0, (middle - entries[index].column) * spacing);
-    fighter.handsDown = true;
+    // A sheet stands at ease unless it asks for the guard (the shoulders are judged with the arms up).
+    fighter.handsDown = !sheet.guard;
     // Turn the bladed stance so the face, not the hips, points at the camera.
     fighter.yaw = -0.5 + turn;
   });
@@ -3852,7 +3862,7 @@ const boxer = window.boxer = {
   finishSkins: () => pumpSkinBuilds(scene, Infinity),
   // How skins are built (render.js SKIN_BUILD: workers, slice ms, reach), to tune or compare.
   skinBuild: SKIN_BUILD,
-  // The body style fighters are drawn in from the next build on (bodystyles.js: 'v7' the default, 'lofted' the old one); no argument: the one in force.
+  // The body style fighters are drawn in from the next build on (bodystyles.js: 'base' the default, 'v7' and 'lofted' the ones before it); no argument: the one in force.
   bodyStyle: (style) => {
     if (BODY_STYLES.includes(style)) setBodyStyle(style);
     return BODY_STYLE;

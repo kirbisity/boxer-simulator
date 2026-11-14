@@ -21,6 +21,8 @@ import { assignColour } from './looks/kit.js';
 import { FACE_MORPH, faceMarks, faceMorphKey, faceMorphWeights, morphHeadPoint } from './facemorph.js';
 import { paintFromFace, PHOTO_ATLAS, photoSkinMaterial } from './photoface.js';
 import { buildPhotoHead, PHOTO_HEAD } from './photohead.js';
+import { HEAD_GRID_DATA } from './headgrid-data.js';
+import { buildLatticeHead } from './headlattice.js';
 import { buildPhotoBeard, photoScalp, scalpCover } from './photohair.js';
 import { buildHairMass, buildHairRim, headEllipsoid } from './hairmass.js';
 import { buildHairSwing, HAIR_SWING } from './hairswing.js';
@@ -358,8 +360,9 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const drawn = photo ? photoShape(female, morph) : FACE_SHAPES[look.faceShape] ?? FACE_SHAPES[female ? 'shonen' : 'seinen'];
   let shape = morph ? { ...drawn, morph } : drawn;
   const unmorphed = { ...drawn, morph: null };
-  const photoHead = photo ? buildPhotoHead({
-    radius: r,
+  // (On the head model, headlattice.js, or the drawn head: PHOTO_HEAD.model.on.)
+  const photoHead = photo ? (PHOTO_HEAD.model.on ? buildLatticeHead : buildPhotoHead)({
+    data: HEAD_GRID_DATA, radius: r,
     deform: (x, y, z) => deformPoint(x, y, z, unmorphed).map((value, axis) => value / SKULL[axis]),
     skull: SKULL, shape, eyeLine: FACE.eyeLine, atlas: PHOTO_ATLAS, region: photo.shape, jitter: photo.jitter, coarse: Boolean(look.photoPainted), female,
   }) : null;
@@ -381,28 +384,16 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     skullGeometry.setAttribute('position', new THREE.Float32BufferAttribute(photoHead.positions, 3));
     skullGeometry.setAttribute('normal', new THREE.BufferAttribute(photoHead.normals, 3));
     skullGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(photoHead.uvs, 2));
+    if (photoHead.tangents) skullGeometry.setAttribute('tangent', new THREE.BufferAttribute(photoHead.tangents, 4));
     skullGeometry.setAttribute('color', new THREE.Float32BufferAttribute(photoHead.colors, 3));
     skullGeometry.setIndex(photoHead.indices);
     if (look.photoPainted) paintFromFace(skullGeometry, photo);
   } else skullGeometry = headGeometry(r, shape, morph ? 48 : 36);
-  // (On the base model's own mesh, its nose, lips and eyelids are modelled: the photo's relief map, drawn for a generic face,
-  // would set a second nose and mouth on them; only a little of its fine detail is kept.)
-  if (photoHead?.ears && skinMaterial.normalScale) skinMaterial.normalScale.set(0.2, 0.2);
-  // (Tried plain: the base model's mesh in the photo's skin tone only, no photo laid on it.)
-  if (photoHead?.ears && PHOTO_HEAD.model.plain && skinMaterial.map) {
-    const flatTone = new THREE.DataTexture(new Uint8Array([204, 204, 204, 255]), 1, 1, THREE.RGBAFormat);
-    flatTone.needsUpdate = true;
-    skinMaterial.map = flatTone;
-    if (skinMaterial.userData.scalp?.faceMap2) skinMaterial.userData.scalp.faceMap2.value = flatTone;
-    skinMaterial.normalMap = null;
-    skinMaterial.needsUpdate = true;
-  }
-  // (A photo head keeps its own normals, the face's softened: photohead.js.)
+  // (A photo head keeps its own normals: photohead.js, headlattice.js.)
   const skull = new SoftShell(skullGeometry, skinMaterial, body.segments.head.fleshFirmness, { recomputeNormals: !photoHead });
   group.add(skull.mesh);
   skull.mesh.add(outlineFor(skull.mesh, 0.0035));
-  // (A head with its own ears, the base model's mesh, has none drawn.)
-  for (const side of photoHead?.ears ? [] : [1, -1]) {
+  for (const side of [1, -1]) {
     const ear = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), skinMaterial);
     ear.scale.set(0.12 * r, 0.22 * r, 0.05 * r);
     ear.position.set(-0.06 * r, -0.08 * r, side * SKULL[2] * r * 0.98);
@@ -420,6 +411,18 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
       const uv = ear.geometry.attributes.uv;
       for (let index = 0; index < position.count; index += 1) uv.setXY(index, ...photoHead.uvAt(position.getX(index), position.getY(index), position.getZ(index)));
       ear.geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Array(position.count * 3).fill(1), 3));
+      if (photoHead.tangents) {
+        // (The head's material reads its normal map in the mesh's own tangents, headlattice.js gridTangents: an ear's, where
+        // that map is flat, need only be square to its normals.)
+        const normal = ear.geometry.attributes.normal;
+        const tangents = new Float32Array(position.count * 4);
+        for (let index = 0; index < position.count; index += 1) {
+          const across = new THREE.Vector3(0, 1, 0).cross(new THREE.Vector3().fromBufferAttribute(normal, index));
+          if (across.lengthSq() < 1e-6) across.set(1, 0, 0);
+          tangents.set([...across.normalize().toArray(), -1], index * 4);
+        }
+        ear.geometry.setAttribute('tangent', new THREE.BufferAttribute(tangents, 4));
+      }
       if (look.photoPainted) paintFromFace(ear.geometry, photo);
     }
     group.add(ear);

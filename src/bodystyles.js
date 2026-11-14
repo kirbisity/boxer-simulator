@@ -4,7 +4,8 @@
 // every module this imports is plain numbers too, so every style can be built
 // and checked in Node.
 //
-// 'v7' is the default (DEFAULT_BODY_STYLE); 'lofted' the old default and the baseline. 'smoothed' and 'dense' are the
+// 'base' is the default (DEFAULT_BODY_STYLE: the modelled bodies, since 2026-11-14); 'v7' the default before it, 'lofted' the
+// one before that and the baseline. 'smoothed' and 'dense' are the
 // anatomy field (bodymesh.js), 'faceted' the loft in flat low poly.
 //
 // Round one of the body-drawing prototypes (docs: tools/bodysheet.html):
@@ -24,10 +25,14 @@
 //   v6  flesh hero: the refined field at full resolution, painted per vertex
 //   v7  V5's shape on a loft: a medium-density loft (V2's texture coordinates, skin weights and maps) wrapped onto the refined
 //       field's large forms (loftbody.js wrapOnField), so the arms grow out of the trunk as in V5 at a fifth of its triangles
+// The base meshes (2026-11-10):
+//   base  the modelled male and female bodies (basebody.js) placed on the loft's rings, so every build moves them as it
+//         moves the loft; V2's texture coordinates and maps, the loft's clothes and armour over them. The game's body (DEFAULT_BODY_STYLE).
 // Every round-two style also morphs the face with the body (the `face` flag; the head is built in face.js).
 
 import { buildBodyMesh } from './bodymesh.js';
-import { buildLoftBody, buildLoftBodySteps, runSteps } from './loftbody.js';
+import { baseBoneRelief, baseLoftOptions, baseRigOf, buildLoftBody, buildLoftBodySteps, LOFT, runSteps } from './loftbody.js';
+import { BASE_BODY, baseStarvedDetail } from './basebody.js';
 import { outfitOf } from './outfits.js';
 import { buildFleshBody, fleshAnatomy, fleshField } from './fleshbody.js';
 import { buildDetailMap } from './skindetail.js';
@@ -53,10 +58,19 @@ export const STYLE_SPECS = {
   v5: { face: true, label: 'V5 flesh-lite, painted' },
   v6: { face: true, label: 'V6 flesh hero, painted' },
   v7: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0, upgrade: true }, label: 'V7 flesh-wrapped loft + V2 maps' },
+  // (PROOF OF CONCEPT, shoulder-poc, 2026-11-11: the muscle and bone maps back on the base meshes, `share`
+  // 0.35: the model's own relief carries about a third of it, and at v7's 0 a thin man's ribs read as starved beside v7's. With the skin placed on the model's own joints and frames (basebody.js baseBindJoints), the rules' kneecap sits on
+  // the knee's front, the shin's crest down the shin and the abs on the abs at every build; at `share` 1 (round 1) they were left
+  // out, when the loft's angles still turned against the model.)
+  base: { face: true, tex: { source: 'rules', layers: ALL_MAPS, share: 0.35, upgrade: true }, label: 'Base meshes + V2 maps' },
 };
 export const BODY_STYLE_KEYS = Object.keys(STYLE_SPECS);
-/** The style fighters are drawn in unless a look says otherwise: V7. ('lofted', the plain loft, is the old default and the placeholder while V7 is built.) */
-export const DEFAULT_BODY_STYLE = 'v7';
+/**
+ * The style fighters are drawn in unless a look says otherwise: the base meshes ('base'; where a build leaves them out, tools/custom.js,
+ * loftbody.js draws the loft they are placed on instead). 'lofted', the plain loft, is the placeholder while a body is built; 'v7' the
+ * default before the base meshes, still to be had.
+ */
+export const DEFAULT_BODY_STYLE = 'base';
 
 /** What a style does beyond the mesh (see STYLE_SPECS); an unknown style does nothing more (the plain loft's). */
 export const styleSpec = (style) => STYLE_SPECS[style] ?? STYLE_SPECS.lofted;
@@ -100,6 +114,7 @@ export function* buildSkinMeshSteps(body, style) {
     const armoured = Boolean(outfitOf(body.inputs).look.armor);
     return yield* buildLoftBodySteps(body, { sculpt: 'rules', rules: { share: 0, density: 'medium' }, hideCovered: true, ...(armoured ? {} : { wrap: coarseField(body) }) });
   }
+  if (style === 'base') return yield* buildLoftBodySteps(body, { ...baseLoftOptions(false), base: true });
   switch (style) {
     case 'lofted': return buildLoftBody(body);
     case 'sculpt': return buildLoftBody(body, { sculpt: true });
@@ -115,10 +130,18 @@ export function* buildSkinMeshSteps(body, style) {
   }
 }
 
+/** How much of the base style's emaciated relief a body shows, 1 to 0 (loftbody.js baseBoneRelief: through its own cover). */
+function boneRelief(body) {
+  if (!BASE_BODY.family.use) return 0;
+  return baseBoneRelief(body, baseRigOf(body.inputs.sex === 'female' ? 'female' : 'male', false).height);
+}
+
 /** The slices of work that make a style's maps for a built body (see skintex.js). */
 function stepsFor(body, style, built) {
   const spec = styleSpec(style).tex;
-  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built) });
+  // (The base style's trunk takes its bones from the emaciated reference's relief, by how much of it the body's cover shows.)
+  const starved = style === 'base' ? baseStarvedDetail(body, boneRelief(body)) : null;
+  return skinTextureSteps(body, { mesh: built, source: spec.source, field: spec.source === 'field' ? refinedField(body) : null, layers: spec.layers, share: spec.share, covered: coverOf(built), starved, folds: style !== 'base', armFade: style === 'base' ? BASE_BODY.starveDetail : null });
 }
 
 /** A built body's maps made now, not looked up or kept (the skin worker's: it hands them over). */
@@ -130,8 +153,8 @@ export function makeSkinTextures(body, style, built) {
 /** What a built body leaves out under armour (its maps leave it blank too), or null. */
 const coverOf = (built) => (built.hiddenTriangles ? built.covered : null);
 
-/** The cache key of a built body's maps. */
-export const skinTextureKey = (body, style, built) => compositionKey(body, style, coverOf(built));
+/** The cache key of a built body's maps (the base style's also by how much of its bone relief shows: LOFT.boneCover.bucket). */
+export const skinTextureKey = (body, style, built) => compositionKey(body, style, coverOf(built)) + (style === 'base' ? `|r${Math.round(boneRelief(body) / LOFT.boneCover.bucket)}` : '');
 
 /** A built body's maps if its bucket's are made (or it has none to make: true), without making them. */
 export function readySkinTextures(body, style, built) {

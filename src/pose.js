@@ -45,7 +45,63 @@ export const POSE = {
   kneeOut: 0.35,
   // Which way a runner's elbow points (intent.runArms): back and down, a little out from his side.
   runElbow: [-1, -0.5, 0.15],
+  // A free arm hangs (and a guard's elbow sits) just clear of the trunk's side, its inner surface `margin` m off it: the
+  // trunk an ellipse round its axis of the body's own equivalent radius (body.js segments.trunk.skinRadius, fat included),
+  // `widthShare` of it across and its inverse fore and aft (ANSUR II, 2012, public data: mean waist breadth 32.6 cm and depth
+  // 23.8 cm for men, 30.0 and 21.3 for women, about 1.4 times as wide as deep: √1.37), and the arm's own girth (segments.lUpperArm.skinRadius) beside it. A thin man's arm rests against his
+  // flank and a fat man's on the side of his trunk, so the margin is nothing: they touch. Thin, the arms hang close; fat, they
+  // stand out (about 6 degrees from the vertical for a thin man, 27 for an obese one). (PROOF OF CONCEPT, shoulder-poc.)
+  armClear: { widthShare: 1.17, margin: 0 },
 };
+
+/** The trunk's half-width and half-depth a free arm's inner surface clears, plus that arm's girth (m): POSE.armClear. */
+export function armClearance(body) {
+  const trunk = body.segments.trunk.skinRadius;
+  const arm = body.segments.lUpperArm.skinRadius;
+  const spec = POSE.armClear;
+  return { across: trunk * spec.widthShare + arm + spec.margin, fore: trunk / spec.widthShare + arm + spec.margin };
+}
+
+/**
+ * The angle (radians from the vertical) an upper arm hangs at, at rest: just enough that its elbow's inner surface clears
+ * the trunk's side (armClearance), from the shoulder joint's own width (lengths.shoulderSpan); never under `least` (3 degrees,
+ * the arm's own hang off the shoulder's slope).
+ */
+export function restArmAngle(body) {
+  const least = (3 * Math.PI) / 180;
+  const need = armClearance(body).across - body.lengths.shoulderSpan / 2;
+  return Math.max(least, Math.asin(Math.min(0.9, Math.max(0, need / body.lengths.upperArm))));
+}
+
+/**
+ * The elbow turned about the shoulder–hand line (its hand and its shoulder kept) until it stands clear of the trunk
+ * (armClearance, an ellipse round the pelvis–neck axis in the shoulders' frame `axes`), by the least turn either way.
+ */
+export function elbowClearOfTrunk(body, axes, pelvis, shoulder, elbow, hand) {
+  if (!axes) return elbow;
+  const clear = armClearance(body);
+  const outside = (point) => {
+    const rel = vec.sub(point, pelvis);
+    const across = vec.dot(rel, axes.left);
+    const fore = vec.dot(rel, axes.forward);
+    return (across / clear.across) ** 2 + (fore / clear.fore) ** 2;
+  };
+  if (outside(elbow) >= 1) return elbow;
+  const line = vec.sub(hand, shoulder);
+  const length = vec.length(line);
+  if (length < 1e-6) return elbow;
+  const axis = vec.scale(line, 1 / length);
+  const centre = vec.add(shoulder, vec.scale(axis, vec.dot(vec.sub(elbow, shoulder), axis)));
+  const arm = vec.sub(elbow, centre);
+  const turned = (angle) => vec.add(centre, vec.add(vec.scale(arm, Math.cos(angle)), vec.scale(vec.cross(axis, arm), Math.sin(angle))));
+  for (let step = 1; step <= 24; step += 1) {
+    for (const sign of [1, -1]) {
+      const candidate = turned((sign * step * Math.PI) / 24);
+      if (outside(candidate) >= 1) return candidate;
+    }
+  }
+  return elbow;
+}
 
 export const vec = {
   add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
@@ -317,6 +373,8 @@ export function desiredPose(body, intent = {}) {
     // Not mid-stroke: a swing's own path through the arm is what drives the blade.
     // A shield arm's forearm lies where the shield's straps put it.
     out[P[`${side}Elbow`]] = (weaponArm && (swinging || windingUp)) || intent.shieldArm === side ? elbow : swivelIntoRange(shoulderAxes, 'arm', side, shoulder, elbow, target, { bladeDir: weaponArm ? (second ? intent.offBladeDir : intent.bladeDir) : null, margin: weaponArm ? margin : 0 });
+    // (A free arm's elbow kept clear of the trunk's side: POSE.armClear.)
+    if (!weaponArm && intent.shieldArm !== side) out[P[`${side}Elbow`]] = elbowClearOfTrunk(body, shoulderAxes, out[P.pelvis], shoulder, out[P[`${side}Elbow`]], target);
   }
   return out;
 }

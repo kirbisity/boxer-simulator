@@ -9,6 +9,7 @@ import { buildOyoroiBox, buildOyoroiHanging } from './oyoroi.js';
 import { buildJoustKit } from './stechzeug.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
+import { dualQuaternionSkinning } from './dqskin.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps, cachedSkinMesh, readySkinTextures, skinTextureKey, skinTexturesNow, skinTexturesSteps, storeSkinMesh, styleSpec } from './bodystyles.js';
 import { bodyCheck } from './skinworker.js';
@@ -38,6 +39,7 @@ import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromF
 import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, HEAD_VARIANT, onlyVariant, simplifyTemplate, stretchedInverses, withoutVariant } from './crowdview.js';
 import { chooseDraw, crowdLod } from './crowdlod.js';
 import { SoftShell } from './soft.js';
+import { FatSlosh } from './fatslosh.js';
 import { buildRobotBody } from './robotview.js';
 import { buildExoFrame } from './exoview.js';
 import { disposeMaterialTextures, disposeObject, doubleSided, outlineFor, surface, unskinnedCopy } from './toon.js';
@@ -1991,12 +1993,17 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
     dressedSkin.userData.fullMaps = { normalMap: dressedSkin.normalMap, roughnessMap: dressedSkin.roughnessMap, roughness: dressedSkin.roughness };
     skinForTier(dressedSkin);
   }
+  // (A base-mesh body (bodystyles.js 'base') skins by dual quaternions, SKIN_DQ: its joints keep their thickness when they bend.)
+  if (built.dualQuaternion && SKIN_DQ.base) dualQuaternionSkinning(dressedSkin);
   const mesh = new THREE.SkinnedMesh(geometry, dressedSkin);
   mesh.bind(new THREE.Skeleton(bones, inverses), new THREE.Matrix4());
   mesh.castShadow = true;
   mesh.frustumCulled = false;
   return mesh;
 }
+
+/** Whether the base-mesh bodies skin by dual quaternions (dqskin.js) rather than linear blending (2026-11-11). */
+export const SKIN_DQ = { base: true };
 
 /** Ways to build the skin: see bodystyles.js. V7 (a loft wrapped onto the flesh field, with maps) is the default; 'lofted' the old one. */
 export const BODY_STYLES = BODY_STYLE_KEYS;
@@ -2056,7 +2063,9 @@ function detailedView(view, fighter, simple) {
   const ready = simple ? null : readySkin(body, wanted);
   const later = !simple && !ready && SKIN_BUILD.slicedStyles.includes(wanted) && !SKIN_BUILD.now;
   const bodyStyle = later ? 'lofted' : wanted;
-  const built = simple ? buildLoftBody(body, { lowDetail: true }) : ready ?? skinNow(body, bodyStyle);
+  // A crowd in the base style wears the base mesh's crowd count (basebody.js), placed on its low-detail rings.
+  const crowdBase = simple && (look.bodyStyle ?? BODY_STYLE) === 'base';
+  const built = simple ? buildLoftBody(body, { lowDetail: true, ...(crowdBase ? { base: true } : {}) }) : ready ?? skinNow(body, bodyStyle);
   const dressLook = dressFor(body.inputs, corner);
   // A machine (`armor.robot`) is drawn in rigid shells over its bones, not a skin: the body mesh is left empty.
   const machine = Boolean(dressLook.armor?.robot);
@@ -2240,7 +2249,7 @@ function detailedView(view, fighter, simple) {
   if (simple) thinOut(layers.skin, skinMesh);
   view.scene.add(group);
   const fighterView = {
-    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells,
+    fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells, slosh: skin.slosh,
     baseColors, vertexSegment, damageVersion: -1, headProps, dangles, swings: headgear?.swings ?? [], steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
     // The helmet as worn (lifted off and thrown when a blow knocks it off: updateProps), and whether it hid the face.
@@ -2269,7 +2278,7 @@ function headVariant(root, variant) {
  * `now`: build at once instead (tools, design sheets, tests). `workers`: how many skin workers (skinworker.js) build them where they can be
  * had, so the page's thread only swaps the finished skin in (0: none, all on this thread).
  */
-export const SKIN_BUILD = { slicedStyles: ['v7'], sliceMs: 5, farDistance: 30, now: false, workers: 2 };
+export const SKIN_BUILD = { slicedStyles: ['v7', 'base'], sliceMs: 5, farDistance: 30, now: false, workers: 2 };
 /**
  * A textured skin by the picture's quality tier (levelmode/quality.js: a stage's, 'high' anywhere else): on `low` it keeps its colour
  * and occlusion maps and drops the normal and roughness maps (a cheaper pixel, the anatomy still painted); both programs are compiled
@@ -2414,7 +2423,9 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
   const vertexSegment = Array.from({ length: built.positions.length / 3 }, (_, vertex) => (built.skinMask[vertex] ? BONE_SEGMENT[BONES[built.skinIndex[vertex * 4]]] : null));
   const skinOutline = outlineFor(skinMesh);
   const shell = soft ? new SoftShell(null, null, body.segments.trunk.fleshFirmness, { mesh: skinMesh, recomputeNormals: false, fixed: built.rigid }) : null;
-  return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, detailMeshes, detailOutlines, vertexSegment, shell };
+  // A fat base-style body's belly, breasts and buttocks follow the frame on springs of their own (fatslosh.js), on the shell's points.
+  const slosh = shell && built.slosh ? new FatSlosh(built.slosh, shell, built.bindFrames, BONES) : null;
+  return { built, baseColors, skinMesh, skinOutline, steelMesh, steelOutline, detailMeshes, detailOutlines, vertexSegment, shell, slosh };
 }
 
 /**
@@ -2641,6 +2652,7 @@ function swapSkin(view, fighterView, style, made = null) {
   Object.assign(fighterView, { built, skinMesh: skin.skinMesh, skinOutline: skin.skinOutline, steelMesh: skin.steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines, baseColors: skin.baseColors, vertexSegment: skin.vertexSegment, bodyStyle: style, damageVersion: -1 });
   const entry = fighterView.shells.find((shell) => shell.key === 'body');
   if (entry && skin.shell) entry.shell = skin.shell;
+  fighterView.slosh = skin.slosh;
   // As he was drawn: ghosted or not, his ink, his shadow.
   setLayer(fighterView, fighterView.layer);
   return true;
@@ -3258,6 +3270,8 @@ export function updateFighterView(fighterView, dt, time) {
     return;
   }
   const step = Math.min(dt, 1 / 30);
+  // (The fat's masses first: their offsets go into the body's shell with its dents.)
+  fighterView.slosh?.update(dt, frames);
   for (const entry of fighterView.shells) entry.shell.update(step);
   // What hanging hair and cloth rest on: the head, and the trunk with
   // whatever is worn over it.
