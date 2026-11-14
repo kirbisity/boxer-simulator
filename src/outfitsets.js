@@ -428,7 +428,7 @@ export const HELM_NAMES = {
   greatHelm: 'Great helm',
   'kettleHat:a': 'Kettle hat', 'kettleHat:b': 'Burgundian kettle hat', 'kettleHat:c': 'German sallet',
   morion: 'Morion', 'cabasset:spanish': 'Cabasset', potHelmet: 'Pot helmet',
-  kabuto: 'Kabuto', 'kabuto+mask': 'Kabuto and menpo', 'kabuto:nanban+mask': 'Nanban kabuto and menpo', 'kabuto:zunari+mask': 'Zunari kabuto and menpo',
+  kabuto: 'Kabuto', 'kabuto+mask': 'Kabuto and menpo', 'kabuto:nanban+mask': 'Nanban kabuto and menpo', 'kabuto:shiinari+mask': 'Shiinari kabuto and menpo', 'kabuto:zunari+mask': 'Zunari kabuto and menpo',
   jingasa: 'Jingasa (iron hat)',
   jaguarHelm: 'Jaguar helmet', eagleHelm: 'Eagle helmet',
   'mingHat:yongBell': 'Ming bell helmet', 'mingHat:rivetedTube': 'Ming riveted helmet', 'mingHat:plainPoint': 'Ming pointed helmet',

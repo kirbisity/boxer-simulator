@@ -214,7 +214,7 @@ export const HELMET_TILES = {
  * off or in a crowd the builder draws the plates one by one. The Song and Jin helmet's aventail was rows of the same small
  * lamellae as the coat (https://dragonsarmory.blogspot.com/2017/07/heavy-jin-dynasty-armor.html).
  */
-export const HELMET_PART_TILES = { pagodaHelm: { aventail: 'lamellae' } };
+export const HELMET_PART_TILES = { pagodaHelm: { aventail: 'lamellae' }, kabuto: { shikoro: 'kozane' } };
 /** The tiles worn by every opaque part of a piece (a moulded shell, a machine), not only its metal. */
 export const MOULDED_TILES = new Set(['polymer', 'panels']);
 /** Machines' bodies (robotview.js's shells, exoview.js's frame) and the tile they wear. */

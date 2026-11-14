@@ -272,6 +272,11 @@ export const LOFT = {
   // and at `full` m is wholly loose (a skirt's hem, a hanging sleeve, a trouser leg of hakama): what the air and his own
   // movement then swing (clothsway.js). `cell` (m): the grid the skin's points are sorted into for the search.
   sway: { from: 0.022, full: 0.12, cell: 0.13 },
+  // A board hung beside a limb (boardOn: a sode, a coat's shoulder flap): `wide` (m) across, its edges bowed `bow` (m) in
+  // towards the limb, `columns` faces across; laced lames each stand `tilt` (m) out at the head over the foot of the lame
+  // above, `row` (m) tall where no laced tile gives the height.
+  // Fitted to the body it is built on, it is laid `over` (m) off whatever is under it, leant by up to `lean` (m) at its foot (clearBoards).
+  board: { wide: 0.26, bow: 0.022, tilt: 0.012, row: 0.05, columns: 8, over: 0.012, lean: 0.1 },
   // A plate breastplate (`plate`, or a kit's `rigidBreastplate`: [waist, top]
   // up the trunk) is one rigid shell on the chest bone from its lower edge at
   // the waist to its top: the trunk under it, and whatever is worn between
@@ -928,7 +933,7 @@ export const ARMOR_KINDS = {
   // skirt and sleeves, the war mask on the kabuto.
   toseiDo: {
     trunk: [-0.1, 1.02, 1.19, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.5, 0.45, 1.24, LACED], collar: 'steel',
-    upperArm: [-0.18, 0.45, 1.62, LACED], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
+    upperArm: [-0.2, 0.62, 1.5, { ...LACED, board: { wide: 0.24 } }], forearm: [-0.04, -0.04, 1.3, 'top'], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.34, 'steel'],
   },
   // A rōnin on a private errand, his armour hidden under the kosode: only the manchira's mail showing at the collar, the
   // kusari-kote's dark linen sleeves with an iron splint along each forearm, a sash of two colours, the kyahan's linen
@@ -953,7 +958,7 @@ export const ARMOR_KINDS = {
   // The same with the great shoulder plates (sode) over bare arms.
   doMaruSode: {
     trunk: [-0.05, 0.96, 1.16, { rows: ['armor', 'armor', 'lace'], kozane: true }], skirt: [0.4, 0.42, 1.22, { rows: ['armor', 'lace'], kozane: true }],
-    upperArm: [-0.18, 0.36, 1.6, { rows: ['armor', 'lace'], kozane: true }],
+    upperArm: [-0.2, 0.62, 1.5, { rows: ['armor', 'lace'], kozane: true, board: { wide: 0.26 } }],
   },
   // A knight in mail: hauberk to the knees, mail sleeves and chausses, and a
   // surcoat in his colours over it.
@@ -1626,6 +1631,86 @@ function domedDisc(rings, centre, angle, radius, out, dome) {
       return [place, angle + across, out + (dome * (1 - reach * reach)) / depth];
     });
   });
+}
+
+/**
+ * A board hung beside a limb (`paint.board`: the sode of Japanese armour on its shoulder strap, a coat's shoulder flap): not a
+ * shell round the arm but a nearly flat panel down its outside (`outer`: +1 the left limb's side round, -1 the right's),
+ * LOFT.board.wide across (times `scale`) and standing clear of the limb's thickest ring by the piece's `inflate`. Its rows
+ * are lames, each one's head standing out over the foot of the lame above, the top one a plain cap plate; with a laced tile
+ * (`tile`, where the maps are drawn) each is a row of the tile tall and wears it. The whole is one stiff body riding the limb.
+ */
+function boardOn(mesh, rings, outer, inflate, paint, tile = null, scale = 1) {
+  const spec = { ...LOFT.board, ...(paint.board === true ? null : paint.board) };
+  const laced = tile && isLacedTile(tile) ? DETAIL_ARMOUR[tile] : null;
+  const last = rings.length - 1;
+  const lames = Math.max(3, Math.round(measureRings(rings, 1).length / (laced?.row ?? spec.row)));
+  const half = (spec.wide * scale) / 2;
+  const columns = mesh.stiffens ? spec.columns : 2;
+  const clear = Math.max(...rings.map((ring) => ring.width)) * inflate;
+  const across = laced ? Math.max(1, Math.round((half * 2) / (laced.columns * laced.pitch))) : 0;
+  // A point of the board: `along` (m) fore and aft of the limb's axis, `stand` (m) out from it, at a place down the rings.
+  const point = (place, along, stand) => {
+    const ring = ringAt(rings, place);
+    const [fore, side] = [along / ring.depth, (outer * stand) / ring.width];
+    return [place, Math.atan2(side, fore), Math.hypot(fore, side)];
+  };
+  const rows = paint.rows ?? [paint.base ?? 'steel'];
+  const first = mesh.positions.length / 3;
+  mesh.body = stiffBody(mesh, 'plate');
+  for (let lame = 0; lame < lames; lame += 1) {
+    const start = mesh.positions.length / 3;
+    const grid = [0, 1].map((foot) => Array.from({ length: columns + 1 }, (_, column) => {
+      const share = (column / columns) * 2 - 1;
+      return point(((lame + foot) / lames) * last, share * half, clear + (foot ? 0 : spec.tilt) - spec.bow * share * share);
+    }));
+    addGrid(mesh, rings, grid, laced ? rows[0] : rows[lame % rows.length], () => null);
+    if (!laced || lame === 0) continue;
+    for (let index = 0; index < 2 * (columns + 1); index += 1) {
+      mesh.uvs.set(start + index, [laced.band + ((index % (columns + 1)) / columns) * across, (lames - lame - (index > columns ? 1 : 0)) / laced.rows]);
+    }
+  }
+  mesh.body = 0;
+  const axis = vec.sub(rings[last].center, rings[0].center);
+  (mesh.boards ??= []).push({
+    from: first, to: mesh.positions.length / 3, origin: rings[0].center, axis: vec.normalize(axis), length: vec.length(axis),
+    fore: rings[0].depthAxis, out: vec.scale(rings[0].widthAxis, outer), half, stand: (share) => clear - spec.bow * share * share, over: spec.over, lean: spec.lean,
+  });
+}
+
+/**
+ * The boards (boardOn) laid on what is under them: each was built off the limb's rings, which a fitted body's flesh and the
+ * clothes laid on it may stand out past (a heavy man's shoulder, a full sleeve) or fall short of. Each is moved out or in,
+ * flat as it is, and leant about its head (by up to `lean` m at its foot, either way) to where it lies closest while every
+ * point of the body and its clothes under its face is `over` (m) inside it: it rests on the shoulder and hangs down the arm.
+ */
+function clearBoards(mesh) {
+  const boards = mesh.boards ?? [];
+  const onBoard = (vertex) => boards.some(({ from, to }) => vertex >= from && vertex < to);
+  for (const board of boards) {
+    // What lies under its face: [share down it, how far out the board must stand there].
+    const under = [];
+    for (let vertex = 0; vertex < mesh.positions.length / 3; vertex += 1) {
+      if (onBoard(vertex)) continue;
+      const rel = vec.sub(mesh.positions.slice(vertex * 3, vertex * 3 + 3), board.origin);
+      const down = vec.dot(rel, board.axis);
+      const fore = vec.dot(rel, board.fore);
+      const out = vec.dot(rel, board.out);
+      if (out <= 0 || down < 0 || down > board.length || Math.abs(fore) > board.half) continue;
+      under.push([down / board.length, out + board.over - board.stand(fore / board.half)]);
+    }
+    if (!under.length) continue;
+    let best = null;
+    for (let step = -8; step <= 8; step += 1) {
+      const lean = (step / 8) * board.lean;
+      const head = Math.max(...under.map(([share, need]) => need - lean * share));
+      if (!best || head + lean / 2 < best.head + best.lean / 2) best = { head, lean };
+    }
+    for (let vertex = board.from; vertex < board.to; vertex += 1) {
+      const share = vec.dot(vec.sub(mesh.positions.slice(vertex * 3, vertex * 3 + 3), board.origin), board.axis) / board.length;
+      for (let axis = 0; axis < 3; axis += 1) mesh.positions[vertex * 3 + axis] += board.out[axis] * (best.head + best.lean * share);
+    }
+  }
 }
 
 /**
@@ -4126,9 +4211,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     if (topShape?.inner) sleeveOf(TOPS[topShape.inner], 'shirt');
     sleeveOf(topShape, 'top');
     if (lamellar) {
-      // Sode: broad laced shoulder plates; kote: armoured cloth sleeves.
-      if (kozane) lacedShell(mesh, upperArmRings(-0.18, 0.5, count(4)), 1.85 * (armor.sode ?? 1), () => 'steel', () => null, sides + 6, 'kozane');
-      else armorPiece(upperArmRings(-0.18, 0.5, count(4)), 1.85 * (armor.sode ?? 1), (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
+      // Sode: the great laced shoulder boards, hung beside the arm; kote: armoured cloth sleeves.
+      boardOn(mesh, upperArmRings(-0.22, 0.72, count(4)), side === 'l' ? 1 : -1, 1.5, { rows: ['steel', 'lace'], board: { wide: 0.3, bow: 0.012 } }, kozane ? 'kozane' : null, armor.sode ?? 1);
       armorPiece(forearmRings(-0.04, wrist - 0.04, count(4)), 1.3, 'top');
     } else if (hoplomachus) {
       // The manica: a segmented guard down the sword arm only.
@@ -4137,7 +4221,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
         armorPiece(forearmRings(-0.06, wrist - 0.02, count(6)), 1.32, (ring, angle, index) => (index % 2 ? 'lace' : 'steel'));
       }
     } else if (kit) {
-      for (const [from, to, inflate, paint] of armorPieces(kit, 'upperArm', side)) tablePiece(upperArmRings(from, to, count(Math.max(3, Math.round(7 * (to - from))))), inflate, paint, null, null, 'upperArm');
+      for (const [from, to, inflate, paint] of armorPieces(kit, 'upperArm', side)) {
+        const rings = upperArmRings(from, to, count(Math.max(3, Math.round(7 * (to - from)))));
+        if (paint?.board) boardOn(mesh, rings, side === 'l' ? 1 : -1, inflate, paint, DETAIL_MAPS.on && !lowDetail ? armourTileOf(tileKind, pieceMaterial(paint), 'upperArm') : null);
+        else tablePiece(rings, inflate, paint, null, null, 'upperArm');
+      }
       for (const [from, to, inflate, paint] of armorPieces(kit, 'forearm', side)) tablePiece(forearmRings(from, to <= 0 ? wrist + to : to, count(5)), inflate, paint, null, null, 'forearm');
     } else if (armor && armor.kind !== 'carrier') {
       const big = armor.joust ? LOFT.joust.pauldron : { riot: 1.6, heavyRiot: 1.85, plate: 1.65 }[armor.kind];
@@ -4251,6 +4339,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   if (baseRig) {
     addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints, lowDetail ? null : rulesTraits(body), baseWasting(body), lowDetail ? 0 : baseNeckGirth(body), lowDetail || !BASE_BODY.family.use ? null : baseFamilyWeights(body, baseRig.height), baseBreadth.across);
     fitClothToBase(mesh, baseParts, armoured);
+    clearBoards(mesh);
   }
   // What the armour covers of each skin part (the pieces lofted over it, see loft), the margin taken off each end of every stretch.
   // (On the base mesh, closed cloth hides the skin under it too: the modelled body stands out of the rings the cloth is lofted on.)
