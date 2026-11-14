@@ -259,7 +259,10 @@ export function envApply({ place, view, spec, group }) {
   if (st?.probe) view.scene.remove(st.probe);
   const probe = view.env?.probe ?? new THREE.LightProbe();
   probeLiteProject(probe.sh, (x, y, z, out) => envSkyAt(air, x, y, z, out));
-  probe.intensity = 1;
+  // (Among walls the floor sees less than all of it, and so does who stands there: the share the meter is told
+  // of, config.js `meter.sky`. With the whole sky on them and the camera opened for three quarters of it, skin
+  // in the valley's clearing stood a third of a stop over the land round it and washed out.)
+  probe.intensity = own.meter?.sky ?? 1;
   view.scene.add(probe);
 
   // The sun on the fighters and what stands on the floor: the colour the land is lit with, cut by what the hills

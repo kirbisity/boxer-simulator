@@ -848,8 +848,8 @@ export function envBuildTrees({ place, trees }) {
     crowns.userData.envCard = grow;
     group.add(crowns);
     if (!band.trunk) return;
-    const sides = order === 0 ? 8 : 5;
-    const trunk = new THREE.CylinderGeometry(1, 1, 1, sides, 4, true);
+    const [sides, rings] = band.wood;
+    const trunk = new THREE.CylinderGeometry(1, 1, 1, sides, rings, true);
     trunk.translate(0, 0.5, 0);
     const trunks = new THREE.InstancedBufferGeometry();
     trunks.setAttribute('position', trunk.attributes.position);

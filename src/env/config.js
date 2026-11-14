@@ -547,10 +547,14 @@ export const ENV = {
     // `limbs`: the limbs under the crown are drawn too (near, where they are seen between the leaves).
     // (The full count only out to 70 m: past that a card is under ten pixels of a 900-line picture and a third
     // as many, larger, draw the same crown, which is what lets a wood stand as close as a wood does.)
+    // `wood`: [sides, rings] of each trunk's and limb's tube. A trunk 0.4 m through is 30 pixels wide at 15 m
+    // and 6 at 70 m (900 lines, 50 degree lens): six sides near and four past that leave its outline round to a
+    // pixel, and its shading is by the smooth normal either way. At eight and five sides with four rings each
+    // the valley's wood (17 boughs to a pine) was 612 thousand triangles, a quarter of the place's frame.
     bands: [
-      { to: 70, cards: 340, trunk: true, limbs: true },
-      { to: 140, cards: 120, trunk: true, limbs: true },
-      { to: 520, cards: 44, trunk: true, limbs: false },
+      { to: 70, cards: 340, trunk: true, limbs: true, wood: [6, 3] },
+      { to: 140, cards: 120, trunk: true, limbs: true, wood: [4, 2] },
+      { to: 520, cards: 44, trunk: true, limbs: false, wood: [4, 2] },
       { to: 2600, cards: 6, trunk: false, limbs: false },
     ],
     // The leaf-card picture: `atlas` x `atlas` tiles of `tile` px (two sprays of broad leaves, two of needles, two
