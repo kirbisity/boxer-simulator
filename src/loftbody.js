@@ -166,16 +166,25 @@ export const LOFT = {
   // an ordinary and a fat build's from Deurenberg, Weststrate and Seidell's line at age 30 (1991, Br J Nutr 65:105: 1.2 BMI +
   // 0.23 age − 10.8 for a man − 5.4, %); the muscular man's the reference build's own 11%, an athletic woman's 20%; an
   // emaciated body's 5% and 9%, its essential fat nearly gone.
-  // `fatPast`: how far past the fattest build a body goes on along the last step (1: as far again as from F2 to F3, a BMI of
-  // about 45; fatter than that is drawn no fatter). `muscleMost`: the most of the muscular build's gain over the ordinary one a
-  // body takes (2: a fat-free mass index of about 28 on a lean man, past the 25 Kouri et al. found the ceiling without drugs,
-  // 1995, Clin J Sport Med 5:223), and `muscleLeast` the most of it taken off a body with less lean mass than the line has at
-  // its fat (half: an unused frame; further and the model's forms turn inside out). `wasteMost`: the most of the emaciated
-  // build's loss from the ordinary one (past 1 the limbs thin towards the bone).
+  // Past F3, the fattest build a tape was found for, a body is drawn by its volume and not by its place along the line: it is
+  // a share of F4 (tools/blender/family/swell.py: F3 grown as fat grows to the game's fattest body, a BMI of 100 on the line
+  // from F2 through F3), the share whose mix holds what the body weighs at its fat share, by the same densities (`density`,
+  // kg/m³, Siri's two compartments) and the same `rest` (the BMI of the head, hands and feet the mesh has not) as the builds
+  // were placed with. `swell`: the volume that mix holds over F3's, statures cubed, the terms of its cube in the share
+  // (swell.py prints them from the builds as drawn: every point moving in a line, a mix's volume is a cube exactly).
+  // `muscleMost`: the most of the muscular build's gain over the ordinary one a body takes (2: a fat-free mass index of about
+  // 28 on a lean man, past the 25 Kouri et al. found the ceiling without drugs, 1995, Clin J Sport Med 5:223), and
+  // `muscleLeast` the most of it taken off a body with less lean mass than the line has at its fat (half: an unused frame;
+  // further and the model's forms turn inside out). That least fades to nothing at the emaciated build, which has no muscle
+  // left to take off (less the muscular build's gain it was a shape of its own, not her: notched under the collarbones, its
+  // shoulders sunk): the lean such a body lacks is taken as wasting along the line instead, mass for mass. `wasteMost`: the
+  // most of the emaciated build's loss from the ordinary one (1.55: the game's thinnest body, a BMI of 10, drawn at the
+  // volume it weighs, its limbs thinned towards the bone).
   family: {
     male: { E: [0.69, 13.19], N: [4.11, 18.67], M: [2.87, 23.22], F1: [6.29, 20.8], F2: [9.93, 22.97], F3: [15.11, 24.46] },
     female: { E: [1.27, 12.84], N: [5.98, 15.73], M: [4.74, 18.95], F1: [9.18, 17.86], F2: [13.74, 19.48], F3: [19.34, 20.19] },
-    fatPast: 1, muscleMost: 2, muscleLeast: 0.5, wasteMost: 1.15,
+    muscleMost: 2, muscleLeast: 0.5, wasteMost: 1.55,
+    swell: { male: [0.02345, 0.01071, 0.001684], female: [0.02607, 0.01163, 0.001549] }, density: { fat: 900, lean: 1100 }, rest: 2.2,
   },
   // What lies over the emaciated build's bones on a fuller body (baseBoneRelief), m of soft tissue at the model's height for
   // each kg/m² more than that build has. `fat`: an ordinary man's fold of skin pinched at the chest or under the shoulder blade
@@ -189,8 +198,11 @@ export const LOFT = {
   // fades over a few kg/m², and a man of BMI 22 wore the ribs made for one of 19.
   boneCover: { fat: 0.0012, lean: 0.002, spacing: 0.028, bucket: 0.05 },
   // The neck's girth (baseNeckGirth), m: at BMI 22, per unit of BMI, for full training (exercise 1: the trapezius and
-  // sternocleidomastoid grown), at this height (scaled with the body's).
-  neck: { male: { at22: 0.375, perBmi: 0.005, trained: 0.025, height: 1.78 }, female: { at22: 0.325, perBmi: 0.0033, trained: 0.012, height: 1.65 } },
+  // sternocleidomastoid grown), at this height (scaled with the body's). `lean`: per unit of BMI under 22. The published line
+  // is of the fed, whose necks differ by their fat; a wasting body loses the neck's muscle with the rest, and its neck is a
+  // column on the spine: the line from the ordinary neck to the emaciated build's at its BMI of 14, drawn 6% under the
+  // emaciated reference's own (27 cm round at 1.68 m, and a man's by the builds' ratio, 300 mm to 270).
+  neck: { male: { at22: 0.375, perBmi: 0.005, lean: 0.012, trained: 0.025, height: 1.78 }, female: { at22: 0.325, perBmi: 0.0033, lean: 0.0094, trained: 0.012, height: 1.65 } },
   heat: { reach: 0.06, bones: { trunk: ['trunk', 'lThigh', 'rThigh'], neck: ['neck', 'trunk'], '*Upper': ['*UpperArm', '*Clavicle', 'trunk'], '*Fore': ['*Forearm', '*UpperArm'], '*Thigh': ['*Thigh', 'trunk'], '*Shin': ['*Shin', '*Thigh'] } },
   // PROOF OF CONCEPT (shoulder-poc): the armpit's hand-over from the trunk's bones to the upper arm's made narrow. Below the
   // shoulder's cap (t of the upper arm from `from` to `to`, eased) and on the arm's inner side, facing the trunk, the arm's share of
@@ -1987,12 +1999,13 @@ export function baseWasting(body) {
 /**
  * The body's own neck girth (m round its middle), from its BMI and its training (LOFT.neck): the line through the published
  * means (a man's about 38 cm and a woman's about 33 at a normal BMI, 37 and 34 the cut-offs for overweight: Ben-Noun, Sohar
- * and Laor 2001, Obesity Research 9:470), half a centimetre a unit of BMI, and a trained man's neck muscle on top.
+ * and Laor 2001, Obesity Research 9:470), half a centimetre a unit of BMI, and a trained man's neck muscle on top; under an
+ * ordinary BMI the steeper line to the emaciated build's neck (`lean`).
  */
 export function baseNeckGirth(body) {
   const spec = LOFT.neck[body.inputs.sex === 'female' ? 'female' : 'male'];
   const bmi = body.massKg / (body.heightM * body.heightM);
-  return (spec.at22 + spec.perBmi * (bmi - 22) + spec.trained * (body.inputs.exercise ?? 0)) * (body.heightM / spec.height);
+  return (spec.at22 + (bmi < 22 ? spec.lean : spec.perBmi) * (bmi - 22) + spec.trained * (body.inputs.exercise ?? 0)) * (body.heightM / spec.height);
 }
 
 /**
@@ -2001,7 +2014,8 @@ export function baseNeckGirth(body) {
  * emaciated, the ordinary and the fat builds lie along one line in that plane, how well fed a body is (each step its own mix
  * of fat and the lean that comes and goes with it); the muscular build stands off it, across. So a body is the point of that
  * line it is level with, between two of its builds, and the muscular build's gain over the ordinary one, by as much as its
- * lean mass is over the line's there (or under: a little of that gain taken off). One rule for every body, with no step
+ * lean mass is over the line's there (or under: a little of that gain taken off; towards the emaciated build, which has none
+ * to take off, the lean it lacks is wasting further along the line instead). One rule for every body, with no step
  * anywhere. `modelHeight` the model's standing height (m): a shape's mass goes by the cube of its height, so its mass indices
  * by the height itself, and a body is looked up at the model's.
  */
@@ -2014,8 +2028,8 @@ export function baseFamilyWeights(body, modelHeight) {
   const muscular = sub(at.M, at.N);
   const line = ['E', 'N', 'F1', 'F2', 'F3'];
   // (Each step of the line: the point as `along` of the step and `muscle` of the muscular gain; the step it falls within, the
-  // first and the last reaching on past their ends, to `wasteMost` and `fatPast`.)
-  let [from, to, along, muscle] = ['N', 'F1', 0, 0];
+  // first reaching on past its end, to `wasteMost`, and the last giving way to `past` of the fattest build.)
+  let [from, to, along, muscle, past, least] = ['N', 'F1', 0, 0, 0, spec.muscleLeast];
   for (let step = 0; step + 1 < line.length; step += 1) {
     const start = at[line[step]];
     const run = sub(at[line[step + 1]], start);
@@ -2024,13 +2038,36 @@ export function baseFamilyWeights(body, modelHeight) {
     const u = (off[0] * muscular[1] - off[1] * muscular[0]) / det;
     if (u < 0 && step > 0) break;
     [from, to, muscle] = [line[step], line[step + 1], (run[0] * off[1] - run[1] * off[0]) / det];
-    along = step === 0 ? Math.max(1 - spec.wasteMost, u) : step + 2 === line.length ? Math.min(1 + spec.fatPast, u) : u;
+    least = spec.muscleLeast;
+    along = step + 2 === line.length ? Math.min(1, u) : u;
+    if (step === 0) {
+      // (The emaciated build has no muscle left to take off: the least fades to nothing at it, and the lean a body lacks
+      // under that is taken as wasting along the line instead, mass for mass, as fully as the least has faded.)
+      const fed = Math.min(1, Math.max(0, u));
+      least *= fed;
+      const under = Math.min(0, muscle + least);
+      along = Math.max(1 - spec.wasteMost, u + ((1 - fed) * under * (muscular[0] + muscular[1])) / (run[0] + run[1]));
+    }
+    if (step + 2 === line.length && u > 1) {
+      // (The volume of the line's point there over F3's, and the share of F4 that holds it: the cube rises all the way.)
+      const volume = ([fat, lean]) => ((fat + lean - spec.rest) / (modelHeight * (fat + lean))) * (fat / spec.density.fat + lean / spec.density.lean);
+      const more = volume([start[0] + u * run[0], start[1] + u * run[1]]) - volume(at[line[step + 1]]);
+      const terms = spec.swell[body.inputs.sex === 'female' ? 'female' : 'male'];
+      let low = 0;
+      past = 1;
+      for (let pass = 0; pass < 24; pass += 1) {
+        const share = (low + past) / 2;
+        if (share * (terms[0] + share * (terms[1] + share * terms[2])) < more) low = share;
+        else past = share;
+      }
+    }
     if (u <= 1) break;
   }
-  muscle = Math.min(spec.muscleMost, Math.max(-spec.muscleLeast, muscle));
+  muscle = Math.min(spec.muscleMost, Math.max(-least, muscle));
   const weights = Object.fromEntries(BASE_BODY.family.builds.map((name) => [name, 0]));
   weights[from] += 1 - along;
-  weights[to] += along;
+  weights[to] += along - past;
+  weights.F4 += past;
   weights.M += muscle;
   weights.N -= muscle;
   return BASE_BODY.family.builds.map((name) => weights[name]);

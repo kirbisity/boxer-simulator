@@ -1,10 +1,10 @@
 // Writes the family of builds (the remodel of 2026-11: each sex's base mesh refitted in Blender to an emaciated, an ordinary, a
-// muscular and three fat bodies, the same points in the same order) into src/basebody-data.js as the full meshes' `family`:
+// muscular, three fat bodies and the game's fattest, the same points in the same order) into src/basebody-data.js as the full meshes' `family`:
 // each build each point's offset from the base mesh in its own part's frame (along, fore and aft, across; the frame on the
 // mesh's joints, forward +x: src/basebody.js baseFamily), units of height, ten bits a number, three to a Uint32 (each
 // (n − 512) × the build's `scale`). A build that is the base itself (the man's muscular one) is left out. In place of the
 // emaciated reference's own array (`her`: the family's E is her, refitted).
-//   node tools/basebody-family.js <family.json>     {female: {base, E, N, M, F1, F2, F3}, male: …}, flat points
+//   node tools/basebody-family.js <family.json>     {female: {base, E, N, M, F1, F2, F3, F4}, male: …}, flat points
 import { readFileSync, writeFileSync } from 'node:fs';
 import { BASE_BODY_DATA } from '../src/basebody-data.js';
 import { BASE_BODY } from '../src/basebody.js';

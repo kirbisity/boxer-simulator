@@ -27,15 +27,16 @@ def closed_volume(V, T):
         total += np.einsum('ij,ij->i', np.roll(P, -1, 0), np.cross(P, centre[None])).sum()
     return abs(total) / 6
 
-for sex in ('male', 'female'):
-    b = bl.load(sex)
-    row = {}
-    for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
-        v = closed_volume(np.load(f'{name}-{sex}.npy'), b['T'])
-        fat = STATED[sex].get(name, 0.2)
-        for _ in range(30):
-            bmi = v * HEIGHT[sex] * 1000 / (fat / 0.9 + (1 - fat) / 1.1) + REST
-            if name not in STATED[sex]: fat = (1.2 * bmi + 0.23 * 30 - 10.8 * (sex == 'male') - 5.4) / 100
-        row[name] = [round(bmi * fat, 2), round(bmi * (1 - fat), 2)]
-        print(sex, name, 'volume', round(v, 5), 'bmi', round(bmi, 1), 'fat', round(fat, 3), row[name])
-    print(sex, row)
+if __name__ == '__main__':
+    for sex in ('male', 'female'):
+        b = bl.load(sex)
+        row = {}
+        for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
+            v = closed_volume(np.load(f'{name}-{sex}.npy'), b['T'])
+            fat = STATED[sex].get(name, 0.2)
+            for _ in range(30):
+                bmi = v * HEIGHT[sex] * 1000 / (fat / 0.9 + (1 - fat) / 1.1) + REST
+                if name not in STATED[sex]: fat = (1.2 * bmi + 0.23 * 30 - 10.8 * (sex == 'male') - 5.4) / 100
+            row[name] = [round(bmi * fat, 2), round(bmi * (1 - fat), 2)]
+            print(sex, name, 'volume', round(v, 5), 'bmi', round(bmi, 1), 'fat', round(fat, 3), row[name])
+        print(sex, row)

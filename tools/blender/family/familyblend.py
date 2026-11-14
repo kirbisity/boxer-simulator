@@ -9,7 +9,7 @@ import numpy as np
 
 SRC, BASE, SEX, STATURE, OUT = sys.argv[sys.argv.index('--') + 1:][:5]
 # What each key is, for whoever opens the file.
-BUILDS = {'E': 'emaciated', 'N': 'ordinary', 'M': 'muscular', 'F1': 'fat 1', 'F2': 'fat 2', 'F3': 'fat 3'}
+BUILDS = {'E': 'emaciated', 'N': 'ordinary', 'M': 'muscular', 'F1': 'fat 1', 'F2': 'fat 2', 'F3': 'fat 3', 'F4': 'fat 4'}
 z = {key: np.array(points, float).reshape(-1, 3) for key, points in json.load(open(SRC))[SEX].items()}
 triangles = np.array(json.load(open(BASE))['meshes']['full']['triangles']).reshape(-1, 3)
 # The game's frame (units of height, x forward, y up) to Blender's (m, facing -Y, Z up), a rotation.

@@ -9,24 +9,27 @@
 # Fore and aft the shoulder is as deep as the humerus' head under its skin and no deeper, and the collarbone is a bone of the
 # girdle like the acromion: the skin hangs between it and the trapezius' border behind (the hollow over the collarbone), so
 # the bone stands as its rim.
-# Reads even/<build>-<sex>.npy, writes shaped/ (E changed, the others as they were): dump.py's last argument.
+# The other builds keep their cover over the bone, and less of the trapezius over it (TRAPEZIUS, top_line).
+# Reads even/<build>-<sex>.npy, writes shaped/: dump.py's last argument.
 import os, shutil, numpy as np, bodylib as bl, relax
 
 GIRDLE = dict(
-    # The acromion's top over the shoulder joint's centre (units of stature): the humeral head's radius (24 mm of a man's 48 mm
-    # head), the space over it (10 mm), the acromion's thickness (8 mm) and the skin (3 mm): 45 mm of 1.76 m.
-    rise=0.0255,
+    # The acromion's top over the shoulder joint's centre (units of stature). The game's skeleton carries the joint at 0.775
+    # and ANSUR II's acromion stands at 0.820 on the fed (both sexes): 0.045 between them, less what the fed have over the bone
+    # there (the deltoid's origin and the fat on it: 15 mm, 0.009). A bone does not sink as its cover wastes.
+    rise=0.036,
     # The acromion's edge out past the joint's centre: the head's centre lies 10 to 15 mm inside the acromion's lateral edge.
     reach=0.008,
-    # The line's rise from the acromion to the neck's root, per unit across: the collarbone's own on the model (its inner end
-    # 0.82 of stature at 0.04 across, the acromion 0.80 at 0.11), what is left of the trapezius lying on it.
-    slope=0.24,
+    # The line's rise from the acromion to the neck's root, per unit across: the collarbone lies nearly level (its inner end's
+    # top 0.822 of stature, `notch`, the acromion 0.811, 0.09 across from it), what is left of the trapezius lying on it: the
+    # shoulders of the wasted are square, a hanger's bar, where the fed slope from the neck.
+    slope=0.10,
     # The neck's side: an upright wall `root` of the shoulder joint's distance from the middle (a wasted neck is a column from
     # the jaw to its root, the trapezius' upper fibres no cone about it). Her sculpt's neck is 83 to 90 mm across under the
-    # jaw and 27 cm round. The walls stand 90 mm apart on her and 102 on the man; the knee, held on each pass, leaves the skin
-    # 5 to 6 mm inside each: 79 mm across on her, 88 on him (ANSUR II's leanest twentieth of necks are 302 mm round on women
-    # and 360 mm on men: 1.19 to one, as 88 to 79 is 1.11).
-    root=0.28,
+    # jaw and 27 cm round, and the build's is drawn a little under it. The walls stand 84 mm apart on her and 95 on the man;
+    # the knee, held on each pass, leaves the skin 5 to 6 mm inside each: 73 mm across on her, 83 on him (ANSUR II's leanest
+    # twentieth of necks are 302 mm round on women and 360 mm on men: 1.19 to one, as 83 to 73 is 1.14).
+    root=0.26,
     # The knee the skin turns over the bone with (a soft minimum's width under the line; the corner's radius): 3 mm of skin and
     # tendon under the line, 6 mm round the acromion's edge.
     knee=0.0018, corner=0.0035,
@@ -196,13 +199,64 @@ def girdle(V, J, T, rest, spec=GIRDLE):
         for step in spec['step']: X = bl.smooth(X, M, 1, step, near)[weld]
     return X[weld]
 
+TRAPEZIUS = dict(
+    # The other builds' top line. Their shoulders are the model's own, a boxer's, set at the survey's heights (ANSUR II's
+    # acromion: 0.820 of stature), and the game's skeleton carries its shoulder joints lower than the survey's soldiers do: the
+    # skin stands 40 to 60 mm over the bone's collar line from the neck to the acromion, the trapezius' upper fibres a slab
+    # there and a cone up the neck's flank, and the neck shows short under the jaw. So a build's skin outside its own neck's
+    # side and over the bone's collar line (carried on out past the acromion, so the cap's top comes down with it and the
+    # deltoid's face below it stays) keeps `keep` of its height over them: 0.65 lowers the top line 13 to 20 mm from beside
+    # the neck to the shoulder's middle and 10 at the acromion, which then stands at 0.822 on the ordinary man and 0.823 on
+    # the woman (the survey's spread of it is 0.009 of stature, 16 mm), and the neck shows that much longer.
+    keep=0.65,
+    # The neck's own side: its half-breadth `column` of the way from its joint to the head's (where the fighter's skin is
+    # all the game's neck: src/basebody.js BASE_BODY.family.ease.neck), read within `band` of that height; over it nothing moves.
+    column=0.6, band=0.006,
+    # ... and the drop eases in over `beside` out from it (one edge of the mesh there: 14 mm), so the column's own skin stays.
+    beside=0.008,
+    # What was brought in is faired as the emaciated build's is (Taubin's, GIRDLE.step): `fair` rounds.
+    fair=3,
+)
+
+WAIST = dict(
+    # The emaciated build's waist. Between the lowest ribs and the hip bones' crests the trunk has no bone but the spine: what
+    # stands there is the flank's muscle and the gut, and a wasted body is drawn in there under its ribs' margin. The trunk's
+    # sections are drawn in about its middle by `draw` at its narrowest level `between` the crest and the ribs' margin (ANSUR
+    # II: the crest 0.60 of stature, the tenth rib 0.64, the chest's lower ribs to 0.70), easing out to nothing `over` above
+    # and below it (the crest and the margin themselves are bone and stay).
+    between=(0.60, 0.70), over=0.045, draw=0.07,
+)
+
+def waist(V, part, own=WAIST):
+    y = V[:, 1]; levels = np.arange(own['between'][0], own['between'][1], 0.005)
+    at = levels[int(np.argmin([np.ptp(V[part & (np.abs(y - level) < 0.01), 2]) for level in levels]))]
+    fore = V[part & (np.abs(y - at) < 0.01), 0]; middle = (fore.max() + fore.min()) / 2
+    share = own['draw'] * part * (1 + np.cos(np.pi * np.clip(np.abs(y - at) / own['over'], 0, 1))) / 2
+    X = V.copy(); X[:, 0] -= share * (V[:, 0] - middle); X[:, 2] -= share * V[:, 2]
+    return X
+
+def top_line(V, J, T, rest, spec=GIRDLE, own=TRAPEZIUS):
+    # A build's trapezius lessened: the neck's wall its own, the collar line the bone's.
+    weld = bl.weld_map(rest); TW = weld[T]; TW = TW[(TW[:, 0] != TW[:, 1]) & (TW[:, 1] != TW[:, 2]) & (TW[:, 0] != TW[:, 2])]
+    M = bl.laplacian(len(V), TW); X = V.copy(); k = spec['knee']
+    height = J['neck'][1] + own['column'] * (J['head'][1] - J['neck'][1])
+    for side, sign in (('l', 1), ('r', -1)):
+        s = J[side + 'Shoulder']; zs = s[2] * sign; edge = zs + spec['reach']; z = V[:, 2] * sign; y = V[:, 1]
+        root = z[(np.abs(y - height) < own['band']) & (z < zs / 2)].max()
+        out, up = z - root, y - (s[1] + spec['rise'] + spec['slope'] * (edge - z))
+        X[:, 1] -= (1 - own['keep']) * k * np.logaddexp(0, up / k) * np.clip(out / own['beside'], 0, 1) * (y < height)
+    near = np.clip(2 * bl.smooth((np.linalg.norm(X - V, axis=1) > 1e-5).astype(float), M, 2, 1.0), 0, 1)
+    for _ in range(own['fair']):
+        for step in spec['step']: X = bl.smooth(X, M, 1, step, near)[weld]
+    return X[weld]
+
 if __name__ == '__main__':
     os.makedirs('shaped', exist_ok=True)
     for sex in ('female', 'male'):
         b = bl.load(sex)
         for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
-            if name != 'E': shutil.copy(f'even/{name}-{sex}.npy', f'shaped/{name}-{sex}.npy'); continue
-            V = np.load(f'even/E-{sex}.npy'); X = girdle(V, b['J'], np.asarray(b['T']), b['V'])
+            V = np.load(f'even/{name}-{sex}.npy'); X = (girdle if name == 'E' else top_line)(V, b['J'], np.asarray(b['T']), b['V'])
+            if name == 'E': X = waist(X, np.asarray(b['part']) == b['parts'].index('trunk'))
             moved = np.linalg.norm(X - V, axis=1)
-            print(f'{sex}: {int((moved > 1e-4).sum())} points brought in, most {moved.max() * 1750:.0f} mm')
-            np.save(f'shaped/E-{sex}.npy', X)
+            print(f'{sex} {name}: {int((moved > 1e-4).sum())} points brought in, most {moved.max() * 1750:.0f} mm')
+            np.save(f'shaped/{name}-{sex}.npy', X)

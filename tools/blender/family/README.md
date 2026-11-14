@@ -1,7 +1,7 @@
 # The family of builds
 
-The base body (src/basebody.js) is one mesh a sex. A fighter's skin is a mix of six builds of it, the same points in the same
-order: `E` emaciated, `N` ordinary, `M` muscular, `F1` to `F3` fat (src/loftbody.js `LOFT.family` places each by its fat and
+The base body (src/basebody.js) is one mesh a sex. A fighter's skin is a mix of seven builds of it, the same points in the same
+order: `E` emaciated, `N` ordinary, `M` muscular, `F1` to `F3` fat, `F4` the game's fattest body (src/loftbody.js `LOFT.family` places each by its fat and
 fat-free mass index; `baseFamilyWeights` mixes them). These scripts make the builds and pack them into src/basebody-data.js.
 
 Python 3 with numpy and scipy; Blender for the three scripts that say so. Nothing here runs in the game or its tests.
@@ -35,7 +35,9 @@ From `<work>/remodel`, with `F=<repo>/tools/blender/family`:
     python3 $F/famE.py                       # E: the emaciated man, her tape by the sexes' ratio at the lean end
     python3 $F/register.py                   # reg/: each build's limbs set back on the base's bones
     python3 $F/relax.py                      # even/: each build's points set evenly on its own surface
-    python3 $F/girdle.py                     # shaped/: the emaciated build's shoulders held to the girdle's bone
+    python3 $F/girdle.py                     # shaped/: the emaciated build's shoulders held to the girdle's bone and its
+                                             # waist drawn in, the others' top line lowered towards that bone
+    python3 $F/swell.py                      # shaped/F4: F3 grown as fat grows to a BMI of 100; prints LOFT.family.swell
     python3 $F/composition.py                # each build's [fat, fat-free mass index], for LOFT.family
     python3 $F/dump.py family-even.json shaped
     node <repo>/tools/basebody-family.js family-even.json

@@ -7,6 +7,6 @@ out = {}
 for sex in ('female', 'male'):
     b = bl.load(sex)
     out[sex] = {'base': np.round(b['V'], 6).ravel().tolist()}
-    for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
+    for name in ('E', 'N', 'M', 'F1', 'F2', 'F3', 'F4'):
         out[sex][name] = np.round(np.load(f'{sys.argv[2] if len(sys.argv) > 2 else "reg"}/{name}-{sex}.npy'), 6).ravel().tolist()
 json.dump(out, open(sys.argv[1], 'w'))

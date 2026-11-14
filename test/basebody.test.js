@@ -6,6 +6,7 @@ import { buildSkinMesh, skinTextureKey } from '../src/bodystyles.js';
 import { BASE_BODY, baseBindJoints, baseBodyMesh, baseStarvedDetail, measureBaseBody, placeBaseBody } from '../src/basebody.js';
 import { baseBoneRelief, baseFamilyWeights, baseLoftOptions, baseRigOf, buildLoftBody } from '../src/loftbody.js';
 import { FLAT_UV } from '../src/skindetail.js';
+import { caloriesForWeight } from '../src/physiology.js';
 import { progression } from '../tools/bodysheet-cast.js';
 
 const CAST = [...progression('male'), ...progression('female')].map((row) => ({ ...row, body: buildBody(row.inputs) }));
@@ -129,6 +130,15 @@ test('the family of builds: a body is a mix of them summing to one, the emaciate
     assert.ok(emaciated(starved) > 0.9, `${sex}: a starved body is the emaciated build`);
     assert.ok(emaciated(thin) > 0.3 && emaciated(thin) < 0.8, `${sex}: a thin one part of it`);
     assert.ok(Math.abs(emaciated(average)) < 0.1 && emaciated(obese) === 0, `${sex}: an average or a fat one none of it`);
+    // (The ends of the game's range: under the emaciated build's own BMI a body wastes on past it, with none of the muscular
+    // build's gain taken off; the fattest body is the fattest build, and a body between F3 and it a share of both.)
+    const builds = BASE_BODY.family.builds;
+    const at = (bmi) => baseFamilyWeights(buildBody({ ...average.inputs, calories: caloriesForWeight(average.inputs, bmi * average.heightM ** 2) }), height);
+    const [wasted, fat, fattest] = [10, 60, 100].map(at);
+    assert.ok(wasted[builds.indexOf('E')] > 1.3 && Math.abs(wasted[builds.indexOf('M')]) < 1e-9, `${sex}: a BMI of 10 past the emaciated build (${wasted.map((weight) => weight.toFixed(2))})`);
+    assert.ok(fat[builds.indexOf('F4')] > 0.2 && fat[builds.indexOf('F4')] < 0.8 && fat[builds.indexOf('F3')] > 0.2, `${sex}: a BMI of 60 between the fat builds (${fat.map((weight) => weight.toFixed(2))})`);
+    assert.ok(fattest[builds.indexOf('F4')] > 0.95, `${sex}: a BMI of 100 the fattest build (${fattest.map((weight) => weight.toFixed(2))})`);
+    for (const weights of [wasted, fat, fattest]) assert.ok(Math.abs(weights.reduce((sum, weight) => sum + weight, 0) - 1) < 1e-9);
     // (The relief fades with the body's cover, faster than the build's share: LOFT.boneCover.)
     const shows = [starved, thin, average, obese].map((body) => baseBoneRelief(body, height));
     assert.ok(shows[0] > 0.9 && shows[1] > 0.1 && shows[1] < 0.5 && shows[2] < 0.1 && shows[3] < 0.01, `${sex}: bones through a starved body's skin, faintly a thin one's, not an average one's (${shows.map((show) => show.toFixed(2))})`);
