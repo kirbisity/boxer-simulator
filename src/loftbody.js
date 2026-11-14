@@ -264,6 +264,10 @@ export const LOFT = {
   // `fine` times as many sides round (so the splits are cut narrow), the front panel `finer` times, standing `stand` (share
   // of the radius) out over the skirt; the bindings `wide` (rad round) and, across a panel's top, `deep` (places along).
   legs: { fine: 2, finer: 4, stand: 0.025, wide: 0.07, deep: 0.22 },
+  // Stiff pieces (stiffnessOf, stiffen): a plate rides the bones as one body, its points' mean weights raised to `sharpen` (so a
+  // cannon keeps to its own bone and a cop over a joint to both); a skirt's rows are stiff panel by panel, `panels` round it; a cloth coat
+  // of plates keeps `coat` of the body's own give.
+  stiff: { sharpen: 3, panels: 8, coat: 0.5 },
   // A plate breastplate (`plate`, or a kit's `rigidBreastplate`: [waist, top]
   // up the trunk) is one rigid shell on the chest bone from its lower edge at
   // the waist to its top: the trunk under it, and whatever is worn between
@@ -359,6 +363,105 @@ function clothLoftUv(mesh, rings, sides, inflate, paint) {
 }
 
 /**
+ * How a piece moves on the body, by what it is made of. A plate of steel, of lacquer or of a moulded shell is one stiff body
+ * ('plate'): it rides the bones whole and never bends, stretches or twists. Lames and the rows of lamellar, scale
+ * and laced kozane are stiff row by row and give only between the rows ('rows'). A coat of small plates riveted inside cloth
+ * ('coat') is half one and half the other: each ring of it leans `LOFT.stiff.coat` of the way from a stiff hoop to the body
+ * under it. Cloth, mail, leather and padding follow the body point by point (null).
+ */
+const PLATE_PAINTS = new Set(['steel', 'steel2', 'gold', 'armor']);
+export function stiffnessOf(paint) {
+  if (typeof paint === 'string') return PLATE_PAINTS.has(paint) ? 'plate' : null;
+  if (!paint || typeof paint !== 'object' || paint.mail) return null;
+  const material = pieceMaterial(paint);
+  if (material === 'studded') return 'coat';
+  if (material === 'lamellae' || material === 'scales' || material === 'kozane') return 'rows';
+  if (paint.lames || paint.rows?.some((role) => PLATE_PAINTS.has(role))) return 'rows';
+  return material === 'steel' || material === 'armor' ? 'plate' : null;
+}
+
+/** A new stiff body of the mesh (its number), of a `kind`: 'plate', 'rows' or 'coat' (stiffnessOf). None (0) in a crowd's body. */
+function stiffBody(mesh, kind) {
+  if (!mesh.stiffens) return 0;
+  mesh.bodies += 1;
+  mesh.kinds.set(mesh.bodies, kind);
+  return mesh.bodies;
+}
+
+/**
+ * Make a piece's rings stiff (`kind`: stiffnessOf): whatever is lofted or laid on them afterwards (the piece, its edges, rivets
+ * and lacing) belongs to the ring's body. A plate is one body; rows and a coat's are a body to each ring, or, round something
+ * that parts (`panels`: a skirt over two legs), a body to each of that many panels of each ring.
+ */
+function stiffen(mesh, rings, kind, panels = 0) {
+  if (!kind) return rings;
+  const whole = kind === 'plate' ? stiffBody(mesh, kind) : 0;
+  for (const ring of rings) ring.body = whole || (panels ? Array.from({ length: panels }, () => stiffBody(mesh, kind)) : stiffBody(mesh, kind));
+  return rings;
+}
+
+/** The stiff body a point at `angle` round a ring belongs to (0: none): the piece being built as one (`mesh.body`), else the ring's. */
+function bodyAt(mesh, ring, angle) {
+  if (mesh.body) return mesh.body;
+  if (!Array.isArray(ring.body)) return ring.body ?? 0;
+  const turn = angle / (Math.PI * 2);
+  return ring.body[Math.floor((turn - Math.floor(turn)) * ring.body.length) % ring.body.length];
+}
+
+/**
+ * Stiff bodies ride whole: every point of one takes the mean of its points' weights (a plate's sharpened, LOFT.stiff), so the
+ * body turns with the bones as one piece (exactly, skinned by dual quaternions; without them it shears a little, never bends).
+ */
+function stiffWeights(weights, stiff, kinds) {
+  const groups = new Map();
+  stiff.forEach((body, vertex) => {
+    if (!body) return;
+    if (!groups.has(body)) groups.set(body, []);
+    groups.get(body).push(vertex);
+  });
+  const sums = new Map();
+  const write = (vertex, shares) => {
+    const top = [...shares].sort((a, b) => b[1] - a[1]).slice(0, 4);
+    const total = top.reduce((sum, [, share]) => sum + share, 0) || 1;
+    for (let slot = 0; slot < 4; slot += 1) {
+      weights.skinIndex[vertex * 4 + slot] = top[slot]?.[0] ?? 0;
+      weights.skinWeight[vertex * 4 + slot] = top[slot] ? top[slot][1] / total : 0;
+    }
+  };
+  for (const [body, vertices] of groups) {
+    sums.clear();
+    for (const vertex of vertices) {
+      for (let slot = 0; slot < 4; slot += 1) {
+        const share = weights.skinWeight[vertex * 4 + slot];
+        if (share > 0) sums.set(weights.skinIndex[vertex * 4 + slot], (sums.get(weights.skinIndex[vertex * 4 + slot]) ?? 0) + share);
+      }
+    }
+    const kind = kinds.get(body);
+    const power = kind === 'plate' ? LOFT.stiff.sharpen : 1;
+    const mean = [...sums].map(([bone, sum]) => [bone, (sum / vertices.length) ** power]);
+    const total = mean.reduce((sum, [, share]) => sum + share, 0) || 1;
+    if (kind === 'plate') {
+      for (const vertex of vertices) write(vertex, mean);
+      continue;
+    }
+    // A row holds as a hoop where the body under it moves as one. A point of it that lies over another limb (a coat's yoke
+    // over the shoulder) shares few of the hoop's bones and goes with that limb, as the strap or the cloth there does.
+    const hoop = new Map(mean.map(([bone, share]) => [bone, share / total]));
+    for (const vertex of vertices) {
+      let shared = 0;
+      for (let slot = 0; slot < 4; slot += 1) shared += Math.min(weights.skinWeight[vertex * 4 + slot], hoop.get(weights.skinIndex[vertex * 4 + slot]) ?? 0);
+      const hold = shared * shared * (kind === 'coat' ? 1 - LOFT.stiff.coat : 1);
+      const own = new Map([...hoop].map(([bone, share]) => [bone, share * hold]));
+      for (let slot = 0; slot < 4; slot += 1) {
+        const share = weights.skinWeight[vertex * 4 + slot];
+        if (share > 0) own.set(weights.skinIndex[vertex * 4 + slot], (own.get(weights.skinIndex[vertex * 4 + slot]) ?? 0) + share * (1 - hold));
+      }
+      write(vertex, own);
+    }
+  }
+}
+
+/**
  * Add one loft to the mesh arrays.
  * @param rings [{ center, depthAxis, widthAxis, depth, width }]
  */
@@ -410,6 +513,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       // (The seam's second column is painted as the first: the same place round.)
       mesh.colors.push(paint(ring, angle, ringIndex, step % sides));
       mesh.bones.push(bones(ring, Math.cos(angle)));
+      mesh.stiff.push(bodyAt(mesh, ring, angle));
       // (By the point's own index: patches and grids, which have no ring place, push points without one.)
       mesh.ringT[mesh.positions.length / 3 - 1] = ring.t;
       mesh.ringA[mesh.positions.length / 3 - 1] = angle;
@@ -435,6 +539,7 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
     mesh.weightPositions.push(...rings[row].center);
     mesh.colors.push(paint(rings[row], 0, row, 0));
     mesh.bones.push(bones(rings[row], 0));
+    mesh.stiff.push(bodyAt(mesh, rings[row], 0));
     mesh.ringT[center] = rings[row].t;
     mesh.ringA[center] = 0;
     if (uv) mesh.uvs.set(center, uv(rings[row], 0, row, 0));
@@ -1370,6 +1475,8 @@ function ringAt(rings, place) {
   return {
     t: mix(a.t, b.t), center: vec.lerp(a.center, b.center, share), depthAxis: a.depthAxis, widthAxis: a.widthAxis,
     depth: mix(a.depth, b.depth), width: mix(a.width, b.width),
+    // (Of the nearer ring's stiff body: stiffen.)
+    body: (share < 0.5 ? a : b).body,
   };
 }
 
@@ -1392,6 +1499,7 @@ function addPatch(mesh, rings, corners, role, bones) {
     mesh.weightPositions.push(...onRing(ring, angle, 1));
     mesh.colors.push(role);
     mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
+    mesh.stiff.push(bodyAt(mesh, ring, angle));
     patchUv(mesh, rings, role, start + index, place, angle);
   }
   // Wound so its face looks away from the piece's axis.
@@ -1421,6 +1529,7 @@ function addGrid(mesh, rings, grid, role, bones) {
       mesh.weightPositions.push(...onRing(ring, angle, 1));
       mesh.colors.push(role);
       mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
+      mesh.stiff.push(bodyAt(mesh, ring, angle));
       patchUv(mesh, rings, role, mesh.positions.length / 3 - 1, place, angle);
     }
   }
@@ -1545,14 +1654,19 @@ function lacedShell(mesh, rings, inflate, roleOf, bones, sides, style, holes = n
   const high = inflate + spec.lift + spec.tilt;
   const shell = [];
   // `up`: rows up the piece (0 at its lowest ring).
-  const add = (up, outward, role) => {
+  const add = (up, outward, role, body) => {
     const place = (up / rows) * last;
-    shell.push({ ...ringAt(rings, measure.rising ? place : last - place), out: outward, v: up / tile.rows, role });
+    shell.push({ ...ringAt(rings, measure.rising ? place : last - place), out: outward, v: up / tile.rows, role, ...(body ? { body } : {}) });
   };
+  // Where the piece is stiff in rows (stiffen), each laced row is a stiff body of its own (in as many panels round as the piece's).
+  const rowsKind = rings[0].body ? mesh.kinds.get(Array.isArray(rings[0].body) ? rings[0].body[0] : rings[0].body) : null;
+  const rowsStiff = rowsKind && rowsKind !== 'plate';
+  const panels = Array.isArray(rings[0].body) ? rings[0].body.length : 0;
   // (Scales, `hangs`, the other way: each row's foot stands out over the heads of the row below.)
   for (let row = 0; row < rows; row += 1) {
-    add(row, tile.hangs ? high : low, roleOf(row, rows));
-    add(row + 1, tile.hangs ? low : high, roleOf(row, rows));
+    const body = !rowsStiff ? null : panels ? Array.from({ length: panels }, () => stiffBody(mesh, rowsKind)) : stiffBody(mesh, rowsKind);
+    add(row, tile.hangs ? high : low, roleOf(row, rows), body);
+    add(row + 1, tile.hangs ? low : high, roleOf(row, rows), body);
   }
   // (In the run's own order, so the faces wind outward as the piece's own loft does.)
   if (!measure.rising) shell.reverse();
@@ -1600,7 +1714,10 @@ function lamesOn(mesh, rings, inflate, paint, bones) {
   const spec = LOFT.lames;
   const span = (rings.length - 1) / paint.lames;
   const turn = (step) => (step / spec.steps) * Math.PI * 2;
+  const outer = mesh.body;
   for (let lame = 0; lame < paint.lames; lame += 1) {
+    // (Each lame a stiff body of its own, sliding under the next.)
+    mesh.body = stiffBody(mesh, 'rows');
     const from = lame * span;
     const to = Math.min(rings.length - 1, (lame + 1 + spec.overlap) * span);
     const out = (u) => inflate + spec.lift + spec.tilt * (1 - u);
@@ -1617,6 +1734,7 @@ function lamesOn(mesh, rings, inflate, paint, bones) {
       addPatch(mesh, rings, [[at - span * 0.12, angle - spec.rivet, lift], [at - span * 0.12, angle + spec.rivet, lift], [at + span * 0.12, angle + spec.rivet, lift], [at + span * 0.12, angle - spec.rivet, lift]], 'gold', bones);
     }
   }
+  mesh.body = outer;
 }
 
 /**
@@ -1637,7 +1755,10 @@ function tassetOn(mesh, rings, outer, lames = LOFT.tasset.lames) {
       // Each lame flares a little at its lower edge, lapping over the next.
       return [place, angle, out + 0.03 * row];
     }));
+    // (Each lame a stiff plate hung on the thigh.)
+    mesh.body = stiffBody(mesh, 'plate');
     addGrid(mesh, rings, grid, lame % 2 ? 'steel2' : 'steel', () => null);
+    mesh.body = 0;
   }
 }
 
@@ -1926,21 +2047,23 @@ function heraldry(kind, t, across, ahead) {
 }
 
 /** Split every triangle's corners apart so each face shades flat. */
-function facet(positions, indices, colors, bones, weightPositions) {
+function facet(positions, indices, colors, bones, weightPositions, stiff) {
   const flatPositions = [];
   const flatIndices = [];
   const flatColors = [];
   const flatBones = [];
+  const flatStiff = [];
   const flatWeights = [];
   for (let face = 0; face < indices.length; face += 1) {
     const i = indices[face];
     flatPositions.push(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
     flatColors.push(colors[i]);
     flatBones.push(bones[i]);
+    flatStiff.push(stiff[i]);
     flatWeights.push(weightPositions[i * 3], weightPositions[i * 3 + 1], weightPositions[i * 3 + 2]);
     flatIndices.push(face);
   }
-  return { positions: flatPositions, indices: flatIndices, colors: flatColors, bones: flatBones, weightPositions: flatWeights };
+  return { positions: flatPositions, indices: flatIndices, colors: flatColors, bones: flatBones, weightPositions: flatWeights, stiff: flatStiff };
 }
 
 /**
@@ -2151,6 +2274,7 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
     mesh.weightPositions.push(...point);
     mesh.colors.push('skin');
     mesh.bones.push(parts[name].bones ? parts[name].bones(render.t[index], Math.cos(render.angle[index])) : null);
+    mesh.stiff.push(0);
     mesh.ringT[start + index] = render.t[index];
     mesh.ringA[start + index] = render.angle[index];
     if (uvs) mesh.uvs.set(start + index, [uvs[index * 2], uvs[index * 2 + 1]]);
@@ -3360,7 +3484,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const at = (name) => points[P[name]];
   const seg = body.segments;
   const L = body.lengths;
-  const mesh = { positions: [], weightPositions: [], indices: [], colors: [], bones: [], uvs: new Map(), welds: [], parts: {}, ringT: [], ringA: [], covers: {}, cover: lowDetail ? null : {}, ringOf: base && !base.measure ? new Map() : null };
+  const mesh = { positions: [], weightPositions: [], indices: [], colors: [], bones: [], stiff: [], bodies: 0, kinds: new Map(), body: 0, stiffens: !lowDetail, uvs: new Map(), welds: [], parts: {}, ringT: [], ringA: [], covers: {}, cover: lowDetail ? null : {}, ringOf: base && !base.measure ? new Map() : null };
   // Rings along a skin part, tagged with it: a closed piece lofted over them covers that stretch of the part (loft).
   const tagged = (name, rings) => Object.assign(rings, { part: name });
   const build = seg.trunk.tissue.muscle / (seg.trunk.tissue.muscle + seg.trunk.tissue.fat);
@@ -3526,6 +3650,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const tablePiece = (rings, inflate, paint, bones, shape = null, slot = null, material = pieceMaterial(paint)) => {
     const tile = DETAIL_MAPS.on && !lowDetail ? armourTileOf(tileKind, material, slot) : null;
     const boned = bones ?? (() => null);
+    // Stiff as what it is made of (stiffnessOf); a skirt's rows panel by panel, as it parts over the legs.
+    stiffen(mesh, rings, stiffnessOf(paint), slot === 'skirt' ? LOFT.stiff.panels : 0);
     // Lamellae (and scales hung point down) drawn as plates over a backing of their dark lacing (the robe showing in the
     // splits), except in a crowd: with the maps, one shell in rows wearing its laced tile, or a field tile of the kind's own over
     // the backing; else plate by plate.
@@ -3698,15 +3824,15 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   if (skirted) loft(mesh, skirtRings(skirtTo(0.85), count(8), 0.5), sides, { color: 'kit', inflate: 1.16, capStart: false, capEnd: false, bones: () => hanging3 });
   // Plate below the waist is a fauld, not a skirt: a short band of lames round the hips (the tassets hang from it over each thigh, with the legs).
   if (plate) {
-    const fauld = skirtRings(skirtTo(LOFT.fauld.reach), count(3), LOFT.fauld.flare);
+    const fauld = stiffen(mesh, skirtRings(skirtTo(LOFT.fauld.reach), count(3), LOFT.fauld.flare), 'rows', LOFT.stiff.panels);
     loft(mesh, fauld, sides, { color: (ring, angle, index) => (index % 2 ? 'steel2' : 'steel'), inflate: 1.2, capStart: false, capEnd: false, bones: () => hanging3 });
     if (!lowDetail && !armor.over) lamesOn(mesh, fauld, 1.2, { lames: LOFT.fauld.lames, base: 'steel2' }, () => hanging3);
   }
   // Kusazuri: the laced skirt of plates, in panels, over the hips and thighs.
   // (With the detail maps, its laced rows are the kozane's: one stepped shell.)
   const kozane = lamellar && DETAIL_MAPS.on && !lowDetail;
-  if (kozane) lacedShell(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), 1.24, (row) => (row === 0 && armor.trim ? 'gold' : 'steel'), () => hanging3, sides + 6, 'kozane');
-  else if (lamellar) loft(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
+  if (kozane) lacedShell(mesh, stiffen(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), 'rows', LOFT.stiff.panels), 1.24, (row) => (row === 0 && armor.trim ? 'gold' : 'steel'), () => hanging3, sides + 6, 'kozane');
+  else if (lamellar) loft(mesh, stiffen(mesh, skirtRings(skirtTo(0.5), count(6), 0.45), 'rows', LOFT.stiff.panels), sides, { color: (ring, angle, index) => (index % 2 ? 'lace' : 'steel'), inflate: 1.24, capStart: false, capEnd: false, bones: () => hanging3 });
   // A long gown's skirt, belled out from the waist to below the knee.
   // A gown, or a skirt over another bottom (`gown`: bloomers under a bubble skirt).
   const gownShape = bottom?.kind === 'gown' ? bottom.shape ?? 'crinoline' : bottom?.gown ?? null;
@@ -3879,9 +4005,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const collarRings = tagged('neck', along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)));
     // A mail collar with the mail's maps (detailmaps.js).
     const mailMaps = kit?.collar === 'mail' && DETAIL_MAPS.on && !lowDetail ? { uv: mailUv(collarRings, 1) } : {};
+    // (A plate gorget is stiff on the neck; a mail or cloth collar gives with it.)
+    stiffen(mesh, collarRings, kit?.collar ? stiffnessOf(kit.collar) : 'plate');
     loft(mesh, collarRings, sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false, ...mailMaps });
   }
-  const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, rings, sides, { color: role, inflate, capStart: false, capEnd: false });
+  // (Stiff as its paint is: one plate, or rows where it is painted in rows of plates and lacing.)
+  const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, stiffen(mesh, rings, typeof role === 'function' ? 'rows' : stiffnessOf(role)), sides, { color: role, inflate, capStart: false, capEnd: false });
   // A plate harness's piece (with the maps): its edges turned and roped, rivets inside them (harnessEdgesOn); a couter's or a
   // poleyn's articulating lames (`lames`) over its cop.
   const harnessPiece = (rings, inflate, lames = 0) => {
@@ -4083,10 +4212,10 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   if (covered && baseRig) closeCoveredJoints(covered, mesh.cover);
   if (coverOnly) return { covered };
   yield 'lofted';
-  let { positions, indices, colors, bones, weightPositions } = mesh;
+  let { positions, indices, colors, bones, weightPositions, stiff } = mesh;
   // (The base mesh's bone-heat weights per point, the skin's own and each worn point's from the skin beneath it: baseHeatWeights.)
   let heat = mesh.heat ? clothHeat(mesh) : null;
-  if (faceted) ({ positions, indices, colors, bones, weightPositions } = facet(positions, indices, colors, bones, weightPositions));
+  if (faceted) ({ positions, indices, colors, bones, weightPositions, stiff } = facet(positions, indices, colors, bones, weightPositions, stiff));
   let positionArray = Float32Array.from(positions);
   let indexArray = Uint32Array.from(indices);
   if (!faceted) {
@@ -4207,6 +4336,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       weightPositions = Array.from(order, (from) => [weightPositions[from * 3], weightPositions[from * 3 + 1], weightPositions[from * 3 + 2]]).flat();
       colors = Array.from(order, (from) => colors[from]);
       bones = Array.from(order, (from) => bones[from]);
+      stiff = Array.from(order, (from) => stiff[from]);
       if (heat) heat = Array.from(order, (from) => heat[from]);
       indexArray = Uint32Array.from(kept, (vertex) => used[vertex]);
     }
@@ -4226,18 +4356,22 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       tint.fill(Math.min(band.light, Math.max(band.dark, 1 + shade)), vertex * 3, vertex * 3 + 3);
     }
   }
-  // `rigid`: vertices carried by the chest bone alone (a breastplate and what is under it): no flesh to dent.
+  // `rigid`: vertices carried by the chest bone alone (a breastplate and what is under it); `firm`: those and every stiff
+  // body's (no flesh to dent, nothing to slosh).
   const rigid = bones.map((list) => list === chestOnly);
+  const firm = rigid.map((flag, vertex) => flag || Boolean(stiff[vertex]));
   yield 'skin weights';
   const weights = yield* skinWeightsSteps(Float32Array.from(weightPositions), frames, bones);
-  if (heat) baseHeatWeights(weights, heat, weightPositions, frames, rigid);
+  // (Rows and a coat's rings take the cloth's weights first, as what is under them does, and are made hoops of afterwards.)
+  if (heat) baseHeatWeights(weights, heat, weightPositions, frames, bones.map((list, vertex) => list === chestOnly || mesh.kinds.get(stiff[vertex]) === 'plate'));
   else if (baseRig) blendShoulders(weights, weightPositions, frames, baseParts);
+  stiffWeights(weights, stiff, mesh.kinds);
   // The base mesh's fat masses that follow the frame (fatslosh.js): an overweight trunk and up, not in a crowd; each point by the
   // share the trunk's bones carry of it (an arm or a thigh lying against the belly or a breast is not moved with it), not a rigid plate.
   const figures = baseRig && !lowDetail ? sloshFigures(fatLayer) : null;
   const trunkBones = new Set([BONE.pelvis, BONE.spine, BONE.chest]);
-  const trunkShare = figures ? Float32Array.from(rigid, (_, vertex) => [0, 1, 2, 3].reduce((sum, slot) => sum + (trunkBones.has(weights.skinIndex[vertex * 4 + slot]) ? weights.skinWeight[vertex * 4 + slot] : 0), 0)) : null;
-  const slosh = figures ? baseSlosh(figures, positionArray, rigid, baseParts.trunk, baseBellyShape, trunkShare, { positions: mesh.positions, regions: mesh.colors }) : null;
+  const trunkShare = figures ? Float32Array.from(firm, (_, vertex) => [0, 1, 2, 3].reduce((sum, slot) => sum + (trunkBones.has(weights.skinIndex[vertex * 4 + slot]) ? weights.skinWeight[vertex * 4 + slot] : 0), 0)) : null;
+  const slosh = figures ? baseSlosh(figures, positionArray, firm, baseParts.trunk, baseBellyShape, trunkShare, { positions: mesh.positions, regions: mesh.colors }) : null;
   // `regions` names what each vertex is (skin, kit, band, top) for painting.
   return {
     positions: positionArray, normals, indices: indexArray, regions: colors, rigid, ...(uvs ? { uvs } : {}), ...weights, bindFrames, bindPoints: bindAt,

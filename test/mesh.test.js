@@ -126,6 +126,25 @@ test('a plate breastplate rides the chest bone alone (rigid: no bend, twist or d
   assert.ok(!buildLoftBody(buildBody(PRESETS.heavy)).rigid.some(Boolean), 'no rigid piece without a breastplate');
 });
 
+test('steel is stiff: a plate\'s points all carry the same weights, so no plate bends; a crowd\'s body is left as it was', async () => {
+  const { buildLoftBody, stiffnessOf } = await import('../src/loftbody.js');
+  assert.equal(stiffnessOf('steel'), 'plate');
+  assert.equal(stiffnessOf('cloth'), null);
+  const distinct = (mesh) => {
+    const seen = new Set();
+    let steel = 0;
+    mesh.regions.forEach((region, vertex) => {
+      if (region !== 'steel') return;
+      steel += 1;
+      seen.add([0, 1, 2, 3].map((slot) => `${mesh.skinIndex[vertex * 4 + slot]}:${mesh.skinWeight[vertex * 4 + slot].toFixed(4)}`).join(' '));
+    });
+    return seen.size / steel;
+  };
+  const body = buildBody(PRESETS.knight);
+  assert.ok(distinct(buildLoftBody(body)) < 0.15, 'a harness of stiff plates and rows');
+  assert.ok(distinct(buildLoftBody(body, { lowDetail: true })) > 0.5, 'the crowd\'s harness follows the body point by point');
+});
+
 test('the horse peoples\' kit and the armies that met them loft whole: every design of each new outfit, its armour drawn', async () => {
   const { buildLoftBody, ARMOR_KINDS } = await import('../src/loftbody.js');
   const { OUTFITS } = await import('../src/outfits.js');
