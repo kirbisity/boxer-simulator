@@ -117,6 +117,14 @@ export const ENV = {
     // its one step at its own depth and the sward averages them (three steps a blade were half the walk's whole
     // cost, 3 ms of 6 at 1600 x 900 in mist on the bench machine, a blade having many corners and a field many blades).
     shadeSteps: [8, 4, 1],
+    // Where the frame can be drawn through passes (post.js) the lines are not walked in the materials at all:
+    // one pass at half the frame's size walks the line of every point of the picture from its depth, this
+    // many steps, and the light the shade takes is taken off the picture. It is the same walk over the same
+    // cover, but once a point of the picture and not once a corner of a tree or a blade, so a shaft stands
+    // before a far wood as it does before the ground (worked once a corner, the air before the trees had no
+    // shafts in it: a glow only); and it is a quarter of the points, so it has the steps to spare. 14: the
+    // least at which a trunk's band of shade in the air is not broken into grain at 20 m, by eye.
+    frameSteps: 14,
     // Fewer steps where the haze has taken little by then (the share of the light behind it that it has put its
     // own in place of): under `shadeFrom` one step, under `shadeFull` half of them. On a clear day that is all the
     // land within a few hundred metres; in mist everything past the fighters is walked in full. (At 1600 x 900 the
@@ -177,6 +185,17 @@ export const ENV = {
     // round the sun burn out, as the wood-in-mist reference does. By eye on that view, between the fighters
     // going under (8 and over) and the whole frame going milky (3).
     hazeMost: 5,
+    // The sky in the frame. `skyOver`: how many times the land's light the sky toward the view (the sky
+    // table's horizon row) may be before the meter counts it. An ordinary day's sky is 3 to 6 times the
+    // metered land (measured here: the meadow's broken cloud 3.3 to 5.6 off the sun, 8 at it) and the curve's
+    // shoulder holds that with its structure; a 7 degree sun's is 11 at a right angle to the sun and 35 toward
+    // it, which an exposure set by the land burnt to one yellow-white. `skyShare`: the share of a level frame
+    // the sky fills, about a quarter to a third at the heights the camera works at (approximate): the excess
+    // is metered by it, so toward an evening sun the camera closes one to two stops and the land goes to
+    // silhouette under a sky that keeps its glow and cloud bars. Through thick air the haze's own term above
+    // stands for the sky, and this one fades by the haze's share.
+    skyOver: 8,
+    skyShare: 0.25,
     // The grade, where a weather does not say otherwise (ENV_WEATHER `grade`): `ev` stops over the metered
     // exposure, `contrast` the curve's n, `saturation` (1 as the curve leaves it), `white` the light (in white
     // cards) that just reaches the ceiling, `warmth` moved from blue to red (0.02: 2 % each way). All by eye
@@ -256,6 +275,22 @@ export const ENV = {
     // The flecks are sharp where the shade is thin and close up as it deepens. By eye.
     dapple: 0.55,
     dappleSway: 0.06,
+    // A crown is leaf in masses, a bough's worth each, with sky between them: `boughs` m the size of a mass
+    // and of the gap beside it (a bough of a tree 10 to 20 m tall carries leaf 2 to 3 m across: approximate, by
+    // eye off the crowns drawn here), `boughShare` how much of the pattern of sun and shade under a crown is the
+    // boughs' and how much the leaves' own (`dapple`). The leaves' flecks are lost a few metres below the
+    // crown, the sun being half a degree wide (a fleck half a metre across is all penumbra 60 m down its ray);
+    // the boughs' gaps are not, so they are what the air shows: the shafts in mist are the gaps between
+    // boughs, and each comes down on a patch of sunlit ground (air.js envSunwardOver, terrain.js envCover).
+    boughs: 2.4,
+    boughShare: 0.5,
+    // A trunk's shade in the air ends at the trunk: the near map keeps, with each band on the ground, how high the
+    // line to the sun has climbed where it meets the trunk (8 bits over `reachMost` m: 0.13 m a step, and above
+    // any bare trunk here), and the air over the band is shaded below that height only (`reachSoft` m to fade
+    // over, about a trunk's width). Without it a band also darkened the air sunward of its trunk, up to the crowns:
+    // dark bars across the mist that nothing cast.
+    reachMost: 32,
+    reachSoft: 0.6,
     // A crown's shadow on the near map is three rounds up its height, each taking `crown` of the sun at its
     // middle: a tree in leaf lets a tenth or less of the direct sun through its whole depth (approximate; canopy
     // gap fractions of 5 to 15 per cent are the usual figures quoted), which three rounds of 0.55 one behind
@@ -697,8 +732,10 @@ export const ENV_WEATHER = {
   heavy: { label: 'Heavy cloud', grade: { contrast: 1.08, saturation: 1.25, warmth: -0.27, ev: 0.5 }, fine: 1.1, cover: 0.72, deck: 1, gloom: 0.85, sun: 1, visibility: 4500, hazeHeight: 300, wind: 1.25, gust: 0.12, wet: 0, fall: null, snow: 0 },
   // A low grey lid: no shadows, flat light (the sun's share is what gets through thick stratus, a few per cent direct).
   overcast: { label: 'Overcast', grade: { contrast: 1.4, saturation: 0.94, warmth: -0.015, ev: -0.3 }, fine: 0.8, cover: 1, gloom: 0.4, sun: 0.06, visibility: 12000, hazeHeight: null, wind: 1.2, gust: 0.05, wet: 0, fall: null, snow: 0 },
-  // Steady rain: visibility a few km (approximate for moderate rain), everything wet.
-  rain: { label: 'Rain', grade: { contrast: 1.42, saturation: 0.86, warmth: -0.03, ev: -0.5 }, fine: 0, cover: 1, gloom: 0.65, sun: 0.03, visibility: 2600, hazeHeight: 900, wind: 1.5, gust: 0.15, wet: 1, fall: { kind: 'rain', share: 1 }, snow: 0 },
+  // Steady rain: visibility a few km (approximate for moderate rain), everything wet. (`ev`: a third of a stop
+  // under, by eye; at half a stop, with the ground wet and the lid's gloom, a wood in rain measured a median
+  // of 0.12 of full scale and its fighters were lost.)
+  rain: { label: 'Rain', grade: { contrast: 1.42, saturation: 0.86, warmth: -0.03, ev: -0.3 }, fine: 0, cover: 1, gloom: 0.65, sun: 0.03, visibility: 2600, hazeHeight: 900, wind: 1.5, gust: 0.15, wet: 1, fall: { kind: 'rain', share: 1 }, snow: 0 },
   // Ground mist at dawn: a layer some tens of metres deep, the sun and the sky above it clear, the air near still.
   // (Mist is by definition visibility over 1 km and fog under; a valley's dawn fog is 100-400 m. 150, set against
   // a wood: at 260 trees 40 and 120 m off stood at nearly one tone and the wood read as a wash; at 150 each
@@ -710,7 +747,7 @@ export const ENV_WEATHER = {
   // Snow driving on a hard wind: visibility under a km in moderate snow (approximate), the ground white.
   snow: { label: 'Snow', grade: { contrast: 1.3, saturation: 0.85, warmth: -0.02, ev: 0.3 }, fine: 0, cover: 1, gloom: 0.25, sun: 0.05, visibility: 700, hazeHeight: 600, wind: 1.6, gust: 0.15, wet: 0, fall: { kind: 'snow', share: 1 }, snow: 0.85 },
   // Showers: heavy cloud with gaps, rain out of the thick of it and sun through the gaps, the ground wet between.
-  showers: { label: 'Showers', grade: { contrast: 1.36, saturation: 0.94, ev: -0.15 }, fine: 0.6, cover: 0.66, gloom: 0.6, sun: 0.9, visibility: 14000, hazeHeight: null, wind: 1.4, gust: 0.2, wet: 1, fall: { kind: 'rain', share: 1, under: [0.09, 0.17], least: 0, thick: 3200 }, snow: 0 },
+  showers: { label: 'Showers', grade: { contrast: 1.36, saturation: 0.94, ev: 0.1 }, fine: 0.6, cover: 0.66, gloom: 0.6, sun: 0.9, visibility: 14000, hazeHeight: null, wind: 1.4, gust: 0.2, wet: 1, fall: { kind: 'rain', share: 1, under: [0.09, 0.17], least: 0, thick: 3200 }, snow: 0 },
   // Snow showers on a cold wind: flurries out of each cloud that passes, the sun between them on new snow.
   flurries: { label: 'Snow showers', grade: { contrast: 1.3, saturation: 0.9, warmth: -0.01, ev: 0.15 }, fine: 0.3, cover: 0.64, gloom: 0.4, sun: 0.85, visibility: 9000, hazeHeight: 900, wind: 1.5, gust: 0.2, wet: 0, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 900 }, snow: 0.85 },
   // Dust lifted off dry ground by a hard wind: an ochre haze near the ground.
@@ -718,6 +755,13 @@ export const ENV_WEATHER = {
 };
 
 // ---- places ----------------------------------------------------------------------------------------------------------
+// weather: its own, an ENV_WEATHER name; `weatherHere`: any of that weather's entries as they are on this place
+//   (its mist thinner, its cloud lower), laid over it while the place's own weather is the one shown and not
+//   where the same weather is picked by name.
+// other: a place whose own day is a mood (a low sun, a set sky) says how it stands under any other weather:
+//   { than: its own weather's name, and any of sun, air, clouds, meter }. A weather picked by name, or brought
+//   by a battle, then looks like itself there (snow under a snow sky, not an evening with snow in it); under
+//   `than` the place is its own day. Left out: the place has one sun for every weather.
 // sun: `azimuth` rad round from +x toward +z (scenery.js's convention: -pi/2 is the far side of the floor),
 //   `elevation` degrees above the horizon.
 // air: `visibility` m on this place's clear day, `hazeHeight` m.
@@ -739,8 +783,10 @@ export const ENV_WEATHER = {
 // rocks: stands of boulders, each { count, from, to (m from the middle), clump 0..1, size: [least, most] (m, half a
 // rock's width) }, laid as trees are planted; outcrops: knots of rock at a point, each { at: [x, z], radius (m),
 // rocks, plants (how many of each), size, kinds (the plants: ENV_TREES names; dock and bracken if left out) }.
-// rides: lanes through the trees from the floor outward, each { azimuth (rad, as the sun's), width, length (m) }:
-//   no tree stands in one. Where the sun comes down a ride the floor at its end is lit and the wood either side is not.
+// rides: lanes through the trees from the floor outward, each { azimuth (rad, as the sun's), width, length (m),
+//   standards, kind }: no tree stands in one but its `standards`, that many tall trees of `kind` (pine if not
+//   given) left standing in it where they fall. Where the sun comes down a ride the floor at its end is lit and the
+//   wood either side is not; the standards' trunks are what bands that light, on the ground and in the air.
 // woods: 0..1 of the far hills wooded (drawn as colour on the land beyond the last tree), and its colour.
 // drift: what is in the air on its clear day: [{ kind (ENV.particles), share of its count, colours }].
 //
@@ -837,6 +883,11 @@ export const PLACE_ENV = {
     sun: { azimuth: -2.3, elevation: 7 },
     air: { visibility: 18000, hazeHeight: 900 },
     clouds: { cover: 0.36, deck: 1 },
+    // The evening is the field's own day, and only that: under any weather picked by name the sun stands at
+    // mid-afternoon height on the same bearing, so that the weather's own light is what is seen (at 7 degrees
+    // every weather was amber, and a low sun's long cloud shadows cut mist and flurries into a lit half and a
+    // dark half).
+    other: { than: 'clear', sun: { azimuth: -2.3, elevation: 34 }, clouds: { cover: 0.4 } },
     terrain: {
       seed: 23,
       layers: [
@@ -871,6 +922,13 @@ export const PLACE_ENV = {
   // the sun past black trunks, is the one from the wood behind the floor looking up the ride.
   sengoku: {
     weather: 'mist',
+    // A wood's morning mist is thin and lies low: the sun comes into it under the crowns nearly whole, so trunks
+    // lay bands of shade across the ground and through the air, and the gaps between crowns are shafts (the
+    // second reference). At 200 m in a layer 16 m deep the sun at 15 degrees crosses an optical depth of
+    // 3.9 / 200 x 16 / sin 15 = 1.2 of mist and keeps exp(-0.42 x 1.2) = 0.6 of its key on the ground
+    // (ENV.air.hazeForward: most of what the mist scatters still goes on down the beam); in the weather's
+    // own 150 m and 26 m it keeps 0.33 and the bands were lost in the mist's own light. By eye between the two.
+    weatherHere: { visibility: 200, hazeHeight: 16 },
     sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },
@@ -923,7 +981,7 @@ export const PLACE_ENV = {
       { kind: 'pine', count: 2600, from: 480, to: 2400, clump: 0.5 },
       { kind: 'rosette', count: 160, from: 0, to: 50, clump: 0.5 },
     ],
-    rides: [{ azimuth: -0.4, width: 12, length: 130 }],
+    rides: [{ azimuth: -0.4, width: 12, length: 130, standards: 7 }],
     woods: { cover: 0.9, colour: 0x2c4430 },
     drift: [{ kind: 'leaves', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }, { kind: 'motes', share: 0.6, colours: [0xfff0c8] }, { kind: 'litter', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }],
   },

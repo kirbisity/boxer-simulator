@@ -159,7 +159,12 @@ void main() {
 const ENV_PARTICLE_FRAGMENT = /* glsl */ `
 varying vec2 vUv;
 varying vec4 vColour;
+// Drawn after the scene (post.js, what falls through the air): what stands before it is asked of the scene's
+// kept depth, the frame it is drawn onto having none. xy: one over the frame's size, z: 1 while so drawn.
+uniform vec3 uLate;
+uniform sampler2D uLateDepth;
 void main() {
+  if (uLate.z > 0.5 && gl_FragCoord.z > texture2D(uLateDepth, gl_FragCoord.xy * uLate.xy).x) discard;
 #if STYLE == 0
   float cover = (1.0 - abs(vUv.x)) * (1.0 - vUv.y * vUv.y);
 #elif STYLE == 1
@@ -230,6 +235,8 @@ export function envBuildParticles(map, cover = null) {
         uDrawn: { value: new THREE.Vector4(spec.wander, drawn.alpha, 0.001, drawn.low ? 1 : 0) },
         uColours: { value: [0, 1, 2, 3].map(() => new THREE.Color(0xffffff)) },
         uColourCount: { value: 1 },
+        uLate: { value: new THREE.Vector3(0, 0, 0) },
+        uLateDepth: { value: null },
       },
       side: THREE.DoubleSide,
       transparent: !solid,
@@ -243,6 +250,9 @@ export function envBuildParticles(map, cover = null) {
     // After the fight's own see-through things (blood, dust, trails): the air is in front of them as often as behind.
     mesh.renderOrder = 6;
     mesh.userData.env = kind;
+    // (See-through and not adding light: rain, snow, dust. Where the frame takes the air's shade off after the
+    // scene is drawn, these are drawn after that: post.js.)
+    mesh.userData.envLate = !solid && !drawn.glow;
     group.userData.envKinds[kind] = mesh;
     group.add(mesh);
   }

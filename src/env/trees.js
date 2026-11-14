@@ -42,6 +42,23 @@ export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
       planted += 1;
     }
   }
+  // Standards: the trees left standing where a ride was cut, a few tall stems with the lane's light between them
+  // (a ride's `standards`, of `kind`, pine if left out). From a stream of their own, so no other tree moves.
+  const left = envRandom(place.terrain.seed * 977 + 47);
+  for (const ride of rides) {
+    const kind = ENV_TREES[ride.kind ?? 'pine'];
+    for (let standard = 0; standard < (ride.standards ?? 0); standard += 1) {
+      const along = left() * ride.length;
+      const across = (left() - 0.5) * ride.width;
+      const tall = kind.height[0] + (kind.height[1] - kind.height[0]) * (0.5 + 0.5 * left());
+      const x = along * ride.cos - across * ride.sin;
+      const z = along * ride.sin + across * ride.cos;
+      if (Math.abs(x) < keepOut[0] + 4 && Math.abs(z) < keepOut[1] + 4) continue;
+      if (footprints.some((print) => Math.abs(x - print.x) < print.halfX + 2.5 && Math.abs(z - print.z) < print.halfZ + 2.5)) continue;
+      const y = height(x, z);
+      trees.push({ kind: ride.kind ?? 'pine', x, y, z, height: tall, lit: envSunPast(height, sun, x, y + tall * kind.crown.at, z) });
+    }
+  }
   // What grows among the rocks of an outcrop (from a stream of its own, so a change to a stand of trees far off
   // does not move the plants a view is framed by).
   const among = envRandom(place.terrain.seed * 977 + 31);
@@ -115,14 +132,15 @@ export function envRockShadows(rocks, sun) {
   for (const rock of rocks) {
     if (Math.abs(rock.x) > reach || Math.abs(rock.z) > reach || rock.lit <= 0) continue;
     const tall = rock.size * ENV.rocks.forms[rock.form].scale[1] * 2 * (1 - ENV.rocks.sink);
-    shadows.push({ x: rock.x, z: rock.z, toX: rock.x - (sun[0] / flat) * tall * slant, toZ: rock.z - (sun[2] / flat) * tall * slant, half: rock.size * 0.75 });
+    shadows.push({ x: rock.x, z: rock.z, toX: rock.x - (sun[0] / flat) * tall * slant, toZ: rock.z - (sun[2] / flat) * tall * slant, half: rock.size * 0.75, tall });
   }
   return shadows;
 }
 
 /**
  * The shadows a place's trees lay on the near map (terrain.js envBuildNearMap): crowns as rounds moved to where the
- * sun puts them, and each trunk below its crown as a band `half` m to each side from its foot to (toX, toZ).
+ * sun puts them, and each trunk below its crown as a band `half` m to each side from its foot to (toX, toZ),
+ * `tall` m of trunk casting it.
  */
 export function envTreeShadows(trees, sun) {
   const shadows = [];
@@ -133,8 +151,11 @@ export function envTreeShadows(trees, sun) {
     if (Math.abs(tree.x) > reach || Math.abs(tree.z) > reach || tree.lit <= 0) continue;
     const kind = ENV_TREES[tree.kind];
     const bare = tree.height * Math.max(0, kind.crown.at - kind.crown.tall * 0.8);
-    if (bare > 0.5) shadows.push({ x: tree.x, z: tree.z, toX: tree.x - (sun[0] / flat) * bare * slant, toZ: tree.z - (sun[2] / flat) * bare * slant, half: tree.height * kind.trunk });
-    // Three rounds up the crown: a low sun draws them out into the long shadow it casts.
+    if (bare > 0.5) shadows.push({ x: tree.x, z: tree.z, toX: tree.x - (sun[0] / flat) * bare * slant, toZ: tree.z - (sun[2] / flat) * bare * slant, half: tree.height * kind.trunk, tall: bare });
+    // Three rounds up the crown: a low sun draws them apart along the ground, and each out by `stretch` along
+    // (`sunX`, `sunZ`), as a ball's shadow is on flat ground (1 / sin of the sun's height: the ball's width
+    // across the light, laid along the ground). Left round they stood apart under a low sun and each shaded a
+    // slab of air two metres thick: dark bars across the mist in front of a crown.
     for (const part of [-0.6, 0, 0.6]) {
       const up = tree.height * (kind.crown.at + kind.crown.tall * part);
       shadows.push({
@@ -142,6 +163,9 @@ export function envTreeShadows(trees, sun) {
         z: tree.z - (sun[2] / flat) * up * slant,
         radius: tree.height * kind.crown.wide * (part === 0 ? 1.15 : 0.9),
         depth: ENV.shadow.crown,
+        sunX: sun[0] / flat,
+        sunZ: sun[2] / flat,
+        stretch: Math.hypot(1, slant),
         over: part === 0 ? { x: tree.x, z: tree.z, radius: tree.height * kind.crown.wide * 1.3 } : null,
       });
     }

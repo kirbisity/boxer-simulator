@@ -13,11 +13,12 @@
 /* global THREE */
 
 import { ENV } from './config.js';
+import { ENV_GLSL, envUniforms } from './air.js';
 
 /**
  * The curve for an air state (air.js envAirState) under a weather, its constants solved so mid-grey keeps its value
  * and `white` reaches the ceiling (config.js), and what the camera's meter needs: `ground`, the light the place's
- * ground (a grey card, where neither the place's `meter` nor lying snow says otherwise) on the level sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
+ * ground (a grey card, where neither the place's `meter`, the wet nor lying snow says otherwise) on the level sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
  * power as light), and `hazed`, the share of a view that is the haze's own light and not the land's.
  */
 export function envToneOf(air, weather, place) {
@@ -27,7 +28,9 @@ export function envToneOf(air, weather, place) {
   // card's worth unless the place says, and moved toward snow's by the weather's lying snow.
   const open = place?.meter?.sky ?? 1;
   const bare = place?.meter?.albedo ?? tune.grey;
-  const card = tune.grey + (bare + (ENV.air.snowBounce - bare) * (weather.snow || 0) - tune.grey) * tune.groundSeen;
+  // (Wet, it throws back less: the same share the land's shader darkens it by.)
+  const soaked = bare * (1 - (1 - ENV.terrain.wetDarken) * (weather.wet || 0));
+  const card = tune.grey + (soaked + (ENV.air.snowBounce - soaked) * (weather.snow || 0) - tune.grey) * tune.groundSeen;
   const level = [0, 1, 2].map((channel) => air.sunColour[channel] * air.sun[1] + air.skyLight[channel] * open);
   const n = grade.contrast;
   const grey = Math.pow(tune.grey, n);
@@ -54,12 +57,14 @@ const envSeen = [0, 0, 0];
  * land, a grey card's worth of the light on the ground, and through thick air the haze's own light that way (the
  * sky table's horizon row, as the haze shader draws it), each by its share of the view. Looking into the sun
  * through mist the meter closes down, as far as ENV.tone.hazeMost lets the air's light count (past it the air
- * round the sun burns out and what stands in the mist is still seen); looking away it opens.
+ * round the sun burns out and what stands in the mist is still seen); looking away it opens. A sky far brighter
+ * than the land (a low sun's) closes it too, by the share of a frame the sky fills.
  */
 export function envMeter(tone, air, x, z) {
   const tune = ENV.tone;
   let haze = 0;
-  if (tone.hazed > 0.01) {
+  let sky = 0;
+  {
     const { across } = ENV.sky;
     const flat = Math.hypot(x, z);
     const cosine = flat > 1e-4 ? Math.min(1, Math.max(-1, (x * air.sun[0] + z * air.sun[2]) / (flat * Math.hypot(air.sun[0], air.sun[2])))) : 0;
@@ -69,9 +74,14 @@ export function envMeter(tone, air, x, z) {
       const a = air.table[left * 4 + channel];
       envSeen[channel] = (a + (air.table[left * 4 + 4 + channel] - a) * (column - left)) / 255 * ENV.sky.most;
     }
-    haze = Math.pow(envLuma(envSeen) * (1 - ENV.air.shadeBeam * (1 - (tone.airShare ?? 1))), 2.2);
+    sky = Math.pow(envLuma(envSeen), 2.2);
+    if (tone.hazed > 0.01) haze = Math.pow(envLuma(envSeen) * (1 - ENV.air.shadeBeam * (1 - (tone.airShare ?? 1))), 2.2);
   }
-  const seen = tone.ground + (Math.min(haze, tone.ground * tune.hazeMost) - tone.ground) * tone.hazed;
+  // The sky that way is in the frame too, and counts where it outshines the land past what the curve's shoulder
+  // holds (ENV.tone.skyOver): toward a low sun the camera closes down for it and lets the land go dark, as an
+  // evening is photographed, where an exposure set by the land alone burnt the whole sky out.
+  const land = tone.ground + (Math.min(haze, tone.ground * tune.hazeMost) - tone.ground) * tone.hazed;
+  const seen = land + Math.max(0, sky - tone.ground * tune.skyOver) * tune.skyShare * (1 - tone.hazed);
   tone.exposure = Math.pow((tune.grey * tune.meter) / seen, tune.adapt) * tone.stops;
   return tone.exposure;
 }
@@ -161,7 +171,72 @@ void main() {
   gl_FragColor = vec4(c, 1.0);
 }`;
 
+// Shade in the air, walked once a point of the picture (ENV.air.frameSteps): the scene's materials have put the
+// air's light before everything as if the sun were on all of it (air.js envAirShare gives them 1), and this pass,
+// at half the frame's size, finds from the depth of each point how much of the light on its line the sun does
+// not reach and writes the light that is not there: rgb in the scene's own display values, a the point's depth
+// (m), which the next pass uses to keep one thing's air off another's edge. The sky's points lie at the far
+// plane: their line is walked up through the layer as sky.js lays it over the sky.
+// (Made at first use and not as this file is read: air.js and this file read one another.)
+const envPostAirShader = () => /* glsl */ `
+uniform sampler2D uDepth;
+uniform mat4 uUnproject;
+uniform vec3 uEye;
+uniform vec2 uRange;
+varying vec2 vUv;
+${ENV_GLSL}
+void main() {
+  float z = texture2D(uDepth, vUv).x;
+  vec4 at = uUnproject * vec4(vUv * 2.0 - 1.0, z * 2.0 - 1.0, 1.0);
+  vec3 ray = at.xyz / at.w - uEye;
+  float distance_ = length(ray);
+  vec3 dir = ray / max(distance_, 1e-3);
+  vec3 depth = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(uEye.y, 0.0), max(uEye.y + ray.y, 0.0))) * distance_;
+  if (z >= 0.999999) {
+    float column = uEnvRayleigh.a / uEnvHaze.w * exp(-max(uEye.y, 0.0) * uEnvHaze.w) / max(dir.y, 0.004);
+    depth = vec3(dir.y > 0.0 ? column : 40.0);
+  }
+  float share = envAirWalk(uEye, ray, depth.g, envGrain(gl_FragCoord.xy), ${ENV.air.frameSteps});
+  gl_FragColor = vec4((envAirlightIn(dir, 1.0) - envAirlightIn(dir, share)) * (1.0 - exp(-depth)), uRange.x * uRange.y / (uRange.y - z * (uRange.y - uRange.x)));
+}`;
+
+// The scene less that light. The pass above is half the size, so each point takes the four of its points round
+// it, each by how near it is and by how like its depth is to this point's: the air before a far wood is not
+// laid on the edge of a fighter standing before it.
+const ENV_POST_UNSHADE = /* glsl */ `
+uniform sampler2D uFrom;
+uniform sampler2D uAir;
+uniform sampler2D uDepth;
+uniform vec2 uStep;
+uniform vec2 uRange;
+varying vec2 vUv;
+void main() {
+  vec4 colour = texture2D(uFrom, vUv);
+  float z = texture2D(uDepth, vUv).x;
+  float here = uRange.x * uRange.y / (uRange.y - z * (uRange.y - uRange.x));
+  vec2 at = vUv / uStep - 0.5;
+  vec2 corner = (floor(at) + 0.5) * uStep;
+  vec2 part = fract(at);
+  vec3 sum = vec3(0.0);
+  float total = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec2 which = vec2(mod(float(i), 2.0), floor(float(i) / 2.0));
+    vec4 tap = texture2D(uAir, corner + which * uStep);
+    vec2 near_ = mix(1.0 - part, part, which);
+    float weight = (near_.x * near_.y + 0.02) / (0.03 + abs(tap.a - here) / max(here, 1.0));
+    sum += tap.rgb * weight;
+    total += weight;
+  }
+  gl_FragColor = vec4(max(colour.rgb - sum / total, 0.0), colour.a);
+}`;
+
 let envPost = null;
+
+/** Whether the frame can be drawn through the passes on this device (so the air's shade may be left to them). */
+export function envPostAble(renderer) {
+  envPost ??= envPostMake(renderer);
+  return envPost.able;
+}
 
 /** The passes' own things, made at first use: a quad, three materials, and whether this device can hold light in a target. */
 function envPostMake(renderer) {
@@ -172,18 +247,22 @@ function envPostMake(renderer) {
     width: 0,
     height: 0,
     scene: new THREE.Scene(),
+    late: new THREE.Scene(),
     camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1),
     blur: pass(ENV_POST_BLUR, blur),
     // The same blur, laid over what its target holds: a level of the bloom added to the one above it.
     add: pass(ENV_POST_BLUR, blur, { blending: THREE.AdditiveBlending, transparent: true }),
     shafts: pass(ENV_POST_SHAFTS, { uFrom: { value: null }, uSun: { value: new THREE.Vector4() } }),
     frame: pass(ENV_POST_FRAME, { uFrom: { value: null }, uBloom: { value: null }, uShafts: { value: null }, uTone: { value: new THREE.Vector4() }, uGrade: { value: new THREE.Vector4() }, uLens: { value: new THREE.Vector3() } }),
+    air: pass(envPostAirShader(), { ...envUniforms(), uDepth: { value: null }, uUnproject: { value: new THREE.Matrix4() }, uEye: { value: new THREE.Vector3() }, uRange: { value: new THREE.Vector2() } }),
+    unshade: pass(ENV_POST_UNSHADE, { uFrom: { value: null }, uAir: { value: null }, uDepth: { value: null }, uStep: { value: new THREE.Vector2() }, uRange: { value: new THREE.Vector2() } }),
     targets: [],
     sunAt: new THREE.Vector3(),
     size: new THREE.Vector2(),
   };
   post.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), post.blur);
   post.quad.frustumCulled = false;
+  post.late.autoUpdate = false;
   post.scene.add(post.quad);
   return post;
 }
@@ -200,19 +279,27 @@ function envPostSize(post, width, height) {
   post.width = width;
   post.height = height;
   post.main = make(THREE.WebGLMultisampleRenderTarget, width, height);
+  // (The scene's depth is kept to read: the air's shade is walked from it.)
+  post.main.depthTexture?.dispose();
+  post.main.depthTexture = new THREE.DepthTexture(width, height, THREE.UnsignedIntType);
+  post.lit = make(THREE.WebGLRenderTarget, width, height);
+  post.airAt = make(THREE.WebGLRenderTarget, width >> 1, height >> 1);
+  post.airAt.texture.minFilter = post.airAt.texture.magFilter = THREE.NearestFilter;
   post.half = make(THREE.WebGLRenderTarget, width >> 1, height >> 1);
   post.levels = [];
   for (let level = 0; level < ENV.post.bloomLevels; level += 1) post.levels.push(make(THREE.WebGLRenderTarget, width >> (level + 2), height >> (level + 2)));
   post.rays = [make(THREE.WebGLRenderTarget, width >> 2, height >> 2), make(THREE.WebGLRenderTarget, width >> 2, height >> 2)];
-  post.targets = [post.main, post.half, ...post.levels, ...post.rays];
+  post.targets = [post.main, post.lit, post.airAt, post.half, ...post.levels, ...post.rays];
 }
 
 /**
  * Draw the view's frame through the passes. `tone`: an envToneOf; `level`: 1 bloom, 2 bloom and shafts
- * (ENV.quality's `post`); `shafts`: the shafts' strength (index.js, from the air). Returns false where the device
- * cannot hold light in a target: the caller draws the plain frame, whose materials then carry the curve themselves.
+ * (ENV.quality's `post`); `shafts`: the shafts' strength (index.js, from the air); `air`: the air's shade is
+ * walked here, from the scene's depth (the scene's materials were told so: index.js envUpdate). Returns false where
+ * the device cannot hold light in a target: the caller draws the plain frame, whose materials then carry the
+ * curve themselves.
  */
-export function envPostDraw(view, tone, level, shafts) {
+export function envPostDraw(view, tone, level, shafts, air) {
   const renderer = view.renderer;
   envPost ??= envPostMake(renderer);
   const post = envPost;
@@ -223,9 +310,15 @@ export function envPostDraw(view, tone, level, shafts) {
   const camera = view.camera;
 
   // The scene, as light sums: its materials' own curve stands aside for a negative exposure (air.js).
+  // What falls through the air and is seen through (rain, snow, dust) waits where the air's shade is taken off
+  // the frame: that light is worked out for what stands behind each pixel, and taken off a flake in front of a far
+  // wood or a shaded sky it left the flake black. It is drawn onto the frame after, tested against the scene's depth.
+  const late = air ? (view.env?.group?.userData.envParts?.particles.children ?? []).filter((mesh) => mesh.userData.envLate && mesh.visible) : [];
+  for (const mesh of late) mesh.visible = false;
   renderer.toneMappingExposure = -1;
   renderer.setRenderTarget(post.main);
   renderer.render(view.scene, camera);
+  for (const mesh of late) mesh.visible = true;
 
   const quad = post.quad;
   const run = (material, from, to, x, expose, cut, times) => {
@@ -240,8 +333,49 @@ export function envPostDraw(view, tone, level, shafts) {
     renderer.setRenderTarget(to);
     renderer.render(post.scene, post.camera);
   };
+  // The air's shade: the light that is not there, at half size, then the scene less it.
+  let scene = post.main;
+  if (air) {
+    quad.material = post.air;
+    const a = post.air.uniforms;
+    a.uDepth.value = post.main.depthTexture;
+    a.uUnproject.value.multiplyMatrices(camera.matrixWorld, camera.projectionMatrixInverse);
+    a.uEye.value.setFromMatrixPosition(camera.matrixWorld);
+    a.uRange.value.set(camera.near, camera.far);
+    renderer.setRenderTarget(post.airAt);
+    renderer.render(post.scene, post.camera);
+    quad.material = post.unshade;
+    const s = post.unshade.uniforms;
+    s.uFrom.value = post.main.texture;
+    s.uAir.value = post.airAt.texture;
+    s.uDepth.value = post.main.depthTexture;
+    s.uStep.value.set(1 / post.airAt.width, 1 / post.airAt.height);
+    s.uRange.value.set(camera.near, camera.far);
+    renderer.setRenderTarget(post.lit);
+    renderer.render(post.scene, post.camera);
+    scene = post.lit;
+    if (late.length) {
+      for (const mesh of late) {
+        mesh.material.uniforms.uLate.value.set(1 / post.lit.width, 1 / post.lit.height, 1);
+        mesh.material.uniforms.uLateDepth.value = post.main.depthTexture;
+      }
+      // (Their own scene only to be drawn from: they stay the place's children, and their matrices are the main
+      // scene's.)
+      post.late.children = late;
+      const clears = renderer.autoClear;
+      renderer.autoClear = false;
+      renderer.render(post.late, camera);
+      renderer.autoClear = clears;
+      // (The depth is not left on their materials: a stage torn down frees every texture its materials hold
+      // (toon.js disposeMaterialTextures), and this one is the frame's.)
+      for (const mesh of late) {
+        mesh.material.uniforms.uLate.value.z = 0;
+        mesh.material.uniforms.uLateDepth.value = null;
+      }
+    }
+  }
   const levels = post.levels;
-  run(post.blur, post.main, post.half, 0, tone.exposure, 0, 1);
+  run(post.blur, scene, post.half, 0, tone.exposure, 0, 1);
   run(post.blur, post.half, levels[0], 0, 0, tune.bloomFrom, 1);
   for (let at = 1; at < levels.length; at += 1) run(post.blur, levels[at - 1], levels[at], 0, 0, 0, 1);
   for (let at = levels.length - 1; at > 0; at -= 1) run(post.add, levels[at], levels[at - 1], 1, 0, 0, tune.bloomSpread);
@@ -271,6 +405,6 @@ export function envPostDraw(view, tone, level, shafts) {
   u.uGrade.value.set(tone.saturation, tone.warmth, tune.bloom, tune.vignette);
   const tangent = Math.tan((camera.fov * Math.PI) / 360);
   u.uLens.value.set(tangent * camera.aspect, tangent, rays);
-  run(post.frame, post.main, null);
+  run(post.frame, scene, null);
   return true;
 }
