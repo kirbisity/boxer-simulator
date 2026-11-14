@@ -49,13 +49,13 @@ import { ktShadow, ktShadowInit, KT_SHADOW_PARS } from '../levelmode/kitshadow.j
  *    sight line is within this cosine of the sun's own way round the compass (0.3: about 70 degrees either
  *    side), since across the sun a sight line crosses the columns and nothing would show for the work. `gain`:
  *    1 is the open air's own figure for what shade takes of a slab's light, and at 1 the rays were there only in
- *    a difference of two frames (about 5 of 255). 3 is by eye, not derived: the least at which shafts read under
- *    Pyongyang's broken snow cloud. What the true figure misses is most likely the forward scatter of the falling
+ *    a difference of two frames (about 5 of 255). 6 is by eye, not derived: at 3 the sunward sky was a glow with
+ *    no shafts in it, at 6 a band of light comes down from each gap under Pyongyang's broken snow cloud. What the true figure misses is most likely the forward scatter of the falling
  *    snow and of the haze near the sun's own direction, which the open air's haze counts once for the whole sky.
  */
 export const TK_BEAMS = {
   slabs: 12, from: 1.2, to: 400, least: 0.00002, most: 0.9, bias: 0.25,
-  rays: { slabs: 8, from: 120, to: 9000, reads: 3, sunward: 0.3, gain: 3 },
+  rays: { slabs: 8, from: 120, to: 9000, reads: 3, sunward: 0.3, gain: 6 },
 };
 
 const TK_BEAMS_VERTEX = `

@@ -763,21 +763,27 @@ export function buildPyongyang() {
     // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun:
     //   cover, sun   the cloud broken wider, half the sky, and the sun whole in the gaps: the sun between the showers
     //                is what draws the wall and lays the long shadows;
-    //   gloom        the showers' own cloud darker underneath, so the lit snow stands against a dark sky down-sun;
+    //   gloom        the showers' own cloud darker underneath (0.85 against the open air's own figure for flurries),
+    //                so the lit snow stands against a dark sky down-sun and the cloud up the sun keeps dark forms
+    //                for the light to come through (at 0.7 the sunward cloud in a shower was pale on pale);
     //   visibility   14 km between the showers (a cold clear air; with the open air's own 9 km the haze up the low
     //                sun hid the cloud's forms, and the sunward half of the frame was one pale wash);
-    //   fall.thick   2200 m of sight in the thick of a shower, against its 900: a showery snow, not a blizzard.
+    //   fall.thick   4000 m of sight in the thick of a shower, against its 900: a showery snow, not a blizzard.
     //                It greys the far hills and the pines across the field and still leaves the cloud's forms and
     //                the sun's glow up the sun (at 350 and at 600 the sunward two thirds of the frame was one blank
-    //                white); the rest of `fall` is the open air's own;
-    //   grade.ev     0.7 of a stop under what the open air's meter gives. Its meter allows for the snow (the place's
+    //                white, and at 2200 a pale one with the flakes lost against it); the rest of `fall` is the
+    //                open air's own;
+    //   grade.ev     0.9 of a stop under what the open air's meter gives. Its meter allows for the snow (the place's
     //                ground albedo), but a low sun in front of the camera over a whole frame of snow still put the
-    //                sunlit drifts on the curve's shoulder; held here they are the brightest thing in the frame
-    //                and keep their shading. Contrast and colour a little off its own, for the stone's warmth.
+    //                sunlit drifts on the curve's shoulder, and in a shower, when the ground dims and the meter
+    //                opens, the glow round the sun burnt out (3 to 4 percent of a sunward frame at 0.7 under, 1 to 2
+    //                at 0.9, measured from five standing places). Held here the drifts are the brightest thing on
+    //                the ground and keep their shading, and the gatehouse's paint and stone keep their colour both
+    //                with the sun and against it. Contrast and colour a little off its own, for the stone's warmth.
     // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall.
     weathers: { snow: 'siegesnow', bare: 'clear' },
     first: 'snow',
-    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.7 }, cover: 0.5, sun: 1, gloom: 0.7, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 2200 } }] },
+    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }] },
   };
   tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;
