@@ -12,6 +12,7 @@
 // envGust), the wet and the snow the weather's (uTkWet, uTkSnow, uTkRain).
 
 import { ENV_GLSL, envUniforms } from '../env/air.js';
+import { tkBeams } from './beams.js';
 import { tkgBuilder, tkgFrame } from './geo.js';
 import { tkRandom } from './tex.js';
 import { tkWeather } from './weather.js';
@@ -30,7 +31,11 @@ export const TK_STIR = {
   // under level: 6 gives 20 degrees in a 4 m/s wind and nearly straight down under 1 m/s); its wave `flutter` m per
   // metre from the pole. A banner laced to a pole and a top yard (a nobori) cannot stream: it only bellies and shakes.
   flag: { droop: 6, flutter: 0.12 },
-  nobori: { flutter: 0.06 },
+  // (`cuts`: a nobori's cloth is cut this many times across and down its length so the waves show; `grime`: how
+  // much darker its foot is than its head, the hem that the weather and the ground's mud reach; `tone`: each piece
+  // of it varies this much, the cloth's own unevenness. Its flutter 0.1 m per metre from the pole: the free side of
+  // a laced banner bellies a hand or so. By eye.)
+  nobori: { flutter: 0.1, cuts: [4, 14], grime: 0.3, tone: 0.1 },
   // Smoke from a small fire: `count` puffs each living `life` s, rising at `rise` m/s and taken up to the wind's
   // speed over `drag` s, growing from `size[0]` to `size[1]` m across; a wood fire's plume leaves at about 1 m/s
   // and is bent flat within a few metres in a fresh wind, approximate. `colour`: its own (wood smoke, blue-grey).
@@ -46,7 +51,9 @@ export const TK_STIR = {
   spindrift: { perMetre: 2.4, life: 2.6, from: 3.6, full: 6.5, ride: 0.8, fall: 0.35, size: [0.5, 2.4], alpha: 1.1 },
   // Drips from an eave: `perMetre` along it; each lets a drop go every `every` s (a range) when the roof is soaked,
   // fewer of them as it dries (none under `wetFrom`); a drop is `wide` m across and drawn `long` s of its fall long.
-  drip: { perMetre: 2.2, every: [0.5, 3.5], wetFrom: 0.12, wide: 0.014, long: 0.035, alpha: 0.55 },
+  // (`long` 0.018: the eye's own blur of a falling drop, a hand's length near the ground; longer and each reads as a
+  // blue rod standing in a dark lane.)
+  drip: { perMetre: 2.2, every: [0.5, 3.5], wetFrom: 0.12, wide: 0.012, long: 0.018, alpha: 0.4 },
 };
 
 const TK_STIR_KINDS = ['smoke', 'fire', 'spindrift', 'drip'];
@@ -250,7 +257,7 @@ export function tkStir(seed = 1) {
           const at = (a, b) => [x + fly * a, y1 - hoist * (0.5 + (b - 0.5) * (1 - a)), z];
           builder.quad('cloth', at(a0, 1), at(a1, 1), at(a1, 0), at(a0, 0), { uvs: [[a0 * fly, 0], [a1 * fly, 0], [a1 * fly, hoist], [a0 * fly, hoist]], colour });
         }
-      } else sheet([x, y1 - hoist, z], [fly, 0, 0], [0, hoist, 0], 5, 2, colour);
+      } else sheet([x, y1 - hoist, z], [fly, 0, 0], [0, hoist, 0], 8, 3, colour);
       hang((point) => [x, point[1], z], [-TK_STIR.flag.droop, TK_STIR.flag.flutter, random() * 6.28, 0]);
     },
     /**
@@ -258,15 +265,16 @@ export function tkStir(seed = 1) {
      * `top`, the cloth `wide` m out from the pole along `yaw` and `long` m down from the yard. `bands`: [share of the
      * length from the top, colour] pairs laid over the field.
      */
-    nobori(into, x, z, foot, top, { wide = 0.7, long = 3.2, yaw = 0, colour = [0.9, 0.9, 0.86], bands = [], pole = 0.03 } = {}) {
+    nobori(into, x, z, foot, top, { wide = 0.7, long = 3.2, yaw = 0, colour = [0.8, 0.77, 0.68], bands = [], pole = 0.03 } = {}) {
       const out = [Math.cos(yaw), 0, -Math.sin(yaw)];
       into.round('timber', world, x, z, foot, top, pole, pole * 0.8, { sides: 6, colour: [0.3, 0.26, 0.2] });
       into.tube('timber', [[x, top - 0.08, z], [x + out[0] * (wide + 0.06), top - 0.08, z + out[2] * (wide + 0.06)]], 0.014, 0.014, { sides: 4, colour: [0.3, 0.26, 0.2] });
-      const cuts = 8;
+      const [across, cuts] = TK_STIR.nobori.cuts;
       for (let j = 0; j < cuts; j += 1) {
         const [b0, b1] = [j / cuts, (j + 1) / cuts];
         const tint = bands.find(([from, to]) => (b0 + b1) / 2 >= from && (b0 + b1) / 2 < to)?.[2] ?? colour;
-        sheet([x + out[0] * 0.03, top - 0.1 - long * b1, z + out[2] * 0.03], [out[0] * wide, 0, out[2] * wide], [0, long * (b1 - b0), 0], 2, 1, tint);
+        const worn = (1 - TK_STIR.nobori.grime * ((b0 + b1) / 2) ** 1.6) * (1 - TK_STIR.nobori.tone * random());
+        sheet([x + out[0] * 0.03, top - 0.1 - long * b1, z + out[2] * 0.03], [out[0] * wide, 0, out[2] * wide], [0, long * (b1 - b0), 0], across, 1, tint.map((part) => part * worn));
       }
       hang((point) => [x, point[1], z], [0, TK_STIR.nobori.flutter, random() * 6.28, 0]);
     },
@@ -363,6 +371,13 @@ export function tkStir(seed = 1) {
         mesh.visible = false;
         carried.push(mesh);
         group.add(mesh);
+      }
+      // The light in the air (beams.js: a workaround, marked there). Every sheet of it covers the screen, so not on
+      // the low tier.
+      if (tier !== 'low') {
+        const beams = tkBeams();
+        carried.push(beams);
+        group.add(beams);
       }
       const tick = (time, wind, view, open) => {
         // What the air carries is lit and moved by the open air; without it the place is as it was built.

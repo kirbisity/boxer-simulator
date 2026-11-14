@@ -42,17 +42,31 @@ export const TK_WEATHER = {
   mirror: [0.05, 0.9],
   // A wet stone that is not under water shows this share of a puddle's mirror.
   sheen: 0.3,
+  // The most a mirror image may show, in the picture's own light units before the camera's curve (a matte white in
+  // full sun is about 1): a wet lane looked down toward a bright haze otherwise shows one burnt-out streak with no
+  // stone left in it. And in a shut-in place the low sky a grazing mirror would show is mostly walls: the image
+  // keeps `shut` of itself where the lie's map sees no sky, all of it in the open.
+  glare: 1.4, shut: 0.3,
   // The damp band at a wall's foot: its height (m; it rises unevenly along the wall, from 0.55 to 1.45 of this) and
   // how dark; how green the moss in it; the mud splashed up the first `splash` m, and its colour.
-  foot: { height: 0.9, dark: 0.3, moss: [0.3, 0.38, 0.19], splash: 0.35, mud: [0.3, 0.27, 0.22] },
+  foot: { height: 0.9, dark: 0.3, moss: [0.22, 0.29, 0.13], splash: 0.35, mud: [0.3, 0.27, 0.22] },
   // Streaks running down a wall from its top or from under its eave: how dark the darkest, and how far the longest
   // runs (m; each runs its own length, from 0.6 m).
-  streak: { dark: 0.5, runs: 3.6 },
+  streak: { dark: 0.62, runs: 4.6 },
+  // What years leave on a wall's face besides: broad curtains of damp and soot a few metres across and taller than
+  // they are wide (`dark`: how much darker at the most), and lichen in pale specks a hand across on stone open to
+  // the weather (its colour, a grey-green crust; `lichen`: how much of the stone's colour it takes where it grows).
+  // By eye against the reference photographs of old fortress masonry: a wall's stones are the same stone, and what
+  // tells them apart at fifty paces is this, not the block's own grain.
+  stain: { dark: 0.34, colour: [0.5, 0.52, 0.4], lichen: 0.5 },
   // Plaster fallen from the brick under it: the brick's colour, and how much of a wall has lost it at the foot
   // and a storey up (a threshold on a slow noise: 0 none, 1 all).
   bare: { colour: [0.36, 0.35, 0.34], low: 0.42, high: 0.16 },
   // The baked shade: how much of the sky's light the lie's map may take (1: all it says), how much darker the
   // dirt makes a surface the rain never washes, and how much of the light a joint's own depth takes.
+  // (`most` 0.85: the lie's map knows only what stands overhead; the 0.15 left is the light that comes in sideways
+  // under an arcade or into a passage's mouth, which keeps a covered floor two to three stops under the open
+  // square instead of black once the grade's toe has had it. By eye against the arcade and the gate passage.)
   // `bounce`: an upright face shut off from the sky still has the light the open ground before it throws back.
   // The lie's sky share is read `reach` m out from the face, and the face has at least `share` of it (the ground's
   // reflectance, damp stone throws back about 0.3 and its wet film mirrors more at a low angle: 0.5 by eye), more over snow.
@@ -62,9 +76,17 @@ export const TK_WEATHER = {
   // Without it everything that faces down or sideways over a snowfield (the lee of a cart, an eave's underside,
   // the shaded face of a wall) is lit as if it stood on a meadow, and goes black beside the snow.
   // WORKAROUND, to be removed when the open air knows a place's ground (shared/env-requests.md R9).
-  shade: { most: 0.9, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, fill: 2.4 },
+  // `street`: the light that reaches a shut-in place from the lit walls and paving round it (a lane, an arcade, the
+  // foot of a wall under its eave), as a multiple of the open air's ground light, given where the sky's own is
+  // shut out. Pale plaster and wet flags in sun throw back a fifth to a half of what falls on them and fill about
+  // half of what a shaded face sees: with 0.9 a face wholly shut from the sky keeps about a sixth of the open
+  // ground's light, some two and a half stops under it: a dim interior in which timber and lattice still read,
+  // not a silhouette. By eye against the arcade, the lane and the gate passage.
+  shade: { most: 0.85, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, fill: 2.4, street: 0.9 },
   // A way's worn middle is this much paler and smoother than its edges; its edges this much darker.
-  tread: { pale: 0.1, edge: 0.24 },
+  tread: { pale: 0.16, edge: 0.4, patch: 0.3 },
+  // (`patch`: where no one treads, old damp and dirt lie in patches a few metres across, this much darker at the
+  // most; a paving is the colour of its stone only down the worn middle of the way.)
   // Snow's colour, and how level a surface must be to hold it (the normal's y: from none to full). `colour` is for
   // the page without the open air's camera curve: well under fresh snow's own reflectance (about 0.9), because
   // with no tone mapping a sunlit field at 0.9 clips to flat white and loses its shape. `colourAir` is for the open
@@ -77,7 +99,18 @@ export const TK_WEATHER = {
   // `stretch` times as long down the wind, their flanks up to about `driftSlope` (rise over run); over them a ripple
   // `ripple` m across of `rippleSlope`, seen out to `rippleTo` m. Wind-packed snow's ridges (sastrugi) run from
   // centimetres to a few decimetres high and lie along the wind; the sizes are by eye inside that, approximate.
-  snow: { colour: [0.76, 0.79, 0.84], colourAir: ENV.terrain.snowColour, holds: [0.45, 0.8], drift: 0.1, trodden: [0.7, 0.64, 0.56], caught: 0.55, blown: { drift: 4.5, stretch: 2.6, driftSlope: 0.17, ripple: 0.42, rippleSlope: 0.13, rippleTo: [22, 55] } },
+  // `hollow`: how much darker and bluer the troughs between drifts are than their crests (they see less of the sky and
+  // more of the snow beside them), so the field keeps its shape when a cloud has the sun.
+  // `print`: a foot's print in trodden snow, by rule: the ground in cells of `cell` m, in each at most one print
+  // `long` x `wide` m (a shod foot is about 0.27 x 0.1 m) turned its own way, the chance rising with the wear; its
+  // floor `dark` darker than the snow round it (it is in its own shade), its rim catching the light (`slope`: the
+  // rim's rise over run); drawn out to `to` m (from all of it to none). `packed`: the share of its hold that snow
+  // loses where the wear is full (feet pack it to a dirty crust more than they clear it).
+  // `edge`: how wide the border between lying snow and bare ground is, in the units of the rule's own sum (the old
+  // 0.3 blurred a patch's edge over a metre; thawed and trodden patches have edges a hand wide).
+  snow: { colour: [0.76, 0.79, 0.84], colourAir: ENV.terrain.snowColour, holds: [0.45, 0.8], drift: 0.16, trodden: [0.7, 0.64, 0.56], caught: 0.55, packed: 0.5, edge: 0.07,
+    blown: { drift: 4.5, stretch: 2.6, driftSlope: 0.3, ripple: 0.42, rippleSlope: 0.2, rippleTo: [22, 55], hollow: 0.14 },
+    print: { cell: 0.45, long: 0.28, wide: 0.11, dark: 0.3, slope: 0.9, to: [16, 34] } },
 };
 
 /**
@@ -94,9 +127,12 @@ export const TK_WEATHER = {
  *    and swings on about that at its pendulum's own rate. catch < 0: tied down one side to a pole (a banner): it
  *    streams round the pole to lie downwind, drooping by atan(-catch / U^2).
  *    flutter: a wave runs down the cloth from where it is held, its height `flutter` x the distance from there, at
- *    its fullest from `fullAt` m/s (TK_STIR.flap: its wave number rad/m, its rate rad/s).
+ *    its fullest from `fullAt` m/s (TK_STIR.flap: its wave number rad/m, its rate rad/s). A second, standing
+ *    ripple runs down the cloth's length (`down`: its share of the first's height, its wave number and rate), and
+ *    the cloth's face is tilted by both waves' slopes, so the light shows its folds: a cloth whose face stays flat
+ *    while its edge moves reads as a painted board.
  */
-export const TK_STIR_RULE = { tree: { bend: 6e-5, flutter: 0.004 }, flap: { wave: 4.5, rate: 7, fullAt: 6 }, swing: 0.35, swell: [0.35, 0.7] };
+export const TK_STIR_RULE = { tree: { bend: 6e-5, flutter: 0.004 }, flap: { wave: 4.5, rate: 7, fullAt: 6, down: { share: 0.6, wave: 5.2, rate: 4.1 } }, swing: 0.35, swell: [0.35, 0.7] };
 
 /** The uniforms every kit material shares: the weather (tkSetWeather), the mirror's sources, the clock, the place's lie, the open air. */
 export const tkWeather = {
@@ -208,6 +244,17 @@ float tkNoise(vec2 p) {
   return mix(mix(tkHash(i), tkHash(i + vec2(1.0, 0.0)), f.x), mix(tkHash(i + vec2(0.0, 1.0)), tkHash(i + vec2(1.0, 1.0)), f.x), f.y);
 }
 float tkFbm(vec2 p) { return 0.55 * tkNoise(p) + 0.3 * tkNoise(p * 2.3 + 7.1) + 0.15 * tkNoise(p * 5.1 + 3.7); }
+// A foot's print at a ground point (TK_WEATHER.snow.print): 1 on its floor, falling to 0 at its rim; chance: the
+// share of the cells that have one.
+float tkPrint(vec2 p, float chance) {
+  vec2 cell = floor(p / ${TK_WEATHER.snow.print.cell.toFixed(2)});
+  if (tkHash(cell + 41.0) > chance) return 0.0;
+  vec2 d = p - (cell + 0.3 + 0.4 * vec2(tkHash(cell + 1.3), tkHash(cell + 5.9))) * ${TK_WEATHER.snow.print.cell.toFixed(2)};
+  float turn = 6.2832 * tkHash(cell + 9.1);
+  vec2 along = vec2(cos(turn), sin(turn));
+  float e = length(vec2(dot(d, along) / ${(TK_WEATHER.snow.print.long / 2).toFixed(3)}, (d.x * along.y - d.y * along.x) / ${(TK_WEATHER.snow.print.wide / 2).toFixed(3)}));
+  return 1.0 - smoothstep(0.55, 1.0, e);
+}
 // What a mirror shows along a world direction: the place's cube map (taken with the open air's sky in it), the
 // open air's sky alone, or the sky's two colours.
 vec3 tkMirror(vec3 r) {
@@ -225,6 +272,7 @@ float tkBounce = 0.0;
 float tkUnder = 0.0;
 float tkWear = 0.0;
 float tkJoint = 0.0;
+float tkPrintNear = 0.0;
 `;
 
 // After the colour is read: where this is (the lie), the dirt, the wet, the snow. uTkKind: (x: over 0 a wall with a
@@ -300,6 +348,14 @@ const TK_COLOUR = `
   if (uTkKind.x > 0.01 && upright > 0.01) {
     // Along the wall, whichever way it runs.
     float along = vTkPos.x * n.z - vTkPos.z * n.x;
+    // What years leave on it (TK_WEATHER.stain): curtains of damp and soot, and lichen on stone open to the weather.
+    float curtain = smoothstep(0.4, 0.72, tkFbm(vec2(along * 0.23, vTkPos.y * 0.06) + 31.0) + 0.3 * (blot - 0.5));
+    diffuseColor.rgb *= 1.0 - ${TK_WEATHER.stain.dark.toFixed(2)} * uTkDirt.x * curtain;
+    if (uTkLaid.z < 0.01) {
+      vec2 face = vec2(along, vTkPos.y);
+      float speck = smoothstep(0.58, 0.68, tkNoise(face * 2.7 + 9.0) * 0.55 + tkNoise(face * 8.0 + 4.0) * 0.45) * smoothstep(0.42, 0.6, tkFbm(face * 0.4 + 17.0)) * (1.0 - tkJoint);
+      diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.stain.colour)} * (0.8 + 0.4 * fine), speck * ${TK_WEATHER.stain.lichen.toFixed(2)} * uTkDirt.y * tkSky);
+    }
     if (uTkLaid.z > 0.01) {
       // Plaster fallen from the brick: most at the foot, in patches with a broken edge; the edge's shadow.
       float gone = tkFbm(vec2(along * 0.55, vTkPos.y * 0.7) + 2.0) + (tkNoise(vec2(along * 6.0, vTkPos.y * 6.0)) - 0.5) * 0.12;
@@ -316,13 +372,13 @@ const TK_COLOUR = `
     float splash = 1.0 - smoothstep(0.04, ${TK_WEATHER.foot.splash.toFixed(2)}, high + (fine - 0.5) * 0.25);
     diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.foot.mud)} * (0.75 + 0.5 * fine), splash * 0.5);
     float north = 0.5 + 0.5 * dot(normalize(n.xz + 1e-4), uTkAir.yz);
-    float mossy = foot * smoothstep(0.42, 0.72, tkFbm(vTkPos.xz * 0.6 + vTkPos.y * 0.4 + 11.0) + 0.3 * (north - 0.5) + 0.25 * (1.0 - tkSky));
+    float mossy = foot * smoothstep(0.5, 0.85, tkFbm(vTkPos.xz * 0.6 + vTkPos.y * 0.4 + 11.0) + 0.3 * (north - 0.5) + 0.16 * (1.0 - tkSky)) * (0.55 + 0.45 * blot);
     diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.foot.moss)} * (0.6 + 0.5 * fine), mossy * 0.8 * uTkDirt.y * (1.0 - 0.6 * uTkSnow));
     // What runs down from the wall's top and from under its eave: dark streaks, each its own width and length.
     if (fall > -0.05) {
-      float run = tkNoise(vec2(along * 2.6, 1.7)) * 0.65 + tkNoise(vec2(along * 9.0, 4.2)) * 0.35;
+      float run = tkNoise(vec2(along * 1.9, 1.7)) * 0.6 + tkNoise(vec2(along * 7.0, 4.2)) * 0.4;
       float runs = 0.6 + ${(TK_WEATHER.streak.runs - 0.6).toFixed(2)} * tkNoise(vec2(along * 1.3, 8.8));
-      float streak = smoothstep(0.5, 0.75, run) * (1.0 - smoothstep(0.0, runs, max(fall, 0.0)));
+      float streak = smoothstep(0.44, 0.66, run) * (1.0 - smoothstep(0.0, runs, max(fall, 0.0)));
       // (And the wash under the top itself: a darker hand's breadth where the water first runs over.)
       streak = max(streak, 0.6 * (1.0 - smoothstep(0.0, 0.35, max(fall, 0.0))));
       diffuseColor.rgb *= 1.0 - ${TK_WEATHER.streak.dark.toFixed(2)} * uTkDirt.x * streak * upright;
@@ -338,7 +394,8 @@ const TK_COLOUR = `
     // foot, where no one treads.
     float tread = tkWear * uTkDirt.w;
     diffuseColor.rgb *= 1.0 + ${TK_WEATHER.tread.pale.toFixed(2)} * tread - ${TK_WEATHER.tread.edge.toFixed(2)} * nearWall * (0.4 + blot) * (1.0 - tread);
-    float weed = tkJoint * smoothstep(0.3, 0.75, nearWall * 0.8 + (fine - 0.5) * 0.7 + (blot - 0.5) * 0.5 - tread) * uTkDirt.y;
+    diffuseColor.rgb *= 1.0 - ${TK_WEATHER.tread.patch.toFixed(2)} * smoothstep(0.42, 0.7, tkFbm(vTkPos.xz * 0.33 + 21.0) + 0.25 * (hollow - 0.4)) * (1.0 - 0.7 * tread);
+    float weed = tkJoint * level * smoothstep(0.3, 0.75, nearWall * 0.8 + (fine - 0.5) * 0.7 + (blot - 0.5) * 0.5 - tread) * uTkDirt.y;
     diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.foot.moss)} * (0.55 + 0.5 * fine), weed * 0.85 * (1.0 - 0.6 * uTkSnow));
     // Water stands where the ground is low (the lie's map; the joints first), under open sky.
     float low = hollow + tkNoise(vTkPos.xz * 0.9) * 0.12 + tkJoint * 0.22;
@@ -348,20 +405,33 @@ const TK_COLOUR = `
   }
   // Lying snow: white wherever it holds; less of it leaves bare patches, a few metres and a few tens of metres
   // across. The wind's work (the lie's map) piles it or thins it, feet tread it away, and nothing lies under cover.
-  float holds = uTkHold * (1.0 - 0.8 * tkWear);
+  float holds = uTkHold * (1.0 - ${TK_WEATHER.snow.packed.toFixed(2)} * tkWear);
   float lying = blot * 0.42 + fine * 0.28 + tkFbm(vTkPos.xz * 0.045 + 7.0) * 0.3 + uTkSnow * holds * 0.45 + (lies - 0.5) * 0.8;
-  tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(0.25, 0.55, lying) * (1.0 - tkPoolHere) * (1.0 - tkUnder);
+  // (A patch's edge is broken at a hand's scale, and narrow: TK_WEATHER.snow.edge.)
+  lying += (tkNoise(vTkPos.xz * 6.3 + 2.0) - 0.5) * 0.12 + (tkNoise(vTkPos.xz * 21.0) - 0.5) * 0.06;
+  tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(${(0.4 - TK_WEATHER.snow.edge / 2).toFixed(3)}, ${(0.4 + TK_WEATHER.snow.edge / 2).toFixed(3)}, lying) * (1.0 - tkPoolHere) * (1.0 - tkUnder);
   if (uTkLaid.x > 0.5) {
     // (Off a roof it has slid in sheets: strips down the slope lie bare.)
     float across = vTkPos.x * n.z - vTkPos.z * n.x;
     tkSnowHere *= 1.0 - smoothstep(0.62, 0.7, tkNoise(vec2(across * 0.4, 5.0)) + 0.25 * (fine - 0.5)) * smoothstep(0.1, 0.3, 1.0 - n.y);
   }
   // (The wind plasters it into the joints and onto the ledges of the faces it blows against.)
-  float caught = uTkSnow * ${TK_WEATHER.snow.caught.toFixed(2)} * upright * smoothstep(0.1, 0.7, -dot(n.xz, uTkBlow.xy)) * smoothstep(0.35, 0.7, tkJoint + 0.5 * (blot - 0.5)) * (1.0 - tkUnder) * step(0.01, uTkKind.x);
+  // (Not every joint: it holds in patches, most toward the foot where the eddy drops it and under the top where
+  // it blows over, and a face's own stains show between.)
+  float faceAlong = vTkPos.x * n.z - vTkPos.z * n.x;
+  float holdsHere = mix(0.3, 1.0, smoothstep(0.3, 0.75, tkFbm(vec2(faceAlong * 0.45, vTkPos.y * 0.8) + 23.0) + 0.22 * (1.0 - smoothstep(0.0, 2.0, high)) + 0.18 * (1.0 - smoothstep(0.0, 1.2, max(fall, 0.0))) * step(-0.05, fall)));
+  float caught = uTkSnow * ${TK_WEATHER.snow.caught.toFixed(2)} * upright * smoothstep(0.1, 0.7, -dot(n.xz, uTkBlow.xy)) * smoothstep(0.35, 0.7, tkJoint + 0.5 * (blot - 0.5)) * holdsHere * (1.0 - tkUnder) * step(0.01, uTkKind.x);
   tkSnowHere = max(tkSnowHere, caught);
   diffuseColor.rgb *= mix(1.0, ${TK_WEATHER.wetDark.toFixed(2)}, max(tkWetHere, tkPoolHere * 0.8));
   vec3 snow = mix(${tkVec(TK_WEATHER.snow.colour)}, ${tkVec(TK_WEATHER.snow.colourAir)}, uTkAir.x) * (1.0 - ${TK_WEATHER.snow.drift.toFixed(2)} * tkFbm(vTkPos.xz * 0.3 + 3.0));
   snow *= mix(vec3(1.0), ${tkVec(TK_WEATHER.snow.trodden)} * (0.85 + 0.3 * fine), clamp(tkWear * 1.3, 0.0, 1.0));
+  // (The troughs between the wind's drifts: the same field the snow's own slopes are read from, below.)
+  snow *= mix(vec3(1.0), vec3(0.9, 0.95, 1.04), ${(TK_WEATHER.snow.blown.hollow / 0.1).toFixed(2)} * (1.0 - tkNoise(vec2(dot(vTkPos.xz, uTkBlow.xy) / ${TK_WEATHER.snow.blown.stretch.toFixed(2)}, dot(vTkPos.xz, vec2(-uTkBlow.y, uTkBlow.x))) / ${TK_WEATHER.snow.blown.drift.toFixed(2)})) * level * (1.0 - clamp(tkWear * 1.5, 0.0, 1.0)));
+  // (Feet's prints where it is trodden: TK_WEATHER.snow.print.)
+  if (tkSnowHere > 0.01 && tkWear > 0.03 && level > 0.5) {
+    tkPrintNear = 1.0 - smoothstep(${TK_WEATHER.snow.print.to[0].toFixed(1)}, ${TK_WEATHER.snow.print.to[1].toFixed(1)}, length(vTkPos - cameraPosition));
+    if (tkPrintNear > 0.0) snow *= 1.0 - ${TK_WEATHER.snow.print.dark.toFixed(2)} * tkPrintNear * tkPrint(vTkPos.xz, clamp(tkWear * 1.5, 0.0, 0.92)) * vec3(1.0, 0.94, 0.86);
+  }
   diffuseColor.rgb = mix(diffuseColor.rgb, snow, tkSnowHere);
 }
 `;
@@ -399,7 +469,14 @@ if (tkSnowHere > 0.0) {
     // Trodden: pocked by feet (a boot's length across), deeper where more have passed.
     vec2 p = vTkPos.xz * 3.6;
     float here = tkNoise(p);
-    tkLie = normalize(tkLie + vec3(here - tkNoise(p + vec2(0.35, 0.0)), 0.0, here - tkNoise(p + vec2(0.0, 0.35))) * 1.6 * clamp(tkWear * 1.5, 0.0, 1.0));
+    tkLie = normalize(tkLie + vec3(here - tkNoise(p + vec2(0.35, 0.0)), 0.0, here - tkNoise(p + vec2(0.0, 0.35))) * 1.1 * clamp(tkWear * 1.5, 0.0, 1.0));
+    if (tkPrintNear > 0.0) {
+      // (A print's rim: the slope of its floor's edge, by a finger's difference.)
+      float chance = clamp(tkWear * 1.5, 0.0, 0.92);
+      float at = tkPrint(vTkPos.xz, chance);
+      vec2 rim = vec2(tkPrint(vTkPos.xz + vec2(0.012, 0.0), chance) - at, tkPrint(vTkPos.xz + vec2(0.0, 0.012), chance) - at) * ${(TK_WEATHER.snow.print.slope * 0.03 / 0.012).toFixed(2)};
+      tkLie = normalize(tkLie + vec3(rim.x, 0.0, rim.y) * tkPrintNear);
+    }
   }
   {
     // Blown: drifts lying along the wind and a ripple over them (TK_WEATHER.snow.blown), flatter where feet have
@@ -426,7 +503,11 @@ const TK_SHADE = `
 {
   float tkOpen = mix(1.0, max(tkSky, tkBounce), ${TK_WEATHER.shade.most.toFixed(2)}) * (1.0 - ${TK_WEATHER.shade.joint.toFixed(2)} * tkJoint * (1.0 - tkSnowHere) * step(0.01, uTkDirt.z));
   reflectedLight.indirectDiffuse *= tkOpen;
-  reflectedLight.indirectSpecular *= tkOpen;
+  // (An upright face's joint is a rough recess that sees its own sides, not the sky: it mirrors nothing. Without
+  // this a wet wall seen along its length shows every joint that leans toward the eye as a bright line.)
+  reflectedLight.indirectSpecular *= tkOpen * (1.0 - tkJoint * (1.0 - smoothstep(0.25, 0.6, abs(normalize(vTkNrm).y))));
+  // The light of the lit walls and ground round a shut-in place (TK_WEATHER.shade.street).
+  if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.street.toFixed(2)} * (1.0 - tkOpen)) * material.diffuseColor;
   // Lying snow's light, thrown up (TK_WEATHER.shade.fill): on the half of the world a face sees below the level.
   if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.fill.toFixed(2)} * uTkSnow * (0.5 - 0.5 * normalize(vTkNrm).y) * max(tkSky, tkBounce)) * material.diffuseColor;
 }
@@ -443,7 +524,7 @@ const TK_MIRROR = `
     float graze = pow(1.0 - clamp(dot(-look, n), 0.0, 1.0), 4.0);
     float fresnel = mix(${TK_WEATHER.mirror[0].toFixed(2)}, ${TK_WEATHER.mirror[1].toFixed(2)}, graze);
     // (What stands under cover mirrors the dark over it, not the sky.)
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, tkMirror(reflect(look, n)) * mix(1.0, 0.25, tkUnder), fresnel * share);
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, min(tkMirror(reflect(look, n)) * mix(1.0, 0.25, tkUnder) * mix(${TK_WEATHER.shut.toFixed(2)}, 1.0, max(tkSky, tkPoolHere * step(0.5, tkSky))), vec3(${TK_WEATHER.glare.toFixed(2)})), fresnel * share);
   }
   if (uTkAir.x > 0.5) gl_FragColor.rgb = envHaze(gl_FragColor.rgb, cameraPosition, vTkPos);
 }
@@ -513,6 +594,20 @@ const TK_STIR_NORMAL = `
     tkCosine = dot(out2, tkDown.xz);
     objectNormal = tkTurn(objectNormal, tkStream, -tkSine, tkCosine);
   }
+  // The waves in the cloth, and its face tilted by their slopes (TK_STIR_RULE.flap).
+  vec3 tkFace = objectNormal;
+  float tkGo = aTkStir.y * clamp(tkU / ${TK_STIR_RULE.flap.fullAt.toFixed(1)}, 0.06, 1.3);
+  float tkPhase = tkFree * ${TK_STIR_RULE.flap.wave.toFixed(2)} - uTkTime * ${TK_STIR_RULE.flap.rate.toFixed(2)} + aTkStir.z;
+  float tkPhaseDown = position.y * ${TK_STIR_RULE.flap.down.wave.toFixed(2)} + uTkTime * ${TK_STIR_RULE.flap.down.rate.toFixed(2)} + aTkStir.z * 1.7;
+  float tkFlap = tkGo * tkFree * (sin(tkPhase) + ${TK_STIR_RULE.flap.down.share.toFixed(2)} * sin(tkPhaseDown));
+  if (tkGo > 0.0 && tkFree > 1e-4) {
+    vec3 tkOut = tkArm / tkFree;
+    if (aTkStir.x > 0.0) tkOut = tkTurn(tkOut, tkAxis, tkSine, tkCosine);
+    else if (aTkStir.x < 0.0) tkOut = tkTurn(tkOut, tkStream, -tkSine, tkCosine);
+    float outSlope = tkGo * (sin(tkPhase) + ${TK_STIR_RULE.flap.down.share.toFixed(2)} * sin(tkPhaseDown) + tkFree * ${TK_STIR_RULE.flap.wave.toFixed(2)} * cos(tkPhase));
+    float downSlope = tkGo * tkFree * ${(TK_STIR_RULE.flap.down.share * TK_STIR_RULE.flap.down.wave).toFixed(3)} * cos(tkPhaseDown);
+    objectNormal = normalize(tkFace - tkOut * outSlope - vec3(0.0, 1.0, 0.0) * downSlope * (1.0 - abs(tkOut.y)));
+  }
 #endif
 `;
 
@@ -529,8 +624,8 @@ const TK_STIR_VERTEX = `
       arm.xz *= cos(droop);
       arm.y -= reach * sin(droop);
     }
-    float flap = aTkStir.y * tkFree * sin(tkFree * ${TK_STIR_RULE.flap.wave.toFixed(2)} - uTkTime * ${TK_STIR_RULE.flap.rate.toFixed(2)} + aTkStir.z) * clamp(tkU / ${TK_STIR_RULE.flap.fullAt.toFixed(1)}, 0.06, 1.3);
-    transformed = aTkPivot + arm + objectNormal * flap;
+    // (Moved along the cloth's face as it hangs, not its face as the waves tilt it.)
+    transformed = aTkPivot + arm + tkFace * tkFlap;
   }
 #endif
 #ifdef TK_TREE
@@ -553,7 +648,7 @@ function tkSunShaded() {
     const line = 'getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );';
     const own = THREE.ShaderChunk.lights_fragment_begin;
     tkSunChunk = own.includes(line)
-      ? `float tkSunShadeNow = kitSunShade(vTkPos, normalize(vTkNrm));\n  // (In the open air the clouds' shade crosses the place: the sun's light is set for the floor's middle, env/index.js, and is put right here for this point.)\n  float tkCloudNow = uTkAir.x > 0.5 ? envSunShare(vTkPos) / max(envSunShare(vec3(0.0)), 0.05) : 1.0;\n  vec3 tkSunView = normalize((viewMatrix * vec4(uKitSunDir, 0.0)).xyz);\n${own.replace(line, `${line}\n\t\tdirectLight.color *= mix(1.0, tkSunShadeNow * tkCloudNow, step(0.995, dot(directLight.direction, tkSunView)));`)}`
+      ? `float tkSunShadeNow = kitSunShade(vTkPos, normalize(vTkNrm));\n  // (In the open air the clouds' shade crosses the place: the sun's light is set for the floor's middle, env/index.js, and is put right here for this point.)\n  float tkCloudNow = uTkAir.x > 0.5 ? envSunShare(vTkPos) / max(envSunShare(vec3(0.0)), 0.05) : 1.0;\n  vec3 tkSunView = normalize((viewMatrix * vec4(uKitSunDir, 0.0)).xyz);\n${own.replace(line, `${line}\n\t\tdirectLight.color *= mix(1.0, tkSunShadeNow * tkCloudNow, step(0.995, dot(directLight.direction, tkSunView)));\n\t\t// (A face turned from the light has none of it, whatever its relief says: without this the sides of a wall's joints, leaning toward a sun the wall has its back to, show as bright lines down a dark wall. Gone by 9 degrees past the edge, where the face's own light is next to nothing.)\n\t\tdirectLight.color *= smoothstep(0.0, 0.15, dot(geometryNormal, directLight.direction));`)}`
       : own;
   }
   return tkSunChunk;
@@ -609,8 +704,10 @@ export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1, dirt = [0, 0, 0
  */
 export const TK_MATERIALS = {
   brick: { sheet: 'brick', foot: 1, dirt: [0.55, 0.8, 0.8, 0] },
-  ashlar: { sheet: 'ashlar', foot: 1, dirt: [0.6, 0.9, 0.9, 0] },
-  rubble: { sheet: 'rubble', foot: 1, dirt: [0.5, 1, 1, 0] },
+  // (Old masonry: its blotches strong enough to break the sheet's repeat along a rampart, and what runs down it
+  // from the parapet strong, as on any old wall the rain has had for centuries.)
+  ashlar: { sheet: 'ashlar', foot: 1, blotch: 1.5, dirt: [0.85, 0.9, 0.9, 0] },
+  rubble: { sheet: 'rubble', foot: 1, blotch: 1.7, dirt: [0.9, 1, 1, 0] },
   plaster: { sheet: 'plaster', foot: 1, blotch: 1.3, dirt: [1, 0.9, 0.6, 0], fall: 1 },
   timber: { sheet: 'timber', foot: 0.5, blotch: 0.6, dirt: [0.35, 0.3, 0.7, 0] },
   rooftile: { sheet: 'rooftile', blotch: 0.9, dirt: [0, 0.8, 0.7, 0], tiles: [TK_TEX.rooftile.rolls, TK_TEX.rooftile.laps] },
@@ -636,7 +733,7 @@ export const TK_MATERIALS = {
   drift: { sheet: 'earth', blotch: 0.8, snow: 2.2, dirt: [0, 0, 0.2, 0.6] },
   // Cloth and paper that hang and fly (townkit/stir.js): the plaster sheet's fine grain under each piece's own
   // colour, seen from both sides, holding no snow.
-  cloth: { sheet: 'plaster', plain: true, twoSided: true, snow: 0, blotch: 0.5, hung: true },
+  cloth: { sheet: 'plaster', plain: true, twoSided: true, snow: 0, blotch: 1.1, hung: true },
   // Open water: the canal. Silted green-brown water, nearly all mirror at the angles it is seen from: it shows the
   // sky pale and the houses dark, as the reference's does.
   water: { sheet: 'plaster', pools: 2, colour: [0.2, 0.25, 0.2], blotch: 0.3, plain: true },

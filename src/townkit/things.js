@@ -344,7 +344,10 @@ export const TK_SCATTER = {
   // Tufts: they stand where the ground is not trodden (their chance falls to nothing as the wear passes `wearTo`),
   // thickest within reach of a wall's foot (`wall`: the chance there against `open` ground's), more where water
   // gathers (`hollow`), fewer in deep shade (`shade`: the chance under a sky share of 0) and none under cover.
-  tuft: { chance: 0.55, open: 0.16, wall: 1, hollow: 0.5, shade: 0.35, wearTo: 0.3, size: [0.14, 0.5] },
+  // On paving (`paved`: the open ground's chance there against bare earth's) they keep to the wall's foot and the
+  // kerb, where no foot falls and the joints hold soil: a weed standing alone in the middle of a square's flags
+  // reads as a mistake, not as neglect.
+  tuft: { chance: 0.55, open: 0.16, wall: 1, hollow: 0.5, shade: 0.35, wearTo: 0.3, size: [0.14, 0.5], paved: 0.12 },
   // Stones: loose ones at wall feet (fallen from the wall) and scattered thinly over open earth.
   stone: { chance: 0.05, open: 0.3, wall: 1, size: [0.05, 0.16] },
   // Litter (fallen leaves, straw): gathers in corners and at wall feet out of the wind and the way, under cover too.
@@ -357,10 +360,10 @@ export const TK_SCATTER = {
  * about 0.3: paving, in its joints; 1: earth), or null to leave the point bare; `heightAt(x, z)`: the ground's
  * height where the lay's own is too coarse; `colour`: the tufts' (TK_THINGS.green or .dead); `litter`: the
  * colours of what lies (null: none); `stones`: whether loose stones lie about; `thick`: a multiple of the tufts'
- * chance; `cover`: what stands this far over the ground is a roof (m). All of it is fine detail, drawn near the
+ * chance; `paved(x, z)`: whether the ground there is paved (TK_SCATTER.tuft.paved); `cover`: what stands this far over the ground is a roof (m). All of it is fine detail, drawn near the
  * camera only. Returns the counts laid.
  */
-export function tkScatter(blocks, lay, { box, grows, heightAt = null, colour = TK_THINGS.green, litter = TK_THINGS.leafLitter, stones = true, seed = 1, cover = 0.5, thick = 1 }) {
+export function tkScatter(blocks, lay, { box, grows, heightAt = null, colour = TK_THINGS.green, litter = TK_THINGS.leafLitter, stones = true, seed = 1, cover = 0.5, thick = 1, paved = null }) {
   const random = tkRandom(seed * 977 + 31);
   const s = TK_SCATTER;
   const laid = { tuft: 0, stone: 0, litter: 0 };
@@ -374,11 +377,11 @@ export function tkScatter(blocks, lay, { box, grows, heightAt = null, colour = T
       const covered = here.top - here.ground > cover;
       const y = heightAt ? heightAt(px, pz) : here.ground;
       const builder = blocks.at(px, pz);
-      const wallShare = (rule) => rule.open + (rule.wall - rule.open) * here.wall * here.wall;
+      const wallShare = (rule, open = 1) => rule.open * open + (rule.wall - rule.open * open) * here.wall * here.wall;
       const clump = 0.35 + 1.3 * tktRough(px * 0.21 + seed, pz * 0.21 - seed);
       const quiet = Math.max(0, 1 - here.wear / s.tuft.wearTo);
       if (!covered && grow > 0) {
-        const chance = s.tuft.chance * thick * grow * wallShare(s.tuft) * quiet * (1 + s.tuft.hollow * here.hollow) * (s.tuft.shade + (1 - s.tuft.shade) * here.sky) * clump;
+        const chance = s.tuft.chance * thick * grow * wallShare(s.tuft, paved?.(px, pz) ? s.tuft.paved : 1) * quiet * (1 + s.tuft.hollow * here.hollow) * (s.tuft.shade + (1 - s.tuft.shade) * here.sky) * clump;
         if (r1 < chance * s.cell * s.cell) {
           const size = s.tuft.size[0] + (s.tuft.size[1] - s.tuft.size[0]) * r2 * r2 * (0.5 + 0.5 * here.wall);
           builder.at('near', () => tkTuft(builder, px, y, pz, { size, wide: 0.8 + 0.8 * r3, colour: colour.map((value) => value * (0.75 + 0.5 * r4)), yaw: r3 * Math.PI }));

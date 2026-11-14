@@ -53,7 +53,7 @@ export const PYONGYANG_PLACE = {
   // Snow lying (0..1) and the winter haze: clear cold air, the hills at a kilometre still seen.
   snow: 0.62, fog: [150, 1500],
   // How well the snow holds on trodden ground (the road to the gate, the ground the columns cross, the streets), as a share of its hold elsewhere.
-  trodden: 0.3,
+  trodden: 0.55,
 };
 
 const pySmooth = (a, b, x) => {
@@ -251,6 +251,15 @@ export const PYONGYANG_LIGHT = {
 // The far country, drawn only: how far it is drawn (m, to the sky's edge in the haze), and how far it is sunk under
 // the walked ground where the two overlap.
 const PY_FAR = { reach: 1500, sink: 4 };
+
+// The far country's woods, drawn only. That country's hills carry pine (red pine above all, approximate) on their
+// slopes and crests while the valley floors are fields: woods stand where a slow noise passes `cover` (0..1; patches
+// `patch` m across), helped by height (`rise`: added per 100 m over the plain). Out to `near.to` m from the middle
+// every tree is its own cone on a shaken grid of `every` m, `high` m tall; beyond, to the far country's edge, one
+// cone stands for a clump on a grid of `far.every` m. `spread`: a crown's radius over its height. `colour`: under
+// the rock sheet's own grain, a pine wood seen across a valley in winter, nearly black against the snow. By eye.
+// The low tier draws the near trees on a grid half again as wide and the clumps on one twice as wide.
+const PY_WOODS = { cover: 0.5, patch: 200, rise: 0.22, near: { every: 11, to: 460, high: [7, 13] }, far: { every: 30, high: [13, 20] }, spread: 0.24, colour: [0.2, 0.27, 0.19] };
 
 /** The river south of the ground (0..1: 1 on its ice), a few hundred metres wide, running east-west. */
 const pyRiver = (z) => pySmooth(150, 200, z) * (1 - pySmooth(520, 600, z));
@@ -541,9 +550,42 @@ export function buildPyongyang() {
       const out = Math.max(Math.abs(x) - 148, Math.abs(z) - 129, 0);
       return { p: [x, pyFar(x, z) - 0.3 - PY_FAR.sink * (1 - pySmooth(0, 30, out)), z], n: normal.map((value) => value / length), uv: [x / 6, -z / 6] };
     };
+    const corners = Array.from({ length: cells + 1 }, (_, j) => Array.from({ length: cells + 1 }, (_, i) => corner(i, j)));
+    // (The drawn ground's own height at a point: its triangles', not the hills' rule, so a tree stands on what is drawn.)
+    const cellOf = (s) => Math.max(0, Math.min(cells - 1, Math.floor(((Math.sign(s) * (Math.abs(s) / reach) ** (1 / 1.7) + 1) * cells) / 2)));
+    const drawnHeight = (x, z) => {
+      const [i, j] = [cellOf(x), cellOf(z)];
+      const [u, v] = [(x - points[i]) / (points[i + 1] - points[i]), (z - points[j]) / (points[j + 1] - points[j])];
+      const [a, b, c, e] = [corners[j][i].p[1], corners[j][i + 1].p[1], corners[j + 1][i + 1].p[1], corners[j + 1][i].p[1]];
+      return u >= v ? a + u * (b - a) + v * (c - b) : a + v * (e - a) + u * (c - e);
+    };
+    // The woods (PY_WOODS): by one seeded rule, never by hand.
+    const w = PY_WOODS;
+    const woodRandom = tkRandom(4421);
+    const farFrame = tkgFrame(0, 0, 0, 0);
+    const wooded = (x, z) => tkFbm((x + 4000) / 8000, (z + 4000) / 8000, Math.round(8000 / w.patch), 3, 23) + (w.rise * Math.max(pyFar(x, z), 0)) / 100 > w.cover;
+    const stand = (every, high, from, to, tiers) => {
+      for (let z = -to; z < to; z += every) {
+        for (let x = -to; x < to; x += every) {
+          const [px, pz] = [x + every * woodRandom(), z + every * woodRandom()];
+          const tall = high[0] + (high[1] - high[0]) * woodRandom();
+          const out = Math.max(Math.abs(px), Math.abs(pz));
+          if (out < from || out >= to || (Math.abs(px) < 156 && Math.abs(pz) < 137) || pyRiver(pz) > 0.05 || !wooded(px, pz)) continue;
+          const foot = drawnHeight(px, pz) - 0.4;
+          const shade = 0.8 + 0.4 * woodRandom();
+          for (let k = 0; k < tiers; k += 1) {
+            // (A crown in `tiers` skirts, each a cone, the lower ones wider.)
+            const [y0, y1] = [foot + tall * (0.22 + (0.5 * k) / tiers), foot + tall * (tiers === 1 ? 1 : 0.62 + (0.38 * (k + 1)) / tiers)];
+            blocks.wide.round('rock', farFrame, px, pz, y0, y1, tall * w.spread * (1 - (0.35 * k) / tiers), 0.02, { sides: 5, caps: '', colour: w.colour.map((part) => part * shade) });
+          }
+        }
+      }
+    };
+    stand(w.near.every * (tier === 'low' ? 1.5 : 1), w.near.high, 0, w.near.to, 2);
+    stand(w.far.every * (tier === 'low' ? 2 : 1), w.far.high, w.near.to, reach, 1);
     for (let j = 0; j < cells; j += 1) {
       for (let i = 0; i < cells; i += 1) {
-        const [a, b, c, e] = [corner(i, j), corner(i + 1, j), corner(i + 1, j + 1), corner(i, j + 1)];
+        const [a, b, c, e] = [corners[j][i], corners[j][i + 1], corners[j + 1][i + 1], corners[j + 1][i]];
         // (Left out where the walked ground's own fields are drawn.)
         if (Math.max(Math.abs(a.p[0]), Math.abs(c.p[0])) < 148 && Math.max(Math.abs(a.p[2]), Math.abs(c.p[2])) < 129) continue;
         const icy = pyRiver((a.p[2] + c.p[2]) / 2) > 0.85;
@@ -627,7 +669,7 @@ export function buildPyongyang() {
     // its shading. By eye against the sunlit snow holding the drifts' forms.
     weathers: { snow: 'siegesnow', bare: 'clear' },
     first: 'snow',
-    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.75 }, cover: 0.5, sun: 1, gloom: 0.6, visibility: 16000 }] },
+    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.95 }, cover: 0.56, sun: 1, gloom: 0.8, visibility: 5500 }] },
   };
   tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;
