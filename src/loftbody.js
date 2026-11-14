@@ -4291,7 +4291,15 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     return rings;
   };
-  const shortsOn = (role, inflate) => loft(mesh, tiltWaist(shortsRings(base ? LOFT.baseCrotch : -0.12, 0.2, count(base ? 6 : 5))), trunkSides, { color: role, inflate, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
+  // (Under a harness whose groin is closed with mail, the kit's gaps.mail, they are the mail breeches worn there: mail between
+  // the fauld's foot and the cuisses, and behind, where the hose alone showed as a dark band.)
+  const mailAt = outfitOf(body.inputs).spec?.gaps?.mail;
+  const breeches = armor && base && DETAIL_MAPS.on && !lowDetail && Array.isArray(mailAt) && mailAt.includes('groin');
+  const shortsOn = (role, inflate) => {
+    const rings = tiltWaist(shortsRings(base ? LOFT.baseCrotch : -0.12, 0.2, count(base ? 6 : 5)));
+    const mail = breeches && role === 'kit' ? { color: 'mail', uv: asWorn(mailUv(rings, inflate), 'mail') } : { color: role };
+    loft(mesh, rings, trunkSides, { ...mail, inflate, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
+  };
   if (bottom) {
     switch (bottom.kind) {
       case 'trunks': case 'longShorts':
