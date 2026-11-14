@@ -291,7 +291,11 @@ vec3 envSky(vec3 dir) {
 }
 
 vec3 envAirlight(vec3 dir) {
-  return envSky(vec3(dir.x, 0.0, dir.z));
+  // The horizon row that way, brighter toward the sun itself as the haze throws its light forward (config.js aureole).
+  vec3 sun = uEnvSunDir;
+  float level = dot(normalize(dir.xz + vec2(1e-5, 0.0)), sun.xz);
+  float lobe = pow((${(1 + ENV.air.hazeForward * ENV.air.hazeForward).toFixed(4)} - ${(2 * ENV.air.hazeForward).toFixed(4)} * level) / (${(1 + ENV.air.hazeForward * ENV.air.hazeForward).toFixed(4)} - ${(2 * ENV.air.hazeForward).toFixed(4)} * dot(normalize(dir), sun)), 1.5);
+  return envSky(vec3(dir.x, 0.0, dir.z)) * (1.0 + ${ENV.air.aureole.toFixed(2)} * (lobe - 1.0));
 }
 
 // The haze's density falls off with height as exp(-y / H); along a straight sight line that integrates exactly.

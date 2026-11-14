@@ -118,7 +118,7 @@ export function envBuild({ place, view, spec }) {
     terrain: envBuildTerrain({ place: own, height, sun, map }),
     grass: envBuildGrass({ place: own, map }),
     trees: envBuildTrees({ place: own, trees }),
-    particles: envBuildParticles(),
+    particles: envBuildParticles(map),
   };
   group.add(parts.sky, parts.terrain, parts.grass, parts.trees, parts.particles);
   group.userData.env = 'open-air';

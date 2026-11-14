@@ -1,13 +1,17 @@
-// What falls and drifts in the air of a place (src/env/): rain, snow, blown dust, leaves, petals, motes in the sun.
+// What falls and drifts in the air of a place (src/env/): rain, snow, blown dust, leaves, petals, motes in the sun,
+// and the litter on the ground that a gust picks up.
 // Each kind (config.js ENV.particles) is one instanced mesh filling a box that follows the camera and wraps at its
 // faces. Nothing is simulated: where a particle is now is its seed carried by the same wind travel the gusts ride
 // (air.js uEnvWindTravel) and by its own fall, so the rain slants and the leaves run with the wind that bends the
-// grass, and a drop is at the same place at the same moment of the fight however it is stepped.
+// grass, and a drop is at the same place at the same moment of the fight however it is stepped. A kind with a
+// `lift` lies on the ground instead and is in the air only while the wind where it lies is strong enough: the gust
+// that is seen coming across the grass throws the leaves up as it arrives and lets them down behind it.
 
 /* global THREE */
 
 import { ENV } from './config.js';
 import { ENV_GLSL, envUniforms } from './air.js';
+import { ENV_GLSL_MAP } from './terrain.js';
 import { envRandom } from './noise.js';
 
 // How each kind is drawn: 'streak' a line along its own velocity, 'dot' a soft round facing the camera, 'flake' a
@@ -20,11 +24,15 @@ const ENV_PARTICLE_DRAWN = {
   petals: { style: 'flake', alpha: 1, glow: false, low: false },
   motes: { style: 'dot', alpha: 0.85, glow: true, low: false },
   dust: { style: 'dot', alpha: 0.085, glow: false, low: true },
+  litter: { style: 'flake', alpha: 1, glow: false, low: false },
 };
 const ENV_PARTICLE_STYLES = ['streak', 'dot', 'flake'];
 
 const ENV_PARTICLE_VERTEX = /* glsl */ `
 ${ENV_GLSL}
+${ENV_GLSL_MAP}
+// What lies on the ground: the wind (m/s) that stirs it and that has it flying, how high it goes (m), how far it is thrown (m).
+uniform vec4 uLift;
 // The box (m).
 uniform vec3 uBox;
 // x: fall (m/s); y: the share of the wind it rides; z: size (m); w: streak (s).
@@ -53,6 +61,18 @@ void main() {
   vec3 middle = centre + rel;
   vec3 edge = abs(rel) / uBox * 2.0;
   float fade = (1.0 - smoothstep(0.8, 1.0, max(edge.x, edge.z))) * (1.0 - smoothstep(0.85, 1.0, edge.y));
+  float aloft = 1.0;
+#if LIFT == 1
+  // Lying where the wind has crept it to, until the air there is fast enough for a thing of its weight: then up
+  // and downwind with the gust, and down again as it passes.
+  rel.xz = mod(start.xz + travel.xz - centre.xz + uBox.xz * 0.5, uBox.xz) - uBox.xz * 0.5;
+  middle.xz = centre.xz + rel.xz;
+  aloft = smoothstep(uLift.x, uLift.y, envGust(middle.xz) * (0.7 + 0.6 * r));
+  middle.xz += uEnvWind.xy * uLift.w * aloft * (0.4 + r2) + stray.xz * aloft;
+  middle.y = envMap(middle.xz).r + 0.02 + uLift.z * aloft * r3 * (1.0 + 0.3 * stray.y);
+  edge = abs(rel) / uBox * 2.0;
+  fade = (1.0 - smoothstep(0.8, 1.0, max(edge.x, edge.z))) * envInMap(middle.xz);
+#endif
 
   vec3 toEye = cameraPosition - middle;
   float away = length(toEye);
@@ -76,6 +96,10 @@ void main() {
 #else
   // Tumbling about its own axis, faster in faster air.
   float spin = uEnvTime * (1.5 + 3.0 * r2) * (0.5 + 0.2 * local) + r * 50.0;
+#if LIFT == 1
+  // Flat on the ground at rest, turning over as it rises and falls.
+  spin = aloft * (5.0 + 14.0 * r2);
+#endif
   float lie = r3 * 6.2831853;
   vec3 axis = normalize(vec3(cos(lie), 0.35 * (r - 0.5), sin(lie)));
   vec3 flat_ = normalize(cross(axis, vec3(0.0, 1.0, 0.0)));
@@ -121,9 +145,9 @@ void main() {
 
 /**
  * Every kind's mesh, in one group, none drawn until envParticlesSet says how much of each. A kind's mesh is under
- * group.userData.envKinds[kind].
+ * group.userData.envKinds[kind]. `map` the near map's uniform (what lies on the ground lies on its ground).
  */
-export function envBuildParticles() {
+export function envBuildParticles(map) {
   const group = new THREE.Group();
   group.userData.env = 'particles';
   group.userData.envKinds = {};
@@ -142,9 +166,12 @@ export function envBuildParticles() {
     const material = new THREE.ShaderMaterial({
       vertexShader: ENV_PARTICLE_VERTEX,
       fragmentShader: ENV_PARTICLE_FRAGMENT,
-      defines: { STYLE: ENV_PARTICLE_STYLES.indexOf(drawn.style), GLOW: drawn.glow ? 1 : 0, SOFT: drawn.low ? '0.0' : '0.35' },
+      defines: { STYLE: ENV_PARTICLE_STYLES.indexOf(drawn.style), GLOW: drawn.glow ? 1 : 0, SOFT: drawn.low ? '0.0' : '0.35', LIFT: spec.lift ? 1 : 0 },
       uniforms: {
         ...envUniforms(),
+        uEnvMap: map,
+        uEnvCover: map.cover,
+        uLift: { value: new THREE.Vector4(...(spec.lift ?? [0, 0, 0, 0])) },
         uBox: { value: new THREE.Vector3(...spec.box) },
         uMove: { value: new THREE.Vector4(spec.fall, spec.ride, spec.size, spec.streak) },
         uDrawn: { value: new THREE.Vector4(spec.wander, drawn.alpha, 0.001, drawn.low ? 1 : 0) },

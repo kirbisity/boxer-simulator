@@ -44,7 +44,9 @@ void main() {
   float r2 = aRoot.w;
   float r3 = fract(r1 * 37.7 + r2 * 11.3);
   float snow = uEnvWet.y;
-  float tall = mix(uBlades.x, uBlades.y, r1) * map.g * uLayer.z * fade * (1.0 - 0.45 * snow);
+  // Rank tussocks: where the noise says so the grass stands taller and darker, a few metres of it together.
+  float rank = smoothstep(${(1 - ENV.grass.rank.share).toFixed(2)}, ${(1.08 - ENV.grass.rank.share).toFixed(2)}, texture2D(uEnvNoise, xz / ${(ENV.grass.rank.size * 16).toFixed(1)} + 0.21).b * 0.7 + texture2D(uEnvNoise, xz / ${(ENV.grass.rank.size * 5).toFixed(1)}).g * 0.3);
+  float tall = mix(uBlades.x, uBlades.y, r1) * map.g * uLayer.z * fade * (1.0 - 0.45 * snow) * (1.0 + ${ENV.grass.rank.taller.toFixed(2)} * rank);
   float t = aBlade.y;
 
   // The wind where this blade stands: the drag on a stem goes as the square of the air's speed.
@@ -74,7 +76,7 @@ void main() {
 
   // Colour: green to straw in broad patches and blade by blade, the root in its neighbours' shade.
   float dry = clamp(envDryAt(xz) + (r1 - 0.5) * 0.5, 0.0, 1.0);
-  vec3 colour = mix(uGrass, uDry, dry) * (0.82 + 0.36 * r2);
+  vec3 colour = mix(uGrass, uDry, dry * (1.0 - 0.5 * rank)) * (0.82 + 0.36 * r2) * (1.0 - ${ENV.grass.rank.darker.toFixed(2)} * rank);
   colour *= mix(uRoot, 1.08, t);
   float flower = step(1.0 - uBlades.z, r3) * smoothstep(0.7, 0.9, t);
   colour = mix(colour, mix(uFlowerA, uFlowerB, step(0.5, r1)), flower);

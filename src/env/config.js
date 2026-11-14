@@ -38,6 +38,12 @@ export const ENV = {
     // How forward the haze throws light (Henyey-Greenstein g): 0.76 is the usual figure for haze, approximate.
     // It is what makes the glow round a low sun.
     hazeForward: 0.76,
+    // The haze's light is tabled along the horizon only (the sky table's lowest row), but the sun stands over
+    // it: a sight line nearer the sun than the level line under it is brighter by the ratio of the phase
+    // function at the two angles, which is the bright patch of mist round a low sun. `aureole`: the share of
+    // the haze's light that follows that ratio (light scattered once; the rest has been scattered about and
+    // comes evenly). By eye against the second reference, where the mist toward the sun burns white.
+    aureole: 0.45,
     // The share of the sun's own dimming that the light scattered into the sky has also suffered, looking along
     // the horizon and straight up: light seen overhead was scattered high, where the sun's path through the
     // air was short, so the zenith stays blue over an amber horizon at sunset. 1 would be the ground's own sun
@@ -143,7 +149,7 @@ export const ENV = {
     shaftSteps: 28,
     shaftFade: 1.5,
     shaftPath: 60,
-    shafts: 0.9,
+    shafts: 0.5,
     // The shafts fade as the sun leaves the picture and are gone with it this many half-pictures from the middle.
     shaftOff: 2.6,
     // A simple lens lights the film's corners less than its middle, by cos^4 of the angle off its axis (the
@@ -330,6 +336,10 @@ export const ENV = {
     // A bent blade turns its glossy face to the sky: this much of the sky's light is added at full bend.
     // It is what makes a gust visible from far off (the pale wave crossing a hayfield).
     sheen: 0.38,
+    // No sward is even: this `share` of the ground carries rank tussocks about `size` m across (ungrazed
+    // patches, wetter hollows), `taller` by this share of the place's grass and `darker` (greener, less gone
+    // to straw). By eye against the first reference's mixed long grass.
+    rank: { size: 3.4, share: 0.3, taller: 0.55, darker: 0.14 },
   },
 
   // ---- trees ----------------------------------------------------------------------------------------------------
@@ -369,6 +379,12 @@ export const ENV = {
     petals: { box: [34, 9, 34], count: 420, fall: 0.5, ride: 0.95, size: 0.028, streak: 0, wander: 0.7 },
     motes: { box: [22, 7, 22], count: 900, fall: 0.02, ride: 1, size: 0.008, streak: 0, wander: 0.25 },
     dust: { box: [50, 9, 50], count: 1400, fall: 0.05, ride: 1, size: 0.5, streak: 0, wander: 0.5 },
+    // What lies on the ground until the wind lifts it (dead leaves, chaff, torn grass). `lift`: the wind where
+    // it lies (m/s) at which the lightest piece stirs and at which it is flying, how high it is carried (m) and
+    // how far downwind (m). Beaufort's own marks: at force 3 (3.4-5.4 m/s) leaves are in constant motion, at
+    // force 4 (5.5-7.9) dust and loose paper are raised (approximate, from memory of the scale). `ride` is here
+    // the share of the wind's pace at which the litter creeps along the ground between gusts. Heights by eye.
+    litter: { box: [36, 3, 36], count: 700, fall: 0, ride: 0.06, size: 0.06, streak: 0, wander: 0.5, lift: [4.2, 7.5, 1.7, 3.2] },
   },
 
   // ---- what a weak device drops ---------------------------------------------------------------------------------------
@@ -416,6 +432,9 @@ export const ENV_TREES = {
   // Japanese cedar and red pine on a valley side: 15-25 m, a narrow dark spire of boughs, bare at the foot.
   pine: { height: [12, 22], crown: { wide: 0.21, tall: 0.37, at: 0.61 }, shape: 'boughs', limbs: 17, fork: 0, card: 0.085, leaf: [0x25402c, 0x335034, 0x1b3022], bark: 0x4a3626, trunk: 0.018, picture: 'needle' },
   // Autumn broadleaf among the pines (maple, zelkova): the valley's colour in October.
+  // What grows at a wood's edge and along a fence where nothing grazes it: hawthorn, bramble, hazel, a few
+  // metres high and as broad, leafy to the ground.
+  shrub: { height: [1.3, 3.4], crown: { wide: 0.6, tall: 0.46, at: 0.5 }, shape: 'round', limbs: 4, fork: 1.0, card: 0.3, leaf: [0x41602a, 0x56702e, 0x2e4a22], bark: 0x40352a, trunk: 0.02, picture: 'leaf' },
   autumn: { height: [8, 14], crown: { wide: 0.42, tall: 0.34, at: 0.62 }, shape: 'round', limbs: 6, fork: 0.85, card: 0.125, leaf: [0xa8642a, 0xb8862e, 0x8a3a22], bark: 0x43352a, trunk: 0.027, picture: 'leaf' },
 };
 
@@ -484,11 +503,12 @@ export const PLACE_ENV = {
     grass: { height: [0.3, 0.62], floorHeight: 0.09, dry: 0.2, flowers: 0.1, flowerColours: [0xf2efe0, 0xe8c83a, 0xc58ad0] },
     trees: [
       { kind: 'broadleaf', count: 26, from: 24, to: 120, clump: 0.6 },
+      { kind: 'shrub', count: 16, from: 24, to: 110, clump: 0.75 },
       { kind: 'broadleaf', count: 260, from: 120, to: 520, clump: 0.8 },
       { kind: 'broadleaf', count: 2600, from: 480, to: 2600, clump: 0.97 },
     ],
     woods: { cover: 0.6, colour: 0x34502a },
-    drift: [{ kind: 'motes', share: 1, colours: [0xfff4d0] }, { kind: 'petals', share: 0.5, colours: [0xf4f0e2, 0xe8d77a] }],
+    drift: [{ kind: 'motes', share: 1, colours: [0xfff4d0] }, { kind: 'petals', share: 0.5, colours: [0xf4f0e2, 0xe8d77a] }, { kind: 'litter', share: 0.5, colours: [0x8a7a3a, 0x6a6a2c, 0x9a8a52] }],
   },
   // Open pasture for horsemen under a driven sky: a wide level floor, long low swells, a scarp far off, the
   // grass running in waves before a fresh breeze.
@@ -509,11 +529,12 @@ export const PLACE_ENV = {
     grass: { height: [0.32, 0.7], floorHeight: 0.1, dry: 0.4, flowers: 0.03, flowerColours: [0xf2efe0, 0xe8c83a] },
     trees: [
       { kind: 'broadleaf', count: 34, from: 62, to: 240, clump: 0.85 },
+      { kind: 'shrub', count: 14, from: 40, to: 200, clump: 0.85 },
       { kind: 'broadleaf', count: 300, from: 240, to: 700, clump: 0.9 },
       { kind: 'broadleaf', count: 1800, from: 650, to: 2600, clump: 0.97 },
     ],
     woods: { cover: 0.4, colour: 0x38522c },
-    drift: [{ kind: 'motes', share: 0.4, colours: [0xe8e4d0] }],
+    drift: [{ kind: 'motes', share: 0.4, colours: [0xe8e4d0] }, { kind: 'litter', share: 0.8, colours: [0xb0a060, 0x8a7a3a, 0xa09050] }],
   },
   // Sekigahara at first light, 21 October 1600: a valley floor shut in by steep wooded mountains, the night's fog
   // still lying in it (the battle opened in fog), the sun low through the pines (the second reference).
@@ -538,10 +559,11 @@ export const PLACE_ENV = {
     trees: [
       { kind: 'pine', count: 46, from: 21, to: 110, clump: 0.5 },
       { kind: 'autumn', count: 12, from: 24, to: 110, clump: 0.3 },
+      { kind: 'shrub', count: 18, from: 22, to: 110, clump: 0.4 },
       { kind: 'pine', count: 420, from: 110, to: 520, clump: 0.6 },
       { kind: 'pine', count: 2600, from: 480, to: 2400, clump: 0.5 },
     ],
     woods: { cover: 0.9, colour: 0x2c4430 },
-    drift: [{ kind: 'leaves', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }, { kind: 'motes', share: 0.6, colours: [0xfff0c8] }],
+    drift: [{ kind: 'leaves', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }, { kind: 'motes', share: 0.6, colours: [0xfff0c8] }, { kind: 'litter', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }],
   },
 };
