@@ -103,6 +103,8 @@ export function envAirState(place, weather) {
   const wide = 1 - tune.hazeForward * tune.hazeForward;
   air.sunColour = [0, 1, 2].map((channel) => tune.sunGain * weather.sun
     * Math.pow(tune.sunPower * Math.exp(-(tune.rayleighDepth[channel] + air.hazeDepth * wide) * air.sunMass), 1 / 2.2));
+  // The share of the beam the haze has thrown wide by the time it is down: that light comes from all round.
+  air.strewn = 1 - Math.exp(-air.hazeDepth * wide * air.sunMass);
   air.extinction = tune.koschmieder / air.visibility;
   // Fine haze dims blue more than red (extinction ~ wavelength ^ -fine); droplets dim all alike.
   air.hazeHue = tune.wavelengths.map((nm) => Math.pow(tune.wavelengths[1] / nm, weather.fine));
@@ -272,7 +274,7 @@ export function envUniforms() {
   u.uEnvCloud.value = new THREE.Vector4(0, 0, 1 / ENV.clouds.scale, ENV.clouds.height);
   u.uEnvCloudTravel.value = new THREE.Vector2(0, 0);
   u.uEnvCloudLit.value = new THREE.Vector3(1, 1, 1);
-  u.uEnvCloudForm.value = new THREE.Vector3(ENV.clouds.ragged, ENV.clouds.baseAt, 1);
+  u.uEnvCloudForm.value = new THREE.Vector4(ENV.clouds.ragged, ENV.clouds.baseAt, 1, 0);
   u.uEnvCloudDark.value = new THREE.Vector3(0.5, 0.5, 0.5);
   u.uEnvWet.value = new THREE.Vector2(0, 0);
   u.uEnvShade.value = new THREE.Vector4(0, 0, 1, 1);
@@ -294,7 +296,7 @@ export function envAirToUniforms(air, weather, quality, place) {
   u.uEnvHaze.value.set(air.extinction * air.hazeHue[0], air.extinction * air.hazeHue[1], air.extinction * air.hazeHue[2], 1 / air.hazeHeight);
   u.uEnvRayleigh.value.set(air.rayleigh[0], air.rayleigh[1], air.rayleigh[2], air.extinction);
   u.uEnvCloud.value.set(air.cover, quality.cloudShadow ? ENV.clouds.shadow * (1 - air.lid) : 0, 1 / ENV.clouds.scale, ENV.clouds.height);
-  u.uEnvCloudForm.value.fromArray(air.form);
+  u.uEnvCloudForm.value.set(air.form[0], air.form[1], air.form[2], air.strewn);
   u.uEnvCloudLit.value.fromArray(air.cloudLit);
   u.uEnvCloudDark.value.fromArray(air.cloudDark);
   u.uEnvWet.value.set(weather.wet, weather.snow);
@@ -327,7 +329,7 @@ uniform vec4 uEnvWind;
 uniform vec2 uEnvWindTravel;
 uniform vec4 uEnvCloud;
 uniform vec2 uEnvCloudTravel;
-uniform vec3 uEnvCloudForm;
+uniform vec4 uEnvCloudForm;
 uniform vec3 uEnvCloudLit;
 uniform vec3 uEnvCloudDark;
 uniform vec2 uEnvWet;
@@ -443,14 +445,19 @@ vec3 envSunward(vec3 point) {
   return envSunwardOver(point, 0.0);
 }
 
-// The share of the sun on a point in the air: the cloud over it and what stands sunward of it.
-float envAirSunOver(vec3 point, float spread) {
+// The share of the sun on a point in the air seen from eye: the cloud over it and what stands sunward of it.
+// Light the haze has thrown wide (uEnvCloudForm.w: its share of the beam, envAirState) comes to the point from
+// all round, under the cloud over a wide round and not the cloud over the point, so the cloud is read over a
+// point drawn that share of the way to the eye: in clear air each point's own cloud (the rays under a broken
+// sky), in mist, where all that is seen stands within a stone's throw, one shade for the view. (Read at the
+// point, a cloud's shadow stood in a low sun's mist as a seam, bright air one side and dark the other.)
+float envAirSunOver(vec3 point, vec3 eye, float spread) {
   vec3 past = envSunwardOver(point, spread);
-  return envSunShare(point) * past.x * past.y * past.z;
+  return envSunShare(mix(point, eye, uEnvCloudForm.w)) * past.x * past.y * past.z;
 }
 
 float envAirSun(vec3 point) {
-  return envAirSunOver(point, 0.0);
+  return envAirSunOver(point, point, 0.0);
 }
 
 // The mean share of the sun on the air along a sight line (from from along ray, depth what the haze takes
@@ -479,7 +486,7 @@ float envAirShare(vec3 from, vec3 ray, float depth, float grain, int steps) {
     float u = (float(i) + grain) / float(count);
     float along = depth > 1e-3 ? -log(1.0 - u * gone) / depth : u;
     if (abs(high - low) > 1e-3) along = (-log(max(mix(lowThin, highThin, along), 1e-6)) - low) / (high - low);
-    sum += envAirSunOver(from + ray * along, spread);
+    sum += envAirSunOver(from + ray * along, from, spread);
   }
   return sum / float(count);
 }

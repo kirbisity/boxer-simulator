@@ -394,7 +394,9 @@ function envAirShareAt(state, eye, look, travelX, travelZ, strength, extinction)
     const along = (depth > 1e-3 ? -Math.log(1 - u * gone) / depth : u) * ENV.tone.view;
     const x = eye.x + look.x * along;
     const z = eye.z + look.z * along;
-    let share = envCloudShareAt(air, travelX, travelZ, strength, x, eye.y + look.y * along, z);
+    // (The cloud over a point drawn toward the eye by the share of the light the haze has thrown wide: air.js envAirSunOver.)
+    const back = air.strewn ?? 0;
+    let share = envCloudShareAt(air, travelX, travelZ, strength, x + (eye.x - x) * back, eye.y + look.y * along * (1 - back), z + (eye.z - z) * back);
     if (Math.abs(x) < mapHalf * 0.98 && Math.abs(z) < mapHalf * 0.98) {
       const above = Math.max(0, eye.y + look.y * along - height(x, z));
       const column = Math.min(cover.width - 1, Math.max(0, Math.floor(((x - air.sun[0] * lean * above) / (2 * mapHalf) + 0.5) * cover.width)));

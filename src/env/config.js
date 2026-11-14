@@ -416,7 +416,11 @@ export const ENV = {
     // Wet ground: soil darkens to about this share of its dry colour (approximate: wet soil albedo is
     // roughly half of dry), and takes a sheen of the sky at grazing angles.
     wetDarken: 0.58,
-    wetSheen: 0.5,
+    wetSheen: 0.25,
+    // Water stands where the worn ground's hollows lie under this level (of a smooth noise, 0..1: under 0.4 is
+    // about a third of the ground; by eye, against a trodden ring after rain: separate pools, not a sheet. With
+    // every worn patch one pool and a sheen of 0.5 a rained-on floor was a single dark mirror).
+    puddles: 0.4,
     // What standing water mirrors: the sky only above what stands round the floor (trees.js envBuildSkyline:
     // `skyline` texels round the compass, tangents up to `skylineMost`, 63 degrees); below that line the wood,
     // at `mirrorWood` of the sky's light on its colour (a crown seen from below and the side is mostly its own
@@ -837,6 +841,11 @@ export const PLACE_ENV = {
     sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },
+    // The floor is a clearing some 16 m across each way in a wood 20 m tall: a solid wall of that height would
+    // leave its middle 0.4 to 0.6 of the sky's light (the cosine-weighted share above 40 to 50 degrees), and
+    // crowns pass some and the ride is open, so about three quarters (approximate). The meter is told, and
+    // opens up under a lid of cloud, where the fighters stood near black against a black wood.
+    meter: { sky: 0.75 },
     terrain: {
       seed: 37,
       layers: [
