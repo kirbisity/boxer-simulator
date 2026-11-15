@@ -6,7 +6,7 @@
 
 /* global THREE */
 
-import { ENV } from './config.js';
+import { ENV, ENV_WEATHER } from './config.js';
 import { ENV_NOISE_CELLS, envNoiseTexture } from './noise.js';
 import { ENV_GLSL_FILM, envToneOf } from './post.js';
 
@@ -563,7 +563,7 @@ float envAirWalk(vec3 from, vec3 ray, float depth, float grain, int steps) {
   vec2 slant = uEnvSunDir.xz / max(uEnvSunDir.y, 0.12);
   float sheetRun = length(ray.xz - slant * ray.y) / float(count) / ${(ENV.clouds.scale / (0.53 * ENV_NOISE_CELLS)).toFixed(1)};
   float sum = 0.0;
-  for (int i = 0; i < ${Math.max(ENV.air.shadeSteps[0], ENV.air.frameSteps)}; i++) {
+  for (int i = 0; i < ${Math.max(ENV.air.shadeSteps[0], ...Object.values(ENV.quality).map((tier) => tier.airSteps ?? 0))}; i++) {
     if (i >= count) break;
     float u = (float(i) + grain) / float(count);
     float along = depth > 1e-3 ? -log(1.0 - u * gone) / depth : u;
@@ -684,14 +684,56 @@ let envToneInstalled = false;
 export function envInstallTone() {
   if (envToneInstalled) return;
   envToneInstalled = true;
-  const tone = envToneOf({ sunColour: [1, 1, 1], sun: [0, 1, 0], skyLight: [0, 0, 0], extinction: 0 }, {});
+  // Every grade the weathers known now carry, each compiled in once: the renderer hands its materials one number
+  // (the exposure), so the grade in force rides on it as a whole multiple of ENV_TONE_SLOT (envToneId), and a
+  // weather made later takes the grade of the weather it was made from.
+  envToneGrades.length = 0;
+  envToneIds.clear();
+  envToneGradeId(ENV.tone.grade);
+  for (const weather of Object.values(ENV_WEATHER)) envToneGradeId({ ...ENV.tone.grade, ...weather.grade });
+  const neutral = { sunColour: [1, 1, 1], sun: [0, 1, 0], skyLight: [0, 0, 0], extinction: 0 };
+  const call = (grade) => {
+    const tone = envToneOf(neutral, { grade });
+    return `envFilm( light, vec4( 1.0, ${tone.contrast.toFixed(3)}, ${tone.sigma.toFixed(4)}, ${tone.gain.toFixed(4)} ), vec2( ${tone.saturation.toFixed(3)}, ${tone.warmth.toFixed(3)} ) )`;
+  };
+  const cases = envToneGrades.slice(1).map((grade, at) => `    if ( id == ${at + 1} ) return ${call(grade)};`).join('\n');
   const curve = `${ENV_GLSL_FILM}
   vec3 CustomToneMapping( vec3 color ) {
     if ( toneMappingExposure < 0.0 ) return color;
-    return envFilm( pow( max( color, 0.0 ), vec3( 2.2 ) ) * toneMappingExposure, vec4( 1.0, ${tone.contrast.toFixed(3)}, ${tone.sigma.toFixed(4)}, ${tone.gain.toFixed(4)} ), vec2( ${tone.saturation.toFixed(3)}, ${tone.warmth.toFixed(3)} ) );
+    float slot = floor( toneMappingExposure / ${ENV_TONE_SLOT.toFixed(1)} );
+    int id = int( slot + 0.5 );
+    vec3 light = pow( max( color, 0.0 ), vec3( 2.2 ) ) * ( toneMappingExposure - slot * ${ENV_TONE_SLOT.toFixed(1)} );
+${cases}
+    return ${call(envToneGrades[0])};
   }`;
   const chunk = THREE.ShaderChunk.tonemapping_pars_fragment;
   const replaced = chunk.replace(/vec3 CustomToneMapping\s*\(\s*vec3 color\s*\)\s*\{[^}]*\}/, curve);
   if (replaced === chunk) console.warn('env: the renderer has no CustomToneMapping to replace; the picture will be flat');
   THREE.ShaderChunk.tonemapping_pars_fragment = replaced;
+}
+
+// (The exposure stays well under a slot: a metered exposure runs to about 20, and a float keeps it to a
+// thousandth at ten slots up.)
+const ENV_TONE_SLOT = 1024;
+const envToneGrades = [];
+const envToneIds = new Map();
+function envToneGradeId(grade) {
+  const key = JSON.stringify(['ev', 'contrast', 'saturation', 'white', 'warmth'].map((name) => grade[name]));
+  if (!envToneIds.has(key)) {
+    envToneIds.set(key, envToneGrades.length);
+    envToneGrades.push(grade);
+  }
+  return envToneIds.get(key);
+}
+
+/**
+ * The renderer's exposure for the tier without passes: the metered exposure with the weather's grade riding on it
+ * (envInstallTone). A grade not compiled in (a weather made after the first place was shown) is the grade of the
+ * weather it was made from, or the default.
+ */
+export function envToneExposure(exposure, weather) {
+  const key = (grade) => JSON.stringify(['ev', 'contrast', 'saturation', 'white', 'warmth'].map((name) => ({ ...ENV.tone.grade, ...grade })[name]));
+  let id = envToneIds.get(key(weather?.grade));
+  if (id === undefined && weather?.madeFrom) id = envToneIds.get(key(ENV_WEATHER[weather.madeFrom]?.grade));
+  return exposure + (id ?? 0) * ENV_TONE_SLOT;
 }

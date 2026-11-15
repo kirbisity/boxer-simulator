@@ -183,9 +183,9 @@ void main() {
   gl_FragColor = vec4(c, 1.0);
 }`;
 
-// Shade in the air, walked once a point of the picture (ENV.air.frameSteps): the scene's materials have put the
+// Shade in the air, walked once a point of the picture (ENV.quality's airSteps): the scene's materials have put the
 // air's light before everything as if the sun were on all of it (air.js envAirShare gives them 1), and this pass,
-// at half the frame's size, finds from the depth of each point how much of the light on its line the sun does
+// at a fraction of the frame's size (the tier's airSize), finds from the depth of each point how much of the light on its line the sun does
 // not reach and writes the light that is not there: rgb in the scene's own display values, a the point's depth
 // (m), which the next pass uses to keep one thing's air off another's edge. The sky's points lie at the far
 // plane: their line is walked up through the layer as sky.js lays it over the sky.
@@ -195,6 +195,7 @@ uniform sampler2D uDepth;
 uniform mat4 uUnproject;
 uniform vec3 uEye;
 uniform vec2 uRange;
+uniform float uSteps;
 varying vec2 vUv;
 ${ENV_GLSL}
 void main() {
@@ -208,7 +209,7 @@ void main() {
     float column = uEnvRayleigh.a / uEnvHaze.w * exp(-max(uEye.y, 0.0) * uEnvHaze.w) / max(dir.y, 0.004);
     depth = vec3(dir.y > 0.0 ? column : 40.0);
   }
-  float share = envAirWalk(uEye, ray, depth.g, envGrain(gl_FragCoord.xy), ${ENV.air.frameSteps});
+  float share = envAirWalk(uEye, ray, depth.g, envGrain(gl_FragCoord.xy), int(uSteps + 0.5));
   gl_FragColor = vec4((envAirlightIn(dir, 1.0) - envAirlightIn(dir, share)) * (1.0 - exp(-depth)), uRange.x * uRange.y / (uRange.y - z * (uRange.y - uRange.x)));
 }`;
 
@@ -266,7 +267,7 @@ function envPostMake(renderer) {
     add: pass(ENV_POST_BLUR, blur, { blending: THREE.AdditiveBlending, transparent: true }),
     shafts: pass(ENV_POST_SHAFTS, { uFrom: { value: null }, uSun: { value: new THREE.Vector4() } }),
     frame: pass(ENV_POST_FRAME, { uFrom: { value: null }, uBloom: { value: null }, uShafts: { value: null }, uTone: { value: new THREE.Vector4() }, uGrade: { value: new THREE.Vector4() }, uLens: { value: new THREE.Vector3() } }),
-    air: pass(envPostAirShader(), { ...envUniforms(), uDepth: { value: null }, uUnproject: { value: new THREE.Matrix4() }, uEye: { value: new THREE.Vector3() }, uRange: { value: new THREE.Vector2() } }),
+    air: pass(envPostAirShader(), { ...envUniforms(), uDepth: { value: null }, uUnproject: { value: new THREE.Matrix4() }, uEye: { value: new THREE.Vector3() }, uRange: { value: new THREE.Vector2() }, uSteps: { value: 14 } }),
     unshade: pass(ENV_POST_UNSHADE, { uFrom: { value: null }, uAir: { value: null }, uDepth: { value: null }, uStep: { value: new THREE.Vector2() }, uRange: { value: new THREE.Vector2() } }),
     targets: [],
     sunAt: new THREE.Vector3(),
@@ -280,8 +281,9 @@ function envPostMake(renderer) {
 }
 
 /** Targets for a drawing buffer of this size: the scene's (light, smoothed edges), half of it, and the bloom's levels down from a quarter. */
-function envPostSize(post, width, height) {
-  if (post.width === width && post.height === height) return;
+function envPostSize(post, width, height, airSize) {
+  if (post.width === width && post.height === height && post.airSize === airSize) return;
+  post.airSize = airSize;
   for (const target of post.targets) target.dispose();
   const make = (Kind, w, h) => {
     const target = new Kind(Math.max(1, w), Math.max(1, h), { type: THREE.HalfFloatType, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: Kind !== THREE.WebGLRenderTarget, stencilBuffer: false });
@@ -295,7 +297,7 @@ function envPostSize(post, width, height) {
   post.main.depthTexture?.dispose();
   post.main.depthTexture = new THREE.DepthTexture(width, height, THREE.UnsignedIntType);
   post.lit = make(THREE.WebGLRenderTarget, width, height);
-  post.airAt = make(THREE.WebGLRenderTarget, width >> 1, height >> 1);
+  post.airAt = make(THREE.WebGLRenderTarget, Math.ceil(width / airSize), Math.ceil(height / airSize));
   post.airAt.texture.minFilter = post.airAt.texture.magFilter = THREE.NearestFilter;
   post.half = make(THREE.WebGLRenderTarget, width >> 1, height >> 1);
   post.levels = [];
@@ -312,12 +314,13 @@ function envPostSize(post, width, height) {
  * curve themselves.
  */
 export function envPostDraw(view, tone, level, shafts, air) {
+  // (`air`: the tier's walk, { airSize, airSteps }, or nothing where the air's shade is not walked here.)
   const renderer = view.renderer;
   envPost ??= envPostMake(renderer);
   const post = envPost;
   if (!post.able) return false;
   renderer.getDrawingBufferSize(post.size);
-  envPostSize(post, post.size.x, post.size.y);
+  envPostSize(post, post.size.x, post.size.y, air?.airSize ?? 2);
   const tune = ENV.post;
   const camera = view.camera;
 
@@ -345,7 +348,7 @@ export function envPostDraw(view, tone, level, shafts, air) {
     renderer.setRenderTarget(to);
     renderer.render(post.scene, post.camera);
   };
-  // The air's shade: the light that is not there, at half size, then the scene less it.
+  // The air's shade: the light that is not there, at the tier's airSize, then the scene less it.
   let scene = post.main;
   if (air) {
     quad.material = post.air;
@@ -354,6 +357,7 @@ export function envPostDraw(view, tone, level, shafts, air) {
     a.uUnproject.value.multiplyMatrices(camera.matrixWorld, camera.projectionMatrixInverse);
     a.uEye.value.setFromMatrixPosition(camera.matrixWorld);
     a.uRange.value.set(camera.near, camera.far);
+    a.uSteps.value = air.airSteps;
     renderer.setRenderTarget(post.airAt);
     renderer.render(post.scene, post.camera);
     quad.material = post.unshade;
