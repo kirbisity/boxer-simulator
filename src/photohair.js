@@ -19,12 +19,21 @@
 
 /* global THREE */
 
+import { sheenMaterial } from './hairmass.js';
+
 export const PHOTO_HAIR = {
   // Beard cards: segments, lift off the skin at the root and the tip (of the head's radius).
   segments: 5,
   lift: [0.025, 0.07],
-  // A moustache's cards: the atlas rows they root between (under the nose, the lip's red edge), and their length (of the head's radius).
-  lip: { rows: [0.612, 0.668], length: 0.055 },
+  // A moustache's cards: the atlas rows they root between (under the nose, the lip's red edge), their length, width and lift off
+  // the skin at root and tip (of the head's radius), the share of the lattice's points there that root one (`keep`), how far
+  // they turn out to the side of the mouth (`splay`, of the down direction) and stand out from the skin (`out`). Upper-lip hair
+  // grows down and out from the philtrum and lies against the lip; these are set by eye against that, so the cards read as
+  // hair lying flat rather than a row of bars standing off it (they were 0.06 wide, lifted 0.025 to 0.07, a third kept,
+  // straight down).
+  lip: { rows: [0.612, 0.668], length: 0.055, width: 0.028, lift: [0.006, 0.016], keep: 0.8, splay: 0.6, out: 0.08 },
+  // A beard's cards on the jaw and chin, the same terms (set by eye the same way; were as the moustache's before).
+  chin: { length: 0.16, width: 0.034, lift: [0.01, 0.03], keep: 0.6, splay: 0.3, out: 0.12 },
   // The scalp's painted hairline (atlas rows, from the crown), by length.
   hairline: { crop: 0.225, short: 0.215, medium: 0.205, long: 0.2, tied: 0.205 },
   nape: 0.64,
@@ -130,28 +139,49 @@ export function strandTexture() {
       paint.stroke();
     }
   }
-  strandAtlas = new THREE.CanvasTexture(canvas);
+  // (Read back and stored with a colour under every clear texel: a canvas keeps a clear texel black, and filtering and
+  // mipmaps blend that black into the strands' edges, which drew light hair dark. The clear texels take the strands' mean
+  // tone, the alpha is the canvas's.)
+  const pixels = paint.getImageData(0, 0, size, size).data;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    // (Rows bottom up: the canvas's top is the texture's v = 1, as a canvas texture's is.)
+    const from = (size - 1 - y) * size * 4;
+    for (let x = 0; x < size * 4; x += 4) {
+      const alpha = pixels[from + x + 3];
+      const tone = alpha ? pixels[from + x] : 202;
+      data.set([tone, tone, tone, alpha], y * size * 4 + x);
+    }
+  }
+  strandAtlas = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+  strandAtlas.magFilter = THREE.LinearFilter;
+  strandAtlas.minFilter = THREE.LinearMipmapLinearFilter;
+  strandAtlas.generateMipmaps = true;
+  strandAtlas.needsUpdate = true;
   return strandAtlas;
 }
 
-/** A material for cards in a hair colour: alpha-tested (no sorting), both sides. */
+/**
+ * A material for cards in a hair colour: alpha-tested (no sorting), both sides, lit as the scalp's hair is (hairmass.js
+ * sheenMaterial: the sheen along the strands, by each card's own strand direction). (A plain surface drew a dark beard near
+ * black beside the same colour's scalp hair, which its sheen keeps lighter.)
+ */
 function cardMaterial(colour) {
-  const material = new THREE.MeshStandardMaterial({ color: colour, map: strandTexture(), alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.62, metalness: 0 });
-  return material;
+  return sheenMaterial(colour, strandTexture(), { alphaTest: 0.4 });
 }
 
 /**
  * Cards along the head's surface: each from a root, `steps` along a direction field, a little off the skin, then (`hang`) down
  * free of it. `surface(direction)` is the head's surface point in a direction from its centre (local space).
  */
-function cardStrip({ root, direction, length, width, hang = 0, surface, centre, random, steps = PHOTO_HAIR.segments, toward = null }) {
+function cardStrip({ root, direction, length, width, hang = 0, surface, centre, random, steps = PHOTO_HAIR.segments, toward = null, lift: lifts = PHOTO_HAIR.lift }) {
   const points = [];
   let p = root.clone();
   let d = direction.clone();
   const step = length / steps;
   for (let k = 0; k <= steps; k += 1) {
     const t = k / steps;
-    const lift = PHOTO_HAIR.lift[0] + (PHOTO_HAIR.lift[1] - PHOTO_HAIR.lift[0]) * t;
+    const lift = lifts[0] + (lifts[1] - lifts[0]) * t;
     const out = p.clone().sub(centre);
     const skin = surface(out.clone().normalize());
     const minimum = skin.clone().sub(centre).length() * (1 + lift);
@@ -170,10 +200,12 @@ function cardStrip({ root, direction, length, width, hang = 0, surface, centre, 
   }
   const positions = [];
   const uvs = [];
+  const tangents = [];
   const column = Math.floor(random() * 4);
   points.forEach((point, k) => {
     const t = k / steps;
     const ahead = points[Math.min(steps, k + 1)].clone().sub(points[Math.max(0, k - 1)]).normalize();
+    tangents.push(...ahead.toArray(), ...ahead.toArray());
     const normal = point.clone().sub(centre).normalize();
     const across = new THREE.Vector3().crossVectors(ahead, normal).normalize().multiplyScalar(width * (1 - 0.45 * t) * 0.5);
     positions.push(...point.clone().sub(across).toArray(), ...point.clone().add(across).toArray());
@@ -184,22 +216,25 @@ function cardStrip({ root, direction, length, width, hang = 0, surface, centre, 
     const a = k * 2;
     indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
   }
-  return { positions, uvs, indices };
+  return { positions, uvs, tangents, indices };
 }
 
 function mergeStrips(strips) {
   const positions = [];
   const uvs = [];
+  const tangents = [];
   const indices = [];
   for (const strip of strips) {
     const base = positions.length / 3;
     positions.push(...strip.positions);
     uvs.push(...strip.uvs);
+    tangents.push(...strip.tangents);
     indices.push(...strip.indices.map((index) => index + base));
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute('hairTangent', new THREE.Float32BufferAttribute(tangents, 3));
   geometry.setIndex(indices);
   geometry.computeVertexNormals();
   return geometry;
@@ -236,11 +271,15 @@ export function buildPhotoBeard({ group, head, r, facialHair = 'none', colour, r
       // (A moustache grows from under the nose down to the lip's red edge, the atlas's rows 0.61 to 0.67, and ends there: rooted
       // on the lip itself its cards hung across the mouth as a row of dark stitches.)
       const inLip = row > PHOTO_HAIR.lip.rows[0] && row < PHOTO_HAIR.lip.rows[1] && du < (facialHair === 'handlebar' ? 0.06 : 0.045);
-      if (!(inBeard || inLip) || random() > 0.35) continue;
+      const spec = inLip ? PHOTO_HAIR.lip : PHOTO_HAIR.chin;
+      if (!(inBeard || inLip) || random() > spec.keep) continue;
       const root = at(index);
       const normal = root.clone().sub(centre).normalize();
-      const down = new THREE.Vector3(0, -1, 0).addScaledVector(normal, 0.25).normalize();
-      beard.push(cardStrip({ root, direction: down, length: (inLip ? PHOTO_HAIR.lip.length : facialHair === 'longBeard' ? 0.5 : 0.16) * r, width: 0.06 * r, surface, centre, random, steps: 3 }));
+      // (Down, turned out to his side of the mouth (z is across the head), and only a little off the skin.)
+      const side = Math.sign(root.z) || 1;
+      const down = new THREE.Vector3(0, -1, side * spec.splay).addScaledVector(normal, spec.out).normalize();
+      const length = (inLip ? spec.length : facialHair === 'longBeard' ? 0.5 : spec.length) * r;
+      beard.push(cardStrip({ root, direction: down, length, width: spec.width * r, surface, centre, random, steps: 3, lift: spec.lift }));
     }
     const beardMaterial = cardMaterial(colour);
     add(beard, beardMaterial, 'photoBeard');

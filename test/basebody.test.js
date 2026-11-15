@@ -76,7 +76,8 @@ test('the rig follows the model: limbs along the skin\'s own axes at the game\'s
     for (const root of ['pelvis', 'neck', 'lHip', 'rHip', 'lShoulder', 'rShoulder']) {
       assert.ok(Math.hypot(...[0, 1, 2].map((axis) => bind[P[root]][axis] - rigPoints[P[root]][axis])) < 1e-9, `${name}: ${root} bound where the rig holds it`);
     }
-    // The left forearm's skin reaches within 3 cm of the hand point (under the palm's heel, BASE_BODY.handSeat 2.1 cm).
+    // The left forearm's skin reaches the wrist, within a centimetre of `wristToFist` behind the hand point (the fist's heel there,
+    // body.js ARM_LENGTHS).
     const [elbow, hand] = [bind[P.lElbow], bind[P.lHand]];
     const along = hand.map((value, axis) => value - elbow[axis]);
     const reach = Math.hypot(...along);
@@ -92,7 +93,7 @@ test('the rig follows the model: limbs along the skin\'s own axes at the game\'s
       // (Within 9 cm of the bound line: a forearm's 3-4 cm and the skin's offset from its bone, the shoulder's root shift.)
       if (off < 0.09 && t < reach + 0.05) farthest = Math.max(farthest, t);
     }
-    assert.ok(reach - farthest < 0.03 && farthest < reach, `${name}: the forearm ends ${((reach - farthest) * 100).toFixed(1)} cm short of the hand point`);
+    assert.ok(Math.abs(reach - farthest - body.lengths.wristToFist) < 0.01, `${name}: the forearm ends ${((reach - farthest) * 100).toFixed(1)} cm short of the hand point (the wrist ${(body.lengths.wristToFist * 100).toFixed(1)} cm)`);
   }
 });
 

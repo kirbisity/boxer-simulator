@@ -247,7 +247,7 @@ ${SCALP_GLSL}`;
  * light let a way through the skin (PHOTO_FACES.scatter). Its colour is the fighter's skin (over the atlas' neutral). In a crowd
  * (`painted`) its colours are per vertex instead (paintFromFace).
  */
-export function photoSkinMaterial(cast, { painted = false } = {}) {
+export function photoSkinMaterial(cast, { painted = false, hair: hairColour = null } = {}) {
   const colour = new THREE.Color(cast.skin).multiplyScalar(1 / photoManifest.neutral);
   if (painted) {
     const material = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true });
@@ -270,7 +270,8 @@ export function photoSkinMaterial(cast, { painted = false } = {}) {
   const pores = photoTexture('pores.png');
   pores.wrapT = THREE.RepeatWrapping;
   const skin = new THREE.Color(cast.skin);
-  const hair = new THREE.Color(cast.hair);
+  // (The painted scalp's colour: the fighter's own hair colour when the head gives one, else the photo's.)
+  const hair = new THREE.Color(hairColour ?? cast.hair);
   const tint = new THREE.Vector3(...['r', 'g', 'b'].map((c) => Math.min(1, Math.max(0.12, hair[c] / Math.max(0.05, skin[c])))));
   const d = cast.detail;
   const uniforms = {

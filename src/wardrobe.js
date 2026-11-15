@@ -3,6 +3,7 @@
 // mesh — fists, footwear, headgear and the things that swing.
 
 import { Dangle } from './dangle.js';
+import { WORLD } from './physics/config.js';
 import { FACTIONS, factionOf, HEADGEAR, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
 import { doubleSided, outlineFor, surface } from './toon.js';
 import { activeLook } from './looks.js';
@@ -202,26 +203,33 @@ const finish = (group) => {
  */
 export function buildHand(body, side, kind, skinColor, steel) {
   const scale = body.heightM / 1.8;
+  // The fist from its heel at the wrist (body.js ARM_LENGTHS `wristToFist` behind the hand point, the fist's middle) to its
+  // knuckles' face, as far in front of the point as a bare fist strikes with (physics/config.js WORLD.fists.bare.radius).
+  const heel = body.lengths.wristToFist;
+  const face = WORLD.fists.bare.radius;
+  const middle = (face - heel) / 2;
+  const half = (face + heel) / 2;
+  const knuckleRadius = 0.0095 * scale;
   // (A proximity suit's aluminized gloves: their gauntlet cuff over the sleeve.)
   const material = kind === 'gauntlet' ? steel : kind === 'proximity' ? foilMaterial(steel?.envMap ?? null, 0xc9ccd1) : surface(kind === 'tactical' ? 0x18191d : skinColor);
   const hand = new THREE.Group();
   const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), material);
-  palm.scale.set(0.034 * scale * (kind === 'bare' ? 1 : 1.1), 0.045 * scale, 0.042 * scale * (kind === 'bare' ? 1 : 1.08));
-  palm.position.y = 0.012 * scale;
+  palm.scale.set(0.034 * scale * (kind === 'bare' ? 1 : 1.1), half, 0.042 * scale * (kind === 'bare' ? 1 : 1.08));
+  palm.position.y = middle;
   hand.add(palm);
   for (let finger = 0; finger < 4; finger += 1) {
-    const knuckle = new THREE.Mesh(new THREE.SphereGeometry(0.0095 * scale, 10, 8), material);
-    knuckle.position.set(0.008 * scale, 0.045 * scale, (finger - 1.5) * 0.018 * scale);
+    const knuckle = new THREE.Mesh(new THREE.SphereGeometry(knuckleRadius, 10, 8), material);
+    knuckle.position.set(0.008 * scale, face - knuckleRadius, (finger - 1.5) * 0.018 * scale);
     hand.add(knuckle);
   }
   const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.011 * scale, 0.012 * scale, 0.045 * scale, 8), material);
   thumb.rotation.x = Math.PI / 2;
-  thumb.position.set(0.03 * scale, 0.022 * scale, (side === 'l' ? -1 : 1) * 0.004 * scale);
+  thumb.position.set(0.03 * scale, middle + 0.01 * scale, (side === 'l' ? -1 : 1) * 0.004 * scale);
   hand.add(thumb);
   if (kind !== 'bare') {
     // The cuff of the glove or the gauntlet's flared wrist.
     const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.04 * scale, kind === 'gauntlet' || kind === 'proximity' ? 0.055 * scale : 0.042 * scale, 0.06 * scale, 14), material);
-    cuff.position.y = -0.04 * scale;
+    cuff.position.y = -heel - 0.008 * scale;
     hand.add(cuff);
   }
   return finish(hand);

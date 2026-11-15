@@ -1,0 +1,68 @@
+{
+  "boxing duel": {
+    "hash": "ad0eaf0a",
+    "ms": 281,
+    "events": 6,
+    "sounds": 0
+  },
+  "muay thai v sumo": {
+    "hash": "3f1d2916",
+    "ms": 634,
+    "events": 41,
+    "sounds": 0
+  },
+  "knight v samurai": {
+    "hash": "76b1d4f5",
+    "ms": 638,
+    "events": 98,
+    "sounds": 0
+  },
+  "iron pagoda v kanabo": {
+    "hash": "a2de2a36",
+    "ms": 524,
+    "events": 36,
+    "sounds": 0
+  },
+  "archers": {
+    "hash": "4c42d61c",
+    "ms": 240,
+    "events": 15,
+    "sounds": 0
+  },
+  "rifle v shotgun": {
+    "hash": "2f0143be",
+    "ms": 172,
+    "events": 19,
+    "sounds": 0
+  },
+  "police v katana": {
+    "hash": "a7a7363b",
+    "ms": 418,
+    "events": 33,
+    "sounds": 0
+  },
+  "rhodes 1522": {
+    "hash": "e5afe8f7",
+    "ms": 4217,
+    "events": 531,
+    "sounds": 0
+  },
+  "sekigahara": {
+    "hash": "0b7c7456",
+    "ms": 2222,
+    "events": 327,
+    "sounds": 0
+  },
+  "legion": {
+    "hash": "0c59be02",
+    "ms": 12310,
+    "events": 1653,
+    "sounds": 0
+  },
+  "cajamarca": {
+    "hash": "d50c9aae",
+    "ms": 2376,
+    "events": 431,
+    "sounds": 0
+  }
+}
