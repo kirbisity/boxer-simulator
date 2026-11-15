@@ -256,6 +256,8 @@ export function pyongyangStage() {
 /** The weather the place is seen in (tkSetWeather's argument): snow lying, the air dry and clear. A view's `weather.town` replaces any part of it. */
 export const PYONGYANG_WEATHER = {
   snow: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
+  // (The same snow under the hazier sky the gate views had before: the open air's 'siegesnowhazy'.)
+  hazy: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
   // (The same ground without its snow: for looking at the stone and the earth.)
   bare: { wet: 0.15, pool: 0, rain: 0, snow: 0, mist: [0.001, 0, 0.5], fog: PYONGYANG_PLACE.fog },
 };
@@ -858,9 +860,15 @@ export function buildPyongyang() {
     //                the ground and keep their shading, and the gatehouse's paint and stone keep their colour both
     //                with the sun and against it. Contrast and colour a little off its own, for the stone's warmth.
     // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall.
-    weathers: { snow: 'siegesnow', bare: 'clear' },
+    // 'siegesnowhazy': the same showers in the sky the gate views had before the sunward work (the open air's own
+    // flurries haze: 14 km in its 900 m layer, and 4 km in the thick of a shower), kept to be compared with the
+    // default, which it does not replace (the place's weather `hazy`).
+    weathers: { snow: 'siegesnow', hazy: 'siegesnowhazy', bare: 'clear' },
     first: 'snow',
-    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 60000, hazeHeight: 300, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }] },
+    own: {
+      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 60000, hazeHeight: 300, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegesnowhazy: ['flurries', { label: 'Snow showers on the wall, hazier sky', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }],
+    },
   };
   tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;

@@ -26,7 +26,7 @@ export const TK_PLACE = {
   // The baked sun map handed to the open air (its `sunMap`: env/air.js envPlaceSun), so that its own walk of each
   // sight line finds the shade of walls, roofs and the gate's vault standing in the haze. `bias` m: how far past
   // the map's depth a point of air must be to count as behind what cast it; a quarter metre, as the kit's own
-  // sheets in the air read it (beams.js TK_BEAMS.bias): air has no surface to speckle, so only the map's texel
+  // sheets in the air once read it (the kit's own, retired): air has no surface to speckle, so only the map's texel
   // (about 0.1 to 0.2 m over a place) matters.
   airMap: { bias: 0.25 },
   // The cube mirror's side (px) and the rain's streaks: how many, the box they fall in round the camera (m), their length and speed.
