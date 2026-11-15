@@ -535,6 +535,10 @@ export const ENV = {
     // the first of these (m), and the line's middle for every blade past the second (grass.js): the second and
     // third rings' tufts are few and wide, and each with its own point showed as a fleck against lit mist.
     shadeOwn: [10, 30],
+    // The order blades are drawn in (grass.js envGrassCells): [cells, runs]. 16 x 16 cells to a tile hold 400 to
+    // 500 of the nearest ring's blades each, so the vertex stage meets a cell out of view whole; 20 runs, each an
+    // even sprinkle over the tile, so the tiers' shares (ENV.quality `grass`: 1, 0.5, 0.2) are whole runs.
+    cells: [16, 20],
     // A blade's lean at rest (rad, random way) and how much each differs in height (share).
     lean: 0.32,
     vary: 0.45,
