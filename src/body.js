@@ -48,12 +48,19 @@ const LENGTH = {
 // (10 mm on a man of 1.75 m): a longer neck. A build with a neck of its own (the apes) keeps it. The head's segment is as
 // heavy as it was and as thick as on the table's length (its radii: the neck's capsule).
 const NECK_RISE = 0.0057;
-// The arms and shoulders, fractions of standing height, one table per sex (2026-11-11: the whole shoulder and arm
-// assembly sized down). The figures now are the base models' own (src/basebody-data.js
-// joints): `upperArm` the shoulder joint to the elbow (male 0.1775, female 0.1623); `forearmToFist` the elbow to the point the
-// game's hand is drawn on, the model's elbow to wrist (male 0.1422, female 0.1300) and the hand's heel to its point
-// (basebody.js BASE_BODY.handSeat, 0.0117); `shoulderSpan` between the shoulder joints, narrower than the models' (male
-// 0.2022, female 0.1914). Were Drillis & Contini's 0.186 and 0.19 for both, and 0.2 (x 0.92 for a woman).
+// The arms and shoulders, fractions of standing height, one table per sex.
+// - `upperArm`, the shoulder joint to the elbow: the man's is the base model's own (src/basebody-data.js joints, 0.1775).
+//   ANSUR II (US Army, 2012; public tables, Penn State OpenLab) measures the arm between surface marks, acromion to radiale:
+//   0.1909 of stature for men (4082), 0.1911 for women (1986). The acromion stands above the joint by a margin the survey does
+//   not give, so the man's figure is not set from it; the woman's is the man's by the survey's ratio of the sexes (0.1911 /
+//   0.1909). (Was her model's own, 0.1623: 8.5% under the man's, where the survey has her 0.1% over.)
+// - `elbowToWrist`: ANSUR II's radiale to stylion (the elbow's joint line to the wrist's), 0.1525 of stature for men and
+//   0.1482 for women. (Were the models' own elbow to wrist, 0.1422 and 0.1300.)
+// - `wristToFist`, the wrist to the point the game's fist is (and its hand drawn on): the hand's heel to its point
+//   (basebody.js BASE_BODY.handSeat, 0.0117).
+// - `forearmToFist` is the two.
+// - `shoulderSpan` between the shoulder joints, narrower than the models' (male 0.2022, female 0.1914).
+// Were Drillis & Contini's 0.186 and 0.19 for both, and 0.2 (x 0.92 for a woman); sized down to the base models on 2026-11-11.
 // The arm's reach (upper arm and forearm to the fist, a share of height) the game's blows were timed and its fights spaced
 // at: Drillis & Contini's 0.186 + 0.19. A body's `reachScale` is its own reach over this at its height; the tests that place two
 // men at a measured distance shorten it by this much. Nothing in the simulation reads it: a blow's timing is the move's own
@@ -61,8 +68,8 @@ const NECK_RISE = 0.0057;
 // by the same share and straightens in about the same time.
 export const REACH_REFERENCE = 0.376;
 export const ARM_LENGTHS = {
-  male: { upperArm: 0.1775, forearmToFist: 0.1539, shoulderSpan: 0.19 },
-  female: { upperArm: 0.1623, forearmToFist: 0.1417, shoulderSpan: 0.17 },
+  male: { upperArm: 0.1775, elbowToWrist: 0.1525, wristToFist: 0.0117, shoulderSpan: 0.19 },
+  female: { upperArm: 0.1775 * (0.1911 / 0.1909), elbowToWrist: 0.1482, wristToFist: 0.0117, shoulderSpan: 0.17 },
 };
 
 export const FRAMES = {
@@ -1001,6 +1008,8 @@ export function buildBody(rawInputs) {
   const lengths = {};
   const own = { ...LENGTH, ...ARM_LENGTHS[inputs.sex === 'female' ? 'female' : 'male'] };
   for (const [key, fraction] of Object.entries(own)) lengths[key] = (build?.lengths?.[key] ?? fraction) * heightM;
+  // (The forearm to the fist: the elbow to the wrist and the wrist to the fist, unless a build gives its own.)
+  lengths.forearmToFist = (build?.lengths?.forearmToFist ?? own.elbowToWrist + own.wristToFist) * heightM;
   const neckRise = build?.lengths?.neckToHead === undefined ? NECK_RISE * heightM : 0;
   lengths.neckToHead += neckRise;
   lengths.hipSpan *= frame.width;
