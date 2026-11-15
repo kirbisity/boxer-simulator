@@ -3285,7 +3285,9 @@ function fitClothToBase(mesh, parts, armoured) {
     const visited = new Set();
     const soft = (worn[name] ?? kindOf(vertex)) === 'soft';
     const inward = CINCHED_ROLES.has(mesh.colors[vertex]) || soft ? radius * (1 - spec.tightest) : 0;
-    const overCap = name === 'trunk' && !ribCut(vertex, name) && pieceTop.get(ring.piece) >= LOFT.closedJoint.top.trunk;
+    // (Over the cap only on its rings that reach it, from the trunk's closed top down: lower, at the chest, the arm hangs beside
+    // the coat, not in it, and a coat of plates enclosing it stood 11 to 15 cm wider than the bare chest at an ordinary build.)
+    const overCap = name === 'trunk' && !ribCut(vertex, name) && pieceTop.get(ring.piece) >= LOFT.closedJoint.top.trunk && ring.t >= LOFT.closedJoint.top.trunk;
     // (A leg's piece clears the flesh on its own side of the trunk's middle only: at the top of a very fat woman's thighs the
     // model's skin is one mass across both, and a line in from the shorts' leg ran on through it to the far hip.)
     const side = LEG.test(name) && frames.trunk ? Math.sign(vec.dot(vec.sub(ring.center, frames.trunk.part.a), frames.trunk.widthAxis)) : 0;
