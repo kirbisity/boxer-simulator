@@ -259,7 +259,10 @@ export function envApply({ place, view, spec, group }) {
   if (st?.probe) view.scene.remove(st.probe);
   const probe = view.env?.probe ?? new THREE.LightProbe();
   probeLiteProject(probe.sh, (x, y, z, out) => envSkyAt(air, x, y, z, out));
-  probe.intensity = 1;
+  // (Among walls the floor sees less than all of it, and so does who stands there: the share the meter is told
+  // of, config.js `meter.sky`. With the whole sky on them and the camera opened for three quarters of it, skin
+  // in the valley's clearing stood a third of a stop over the land round it and washed out.)
+  probe.intensity = own.meter?.sky ?? 1;
   view.scene.add(probe);
 
   // The sun on the fighters and what stands on the floor: the colour the land is lit with, cut by what the hills
@@ -326,6 +329,9 @@ export function envLeave(view) {
   view.env.on = false;
   view.drawOver = null;
   envUniforms().uEnvOn.value = 0;
+  envUniforms().uEnvExposure.value = 1;
+  envUniforms().uEnvPlaceSun.value = null;
+  envUniforms().uEnvPlaceSunOn.value.x = 0;
   const shadow = view.lights.sun.shadow;
   shadow.radius = view.env.radius;
   ['left', 'right', 'top', 'bottom', 'near', 'far'].forEach((side, at) => { shadow.camera[side] = view.env.box[at]; });
@@ -342,7 +348,7 @@ function envDraw(view) {
   const state = view.env;
   if (!state?.on) return false;
   const level = ENV.quality[envChosen.tier].post;
-  envMeter(state.tone, state.air, envLookWay.x, envLookWay.z);
+  envUniforms().uEnvExposure.value = envMeter(state.tone, state.air, envLookWay.x, envLookWay.z);
   if (level > 0 && envPostDraw(view, state.tone, level, state.shafts, state.airWalk === 'frame')) return true;
   view.renderer.toneMappingExposure = state.tone.exposure;
   return false;
@@ -522,6 +528,13 @@ export function envUpdate(view, world) {
   const tier = ENV.quality[envChosen.tier];
   state.airWalk = !tier.airShade ? 'none' : tier.post > 0 && envPostAble(view.renderer) ? 'frame' : 'lines';
   u.uEnvShade.value.w = state.airWalk === 'frame' ? 1 : state.airWalk === 'lines' ? -1 : airShare;
+  // A place's own sun map, where it has one drawn by now (a light's map is made at its first frame; `texture`
+  // may be a function to ask each frame).
+  const sunMap = state.own?.sunMap;
+  const sunDrawn = sunMap ? (typeof sunMap.texture === 'function' ? sunMap.texture() : sunMap.texture) : null;
+  u.uEnvPlaceSun.value = sunDrawn ?? null;
+  if (sunDrawn) u.uEnvPlaceSunBy.value.copy(sunMap.matrix);
+  u.uEnvPlaceSunOn.value.set(sunDrawn ? 1 : 0, sunMap?.bias ?? 0.002);
   const fogLight = state.airWalk === 'frame' ? 1 : 1 - ENV.air.shadeBeam * (1 - airShare);
   view.scene.fog.color.setRGB(state.air.horizon[0] * fogLight, state.air.horizon[1] * fogLight, state.air.horizon[2] * fogLight);
   // The shafts: the share of light the air scatters toward the eye over the depth of a view (what falls is part

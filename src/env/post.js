@@ -40,6 +40,7 @@ export function envToneOf(air, weather, place) {
     ground: card * Math.pow(envLuma(level), 2.2),
     hazed: air.extinction ? 1 - Math.exp(-air.extinction * tune.view) : 0,
     stops: Math.pow(2, grade.ev),
+    skyShare: place?.meter?.frame ?? tune.skyShare,
     exposure: 1,
     contrast: n,
     sigma,
@@ -81,7 +82,7 @@ export function envMeter(tone, air, x, z) {
   // holds (ENV.tone.skyOver): toward a low sun the camera closes down for it and lets the land go dark, as an
   // evening is photographed, where an exposure set by the land alone burnt the whole sky out.
   const land = tone.ground + (Math.min(haze, tone.ground * tune.hazeMost) - tone.ground) * tone.hazed;
-  const seen = land + Math.max(0, sky - tone.ground * tune.skyOver) * tune.skyShare * (1 - tone.hazed);
+  const seen = land + Math.max(0, sky - tone.ground * tune.skyOver) * tone.skyShare * (1 - tone.hazed);
   tone.exposure = Math.pow((tune.grey * tune.meter) / seen, tune.adapt) * tone.stops;
   return tone.exposure;
 }
