@@ -3518,6 +3518,8 @@ function fitClothToBase(mesh, parts, armoured) {
  * draw (`mesh.underLayer`). The collar is a piece of the neck and the coat of the trunk, which keepLayersInside keeps apart, so
  * the collar's foot stood over the coat on the trapezius as a plain patch down the back and a bib on the chest. (Not under a
  * plate cuirass, `ribPieces`: a mail standard is worn over the breastplate's top.)
+ * So too the root of the shirt's sleeve (the `top` on an upper arm) within a kit's coat's top band: lofted from above the
+ * shoulder's joint and fitted to the arm's flesh, it stood out of a jack over the shoulder as an open tube.
  */
 function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
   const trunk = frames.trunk;
@@ -3530,11 +3532,13 @@ function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
   };
   const collar = [];
   const coats = new Map();
+  const sleeve = new Set();
   for (const [vertex, { ring, name }] of shares) {
     if (name === 'neck' && ring.collar) collar.push(vertex);
+    if (/Upper$/.test(name) && mesh.colors[vertex] === 'top') { collar.push(vertex); sleeve.add(vertex); }
     if (name !== 'trunk' || ribPieces.has(ring.piece) || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk) continue;
     let rings = coats.get(ring.piece);
-    if (!rings) coats.set(ring.piece, rings = new Map());
+    if (!rings) coats.set(ring.piece, rings = Object.assign(new Map(), { shirt: mesh.colors[vertex] === 'top' }));
     if (!rings.has(ring)) rings.set(ring, []);
     rings.get(ring).push(vertex);
   }
@@ -3544,7 +3548,7 @@ function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
     const [top, below] = [...rings.keys()].sort((a, b) => b.t - a.t);
     if (!below) return null;
     const round = (ring) => rings.get(ring).map(placeOf).sort((a, b) => a.angle - b.angle);
-    return [round(top), round(below)];
+    return [round(top), round(below), rings.shirt];
   }).filter(Boolean);
   const atAngle = (round, angle) => {
     let after = round.findIndex((place) => place.angle >= angle);
@@ -3558,9 +3562,12 @@ function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
   for (const vertex of collar) {
     const place = placeOf(vertex);
     let inside = null;
-    for (const [top, below] of bands) {
+    for (const [top, below, shirt] of bands) {
+      // (A sleeve's root only under a coat of the kit, not the shirt's own body, and only within the band: below it the arm
+      // hangs out beside the trunk.)
+      if (sleeve.has(vertex) && shirt) continue;
       const [edge, foot] = [atAngle(top, place.angle), atAngle(below, place.angle)];
-      if (place.t >= edge.t) continue;
+      if (place.t >= edge.t || (sleeve.has(vertex) && place.t < foot.t)) continue;
       const share = Math.min(1, Math.max(0, (place.t - foot.t) / ((edge.t - foot.t) || 1)));
       const r = foot.r + (edge.r - foot.r) * share - LOFT.layers.margin;
       inside = inside === null ? r : Math.max(inside, r);
@@ -4395,9 +4402,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     // A field tile of the kind's own (hoops, riveted lames, mail and plate, etching, a moulded shell): rows painted in a crowd
     // are in the picture, so one colour (a crest painted over it is kept).
+    // (A spaulder or a shoulder plate from above the shoulder's joint is closed over the shoulder, a low dome on a fitted body
+    // (capsFollow): left open, its mouth showed dark inside above the shoulder once the sleeve under it was tucked under the coat.)
+    const overShoulder = slot === 'upperArm' && rings[0].t < 0 && (material === 'steel' || material === 'armor');
     if (tile && tile !== 'plate' && (material === 'steel' || material === 'armor')) {
       const colour = paint?.rows && !paint.mon ? paint.rows[0] : paintFor(paint, armor);
-      loft(mesh, rings, sides, { color: colour, inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile) });
+      loft(mesh, rings, sides, { color: colour, inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile) });
       if (paint?.lames) lamesOn(mesh, rings, inflate, paint, boned);
       // A plate piece whose edges are turned and riveted (detailmaps.js ARMOUR_EDGES: the foot soldier's spaulders, vambraces, cops).
       if (material === 'steel' && ARMOUR_EDGES[armor?.kind]?.includes(slot)) harnessEdgesOn(mesh, rings, inflate, sides, boned);
@@ -4405,7 +4415,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
-    loft(mesh, rings, split ? split.sides : sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: false, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), ...(split ? { holes: split.holes } : {}) });
+    loft(mesh, rings, split ? split.sides : sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), ...(split ? { holes: split.holes } : {}) });
     if (split) {
       const { edge, stand } = legPanelsOn(mesh, rings, inflate, paint, boned, sides, split, panel(studsDrawn));
       // The front panel's own rivet heads, in columns down it as the skirt's.
