@@ -20,8 +20,8 @@ export const STAGE_ONE = {
 
 // The Level Mode menu's list: Stage 1 is open, the next is shown and not open yet.
 export const STAGE_LIST = [
-  { key: STAGE_ONE.key, number: 1, ready: true, glyph: '🏰', kicker: 'Playable', title: `Stage 1 · ${STAGE_ONE.title}`, blurb: 'A sea-cliff fortress in a storm. Cut through the garrison to Lord Vaelen at the summit.' },
-  { key: null, number: 2, ready: false, glyph: '🔒', kicker: 'Locked', title: 'Stage 2 · Coming soon', blurb: 'Not yet unlocked.' },
+  { key: STAGE_ONE.key, number: 1, ready: true, glyph: 'castle', kicker: 'Playable', title: `Stage 1 · ${STAGE_ONE.title}`, blurb: 'A sea-cliff fortress in a storm. Cut through the garrison to Lord Vaelen at the summit.' },
+  { key: null, number: 2, ready: false, glyph: 'lock', kicker: 'Locked', title: 'Stage 2 · Coming soon', blurb: 'Not yet unlocked.' },
 ];
 
 // Ten found papers: five along the main route, in the order it meets them, one on a dead levy at the drawbridge's head and one at the head of the sea-cave stair (the way round the guarded gate), and three in the vault's optional branches (the stage places them): what each is, and what it says.

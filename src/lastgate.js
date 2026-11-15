@@ -151,7 +151,7 @@ const LG_PEOPLE = {
 export const LAST_GATE_MODES = {
   samurai: {
     level: 1, region: 'Japan',
-    title: 'The Rice Riot', label: 'Samurai', glyph: '⛩️', weapon: 'Ōdachi', foe: 'rebel', foes: 'rebels', felled: 'cut down',
+    title: 'The Rice Riot', label: 'Samurai', glyph: 'torii', weapon: 'Ōdachi', foe: 'rebel', foes: 'rebels', felled: 'cut down',
     strength: { en: 'Tōsei gusoku and the longest blade: cuts them down before they close.', zh: '一身当世具足，一口最长的刀：人还没扑到跟前，就已经倒下了。' },
     blurb: { en: 'A famine ikki: starving peasants at the castle gate, then the ashigaru, rōnin, warrior monks and samurai who join them.', zh: '饥荒逼出来的一揆：饿红了眼的农民堵在城门口，后头跟上来的，是足轻、浪人、僧兵，还有倒戈的武士。' },
     factions: ['japanese'], soldier: 'ashigaruSpear', people: LG_PEOPLE.japanese,
@@ -178,7 +178,7 @@ export const LAST_GATE_MODES = {
   },
   knight: {
     level: 2, region: 'Europe',
-    title: 'The Jacquerie', label: 'Knight', glyph: '🛡️', weapon: 'Lance', foe: 'rebel', foes: 'rebels', felled: 'ridden down',
+    title: 'The Jacquerie', label: 'Knight', glyph: 'shield', weapon: 'Lance', foe: 'rebel', foes: 'rebels', felled: 'ridden down',
     strength: { en: 'Full plate on a destrier: the lance runs them through and is couched again.', zh: '全身板甲，胯下战马：一枪捅穿，夹回腋下，再冲。' },
     blurb: { en: '1358: the peasants of the Beauvaisis rise against their lords; footmen, men-at-arms and knights of the free companies join them.', zh: '一三五八年，博韦地区的农民造了老爷们的反；自由佣兵团的步卒、重甲兵和骑士，也趁乱入了伙。' },
     factions: ['knights'], soldier: 'footSpear',
@@ -202,7 +202,7 @@ export const LAST_GATE_MODES = {
   },
   mongol: {
     level: 3, region: 'China',
-    title: 'The Red Turbans', label: 'Mongol archer', glyph: '🏹', weapon: 'Composite bow', foe: 'rebel', foes: 'rebels', felled: 'shot down',
+    title: 'The Red Turbans', label: 'Mongol archer', glyph: 'bow', weapon: 'Composite bow', foe: 'rebel', foes: 'rebels', felled: 'shot down',
     strength: { en: 'Iron lamellar on a steppe horse: arrows from the saddle, never short of them; the mace up close.', zh: '铁札甲，草原马：马背上放箭，箭壶永远是满的；贴身了，就抡骨朵。' },
     blurb: { en: '1351: famine and the Yellow River\'s flood raise the Red Turbans against the Yuan; their armies grow into soldiers.', zh: '一三五一年，饥荒加上黄河决口，红巾军起来反元；一帮饥民，越打越像兵。' },
     // His own steppe guard and the Han soldiers of the Yuan's garrisons.
@@ -231,7 +231,7 @@ export const LAST_GATE_MODES = {
   },
   police: {
     level: 4, region: 'The depot',
-    title: 'Night Shift', label: 'SWAT officer', glyph: '🚓', weapon: 'AR-15', foe: 'android', foes: 'androids', felled: 'taken down',
+    title: 'Night Shift', label: 'SWAT officer', glyph: 'beacon', weapon: 'AR-15', foe: 'android', foes: 'androids', felled: 'taken down',
     strength: { en: 'A SWAT harness and the rifle\'s magazines; then the baton.', zh: '特警的全套护具，步枪弹匣管够；打空了，还有警棍。' },
     blurb: { en: 'Special police at the depot gate: its service androids walk out of the fog, and keep coming.', zh: '特警守在仓库大门口：雾里走出来一排服务型仿生人，没完没了。' },
     factions: ['law'], soldier: 'baton',

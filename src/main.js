@@ -3,6 +3,7 @@
 
 import { greyedHair } from './aging.js';
 import { getLang, LANG_NAMES, onLangChange, SEP, t, tname, toggleLang, translatePage } from './i18n.js';
+import { uiIconHtml } from './uiicons.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { paintHealth, thinkAll } from './ai.js';
@@ -1457,7 +1458,7 @@ function renderHud() {
     const card = $(`#hud-${corner}`);
     // The sandbox shows each lead's fighting rating (roster.js: ∝ inferred K/D; Maximus is 100).
     const rating = state.game === 'sandbox' ? ratingOf(fighter.body.inputs) : null;
-    card.querySelector('.name').textContent = rating ? `${tname(fighter.body.inputs.name)} · ⚔ ${rating}` : tname(fighter.body.inputs.name);
+    card.querySelector('.name').textContent = rating ? `${tname(fighter.body.inputs.name)} · ${rating}` : tname(fighter.body.inputs.name);
     paintStamina(card.querySelector('.stamina'), fighter.stamina);
     const capacity = concussionCapacity(fighter);
     card.querySelector('.brain i').style.width = `${Math.min(100, Math.round((fighter.concussion / capacity) * 100))}%`;
@@ -1487,63 +1488,66 @@ function renderHud() {
   $('#clock').textContent = `${Math.floor(time / 60)}:${String(Math.floor(time % 60)).padStart(2, '0')}`;
 }
 
+// A fight-log line's drawn mark (uiicons.js), by name.
+const logIcon = (name) => uiIconHtml(name, 'glyph log-glyph');
+
 function logEvent(event) {
   const world = state.world;
   const name = (id) => shortName(world.fighters[id].body.inputs.name);
   // A rider's horse, or a robot dog by its own name (what it carries is bolted on: robotdogs.js).
   const steed = (event) => (world.horses?.[event.horse]?.spec?.robot && event.rider !== undefined ? `<b>${name(event.rider)}</b>` : event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'a horse');
-  const steedGlyph = (event) => (world.horses?.[event.horse]?.spec?.robot ? '🤖' : '🐎');
+  const steedGlyph = (event) => logIcon(world.horses?.[event.horse]?.spec?.robot ? 'robot' : 'horse');
   let text;
   if (event.kind === 'stopped') text = `<b>${name(event.fighter)}</b> cannot continue`;
-  else if (event.kind === 'knockout') text = `💥 <b>${name(event.fighter)}</b> is out cold · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'broken') text = `🦴 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'knockout') text = `${logIcon('burst')} <b>${name(event.fighter)}</b> is out cold · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'broken') text = `${logIcon('snapped')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'heavy') text = `<b>${name(event.attacker)}</b> loads up a heavy ${event.punch}`;
-  else if (event.kind === 'art') text = `✦ <b>${name(event.attacker)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'art') text = `${logIcon('spark')} <b>${name(event.attacker)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'focus') return;
   else if (event.kind === 'strategy') text = `<b>${name(event.fighter)}</b> switches to ${STRATEGIES[event.strategy]?.label ?? event.strategy}`;
-  else if (event.kind === 'accessory') text = `${event.icon} <b>${name(event.fighter)}</b>'s ${event.item} goes flying`;
-  else if (event.kind === 'dazed') text = `💫 <b>${name(event.fighter)}</b> is dazed · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'accessory') text = `${logIcon(event.icon)} <b>${name(event.fighter)}</b>'s ${event.item} goes flying`;
+  else if (event.kind === 'dazed') text = `${logIcon('down')} <b>${name(event.fighter)}</b> is dazed · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
-  else if (event.kind === 'severed') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'severed') text = `${logIcon('drop')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'loosed') return;
   // His arrows (bolts, charges) all spent, or more brought up to him (physics/ranged.js spendMissile).
-  else if (event.kind === 'quiverEmpty' || event.kind === 'ammoEmpty' || event.kind === 'resupplied') text = `${event.kind === 'resupplied' ? '📦' : '🏹'} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'arrow') text = `🏹 <b>${name(event.attacker)}</b> → <b>${name(event.defender)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'shot') text = `🔫 <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'generalFell') text = `👑 <b>${name(event.fighter)}</b>, the ${world.fighters[event.fighter].corner} general, has fallen`;
-  else if (event.kind === 'newGeneral') text = `👑 <b>${name(event.fighter)}</b> takes command`;
-  else if (event.kind === 'panic' || event.kind === 'rally') text = `${event.kind === 'panic' ? '😱' : '🔥'} <b>${name(event.fighter)}</b> ${event.effects.join(', ')}`;
-  else if (event.kind === 'staggered') text = `🌀 <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'killed') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'died') text = `☠️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'bledOut') text = `🩸 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'drowned') text = `🌊 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'disarmed' || event.kind === 'drew') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'quiverEmpty' || event.kind === 'ammoEmpty' || event.kind === 'resupplied') text = `${logIcon(event.kind === 'resupplied' ? 'crate' : 'bow')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'arrow') text = `${logIcon('bow')} <b>${name(event.attacker)}</b> → <b>${name(event.defender)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'shot') text = `${logIcon('gun')} <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'generalFell') text = `${logIcon('crown')} <b>${name(event.fighter)}</b>, the ${world.fighters[event.fighter].corner} general, has fallen`;
+  else if (event.kind === 'newGeneral') text = `${logIcon('crown')} <b>${name(event.fighter)}</b> takes command`;
+  else if (event.kind === 'panic' || event.kind === 'rally') text = `${logIcon(event.kind === 'panic' ? 'panic' : 'flame')} <b>${name(event.fighter)}</b> ${event.effects.join(', ')}`;
+  else if (event.kind === 'staggered') text = `${logIcon('reel')} <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'killed') text = `${logIcon('skull')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'died') text = `${logIcon('skull')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'bledOut') text = `${logIcon('drop')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'drowned') text = `${logIcon('wave')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'disarmed' || event.kind === 'drew') text = `${logIcon('blade')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
-  else if (event.kind === 'parry') text = `⚔️ <b>${name(event.fighter)}</b> parries <b>${name(event.attacker)}</b>'s ${event.punch} · <em>${event.effects.join(', ')}${event.answering ? ', cutting as he does' : ''}</em>`;
+  else if (event.kind === 'parry') text = `${logIcon('swords')} <b>${name(event.fighter)}</b> parries <b>${name(event.attacker)}</b>'s ${event.punch} · <em>${event.effects.join(', ')}${event.answering ? ', cutting as he does' : ''}</em>`;
   else if (event.kind === 'bladeBlock') text = `<b>${name(event.attacker)}</b> meets <b>${name(event.defender)}</b>'s ${event.punch ?? 'strike'} with the blade · <em>${event.effects.join(', ') || 'fended off'}</em>`;
-  else if (event.kind === 'pickup') text = `🗡️ <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'pickup') text = `${logIcon('blade')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'styleSwitch') text = `<b>${name(event.fighter)}</b> switches to ${STYLES[event.style].label}`;
   else if (event.kind === 'pinning') text = `<b>${name(event.attacker)}</b> goes to hold <b>${name(event.defender)}</b> down`;
-  else if (event.kind === 'held') text = `🤼 <b>${name(event.fighter)}</b> is held down`;
+  else if (event.kind === 'held') text = `${logIcon('hold')} <b>${name(event.fighter)}</b> is held down`;
   else if (event.kind === 'pinBroken') text = `<b>${name(event.fighter)}</b> breaks the hold`;
-  else if (event.kind === 'pinned') text = `🤼 <b>${name(event.fighter)}</b> held down · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'impact') text = `💥 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'pain') text = `😣 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'unhorsed') text = `🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'pinned') text = `${logIcon('hold')} <b>${name(event.fighter)}</b> held down · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'impact') text = `${logIcon('burst')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'pain') text = `${logIcon('wince')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'unhorsed') text = `${logIcon('horse')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'horseDown') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} goes down · <em>${event.effects.join(', ')}</em>`;
   // A robot dog's leg cut off (physics/mounted.js severMountLeg): its stump shorts out.
-  else if (event.kind === 'legSevered') text = `⚡ ${steed(event).replace(/^a /, 'A ')} · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'legSevered') text = `${logIcon('snapped')} ${steed(event).replace(/^a /, 'A ')} · <em>${event.effects.join(', ')}</em>`;
   else if (event.kind === 'horseHit') text = `${event.attacker < 0 ? `A ${event.weapon}` : `<b>${name(event.attacker)}</b>`} ${event.punch ?? (event.weapon === 'stake' ? 'meets' : 'hits')} → ${steed(event)} (${event.target}) · ${event.speed === undefined ? '' : `${event.speed.toFixed(1)} m/s · `}${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
   else if (event.kind === 'horseCrash') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} · ${event.speed.toFixed(1)} m/s · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'trampled') text =`🐎 <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'trampled') text =`${logIcon('horse')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
   // A man's foot on one on the floor (physics.js footDown): logged when it did something.
   else if (event.kind === 'trodden') {
     if (!event.flattened && !event.harmed && !event.fell && !event.effects.includes('stumbles')) return;
     text = `<b>${name(event.attacker)}</b> treads on <b>${name(event.defender)}</b> (${event.part}) · <em>${event.effects.join(', ')}</em>`;
   }
-  else if (event.kind === 'crash') text = `💥 <b>${name(event.defender)}</b> crashed into${event.attacker === undefined ? '' : ` by <b>${name(event.attacker)}</b>`} (${event.target}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J · ${(event.force / 1000).toFixed(1)} kN${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
+  else if (event.kind === 'crash') text = `${logIcon('burst')} <b>${name(event.defender)}</b> crashed into${event.attacker === undefined ? '' : ` by <b>${name(event.attacker)}</b>`} (${event.target}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J · ${(event.force / 1000).toFixed(1)} kN${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
   else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
   // A strike's line needs its numbers; anything else without a line of its own is not logged.
   else if (event.attacker === undefined || event.speed === undefined || event.impulse === undefined || event.force === undefined || !event.effects) return;
@@ -2253,7 +2257,7 @@ function fillHelmOptions(select) {
   select.replaceChildren(keyedOption('builder.helmOwn', 'own'), keyedOption('builder.noHelmet', 'none'), ...FACTION_KEYS.map((faction) => {
     const group = helms.filter((helm) => helm.faction === faction);
     if (!group.length) return null;
-    const optgroup = nameOption(FACTIONS[faction].label, '', { prefix: `${FACTIONS[faction].glyph} `, group: true });
+    const optgroup = nameOption(FACTIONS[faction].label, '', { group: true });
     optgroup.append(...group.map((helm) => nameOption(helm.name, helm.key, { suffix: ` (${helm.kg.toFixed(1)} kg)` })));
     return optgroup;
   }).filter(Boolean));
@@ -2274,7 +2278,7 @@ function fieldOption(field, option) {
 function fillSetOptions(select) {
   const sets = pickableSets();
   select.replaceChildren(...FACTION_KEYS.map((faction) => {
-    const group = nameOption(FACTIONS[faction].label, '', { prefix: `${FACTIONS[faction].glyph} `, group: true });
+    const group = nameOption(FACTIONS[faction].label, '', { group: true });
     group.append(...sets.filter((set) => set.faction === faction).map((set) => nameOption(set.name, `${set.kind}/${set.key}`)));
     return group;
   }).filter((group) => group.children.length));
@@ -2338,7 +2342,7 @@ function fillMemberPicker(corner) {
   const picker = $(`#build-${corner} .member`);
   const size = state.teamSizes[corner];
   picker.closest('label').hidden = size < 2;
-  picker.replaceChildren(...state.rosters[corner].slice(0, size).map((fighter, index) => new Option(`${index + 1} · ${isMounted(fighter) ? '🐎 ' : ''}${tname(fighter.name)}${index === 0 ? t('builder.lead') : ''}`, String(index))));
+  picker.replaceChildren(...state.rosters[corner].slice(0, size).map((fighter, index) => new Option(`${index + 1} · ${tname(fighter.name)}${isMounted(fighter) ? t('unit.mounted') : ''}${index === 0 ? t('builder.lead') : ''}`, String(index))));
   picker.value = String(state.editing[corner]);
 }
 
@@ -2355,7 +2359,7 @@ function buildCornerForm(corner) {
   const characters = builderCharacters();
   const levelGroup = corner === 'hero' ? [{ group: 'level', option: keyedOption('builder.dunnottarCast', 'level') }] : [];
   groupSelect.replaceChildren(...levelGroup.map((each) => each.option), ...FACTION_KEYS.filter((faction) => characters.some((character) => character.faction === faction))
-    .map((faction) => nameOption(FACTIONS[faction].label, faction, { prefix: `${FACTIONS[faction].glyph} ` })));
+    .map((faction) => nameOption(FACTIONS[faction].label, faction)));
   const membersOf = (group) => (group === 'level'
     ? Object.entries(LEVEL_PRESETS).map(([key, preset]) => ({ key: `level:${key}`, name: preset.name }))
     : characters.filter((character) => character.faction === group));

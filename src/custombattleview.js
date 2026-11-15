@@ -22,7 +22,7 @@ function sideLine(battle, corner) {
   const counts = Object.entries(customCounts(battle.sides[corner])).sort((a, b) => b[1] - a[1]);
   const named = counts.map(([id, count]) => {
     const unit = level.units[corner].find((each) => each.id === id);
-    return `${count} ${unit.mounted ? '🐎 ' : ''}${String(unit.label).split(SEP).map(tname).join(SEP)}`;
+    return `${count} ${String(unit.label).split(SEP).map(tname).join(SEP)}${unit.mounted ? t('unit.mounted') : ''}`;
   });
   return t('battle.sideLine', { n: battle.sides[corner].men.length, named: named.length ? ` · ${named.join(getLang() === 'zh' ? '、' : ', ')}` : '' });
 }
@@ -54,7 +54,7 @@ export function customBattleScreen(root, { onBack, onFight, storage = globalThis
       const card = customEl('button', {
         type: 'button', role: 'radio', className: `custom-map${battle.map === key ? ' on' : ''}`, ariaChecked: String(battle.map === key),
         onclick: () => { battle = changeBattle(battle, { map: key }); keep(); picker(); },
-      }, map.icon ? uiIcon(map.icon) : customEl('span', { className: 'glyph', textContent: map.glyph, ariaHidden: 'true' }), customEl('b', { textContent: tname(map.label) }));
+      }, uiIcon(map.icon), customEl('b', { textContent: tname(map.label) }));
       return addBattleThumb(card, `map-${key}`);
     }));
     // The ground's own weathers, its default first: picked beside the ground, shown only where it has more than one.
@@ -71,7 +71,7 @@ export function customBattleScreen(root, { onBack, onFight, storage = globalThis
       customEl('div', { className: 'custom-factions', role: 'radiogroup', ariaLabel: t('battle.faction', { side: t(`muster.${corner}`) }) }, ...factions.map((faction) => customEl('button', {
         type: 'button', role: 'radio', className: `custom-faction${battle.factions[corner] === faction.key ? ' on' : ''}`, ariaChecked: String(battle.factions[corner] === faction.key),
         onclick: () => { battle = changeBattle(battle, { factions: { [corner]: faction.key } }); keep(); picker(); },
-      }, customEl('i', { textContent: faction.glyph, ariaHidden: 'true' }), customEl('span', { textContent: tname(faction.label) })))),
+      }, customEl('i', { ariaHidden: 'true' }, uiIcon(faction.glyph)), customEl('span', { textContent: tname(faction.label) })))),
       customEl('p', { className: 'custom-line', textContent: sideLine(battle, corner) }));
     const foot = customEl('div', { className: 'custom-foot' },
       customEl('button', { type: 'button', className: 'custom-quick', textContent: t('battle.fightAsIs'), disabled: !battle.sides.red.men.length || !battle.sides.blue.men.length, onclick: () => onFight(customSetup(battle)) }),

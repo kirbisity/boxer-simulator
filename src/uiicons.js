@@ -149,10 +149,57 @@ const UI_ICON_PATHS = {
   cap: '<path d="M5.5 15a6.5 6.5 0 0 1 13 0v1.5h-13z"/><path d="M4 20h16"/><path d="M12 4v2.2M6.2 6l1.3 1.7M17.8 6l-1.3 1.7"/>',
   // Drowned: water.
   wave: '<path d="M2.5 9.5c2.2-3 4.3-3 6.5 0s4.3 3 6.5 0 4.3-3 6 0M2.5 15.5c2.2-3 4.3-3 6.5 0s4.3 3 6.5 0 4.3-3 6 0"/>',
+
+  // ---- Grounds of the custom battle (custombattle.js) ----
+  // The plain: two hills.
+  hills: '<path d="M2.5 19h19"/><path d="M3 19c2-5 4-7.5 6.5-7.5S14 14 15.5 19"/><path d="M11.5 14.5c1.6-3 3.4-4.5 5.3-4.5 2.4 0 4 3 4.7 9"/>',
+  // A meadow: a flower.
+  flower: '<circle cx="12" cy="8.2" r="1.6"/><path d="M12 6.6c-1.8-2.4-.4-4.1 0-4.1s1.8 1.7 0 4.1M13.6 8.2c2.4-1.8 4.1-.4 4.1 0s-1.7 1.8-4.1 0M10.4 8.2c-2.4-1.8-4.1-.4-4.1 0s1.7 1.8 4.1 0M12 9.8c-1.8 2.4-.4 4.1 0 4.1s1.8-1.7 0-4.1"/><path d="M12 14v7M12 18.5c-2.4 0-3.8-1.3-3.8-3.3 2.4 0 3.8 1.3 3.8 3.3z"/>',
+  // The Sengoku valley: a keep of stacked roofs.
+  tenshu: '<path d="M12 2.5v1.5M8 7c2-.3 3.2-1.3 4-3 .8 1.7 2 2.7 4 3M9.5 7v3M14.5 7v3M5.5 13c2.8-.4 4.5-1.6 5.3-3h2.4c.8 1.4 2.5 2.6 5.3 3M7.5 13v3.5M16.5 13v3.5M5 16.5h14l1.5 4.5h-17z"/>',
+  // Hills of Sarhu: a peak with its snow line.
+  mountain: '<path d="M2.5 20L9 8l3.5 6 2.5-4 6.5 10z"/><path d="M6.6 12.4l1.6 1.2 1.6-1.3 1.4 1.1"/>',
+  // A market town: two gabled houses.
+  houses: '<path d="M3 21h18M4.5 21v-8l4.5-4 4.5 4v8M13.5 13.5l3.25-3 3.25 3V21M7.5 21v-4h3v4M15.5 16h2.5"/>',
+  // The water town: a covered boat and its oar.
+  boat: '<path d="M2.5 15h19c-1 3-3 4.5-6 4.5h-7c-3 0-5-1.5-6-4.5z"/><path d="M8 15v-4.5c2.5-1.3 5.5-1.3 8 0V15M19.5 3.5l-3.5 11.5"/>',
+  // The Catalaunian plains: tufts of grass.
+  grass: '<path d="M3 20h18M6.5 20c0-4-1-7-2.5-9M6.5 20c.5-4 2-7 4.5-9M12 20c0-5-.7-9-2-12M12 20c.3-4 1.5-7.5 3.5-10M17.5 20c0-4 .8-6.5 2.5-8.5M17.5 20c-.3-3-1.3-5.5-3-7"/>',
+  // The desert: dunes under the sun.
+  dunes: '<path d="M2.5 18c3-4 6-6 9.5-6 3 0 5.5 2 9.5 6"/><path d="M2.5 21h19M13.5 12.4c1.7-2.3 3.6-3.4 5.8-3.4"/><circle cx="7" cy="6" r="2"/>',
+  // The Cerignola slope: a bunch of grapes.
+  grapes: '<path d="M12 6.2V3M12 4.6c1.4-1.7 3.5-2 5.3-1-.6 2.1-2.4 3-5.3 2.4"/><circle cx="8.5" cy="8.4" r="1.9"/><circle cx="12" cy="8.4" r="1.9"/><circle cx="15.5" cy="8.4" r="1.9"/><circle cx="10.2" cy="12" r="1.9"/><circle cx="13.8" cy="12" r="1.9"/><circle cx="12" cy="15.6" r="1.9"/>',
+  // A coast village: a thatched hut.
+  hut: '<path d="M2.5 13.5L12 4l9.5 9.5"/><path d="M5 11.5V21h14v-9.5M10 21v-5h4v5M8.5 7.5l-2.5 4M15.5 7.5l2.5 4"/>',
+  // The subway: a carriage seen head on.
+  train: '<rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 10.5h12M9.5 6h5M9 13.8h.01M15 13.8h.01M8.5 17l-2.5 4M15.5 17l2.5 4M7.2 19h9.6"/>',
+  // The stadium: an oval of tiers.
+  arena: '<ellipse cx="12" cy="9" rx="9" ry="3.5"/><path d="M3 9v6.5c0 1.9 4 3.5 9 3.5s9-1.6 9-3.5V9M7 12.3v6M12 12.5v6.5M17 12.3v6"/>',
+
+  // ---- What comes off a head (outfits.js accessories, physics.js) ----
+  // A hat with a brim (a boonie, a kasa, a head wrap).
+  hat: '<path d="M3 16.5c0 1.4 4 2.5 9 2.5s9-1.1 9-2.5c0-1-1.6-1.8-4-2.3"/><path d="M7 14.2C7 9 8.5 6 12 6s5 3 5 8.2c-1.4.6-3 .8-5 .8s-3.6-.2-5-.8z"/>',
+  // A plume: a feather.
+  plume: '<path d="M5.5 21C8.5 15 12 10 18.5 3.5c-1 6.5-4.2 11.4-10 13.4"/><path d="M9.3 15.6c-.9-2.8.3-6 3.2-8.8M11.4 13.2l3.3-.4M13.6 10l2.9-.5"/>',
+  // A helmet's crest: horns over the bowl.
+  crest: '<path d="M6 20a6 6 0 0 1 12 0z"/><path d="M12 14v-3M12 11C8.5 11 6 8 5.5 3.5 8 6 10 8 12 11zM12 11c3.5 0 6-3 6.5-7.5C16 6 14 8 12 11z"/>',
+  // A helmet.
+  helmet: '<path d="M4 16.5a8 8 0 0 1 16 0z"/><path d="M2.5 16.5h19v2.5h-19zM12 8.5v8"/>',
+
+  // ---- Small marks ----
+  // More about it: an i in a ring.
+  info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8h.01"/>',
+  // As the level has it: a star.
+  star: '<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/>',
+  // The formations (muster.js): men as dots.
+  line: '<path stroke-width="2.6" d="M4 10h.01M7.2 10h.01M10.4 10h.01M13.6 10h.01M16.8 10h.01M20 10h.01M4 14h.01M7.2 14h.01M10.4 14h.01M13.6 14h.01M16.8 14h.01M20 14h.01"/>',
+  block: '<path stroke-width="2.6" d="M6 6h.01M10 6h.01M14 6h.01M18 6h.01M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M10 14h.01M14 14h.01M18 14h.01M6 18h.01M10 18h.01M14 18h.01M18 18h.01"/>',
+  wedge: '<path stroke-width="2.6" d="M12 5h.01M9.5 9.5h.01M12 9.5h.01M14.5 9.5h.01M7 14h.01M9.5 14h.01M12 14h.01M14.5 14h.01M17 14h.01M4.5 18.5h.01M7 18.5h.01M9.5 18.5h.01M12 18.5h.01M14.5 18.5h.01M17 18.5h.01M19.5 18.5h.01"/>',
+  skirmish: '<path stroke-width="2.6" d="M4 6h.01M11 6h.01M18 6h.01M7.5 12h.01M14.5 12h.01M21 12h.01M4 18h.01M11 18h.01M18 18h.01"/>',
 };
 
-// TRANSITION (removed once every label names its icon): the pictures the words still open with, and the drawing each one has.
-const LEGACY = { '🏆': 'trophy', '📜': 'book', '🗺': 'banner', '🏰': 'castle', '🛡': 'shield', '☠': 'skull', '⚡': 'bolt', '🧪': 'flask', '🥊': 'glove', '⚔': 'swords', '🎯': 'target', '🔒': 'lock', '☰': 'menu', '⚙': 'cog', '▶': 'play', '🎮': 'pad', '👁': 'eye', '👻': 'ghost', '🧍': 'figure', '🎲': 'die', '🎥': 'camera', '🏹': 'bow', '🗡': 'blade', '⛩': 'torii', '🚓': 'beacon', '💥': 'burst', '💫': 'down', '🦴': 'snapped', '🩸': 'drop', '🌀': 'reel', '😱': 'panic', '🔥': 'flame', '💢': 'rage', '🤼': 'hold', '🎧': 'cap' };
+// The one mark a label's words may still open with ("▶ Start battle"), and its drawing: every other label names its icon.
+const LEGACY = { '▶': 'play' };
 
 /** The names drawn (a sheet of them, a test). */
 export const UI_ICON_NAMES = Object.keys(UI_ICON_PATHS);
@@ -227,7 +274,7 @@ export function dressIcons(root = globalThis.document?.body) {
 }
 
 // TRANSITION: a label that still opens with a picture, dressed as before.
-const LEADING_GLYPH = /^\s*((?:[\u{1F300}-\u{1FAFF}]|[☀-➿]|▶)️?)(?:\s+|$)/u;
+const LEADING_GLYPH = /^\s*((?:[\u{1F300}-\u{1FAFF}]|[\u2600-\u27BF]|▶)️?)(?:\s+|$)/u;
 export function dressLabels(root = globalThis.document?.body, selector = 'button, [data-glyph-label]') {
   if (typeof root?.querySelectorAll !== 'function') return;
   dressIcons(root);

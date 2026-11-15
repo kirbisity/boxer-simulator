@@ -153,7 +153,7 @@ export function lastStandLevel(mode, men) {
   const zone = lastGateZone();
   const across = arena.halfZ - LAST_GATE.zone.edge;
   return {
-    title: `${spec.glyph} ${tname(spec.title)}`,
+    title: tname(spec.title),
     place: 'The gate',
     scene: LAST_GATE.place,
     arena: { halfX: arena.halfX, halfZ: arena.halfZ },

@@ -10,11 +10,13 @@ import { LAST_GATE, LAST_GATE_MODES, lastGateClock, lastGatePosterWords, lastGat
 import { FACTIONS } from './outfits.js';
 import { readSquad, SQUAD, squadCanAdd, squadSpent, squadStep, squadUnits, writeSquad } from './squad.js';
 import { getLang, onLangChange, pick, SEP, t, tname } from './i18n.js';
+import { uiIcon, withIcon } from './uiicons.js';
 
-const lgEl = (tag, props = {}, ...children) => {
+// (`icon`: the name of the drawn icon in front of its words, uiicons.js.)
+const lgEl = (tag, { icon, ...props } = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children.filter((child) => child !== null && child !== undefined));
-  return node;
+  return icon ? withIcon(node, icon) : node;
 };
 
 // How long (ms) a word in the middle stays.
@@ -22,8 +24,8 @@ const LAST_GATE_TOAST_MS = 1800;
 
 /** A line of names kept English in the data ("Ashigaru · Yari"), each part in the language in force. */
 const lgWords = (line) => String(line ?? '').split(SEP).map(tname).join(SEP);
-/** A faction's name with its glyph, as a group's heading. */
-const lgFaction = (faction) => `${FACTIONS[faction]?.glyph ?? ''} ${tname(FACTIONS[faction]?.label ?? faction)}`;
+/** A faction's name, as a group's heading (its drawn icon is the heading's: `group`). */
+const lgFaction = (faction) => tname(FACTIONS[faction]?.label ?? faction);
 
 /** A rating's stars as text: ★ for each, ☆ to five. */
 const lgStars = (count) => `${'★'.repeat(count)}${'☆'.repeat(Math.max(0, 5 - count))}`;
@@ -144,7 +146,7 @@ export function createLastGateView(root) {
         score,
         note, fallback,
         lgEl('div', { className: 'lg-actions' },
-          lgEl('button', { type: 'button', textContent: '☰', title: t('squad.menu'), ariaLabel: t('squad.menu'), onclick: menu }),
+          lgEl('button', { type: 'button', icon: 'menu', title: t('squad.menu'), ariaLabel: t('squad.menu'), onclick: menu }),
           squad ? lgEl('button', { type: 'button', className: 'lg-squad', textContent: t('squad.squad'), title: t('squad.squadTip'), onclick: squad }) : null,
           lgEl('button', { type: 'button', className: 'lg-share', textContent: t('squad.share'), onclick: share }),
           lgEl('button', { type: 'button', className: 'primary', textContent: t('squad.again'), onclick: again })),
@@ -198,7 +200,7 @@ export function lastStandBuilder(root, options) {
   const head = lgEl('header', { className: 'screen-head' },
     lgEl('button', { className: 'back', type: 'button', textContent: t('common.back'), onclick: onBack }),
     lgEl('div', { className: 'titles' },
-      lgEl('h1', { textContent: `${spec.glyph} ${tname(spec.title)}` }),
+      lgEl('h1', { icon: spec.glyph, textContent: tname(spec.title) }),
       lgEl('p', { className: 'lede', textContent: t('squad.lede', { level: spec.level, region: tname(spec.region), budget: SQUAD.budget, most: SQUAD.most }) })));
   const look = lgEl('img', { alt: '', draggable: false });
   portrait?.then((url) => { look.src = url; });
@@ -222,7 +224,7 @@ export function lastStandBuilder(root, options) {
       const name = lgWords(unit.label);
       return lgEl('div', { className: `ls-unit${count ? ' on' : ''}` },
         lgEl('span', { className: 'ls-unit-words' },
-          lgEl('b', { textContent: `${name}${unit.shoots ? ' 🏹' : ''}` }),
+          lgEl('b', { textContent: name }, unit.shoots ? uiIcon('bow', 'glyph trail-glyph') : null),
           lgEl('span', { className: 'ls-stars', title: t('squad.stars', { n: unit.stars }), textContent: lgStars(unit.stars) }),
           lgEl('small', { textContent: lgWords(unit.line) })),
         lgEl('span', { className: 'ls-cost', title: t('squad.priceTip') }, lgEl('b', { textContent: String(unit.cost) }), t('squad.pts')),
@@ -230,10 +232,10 @@ export function lastStandBuilder(root, options) {
         lgEl('b', { className: 'ls-count', textContent: String(count) }),
         lgEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: t('squad.more', { unit: name }), disabled: !squadCanAdd(units, picks, unit.key), onclick: () => { picks = squadStep(units, picks, unit.key, 1); changed(); } }));
     };
-    const group = (label, members) => (members.length ? [lgEl('h3', { className: 'ls-group', textContent: label }), ...members.map(row)] : []);
-    const own = spec.factions.flatMap((faction) => group(lgFaction(faction), units.filter((unit) => unit.faction === faction)));
+    const group = (faction, members) => (members.length ? [lgEl('h3', { className: 'ls-group', icon: FACTIONS[faction]?.glyph, textContent: lgFaction(faction) }), ...members.map(row)] : []);
+    const own = spec.factions.flatMap((faction) => group(faction, units.filter((unit) => unit.faction === faction)));
     const toggle = lgEl('button', { type: 'button', className: 'ls-others', textContent: others ? t('squad.mercsOpen') : t('squad.mercsShut'), ariaExpanded: String(others), onclick: () => { others = !others; draw(); } });
-    const rest = others ? Object.keys(FACTIONS).filter((faction) => !spec.factions.includes(faction)).flatMap((faction) => group(lgFaction(faction), units.filter((unit) => unit.faction === faction))) : [];
+    const rest = others ? Object.keys(FACTIONS).filter((faction) => !spec.factions.includes(faction)).flatMap((faction) => group(faction, units.filter((unit) => unit.faction === faction))) : [];
     const scroll = list.scrollTop;
     list.replaceChildren(...own, toggle, ...rest);
     list.scrollTop = scroll;

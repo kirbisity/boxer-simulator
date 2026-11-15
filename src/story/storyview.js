@@ -21,6 +21,7 @@ import { createChapterRun, storyAnswer, storyBattleDone, storyBattleOver, storyB
 import { knockOut } from '../physics.js';
 import { STORY_DEPLOY_WORDS, storyDeployPostsIn } from './deploy.js';
 import { storyLooseHorse } from './remount.js';
+import { uiIcon } from '../uiicons.js';
 import { P } from '../body.js';
 import { createScenePlay, layDead, poseSetFigures, sceneFocus, sceneHeld, sceneClearYaw, sceneLook, sceneThink, setFocus, skipSceneLine, stageSetFigures, stepScene } from './scenes/stage.js';
 import { storySetSetup, STORY_SETS } from './scenes/sets.js';
@@ -596,12 +597,12 @@ export function installStory(hooks) {
     const loose = storyLooseHorse(world, world.fighters[fight.setup.player]);
     const node = fight.horseNode;
     fight.horseReady = Boolean(loose?.ready);
-    const text = !loose ? null : loose.ready ? `🐎 ${word('horseMount')}` : `🐎 ${word('horseNear', wayWord(loose.toHorse), Math.round(loose.distance))}`;
+    const text = !loose ? null : loose.ready ? word('horseMount') : word('horseNear', wayWord(loose.toHorse), Math.round(loose.distance));
     if (text === fight.horseText) return;
     fight.horseText = text;
     node.hidden = !text;
     node.classList.toggle('ready', fight.horseReady);
-    node.replaceChildren(text ?? '', ...(fight.horseReady ? [svEl('kbd', { textContent: '/' })] : []));
+    node.replaceChildren(...(text ? [uiIcon('horse', 'glyph label-glyph')] : []), text ?? '', ...(fight.horseReady ? [svEl('kbd', { textContent: '/' })] : []));
   }
 
   function endBattle(world = hooks.world()) {

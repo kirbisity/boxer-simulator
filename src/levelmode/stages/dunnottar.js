@@ -504,9 +504,9 @@ function dnSlabHoles(sec, [x0, x1, z0, z1], holes, top, style, opts = {}) {
 //   z -7                 │ stair-    │       │ ▲ iron-gate     │            │   │
 //        stair-house ▲   │ house     ▼ alley ▼ stair head      ▼ door       │   │
 //   z -6.8 ──────────────┴───────────┴───── M band (7 m): west ← ... ← Well, Rest 2 ... ←─┤ junction
-//   z  0.3    plaza / pocket ◄─── M band                     ───────────────────────────────┤
+//   z  0.3    plaza / pocket <─── M band                     ───────────────────────────────┤
 //   z  0.8 ───────────────┬── separator wall ─────────────────────────────────────────────  ┤
-//   z  1.3    (pocket)    │   S band (4.7 m): the tunnel's mouth (x 14.3..19.7) ... east ───►┘ connector
+//   z  1.3    (pocket)    │   S band (4.7 m): the tunnel's mouth (x 14.3..19.7) ... east ───>┘ connector
 //   z  6.8 ───────────────┴──────────────── south wall ───────── (arch at x 17) ──────────────
 //
 // From the tunnel's mouth the only way is east along the south band to the junction at the east wall; there it turns west along the middle band (the Well, Rest 2, the

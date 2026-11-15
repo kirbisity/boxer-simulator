@@ -6418,7 +6418,7 @@ function knockHelmetOff(world, fighter, event) {
   launchProp(world, fighter, prop, event, event.headDeltaV, `${name} knocked off`, { item: name, icon: HELMET_ICON, helmet: true, hold: slip.hold });
 }
 
-const HELMET_ICON = '🪖';
+const HELMET_ICON = 'helmet';
 // How high a helmet's middle (the head's, as it was worn) stands off the floor it lies on (m).
 const HELMET_PROP_RADIUS = 0.05;
 

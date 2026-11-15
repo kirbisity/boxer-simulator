@@ -1,7 +1,8 @@
 // A choice's details in a pop-up over the screen (its armour card, its description), so the choices themselves stay small:
-// opened by the ⓘ on the choice, a right-click or a long press on it; closed by a tap outside, the ✕ or Escape.
+// opened by the info button on the choice, a right-click or a long press on it; closed by a tap outside, the ✕ or Escape.
 
 import { t } from './i18n.js';
+import { uiIcon } from './uiicons.js';
 
 // How long a finger rests on a choice before its details open (ms), and how far it may drift and still count (px).
 const INFO_POP = { holdMs: 480, slopPx: 10 };
@@ -39,9 +40,11 @@ export function openInfoPop(content, { label = t('cards.details'), onClose = nul
   return close;
 }
 
-/** The small ⓘ button that opens a choice's details (`open`), never the choice itself. */
+/** The small info button that opens a choice's details (`open`), never the choice itself. */
 export function infoButton(open, label = t('cards.details')) {
-  const button = Object.assign(document.createElement('button'), { type: 'button', className: 'info-btn', textContent: 'i', title: label, ariaLabel: label });
+  const button = Object.assign(document.createElement('button'), { type: 'button', className: 'info-btn', title: label, ariaLabel: label });
+  const drawn = uiIcon('info');
+  if (drawn) button.append(drawn); else button.textContent = 'i';
   button.addEventListener('click', (click) => { click.stopPropagation(); open(); });
   return button;
 }
@@ -82,7 +85,7 @@ export function holdForInfo(element, open) {
   }, true);
 }
 
-/** A choice with its details a tap away: `choice` (the button that picks) wrapped with its ⓘ, both opening `details()`. */
+/** A choice with its details a tap away: `choice` (the button that picks) wrapped with its info button, both opening `details()`. */
 export function withInfo(choice, details, label) {
   const open = () => openInfoPop(details(), { label });
   holdForInfo(choice, open);
