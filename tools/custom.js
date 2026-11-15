@@ -85,6 +85,10 @@ export const PYONGYANG_LIGHT = { background: 0xd3dbe2, fog: [150, 1500], far: 24
 export function buildPyongyang() {
   return new THREE.Group();
 }
+export function pyongyangPlan() {
+  return null;
+}
+pyongyangPlan.absent = true;
 `,
   'places/storyplaces': `
 export const STORY_PLACES = {};

@@ -122,6 +122,10 @@ test('the walls of Pyongyang: the battle\'s own wall, both sides drawn up before
   const walls = level.arena.works.walls[0].points;
   assert.equal(walls[0][0], PYONGYANG_1593.wall.x);
   assert.equal(level.arena.works.ditches[0].profile[1][1], PYONGYANG_1593.wall.height);
+  // The ground under it is the place's own field, as the battle's is (feet land where the place draws it).
+  const { pyongyangPlan } = await import('../src/places/pyongyang.js');
+  assert.equal(level.arena.works.ground[0], pyongyangPlan().outside);
+  assert.equal(level.arena.works.placeDraws, true);
   for (const corner of ['red', 'blue']) for (const man of battle.sides[corner].men) assert.ok(man.at[0] < PYONGYANG_1593.wall.x - 5, `${corner} stands before the wall (${man.at})`);
   const weathers = customWeathersOf('pyongyang');
   assert.deepEqual(weathers.map((weather) => weather.key).sort(), Object.keys(PYONGYANG_WEATHER).sort());

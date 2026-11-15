@@ -13,6 +13,7 @@ import { drawUp, intoZone, MUSTER } from './muster.js';
 import { tname } from './i18n.js';
 import { SUBWAY_ARENA } from './props/subway.js';
 import { wallWorks } from './story/ground/walls.js';
+import { pyongyangPlan } from './places/pyongyang.js';
 
 export const CUSTOM_BATTLE = {
   // Its key where a level's would be (main.js state.scenario; the menu's card).
@@ -57,6 +58,9 @@ export const CUSTOM_BATTLE = {
   // A first visit: knights against samurai on the open field, the first kinds of each (the roster's most armoured first).
   first: { map: 'field', factions: { red: 'knights', blue: 'japanese' }, kinds: 3, each: 4 },
 };
+
+// (Where the place is not on the page, the custom test page's stand-in says so: its ground is not offered.)
+if (pyongyangPlan.absent) delete CUSTOM_BATTLE.maps.pyongyang;
 
 const CUSTOM_CORNERS = ['red', 'blue'];
 
@@ -107,7 +111,8 @@ function customPyongyang() {
   const zone = (from, to) => ({ x: [wall.x - from, wall.x - to], z: [-halfZ + 1, halfZ - 1] });
   return {
     label: 'Walls of Pyongyang', icon: 'castle',
-    arena: { halfX: 70, halfZ, works: { ...works, placeDraws: true } },
+    // (The battle's own ground under it, as chapter 3's: the place's field outside the wall, so feet land where it is drawn.)
+    arena: { halfX: 70, halfZ, works: { ...works, ground: [pyongyangPlan().outside], placeDraws: true } },
     zones: { red: zone(67, 37), blue: zone(31, 7) },
     middle: wall.x - 34,
     camera: { yaw: -0.9, pitch: 0.38, distance: 22, maxDistance: 30 },
