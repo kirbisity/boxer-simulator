@@ -157,7 +157,9 @@ export const ENV = {
     // bleached a pale face under overcast (its middle at 0.78 of the display). This is the fill while an open-air
     // place is shown: by eye against close-ups under clear sky and overcast, between a pale face bleaching under
     // overcast (above) and a face turned from a clear sun going grey, a man's eye sockets a brown band (below).
-    faceFill: 1.5,
+    // 1 since the body's skin is lit as the face is (photoface.js PHOTO_FACES.fill, skinScatter): at 1.5 the face stood
+    // 1.4 times as bright as the chest under it in the field.
+    faceFill: 1,
     // The exposure is metered as a camera does it (post.js envMeter), off what the view holds: the land (a grey
     // card's worth of the light falling on level ground, sun x sin elevation + sky, as luminance) and, through
     // thick air, the haze's own light the way the camera looks, by the share of a sight line `view` m long that

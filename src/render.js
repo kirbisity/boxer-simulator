@@ -35,7 +35,7 @@ import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } 
 import { buildAirPack, buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
 import { HELM_HEAD_BREADTH, HELM_SPAN } from './helmforms.js';
-import { photoFaceFor } from './photoface.js';
+import { photoFaceFor, skinScatter } from './photoface.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, HEAD_VARIANT, onlyVariant, simplifyTemplate, stretchedInverses, withoutVariant } from './crowdview.js';
@@ -2015,6 +2015,8 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
   if (!material && built.skinMaps) {
     dressedSkin.userData.fullMaps = { normalMap: dressedSkin.normalMap, roughnessMap: dressedSkin.roughnessMap, roughness: dressedSkin.roughness };
     skinForTier(dressedSkin);
+    // (Lit as the photo head is, so the neck and the face match.)
+    skinScatter(dressedSkin);
   }
   // Loose cloth swings behind his bones and in the wind (clothsway.js): one swing for the man, kept with his bones.
   if (built.sway) swayCloth(dressedSkin, (bones.swing ??= new ClothSwing(bones.length)));

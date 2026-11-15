@@ -37,12 +37,17 @@ export const PHOTO_FACES = {
   // How much a fighter varies: the second region's share of his face, his skin's brightness and warmth, his face's width and
   // the height of his eyes and mouth (atlas rows).
   vary: { blend: [0.15, 0.45], bright: 0.06, warm: 0.03, width: 0.06, eyeRow: 0.008, mouthRow: 0.012, region: 0.8, shape: 0.25, measured: 0.35 },
-  // The face's ambient light, scaled: a fill, so a face under an overhead key is not darker and muddier than the chest beside it.
-  fill: 1.8,
+  // The face's ambient light, scaled (setPhotoFill, env config.js faceFill). 1: the head is lit as the body is. At 1.8
+  // (and the open air's 1.5), with the scatter below on the head alone, a head stood paler and warmer than the neck under
+  // it: the albedos at the join are the same (lowest eighth of the head against the neck's top, a man and a woman of BMI
+  // 22: within 1 % in red, 3 to 4 % in green and blue), so the difference was all light; the face 1.4 times the chest's
+  // brightness in the field at 1.5, within 6 % with the fill at 1 and the scatter on both.
+  fill: 1,
   // Skin lets a light through it: the sun's light reaches this far past where a surface turns from it (as a share of the
   // turn: lit to a cosine of -scatter), the whole no brighter for it (the lit side gives up what the turned side gains).
   // Approximate, set by eye against the men's brow: its underside, turned just past the sun (the sockets are 8 to 9 mm
-  // deep under it), was a fifth of the cheek's light and a brown mask over the eyes; it is a third of it at 0.5.
+  // deep under it), was a fifth of the cheek's light and a brown mask over the eyes; it is a third of it at 0.5. The same
+  // light on the body's skin (skinScatter): skin is one tissue, and on the head alone it warmed the face turned from the sun.
   scatter: 0.5,
   normalScale: 1,
 };
@@ -291,9 +296,7 @@ export function photoSkinMaterial(cast, { painted = false, hair: hairColour = nu
 	mapN.xy += ( texture2D( facePores, vUv * vec2( 40.0, 20.0 ) ).xy * 2.0 - 1.0 ) * 0.5 * faceMask.a;
 	float scalpN = faceScalp( vUv );
 	mapN.x += ( faceNoise( vec2( vUv.x * 900.0, ( 1.0 - vUv.y ) * 45.0 + faceHairSeed ) ) - 0.5 ) * 1.2 * scalpN;`);
-  const scatter = PHOTO_FACES.scatter.toFixed(3);
-  const lights = THREE.ShaderChunk.lights_physical_pars_fragment.replace('irradiance * BRDF_Diffuse_Lambert( material.diffuseColor )',
-    `( PI * directLight.color * saturate( ( dot( geometry.normal, directLight.direction ) + ${scatter} ) / ( ( 1.0 + ${scatter} ) * ( 1.0 + ${scatter} ) ) ) ) * BRDF_Diffuse_Lambert( material.diffuseColor )`);
+  const lights = scatteredLights();
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.fragmentShader = shader.fragmentShader
@@ -342,6 +345,34 @@ diffuseColor *= texelColor;`)
   material.userData.fill = uniforms.faceFill;
   material.userData.scalp = uniforms;
   material.userData.faceTextures = [uniforms.faceMap2.value, uniforms.faceDetail.value, uniforms.faceWrinkleMap.value, pores];
+  return material;
+}
+
+/** The physical material's direct light with the sun let a way through the skin (PHOTO_FACES.scatter): its shader chunk. */
+function scatteredLights() {
+  const scatter = PHOTO_FACES.scatter.toFixed(3);
+  return THREE.ShaderChunk.lights_physical_pars_fragment.replace('irradiance * BRDF_Diffuse_Lambert( material.diffuseColor )',
+    `( PI * directLight.color * saturate( ( dot( geometry.normal, directLight.direction ) + ${scatter} ) / ( ( 1.0 + ${scatter} ) * ( 1.0 + ${scatter} ) ) ) ) * BRDF_Diffuse_Lambert( material.diffuseColor )`);
+}
+
+/**
+ * The body's skin lit as the photo head is (PHOTO_FACES.scatter), so the two match across the neck: a standard material
+ * patched (once; its other patches kept, run first). Returns the material.
+ */
+export function skinScatter(material) {
+  if (!material?.isMeshStandardMaterial || material.onBeforeCompile?.skinScatter) return material;
+  const previous = material.onBeforeCompile;
+  const baseKey = material.customProgramCacheKey?.() ?? '';
+  const patched = (shader, renderer) => {
+    previous?.call(material, shader, renderer);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_pars_fragment>', scatteredLights());
+  };
+  patched.skinScatter = true;
+  patched.previous = previous;
+  material.onBeforeCompile = patched;
+  // (three caches programs by onBeforeCompile's source text: keyed apart from the unpatched.)
+  material.customProgramCacheKey = () => `${baseKey}|skinScatter${PHOTO_FACES.scatter}`;
+  material.needsUpdate = true;
   return material;
 }
 
