@@ -90,7 +90,7 @@ export const PYONGYANG_1593 = {
   discipline: 1,
   // The Japanese army's colours at Pyongyang (scenarios.js SEKIGAHARA_WEST: black and blue).
   japanese: { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' },
-  design: { mingEliteInfantry: 3, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  design: { mingEliteInfantry: 0, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
 export const pyongyangBattle = {
