@@ -1597,7 +1597,8 @@ segmented('#corner-tabs', (corner) => { $('.corners').dataset.showing = corner; 
 // ---- The look: a selector, ?look=, and what is remembered ---------------------
 
 const lookSelect = $('#look');
-lookSelect.append(...LOOKS.map((look) => Object.assign(new Option(look.placeholder ? `${look.label} (soft)` : look.label, look.id), { title: look.blurb })));
+// (Named through nameOption: the option's words follow the language, tname.)
+lookSelect.append(...LOOKS.map((look) => Object.assign(nameOption(look.placeholder ? `${look.label} (soft)` : look.label, look.id), { title: look.blurb })));
 lookSelect.value = activeLook().id;
 let lookQueue = Promise.resolve();
 

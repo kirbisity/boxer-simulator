@@ -5,6 +5,8 @@
 export const NAMES_PEOPLE = {
   // A fighter left unnamed in the builder (main.js: its default name).
   'Fighter': '斗士',
+  // The sandbox's Look picker (src/looks/: each look's label).
+  'Realistic (default)': '写实（默认）', 'Classic cartoon': '经典卡通', 'Realistic (default) (soft)': '写实（默认）（柔和）', 'Classic cartoon (soft)': '经典卡通（柔和）',
   // ---- Knights and Europe ----
   'Noble Knight': '贵族骑士',
   'Templar Grand Master': '圣殿骑士大团长',
