@@ -4348,7 +4348,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const boned = bones ?? (() => null);
     // Stiff as what it is made of (stiffnessOf); a skirt's rows panel by panel, as it parts over the legs.
     const hung = slot === 'skirt' && stiffnessOf(paint) === 'coat' && paint.gaps?.length > 1;
-    stiffen(mesh, rings, stiffnessOf(paint), hung ? paint.gaps.length : slot === 'skirt' ? LOFT.stiff.panels : 0, hung);
+    // (Not a fauld of plate lames, unsplit: its lames slide over one another as the hips bend, and are weighted as the plate
+    // harness's fauld is, with no stiff bodies; held in stiff panels, a seated man's thighs pulled each panel between them and
+    // the pelvis and the skirt over the saddle broke into shards. Cut as rows all the same, fitClothToBase.)
+    const lames = slot === 'skirt' && stiffnessOf(paint) === 'rows' && pieceMaterial(paint) === 'steel' && !paint.gaps;
+    if (lames) for (const ring of rings) ring.kind = 'rows';
+    else stiffen(mesh, rings, stiffnessOf(paint), hung ? paint.gaps.length : slot === 'skirt' ? LOFT.stiff.panels : 0, hung);
     // Lamellae (and scales hung point down) drawn as plates over a backing of their dark lacing (the robe showing in the
     // splits), except in a crowd: with the maps, one shell in rows wearing its laced tile, or a field tile of the kind's own over
     // the backing; else plate by plate.
