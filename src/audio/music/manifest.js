@@ -1,7 +1,7 @@
 // The music cues. The scenes' music is supplied recordings (assets/music/*.mp3, one piece each, 3 to 4 minutes: period instruments over a
 // gothic orchestra), fetched the first time a scene wants its piece (`file`, beside the page) and kept. The victory and defeat stings
-// and the Dunnottar boss's choir are embedded (`data`, base64: data/*.js); the stings are the last of the cues rendered with ACE-Step
-// (tools/music-convert.py made them; it no longer writes this file).
+// (supplied recordings too, about 13 s each, played once) and the Dunnottar boss's choir are embedded (`data`, base64: data/*.js), so
+// a sting is ready the moment a fight ends.
 // A cue loops between loopStart and loopEnd (s): a whole piece from its first sound (past the file's lead of silence) to its end.
 // gain: the linear gain that brings the cue to about -18 LUFS (each piece measured with ffmpeg's ebur128).
 // The pieces were converted from the supplied Opus to MP3 (128 kbps, 44.1 kHz), the format of the game's other music: every
@@ -41,8 +41,10 @@ export const MUSIC_CUES = {
   vespers: piece('streetlight-vespers', 'Streetlight Vespers', 0.53, 198.81, 0.624),
   // Highland bagpipe, drone and bodhran.
   scottish: piece('scottish-cliffs', 'Lament of the Scottish Cliffs', 0.73, 224.93, 0.716),
-  victory: { data: MUSIC_DATA_VICTORY, mime: 'audio/mpeg', loop: false, loopStart: 0.0000, loopEnd: 12.0000, gain: 1.122 },
-  defeat: { data: MUSIC_DATA_DEFEAT, mime: 'audio/mpeg', loop: false, loopStart: 0.0000, loopEnd: 12.0000, gain: 1.000 },
+  // A triumphant fanfare: bronze horns, pipe organ, timpani (D major). Measured -16.7 LUFS.
+  victory: { data: MUSIC_DATA_VICTORY, title: 'Victory Fanfare', mime: 'audio/mpeg', loop: false, loopStart: 0, loopEnd: 12.8, gain: 0.861 },
+  // A lament: solo horn, low strings, organ, a timpani roll (D minor). Measured -13.6 LUFS.
+  defeat: { data: MUSIC_DATA_DEFEAT, title: 'Defeat Lament', mime: 'audio/mpeg', loop: false, loopStart: 0, loopEnd: 13.08, gain: 0.603 },
   // A supplied recording made with Suno (data/bosschoir.js): the whole piece looped, from its first sound to where its closing fade
   // has died (the file's 0.24 s lead is its silence and the MP3's delay). At -21.3 LUFS: the gain brings it to the others' -18.
   bossChoir: { data: MUSIC_DATA_BOSS_CHOIR, mime: 'audio/mpeg', loop: true, loopStart: 0.2400, loopEnd: 178.2000, gain: 1.462 },
