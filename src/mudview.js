@@ -23,7 +23,7 @@ export const MUD_VIEW = {
   pit: { depth: 0.05, size: 0.35, per: 0.6 },
   // Raised by this much over the field's level (m): the water (4 cm over it) then lies only in the deepest hollows,
   // small puddles a stride or two apart (by eye, against larger pools and against water only in the hoofprints).
-  lift: 0.08,
+  lift: 0.075,
   // The tiled maps: `pixels` square over `tile` m; the normal map's strength.
   pixels: 512,
   tile: 1.6,
