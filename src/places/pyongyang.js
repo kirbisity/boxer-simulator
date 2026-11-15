@@ -766,13 +766,17 @@ export function buildPyongyang() {
     //   gloom        the showers' own cloud darker underneath (0.85 against the open air's own figure for flurries),
     //                so the lit snow stands against a dark sky down-sun and the cloud up the sun keeps dark forms
     //                for the light to come through (at 0.7 the sunward cloud in a shower was pale on pale);
-    //   visibility   14 km between the showers (a cold clear air; with the open air's own 9 km the haze up the low
-    //                sun hid the cloud's forms, and the sunward half of the frame was one pale wash);
-    //   fall.thick   4000 m of sight in the thick of a shower, against its 900: a showery snow, not a blizzard.
-    //                It greys the far hills and the pines across the field and still leaves the cloud's forms and
-    //                the sun's glow up the sun (at 350 and at 600 the sunward two thirds of the frame was one blank
-    //                white, and at 2200 a pale one with the flakes lost against it); the rest of `fall` is the
-    //                open air's own;
+    //   visibility,  60 km of sight in a layer 300 m deep between the showers (polar air behind a front: approximate,
+    //   hazeHeight   the clear end of what such air gives). Measured by turning one key at a time on the two sunward
+    //                standing places: with 14 km in the open air's own 900 m layer the haze up the low sun hid the
+    //                cloud, and two thirds of the frame was one pale glow with no edge; with these the cloud up the
+    //                sun stands in dark masses nearer than the glow, with bright breaks between them;
+    //   fall.thick   12 km of sight in the thick of a shower, against the open air's 900 m: a showery snow, not a
+    //                blizzard. The falling snow's veil is lit as if the sun reached all of it, so toward the sun a
+    //                thick one is a white wall in front of the cloud that sheds it (at 4000 m 1.8 percent of the
+    //                sunward frame clipped in a shower and the cloud was gone; at 12000 none clips and the forms
+    //                stay). A workaround, asked of the open air as R10 (c): when its veil is shaded by the cloud it
+    //                falls from, this goes back toward 4000;
     //   grade.ev     0.9 of a stop under what the open air's meter gives. Its meter allows for the snow (the place's
     //                ground albedo), but a low sun in front of the camera over a whole frame of snow still put the
     //                sunlit drifts on the curve's shoulder, and in a shower, when the ground dims and the meter
@@ -783,7 +787,7 @@ export function buildPyongyang() {
     // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall.
     weathers: { snow: 'siegesnow', bare: 'clear' },
     first: 'snow',
-    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }] },
+    own: { siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 60000, hazeHeight: 300, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }] },
   };
   tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...PYONGYANG_WEATHER.snow, ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;

@@ -15,8 +15,9 @@
 // tested against the scene's depth, so a slab counts only where all of it is air; each pixel reads its slab at
 // its own depth in it (the open air's own screen pattern, envGrain), which turns the sheets' steps into grain.
 // The frame is drawn in light's own measure with room under zero (env/post.js's half-float sheets), so what is
-// taken is added as a negative; where sight lines are not walked (below the open air's high tier) nothing is
-// drawn.
+// taken is added as a negative, before the open air's own pass takes off what its walk found (which may be in the
+// materials or once a pixel after the scene: view.env.airWalk 'lines' or 'frame'; the count is the same either
+// way); where sight lines are not walked ('none', below the open air's high tier) nothing is drawn.
 //
 // The second set of sheets, the rays, does the same for the cloud (also R10). The open air counts the cloud's
 // shade on its haze from the sheet's broad masses only (envSunShare), which is right for the land's light and too
@@ -62,7 +63,6 @@ const TK_BEAMS_VERTEX = `
 attribute vec3 aSlab;
 uniform vec3 uBeam;
 uniform vec3 uRays;
-uniform vec4 uEnvShade;
 varying vec3 vRay;
 varying vec3 vSpan;
 void main() {
@@ -76,8 +76,6 @@ void main() {
   // (A slab that ends past the camera's far side is drawn just inside it: only the sky is so far.)
   float far = projectionMatrix[3][2] / (projectionMatrix[2][2] + 1.0);
   gl_Position = projectionMatrix * vec4(before * min(vSpan.y, far * 0.98), 1.0);
-  // (Where sight lines are not walked there is nothing to put right.)
-  if (uEnvShade.w >= 0.0) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 }
 `;
 
@@ -165,6 +163,8 @@ export function tkBeams() {
   mesh.matrixAutoUpdate = false;
   mesh.renderOrder = 6;
   mesh.userData.tkAir = true;
+  // (Shown only where the open air walks its sight lines: stir.js.)
+  mesh.userData.tkWalked = true;
   mesh.visible = false;
   return mesh;
 }

@@ -381,7 +381,8 @@ export function tkStir(seed = 1) {
       }
       const tick = (time, wind, view, open) => {
         // What the air carries is lit and moved by the open air; without it the place is as it was built.
-        for (const mesh of carried) mesh.visible = open;
+        // (The sheets of beams.js put right the open air's walk of each sight line: nothing to draw where it walks none.)
+        for (const mesh of carried) mesh.visible = open && !(mesh.userData.tkWalked && (view?.env?.airWalk ?? 'none') === 'none');
       };
       return { group, tick };
     },
