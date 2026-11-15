@@ -607,12 +607,6 @@ export const ENV = {
     // near, where a card is seen leaf by leaf; lower far off, where the picture is shrunk to a blur of leaf and
     // gap and a crown must still close (by eye: at a half the hill woods fell to tatters).
     cut: [0.5, 0.42, 0.3, 0.2],
-    // A broad crown is the masses of leaf its limbs carry (trees.js envCrownMasses): each `size` (least, most) of
-    // the crown's width across, its middle `out` (least, most) of the width from the trunk, and lit by its own
-    // surface's facing `own` of the way (the rest by the whole crown's), its underside darker by `under`.
-    // Masses half the crown wide, a third of the way out, read as one ball (a lollipop); smaller masses further
-    // out with sky between them read as boughs, as a hedgerow oak does. By eye against the meadow and field.
-    clump: { size: [0.22, 0.4], out: [0.45, 0.85], own: 0.7, under: 0.35 },
     // Shading inside a crown: the inside and the underside are darker (leaves shade leaves) by up to this share.
     inner: 0.55,
     // Light through the leaves when the sun is behind the crown.

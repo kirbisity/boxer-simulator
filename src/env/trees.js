@@ -738,10 +738,8 @@ function envCrownMasses(kind, random) {
     const angle = limb * 2.39996 + random() * 0.9;
     // Low limbs reach furthest out; the ones that go up stay nearer the middle.
     const up = limb < 2 ? 0.55 + 0.3 * random() : random() * 1.1 - 0.5;
-    const [outLeast, outMost] = ENV.trees.clump.out;
-    const [sizeLeast, sizeMost] = ENV.trees.clump.size;
-    const out = (outLeast + (outMost - outLeast) * random()) * Math.sqrt(Math.max(0.15, 1 - up * up * 0.9));
-    const radius = (sizeLeast + (sizeMost - sizeLeast) * random()) * (limb < 2 ? 1.15 : 1);
+    const out = (0.32 + 0.4 * random()) * Math.sqrt(Math.max(0.15, 1 - up * up * 0.9));
+    const radius = (0.36 + 0.24 * random()) * (limb < 2 ? 1.15 : 1);
     masses.push({ x: Math.cos(angle) * out * crown.wide, y: crown.at + up * crown.tall * 0.62, z: Math.sin(angle) * out * crown.wide, radius: radius * crown.wide, flat: 0.8, from: [0, fork * (0.8 + 0.3 * random()), 0] });
   }
   return masses;
@@ -786,16 +784,14 @@ function envCrownPoint(kind, random, masses, out) {
   const py = (out[1] - crown.at) / crown.tall;
   const pz = out[2] / crown.wide;
   const whole = Math.hypot(px, py, pz) || 1;
-  const own = ENV.trees.clump.own;
-  const fx = nx * own + (px / whole) * (1 - own);
-  const fy = ny * own + (py / whole) * (1 - own);
-  const fz = nz * own + (pz / whole) * (1 - own);
+  const fx = nx * 0.45 + (px / whole) * 0.55;
+  const fy = ny * 0.45 + (py / whole) * 0.55;
+  const fz = nz * 0.45 + (pz / whole) * 0.55;
   const facing = Math.hypot(fx, fy, fz) || 1;
   out[3] = fx / facing;
   out[4] = fy / facing;
   out[5] = fz / facing;
-  // (Deep in the crown as a whole, and on its own mass's far side from the sky: a bough's underside is in its own shade.)
-  out[6] = Math.min(1, 0.25 + 0.75 * whole) * (0.55 + 0.45 * shell) * (1 - ENV.trees.clump.under * Math.max(0, -ny));
+  out[6] = Math.min(1, 0.25 + 0.75 * whole) * (0.55 + 0.45 * shell);
   // A plant of the ground has no inside: every leaf of it lies open to the sky, its face up and a little out, the
   // lowest ones under the others. (Shaded as a crown's underside they stood as black cut-outs in lit grass.)
   if (kind.shape === 'tuft') {
