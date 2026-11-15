@@ -4516,7 +4516,12 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const torn = topShape.torn;
     loft(mesh, trunkRings(topShape.hem, topShape.neck, torn.rings), torn.sides, { color: 'top', inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk, holes: (u, angle) => ragTorn(tear, u, angle) });
   } else if (topShape) {
-    loft(mesh, trunkRings(topShape.hem, topShape.neck, count(Math.max(4, Math.round(14 * (topShape.neck - topShape.hem))))), trunkSides, { color: topPattern, inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
+    // (Under a coat of the kit closed at the neck, the shirt ends behind at the coat's neck: reaching above it, the Forger's
+    // shirt to 0.99 under his gambeson to 0.96, both collars were carried up the trapezius to one line and the shirt came
+    // through the gambeson's in teeth. In front it goes on up, under the coat's opening and the gorget.)
+    const coatTop = Math.max(-Infinity, ...armorPieces(kit, 'trunk', 'l').map(([, to]) => to));
+    const behind = coatTop >= LOFT.closedJoint.top.trunk && coatTop < topShape.neck && !lowDetail ? { holes: (t, angle) => t > coatTop && Math.cos(angle) < 0 } : {};
+    loft(mesh, trunkRings(topShape.hem, topShape.neck, count(Math.max(4, Math.round(14 * (topShape.neck - topShape.hem))))), trunkSides, { color: topPattern, inflate: topShape.loose, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk, ...behind });
     if (topShape.ribbed) loft(mesh, trunkRings(topShape.hem, topShape.hem + 0.06, 1), trunkSides, { color: 'trim', inflate: topShape.loose + 0.012, capStart: false, capEnd: false, bones: abdomen, ...bendTrunk });
   }
   if (armor) {
