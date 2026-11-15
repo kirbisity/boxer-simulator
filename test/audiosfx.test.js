@@ -97,7 +97,9 @@ test('the ambience follows the place: surf on the cliffs, a crowd in the arena, 
 });
 
 test('music only at its moments', () => {
-  assert.equal(musicMoment({ menu: true, game: 'home', worldId: 1, worldAge: 3 }).moment, 'menu');
+  // (The menus are silent: the home screen and the screens opened from it.)
+  assert.equal(musicMoment({ menu: true, game: 'home', worldId: 1, worldAge: 3 }).moment, null);
+  assert.equal(musicMoment({ menu: true, game: 'level', worldId: 2, worldAge: 5 }).moment, null);
   assert.equal(musicMoment({ game: 'level', worldId: 2, worldAge: 5 }).moment, 'opening');
   assert.equal(musicMoment({ game: 'level', worldId: 2, worldAge: 90 }).moment, null);
   assert.equal(musicMoment({ game: 'quick', worldId: 3, worldAge: 5 }).moment, null);

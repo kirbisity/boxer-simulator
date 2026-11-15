@@ -37,7 +37,7 @@ export const MUSIC_CUES = {
   victory: { data: MUSIC_DATA_VICTORY, mime: 'audio/mpeg', loop: false, loopStart: 0.0000, loopEnd: 12.0000, gain: 1.122 },
   defeat: { data: MUSIC_DATA_DEFEAT, mime: 'audio/mpeg', loop: false, loopStart: 0.0000, loopEnd: 12.0000, gain: 1.000 },
   // </generated cues>
-  // Not tools/music-convert.py's (the user's own track, data/bosschoir.js): the whole piece looped, from its first sound to where its
+  // Not tools/music-convert.py's (a supplied recording made with Suno, data/bosschoir.js): the whole piece looped, from its first sound to where its
   // closing fade has died (the file's 0.24 s lead is its silence and the MP3's delay). At -21.3 LUFS: the gain brings it to the others' -18.
   bossChoir: { data: MUSIC_DATA_BOSS_CHOIR, mime: 'audio/mpeg', loop: true, loopStart: 0.2400, loopEnd: 178.2000, gain: 1.462 },
 };
@@ -81,12 +81,12 @@ export const SCENE_MUSIC = {
   sarhu: 'china',
 };
 
-// (Dunnottar's boss: the user's choir track; the generated 'boss' cue stays for any boss given no track of its own.)
-const BOSS_MUSIC = { dunnottar: 'bossChoir' };
+// (Dunnottar's boss: the supplied choir track; the generated 'boss' cue stays for any boss given no track of its own.)
+export const BOSS_MUSIC = { dunnottar: 'bossChoir' };
 
-/** The cue for a moment ('menu' | 'opening' | 'boss' | 'victory' | 'defeat') in a scene (null for the menu), or null for none (a boss: his scene's own track, else the generated one). */
+/** The cue for a moment ('opening' | 'boss' | 'victory' | 'defeat') in a scene, or null for none (the menus have no music) (a boss: his scene's own track, else the generated one). */
 export function cueFor(scene, moment) {
-  if (moment === 'menu' || moment === 'victory' || moment === 'defeat') return moment;
+  if (moment === 'victory' || moment === 'defeat') return moment;
   if (moment === 'opening') return SCENE_MUSIC[scene] ?? null;
   if (moment === 'boss') return BOSS_MUSIC[scene] ?? 'boss';
   return null;

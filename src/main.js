@@ -874,7 +874,7 @@ function audioScene() {
     drips: stage ? stageView?.sounding?.drips ?? null : null,
     waters: stage ? audioState.waters.list : null,
   });
-  // The music's moment: a menu over the fight, a boss fight on (its room sealed, or his bar up), how the bout or the stage ended (for the man
+  // The music's moment: a menu over the fight (silent), a boss fight on (its room sealed, or his bar up), how the bout or the stage ended (for the man
   // played: watching, no fanfare). A stage's outcome is one occurrence each (`outcomeAt`): each death in a run has its own.
   const winner = state.finishedAt !== null && state.game !== 'home' ? world.verdict?.winner ?? null : null;
   const kept = audioState.outcome?.world === world && realSeconds() - audioState.outcome.at < 15 ? audioState.outcome : null;

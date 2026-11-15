@@ -1,6 +1,6 @@
-// The music, sparse (the user's choice): only at moments. The menu; a level's opening (the cue once, or looped a short while, then
+// The music, sparse: only at moments. A level's opening (the cue once, or looped a short while, then
 // faded out); the Noname boss fight while his bar shows; victory and defeat (once). The rest of the time there is none: the ambience
-// and the fight are the sound.
+// and the fight are the sound. The menus (the home screen and the screens opened from it) have none.
 //
 // The cues are pre-rendered (ACE-Step, period instruments per scenario: audio/music/manifest.js), embedded as base64; each is decoded
 // the first time it is wanted and kept. A loop plays on between its loop points (its seam is cross-faded in the
@@ -14,7 +14,7 @@ import { MUSIC_CUES, cueFor } from './music/manifest.js';
 export const MUSIC = { fade: 2, openingSeconds: 45, duck: 0.55 };
 
 /**
- * The moment the game is at, for the music: { moment ('menu' | 'opening' | 'boss' | 'victory' | 'defeat' | null), key (one occurrence of
+ * The moment the game is at, for the music: { moment ('opening' | 'boss' | 'victory' | 'defeat' | null), key (one occurrence of
  * it: an opening is played once per world) }. `info`: { menu (a menu screen shown), game, worldId, worldAge (s), boss (a boss fight on:
  * its room sealed or his bar shown), outcome ('victory' | 'defeat' | null), outcomeAt (when that outcome came, if each is its own: a stage's
  * deaths, one defeat cue for each) }.
@@ -22,7 +22,8 @@ export const MUSIC = { fade: 2, openingSeconds: 45, duck: 0.55 };
 export function musicMoment(info) {
   if (info.outcome) return { moment: info.outcome, key: `${info.worldId}:${info.outcome}${info.outcomeAt != null ? `@${info.outcomeAt}` : ''}` };
   if (info.boss) return { moment: 'boss', key: `${info.worldId}:boss` };
-  if (info.menu) return { moment: 'menu', key: 'menu' };
+  // A menu screen is silent: a moment of its own all the same, so that whatever played before it is let go.
+  if (info.menu) return { moment: null, key: 'menu' };
   if (info.game === 'level' && info.worldAge < MUSIC.openingSeconds) return { moment: 'opening', key: `${info.worldId}:opening` };
   return { moment: null, key: null };
 }

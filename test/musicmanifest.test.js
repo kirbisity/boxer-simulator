@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MUSIC_CUES, SCENE_MUSIC, cueFor } from '../src/audio/music/manifest.js';
 import { SCENARIOS } from '../src/scenarios.js';
 
-const MOMENTS = ['menu', 'opening', 'boss', 'victory', 'defeat'];
+const MOMENTS = ['opening', 'boss', 'victory', 'defeat'];
 
 test('every cue decodes to a real MP3 or MP4 file', () => {
   for (const [id, cue] of Object.entries(MUSIC_CUES)) {
@@ -26,7 +26,7 @@ test('every cue decodes to a real MP3 or MP4 file', () => {
 test('the loops run 30-60 s and the stings 8-15 s', () => {
   for (const [id, cue] of Object.entries(MUSIC_CUES)) {
     const seconds = cue.loopEnd - cue.loopStart;
-    // (A whole track looped, the user's own boss music, runs its length: 2 to 4 minutes.)
+    // (A whole track looped, the supplied boss music, runs its length: 2 to 4 minutes.)
     if (id === 'bossChoir') assert.ok(seconds >= 120 && seconds <= 240, `${id}: a ${seconds} s track`);
     else if (cue.loop) assert.ok(seconds >= 30 && seconds <= 60, `${id}: a ${seconds} s loop`);
     else assert.ok(seconds >= 8 && seconds <= 15, `${id}: a ${seconds} s sting`);
@@ -43,7 +43,7 @@ test('every scene names a looped opening cue', () => {
 test('cueFor covers every scenario, Dunnottar and the colosseum', () => {
   for (const scene of [...Object.keys(SCENARIOS), 'dunnottar', 'colosseum']) {
     assert.ok(MUSIC_CUES[cueFor(scene, 'opening')], `${scene}: no opening`);
-    for (const moment of ['menu', 'victory', 'defeat']) assert.ok(MUSIC_CUES[cueFor(scene, moment)], `${scene}: no ${moment}`);
+    for (const moment of ['victory', 'defeat']) assert.ok(MUSIC_CUES[cueFor(scene, moment)], `${scene}: no ${moment}`);
     for (const moment of MOMENTS) {
       const cue = cueFor(scene, moment);
       assert.ok(cue === null || MUSIC_CUES[cue], `${scene} ${moment}: ${cue}`);
@@ -54,12 +54,13 @@ test('cueFor covers every scenario, Dunnottar and the colosseum', () => {
   assert.equal(cueFor('yard', 'boss'), 'boss');
   assert.equal(cueFor('nowhere', 'opening'), null);
   assert.equal(cueFor('ring', 'opening'), null);
-  assert.equal(cueFor(null, 'menu'), 'menu');
+  // (The menus have no music.)
+  assert.equal(cueFor(null, 'menu'), null);
   assert.equal(cueFor(null, 'opening'), null);
 });
 
 test('the music fits its 6 MB budget', () => {
-  // (4.5 MB for the generated cues, and the user's 3-minute boss track, 1.4 MB of base64.)
+  // (4.5 MB for the generated cues, and the supplied 3-minute boss track, 1.4 MB of base64.)
   const total = Object.values(MUSIC_CUES).reduce((sum, cue) => sum + cue.data.length, 0);
   assert.ok(total <= 6e6, `${(total / 1e6).toFixed(2)} MB of base64`);
 });

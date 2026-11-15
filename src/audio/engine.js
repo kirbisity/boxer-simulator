@@ -4,8 +4,9 @@
 //                                 ↘ send (by the voice's distance and the room) → the reverb
 //   buses:  effects | voices | ambience | music → master → compressor → mute → out;  the reverb (probed: acoustics.js) → master
 //
-// The context exists only after the first tap, click or key (browsers allow no sound before one), and is resumed when the page comes back
-// into view. Until then, and in Node where there is no AudioContext at all, every call is a no-op; the one thing done every frame
+// The context exists only after the first tap, click or key (browsers allow no sound before one); it sleeps while the page is hidden and
+// is woken when it comes back, by the next gesture if the browser wants one, built anew if it will not wake (wake.js).
+// Until then, and in Node where there is no AudioContext at all, every call is a no-op; the one thing done every frame
 // regardless is telling the simulation where the ear is (`world.ear`), so that the sound log keeps only what it can hear.
 //
 // main.js calls `frame(info, dt)` from its render frame; the work is done at ~30 Hz: the ear placed (the camera's orientation, the
@@ -31,6 +32,7 @@ import { playWhizz, whizzParams } from './sfx/ranged.js';
 import { CRIES, createCryDirector, voiceOfFighter } from './cries.js';
 import { CHARGE, chargeOf } from './charge.js';
 import { createFlameSound } from './flamesound.js';
+import { createWake } from './wake.js';
 import { playUi, uiParams } from './sfx/ui.js';
 import { playThump, thumpParams } from './sfx/thump.js';
 import { artDrawParams, artImpactParams, playArtDraw, playArtImpact } from './sfx/art.js';
@@ -146,9 +148,10 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
 
   // ---- The context and its graph ------------------------------------------------------------------------------------------------------
 
+  /** Make the context and its graph (the first gesture, or a dead context replaced: wake.js). */
   function unlock() {
     if (state.ctx) {
-      if (state.ctx.state !== 'running') state.ctx.resume().catch(() => {});
+      wake.gesture();
       return;
     }
     const Context = env?.AudioContext ?? env?.webkitAudioContext;
@@ -163,9 +166,45 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     } catch {
       return;
     }
+    const ctx = state.ctx;
+    ctx.onstatechange = () => wake.stateChanged(ctx);
     build();
-    state.ctx.resume().catch(() => {});
+    ctx.resume().catch(() => {});
   }
+
+  /** A context that will not wake let go, and everything played through it with it; a new one made in its place. */
+  function rebuild() {
+    const old = state.ctx;
+    stopCharges();
+    state.flame.stop(old.currentTime);
+    state.active = [];
+    state.breaths.clear();
+    state.cries.reset();
+    state.farField = null;
+    state.ctx = null;
+    old.onstatechange = null;
+    old.close().catch(() => {});
+    unlock();
+  }
+
+  /** A sample of silence (inside a gesture): what wakes iOS's output after the page was away. */
+  function prime(ctx) {
+    try {
+      const source = ctx.createBufferSource();
+      source.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+      source.connect(ctx.destination);
+      source.start(0);
+    } catch {}
+  }
+
+  const wake = createWake({
+    context: () => state.ctx,
+    create: unlock,
+    rebuild,
+    prime,
+    wall: () => performance.now() / 1000,
+    later: (fn, seconds) => setTimeout(fn, seconds * 1000),
+  });
 
   function build() {
     const ctx = state.ctx;
@@ -416,6 +455,7 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
     state.clock = 0;
     const read = readSounds(world, state.cursor);
     state.cursor = read.cursor;
+    wake.watch();
     if (!state.ctx || state.ctx.state !== 'running') return;
     tick(info, thunder ? [...read.events, thunder] : read.events, step);
   }
@@ -799,14 +839,21 @@ export function createAudioEngine(env = typeof window === 'undefined' ? null : w
   }
 
   if (env?.addEventListener) {
-    // The first gesture starts the sound (sound is on by default); a page back in view takes it up again.
-    for (const kind of ['pointerdown', 'keydown', 'touchend']) env.addEventListener(kind, unlock, { capture: true, passive: true });
+    // The first gesture starts the sound (sound is on by default); a later one wakes a context the browser would not resume alone.
+    // (A touch is a gesture only when it ends: pointerup and touchend; a mouse's or pen's when pressed.)
+    // (A click the page gives itself, element.click(), is no gesture.)
+    const gesture = (event) => {
+      if (event.isTrusted !== false) unlock();
+    };
+    for (const kind of ['pointerdown', 'pointerup', 'mousedown', 'touchend', 'click', 'keydown']) env.addEventListener(kind, gesture, { capture: true, passive: true });
     // (A page loaded after a tap already given, a reload, may start at once.)
     if (env.navigator?.userActivation?.hasBeenActive) unlock();
-    env.document?.addEventListener('visibilitychange', () => {
-      if (!state.ctx) return;
-      if (env.document.hidden) state.ctx.suspend().catch(() => {});
-      else state.ctx.resume().catch(() => {});
+    const doc = env.document;
+    doc?.addEventListener('visibilitychange', () => (doc.hidden ? wake.hide() : wake.show()));
+    // A page put away whole (the back-forward cache) and brought back.
+    env.addEventListener('pagehide', () => wake.hide());
+    env.addEventListener('pageshow', () => {
+      if (!doc?.hidden) wake.show();
     });
   }
 
