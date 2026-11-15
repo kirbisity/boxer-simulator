@@ -152,5 +152,8 @@
   "map-carrhae": {},
   "map-agincourt": {},
   "map-coastVillage": {},
+  "map-cerignola": {},
+  "map-subway": {},
+  "map-stadium": {},
   "map-pyongyang": { "mapYaw": 2.75, "mapPitch": 0.16, "mapDistance": 1.1 }
 }
