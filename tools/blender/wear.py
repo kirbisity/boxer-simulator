@@ -99,6 +99,8 @@ WEAR = {
     'knightHounskull': ('steel', (0.4, 0.4)),
     'knightCloseHelmet': ('steel', (0.4, 0.4)),
     'munitionPlate': ('munition', (0.16, 0.16)),
+    'etched': ('steel', (0.12, 0.12)),
+    'lamellae': ('steel', (0.09, 0.1)),
     'formKettleRidged': ('munition', (0.4, 0.4)),
     'formKettleBurgundian': ('munition', (0.4, 0.4)),
     'formSalletGerman': ('munition', (0.4, 0.4)),
