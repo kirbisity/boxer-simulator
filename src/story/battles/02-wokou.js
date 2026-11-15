@@ -44,9 +44,9 @@ export const WOKOU_1588 = {
   slot: { front: 0, second: 7, rear: 9, squadLeader: 11 },
   // An officer stands behind the middle squad (m behind its leader).
   officerBack: 2,
-  // The squads' kit and colours (scenarios.js QI: Qi's elite infantry in the dark coat bound red, the household's crimson).
+  // The squads' kit and colours (scenarios.js QI: Qi's elite infantry in the olive coat (design 0, as QI.design since 2026-11-15), the household's crimson).
   kit: 'mingEliteInfantry',
-  design: { mingEliteInfantry: 3, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  design: { mingEliteInfantry: 0, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
 /** Qi's squad of twelve: each man's [style, back, across] about his squad's middle (from qiJiguangLevel's layout). */
