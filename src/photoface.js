@@ -333,6 +333,8 @@ diffuseColor *= texelColor;`)
 	irradiance *= faceFill;
 #endif`);
   };
+  // (The scalp's hairs are filtered by their size on screen: fwidth, core in WebGL 2, an extension in WebGL 1.)
+  material.extensions = { derivatives: true };
   material.customProgramCacheKey = () => 'photoface4';
   material.userData.photoFace = cast.id;
   material.userData.lid = uniforms.faceLid;
