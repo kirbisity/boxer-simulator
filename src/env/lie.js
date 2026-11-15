@@ -76,5 +76,26 @@ export function envLieFieldAt(field, x, z) {
 export function envLieOf(place, arena) {
   const own = PLACE_ENV[place];
   if (!own || own.own || !arena || arena.ring) return null;
-  return envLieField(own.terrain, arena);
+  const field = envLieField(own.terrain, arena);
+  // A floor under a battle's mud and standing water (its works' soft ground, not a puddle's `bare` patch) lies level:
+  // water finds its level, and the soaked plough is drawn and stood on as the flat sheet it is (worksview.js).
+  return field && arena.works?.soft?.some((area) => !area.bare) ? envLieLevelled(field, arena) : field;
+}
+
+const envLieLevelledMade = new WeakMap();
+
+/** `field` levelled to 0 over the floor, its rolls coming back across the margin beyond it (so the land past it meets it). */
+function envLieLevelled(field, arena) {
+  const made = envLieLevelledMade.get(field);
+  if (made?.halfX === arena.halfX && made.halfZ === arena.halfZ) return made.field;
+  const [nu, nv] = field.cells;
+  const heights = field.heights.map((y, at) => {
+    const x = Math.abs(-field.size[0] / 2 + (at % (nu + 1)) * (field.size[0] / nu));
+    const z = Math.abs(-field.size[1] / 2 + Math.floor(at / (nu + 1)) * (field.size[1] / nv));
+    const out = Math.max(x - arena.halfX, z - arena.halfZ, 0);
+    return y * Math.min(1, out / ENV_LIE.margin);
+  });
+  const levelled = { ...field, heights };
+  envLieLevelledMade.set(field, { halfX: arena.halfX, halfZ: arena.halfZ, field: levelled });
+  return levelled;
 }

@@ -75,6 +75,8 @@ const SEKIGAHARA_EAST = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '
 const SEKIGAHARA_WEST = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
 // A side's mounted samurai: spears (the yari from the saddle), a sword and the bow.
 const SEKIGAHARA_HORSE = { spear: 3, katana: 1, archerYumi: 2 };
+// Sekigahara's morning: the valley's fog still lying low, the sun coming through it (Agincourt is fought in the same place and light).
+const SEKIGAHARA_WEATHER = { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 };
 
 function sekigaharaSide(random, army, colours) {
   const warriors = [];
@@ -1067,8 +1069,9 @@ const AGINCOURT_LEVEL = {
   title: 'Agincourt',
   place: 'Agincourt, Artois · 25 October 1415',
   blurb: { en: "King Henry's archers stand behind their stakes at the narrow end of a ploughed field, soaked by a night's rain, between two woods. The French men-at-arms come on across it on foot in plate, sinking to the knee, crowded together as the woods close in; their horse rides first at the archers. Thirty archers and five men-at-arms against twenty-eight men-at-arms, three lances and four crossbows.", zh: '亨利王的弓手守在田地窄头的木桩后面：地刚犁过，夹在两片树林中间，昨夜一场雨浇了个透。法国重甲兵披着板甲徒步过来，一脚泥陷到膝盖，林子越往前越收，人越挤越紧；他们的骑兵先朝弓手冲。弓手三十、重甲兵五，对重甲兵二十八、骑枪三、弩手四。' },
-  scene: 'agincourt',
-  weather: { fog: [28, 120], sky: 0.8, pale: 0.75, sun: 0.55 },
+  // Drawn in Sekigahara's valley and its morning (the wooded place built for that battle), the field's mud over it: the works'.
+  scene: 'sengoku',
+  weather: SEKIGAHARA_WEATHER,
   arena: { ...AGINCOURT.arena, works: agincourtWorks() },
   spread: 1,
   // From behind the English line, looking down the field between the woods (further round, the woods stand in the way).
@@ -1298,7 +1301,7 @@ export const SCENARIOS = {
     place: 'Sekigahara, Mino · 21 October 1600',
     blurb: { en: 'The battle that ends the Sengoku. Thirty-four of the East in red against thirty-five of the West in black and blue, in the morning fog: bows and teppō in front, spears, blades and polearms behind, and six mounted samurai on a flank of each army to charge when the lines close.', zh: '终结战国的一战。晨雾里，东军三十四人着红，西军三十五人着黑蓝：弓和铁炮在前，长枪、刀、长柄兵器在后，两军侧翼各有六名骑马武士，阵线一接就冲进去。' },
     scene: 'sengoku',
-    weather: { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 },
+    weather: SEKIGAHARA_WEATHER,
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
     roster: { en: 'Thirty-four of the East and thirty-five of the West: samurai and ashigaru, six of the samurai on horse a side', zh: '东军三十四人、西军三十五人：武士与足轻，每方六名武士骑马' },

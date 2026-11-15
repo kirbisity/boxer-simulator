@@ -20,7 +20,11 @@ export const KWT_LOOKS = {
   sludge: { colour: 0x24260e, roughness: 0.3, metalness: 0.0, reflect: 0.75, opacity: 1, scum: 0.75, scumColour: 0x4b4a24, wave: 0.35 },
   // The water standing on a ploughed field after a night's rain: thin brown clay-water over the furrows (they show through it), a grey sky in it, silt churned up
   // in patches where it lies pale and rough. (Drawn as a film a few cm deep: what is under it, the field's painted mud, is seen through.)
-  mud: { colour: 0x4a3a28, roughness: 0.3, metalness: 0.0, reflect: 0.45, opacity: 0.5, scum: 0.45, scumColour: 0x6a5a40, wave: 0.55, blood: true },
+  // Clay-water is thick with silt: grey-brown and opaque a few cm down (the furrows only just show), the sky lying grey on it, the silt in darker
+  // brown clouds where it is stirred (they stay glossy: `scumRough`). On it floats what the plough turned in and the feet tread up (`litter`): straw and
+  // stubble, pale, in short stalks lying every way, and dark crumbs of clod and leaf; m between pieces, the stalks' length, their colours.
+  mud: { colour: 0x564838, roughness: 0.22, metalness: 0.0, reflect: 0.7, opacity: 0.84, scum: 0.85, scumColour: 0x281d12, scumRough: 0.3, wave: 0.55, blood: true,
+    litter: { every: 0.16, length: [0.04, 0.22], straw: 0xa49676, dark: 0x221c14, share: 0.7, drift: 6, sunk: [0.35, 0.85] } },
   // Rain standing in the hollows of a trodden field (The Last Gate): clear water a few cm deep over dark mud, a mirror of the grey sky at a grazing look,
   // a little silt in it. Blood that falls in clouds it red (`blood`: blooddye.js, as the realistic grounds' puddles do).
   // Its rim (`edge`: from that share of the way out it thins to nothing, ragged by a noise) soaks into the mud rather than ending in a line.
@@ -81,6 +85,8 @@ function kwtMaterial(look, uniforms, max = KWT_MAX) {
     transparent: look.opacity < 1, opacity: look.opacity, depthWrite: true,
   });
   const own = { uKwScum: { value: look.scum }, uKwScumColour: { value: new THREE.Color(look.scumColour) }, uKwWave: { value: look.wave } };
+  const litter = look.litter;
+  if (litter) Object.assign(own, { uKwStraw: { value: new THREE.Color(litter.straw) }, uKwDark: { value: new THREE.Color(litter.dark) } });
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, own);
     // Blood in it (a battle's standing water): the shared clouds of blooddye.js, the water tinted where they lie.
@@ -99,9 +105,46 @@ function kwtMaterial(look, uniforms, max = KWT_MAX) {
   // (The crest of a ring is a little paler: froth on the sludge, a lit edge on the black water.)
   diffuseColor.rgb += vec3(0.05, 0.05, 0.04) * min(1.0, kwCrest);`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-  roughnessFactor = mix(roughnessFactor, 0.9, kwScum);`)
+  roughnessFactor = mix(roughnessFactor, ${(look.scumRough ?? 0.9).toFixed(2)}, kwScum);${litter ? '\n  roughnessFactor = mix(roughnessFactor, 0.85, kwLitter);' : ''}`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
   normal = normalize((viewMatrix * vec4(normalize(vec3(-kwG.x, 1.0, -kwG.y)), 0.0)).xyz);`);
+    if (litter) {
+      // The floating litter: in each cell of `every` m one piece, at a random place and heading, drifting slowly with the water; a straw stalk (a thin
+      // segment) or a dark crumb (a small blot). Worked out where it is drawn, no texture; a piece across a cell's edge is cut there (too small to see).
+      const cell = litter.every.toFixed(3);
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+uniform vec3 uKwStraw;
+uniform vec3 uKwDark;
+float kwLitter = 0.0;`)
+        .replace('#include <roughnessmap_fragment>', `{
+    vec2 at = vKwAt.xz / ${cell} + vec2(uKwTime * 0.004, uKwTime * 0.0025);
+    vec2 id = floor(at);
+    vec2 inCell = fract(at) - 0.5;
+    float a = kwHash(id);
+    float b = kwHash(id + 17.3);
+    float c = kwHash(id + 41.7);
+    vec2 centre = (vec2(b, c) - 0.5) * 0.5;
+    float turn = a * 6.2832;
+    vec2 along = vec2(cos(turn), sin(turn));
+    vec2 d = inCell - centre;
+    float half_ = mix(${(litter.length[0] / 2 / litter.every).toFixed(3)}, ${(litter.length[1] / 2 / litter.every).toFixed(3)}, fract(a * 7.31));
+    float t = clamp(dot(d, along), -half_, half_);
+    float off = length(d - along * t);
+    float pixel = fwidth(at.x) * 0.7;
+    // The litter lies in drifts (the water's eddies and the lee of the furrows gather it, drift m across): thick in them, a few pieces between.
+    float gathered = mix(0.15, 1.0, smoothstep(0.36, 0.6, kwNoise(vKwAt.xz / ${litter.drift.toFixed(1)}) * 0.7 + kwNoise(vKwAt.xz / ${(litter.drift / 3).toFixed(2)}) * 0.3));
+    float straw = step(b, ${litter.share.toFixed(2)} * gathered) * (1.0 - smoothstep(0.012, 0.012 + pixel, off));
+    float crumb = step(1.0 - 0.2 * gathered, c) * (1.0 - smoothstep(0.03, 0.03 + pixel, length(d) * mix(0.8, 1.6, fract(a * 3.7))));
+    // (Far off a stalk is thinner than a pixel: it is let fade rather than shimmer.)
+    float far = 1.0 - smoothstep(0.08, 0.2, pixel);
+    // (Most of it half sunk: the clay-water over it by as much as sunk lets through.)
+    kwLitter = max(straw, crumb) * mix(${litter.sunk[0].toFixed(2)}, ${litter.sunk[1].toFixed(2)}, fract(c * 9.7)) * far;
+    diffuseColor.rgb = mix(diffuseColor.rgb, straw > crumb ? uKwStraw * mix(0.7, 1.1, fract(b * 5.3)) : uKwDark, kwLitter);
+    diffuseColor.a = mix(diffuseColor.a, 1.0, kwLitter);
+  }
+  #include <roughnessmap_fragment>`);
+    }
     if (look.edge) {
       // (The mesh is a disc of radius 0.5 scaled to the puddle: twice its local radius is the share of the way to the rim.)
       shader.fragmentShader = shader.fragmentShader
@@ -119,7 +162,7 @@ function kwtMaterial(look, uniforms, max = KWT_MAX) {
         .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb *= mix(vec3(1.0), bloodDyeFilter, kwBlood);\n#include <tonemapping_fragment>');
     }
   };
-  material.customProgramCacheKey = () => `kitwater-${look.scum > 0 ? 'sludge' : 'clear'}-${max}${look.blood ? '-blood' : ''}${look.edge ? `-edge${look.edge}` : ''}`;
+  material.customProgramCacheKey = () => `kitwater-${look.scum > 0 ? 'sludge' : 'clear'}-${max}${look.blood ? '-blood' : ''}${look.edge ? `-edge${look.edge}` : ''}${look.scumRough ?? ''}${litter ? '-litter' : ''}`;
   return material;
 }
 
