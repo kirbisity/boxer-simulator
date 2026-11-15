@@ -84,9 +84,9 @@ export const SCENE_MUSIC = {
 // (Dunnottar's boss: the user's choir track; the generated 'boss' cue stays for any boss given no track of its own.)
 const BOSS_MUSIC = { dunnottar: 'bossChoir' };
 
-/** The cue for a moment ('menu' | 'opening' | 'boss' | 'victory' | 'defeat') in a scene (null for the menu), or null for none (a boss: his scene's own track, else the generated one). */
+/** The cue for a moment ('opening' | 'boss' | 'victory' | 'defeat') in a scene, or null for none (the menus have no music) (a boss: his scene's own track, else the generated one). */
 export function cueFor(scene, moment) {
-  if (moment === 'menu' || moment === 'victory' || moment === 'defeat') return moment;
+  if (moment === 'victory' || moment === 'defeat') return moment;
   if (moment === 'opening') return SCENE_MUSIC[scene] ?? null;
   if (moment === 'boss') return BOSS_MUSIC[scene] ?? 'boss';
   return null;
