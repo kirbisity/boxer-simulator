@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { readFileSync, statSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { MUSIC_CUES, SCENE_MUSIC, cueFor } from '../src/audio/music/manifest.js';
 import { SCENARIOS } from '../src/scenarios.js';
@@ -7,7 +8,8 @@ const MOMENTS = ['opening', 'boss', 'victory', 'defeat'];
 
 test('every cue decodes to a real MP3 or MP4 file', () => {
   for (const [id, cue] of Object.entries(MUSIC_CUES)) {
-    const bytes = Buffer.from(cue.data, 'base64');
+    // (A supplied piece is a file beside the page; a sting is embedded.)
+    const bytes = cue.file ? readFileSync(cue.file) : Buffer.from(cue.data, 'base64');
     assert.ok(bytes.length > 20000, `${id}: only ${bytes.length} bytes`);
     if (cue.mime === 'audio/mpeg') {
       const id3 = bytes.subarray(0, 3).toString('latin1') === 'ID3';
@@ -26,8 +28,8 @@ test('every cue decodes to a real MP3 or MP4 file', () => {
 test('the loops run 30-60 s and the stings 8-15 s', () => {
   for (const [id, cue] of Object.entries(MUSIC_CUES)) {
     const seconds = cue.loopEnd - cue.loopStart;
-    // (A whole track looped, the supplied boss music, runs its length: 2 to 4 minutes.)
-    if (id === 'bossChoir') assert.ok(seconds >= 120 && seconds <= 240, `${id}: a ${seconds} s track`);
+    // (A whole piece looped, every supplied one, runs its length: 2 to 4 and a half minutes.)
+    if (id === 'bossChoir' || cue.file) assert.ok(seconds >= 120 && seconds <= 270, `${id}: a ${seconds} s piece`);
     else if (cue.loop) assert.ok(seconds >= 30 && seconds <= 60, `${id}: a ${seconds} s loop`);
     else assert.ok(seconds >= 8 && seconds <= 15, `${id}: a ${seconds} s sting`);
   }
@@ -60,8 +62,17 @@ test('cueFor covers every scenario, Dunnottar and the colosseum', () => {
   assert.equal(cueFor(null, 'opening'), null);
 });
 
-test('the music fits its 6 MB budget', () => {
-  // (4.5 MB for the generated cues, and the supplied 3-minute boss track, 1.4 MB of base64.)
-  const total = Object.values(MUSIC_CUES).reduce((sum, cue) => sum + cue.data.length, 0);
-  assert.ok(total <= 6e6, `${(total / 1e6).toFixed(2)} MB of base64`);
+test('the embedded music fits 2 MB and the pieces 50 MB, each loaded only when its scene wants it', () => {
+  // (The stings and the Dunnottar boss's choir embedded, 1.6 MB of base64; thirteen pieces of 3 to 4 MB at 128 kbps.)
+  const cues = Object.values(MUSIC_CUES);
+  const embedded = cues.reduce((sum, cue) => sum + (cue.data?.length ?? 0), 0);
+  assert.ok(embedded <= 2e6, `${(embedded / 1e6).toFixed(2)} MB of base64`);
+  const files = [...new Set(cues.filter((cue) => cue.file).map((cue) => cue.file))];
+  const total = files.reduce((sum, file) => sum + statSync(file).size, 0);
+  assert.ok(total <= 50e6, `${(total / 1e6).toFixed(1)} MB of pieces`);
+});
+
+test('the supplied pieces are all played somewhere', () => {
+  const played = new Set([...Object.values(SCENE_MUSIC), 'boss']);
+  for (const [id, cue] of Object.entries(MUSIC_CUES)) if (cue.file) assert.ok(played.has(id), `${id} (${cue.title}) plays nowhere`);
 });

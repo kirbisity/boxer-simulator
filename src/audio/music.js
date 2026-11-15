@@ -2,8 +2,8 @@
 // faded out); the Noname boss fight while his bar shows; victory and defeat (once). The rest of the time there is none: the ambience
 // and the fight are the sound. The menus (the home screen and the screens opened from it) have none.
 //
-// The cues are pre-rendered (ACE-Step, period instruments per scenario: audio/music/manifest.js), embedded as base64; each is decoded
-// the first time it is wanted and kept. A loop plays on between its loop points (its seam is cross-faded in the
+// The cues (audio/music/manifest.js): the scenes' pieces are supplied recordings fetched from beside the page (`file`), the stings
+// embedded as base64 (`data`); each is fetched and decoded the first time it is wanted and kept. A loop plays on between its loop points (its seam is cross-faded in the
 // file itself); a change of cue cross-fades one into the next. Under loud action the music ducks.
 //
 // `musicMoment` is pure (Node tests); `createMusic` plays.
@@ -36,6 +36,20 @@ function bytesOf(base64) {
   return bytes.buffer;
 }
 
+/** A cue's bytes: its file fetched (MUSIC_FILE_BASE before its path, where the page is not beside assets/), or its embedded base64. */
+async function bytesOfCue(cue) {
+  if (!cue.file) return bytesOf(cue.data);
+  const response = await fetch(`${MUSIC_FILE_BASE}${cue.file}`);
+  if (!response.ok) throw new Error(`${cue.file}: ${response.status}`);
+  return response.arrayBuffer();
+}
+
+/** Where the cues' files are, before their paths ('' beside the page; a page put elsewhere sets it: the music board). */
+export let MUSIC_FILE_BASE = '';
+export function setMusicFileBase(base) {
+  MUSIC_FILE_BASE = base;
+}
+
 /**
  * The player: `update({ moment, key, scene, duck }, when)` once a tick: the cue for the moment (manifest cueFor) played, looped and
  * cross-faded; `play(id)` a cue now (the bench); `stop()`. `onMissing(moment)`: told when a victory or defeat has no cue (the engine
@@ -52,7 +66,7 @@ export function createMusic(ctx, out, { onMissing = () => {} } = {}) {
   function decode(id) {
     if (!decoded.has(id)) {
       const cue = MUSIC_CUES[id];
-      decoded.set(id, cue ? ctx.decodeAudioData(bytesOf(cue.data)).catch((error) => {
+      decoded.set(id, cue ? bytesOfCue(cue).then((bytes) => ctx.decodeAudioData(bytes)).catch((error) => {
         console.warn(`Gladiator: the music cue ${id} could not be decoded`, error);
         return null;
       }) : Promise.resolve(null));
