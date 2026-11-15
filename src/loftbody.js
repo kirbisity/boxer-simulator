@@ -279,6 +279,10 @@ export const LOFT = {
   // A plate harness's edges with the detail maps (harnessEdgesOn): a band `depth` (m; at most `most` of a short piece) at each
   // end of a piece, `lift` (share of the radius) proud of it; a couter's and a poleyn's `copLames` articulating lames.
   harnessEdge: { depth: 0.025, most: 0.3, lift: 0.012, copLames: 2 },
+  // A collar worn under a coat to the neck starts this far up the neck (shares of it; 0 its foot): see underCoat.
+  collarUnder: 0.02,
+  // A hung sleeve's bag (FLARED): the lobe below the arm falls off round the ring as the cosine to this power (higher, narrower).
+  sleeveBag: 4,
   // A worn loft's closed end on a base body (capsFollow): its middle this share of the ring's radius out past the ring.
   capDome: 0.3,
   // A brigandine's rivet heads: three rows to a ring, each `size` of its column
@@ -741,7 +745,7 @@ const FLARED = {
     const pleat = pleatAt(ring, angle);
     if (pleat !== null) out *= 1 + ring.fold * (pleat - 0.5);
     // (The bag: a narrow lobe at the back of the ring, as thick as the sleeve round the arm.)
-    if (ring.hang) out += (ring.hang / ring.depth) * Math.max(0, -Math.cos(angle)) ** 6;
+    if (ring.hang) out += (ring.hang / ring.depth) * Math.max(0, -Math.cos(angle)) ** LOFT.sleeveBag;
     return out;
   },
   capStart: false,
@@ -4637,7 +4641,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // A collar up the neck: plate's gorget, or heavy riot armour's padded collar.
   // The riot collar starts lower and flares out over the trapezius, so no skin shows between it and the vest.
   // Plate's gorget flares down over the tops of the breast and back plates, closing the gap between them and the helmet.
-  const collarFrom = plate ? -0.45 : lamellar || kit?.collar ? -0.15 : -0.6;
+  // (A collar worn under a coat to the neck, the rōnin's manchira under his kosode, `underCoat`, starts on the neck itself,
+  // LOFT.collarUnder: from below the neck's foot it was fitted as the trunk's outermost piece, over the trapezius and down the
+  // back, and showed there through the coat as a tongue of mail between the coat's collar edges.)
+  const underCoat = Boolean(kit?.collar) && !kit.trunk && !plate && !lamellar && Boolean(topShape) && !topShape.torn && topShape.neck >= LOFT.closedJoint.top.trunk;
+  const collarFrom = plate ? -0.45 : underCoat ? LOFT.collarUnder : lamellar || kit?.collar ? -0.15 : -0.6;
   const flare = (t) => 1 + (lamellar || kit?.collar ? 0 : (plate ? 0.7 : 0.9) * Math.max(0, -t) / 0.6);
   if (plate || lamellar || kit?.collar || armor?.kind === 'heavyRiot') {
     const collarRings = tagged('neck', along(at('neck'), at('head'), forward, count(3), collarFrom, 0.55, (t) => neckR * 1.55 * flare(t), (t) => neckR * 1.6 * flare(t) * flare(t)));
@@ -4716,10 +4724,15 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       if (shape.sleeveFlare) {
         const upper = upperArmRings(-0.3, 1.05, count(6));
         const elbow = Math.max(upper.at(-1).depth, upper.at(-1).width);
-        const mid = shape.sleeveLoose * (1 + (shape.sleeveFlare - 1) * (1.35 / (shape.sleeve + 0.3)));
         const hang = shape.sleeveHang ?? 0;
-        loft(mesh, bagged(widened(upper, 1.1, mid), 0, hang), sides, { color: pattern, ...FLARED });
-        loft(mesh, bagged(widened(forearmRings(0.05, shape.sleeve - 1, count(4)), mid, shape.sleeveLoose * shape.sleeveFlare, hang ? 0 : elbow), hang, hang), sides, { color: pattern, ...FLARED, capEnd: hang > 0 });
+        // (A hung sleeve is flat: two layers of cloth close round the arm, its depth the bag below it, `sleeveLoose` all its
+        // length. Widened to the flare as well it was a round tube half as wide again as the arm, with the bag under it.)
+        const mid = hang ? shape.sleeveLoose : shape.sleeveLoose * (1 + (shape.sleeveFlare - 1) * (1.35 / (shape.sleeve + 0.3)));
+        const mouth = hang ? shape.sleeveLoose : shape.sleeveLoose * shape.sleeveFlare;
+        // (The bag drawn on twice the sides round, so its lobe below the arm is a rounded fold, not two flat faces and a corner.)
+        const round = hang && !lowDetail ? sides * 2 : sides;
+        loft(mesh, bagged(widened(upper, 1.1, mid), 0, hang), round, { color: pattern, ...FLARED });
+        loft(mesh, bagged(widened(forearmRings(0.05, shape.sleeve - 1, count(4)), mid, mouth, hang ? 0 : elbow), hang, hang), round, { color: pattern, ...FLARED, capEnd: hang > 0 });
         return;
       }
       // (Under a harness's pauldron the sleeve's head ends inside the cap, not above it.)
