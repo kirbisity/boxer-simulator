@@ -77,6 +77,8 @@ export function outlineFor(mesh, width = STYLE.outlineWidth) {
   // three caches programs by onBeforeCompile's source text, which is the same
   // for every width: key the program by the width, or all widths share the first.
   material.customProgramCacheKey = () => `outline-${width.toFixed(5)}`;
+  // (Kept on the material for what bakes a still body's outline into place: fallenview.js.)
+  material.userData.outlineWidth = width;
   const outline = mesh.isSkinnedMesh ? new THREE.SkinnedMesh(mesh.geometry, material) : new THREE.Mesh(mesh.geometry, material);
   if (mesh.isSkinnedMesh) outline.bind(mesh.skeleton, mesh.bindMatrix);
   outline.userData.outline = true;
