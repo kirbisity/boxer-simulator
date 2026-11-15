@@ -252,7 +252,7 @@ export const LOFT = {
   // goes on looking for skin while skin goes on along its line, set against the family's BMI 100 woman, whose hips and belly
   // stand up to 26 cm past the loft's rings of her shorts (measured by a ray cast through the modelled skin).)
   fit: { kinds: { plate: { squeeze: 0.8, waist: 0.25 }, rows: { squeeze: 0.6, waist: 0.5 }, coat: { squeeze: 0.4, waist: 0.75 }, panel: { squeeze: 0.4, waist: 0.75 }, hung: { squeeze: 0.4, waist: 0.75 }, soft: { squeeze: 0, waist: 1 } },
-    ribs: 0.6, waistIn: [0.1, 0.6], alongPasses: 2, tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, overhang: 0.005, across: 0.03, sampling: 0.5, tuck: 0.03, deeper: 0.07, farthest: 0.3, parallel: 0.999, onLine: 0.03, clear: 1.02, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25, herReach: 0.6, leanRing: 0.13 },
+    ribs: 0.6, waistIn: [0.1, 0.6], alongPasses: 2, tightest: 0.7, alongBand: 0.015, hardSpan: 0.8, overhang: 0.005, across: 0.03, sampling: 0.5, tuck: 0.03, deeper: 0.07, farthest: 0.3, parallel: 0.999, onLine: 0.03, clear: 1.02, capRamp: 0.12, ownBlend: 0.2, armReach: 1.6, armFrom: -0.25, herReach: 0.6, leanRing: 0.13 },
   // Trunk lean radius (m) below which the body looks wasted, and over what
   // span it reaches the BMI floor's look (~0.107 m for a 180 cm man).
   wastingFrom: 0.135,
@@ -3343,7 +3343,13 @@ function fitClothToBase(mesh, parts, armoured) {
     const inward = CINCHED_ROLES.has(mesh.colors[vertex]) || soft ? radius * (1 - spec.tightest) : 0;
     // (Over the cap only on its rings that reach it, from the trunk's closed top down: lower, at the chest, the arm hangs beside
     // the coat, not in it, and a coat of plates enclosing it stood 11 to 15 cm wider than the bare chest at an ordinary build.)
-    const overCap = name === 'trunk' && !ribCut(vertex, name) && pieceTop.get(ring.piece) >= LOFT.closedJoint.top.trunk && ring.t >= LOFT.closedJoint.top.trunk;
+    // (Below those rings, over `capRamp` of the trunk, it is let out towards the arm's outside by the share of the way up, so the
+    // cloth falls from the shoulder's top to beside the arm in a slope: enclosing at the top ring alone, then not at all on the
+    // next, it stood out level over the arm and dropped straight, a box at each shoulder.)
+    const capTop = LOFT.closedJoint.top.trunk;
+    const capShare = name === 'trunk' && !ribCut(vertex, name) && pieceTop.get(ring.piece) >= capTop ? Math.max(0, Math.min(1, (ring.t - capTop + spec.capRamp) / spec.capRamp)) : 0;
+    const overCap = capShare >= 1;
+    let armCap = 0;
     // (A leg's piece clears the flesh on its own side of the trunk's middle only: at the top of a very fat woman's thighs the
     // model's skin is one mass across both, and a line in from the shorts' leg ran on through it to the far hip.)
     const side = LEG.test(name) && frames.trunk ? Math.sign(vec.dot(vec.sub(ring.center, frames.trunk.part.a), frames.trunk.widthAxis)) : 0;
@@ -3377,6 +3383,10 @@ function fitClothToBase(mesh, parts, armoured) {
           if (name === 'trunk' && !overCap && arm && !ribCut(vertex, name)) {
             if (/Upper|Fore/.test(fleshOf)) armOnLine = Math.min(armOnLine, along);
             else besides.push(along);
+            if (capShare > 0) {
+              armCap = Math.max(armCap, along);
+              past = Math.max(past, along - radius + spec.deeper);
+            }
             continue;
           }
           // (The arm's flesh fits a piece on the arm, the rest of the skin a piece on the rest.)
@@ -3390,6 +3400,7 @@ function fitClothToBase(mesh, parts, armoured) {
     // (Behind an arm's own skin on the line out it is the arm that is seen, and the skin of the arm's root there, past the arm,
     // is not enclosed: a thin woman's armpit skin stands out round her arm, and a bandeau's upper edge reached out to it in blades.)
     for (const along of besides) if (along < armOnLine && along > need) need = along;
+    if (armCap > need) need += capShare * (armCap - need);
     // (A leg's flesh under a trunk's piece, a fauld's foot or a skirt over the thighs, is cleared whole: the leg wears its own
     // pieces at its own cut, and a groin's mail pressed in to the trunk's lean ring sank inside the hose of both thighs.)
     const cut = legs ? { ...cutOf(vertex, name), squeeze: 0 } : cutOf(vertex, name);
