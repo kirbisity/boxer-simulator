@@ -155,5 +155,6 @@
   "map-cerignola": {},
   "map-subway": {},
   "map-stadium": {},
+  "map-canaltown": {},
   "map-pyongyang": { "mapYaw": 2.75, "mapPitch": 0.16, "mapDistance": 1.1 }
 }

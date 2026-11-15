@@ -79,6 +79,11 @@ export const CANAL_TOWN_LIGHT = { background: 0x9aa4aa, fog: [60, 400], far: 520
 export function buildCanalTown() {
   return new THREE.Group();
 }
+export const CANAL_TOWN = null;
+export function canalTownPlan() {
+  return null;
+}
+canalTownPlan.absent = true;
 `,
   'places/pyongyang': `
 export const PYONGYANG_LIGHT = { background: 0xd3dbe2, fog: [150, 1500], far: 2400, key: 0xffffff, keyIntensity: 0.1, rim: 0xffffff, sun: 1, hemi: 0.62 };
