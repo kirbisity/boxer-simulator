@@ -132,7 +132,7 @@ Every fight is watched by default; **Play red** takes control of the red lead. *
 npm run serve        # http://127.0.0.1:8934
 npm test
 npm run bout -- heavy:muayThai light:kickboxing 10 180   # headless bouts by preset:style
-npm run bundle       # dist/gladiator.html, one self-contained page
+npm run bundle       # dist/historically-accurate-combat-simulator.html, one self-contained page
 ```
 
 ## Photo faces

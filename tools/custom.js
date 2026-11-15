@@ -1,4 +1,4 @@
-// The custom build (`node tools/bundle.js --custom` → dist/gladiator-custom.html): a test bed that is only the sandbox (custom
+// The custom build (`node tools/bundle.js --custom` → dist/historically-accurate-combat-simulator-custom.html): a test bed that is only the sandbox (custom
 // mode: the fighter builder and its fights), opened at once, in one file under its budget (CUSTOM_BUDGET). The fights are the same code as the full
 // game's (physics, AI, weapons, outfits, fire, sound effects, the builder's roster and presets); what custom mode never reaches is
 // left out: level mode (the Dunnottar stages, their kit, the storm and its sky photographs, the story, cutscenes and HUD), story mode, Last

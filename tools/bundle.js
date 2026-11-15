@@ -34,7 +34,7 @@ const lite = args.includes('--lite');
 // the modules it never reaches left out (stubbed where kept code imports them), the music gone, the ground tiles of its places kept.
 const custom = args.includes('--custom');
 if (lite && custom) throw new Error('--lite and --custom are two different builds: pick one');
-const out = args.find((arg) => !arg.startsWith('--')) ?? (lite ? 'dist/gladiator-lite.html' : custom ? 'dist/gladiator-custom.html' : 'dist/gladiator.html');
+const out = args.find((arg) => !arg.startsWith('--')) ?? (lite ? 'dist/historically-accurate-combat-simulator-lite.html' : custom ? 'dist/historically-accurate-combat-simulator-custom.html' : 'dist/historically-accurate-combat-simulator.html');
 // The modules in this page, in order: a custom page's excluded modules gone, or in their place their stubs (CUSTOM_STUBS).
 const listed = custom ? MODULES.filter((name) => !CUSTOM_EXCLUDED(name) || CUSTOM_STUBS[name]) : MODULES;
 const stubbed = (name) => custom && CUSTOM_EXCLUDED(name);
@@ -232,7 +232,7 @@ let pageCode = code;
 let pageWorker = workerCode;
 if (minify) {
   const mapName = `${basename(out)}.map`;
-  const main = minified(code, 'gladiator-src.js');
+  const main = minified(code, 'historically-accurate-combat-simulator-src.js');
   pageCode = main.code;
   pageWorker = minified(workerCode, 'skin-worker-src.js').code;
   new vm.Script(pageCode);

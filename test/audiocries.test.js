@@ -45,8 +45,8 @@ const struck = (fighter, energy, t, covering = 'flesh') => ({ type: 'voice', kin
 test('the cry sets are there for each sex and kind, the charge loop too, and the bundle carries them', () => {
   for (const sex of SEXES) for (const kind of Object.keys(CRY_KINDS)) assert.ok(SAMPLE_SETS[`voice-${sex}-${kind}`]?.length >= 2, `voice-${sex}-${kind}`);
   assert.deepEqual(SAMPLE_SETS.charge, ['charge-1']);
-  if (!existsSync('dist/gladiator.html')) return;
-  const page = readFileSync('dist/gladiator.html', 'utf8');
+  if (!existsSync('dist/historically-accurate-combat-simulator.html')) return;
+  const page = readFileSync('dist/historically-accurate-combat-simulator.html', 'utf8');
   for (const name of [...SAMPLE_SETS['voice-female-scream'], ...SAMPLE_SETS['voice-male-hurt'], 'charge-1']) assert.ok(page.includes(readFileSync(`src/audio/samples/${name}.mp3`).toString('base64')), `${name} in the bundle`);
 });
 

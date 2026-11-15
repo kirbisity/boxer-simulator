@@ -129,7 +129,7 @@ test('linearise decodes sRGB colours and unlinearise restores the authored value
 test('the bundle carries the kit, the registry and every look file, and refuses duplicate names', () => {
   const bundler = readFileSync(new URL('../tools/bundle.js', import.meta.url), 'utf8');
   for (const name of ['looks/kit', 'looks', 'looksbench', ...LOOKS.map((look) => `looks/${look.id}`)]) assert.ok(bundler.includes(`'${name}'`), `${name} is not in tools/bundle.js MODULES`);
-  const out = join(mkdtempSync(join(tmpdir(), 'looks-bundle-')), 'gladiator.html');
+  const out = join(mkdtempSync(join(tmpdir(), 'looks-bundle-')), 'historically-accurate-combat-simulator.html');
   // The bundler throws if two modules declare one top-level name or a module does not compile.
   execFileSync('node', ['tools/bundle.js', out, '--no-minify'], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
   const page = readFileSync(out, 'utf8');

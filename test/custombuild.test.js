@@ -44,7 +44,7 @@ test('no kept module needs an excluded one at runtime: every name it imports fro
 });
 
 test('the custom page is one file under its budget, without the music, the storm sky or the left-out tiles', () => {
-  const out = join(mkdtempSync(join(tmpdir(), 'custom-bundle-')), 'gladiator-custom.html');
+  const out = join(mkdtempSync(join(tmpdir(), 'custom-bundle-')), 'historically-accurate-combat-simulator-custom.html');
   bundle(out, '--custom');
   const size = statSync(out).size;
   assert.ok(size < CUSTOM_BUDGET && CUSTOM_BUDGET < 16_000_000, `${size} bytes`);
