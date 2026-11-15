@@ -97,6 +97,7 @@ import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
 import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
 import { installStory } from './story/storyview.js';
+import { easeFor } from './story/scenes/stage.js';
 import { STORY_MUSTER_RADIUS, STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
 import { tkSetTier, tkTier } from './townkit/place.js';
 import { tkWeatherNow } from './townkit/weather.js';
@@ -745,8 +746,13 @@ function walkAbout(fighter) {
   }
   const pelvis = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   fighter.strafe = 0;
+  // Walking about a story place (enterStoryRoam: nobody there is fighting), he stands and walks at ease as the
+  // scenes' men do (story/scenes/stage.js easeFor): standing, the hands down and the feet side by side; walking, the
+  // arms to the stride. Out of the crouch of the guard, a man standing still in built shade is not read as hanging in the air.
+  const atEase = Boolean(state.world?.roam);
   if (!along && !across) {
     // Standing: keep the way he faces.
+    if (atEase) fighter.ease = easeFor(fighter, { time: state.world.time });
     fighter.move = 0;
     fighter.goTo = [pelvis[0] + Math.cos(fighter.yaw) * 3, 0, pelvis[1] - Math.sin(fighter.yaw) * 3];
     return;
@@ -758,6 +764,7 @@ function walkAbout(fighter) {
     fighter.move = 0;
     return;
   }
+  if (atEase) fighter.ease = easeFor(fighter, { walking: true });
   fighter.goTo = [pelvis[0] + (way[0] / size) * 3, 0, pelvis[1] + (way[1] / size) * 3];
   fighter.move = 1;
   fighter.running = state.walkRunning && !fighter.crawling;
@@ -770,6 +777,8 @@ function setWalking(on) {
   if (!fighter) return;
   fighter.walking = on;
   if (!on) {
+    // (Back on guard: the ease a story place's walk gave him is let go.)
+    if (state.world?.roam) fighter.ease = undefined;
     fighter.goTo = null;
     fighter.move = 0;
     fighter.running = false;
@@ -3047,6 +3056,9 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   state.sideAsked = true;
   $('#side-pick').hidden = true;
   $('#modes button[data-value="play"]:not([data-side])').click();
+  // (The mode's button puts the one played on guard: here he walks about, at ease, until he fights. walkAbout.)
+  state.world.roam = key;
+  setWalking(true);
   state.walkRunning = false;
   renderHud();
   boxer.finishBuilding();
