@@ -26,27 +26,27 @@ export const CUSTOM_BATTLE = {
   caps: { side: MUSTER.cap, total: 70 },
   // The ground: the places a battle is fought in, each with the floor and the camera its set battles have there
   // (scenarios.js, drawn apart: the riders' room to charge and wheel; the town, the water town and the port only as wide
-  // as their house fronts, shops and containers leave), `glyph` for its card where it has no picture.
+  // as their house fronts, shops and containers leave), `icon` (uiicons.js) for its card where it has no picture.
   maps: {
-    field: { label: 'Open field', glyph: '🌾', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
-    plain: { label: 'The plain', glyph: '🏞️', arena: { halfX: 30, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.45, distance: 28, maxDistance: 38 } },
-    meadow: { label: 'Meadow', glyph: '🌼', arena: { halfX: 12, halfZ: 8 }, camera: { yaw: -0.5, pitch: 0.42, distance: 13, maxDistance: 17 } },
-    sengoku: { label: 'Sengoku valley', glyph: '🏯', arena: { halfX: 30, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 } },
-    sarhu: { label: 'Sarhu hills', glyph: '⛰️', arena: { halfX: 30.5, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 } },
-    town: { label: 'Market town', glyph: '🏘️', arena: { halfX: 11.5, halfZ: 8.5 }, camera: { yaw: -0.55, pitch: 0.42, distance: 10.5, maxDistance: 10.5 } },
-    jiangnan: { label: 'Water town', glyph: '🛶', arena: { halfX: 18, halfZ: 9 }, camera: { yaw: -0.5, pitch: 0.42, distance: 19, maxDistance: 24 } },
-    cajamarca: { label: 'Cajamarca square', glyph: '☀️', arena: { halfX: 16, halfZ: 11 }, camera: { yaw: -0.5, pitch: 0.48, distance: 19, maxDistance: 25 } },
-    coastFort: { label: 'Coast fort', glyph: '⚓', arena: { halfX: 17.5, halfZ: 10 }, camera: { yaw: -0.5, pitch: 0.42, distance: 18.5, maxDistance: 23 } },
-    port: { label: 'Harbour', glyph: '🚢', arena: { halfX: 11, halfZ: 6 }, camera: { yaw: -0.6, pitch: 0.36, distance: 10, maxDistance: 12 } },
-    mobei: { label: 'Gobi steppe', glyph: '🐎', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
-    catalaunian: { label: 'Catalaunian plains', glyph: '🌿', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
-    carrhae: { label: 'Desert', glyph: '🏜️', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
+    field: { label: 'Open field', icon: 'wheat', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
+    plain: { label: 'The plain', icon: 'hills', arena: { halfX: 30, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.45, distance: 28, maxDistance: 38 } },
+    meadow: { label: 'Meadow', icon: 'flower', arena: { halfX: 12, halfZ: 8 }, camera: { yaw: -0.5, pitch: 0.42, distance: 13, maxDistance: 17 } },
+    sengoku: { label: 'Sengoku valley', icon: 'tenshu', arena: { halfX: 30, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 } },
+    sarhu: { label: 'Sarhu hills', icon: 'mountain', arena: { halfX: 30.5, halfZ: 15 }, camera: { yaw: -0.5, pitch: 0.42, distance: 28, maxDistance: 36 } },
+    town: { label: 'Market town', icon: 'houses', arena: { halfX: 11.5, halfZ: 8.5 }, camera: { yaw: -0.55, pitch: 0.42, distance: 10.5, maxDistance: 10.5 } },
+    jiangnan: { label: 'Water town', icon: 'boat', arena: { halfX: 18, halfZ: 9 }, camera: { yaw: -0.5, pitch: 0.42, distance: 19, maxDistance: 24 } },
+    cajamarca: { label: 'Cajamarca square', icon: 'sun', arena: { halfX: 16, halfZ: 11 }, camera: { yaw: -0.5, pitch: 0.48, distance: 19, maxDistance: 25 } },
+    coastFort: { label: 'Coast fort', icon: 'anchor', arena: { halfX: 17.5, halfZ: 10 }, camera: { yaw: -0.5, pitch: 0.42, distance: 18.5, maxDistance: 23 } },
+    port: { label: 'Harbour', icon: 'ship', arena: { halfX: 11, halfZ: 6 }, camera: { yaw: -0.6, pitch: 0.36, distance: 10, maxDistance: 12 } },
+    mobei: { label: 'Gobi steppe', icon: 'horse', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
+    catalaunian: { label: 'Catalaunian plains', icon: 'grass', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
+    carrhae: { label: 'Desert', icon: 'dunes', arena: { halfX: 45, halfZ: 30 }, camera: { yaw: -0.5, pitch: 0.42, distance: 36, maxDistance: 52 } },
     // The other battles' grounds (each its level's floor, without its works: the stakes and ditches were that day's; render.js PLACE_ARENAS).
-    agincourt: { label: 'Agincourt field', glyph: '🏹', arena: { halfX: 50, halfZ: 11.5 }, camera: { yaw: -0.5, pitch: 0.42, distance: 30, maxDistance: 46 } },
-    cerignola: { label: 'Cerignola slope', glyph: '🍇', arena: { halfX: 32, halfZ: 11 }, camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 30 } },
-    coastVillage: { label: 'Coast village', glyph: '🛖', arena: { halfX: 12, halfZ: 8 }, camera: { yaw: -0.5, pitch: 0.42, distance: 13, maxDistance: 17 } },
-    subway: { label: 'Subway', glyph: '🚇', arena: SUBWAY_ARENA, camera: { yaw: -0.25, pitch: 0.3, distance: 8, maxDistance: 10 } },
-    stadium: { label: 'Stadium', glyph: '🏟️', arena: { halfX: 10, halfZ: 7 }, camera: { yaw: -0.35, pitch: 0.36, distance: 12, maxDistance: 15 } },
+    agincourt: { label: 'Agincourt field', icon: 'bow', arena: { halfX: 50, halfZ: 11.5 }, camera: { yaw: -0.5, pitch: 0.42, distance: 30, maxDistance: 46 } },
+    cerignola: { label: 'Cerignola slope', icon: 'grapes', arena: { halfX: 32, halfZ: 11 }, camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 30 } },
+    coastVillage: { label: 'Coast village', icon: 'hut', arena: { halfX: 12, halfZ: 8 }, camera: { yaw: -0.5, pitch: 0.42, distance: 13, maxDistance: 17 } },
+    subway: { label: 'Subway', icon: 'train', arena: SUBWAY_ARENA, camera: { yaw: -0.25, pitch: 0.3, distance: 8, maxDistance: 10 } },
+    stadium: { label: 'Stadium', icon: 'arena', arena: { halfX: 10, halfZ: 7 }, camera: { yaw: -0.35, pitch: 0.36, distance: 12, maxDistance: 15 } },
     // The level strip before the walls of Pyongyang (places/pyongyang.js), the wall itself standing at the floor's east
     // end as chapter 3's battle has it (story/battles/03-pyongyang.js: its height and foot), without that day's ladders:
     // both sides draw up before it (`zones`, facing each other across `middle`), the gate and the wall behind the

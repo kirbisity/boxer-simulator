@@ -48,7 +48,7 @@ export const EVENTS = {
 // Passive is the sandbox's: nobody makes a fighter who will not fight.
 const UNARMED = STYLE_KEYS.filter((key) => !STYLES[key].weapon && !STYLES[key].passive);
 const ARMED = STYLE_KEYS.filter((key) => STYLES[key].weapon);
-// What each style is (the ⓘ of its card), in either language.
+// What each style is (the info button of its card), in either language.
 const STYLE_NOTES = {
   boxing: { en: 'Hands only: slips, rolls, combinations.', zh: '只用拳：闪、潜、组合拳。' }, kickboxing: { en: 'Punches and kicks from range.', zh: '拳脚并用，远距离开打。' }, street: { en: 'Wild and heavy, little defence.', zh: '又野又狠，基本不防守。' },
   muayThai: { en: 'Kicks, knees, elbows, the clinch.', zh: '腿、膝、肘，外加箍颈缠抱。' }, sumo: { en: 'Pushes and drives men off their feet.', zh: '推、顶，把人撞得脚下离地。' }, mix: { en: 'Switches between the unarmed styles.', zh: '几门徒手功夫换着用。' },
@@ -115,7 +115,7 @@ function screen(id, title, subtitle, onBack) {
 
 /**
  * A choice: glyph (the name of its drawn icon), kicker and title, kept small (its line of text is its tooltip, and a battle's whole story is behind
- * its ⓘ: `withStory`). Without `onClick`, not open yet: shown, dimmed, and saying so.
+ * its info button: `withStory`). Without `onClick`, not open yet: shown, dimmed, and saying so.
  */
 function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
   const open = Boolean(onClick);
@@ -124,7 +124,7 @@ function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
     el('span', { className: 'words' }, kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), text ? el('span', { className: 'note', textContent: text }) : null));
 }
 
-/** A choice with its story (`title`, `kicker`, the paragraphs of `lines`) a tap away behind its ⓘ (infopop.js). */
+/** A choice with its story (`title`, `kicker`, the paragraphs of `lines`) a tap away behind its info button (infopop.js). */
 const withStory = (card, { title, kicker, lines }) => withInfo(card, () => el('div', { className: 'story-info' },
   kicker ? el('em', { textContent: kicker }) : null, el('b', { textContent: title }), ...lines.filter(Boolean).map((line) => el('p', { textContent: line }))), t('menu.story', { title }));
 
@@ -309,7 +309,7 @@ export function installMenus(game) {
 
   // ---- Battle Mode: the levels --------------------------------------------------
   // A battle is one tap from here as the level has it; its Set up button opens the setup (musterview.js): the armies, their order, the man played;
-  // its ⓘ its story. The custom battle first (custombattleview.js): the player's own ground, sides and men.
+  // behind its info button its story. The custom battle first (custombattleview.js): the player's own ground, sides and men.
   function levels() {
     redraw = levels;
     const body = screen('levels-screen', t('menu.home.battle.title'), t('menu.levels.lede'), home);
@@ -320,7 +320,7 @@ export function installMenus(game) {
       const play = choice({ glyph: { rebellion: 'wheat', pride: 'glove', port: 'ship', agincourt: 'bow', cerignola: 'flame', sekigahara: 'torii', pyongyang: 'pagoda', cajamarca: 'sun', zeelandia: 'anchor', wokou: 'pennon', qiJiguang: 'shield', rhodes: 'moon' }[key] ?? 'banner', kicker: tname(pick(level.place)).split(' · ').pop(), title: tname(level.title), text: pick(level.blurb), onClick: () => { close(); game.level(key); } });
       addBattleThumb(play, key);
       const told = withStory(play, { title: tname(level.title), kicker: tname(pick(level.place)), lines: [pick(level.blurb), pick(level.roster)] });
-      // (The card's kicker is the date alone, to fit one line; the ⓘ has the place too.) A battle of armies (a `cast`) can be set up; a duel cannot.
+      // (The card's kicker is the date alone, to fit one line; the info button has the place too.) A battle of armies (a `cast`) can be set up; a duel cannot.
       if (!level.cast) return told;
       return el('div', { className: 'level-card' }, told, el('button', { className: 'level-setup', type: 'button', icon: 'cog', textContent: t('menu.levels.setup'), title: t('menu.levels.setupTitle', { title: tname(level.title) }), onclick: () => muster(key) }));
     };
@@ -625,7 +625,7 @@ export function installMenus(game) {
     function styleCard(key) {
       {
         const style = STYLES[key];
-        // Its name only; what it is, in its pop-up (the ⓘ, a long press or a right-click).
+        // Its name only; what it is, in its pop-up (the info button, a long press or a right-click).
         const card = el('button', { type: 'button', className: inputs.style === key ? 'card-choice on' : 'card-choice' }, el('b', { textContent: tname(style.label) }));
         card.onclick = () => {
           inputs.style = key;

@@ -2917,31 +2917,31 @@ export const PICKABLE_OUTFIT_KEYS = OUTFIT_KEYS.filter((key) => !OUTFITS[key].le
  * when he goes down.
  */
 export const HEADGEAR = {
-  headset: { label: 'Headset', knock: 0, falls: true, icon: '🎧' },
-  cap: { label: "Runner's cap", knock: 0.3, falls: true, icon: '🧢' },
-  boonie: { label: 'Boonie hat', knock: 0.25, falls: true, icon: '👒' },
-  hat: { label: 'Hat', knock: 0.25, falls: true, icon: '🎩' },
-  headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: '🧣' },
-  plume: { label: 'Plume', knock: 0.45, falls: true, icon: '🪶' },
+  headset: { label: 'Headset', knock: 0, falls: true, icon: 'headset' },
+  cap: { label: "Runner's cap", knock: 0.3, falls: true, icon: 'cap' },
+  boonie: { label: 'Boonie hat', knock: 0.25, falls: true, icon: 'hat' },
+  hat: { label: 'Hat', knock: 0.25, falls: true, icon: 'hat' },
+  headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: 'hat' },
+  plume: { label: 'Plume', knock: 0.45, falls: true, icon: 'plume' },
   // A knight's parade crests (wardrobe.js HELM_CRESTS): the gilt winged harpy of the Negroli burgonets, and a spray of
   // ostrich plumes from a small crown. Cast or wired on a bracket: a hard blow takes them off as it does a plume.
-  harpy: { label: 'Winged harpy crest', knock: 0.45, falls: true, icon: '🦅' },
-  ostrich: { label: 'Ostrich plumes and crown', knock: 0.45, falls: true, icon: '👑' },
+  harpy: { label: 'Winged harpy crest', knock: 0.45, falls: true, icon: 'plume' },
+  ostrich: { label: 'Ostrich plumes and crown', knock: 0.45, falls: true, icon: 'plume' },
   // A straw hat tied loosely under the chin: a hard blow or a fall takes it off.
-  kasa: { label: 'Kasa', knock: 0.3, falls: true, icon: '👒' },
+  kasa: { label: 'Kasa', knock: 0.3, falls: true, icon: 'hat' },
   // A cut on the helmet carrying at least `cutFrom` J of edge takes the crest off with it.
   // A lady's hair decoration (the design's own head piece, shown or not: OUTFITS optionalHead); never knocked off.
-  hairDecor: { label: 'Hair decoration', knock: 0, falls: false, icon: '🌸' },
-  crest: { label: 'Crest', knock: 0.5, falls: true, icon: '🌙', cutFrom: 6 },
+  hairDecor: { label: 'Hair decoration', knock: 0, falls: false, icon: 'plume' },
+  crest: { label: 'Crest', knock: 0.5, falls: true, icon: 'crest', cutFrom: 6 },
   // A kabuto's crest chosen in place of the design's own (`maedate`: wardrobe.js kabutoCrest's shapes), knocked and cut off as it.
-  crestKuwagata: { label: 'Crest: gilt kuwagata horns', knock: 0.5, falls: true, icon: '🌙', cutFrom: 6, maedate: 'kuwagataTall' },
-  crestFlame: { label: 'Crest: gilt flame', knock: 0.5, falls: true, icon: '🔥', cutFrom: 6, maedate: 'flame' },
-  crestAntlers: { label: 'Crest: stag antlers', knock: 0.5, falls: true, icon: '🦌', cutFrom: 6, maedate: 'antlers' },
-  crestHalo: { label: 'Crest: tall eboshi, gilt sun halo', knock: 0.5, falls: true, icon: '☀️', cutFrom: 6, maedate: 'halo' },
-  crestRabbit: { label: "Crest: hare's ears", knock: 0.5, falls: true, icon: '🐇', cutFrom: 6, maedate: 'rabbit' },
-  crestWings: { label: "Crest: eagle's wings", knock: 0.5, falls: true, icon: '🦅', cutFrom: 6, maedate: 'wings' },
-  crestFan: { label: 'Crest: gilt fans', knock: 0.5, falls: true, icon: '🪭', cutFrom: 6, maedate: 'fan' },
-  crestBuffalo: { label: 'Crest: buffalo horns', knock: 0.5, falls: true, icon: '🐃', cutFrom: 6, maedate: 'buffalo' },
+  crestKuwagata: { label: 'Crest: gilt kuwagata horns', knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'kuwagataTall' },
+  crestFlame: { label: 'Crest: gilt flame', knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'flame' },
+  crestAntlers: { label: 'Crest: stag antlers', knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'antlers' },
+  crestHalo: { label: 'Crest: tall eboshi, gilt sun halo', knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'halo' },
+  crestRabbit: { label: "Crest: hare's ears", knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'rabbit' },
+  crestWings: { label: "Crest: eagle's wings", knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'wings' },
+  crestFan: { label: 'Crest: gilt fans', knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'fan' },
+  crestBuffalo: { label: 'Crest: buffalo horns', knock: 0.5, falls: true, icon: 'crest', cutFrom: 6, maedate: 'buffalo' },
 };
 
 /** What can be worn on the head with this outfit: a headset unless there is a helmet, and its own. */
@@ -3004,27 +3004,27 @@ export function familyKinds(family) {
 // `lamellarCord`: the colour its laced lamellar is laced in where a kit's design does not say (an armour's own `cord`): the
 // steppe's white or off-white thongs, the Chinese red cords (detailtex.js draws them; Japanese kits keep their `lace`).
 export const FACTIONS = {
-  knights: { label: 'Knights', glyph: '🏰', standard: { weapon: 'banner', colour: '#b3161b' }, blurb: { en: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.', zh: '中世纪欧洲：板甲锁甲的骑士，跟在后头的步卒，还有种地的百姓。' } },
-  japanese: { label: 'Japanese', glyph: '⛩️', standard: { weapon: 'nobori', worn: true }, blurb: { en: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.', zh: '武士与足轻：打刀、薙刀、长枪、和弓，还有铁炮。' } },
-  mexica: { label: 'Mexica', glyph: '🦅', standard: { weapon: 'pamitl', worn: true }, strangers: ['horse', 'gun'], blurb: { en: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.', zh: '阿兹特克大军：穿棉甲的战士，美洲豹与雄鹰武士，黑曜石的刃。' } },
-  inca: { label: 'Inca', glyph: '☀️', strangers: ['horse', 'gun'], blurb: { en: 'Atahualpa\'s people at Cajamarca: lords and attendants in the woven uncu, the llautu round the head, the champi star mace.', zh: '阿塔瓦尔帕在卡哈马卡的人：贵族和随从穿织纹长衫，头缠彩绳，手里是星锤。' } },
-  chinese: { label: 'Chinese', glyph: '🐉', standard: { weapon: 'lingQi', colour: '#c0392b' }, lamellarCord: '#9e1a1c', blurb: { en: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.', zh: '明军：卫所枪兵，穿布面甲的刀盾手与铳手，使关刀的精锐；还有传说里的铁浮屠。' } },
+  knights: { label: 'Knights', glyph: 'castle', standard: { weapon: 'banner', colour: '#b3161b' }, blurb: { en: 'Medieval Europe: knights in plate and mail, foot soldiers, the commons.', zh: '中世纪欧洲：板甲锁甲的骑士，跟在后头的步卒，还有种地的百姓。' } },
+  japanese: { label: 'Japanese', glyph: 'torii', standard: { weapon: 'nobori', worn: true }, blurb: { en: 'Samurai and ashigaru: katana, naginata, yari, bows and teppō.', zh: '武士与足轻：打刀、薙刀、长枪、和弓，还有铁炮。' } },
+  mexica: { label: 'Mexica', glyph: 'pyramid', standard: { weapon: 'pamitl', worn: true }, strangers: ['horse', 'gun'], blurb: { en: 'The Aztec army: warriors in quilted cotton, jaguar and eagle knights, obsidian blades.', zh: '阿兹特克大军：穿棉甲的战士，美洲豹与雄鹰武士，黑曜石的刃。' } },
+  inca: { label: 'Inca', glyph: 'sun', strangers: ['horse', 'gun'], blurb: { en: 'Atahualpa\'s people at Cajamarca: lords and attendants in the woven uncu, the llautu round the head, the champi star mace.', zh: '阿塔瓦尔帕在卡哈马卡的人：贵族和随从穿织纹长衫，头缠彩绳，手里是星锤。' } },
+  chinese: { label: 'Chinese', glyph: 'pagoda', standard: { weapon: 'lingQi', colour: '#c0392b' }, lamellarCord: '#9e1a1c', blurb: { en: 'Ming soldiers: garrison spearmen, brigandine sword-and-shield men and gunners, elite guandao; the Iron Pagoda of legend.', zh: '明军：卫所枪兵，穿布面甲的刀盾手与铳手，使关刀的精锐；还有传说里的铁浮屠。' } },
   // The Later Jin's Eight Banners (the Qing's after 1636): led under the plain yellow banner, Nurhaci's own.
-  manchu: { label: 'Eight Banners', glyph: '🚩', standard: { weapon: 'banner', colour: '#d9a524' }, lamellarCord: '#9e1a1c', blurb: { en: 'The Later Jin of Nurhaci: banner men in studded coats of plates under the black helmet, with the heavy Manchu bow, saber, spear and guandao; the Bayara guard on horse.', zh: '努尔哈赤的后金：旗兵戴黑盔，披钉甲，使满洲大弓、马刀、长枪、大刀；马上是巴牙喇护军。' } },
-  steppe: { label: 'Steppe', glyph: '🐎', standard: { weapon: 'tug' }, lamellarCord: '#e9e2d0', blurb: { en: 'Mongol, Oirat and Timurid warriors: archers in the deel, hardened leather lamellar, sabre, mace and composite bow; the Khan\'s kheshig in gilt scale; the Cumans of the Kipchak steppe in plated mail and the masked helmet.', zh: '蒙古、瓦剌与帖木儿的战士：穿蒙古袍的弓手，硬皮札甲，马刀、骨朵、复合弓；大汗的怯薛披鎏金鳞甲；钦察草原的库曼人，甲片缀锁甲，戴铁面盔。' } },
+  manchu: { label: 'Eight Banners', glyph: 'pennon', standard: { weapon: 'banner', colour: '#d9a524' }, lamellarCord: '#9e1a1c', blurb: { en: 'The Later Jin of Nurhaci: banner men in studded coats of plates under the black helmet, with the heavy Manchu bow, saber, spear and guandao; the Bayara guard on horse.', zh: '努尔哈赤的后金：旗兵戴黑盔，披钉甲，使满洲大弓、马刀、长枪、大刀；马上是巴牙喇护军。' } },
+  steppe: { label: 'Steppe', glyph: 'horse', standard: { weapon: 'tug' }, lamellarCord: '#e9e2d0', blurb: { en: 'Mongol, Oirat and Timurid warriors: archers in the deel, hardened leather lamellar, sabre, mace and composite bow; the Khan\'s kheshig in gilt scale; the Cumans of the Kipchak steppe in plated mail and the masked helmet.', zh: '蒙古、瓦剌与帖木儿的战士：穿蒙古袍的弓手，硬皮札甲，马刀、骨朵、复合弓；大汗的怯薛披鎏金鳞甲；钦察草原的库曼人，甲片缀锁甲，戴铁面盔。' } },
   // Keyed `ottomans` (saves and levels name it); it holds the Turkish and Kurdish sultanates both, Saladin's Ayyubids of the 1100s and the Ottomans after them.
-  ottomans: { label: 'Sultanates', glyph: '🌙', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: { en: 'Saladin\'s Ayyubids and the Ottoman Turks: Saladin in kazaghand and turbaned helmet; the Sultan\'s azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.', zh: '萨拉丁的阿尤布王朝与奥斯曼土耳其：萨拉丁锁甲外罩棉甲，头戴缠头盔；苏丹的阿扎普，挎弯刀扛火枪的耶尼切里，锁甲缀板的重骑；还有传说中奥斯曼麾下的一名加齐勇士。' } },
-  gladiators: { label: 'Gladiators', glyph: '🏛️', blurb: { en: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.', zh: '罗马的竞技场：重装斗士、鱼盔斗士、追击斗士、色雷斯斗士、网斗士。' } },
-  ring: { label: 'Ring', glyph: '🥊', blurb: { en: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.', zh: '格斗运动：拳击、踢拳、泰拳、综合格斗、相扑。' } },
-  street: { label: 'Street', glyph: '🏙️', blurb: { en: 'Ordinary people and the underworld: brawlers, yakuza, office workers.', zh: '寻常百姓与地下世界：打架的、混极道的、坐办公室的。' } },
+  ottomans: { label: 'Sultanates', glyph: 'moon', standard: { weapon: 'sancak', colour: '#2e6b3a' }, blurb: { en: 'Saladin\'s Ayyubids and the Ottoman Turks: Saladin in kazaghand and turbaned helmet; the Sultan\'s azaps, Janissaries with yatagan and gun, heavy men in mail-and-plate; an alp of Osman\'s gazis of legend.', zh: '萨拉丁的阿尤布王朝与奥斯曼土耳其：萨拉丁锁甲外罩棉甲，头戴缠头盔；苏丹的阿扎普，挎弯刀扛火枪的耶尼切里，锁甲缀板的重骑；还有传说中奥斯曼麾下的一名加齐勇士。' } },
+  gladiators: { label: 'Gladiators', glyph: 'column', blurb: { en: 'The arena of Rome: hoplomachus, murmillo, secutor, thraex, retiarius.', zh: '罗马的竞技场：重装斗士、鱼盔斗士、追击斗士、色雷斯斗士、网斗士。' } },
+  ring: { label: 'Ring', glyph: 'glove', blurb: { en: 'Fighting sports: boxing, kickboxing, Muay Thai, MMA, sumo.', zh: '格斗运动：拳击、踢拳、泰拳、综合格斗、相扑。' } },
+  street: { label: 'Street', glyph: 'city', blurb: { en: 'Ordinary people and the underworld: brawlers, yakuza, office workers.', zh: '寻常百姓与地下世界：打架的、混极道的、坐办公室的。' } },
   // The Goths of the migrations (the Visigoths of Toulouse, the Ostrogoths and Gepids under Attila).
-  goths: { label: 'Goths', glyph: '🪓', standard: { weapon: 'banner', colour: '#2f4468' }, blurb: { en: 'The Visigoths of 451 and the Germanic peoples under Attila: tunic and round shield, spear and spatha; their nobles in mail and spangenhelm, on horse.', zh: '四五一年的西哥特人，和阿提拉麾下的日耳曼诸部：短袍圆盾，长枪长剑；贵族披锁甲、戴分片盔，骑在马上。' } },
+  goths: { label: 'Goths', glyph: 'axe', standard: { weapon: 'banner', colour: '#2f4468' }, blurb: { en: 'The Visigoths of 451 and the Germanic peoples under Attila: tunic and round shield, spear and spatha; their nobles in mail and spangenhelm, on horse.', zh: '四五一年的西哥特人，和阿提拉麾下的日耳曼诸部：短袍圆盾，长枪长剑；贵族披锁甲、戴分片盔，骑在马上。' } },
   // Parthia (Surena's army at Carrhae, 53 BC): Iranian horsemen.
-  parthians: { label: 'Parthia', glyph: '🏹', standard: { weapon: 'tug' }, blurb: { en: 'The Parthian horse of Carrhae: cataphracts, man and horse in iron scale, with the kontos; horse archers in tunic and felt cap with the composite bow.', zh: '卡莱之战的帕提亚骑兵：人马俱披铁鳞的重骑兵，持长骑枪；穿短袍戴毡帽的骑射手，拿复合弓。' } },
-  romans: { label: 'Rome', glyph: '🛡️', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: { en: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.', zh: '帝国初年的军团：军团兵披环片甲，持大方盾短剑；百夫长披锁甲挂勋章；一面红色军旗。' } },
-  law: { label: 'Law', glyph: '🚓', blurb: { en: 'Police, SWAT, special forces and the infantry: the baton, the service pistol, the shotgun, the AR-15 and the grenade; firefighters in aluminized proximity and fire-entry suits.', zh: '警察、特警、特种部队和步兵：警棍、配枪、霰弹枪、AR-15、手雷；还有穿镀铝隔热服、进火服的消防员。' } },
-  primates: { label: 'Apes & Monkeys', glyph: '🐒', blurb: { en: 'Not men: a silverback gorilla, a chimpanzee, a chacma baboon and a rhesus macaque, fighting as their kinds fight: the charge, the grab, the clubbing arm and the bite.', zh: '不是人：一头银背大猩猩、一只黑猩猩、一只豚尾狒狒、一只猕猴，各按各的本性打：冲撞、抓扯、抡胳膊、下嘴咬。' } },
-  machines: { label: 'Machines', glyph: '🤖', blurb: { en: 'Machines, and a man in one: a full-size and a mini humanoid robot, a combat bot whose forearms are an AR-15 and a shotgun, three robot dogs (a Go2, Spot with its arm, a Vision 60 with a rifle turret), and a soldier in a powered exoskeleton.', zh: '机器，和机器里的一个人：全尺寸与迷你两种人形机器人，前臂是AR-15和霰弹枪的战斗机器人，三条机器狗（Go2、带机械臂的Spot、背步枪炮塔的Vision 60），还有一个穿动力外骨骼的兵。' } },
+  parthians: { label: 'Parthia', glyph: 'bow', standard: { weapon: 'tug' }, blurb: { en: 'The Parthian horse of Carrhae: cataphracts, man and horse in iron scale, with the kontos; horse archers in tunic and felt cap with the composite bow.', zh: '卡莱之战的帕提亚骑兵：人马俱披铁鳞的重骑兵，持长骑枪；穿短袍戴毡帽的骑射手，拿复合弓。' } },
+  romans: { label: 'Rome', glyph: 'shield', standard: { weapon: 'vexillum', colour: '#9a1a1a' }, blurb: { en: 'The legions of the early Empire: legionaries in segmented iron with scutum and gladius, their centurions in mail and medals; the red vexillum.', zh: '帝国初年的军团：军团兵披环片甲，持大方盾短剑；百夫长披锁甲挂勋章；一面红色军旗。' } },
+  law: { label: 'Law', glyph: 'beacon', blurb: { en: 'Police, SWAT, special forces and the infantry: the baton, the service pistol, the shotgun, the AR-15 and the grenade; firefighters in aluminized proximity and fire-entry suits.', zh: '警察、特警、特种部队和步兵：警棍、配枪、霰弹枪、AR-15、手雷；还有穿镀铝隔热服、进火服的消防员。' } },
+  primates: { label: 'Apes & Monkeys', glyph: 'ape', blurb: { en: 'Not men: a silverback gorilla, a chimpanzee, a chacma baboon and a rhesus macaque, fighting as their kinds fight: the charge, the grab, the clubbing arm and the bite.', zh: '不是人：一头银背大猩猩、一只黑猩猩、一只豚尾狒狒、一只猕猴，各按各的本性打：冲撞、抓扯、抡胳膊、下嘴咬。' } },
+  machines: { label: 'Machines', glyph: 'robot', blurb: { en: 'Machines, and a man in one: a full-size and a mini humanoid robot, a combat bot whose forearms are an AR-15 and a shotgun, three robot dogs (a Go2, Spot with its arm, a Vision 60 with a rifle turret), and a soldier in a powered exoskeleton.', zh: '机器，和机器里的一个人：全尺寸与迷你两种人形机器人，前臂是AR-15和霰弹枪的战斗机器人，三条机器狗（Go2、带机械臂的Spot、背步枪炮塔的Vision 60），还有一个穿动力外骨骼的兵。' } },
 };
 export const FACTION_KEYS = Object.keys(FACTIONS);
 

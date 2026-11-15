@@ -8,6 +8,7 @@
 import { FACTIONS } from './outfits.js';
 import { WARRIORS } from './roster.js';
 import { pick, SEP, t, tname } from './i18n.js';
+import { uiIcon } from './uiicons.js';
 
 export const INTRO = {
   storageKey: 'gladiator.introSeen',
@@ -209,12 +210,15 @@ export function playIntro(stage, onDone) {
     if (carded === index || !plan.chapters[index]) return;
     carded = index;
     const faction = FACTIONS[plan.chapters[index].faction] ?? { label: plan.chapters[index].faction, glyph: '', blurb: '' };
-    card.replaceChildren(introNode('span', 'glyph', faction.glyph), introNode('h2', '', tname(faction.label)), introNode('p', '', pick(faction.blurb)));
+    card.replaceChildren(uiIcon(faction.glyph, 'glyph') ?? introNode('span', 'glyph'), introNode('h2', '', tname(faction.label)), introNode('p', '', pick(faction.blurb)));
   };
   // Its shot's faction above, and a caption for each man below.
   const fillCaptions = (chapter) => {
     const faction = FACTIONS[chapter.faction] ?? { label: chapter.faction, glyph: '' };
-    head.replaceChildren(introNode('span', '', `${faction.glyph} ${tname(faction.label)}`));
+    const named = introNode('span', '', tname(faction.label));
+    const icon = uiIcon(faction.glyph, 'glyph label-glyph');
+    if (icon) named.prepend(icon);
+    head.replaceChildren(named);
     // Left to right as they stand (the camera looks at them from in front).
     const shown = [...chapter.legends].sort((a, b) => a.x - b.x);
     captions.style.setProperty('--count', String(shown.length));
@@ -386,7 +390,7 @@ export function playIntro(stage, onDone) {
         lineupKeys = lineupCamera();
         title.querySelector('em').textContent = t('intro.legends');
         title.classList.add('low');
-        title.querySelector('p').textContent = plan.chapters.map((chapter) => FACTIONS[chapter.faction]?.glyph ?? '').join(' ');
+        title.querySelector('p').replaceChildren(...plan.chapters.map((chapter) => uiIcon(FACTIONS[chapter.faction]?.glyph, 'glyph')).filter(Boolean));
         last = performance.now();
       }
       stage.camera(blendPose(lineupKeys, into / length));

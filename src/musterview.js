@@ -22,6 +22,7 @@ import { capsOf, countUnits, drawUp, formationsOf, intoZone, inZone, MUSTER, roo
 import { STYLES } from './moves.js';
 import { ARMIES } from './scenarios.js';
 import { onLangChange, SEP, t, tname } from './i18n.js';
+import { uiIcon } from './uiicons.js';
 
 // The map's look: the floor's colour by its place (the ground it is drawn on), the sides' colours, sizes.
 const MUSTER_VIEW = {
@@ -85,7 +86,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
     // The man played: { corner, man } (his inputs), or null for the usual choice of side.
     lead: lead && sides[lead.corner]?.men[lead.index] ? { corner: lead.corner, man: sides[lead.corner].men[lead.index] } : null,
     note: '',
-    // The map's zoom (1: the whole floor) and how far it is moved (px), and whether a drag moves it (✋) rather than drawing a block.
+    // The map's zoom (1: the whole floor) and how far it is moved (px), and whether a drag moves it (the hand button) rather than drawing a block.
     zoom: 1,
     pan: [0, 0],
     panning: false,
@@ -369,7 +370,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
   }
 
   // A press on the map: on a man (to move him, or a tap to pick him) or on open ground (a tap to put one down, a drag for a
-  // block; with ✋ on, or the right or middle button, a drag moves the map). Two fingers pinch to zoom and move it.
+  // block; with the hand on, or the right or middle button, a drag moves the map). Two fingers pinch to zoom and move it.
   let press = null;
   const fingers = new Map();
   let pinch = null;
@@ -473,7 +474,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
       musterEl('button', { type: 'button', textContent: '+', title: t('muster.zoomIn'), ariaLabel: t('muster.zoomIn'), onclick: () => zoomAt(MUSTER_VIEW.zoomStep) }),
       musterEl('button', { type: 'button', textContent: '−', title: t('muster.zoomOut'), ariaLabel: t('muster.zoomOut'), disabled: view.zoom <= 1, onclick: () => zoomAt(1 / MUSTER_VIEW.zoomStep) }),
       musterEl('button', { type: 'button', textContent: '⤢', title: t('muster.whole'), ariaLabel: t('muster.wholeAria'), disabled: view.zoom <= 1, onclick: () => { view.zoom = 1; view.pan = [0, 0]; refresh(); } }),
-      musterEl('button', { type: 'button', className: view.panning ? 'on' : '', textContent: '✋', title: t('muster.pan'), ariaLabel: t('muster.pan'), ariaPressed: String(view.panning), onclick: () => { view.panning = !view.panning; refresh(); } }));
+      musterEl('button', { type: 'button', className: view.panning ? 'on' : '', title: t('muster.pan'), ariaLabel: t('muster.pan'), ariaPressed: String(view.panning), onclick: () => { view.panning = !view.panning; refresh(); } }, uiIcon('hand')));
   }
 
   // ---- The panels -----------------------------------------------------------------------
@@ -522,7 +523,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
           musterEl('button', {
             type: 'button', className: `muster-unit${unit.id === view.brush[corner] ? ' on' : ''}`, title: t('muster.placeUnit', { unit: name }),
             onclick: () => { view.brush[corner] = unit.id; refresh(); },
-          }, musterEl('span', { textContent: `${unit.mounted ? '🐎 ' : ''}${name}` }), musterEl('b', { textContent: String(counts[unit.id] ?? 0) })),
+          }, musterEl('span', {}, unit.mounted ? uiIcon('horse', 'glyph label-glyph') : null, name), musterEl('b', { textContent: String(counts[unit.id] ?? 0) })),
           musterEl('button', { type: 'button', className: 'step', textContent: '−', ariaLabel: t('squad.fewer', { unit: name }), disabled: !counts[unit.id], onclick: () => fewer(unit) }),
           musterEl('button', { type: 'button', className: 'step', textContent: '+', ariaLabel: t('squad.more', { unit: name }), onclick: () => { add(corner, unit.id, 1); refresh(); } }),
           musterEl('button', { type: 'button', className: 'step', textContent: '+5', ariaLabel: t('muster.fiveMore', { unit: name }), onclick: () => { add(corner, unit.id, 5); refresh(); } }));
@@ -540,7 +541,7 @@ export function musterScreen(root, { key, level, onStart, onBack, onChange = nul
             mine.places = drawUp(level, corner, mine.men, shape.key);
             refresh();
           },
-        }, musterEl('i', { textContent: shape.glyph, ariaHidden: 'true' }), musterEl('span', { textContent: tname(shape.key === 'level' ? level.formationLabel ?? shape.label : shape.label) })))),
+        }, musterEl('i', { ariaHidden: 'true' }, uiIcon(shape.glyph)), musterEl('span', { textContent: tname(shape.key === 'level' ? level.formationLabel ?? shape.label : shape.label) })))),
         musterEl('p', { className: 'muster-note', textContent: army.formation === 'hand' ? `${t('muster.byHand')}${locked ? t('muster.byHandLocked') : ''}` : t('muster.shapesNote') }));
     } else {
       const lead = view.lead;

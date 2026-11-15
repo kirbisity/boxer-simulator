@@ -8,6 +8,7 @@
 // special button.
 
 import { getLang, onLangChange, t } from './i18n.js';
+import { uiIconHtml } from './uiicons.js';
 
 export const TUTORIAL = {
   // rad of view turned to finish looking about.
@@ -110,15 +111,15 @@ export const TUTORIAL_STEPS = [
   },
   {
     key: 'guard', title: 'Guard',
-    touch: 'Edric swings at you now. <b>Hold Guard 🛡</b> to block with your sword. A quick tap of it dodges instead.',
+    touch: 'Edric swings at you now. <b>Hold Guard {icon:shield}</b> to block with your sword. A quick tap of it dodges instead.',
     mouse: 'Edric swings at you now. <b>Hold T</b> to block with your sword. A quick tap of it dodges instead.',
     done: (progress) => progress.blocked >= 1 || progress.guarded >= TUTORIAL.guardFor,
     stage: 'swing',
   },
   {
     key: 'pickUp', title: 'The special button',
-    touch: 'Your sword is knocked from your hands. The <b>special button</b> (top of the right edge) changes with the moment: now it says <b>Pick up ✋</b>. Tap it.',
-    mouse: 'Your sword is knocked from your hands. The <b>special action</b> changes with the moment: now it is <b>Pick up ✋</b>. Press <b>F</b>.',
+    touch: 'Your sword is knocked from your hands. The <b>special button</b> (top of the right edge) changes with the moment: now it says <b>Pick up {icon:hand}</b>. Tap it.',
+    mouse: 'Your sword is knocked from your hands. The <b>special action</b> changes with the moment: now it is <b>Pick up {icon:hand}</b>. Press <b>F</b>.',
     done: (progress) => progress.armed,
     stage: 'disarm',
   },
@@ -176,13 +177,13 @@ export const TUTORIAL_STEPS_ZH = {
   },
   guard: {
     title: '格挡',
-    touch: '埃德里克要朝你挥过来了。<b>按住格挡 🛡</b>，用剑架住。轻点一下则是闪避。',
+    touch: '埃德里克要朝你挥过来了。<b>按住格挡 {icon:shield}</b>，用剑架住。轻点一下则是闪避。',
     mouse: '埃德里克要朝你挥过来了。<b>按住 T</b>，用剑架住。轻点一下则是闪避。',
   },
   pickUp: {
     title: '特殊键',
-    touch: '你的剑被打飞了。<b>特殊键</b>（右侧最上方）会随情况变化：现在它写着<b>捡起 ✋</b>。点它。',
-    mouse: '你的剑被打飞了。<b>特殊动作</b>会随情况变化：现在是<b>捡起 ✋</b>。按 <b>F</b>。',
+    touch: '你的剑被打飞了。<b>特殊键</b>（右侧最上方）会随情况变化：现在它写着<b>捡起 {icon:hand}</b>。点它。',
+    mouse: '你的剑被打飞了。<b>特殊动作</b>会随情况变化：现在是<b>捡起 {icon:hand}</b>。按 <b>F</b>。',
   },
   unlock: {
     title: '解除锁定',
@@ -202,6 +203,8 @@ export const TUTORIAL_STEPS_ZH = {
 };
 
 /** A step's words (`title`, `touch`, `mouse`) in the language in force: its English, or its `zh` (TUTORIAL_STEPS_ZH). */
+// A step's words with their `{icon:name}` marks drawn (uiicons.js): the button's own picture, as it shows on the button.
+const withDrawnIcons = (html) => String(html).replace(/\{icon:(\w+)\}/g, (_, name) => uiIconHtml(name));
 const tutorialWords = (step, field) => (getLang() === 'zh' && TUTORIAL_STEPS_ZH[step.key]?.[field]) || step[field];
 
 /** A step's progress, from nothing. */
@@ -315,7 +318,7 @@ export function installTutorial(root, hooks) {
     }
     card.querySelector('.count').textContent = t('tutorial.count', { at: run.index + 1, of: TUTORIAL_STEPS.length });
     card.querySelector('.title').textContent = tutorialWords(step, 'title');
-    card.querySelector('.text').innerHTML = tutorialWords(step, device === 'mouse' ? 'mouse' : 'touch');
+    card.querySelector('.text').innerHTML = withDrawnIcons(tutorialWords(step, device === 'mouse' ? 'mouse' : 'touch'));
     card.querySelector('.skip').textContent = t('tutorial.skipStep');
     card.querySelector('.exit').hidden = true;
     skipAll.hidden = false;

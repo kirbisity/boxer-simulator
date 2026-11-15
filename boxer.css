@@ -626,7 +626,7 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .target-marker .name { font: 600 12px var(--display); letter-spacing: 0.04em; text-transform: uppercase; }
 .target-marker .bar { width: 100%; height: 5px; }
 .target-marker.locked .name { color: var(--lock); }
-.target-marker.locked .name::before { content: '◎ '; }
+.target-marker.locked .name::before { content: ''; display: inline-block; width: 1.05em; height: 1.05em; margin-right: 0.3em; vertical-align: -0.17em; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='8.5'/%3E%3Ccircle cx='12' cy='12' r='4.7'/%3E%3Ccircle cx='12' cy='12' r='1'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='8.5'/%3E%3Ccircle cx='12' cy='12' r='4.7'/%3E%3Ccircle cx='12' cy='12' r='1'/%3E%3C/svg%3E") center / contain no-repeat; }
 /* His horse (physics/mounted.js horseHealth: its blood lost, the blows on its body, lame): a thin bar under the man's, a horse
    glyph before it; there only while he rides. Under the player's stamina and adrenaline, and under a mounted man's marker bar. */
 .horse-row { display: flex; align-items: center; gap: 5px; height: 9px; }
@@ -1030,9 +1030,9 @@ body:has(.boss-bar.shown) .lv-toast { top: calc(104px + env(safe-area-inset-top,
 }
 
 /* Ghost walk (the sandbox's stage debug): a quiet tag by the clock, so it is never mistaken for the real stage. */
-body.ghost-walk #clock::after { content: ' · 👻 Ghost'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
+body.ghost-walk #clock::after { content: ' · Ghost'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
 
-body.sandbox-real #clock::after { content: ' · ⚔ Sandbox'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
+body.sandbox-real #clock::after { content: ' · Sandbox'; font-size: 0.6em; opacity: 0.75; letter-spacing: 0.04em; }
 body.sandbox-real #ghost-as-label { display: none; }
 .ghost-bar .seg { border-radius: var(--r-pill); }
 
@@ -1141,12 +1141,12 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
 .bench-table th, .bench-table td { text-align: left; padding: 2px 6px; border-bottom: 1px solid var(--line); }
 .bench-panel > button { min-height: 44px; }
 
-/* ---- Battle Mode: a battle's ⚙ setup, and the setup screen (musterview.js) ---- */
+/* ---- Battle Mode: a battle's setup button, and the setup screen (musterview.js) ---- */
 .level-card { position: relative; display: grid; min-width: 0; }
 .level-setup { position: absolute; top: 12px; right: 12px; padding: 7px 12px; border-radius: var(--r-pill); background: rgba(var(--pit), 0.82); border-color: rgba(var(--gilt), 0.45); color: var(--gold); font-weight: 600; }
 .level-setup:hover, .level-setup:focus-visible { background: rgba(var(--gilt), 0.16); }
 .level-setup::before { content: ''; position: absolute; inset: -8px; }
-/* A battle's story behind its ⓘ (menu.js withStory): in the card's bottom corner, clear of its picture and its ⚙. */
+/* A battle's story behind its info button (menu.js withStory): in the card's bottom corner, clear of its picture and its setup button. */
 .choices.levels .info-pick > .choice { padding-right: 14px; }
 .choices.levels .info-btn { top: auto; bottom: 10px; right: 10px; translate: none; width: 32px; height: 32px; }
 .choices.levels .info-pick .choice .words { padding-right: 34px; }
@@ -1507,7 +1507,7 @@ body[data-game="lastgate"] .hud, body[data-game="lastgate"] .log { display: none
 .set-card.compact .set-blurb { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .set-blurb, .set-text b { user-select: text; -webkit-user-select: text; }
 
-/* ---- A choice's details in a pop-up (infopop.js): the ⓘ on the choice, a long press or a right-click opens it; a tap
+/* ---- A choice's details in a pop-up (infopop.js): the info button on the choice, a long press or a right-click opens it; a tap
    outside, the ✕ or Escape closes it. The choices themselves stay small: a name (and a picture), no description. ---- */
 .info-pick { position: relative; display: grid; min-width: 0; }
 .info-pick > :first-child { padding-right: 36px; }
@@ -1549,7 +1549,7 @@ html:lang(zh) { line-break: strict; }
 html:lang(zh) h1, html:lang(zh) h2, html:lang(zh) .banner p, html:lang(zh) .card .top, html:lang(zh) .choice b { letter-spacing: 0.02em; }
 /* Chinese has no italic: the browser only slants the glyphs (a fake oblique), so the italic lines stand upright in Chinese. */
 html:lang(zh) :is(em, i, .set-blurb, .story-line.story-tale, .lg-hero-words small, .tw-line, #art-name) { font-style: normal; }
-/* A phone's footer has no room for it beside the fight's own buttons (it wraps a second row): there the language is in Settings (Menu → ⚙). */
+/* A phone's footer has no room for it beside the fight's own buttons (it wraps a second row): there the language is in Settings (Menu, then Settings). */
 @media (max-width: 560px) { .lang-switch { display: none; } }
 
 /* The sandbox's camera feel panel (src/camtuner.js): one dial a row, across the sandbox panel. */
@@ -1584,7 +1584,7 @@ kbd { font: 500 10px var(--mono); color: var(--muted); border: 1px solid var(--l
 /* A glyph: the interface's drawn icon (uiicons.js), in the colour of the words; an emoji not drawn yet is toned to the page. */
 .glyph.drawn { display: inline-grid; place-items: center; color: var(--gold); }
 .glyph.drawn svg { width: 1em; height: 1em; display: block; }
-.glyph.emoji, .dw-tab > span, .custom-factions i, .intro .glyph, .muster-formations i { filter: grayscale(1) sepia(0.5) brightness(1.1) contrast(0.95); }
+.glyph.emoji, .dw-tab > span { filter: grayscale(1) sepia(0.5) brightness(1.1) contrast(0.95); }
 
 /* A screen: the fight goes on behind it, dimmed to lamp light; its head is a title, a line of what to do, and the rule. */
 .screen { background: radial-gradient(ellipse at 50% 36%, rgba(var(--pit), 0.52), rgba(var(--pit), 0.93)); }
@@ -2013,3 +2013,97 @@ button.on, .card-choice.on { box-shadow: inset 0 -2px 0 var(--gold); }
   .choices.home-choices .career { min-height: 38px; padding: 5px 12px; }
   html:lang(zh) .choices.home-choices .choice:not(.career):not(:nth-child(2)) b { font-size: 19px; }
 }
+
+/* ---- Drawn marks where pictures used to be (uiicons.js) ---- */
+/* The fight log's mark at the head of a line, and a mark after a name (a Last Stand unit that shoots). */
+.log-glyph { display: inline-grid; vertical-align: -0.18em; margin-right: 0.4em; font-size: 1.2em; }
+.trail-glyph { display: inline-grid; vertical-align: -0.16em; margin-left: 0.4em; font-size: 1.05em; opacity: 0.8; }
+/* The info button: the drawn ring is its border. */
+.info-btn:has(.drawn) { border-color: transparent; background: rgba(var(--pit), 0.55); }
+.info-btn .glyph.drawn { font-size: 26px; color: inherit; }
+.choices.levels .info-btn .glyph.drawn { font-size: 30px; }
+/* Faction chips, formation chips, the intro's faction marks. */
+.custom-faction i .glyph.drawn, .muster-formation i .glyph.drawn { font-size: 1.15em; vertical-align: -0.18em; }
+.intro .glyph.drawn { font-size: 1.1em; }
+.intro p > .glyph.drawn { margin: 0 0.25em; }
+.muster-zoom .glyph.drawn, .muster-unit .label-glyph { color: inherit; }
+
+/* ---- The fight's footer: Pause and Restart carry their drawn marks (a mask in the text's colour), and on a phone the three
+   fight buttons are the marks alone, so the footer is one row (their words stay as the buttons' names for a screen reader) ---- */
+#pause::before, #restart::before { content: ''; display: inline-block; width: 1.15em; height: 1.15em; margin-right: 0.42em; vertical-align: -0.2em; background: currentColor; -webkit-mask: var(--mark) center / contain no-repeat; mask: var(--mark) center / contain no-repeat; opacity: 0.85; }
+#pause { --mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 5v14M15.5 5v14'/%3E%3C/svg%3E"); }
+#pause[data-i18n="fight.play"] { --mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 5l11 7-11 7z'/%3E%3C/svg%3E"); }
+#restart { --mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19.5 12a7.5 7.5 0 1 1-2.2-5.3'/%3E%3Cpath d='M19.5 4.5v3.8h-3.8'/%3E%3C/svg%3E"); }
+@media (max-width: 640px) {
+  .controls { flex-wrap: nowrap; justify-content: center; }
+  body[data-game="sandbox"] .controls { flex-wrap: wrap; }
+  .controls > #pause, .controls > #restart, .controls > #open-menu { font-size: 0 !important; letter-spacing: 0 !important; padding: 0 !important; min-width: 46px; width: 46px; height: 44px; display: inline-grid; place-items: center; flex: none; }
+  .controls > #pause::before, .controls > #restart::before { width: 19px; height: 19px; margin: 0; }
+  .controls > #open-menu .label-glyph { font-size: 20px; margin: 0; }
+  .controls .fu-pick { flex: 0 1 auto; min-width: 0; }
+}
+
+/* ---- A phone's name plates: the whole name, on two lines if it needs them, never cut ("NOBLE K..."); the count of
+   knock-downs sits after it when it fits and under it when it does not ---- */
+@media (max-width: 640px) {
+  .card .top { height: auto; min-height: 26px; max-height: none; overflow: visible; flex-wrap: wrap; align-items: center; row-gap: 0; font-size: 12.5px; letter-spacing: 0.02em; padding-top: 3px; padding-bottom: 3px; }
+  .card .name { white-space: normal; overflow: hidden; text-overflow: clip; line-height: 1.12; padding: 1px 5px 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .card .kd { height: auto; margin: 1px 0 1px auto; }
+  .card.blue .kd { margin: 1px auto 1px 0; }
+  html:lang(zh) .card .top { font-size: 13px; }
+}
+
+/* ---- A phone's first-fight key of the blows: smaller and higher, under the opponent's marker rather than over it (the marker
+   is the one that matters while he moves) ---- */
+.target-marker { z-index: 4; }
+.fu-legend-first { z-index: 1; }
+@media (max-width: 640px) {
+  .fu-legend-first { top: 31%; padding: 6px 8px 6px 6px; gap: 3px; font-size: 10px; letter-spacing: 0.08em; background: rgba(var(--pit), 0.3); }
+  .fu-legend-first .fu-key i { width: 24px; height: 24px; }
+}
+
+/* A phone's title page: a plate's kicker whole ("NEW · STAGE 1", "WHO WOULD WIN?") on up to two short lines, never cut. */
+@media (max-width: 760px) {
+  .choices.home-choices .choice:not(.career):not(:nth-child(2)) em { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; letter-spacing: 0.07em; text-wrap: balance; }
+}
+
+/* ==== The third pass: the remaining screens take the catalogue's plate =================================================
+   Every panel a player reads (a side to pick, a story pop-up, a corner of the custom battle, an army's side in the setup, the
+   sandbox's drawer, the builder's sheet, the tutorial's card, the Last Stand's hero, the settings' groups) is a plate with the
+   four corner marks; its head carries the half rules; a row that scrolls sideways fades at its edges to say so. */
+.side-pick .side, .info-pop-card, .custom-side, .muster-side, .sandbox-panel, .builder .sheet, .tutorial-card, .ls-hero, .audio-mixer, .wizard-panel {
+  --corner: rgba(var(--gilt), 0.6); --corner-len: 14px; --corner-in: 5px;
+  background-image: var(--corners);
+}
+.side-pick .side { --corner-len: 18px; --corner-in: 6px; background-color: var(--plate); border-radius: 2px; padding: 18px 22px 16px; transition: transform var(--quick) var(--ease), box-shadow var(--quick) var(--ease); }
+.side-pick .side:hover, .side-pick .side:focus-visible { --corner: var(--gold); transform: translateY(-3px); box-shadow: inset 0 -3px 0 var(--gold), 0 14px 34px rgba(0, 0, 0, 0.45); }
+.side-pick .side b { font-weight: 600; text-transform: none; letter-spacing: 0.01em; font-size: 26px; }
+.side-pick h2 { text-transform: none; letter-spacing: 0.02em; font-weight: 600; }
+.side-pick h2::after, .audio-mixer h2::after, .custom-side h2::after { content: ''; display: block; height: 7px; margin: 8px auto 0; width: min(220px, 70%); background: var(--gold); opacity: 0.75; --rule: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent) center / 100% 1px no-repeat, var(--lozenge) center / 7px 7px no-repeat; -webkit-mask: var(--rule); mask: var(--rule); }
+.audio-mixer h2::after, .custom-side h2::after { --rule: linear-gradient(90deg, #000, #000 60%, transparent) left center / calc(100% - 12px) 1px no-repeat, var(--lozenge) right center / 7px 7px no-repeat; }
+.audio-mixer h2::after, .custom-side h2::after { margin: 6px 0 0; width: 140px; }
+.audio-mixer h2, .custom-side h2 { font-family: var(--title); text-transform: none; letter-spacing: 0.01em; font-weight: 600; font-size: 20px; }
+.info-pop-card { --corner-len: 18px; --corner-in: 7px; background-color: var(--plate); }
+.tutorial-card { background-color: rgba(var(--pit), 0.88); border-radius: 2px; }
+.custom-side, .muster-side, .ls-hero { border-radius: 2px; }
+/* Rows that scroll sideways on a phone: faded at the edges. */
+@media (max-width: 760px) {
+  .custom-maps, .custom-factions, .dw-tabs { -webkit-mask: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); mask: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); }
+}
+/* The settings' language: two equal halves, each a thumb's height. */
+.lang-seg { display: grid; grid-template-columns: 1fr 1fr; }
+.lang-seg button { min-height: 44px; font-size: 15px; }
+
+/* The sound bench and the camera tuner: the same plate as every other panel (corner marks, the book face for heads, the gilt
+   rule, mono for measured values). */
+.bench-panel, .camtune { --corner: rgba(var(--gilt), 0.6); --corner-len: 14px; --corner-in: 5px; background-image: var(--corners); background-color: var(--plate); border-radius: 2px; border-color: var(--line-strong); }
+.bench-head h1 { font-weight: 600; text-transform: none; letter-spacing: 0.01em; color: #fff; }
+.bench-head h1::after { content: ''; display: block; height: 7px; width: min(240px, 60vw); margin: 10px auto 0; background: var(--gold); opacity: 0.75; --rule: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent) center / 100% 1px no-repeat, var(--lozenge) center / 7px 7px no-repeat; -webkit-mask: var(--rule); mask: var(--rule); }
+.bench-panel h2 { font: 600 19px var(--title); text-transform: none; letter-spacing: 0.01em; }
+.bench-panel h2::after { content: ''; display: block; height: 7px; width: 130px; margin-top: 6px; background: var(--gold); opacity: 0.7; --rule: linear-gradient(90deg, #000, #000 60%, transparent) left center / calc(100% - 12px) 1px no-repeat, var(--lozenge) right center / 7px 7px no-repeat; -webkit-mask: var(--rule); mask: var(--rule); }
+.camtune { padding: 12px 14px; }
+.camtune-row { font-size: 13px; }
+.camtune-row output { font-family: var(--mono); }
+.camtune-row output.changed { color: var(--gold); }
+.camtune-code { font-family: var(--mono); background: rgba(var(--pit), 0.6); color: var(--fg); border: 1px solid var(--line); border-radius: 2px; }
+.camtune input[type="range"] { accent-color: var(--gold); }

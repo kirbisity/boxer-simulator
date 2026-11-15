@@ -40,10 +40,10 @@ export const MUSTER = {
   // - wedge: the point toward the enemy, each rank two wider than the one before it;
   // - skirmish: open order, every other rank offset by half a place.
   formations: {
-    line: { label: 'Line', glyph: '▬', spacing: 1.2, rowSpacing: 1.5, shooters: 'front', ranks: 2 },
-    block: { label: 'Block', glyph: '■', spacing: 1.0, rowSpacing: 1.2, shooters: 'rear', square: true },
-    wedge: { label: 'Wedge', glyph: '▲', spacing: 1.2, rowSpacing: 1.3, shooters: 'rear', wedge: true },
-    skirmish: { label: 'Skirmish', glyph: '⁘', spacing: 2.2, rowSpacing: 2.4, shooters: 'front', ranks: 3, stagger: true },
+    line: { label: 'Line', glyph: 'line', spacing: 1.2, rowSpacing: 1.5, shooters: 'front', ranks: 2 },
+    block: { label: 'Block', glyph: 'block', spacing: 1.0, rowSpacing: 1.2, shooters: 'rear', square: true },
+    wedge: { label: 'Wedge', glyph: 'wedge', spacing: 1.2, rowSpacing: 1.3, shooters: 'rear', wedge: true },
+    skirmish: { label: 'Skirmish', glyph: 'skirmish', spacing: 2.2, rowSpacing: 2.4, shooters: 'front', ranks: 3, stagger: true },
   },
 };
 
@@ -142,7 +142,7 @@ export function inZone(level, corner, [x, z], slack = 0) {
 
 /** The formations a side may take: its level's own first, then MUSTER.formations ({ key, label, glyph }). */
 export function formationsOf() {
-  return [{ key: 'level', label: 'As the level has it', glyph: '★' }, ...Object.entries(MUSTER.formations).map(([key, spec]) => ({ key, label: spec.label, glyph: spec.glyph }))];
+  return [{ key: 'level', label: 'As the level has it', glyph: 'star' }, ...Object.entries(MUSTER.formations).map(([key, spec]) => ({ key, label: spec.label, glyph: spec.glyph }))];
 }
 
 /**

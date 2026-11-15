@@ -31,6 +31,11 @@ export const DRAMA = {
   shakeHz: 23,
   flashSeconds: 0.6,
   iconSeconds: 2.2,
+  // A man's tags at once (updateIcons), fewer on a window narrower than narrowWidth (px), each older one iconStep (px) higher.
+  iconsShown: 3,
+  iconsShownNarrow: 2,
+  narrowWidth: 640,
+  iconStep: 26,
 };
 
 const ICONS = {
@@ -173,13 +178,26 @@ export function updateIcons(drama, view, world, canvas, now) {
       icon.element.remove();
       return false;
     }
+    return true;
+  });
+  // A man's tags do not pile on one spot: the newest at his body part, each older one a plate's height above it, and no more
+  // than DRAMA.iconsShown (fewer on a phone's width) at once; the oldest beyond that are hidden until they fade.
+  const shown = box.width < DRAMA.narrowWidth ? DRAMA.iconsShownNarrow : DRAMA.iconsShown;
+  const above = new Map();
+  for (let index = drama.icons.length - 1; index >= 0; index -= 1) {
+    const icon = drama.icons[index];
+    icon.rank = above.get(icon.fighter) ?? 0;
+    above.set(icon.fighter, icon.rank + 1);
+  }
+  drama.icons.forEach((icon) => {
+    const age = (now - icon.start) / DRAMA.iconSeconds;
+    const fighter = world.fighters[icon.fighter];
     const base = icon.particle * 3;
     projected.set(fighter.x[base], fighter.x[base + 1] + 0.25 + age * 0.25, fighter.x[base + 2]).project(view.camera);
     icon.element.style.left = `${box.left + ((projected.x + 1) / 2) * box.width}px`;
     icon.element.style.top = `${box.top + ((1 - projected.y) / 2) * box.height}px`;
-    icon.element.style.opacity = String(age < 0.1 ? age / 0.1 : 1 - Math.max(0, (age - 0.6) / 0.4));
-    icon.element.style.transform = `translate(-50%, -100%) scale(${0.7 + 0.3 * Math.min(1, age * 8)})`;
-    return true;
+    icon.element.style.opacity = icon.rank >= shown ? '0' : String(age < 0.1 ? age / 0.1 : 1 - Math.max(0, (age - 0.6) / 0.4));
+    icon.element.style.transform = `translate(-50%, calc(-100% - ${icon.rank * DRAMA.iconStep}px)) scale(${0.7 + 0.3 * Math.min(1, age * 8)})`;
   });
 }
 

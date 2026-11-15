@@ -107,7 +107,7 @@
       </div>
       <label class="teams look-pick sandbox-only" aria-label="Look" title="How the game is drawn: the toon look as it has always been, or another approach to compare (also ?look=<id>)" data-i18n-aria="page.look" data-i18n-title="page.lookTitle"><span data-i18n="page.look">Look</span><select id="look"></select></label>
       <!-- The base-mesh bodies (basebody.js), a test build's option only: the game's body or the Blender model. -->
-      <label class="teams body-pick sandbox-only" aria-label="Body" title="The body fighters are drawn with: the game's modelled body, or the one before it (V7), to compare"><span>Body</span><select id="body-style"><option value="base">Game</option><option value="v7">Before (V7)</option></select></label>
+      <label class="teams body-pick sandbox-only" aria-label="Body" title="The body fighters are drawn with: the game's modelled body, or the one before it (V7), to compare"><span data-i18n="page.bodyStyle">Body</span><select id="body-style"><option value="base" data-i18n="page.bodyGame">Game</option><option value="v7" data-i18n="page.bodyV7">Before (V7)</option></select></label>
       <div class="seg" id="speeds" aria-label="Speed" data-i18n-aria="page.speed">
         <button data-value="0.25">¼×</button>
         <button data-value="1" class="on">1×</button>
@@ -131,7 +131,7 @@
       <button type="button" id="level-character" class="sandbox-only" title="Build the character you play the Dunnottar level as (saved in this browser)" data-icon="figure" data-i18n="page.levelCharacter" data-i18n-title="page.levelCharacterTitle">My level character…</button>
       <button type="button" id="ghost-walk" class="sandbox-only" title="Walk the Dunnottar stage unseen: the garrison never notices you (for looking the castle over)" data-icon="ghost" data-i18n="page.ghostWalk" data-i18n-title="page.ghostWalkTitle">Ghost walk · Dunnottar</button>
       <button type="button" id="real-walk" class="sandbox-only" title="Play the real Dunnottar level with your own character: the garrison fights you, doors by the real rules, the whole story to the end" data-icon="swords" data-i18n="page.realWalk" data-i18n-title="page.realWalkTitle">Play for real with my character</button>
-      <button type="button" id="camera-feel" class="sandbox-only" aria-expanded="false" aria-controls="camera-tuner" title="Sliders on the follow camera's inertia, turn speeds and look-ahead (kept in this browser)" data-icon="camera">Camera feel</button>
+      <button type="button" id="camera-feel" class="sandbox-only" aria-expanded="false" aria-controls="camera-tuner" title="Sliders on the follow camera's inertia, turn speeds and look-ahead (kept in this browser)" data-icon="camera" data-i18n="page.cameraFeel">Camera feel</button>
       <button id="open-builder" class="primary sandbox-only" data-i18n="page.buildFighters">Build fighters</button>
       <div class="camtune sandbox-only" id="camera-tuner" hidden></div>
     </div>

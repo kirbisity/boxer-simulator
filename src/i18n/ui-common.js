@@ -8,4 +8,6 @@ export const UI_COMMON = {
   'common.cancel': { en: 'Cancel', zh: '取消' },
   'common.yes': { en: 'Yes', zh: '确定' },
   'common.next': { en: 'Next →', zh: '下一步 →' },
+  // After a unit's name where the line cannot hold a drawing (a picker's option, a line of text): it rides.
+  'unit.mounted': { en: ' (mounted)', zh: '（骑乘）' },
 };
