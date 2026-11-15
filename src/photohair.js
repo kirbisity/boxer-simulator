@@ -95,7 +95,11 @@ float faceScalp(vec2 uv) {
   float crown = 1.0 - faceCrown * smoothstep(0.16, 0.0, row) * (0.6 + 0.4 * faceNoise(uv * vec2(300.0, 150.0)));
   // At the edge the hairs thin out one by one, not as a soft wash.
   float edge = smoothstep(line + 0.014, line - 0.02, row);
-  float hairs = step(faceHash(floor(uv * vec2(1400.0, 700.0)) * 0.37 + faceHairSeed), edge * 1.15) * step(0.002, edge);
+  // Each hair's cell is a fraction of a millimetre (1400 round the head): where cells come smaller than a pixel, the pixel takes
+  // their share covered (the step's expected value) rather than one cell's all or nothing, which drew the edge as pixel noise.
+  vec2 hairCell = uv * vec2(1400.0, 700.0);
+  float perPixel = max(fwidth(hairCell.x), fwidth(hairCell.y));
+  float hairs = mix(step(faceHash(floor(hairCell) * 0.37 + faceHairSeed), edge * 1.15), min(1.0, edge * 1.15), smoothstep(0.35, 1.0, perPixel)) * step(0.002, edge);
   return mix(hairs, 1.0, smoothstep(line - 0.01, line - 0.04, row)) * (1.0 - ear) * crown * faceHairDensity;
 }`;
 
