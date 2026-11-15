@@ -60,6 +60,17 @@ WEAR_KINDS = {
         'grime': [0.45, (0.2, 0.16, 0.12), 0.8],
         'rust': [2500, 0.0004, 0.0012, 0.5, (0.42, 0.25, 0.14)],
     },
+    # Munition plate (a footman's or a rōnin's limb plates, kettle hats, sallets for the rank and file): left from the hammer
+    # and only roughly ground, so the tile is already blotchy and rough. Set against `steel` and judged on the footman's and
+    # rōnin's sheets: a third of its fine scratches (a rough face hides them) and half its added dulling, a little more tarnish
+    # in the patches, more dirt in the dents and twice the rust freckles (kit kept by no squire).
+    'munition': {
+        'scratches': [1400, 0.006, 0.05, 0.00008, 0.0003, 0.4, 0.25, 0.1], 'across': 1.6,
+        'dull': [0.02, 0.045, 0.01], 'patch': [0.03, 0.11],
+        'tarnish': [0.07, (0.93, 0.87, 0.8)],
+        'grime': [0.6, (0.2, 0.17, 0.14), 0.8],
+        'rust': [2400, 0.0003, 0.0011, 0.6, (0.4, 0.24, 0.14)],
+    },
     # Lacquer over iron or rawhide (a tosei do's lames): hard and glossy, so it keeps its shine but gathers fine scratches and
     # dust, and flakes in small chips where edges knock.
     'lacquer': {
@@ -87,6 +98,11 @@ WEAR = {
     'knightSallet': ('steel', (0.4, 0.4)),
     'knightHounskull': ('steel', (0.4, 0.4)),
     'knightCloseHelmet': ('steel', (0.4, 0.4)),
+    'munitionPlate': ('munition', (0.16, 0.16)),
+    'formKettleRidged': ('munition', (0.4, 0.4)),
+    'formKettleBurgundian': ('munition', (0.4, 0.4)),
+    'formSalletGerman': ('munition', (0.4, 0.4)),
+    'formCabassetSpanish': ('munition', (0.4, 0.4)),
     # (A war mask's sheet is half a face, about 0.2 m to a side.)
     'maskOni': ('lacquer', (0.2, 0.2)),
     'maskRessei': ('lacquer', (0.2, 0.2)),
