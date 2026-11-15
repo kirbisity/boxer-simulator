@@ -613,6 +613,13 @@ export const ENV = {
     // Masses half the crown wide, a third of the way out, read as one ball (a lollipop); smaller masses further
     // out with sky between them read as boughs, as a hedgerow oak does. By eye against the meadow and field.
     clump: { size: [0.22, 0.4], out: [0.45, 0.85], own: 0.7, under: 0.35 },
+    // A conifer's boughs (trees.js envCrownPoint): its sprays fan `fan` of the bough's length to either side at its
+    // tip (narrower than the gap to the next bough, so sky shows between tiers), each turned up to `vary` rad from
+    // the bough's own way, the sprays under the bough darker by `under`, and the near bands' cards `near` of the
+    // kind's size (smaller sprays, more of an edge). By eye against the second reference's airy wood: at 0.7, 0,
+    // 0 and 1 the cedars read as stacks of rounded blocks lit flat. (Sprays now start at 0.05 of the bough, not
+    // 0.15, so a cedar seen from under it has no empty ring round its trunk.)
+    bough: { fan: 0.45, vary: 0.9, under: 0.45, near: 0.75 },
     // Shading inside a crown: the inside and the underside are darker (leaves shade leaves) by up to this share.
     inner: 0.55,
     // Light through the leaves when the sun is behind the crown.

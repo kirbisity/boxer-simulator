@@ -753,20 +753,27 @@ function envCrownPoint(kind, random, masses, out) {
   const mass = masses[Math.floor(random() * masses.length)];
   if (kind.shape === 'boughs') {
     // Along the bough from the trunk to its tip, fanning wider as it goes, drooping a little.
-    const t = 0.15 + 0.85 * Math.sqrt(random());
-    const side = (random() - 0.5) * 0.7 * t;
+    const t = 0.05 + 0.95 * Math.sqrt(random());
+    const side = (random() - 0.5) * ENV.trees.bough.fan * t;
     const length = Math.hypot(mass.x, mass.z) || 1e-3;
     const ax = mass.x / length;
     const az = mass.z / length;
     out[0] = (ax * t - az * side) * length;
-    out[1] = mass.from[1] + (mass.y - mass.from[1]) * t * t + (random() - 0.5) * mass.radius * mass.flat;
+    const below = random() - 0.5;
+    out[1] = mass.from[1] + (mass.y - mass.from[1]) * t * t + below * mass.radius * mass.flat;
     out[2] = (az * t + ax * side) * length;
+    // A spray faces up and out from its own bough, each a little its own way: lit spray by spray, not the
+    // bough as one slab; the sprays under the bough are in its shade (ENV.trees.bough).
+    // (Its own way from values already drawn, so the wood's other draws stay where they were.)
+    const turn = ((((side * 13.7 + t * 7.1) % 1) + 1) % 1 - 0.5) * ENV.trees.bough.vary;
     const lift = 0.9;
+    const bx = ax * Math.cos(turn) - az * Math.sin(turn);
+    const bz = az * Math.cos(turn) + ax * Math.sin(turn);
     const norm = Math.hypot(1, lift);
-    out[3] = ax / norm;
+    out[3] = bx / norm;
     out[4] = lift / norm;
-    out[5] = az / norm;
-    out[6] = 0.35 + 0.65 * t;
+    out[5] = bz / norm;
+    out[6] = (0.35 + 0.65 * t) * (1 - ENV.trees.bough.under * Math.max(0, -below * 2));
     return out;
   }
   // On the outside of the mass.
@@ -864,7 +871,7 @@ export function envBuildTrees({ place, trees }) {
         aCard[at] = point[0] * tree.height;
         aCard[at + 1] = point[1] * tree.height;
         aCard[at + 2] = point[2] * tree.height;
-        aCard[at + 3] = kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5);
+        aCard[at + 3] = kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5) * (kind.shape === 'boughs' && order < 2 ? ENV.trees.bough.near : 1);
         aShell[at] = point[3];
         aShell[at + 1] = point[4];
         aShell[at + 2] = point[5];
