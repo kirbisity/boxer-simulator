@@ -36,7 +36,7 @@ import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { envPressForget, envPressStep } from './press.js';
 import { envLieOf } from './lie.js';
 import { activeLook } from '../looks.js';
-import { hidePaintedSky, setRenderer } from '../looks/kit.js';
+import { hidePaintedSky, replaceEnvironment, setRenderer } from '../looks/kit.js';
 import { probeLiteProject } from '../looks/probe-lite.js';
 import { PLACE_ARENAS, reapplyPlace } from '../render.js';
 import { placeWind, setWindOver } from '../wind.js';
@@ -270,6 +270,10 @@ export function envApply({ place, view, spec, group }) {
   // in the valley's clearing stood a third of a stop over the land round it and washed out.)
   probe.intensity = own.meter?.sky ?? 1;
   view.scene.add(probe);
+  // What metal mirrors: this sky over the horizon and this land under it (envSteelSky), where it had mirrored a
+  // painted studio sky, white overhead and grey underfoot, that took no account of the place, its cloud, its
+  // ground or the camera's exposure; the shared map goes back when the place is left.
+  envSteelSwap(view, air, own.meter?.sky ?? 1, view.envSteelShare ?? 1);
 
   // The sun on the fighters and what stands on the floor: the colour the land is lit with, cut by what the hills
   // take of it at the floor's middle (and, each frame, by the cloud over it: envUpdate).
@@ -334,6 +338,13 @@ export function envLeave(view) {
   if (!view.env?.on) return;
   view.env.on = false;
   view.drawOver = null;
+  if (view.envSteelOurs) {
+    // (Where the look has been put back already (looks.js resetForLook, before the next place's scenery) it has
+    // taken its own map back from every material; otherwise the map the open air found goes back.)
+    if (view.steelEnv === view.envSteelOurs) replaceEnvironment(view, view.envSteelWas);
+    view.envSteelOurs.dispose();
+    view.envSteelOurs = null;
+  }
   envPressForget();
   envUniforms().uEnvOn.value = 0;
   envUniforms().uEnvExposure.value = 1;
@@ -348,6 +359,79 @@ export function envLeave(view) {
   setWindOver(null);
   view.clothWindBase = null;
   view.windBase = null;
+}
+
+/**
+ * The map metal mirrors under an air state (an equirectangular picture made into the renderer's prefiltered
+ * environment, as steelEnvironment in wardrobe.js makes the painted one): the sky the place's light probe is
+ * made of (air.js envSkyAt) over the horizon, its broken cloud laid in by the share of the sky it covers (a
+ * rough plate's reflection is spread over tens of degrees: the cloud's mean, not its masses), and the land
+ * under the horizon, lit as the land is and as dark as its ground. `open`: the share of the sky the floor sees
+ * (a place's meter.sky); what hides the rest (crowns, walls) stands round the floor, low, as dark as the land. `share`: what the cloud
+ * leaves of the sun on the land round the fight. ENV.steel says the size.
+ */
+function envSteelSwap(view, air, open, share) {
+  const steel = envSteelSky(view.renderer, air, open, share);
+  if (!view.envSteelOurs) view.envSteelWas = view.steelEnv;
+  const before = view.envSteelOurs;
+  replaceEnvironment(view, steel);
+  before?.dispose();
+  view.envSteelOurs = steel;
+  view.envSteelShare = share;
+}
+
+function envSteelSky(renderer, air, open, share) {
+  const [width, height] = ENV.steel.size;
+  const half = new Uint16Array(width * height * 4);
+  const colour = [0, 0, 0];
+  const ground = [0, 0, 0];
+  const cloud = [0, 1, 2].map((channel) => air.cloudDark[channel] * (1 - ENV.steel.cloudLit) + air.cloudLit[channel] * ENV.steel.cloudLit);
+  const covered = air.cover * (1 - air.lid);
+  const edge = Math.sqrt(Math.max(0, 1 - open));
+  // (The land is lit by the sky and by what the cloud leaves of the sun: `share`, the cloud over the fight.)
+  const landLit = [0, 1, 2].map((channel) => {
+    const whole = air.skyLight[channel] + air.sunColour[channel] * air.sun[1];
+    return whole > 1e-6 ? (air.skyLight[channel] + air.sunColour[channel] * air.sun[1] * share) / whole : 1;
+  });
+  for (let row = 0; row < height; row += 1) {
+    // (three's equirectangular reflection: v = asin(y) / pi + 1/2, u = atan(z, x) / (2 pi) + 1/2.)
+    const y = Math.sin(((row + 0.5) / height - 0.5) * Math.PI);
+    const level = Math.sqrt(1 - y * y);
+    for (let column = 0; column < width; column += 1) {
+      const turn = ((column + 0.5) / width - 0.5) * 2 * Math.PI;
+      const x = Math.cos(turn) * level;
+      const z = Math.sin(turn) * level;
+      envSkyAt(air, x, y, z, colour);
+      if (y < 0) {
+        const down = Math.min(1, -y * 3);
+        for (let channel = 0; channel < 3; channel += 1) colour[channel] *= 1 + (landLit[channel] - 1) * down;
+      }
+      if (y > 0) {
+        // (What hides the sky stands round the floor, low: a ring of crowns or walls up to the height that leaves
+        // `open` of the sky's light on a level card, sin^2 of its edge's elevation = 1 - open, over which the sky
+        // is clear: so metal turned to the side mirrors the wood or the wall, and turned up, the sky.)
+        const seen = envEase(edge - 0.05, edge + 0.05, y);
+        envSkyAt(air, x, -1, z, ground);
+        for (let channel = 0; channel < 3; channel += 1) ground[channel] *= landLit[channel];
+        for (let channel = 0; channel < 3; channel += 1) {
+          const sky = colour[channel] + (cloud[channel] - colour[channel]) * covered;
+          colour[channel] = ground[channel] + (sky - ground[channel]) * seen;
+        }
+      }
+      const at = (row * width + column) * 4;
+      for (let channel = 0; channel < 3; channel += 1) half[at + channel] = THREE.DataUtils.toHalfFloat(colour[channel]);
+      half[at + 3] = THREE.DataUtils.toHalfFloat(1);
+    }
+  }
+  const texture = new THREE.DataTexture(half, width, height, THREE.RGBAFormat, THREE.HalfFloatType);
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  texture.magFilter = texture.minFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  const generator = new THREE.PMREMGenerator(renderer);
+  const target = generator.fromEquirectangular(texture);
+  generator.dispose();
+  texture.dispose();
+  return target.texture;
 }
 
 /** The view's frame (looks.js drawFrame asks): through the camera's last passes where the tier has them and the device can. */
@@ -500,7 +584,10 @@ export function envUpdate(view, world, lead = null) {
   envLookWay ??= new THREE.Vector3();
   view.camera.getWorldDirection(envLookWay);
   u.uEnvLook.value.set(envLookWay.x, envLookWay.z);
-  view.lights.sun.intensity = state.sunPower * envCloudShareAt(state.air, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y);
+  const cloudOnFight = envCloudShareAt(state.air, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y);
+  view.lights.sun.intensity = state.sunPower * cloudOnFight;
+  // The ground metal mirrors lies in the same cloud's shade: made again when that has moved on (ENV.steel.again).
+  if (Math.abs(cloudOnFight - (view.envSteelShare ?? cloudOnFight)) > ENV.steel.again) envSteelSwap(view, state.air, state.own.meter?.sky ?? 1, cloudOnFight);
   const own = state.own;
   const parts = state.group.userData.envParts;
   const eye = view.camera.position;
