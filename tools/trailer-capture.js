@@ -103,7 +103,7 @@ export const TC = {
     if (!style) {
       style = document.createElement('style');
       style.id = 'trailer-play';
-      style.textContent = '#sound-toggle,.audio-mixer,#sandbox-menu,.sandbox-only,footer.controls,.zone-hints,#camera-bar{display:none!important}';
+      style.textContent = '#sound-toggle,.audio-mixer,#sandbox-menu,.sandbox-only,footer.controls,.zone-hints,#camera-bar,#banner,.banner{display:none!important}';
       document.head.appendChild(style);
     }
     this.noCrowns = false;
@@ -118,7 +118,7 @@ export const TC = {
   },
   // Behind man `id`, `back` m from him and raised by `pitch` rad, looking past him at the foes nearest him (their middle within 12 m, else
   // the whole enemy side's): both the eye and the aim eased, as a follow camera would.
-  chase(id, { back = 8.5, pitch = 0.34, lookUp = 1.1, fov = 50, ease = 0.06 } = {}) {
+  chase(id, { back = 8.5, pitch = 0.34, lookUp = 1.1, fov = 50, ease = 0.06, toward = null } = {}) {
     let eye = null;
     let aim = null;
     this.camera = (time, world) => {
@@ -127,13 +127,49 @@ export const TC = {
       const foes = world.fighters.filter((f) => f.corner !== man.corner && f.state === 'up');
       const near = foes.filter((f) => Math.hypot(f.root[0] - at[0], f.root[1] - at[1]) < 12);
       const set = near.length ? near : foes;
-      const mid = set.length ? [set.reduce((s, f) => s + f.root[0], 0) / set.length, set.reduce((s, f) => s + f.root[1], 0) / set.length] : [at[0] + 1, at[1]];
+      // `toward`: a fixed point [x, z] to face past him instead of his foes (a landmark: the gate).
+      const mid = toward ? toward : set.length ? [set.reduce((s, f) => s + f.root[0], 0) / set.length, set.reduce((s, f) => s + f.root[1], 0) / set.length] : [at[0] + 1, at[1]];
       const dx = mid[0] - at[0], dz = mid[1] - at[1], L = Math.hypot(dx, dz) || 1;
       const wantEye = [at[0] - (dx / L) * back * Math.cos(pitch), 1.2 + back * Math.sin(pitch), at[1] - (dz / L) * back * Math.cos(pitch)];
       const wantAim = [at[0] + (dx / L) * 2.5, lookUp, at[1] + (dz / L) * 2.5];
       eye = eye ? lerp(eye, wantEye, ease) : wantEye;
       aim = aim ? lerp(aim, wantAim, ease * 1.5) : wantAim;
       return { pos: eye, look: aim, fov };
+    };
+  },
+  // An arrow's-eye close-up: the camera rides just behind and beside the arrow in flight nearest man `id` and coming at him, looking down
+  // its line at him; once an arrow strikes him it holds on the point it went in (the event's point). For a slow-motion insert.
+  arrowCam(id, { back = 0.9, side = 0.35, up = 0.12, fov = 40, hold = 1.1 } = {}) {
+    let last = null;
+    let struck = null;
+    this.camera = (time, world) => {
+      const man = world.fighters[id];
+      const at = [man.x[0], man.x[1], man.x[2]];
+      const hit = world.events.find((e) => (e.kind === 'arrow' || e.kind === 'glance') && e.defender === id && e.point);
+      if (hit && !struck) struck = { point: hit.point, eye: last?.pos };
+      if (struck) {
+        const p = struck.point;
+        const eye = struck.eye ?? [p[0] - 1, p[1] + 0.3, p[2] + 1];
+        // Drawn in toward the wound a little, as a camera that saw it go in would.
+        const near = [p[0] + (eye[0] - p[0]) * 0.75, p[1] + (eye[1] - p[1]) * 0.75, p[2] + (eye[2] - p[2]) * 0.75];
+        return { pos: near, look: p, fov: fov * 0.8 };
+      }
+      const missiles = [...(world.arrows ?? []), ...(world.missiles ?? [])].filter((m) => m.x && m.v && !m.stuck && !m.landed);
+      let best = null;
+      for (const m of missiles) {
+        const d = [at[0] - m.x[0], at[1] - m.x[1], at[2] - m.x[2]];
+        const dist = Math.hypot(...d);
+        const sp = Math.hypot(...m.v) || 1;
+        const toward = (d[0] * m.v[0] + d[1] * m.v[1] + d[2] * m.v[2]) / (dist * sp);
+        if (dist < 30 && toward > 0.9 && (!best || dist < best.dist)) best = { m, dist, sp };
+      }
+      if (!best) return last ?? { pos: [at[0] + 2, at[1] + 0.6, at[2] + 2], look: at, fov };
+      const { m, sp } = best;
+      const u = [m.v[0] / sp, m.v[1] / sp, m.v[2] / sp];
+      const sideV = [-u[2], 0, u[0]];
+      const pos = [m.x[0] - u[0] * back + sideV[0] * side, m.x[1] - u[1] * back + up, m.x[2] - u[2] * back + sideV[2] * side];
+      last = { pos, look: [m.x[0] + u[0] * hold, m.x[1] + u[1] * hold, m.x[2] + u[2] * hold], fov };
+      return last;
     };
   },
   // The gun shot (spec shot 6): an East ashigaru with a teppō against a West samurai, both from Sekigahara's own cast at `seed`, on the
