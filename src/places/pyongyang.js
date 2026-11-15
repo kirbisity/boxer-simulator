@@ -274,15 +274,24 @@ export const PYONGYANG_WEATHER = {
   bare: { wet: 0.15, pool: 0, rain: 0, snow: 0, mist: [0.001, 0, 0.5], fog: PYONGYANG_PLACE.fog },
 };
 
-// The sun of the day: the afternoon of 8 February at Pyongyang. Worked from the date and the place, not looked up:
-// the town lies at about 39.0 N (approximate); day 39 of the year gives the sun's declination by the usual cosine,
-// -23.44 x cos(360 / 365 x (39 + 10)) = -15.6 degrees; at three in the afternoon by the sun (an hour angle of 45
-// degrees) sin(height) = sin 39.0 sin -15.6 + cos 39.0 cos -15.6 cos 45 = 0.360, a height of 21.1 degrees, and its
-// bearing is 46.9 degrees west of south. (At noon it stands 35.4 degrees high, due south; the afternoon is chosen
-// because the wall's outer face looks west and the storming went on through the day: the low sun lies on the face
-// the ladders climb and throws the wall's shadow long into the town.) `azimuth` is the open air's measure (rad: 0
-// toward +x east, a quarter turn toward +z south).
-const PY_SUN = { azimuth: Math.PI / 2 + (46.9 * Math.PI) / 180, elevation: 21.1 };
+// The sun of the day: 8 February at Pyongyang, worked from the date and the place, not looked up: the town lies at
+// about 39.0 N (approximate); day 39 of the year gives the sun's declination by the usual cosine,
+// -23.44 x cos(360 / 365 x (39 + 10)) = -15.6 degrees; at an hour angle H, sin(height) = sin 39.0 sin -15.6 +
+// cos 39.0 cos -15.6 cos H, and the bearing west of south A has tan A = sin H / (cos H sin lat - tan dec cos lat)
+// (at three by the sun, H = 45 degrees: 21.1 high, 46.9 west of south; at noon 35.4, due south). The hour is half
+// past three: a low winter sun of 16.6 degrees, 52.9 west of south, under air that lets more of the sky's blue
+// through it pale (the weather below), the light a clear winter day has in its first and last hours. Only an
+// afternoon sun can do it here: the wall's outer face looks west, so a morning sun (in the south-east) leaves the
+// face the ladders climb and the gate's front in their own shade, and throws the wall's shadow out over the field.
+// `azimuth` is the open air's measure (rad: 0 toward +x east, a quarter turn toward +z south).
+const PY_DAY = { latitude: 39.0, declination: -15.6, hour: 15.5 };
+function pySunAt({ latitude, declination, hour }) {
+  const [lat, dec, h] = [latitude, declination, 15 * (hour - 12)].map((degrees) => (degrees * Math.PI) / 180);
+  const elevation = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(h));
+  const bearing = Math.atan2(Math.sin(h), Math.cos(h) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat));
+  return { azimuth: Math.PI / 2 + bearing, elevation: (elevation * 180) / Math.PI };
+}
+const PY_SUN = pySunAt(PY_DAY);
 
 /** The place's light (render.js PLACE_LIGHT's entry): the low winter sun of PY_SUN in a pale clear sky. */
 // What the bare ground under the snow throws back, for the open air's light from below (its `ground.albedo`):
@@ -847,38 +856,33 @@ export function buildPyongyang() {
       height: (x, z) => { if (z > t.outside.z[1] && x >= t.river.field.x[0] && x <= t.river.field.x[1]) return tkFieldAt(plan.south, x, Math.min(z, t.river.field.to)); const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)); return x <= wall.x ? tkFieldAt(plan.outside, Math.max(t.outside.x[0], x), zc) : x < head ? pyFoot(zc) : tkFieldAt(plan.inside, Math.min(plan.east, x), zc); },
       openings: [{ at: [mouth, 0, t.gate.z - t.gate.way / 2], a: [0, t.gate.spring + t.gate.rise * 0.6, 0], b: [0, 0, t.gate.way], floor: 0, dust: 0.06 }],
     },
-    // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun:
-    //   cover, sun   the cloud broken wider, half the sky, and the sun whole in the gaps: the sun between the showers
-    //                is what draws the wall and lays the long shadows;
-    //   gloom        the showers' own cloud darker underneath (0.85 against the open air's own figure for flurries),
-    //                so the lit snow stands against a dark sky down-sun and the cloud up the sun keeps dark forms
-    //                for the light to come through (at 0.7 the sunward cloud in a shower was pale on pale);
-    //   visibility,  60 km of sight in a layer 300 m deep between the showers (polar air behind a front: approximate,
-    //   hazeHeight   the clear end of what such air gives). Measured by turning one key at a time on the two sunward
-    //                standing places: with 14 km in the open air's own 900 m layer the haze up the low sun hid the
-    //                cloud, and two thirds of the frame was one pale glow with no edge; with these the cloud up the
-    //                sun stands in dark masses nearer than the glow, with bright breaks between them;
+    // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun: a bright pale
+    // winter sky with the low sun whole on the wall between passing showers.
+    //   cover, sun   the cloud a little broken, two fifths of the sky, the sun whole in the gaps: the sun between the
+    //                showers draws the wall and lays the long shadows;
+    //   gloom        the showers' cloud a little darker underneath than a fair cumulus (0.45): grey forms on a pale
+    //                sky. At 0.85 (with 60 km of sight) the gate views showed hard slate cloud on saturated blue;
+    //   visibility,  25 km of sight in a 700 m layer (the place's own figure for a continental winter's air; a
+    //   hazeHeight,  shallower layer than the open air's own): enough haze to pale the sky's blue to the white of a
+    //   fine         cold morning and to warm the low sun, with the far hills still seen; `fine` 0.95, ice-crystal haze
+    //                greying more evenly than fine dust does. At 60 km in 300 m the sky was deep blue overhead;
     //   fall.thick   12 km of sight in the thick of a shower, against the open air's 900 m: a showery snow, not a
     //                blizzard. The falling snow's veil is lit as if the sun reached all of it, so toward the sun a
     //                thick one is a white wall in front of the cloud that sheds it (at 4000 m 1.8 percent of the
-    //                sunward frame clipped in a shower and the cloud was gone; at 12000 none clips and the forms
-    //                stay). A workaround, asked of the open air as R10 (c): when its veil is shaded by the cloud it
-    //                falls from, this goes back toward 4000;
-    //   grade.ev     0.9 of a stop under what the open air's meter gives. Its meter allows for the snow (the place's
-    //                ground albedo), but a low sun in front of the camera over a whole frame of snow still put the
-    //                sunlit drifts on the curve's shoulder, and in a shower, when the ground dims and the meter
-    //                opens, the glow round the sun burnt out (3 to 4 percent of a sunward frame at 0.7 under, 1 to 2
-    //                at 0.9, measured from five standing places). Held here the drifts are the brightest thing on
-    //                the ground and keep their shading, and the gatehouse's paint and stone keep their colour both
-    //                with the sun and against it. Contrast and colour a little off its own, for the stone's warmth.
+    //                sunward frame clipped in a shower). A workaround, asked of the open air as R10 (c);
+    //   grade.ev     0.6 of a stop under what the open air's meter gives (0.9 kept a darker day): the meter allows for
+    //                the snow, but a low sun in front of the camera over a frame of snow puts the sunlit drifts on the
+    //                curve's shoulder; at 0.6 the sunward frames clip 0.2 percent or less, all of it in the glow at
+    //                the sun, and the gate views sit a third of a stop brighter than at 0.9. Warmth a little up, for
+    //                the low sun; contrast a little down, for the paler sky.
     // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall.
-    // 'siegesnowhazy': the same showers in the sky the gate views had before the sunward work (the open air's own
-    // flurries haze: 14 km in its 900 m layer, and 4 km in the thick of a shower), kept to be compared with the
-    // default, which it does not replace (the place's weather `hazy`).
+    // 'siegesnowhazy': the same showers in the hazier, darker sky the gate views had before the sunward work (the
+    // open air's own flurries haze: 14 km in its 900 m layer, and 4 km in the thick of a shower), kept to be compared
+    // with the default, which it does not replace (the place's weather `hazy`).
     weathers: { snow: 'siegesnow', hazy: 'siegesnowhazy', bare: 'clear' },
     first: 'snow',
     own: {
-      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 60000, hazeHeight: 300, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.24, saturation: 0.94, warmth: 0.03, ev: -0.6 }, cover: 0.42, sun: 1, gloom: 0.45, fine: 0.95, visibility: 25000, hazeHeight: 700, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
       siegesnowhazy: ['flurries', { label: 'Snow showers on the wall, hazier sky', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }],
     },
   };
