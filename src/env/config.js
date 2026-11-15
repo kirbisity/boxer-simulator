@@ -535,6 +535,10 @@ export const ENV = {
     // the first of these (m), and the line's middle for every blade past the second (grass.js): the second and
     // third rings' tufts are few and wide, and each with its own point showed as a fleck against lit mist.
     shadeOwn: [10, 30],
+    // The order blades are drawn in (grass.js envGrassCells): [cells, runs]. 16 x 16 cells to a tile hold 400 to
+    // 500 of the nearest ring's blades each, so the vertex stage meets a cell out of view whole; 20 runs, each an
+    // even sprinkle over the tile, so the tiers' shares (ENV.quality `grass`: 1, 0.5, 0.2) are whole runs.
+    cells: [16, 20],
     // A blade's lean at rest (rad, random way) and how much each differs in height (share).
     lean: 0.32,
     vary: 0.45,
@@ -603,6 +607,12 @@ export const ENV = {
     // near, where a card is seen leaf by leaf; lower far off, where the picture is shrunk to a blur of leaf and
     // gap and a crown must still close (by eye: at a half the hill woods fell to tatters).
     cut: [0.5, 0.42, 0.3, 0.2],
+    // A broad crown is the masses of leaf its limbs carry (trees.js envCrownMasses): each `size` (least, most) of
+    // the crown's width across, its middle `out` (least, most) of the width from the trunk, and lit by its own
+    // surface's facing `own` of the way (the rest by the whole crown's), its underside darker by `under`.
+    // Masses half the crown wide, a third of the way out, read as one ball (a lollipop); smaller masses further
+    // out with sky between them read as boughs, as a hedgerow oak does. By eye against the meadow and field.
+    clump: { size: [0.22, 0.4], out: [0.45, 0.85], own: 0.7, under: 0.35 },
     // Shading inside a crown: the inside and the underside are darker (leaves shade leaves) by up to this share.
     inner: 0.55,
     // Light through the leaves when the sun is behind the crown.

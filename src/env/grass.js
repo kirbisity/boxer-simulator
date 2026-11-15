@@ -41,6 +41,23 @@ void main() {
   float fade = (1.0 - smoothstep(0.36 * tile, 0.5 * tile, out_)) * smoothstep(uLayer.w * 0.7, uLayer.w, length(xz - cameraPosition.xz));
   vec4 map = envMap(xz);
   fade *= envInMap(xz);
+  // Only what the camera sees is worked (the perception rule): a blade whose round (from its root to the tallest
+  // a blade of this ring stands, laid over by as much) lies wholly outside the view, or that has faded to
+  // nothing, is put off the picture before anything else is asked of it. A ring's tile stands all round the
+  // eye, and about two thirds of its blades are out of a 50 degree view; blades are laid down cell by cell
+  // (envBuildGrass), so neighbours in the draw stand together and are passed over together.
+  {
+    float reach = uBlades.y * uLayer.z * ${(1 + ENV.grass.rank.taller).toFixed(2)} + uLayer.y;
+    vec4 clip = projectionMatrix * viewMatrix * vec4(xz.x, map.r + reach * 0.5, xz.y, 1.0);
+    float sideX = reach * (abs(projectionMatrix[0][0]) + 1.0);
+    float sideY = reach * (abs(projectionMatrix[1][1]) + 1.0);
+    if (fade <= 0.0 || clip.x - clip.w > sideX || -clip.x - clip.w > sideX || clip.y - clip.w > sideY || -clip.y - clip.w > sideY || clip.w < -reach) {
+      vLit = vec3(0.0);
+      vBase = vec3(0.0);
+      gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+      return;
+    }
+  }
 
   float r1 = aRoot.z;
   float r2 = aRoot.w;
@@ -136,6 +153,24 @@ void main() {
   #include <tonemapping_fragment>
 }`;
 
+/**
+ * Order a ring's roots ([x, z, r1, r2] per blade) so that blades drawn together stand together: in
+ * ENV.grass.cells[1] runs, each the whole tile at an even sprinkle (a tier draws a share of the count from the
+ * front, envGrassQuality, and a share that is a whole number of runs is still even over the tile), and within a
+ * run by the cell of a ENV.grass.cells[0]-square grid the blade falls in, the cells taken in rows.
+ */
+function envGrassCells(roots, tile) {
+  const [cells, runs] = ENV.grass.cells;
+  const count = roots.length / 4;
+  const order = Array.from({ length: count }, (_, at) => at);
+  const cellOf = (at) => Math.min(cells - 1, Math.floor((roots[at * 4 + 1] / tile) * cells)) * cells + Math.min(cells - 1, Math.floor((roots[at * 4] / tile) * cells));
+  const keys = new Int32Array(count);
+  for (let at = 0; at < count; at += 1) keys[at] = Math.floor((at / count) * runs) * cells * cells + cellOf(at);
+  order.sort((a, b) => keys[a] - keys[b] || a - b);
+  const copy = roots.slice();
+  order.forEach((from, to) => roots.set(copy.subarray(from * 4, from * 4 + 4), to * 4));
+}
+
 /** One blade: `segments` quads tapering to a point. */
 function envBladeGeometry(segments) {
   const blade = [];
@@ -174,6 +209,9 @@ export function envBuildGrass({ place, map }) {
       roots[at + 2] = random();
       roots[at + 3] = random();
     }
+    // Laid down cell by cell, so blades drawn together stand together and the vertex stage passes over a cell
+    // out of view as a whole (envGrassCells).
+    envGrassCells(roots, layer.tile);
     geometry.setAttribute('aRoot', new THREE.InstancedBufferAttribute(roots, 4));
     geometry.instanceCount = layer.count;
     const inner = order === 0 ? 0 : ENV.grass.layers[order - 1].tile * 0.4;
