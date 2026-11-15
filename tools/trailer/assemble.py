@@ -91,6 +91,10 @@ def main():
     mix = edit.get('mix', {})
     music, ambience, sfx = (np.zeros(int(total * SR) + SR, np.float32) for _ in range(3))
     for piece in edit.get('music', []):
+        # Over a run of entries ([first, last]), or by timeline second (at, until).
+        if 'entries' in piece:
+            a, b = piece['entries']
+            piece = {**piece, 'at': timeline[a][1], 'until': timeline[b][1] + timeline[b][2]}
         length = piece['until'] - piece['at']
         sound = decode(os.path.join(ROOT, 'assets/music', f"{piece['file']}.mp3"), piece.get('in', 0), length) * piece.get('gain', 0.5)
         add(music, faded(sound, piece.get('fadeIn', 0.3), piece.get('fadeOut', 0.5)), piece['at'])

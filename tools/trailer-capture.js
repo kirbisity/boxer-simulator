@@ -14,6 +14,7 @@ import { seededRandom } from '/src/physics.js';
 import { STORY_BATTLES } from '/src/story/battles/index.js';
 import { storyNorthLife } from '/tools/storynorth.js';
 import { skirmish, SKIRMISH_ARENA } from '/tools/trailer-skirmish.js';
+import { floorAt } from '/src/physics/terrain.js';
 
 const HIDE = 'header,footer,#fight-ui,#hud,.hud,#clock,#ghost-bar,.ghost-bar,#log,#banner,.level-hud,#speeds,.fu-pick,#pause,#restart,#menu,.menu,#modes,.arena::after,.toast,#toast,#sound-toggle,.audio-mixer,#icons,.event-icon,#camera-bar{display:none!important}';
 
@@ -48,7 +49,8 @@ export const TC = {
         if (window.TC.noCrowns) scene.traverse((o) => { if (o.isSprite && Math.abs(o.scale.x - 0.035) < 1e-6) o.scale.setScalar(1e-6); });
         // (The game's resolution keeps pulling the ratio back to its cap of 2: the full device ratio, every frame.)
         if (renderer.getPixelRatio() !== window.devicePixelRatio) renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.__orig(scene, camera);
+        // A frame that throws in drawing is kept (TC.renderErrors) and the take goes on, as the page's own loop does (main.js frame).
+        try { renderer.__orig(scene, camera); } catch (error) { (TC.renderErrors ??= []).push(String(error.message)); window.TC.renderErrors = TC.renderErrors; }
       };
     }
     boxer.capture(true);
@@ -171,6 +173,65 @@ export const TC = {
       last = { pos, look: [m.x[0] + u[0] * hold, m.x[1] + u[1] * hold, m.x[2] + u[2] * hold], fov };
       return last;
     };
+  },
+  // Dunnottar played (Level Mode): every man his own full model first (the stage's crowd bodies baked from the base meshes crash the page:
+  // 2026-11-15, since 70afbbc), the HUD as on a phone, the game's own camera (made for the castle's walls and rooms). Then `at` [x, y, z]:
+  // the Forger stood there (the sections there wake on his first steps), facing `yaw`.
+  async level(at = null, yaw = 0) {
+    const boxer = window.boxer;
+    boxer.fullModels(true);
+    boxer.levelMode('dunnottar');
+    window.boxer.state.game = 'level';
+    document.body.dataset.game = 'level';
+    this.ui(true);
+    let style = document.getElementById('trailer-play');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'trailer-play';
+      style.textContent = '#sound-toggle,.audio-mixer,#sandbox-menu,.sandbox-only,footer.controls,.zone-hints,#camera-bar,#banner,.banner{display:none!important}';
+      document.head.appendChild(style);
+    }
+    const ui = document.getElementById('fight-ui');
+    if (ui) ui.dataset.device = 'touch';
+    this.noCrowns = false;
+    this.camera = null;
+    if (at) {
+      const run = boxer.levelRun();
+      // On the spot first (its sections wake), then on the floor found there (null y: the highest floor under 40 m).
+      run.put([at[0], (at[1] ?? 40) + 0.3, at[2]], yaw);
+      boxer.playFrames(4, 1 / 60);
+      const floor = floorAt(boxer.state.world.arena.terrain, at[0], at[2], (at[1] ?? 40) + 1.5);
+      run.put([at[0], floor ?? at[1] ?? 0, at[2]], yaw);
+    }
+    boxer.finishBuilding?.();
+    boxer.finishSkins?.();
+    boxer.playFrames(30, 1 / 60);
+    return { men: boxer.state.world.fighters.length, at: boxer.state.world.fighters[0].root };
+  },
+  // The Forger played as a player would: along `points` ([x, z], the stage's DUNNOTTAR_ROUTE) at a run, the fight AI at the controls
+  // whenever a foe that knows of him is within `fightWithin` m; `ally` ids are brought along (the stage's gather).
+  pilot(points, { fightWithin = 7, run = true, zoom = 6.5, pitch = 0.5 } = {}) {
+    const boxer = window.boxer;
+    let next = 0;
+    this.onFrame = (w) => {
+      const me = w.fighters[0];
+      const orders = boxer.state.orders;
+      const near = w.fighters.some((f) => f.corner !== me.corner && f.state === 'up' && !f.dormant && Math.hypot(f.root[0] - me.root[0], f.root[1] - me.root[1]) < fightWithin && (f.aiFelt || f.focus === me.id || f.nearestFoe === me.id));
+      while (next < points.length && Math.hypot(points[next][0] - me.root[0], points[next][1] - me.root[1]) < 1.1) next += 1;
+      // The player's zoom held out and up (as a pinch would), so the game's camera rides higher behind him in the castle's narrow places.
+      if (zoom) Object.assign(boxer.scene.orbit, { distance: zoom, pitch });
+      if (near || next >= points.length) {
+        boxer.autopilot(true);
+        orders.stick = null;
+        return;
+      }
+      boxer.autopilot(false);
+      const d = [points[next][0] - me.root[0], points[next][1] - me.root[1]];
+      const L = Math.hypot(d[0], d[1]) || 1;
+      // The touch stick (it outranks the keys, which the page clears each frame).
+      orders.stick = { dir: [d[0] / L, d[1] / L], amount: run ? 1 : 0.7 };
+    };
+    return points.length;
   },
   // The gun shot (spec shot 6): an East ashigaru with a teppō against a West samurai, both from Sekigahara's own cast at `seed`, on the
   // Sengoku battlefield (its camps) in mist, `distance` m apart. Returns the pair's ids [gunner, samurai].
@@ -319,6 +380,7 @@ export const TC = {
     const w = boxer.state.world;
     this.cursor ??= w.events.length;
     if (this.cursor > w.events.length) this.cursor = 0;
+    this.onFrame?.(w);
     boxer.playFrames(1, dt);
     const cam = boxer.scene.camera.position;
     const out = [];

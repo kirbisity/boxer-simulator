@@ -36,7 +36,7 @@ async function renderShot(id) {
     await page.goto(`http://localhost:${CONFIG.port}/`, { waitFor: 'Boolean(window.boxer?.scene?.renderer)', timeout: 60000 });
     await page.eval(`(async () => {
       const { TC } = await import('/tools/trailer-capture.js');
-      TC.prep({ hideUi: ${shot.hud === false} });
+      TC.prep({ hideUi: ${shot.hud === false && !shot.level} });
       const boxer = window.boxer;
       ${shot.setup}
       return true;

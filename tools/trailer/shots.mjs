@@ -103,4 +103,31 @@ export const SHOTS = {
       for (let i = 0; i < 34; i += 1) boxer.playFrames(1, 0.1);`,
     segments: [real(2.3), slow(1, 4), real(5)],
   },
+
+  // ---- Dunnottar (Level Mode, played: the Forger walks the stage's own route, DUNNOTTAR_ROUTE, and the fight AI fights for him when a foe
+  // closes; the game's own camera, its zoom held out; the HUD as on a phone). A section is entered where the route enters it. `at` [x, y, z]: y the floor
+  // height near there (the stage's views, tools/camshots.js), null for the highest floor (open ground only).
+  dnCliff: dunnottar([-100, 10.6, -4], 0, [[-80, -4], [-64, -4], [-60.5, -2], [-60.5, 8], [-70, 8]], 5),
+  dnBridge: dunnottar([-50, null, 44], 0, [[-44, 44], [-34, 45], [-28, 46.2], [-22, 46.2], [-16, 46.2], [-10.4, 46.2]], 6),
+  dnLedge: dunnottar([-7.8, null, 49.5], Math.PI / 2, [[-7.8, 50.4], [-8.2, 54], [-3, 54.2], [2.2, 54]], 6),
+  dnGate: dunnottar([5, 2, 46.2], 0, [[10, 46.2], [13, 46.2], [16.5, 46.2], [17.7, 42], [17.7, 37]], 5),
+  dnQuad: dunnottar([17, 12.18, 6.5], 0, [[17, 4.4], [24, 3.6], [32, 3.6], [39, 3.4]], 5, 'boxer.stage.gather?.();'),
+  dnChapel: dunnottar([-4, 17.18, -36], Math.PI, [[-6, -36], [-14, -36], [-22, -36]], 9, 'const run = boxer.levelRun(); for (let i = 0; i < 240 && !run.cutscene(); i += 1) { TC.onFrame(boxer.state.world); boxer.playFrames(1, 1 / 60); } run.skipCutscene?.();'),
 };
+
+/** A Dunnottar shot: the Forger stood at `at` facing `yaw`, piloted along `points` for `seconds`; `extra` runs before the take. */
+function dunnottar(at, yaw, points, seconds, extra = '') {
+  return {
+    view: 'phone',
+    level: true,
+    setup: `
+      await TC.level(${JSON.stringify(at)}, ${yaw});
+      TC.pilot(${JSON.stringify(points)});
+      ${extra}
+      await TC.warm(90);
+      // The game's camera comes to him at real speed (it does not move in a held frame).
+      for (let i = 0; i < 40; i += 1) { TC.onFrame(boxer.state.world); boxer.playFrames(1, 1 / 60); }`,
+    segments: [real(seconds)],
+  };
+}
+
