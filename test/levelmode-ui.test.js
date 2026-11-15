@@ -112,7 +112,7 @@ test('the story: the lore is about 150 words and names who it should; nine notes
 test('Level Mode lists Stage 1 (playable) and Stage 2 (coming soon)', () => {
   assert.equal(STAGE_LIST[0].key, 'dunnottar');
   assert.equal(STAGE_LIST[0].ready, true);
-  assert.equal(STAGE_LIST[0].title, 'Stage 1 · Memories of Dunnottar');
+  assert.equal(STAGE_LIST[0].title, 'Memories of Dunnottar');
   assert.equal(STAGE_LIST[1].ready, false);
   assert.equal(STAGE_LIST[1].title, 'Stage 2 · Coming soon');
   assert.equal(LEVEL_PRESETS.vaelen.name, 'Lord Vaelen');

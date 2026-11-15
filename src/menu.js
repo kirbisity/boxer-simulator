@@ -157,16 +157,16 @@ export function installMenus(game) {
     body.parentElement.classList.add('home');
     body.append(el('div', { className: 'choices home-choices' },
       choice({ glyph: 'trophy', kicker: t('menu.home.career.kicker'), title: t('menu.home.career.title'), text: t('menu.home.career.text'), tone: 'career' }),
-      // Story mode (src/story/): one Ming conscript's life, its own screen (storyview.js), opened over the fight behind the menus.
-      choice({ glyph: 'book', kicker: pick({ en: 'New · 1587-1621', zh: '新 · 1587-1621' }), title: pick({ en: 'Story', zh: '故事' }), text: pick({ en: 'One Ming soldier\'s life, from the register to the Hun River.', zh: '一个明朝兵的一生，从入军籍到浑河。' }), onClick: () => { close(); game.story?.(); }, tone: 'gold' }),
+      // Story mode: the stories, each played its own way for now (stories(), below).
+      choice({ glyph: 'book', kicker: t('menu.home.story.kicker'), title: t('menu.home.story.title'), text: t('menu.home.story.text'), onClick: stories, tone: 'gold' }),
       choice({ glyph: 'banner', kicker: t('menu.home.battle.kicker'), title: t('menu.home.battle.title'), text: t('menu.home.battle.text'), onClick: levels, tone: 'gold' }),
-      choice({ glyph: 'castle', kicker: t('menu.home.level.kicker'), title: t('menu.home.level.title'), text: t('menu.home.level.text'), onClick: stages, tone: 'storm' }),
       choice({ glyph: 'shield', kicker: t('menu.home.gate.kicker'), title: tname(LAST_GATE.title), text: t('menu.home.gate.text'), onClick: () => lastGate(), tone: 'mist' }),
       choice({ glyph: 'skull', kicker: t('menu.home.versus.kicker'), title: t('menu.home.versus.title'), text: t('menu.home.versus.text'), onClick: versus }),
-      choice({ glyph: 'bolt', kicker: t('menu.home.quick.kicker'), title: t('menu.home.quick.title'), text: t('menu.home.quick.text'), onClick: quickEvent }),
-      choice({ glyph: 'flask', kicker: t('menu.home.sandbox.kicker'), title: t('menu.home.sandbox.title'), text: t('menu.home.sandbox.text'), onClick: () => { close(); game.sandbox(); } })),
+      choice({ glyph: 'bolt', kicker: t('menu.home.quick.kicker'), title: t('menu.home.quick.title'), text: t('menu.home.quick.text'), onClick: quickEvent })),
       el('div', { className: 'home-links' },
         el('button', { className: 'replay-intro', type: 'button', icon: 'target', textContent: t('menu.home.tutorial'), onclick: () => { close(); game.tutorial(); } }),
+        // The sandbox (every setting: teams, bodies, layers) is a tool, not a way to play: a link here, beside the tutorial.
+        el('button', { className: 'replay-intro', type: 'button', icon: 'flask', textContent: t('menu.home.sandbox.title'), title: t('menu.home.sandbox.text'), onclick: () => { close(); game.sandbox(); } }),
         // The intro (intro.js) again: the legends, then back here.
         el('button', { className: 'replay-intro', type: 'button', textContent: t('menu.home.intro'), onclick: () => { close(); game.intro(home); } }),
         // How the player attacks (fightui/): tapping his man or the buttons; a tap flips it.
@@ -291,19 +291,25 @@ export function installMenus(game) {
     });
   }
 
-  // ---- Level Mode: the stages ---------------------------------------------------
-  // Stage 1 starts through `game.onStage(key)` (main.js wires it; unwired, the card does nothing); the rest are shown, not open yet.
-  function stages() {
-    redraw = stages;
-    const body = screen('stages-screen', t('menu.home.level.title'), t('menu.stages.lede'), home);
-    body.append(el('div', { className: 'choices levels stages' }, ...STAGE_LIST.map((stage) => {
+  // ---- Story mode: the stories ---------------------------------------------------
+  // Two stories with two ways of playing, kept apart for now and meant to grow together: one Ming conscript's life (src/story/,
+  // its own screen, storyview.js, opened over the fight behind the menus) and the Dunnottar stage (src/levelmode/, started through
+  // `game.onStage(key)`, which main.js wires; unwired, its card does nothing). Stages not open yet are left off.
+  function stories() {
+    redraw = stories;
+    const body = screen('stages-screen', t('menu.home.story.title'), t('menu.stories.lede'), home);
+    // Its picture is the Hun River battle (Sarhu, 1619) the life ends in.
+    const lifeCard = addBattleThumb(choice({ glyph: 'book', kicker: t('menu.stories.life.kicker'), title: t('menu.stories.life.title'), text: t('menu.stories.life.text'), onClick: () => { close(); game.story?.(); }, tone: 'gold' }), 'sarhu');
+    const life = withStory(lifeCard, { title: t('menu.stories.life.title'), kicker: t('menu.stories.life.kicker'), lines: [t('menu.stories.life.text')] });
+    const stageCards = STAGE_LIST.filter((stage) => stage.ready).map((stage) => {
       const card = choice({
-        glyph: stage.glyph, kicker: pick(stage.kicker), title: pick(stage.title), text: pick(stage.blurb), tone: stage.ready ? 'storm' : '',
-        onClick: stage.ready ? () => { if (!game.onStage) return; close(); game.onStage(stage.key); } : null,
+        glyph: stage.glyph, kicker: pick(stage.kicker), title: pick(stage.title), text: pick(stage.blurb), tone: 'storm',
+        onClick: () => { if (!game.onStage) return; close(); game.onStage(stage.key); },
       });
-      if (stage.ready) addBattleThumb(card, stage.key);
+      addBattleThumb(card, stage.key);
       return withStory(card, { title: pick(stage.title), kicker: pick(stage.kicker), lines: [pick(stage.blurb)] });
-    })));
+    });
+    body.append(el('div', { className: 'choices levels stages' }, life, ...stageCards));
     show('stages-screen');
   }
 
@@ -769,5 +775,5 @@ export function installMenus(game) {
 
   // Back to the menu from a fight.
   game.onMenu(home);
-  return { lastGate, home, levels, stages, versus, quickEvent, customBattle, close };
+  return { lastGate, home, levels, stories, versus, quickEvent, customBattle, close };
 }
