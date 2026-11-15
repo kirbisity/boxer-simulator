@@ -14,12 +14,19 @@ import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, seededRandom } from '../src/physics.js';
 import { SCENARIOS } from '../src/scenarios.js';
+import { pyongyangBattle } from '../src/story/battles/03-pyongyang.js';
+import { storyNewLife } from '../src/story/life.js';
 
 const duel = (red, blue, extra = {}) => () => createWorld([{ inputs: structuredClone(PRESETS[red]), corner: 'red' }, { inputs: structuredClone(PRESETS[blue]), corner: 'blue' }], { seed: 7, ...extra });
 const level = (key) => () => {
   const scenario = SCENARIOS[key];
   const cast = scenario.cast(seededRandom(7));
   return createWorld([...cast.red.map((inputs) => ({ inputs, corner: 'red' })), ...cast.blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 7, arena: scenario.arena, formation: scenario.formation });
+};
+
+const story = (battle) => () => {
+  const setup = battle.setup(storyNewLife(1), 1);
+  return createWorld(setup.fighters, setup.options);
 };
 
 // What is fingerprinted: each kind of fight the game has, for `seconds`.
@@ -37,6 +44,8 @@ const FIGHTS = {
   'legion': [level('legion'), 30],
   // The ambush at Cajamarca: hidden men, the signal, horses and guns among a crowd.
   'cajamarca': [level('cajamarca'), 10],
+  // A story battle on the lie of the land (physics/fieldworks.js ground): the columns' march over it under the walls' fire.
+  'pyongyang 1593': [story(pyongyangBattle), 40],
 };
 
 /** A 32-bit FNV-1a hash of a world's particles (rounded to 0.1 mm) and its event count. */
@@ -83,7 +92,10 @@ console.log(`total ${Object.values(results).reduce((sum, result) => sum + result
 if (mode === 'save') writeFileSync(file, JSON.stringify(results, null, 2));
 if (mode === 'check') {
   const saved = JSON.parse(readFileSync(file, 'utf8'));
-  const changed = Object.keys(results).filter((name) => saved[name]?.hash !== results[name].hash);
+  // (A fight added since the file was saved is listed, not counted as changed.)
+  const added = Object.keys(results).filter((name) => !saved[name]);
+  const changed = Object.keys(results).filter((name) => saved[name] && saved[name].hash !== results[name].hash);
+  if (added.length) console.log(`not in the saved file: ${added.join(', ')}`);
   console.log(changed.length ? `changed: ${changed.join(', ')}` : 'identical to the saved fingerprint');
   if (changed.length) process.exitCode = 1;
 }

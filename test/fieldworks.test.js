@@ -314,3 +314,29 @@ test('a horse driven at a canter or more through deep mud founders and throws it
     assert.equal(ride(MUD, 1.5, seed, 20).reason, undefined, 'at a walk it picks its feet out of the mud');
   }
 });
+
+test('the lie of the land (works `ground`): a man walks over a rolling field with his feet on it, neither floating nor sunk', async () => {
+  const { reliefAt, worksOf } = await import('../src/physics/fieldworks.js');
+  // A field 40 m along x rising and falling 0.6 m over 20 m (a swale and a rise), level across.
+  const nu = 8;
+  const heights = [];
+  for (let j = 0; j <= 1; j += 1) for (let i = 0; i <= nu; i += 1) heights.push(0.3 * Math.sin((i / nu) * 2 * Math.PI));
+  const field = { at: [0, 0], size: [40, 12], cells: [nu, 1], heights };
+  const arena = { halfX: 20, halfZ: 6, works: { ground: [field] } };
+  const works = worksOf(arena);
+  assert.ok(works.relief, 'a ground field is relief');
+  assert.ok(Math.abs(reliefAt(works, -10, 0) - 0.3) < 1e-9, 'the corner heights are the ground there');
+  assert.equal(reliefAt(works, 30, 0), 0, 'outside the field the ground is at 0');
+  const world = createWorld([{ inputs: normaliseInputs(structuredClone(PRESETS.heavy)), corner: 'red' }, { inputs: normaliseInputs(structuredClone(PRESETS.light)), corner: 'blue' }], { seed: 1, arena, distance: 8 });
+  const lows = [];
+  for (let t = 0; t < 12; t += 0.25) {
+    advance(world, 0.25, (current, dt) => thinkAll(current, dt));
+    for (const fighter of world.fighters) {
+      if (fighter.state !== 'up') continue;
+      for (const foot of [P.lFoot, P.rFoot]) lows.push(fighter.x[foot * 3 + 1] - fighter.radius[foot] - reliefAt(works, fighter.x[foot * 3], fighter.x[foot * 3 + 2]));
+    }
+  }
+  lows.sort((a, b) => a - b);
+  assert.ok(lows[0] > -0.01, `no foot under the ground (${lows[0].toFixed(3)} m)`);
+  assert.ok(lows[Math.floor(lows.length / 2)] < 0.05, `a foot is on the ground most of the time (median ${lows[Math.floor(lows.length / 2)].toFixed(3)} m)`);
+});

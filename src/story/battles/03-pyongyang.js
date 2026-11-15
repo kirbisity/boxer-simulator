@@ -41,6 +41,7 @@ import { BATTLE_END } from '../../battleend.js';
 import { DRILL } from '../../formation.js';
 import { seededRandom } from '../../physics.js';
 import { wallWorks } from '../ground/walls.js';
+import { pyongyangPlan } from '../../places/pyongyang.js';
 import { koreaAssemble, koreaRowOf, koreaRows, koreaSeat, koreaStyles } from './korea.js';
 
 // m from the wall's foot (above): where the columns form up, and where the stretch's guns are laid.
@@ -142,7 +143,8 @@ export const pyongyangBattle = {
       fighters: built.fighters,
       options: {
         seed,
-        arena: { ...spec.arena, works: { ...works, placeDraws: true } },
+        // (The ground the columns cross is the place's own outside field, drawn and stood on alike: physics/fieldworks.js `ground`.)
+        arena: { ...spec.arena, works: { ...works, ground: [pyongyangPlan().outside], placeDraws: true } },
         place: 'pyongyang',
         // (Judged on strength left only after the march and the battle's own time: battleend.js.)
         timeLimit: BATTLE_END.timeLimit + PYONGYANG_MARCH,

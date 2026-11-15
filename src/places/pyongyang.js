@@ -34,8 +34,13 @@ export const PYONGYANG_PLACE = {
   // The ground's grid: cells along the wall (m: the wall's pieces are these too), outside it and inside it. The inner
   // cells are the earth bank's own run (height x STORY_WALL.innerRun / 2), so the bank's head and foot fall on grid lines.
   cell: 5, outside: { x: [-149, 1], z: [-130, 130] }, inside: { cells: 32, z: [-130, 130] },
-  // The battle's level strip (|z|), and how far beyond it the ground has come to its own relief.
-  strip: [10, 24],
+  // The battle's strip (|z|): kept clear of trees, rocks and litter, which the battle's physics does not have. Its
+  // ground is the land as it lies (the battle stands on this place's outside field: story/battles/03-pyongyang.js).
+  strip: [10],
+  // The berm the builders left level along the wall's foot, m out from it, and over how many m beyond it the ground
+  // comes to its own lie (by eye: room for the ladders' feet and the men at them; whole cells of the ground's grid, so
+  // the drawn and stood-on triangles are level all over it; it meets the wall's base, drawn at the foot's height).
+  berm: [10, 15],
   // The hill the wall climbs to the north: how high the wall's foot is at the corner, and over what stretch (z) it rises.
   hill: { high: 13, z: [-70, -120] },
   // The gate: its middle (z), the block's width along the wall and depth through it, its terrace's height; the passage.
@@ -87,13 +92,18 @@ const PY_KNOLLS = [[-42, 38, 17, 3.6], [-88, -44, 21, 4.4], [-28, -40, 12, -1.5]
 function pyOutside(x, z) {
   const t = PYONGYANG_PLACE;
   const wall = pyWall();
-  const free = pySmooth(...t.strip, Math.abs(z)) * pySmooth(wall.x, wall.x - 14, x);
+  const free = pySmooth(wall.x - t.berm[0], wall.x - t.berm[0] - t.berm[1], x);
   // (Rolls about 45 m long, a metre or two high: the noise repeats every 900 m, wider than the ground.)
   let relief = (tkFbm((x + 450) / 900, (z + 450) / 900, 20, 3, 5) - 0.5) * 3.6;
   for (const [kx, kz, radius, high] of PY_KNOLLS) relief += high * Math.exp(-((x - kx) ** 2 + (z - kz) ** 2) / (radius * radius * 0.5));
   // (The hill's flank runs on west of the wall, higher away from it.)
   return pyFoot(z) * (1 + 0.5 * pySmooth(wall.x, -120, x)) + relief * free;
 }
+
+/** Where a walker comes in and where his column musters, stood on the ground there (the strip is the land as it lies). */
+const pyGrounded = () => {
+  for (const at of [PYONGYANG_PLACE.start.at, PYONGYANG_PLACE.muster]) at[1] = pyOutside(at[0], at[2]);
+};
 
 /** The ground's height inside the wall: the earth bank against it, the town's level beyond (the hill's slope in the north). */
 function pyInside(x, z) {
@@ -110,6 +120,7 @@ let pyPlanMade = null;
 /** The place laid out: its two fields of ground, the wall's nodes, the gate, the houses, trees and boulders. Seeded; made once. */
 export function pyongyangPlan() {
   if (pyPlanMade) return pyPlanMade;
+  pyGrounded();
   const t = PYONGYANG_PLACE;
   const wall = pyWall();
   const grid = (x0, x1, nu, z0, z1, height) => {
@@ -244,6 +255,7 @@ export function pyongyangSolids() {
 
 /** The place as a stage (levelmode/stage.js) to walk in: one section, nobody in it. */
 export function pyongyangStage() {
+  pyGrounded();
   const t = PYONGYANG_PLACE;
   return {
     id: 'pyongyang', title: 'The walls of Pyongyang', place: 'pyongyang',

@@ -1833,7 +1833,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // On fieldworks with relief (a bank, a rampart, a hill: physics/fieldworks.js ditches), each man stood on the ground where he is
   // placed, not at y = 0 inside it (the stance snaps to the relief on the first step, and a body sunk a metre in is flung out).
   const works = worksOf(arena);
-  if (works?.ditches.length) {
+  if (works?.relief) {
     for (const fighter of fighters) {
       const ground = reliefAt(works, fighter.root[0], fighter.root[1]);
       if (ground !== 0 && !riding(fighter.body.inputs)) placeOnFloor(fighter, fighter.root[0], fighter.root[1], ground, fighter.yaw);
@@ -4829,6 +4829,16 @@ function poseProxy(fighter, dt) {
     }
   }
   solveConstraints(fighter, dt);
+  // On relief his feet are not left under the ground: eased after his pose, he lags it up a slope. Only a lag (the ground
+  // within a step over the foot): a foot against a face (a rampart's, a bank's) is not lifted up it.
+  const works = worksOf(fighter.arena);
+  if (works?.relief) {
+    for (const index of [P.lFoot, P.rFoot]) {
+      const floor = fighter.radius[index] + reliefAt(works, fighter.x[index * 3], fighter.x[index * 3 + 2]);
+      const under = floor - fighter.x[index * 3 + 1];
+      if (under > 0 && under < WORLD.terrain.stepUp) fighter.x[index * 3 + 1] = floor;
+    }
+  }
   if (fighter.weapon?.held) updateWeapon(fighter, dt);
   if (fighter.offWeapon?.held) updateWeapon(fighter, dt, fighter.offWeapon);
 }

@@ -26,6 +26,10 @@
 //    and climbs out, slowly as the slope is steep; a horse does not go where the
 //    ground falls or rises more than a step at its chest's front, and is
 //    stopped at the lip (at a gallop, brought down into it).
+//  - ground: the lie of the land itself under a battle (a field is not a levelled patch: it rolls, dips to a
+//    swale, rises to a knoll), as height fields over rectangles. The place that draws the battle draws the same
+//    field (physics/terrain.js fieldHeight is the one function for both), so a foot lands where the ground is
+//    drawn; everything else the relief does (the stance, the steps' slope, what lies loose) is the ditches'.
 //  - soft ground (mud, a stream's bed): a man sinks into it as hard as he presses
 //    on it (Bekker's sinkage: deeper the heavier he is, with all his armour, over
 //    the soles of his feet; never past the firm layer under it), and it holds his
@@ -48,6 +52,7 @@ import { P, PARTICLES } from '../body.js';
 import { wadeDrag } from '../levelmode/water.js';
 import { bardingAt } from '../horses.js';
 import { WORLD } from './config.js';
+import { fieldHeight } from './terrain.js';
 import { pointThrough } from '../weapons.js';
 import { knockOut } from '../physics.js';
 
@@ -204,6 +209,9 @@ const compiledWorks = new WeakMap();
  * - `soft`: { x: [x0, x1], z: [z0, z1] (its box; `shape` 'ellipse': the ellipse in it, a puddle), depth (m, the reference man's sinkage), firm (m, the layer under it),
  *   viscosity (as water's: 1 water, ~2 the cesspool's sludge), footing (share of his grip left), surface ('mud' |
  *   'water': the ear's), water (m of standing water over it), edge (m it deepens over from its sides) }.
+ * - `ground`: { at: [x, z] (its middle), size: [along x, along z], cells: [nu, nv], heights: (nu + 1) x (nv + 1)
+ *   corner heights, i along x fastest } (the shape of physics/terrain.js's `field`, without a yaw): the ground's
+ *   height inside its rectangle; outside every one of them the ground is at 0 as before.
  */
 export function worksOf(arena) {
   const spec = arena?.works;
@@ -272,6 +280,7 @@ function compileWorks(spec) {
     }
   }
   const ditches = (spec.ditches ?? []).map(compileDitch);
+  const ground = (spec.ground ?? []).map((field) => ({ ...field, box: { x: [field.at[0] - field.size[0] / 2, field.at[0] + field.size[0] / 2], z: [field.at[1] - field.size[1] / 2, field.at[1] + field.size[1] / 2] } }));
   const soft = (spec.soft ?? []).map((area) => ({ surface: 'mud', viscosity: 2, footing: 0.7, firm: 0.5, water: 0, ...area }));
   // A box round everything, to pass over a man far from all of it at once.
   const xs = [];
@@ -280,7 +289,8 @@ function compileWorks(spec) {
   for (const wall of walls) xs.push(wall.a[0], wall.b[0]), zs.push(wall.a[1], wall.b[1]);
   const near = xs.length ? { x: [Math.min(...xs) - 1.5, Math.max(...xs) + 1.5], z: [Math.min(...zs) - 1.5, Math.max(...zs) + 1.5] } : null;
   screens.unshift(...walls.filter((wall) => wall.cover));
-  return { stakes, walls, screens, ditches, soft, near, spec };
+  // (`relief`: whether anything here lifts the ground off y = 0.)
+  return { stakes, walls, screens, ditches, ground, relief: ditches.length > 0 || ground.length > 0, soft, near, spec };
 }
 
 /**
@@ -379,10 +389,14 @@ export const stakeStanding = (world, stake) => !worksStateOf(world).broken.has(s
 
 // ---- The ground: relief and soft places --------------------------------------------------
 
-/** The height of the ground at (x, z) the ditches and banks make (0 where there are none). */
+/** The height of the ground at (x, z) the lie of the land, the ditches and the banks make (0 where there are none). */
 export function reliefAt(works, x, z) {
-  if (!works?.ditches.length) return 0;
+  if (!works?.relief) return 0;
   let height = 0;
+  for (const field of works.ground) {
+    if (x < field.box.x[0] || x > field.box.x[1] || z < field.box.z[0] || z > field.box.z[1]) continue;
+    height += fieldHeight(field.heights, field.cells[0], field.cells[1], (x - field.box.x[0]) / field.size[0], (z - field.box.z[0]) / field.size[1]);
+  }
   for (const ditch of works.ditches) {
     if (x < ditch.box.x[0] || x > ditch.box.x[1] || z < ditch.box.z[0] || z > ditch.box.z[1]) continue;
     const at = onDitch(ditch, x, z);
@@ -408,7 +422,7 @@ export function reliefAt(works, x, z) {
  * time). +1 up a face, -1 down one, 0 neither.
  */
 export function faceBetween(works, from, to) {
-  if (!works?.ditches.length) return 0;
+  if (!works?.relief) return 0;
   const spec = FIELDWORKS.face;
   const rise = reliefAt(works, to[0], to[1]) - reliefAt(works, from[0], from[1]);
   if (Math.abs(rise) < 1e-4) return 0;
@@ -619,7 +633,7 @@ export function stepOnWorks(works, fighter, wanted, world = null) {
   const speed = Math.hypot(vx, vz);
   if (speed < 1e-6) return wanted;
   const [x, z] = fighter.root;
-  if (works.ditches.length) {
+  if (works.relief) {
     const spec = FIELDWORKS.climb;
     const ux = vx / speed;
     const uz = vz / speed;
@@ -966,7 +980,7 @@ export function horseBalks(world, horse) {
       hurdle(along, wall.height);
       continue;
     }
-    if (wall || (works.ditches.length && Math.abs(reliefAt(works, x, z) - reliefAt(works, horse.at[0], horse.at[1])) > spec.step)) {
+    if (wall || (works.relief && Math.abs(reliefAt(works, x, z) - reliefAt(works, horse.at[0], horse.at[1])) > spec.step)) {
       nearest = Math.min(nearest, along);
       break;
     }
@@ -990,7 +1004,7 @@ export function horseOnWorks(world, horse, before, hurt) {
   const flying = horse.air?.phase === 'flight';
   const feet = flying ? horse.lift ?? 0 : 0;
   // A ditch's lip or a bank's face before its chest: it does not go on.
-  if (works.ditches.length && !flying) {
+  if (works.relief && !flying) {
     const here = reliefAt(works, horse.at[0], horse.at[1]);
     const ahead = reliefAt(works, front[0], front[1]);
     if (Math.abs(ahead - here) > FIELDWORKS.horse.step) {
