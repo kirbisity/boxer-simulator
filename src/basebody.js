@@ -49,15 +49,12 @@ export const BASE_BODY = {
   // loft's stops, a tenth of a part apart, and a ratio taken stop by stop would print them as bands).
   ratioSmooth: 8,
   // The forearm's skin ends at the modelled wrist, and the game's hand (wardrobe.js buildHand) is drawn on the rig's hand point,
-  // the fist's middle (0.19 of height from the elbow; the model's wrist lies 0.14 from it, the anatomical 0.146 of Drillis and
-  // Contini: the rig's point is right, the drawn palm short, its heel only 3.3 cm behind the point). So the forearm is drawn
-  // out to `handSeat` (m per 1.8 m of height) behind the hand point, under the palm's rounded heel (its section there 2.3 by
-  // 2.9 cm, a wrist's), not to the fist's middle. The upper arm runs at the game's length too. The length either gains is laid
-  // on in the shaft's middle, between `stretch[0]` and `[1]` of the part (with a smooth rise and fall, 1 - cos), and both
-  // ends keep the model's own scale: the elbow's point and crease, the deltoid's insertion, the forearm's swell below the elbow
-  // and the wrist's slimness. Stretched evenly (2026-11-11: the arms read as rubber tubes), the joints'
-  // forms were drawn out with the shafts and the arm lost its hinge.
-  handSeat: 0.021,
+  // the fist's middle, its heel at the wrist (body.js ARM_LENGTHS `wristToFist`). So the forearm is drawn out to the wrist, that
+  // far behind the hand point (baseBindJoints' `wristToFist`), not to the fist's middle. The upper arm runs at the game's length
+  // too. The length either gains is laid on in the shaft's middle, between `stretch[0]` and `[1]` of the part (with a smooth
+  // rise and fall, 1 - cos), and both ends keep the model's own scale: the elbow's point and crease, the deltoid's insertion,
+  // the forearm's swell below the elbow and the wrist's slimness. Stretched evenly (2026-11-11: the arms read as rubber tubes),
+  // the joints' forms were drawn out with the shafts and the arm lost its hinge.
   stretch: [0.2, 0.85],
   // An arm's own reach (loftbody.js LOFT.fit's): this share of its ring's radius round its axis, from `armFrom` (t, above the
   // shoulder joint) down.
@@ -802,10 +799,11 @@ export function measureBaseBody(mesh, refParts, height, refJoints) {
  *     drawn over the rig's, and a body's weight under the ordinary build, which draws its skeleton in a little), the loft's
  *     and the skin's; the rig's stay, and the skin is bound to them.
  * Returns { loft, skin, bind } (joints by name; `skin` has the forearm end at the modelled wrist, not the hand point) and
- * `reach` (each arm part's length against the model's: a forearm's `extra` out to the hand, BASE_BODY.handSeat; an upper arm's
+ * `reach` (each arm part's length against the model's: a forearm's `extra` out to the wrist, `wristToFist` (m) behind the hand (by default the two sexes' mean of body.js
+ * ARM_LENGTHS, 0.0358 of height); an upper arm's
  * `within` its game-length frame).
  */
-export function baseBindJoints(rig, joints, height, apart = 1) {
+export function baseBindJoints(rig, joints, height, apart = 1, wristToFist = 0.0358 * height) {
   const moved = Object.fromEntries(Object.keys(rig.joints).map((name) => [name, vec.add(rig.joints[name], vec.sub(joints[name], rig.refJoints[name]))]));
   const loft = { ...moved };
   const skin = {};
@@ -841,9 +839,9 @@ export function baseBindJoints(rig, joints, height, apart = 1) {
     const along = vec.normalize(vec.sub(hand, elbow));
     const modelled = vec.length(vec.sub(moved[`${side}Hand`], moved[`${side}Elbow`]));
     skin[`${side}Hand`] = vec.add(elbow, vec.scale(along, modelled));
-    // (The forearm drawn out past its modelled length to the palm's heel: `extra`; the upper arm's frame is at the game's length,
+    // (The forearm drawn out past its modelled length to the wrist: `extra`; the upper arm's frame is at the game's length,
     // the model's shorter, `within` of it taken up in the shaft.)
-    reach[`${side}Fore`] = { extra: Math.max(0, vec.length(vec.sub(hand, elbow)) - (BASE_BODY.handSeat * height) / 1.8 - modelled) };
+    reach[`${side}Fore`] = { extra: Math.max(0, vec.length(vec.sub(hand, elbow)) - wristToFist - modelled) };
     const upper = vec.length(vec.sub(loft[`${side}Elbow`], loft[`${side}Shoulder`]));
     reach[`${side}Upper`] = { within: Math.max(0, upper - vec.length(vec.sub(moved[`${side}Elbow`], moved[`${side}Shoulder`]))) };
   }

@@ -56,8 +56,10 @@ const NECK_RISE = 0.0057;
 //   0.1909). (Was her model's own, 0.1623: 8.5% under the man's, where the survey has her 0.1% over.)
 // - `elbowToWrist`: ANSUR II's radiale to stylion (the elbow's joint line to the wrist's), 0.1525 of stature for men and
 //   0.1482 for women. (Were the models' own elbow to wrist, 0.1422 and 0.1300.)
-// - `wristToFist`, the wrist to the point the game's fist is (and its hand drawn on): the hand's heel to its point
-//   (basebody.js BASE_BODY.handSeat, 0.0117).
+// - `wristToFist`, the wrist to the fist's middle, the point the game's fist is (and its hand drawn on): ANSUR II's hand length
+//   less the fingertip's reach past the centre of a gripped bar (forearm-hand length less forearm-centre of grip length,
+//   both from the back of the elbow), 0.0354 of stature for men and 0.0362 for women: a third of the hand's length. (Was the
+//   drawn hand's heel to its point, 0.0117: the fist sat 4 to 6 cm short of where the hand's bones put it.)
 // - `forearmToFist` is the two.
 // - `shoulderSpan` between the shoulder joints, narrower than the models' (male 0.2022, female 0.1914).
 // Were Drillis & Contini's 0.186 and 0.19 for both, and 0.2 (x 0.92 for a woman); sized down to the base models on 2026-11-11.
@@ -68,8 +70,8 @@ const NECK_RISE = 0.0057;
 // by the same share and straightens in about the same time.
 export const REACH_REFERENCE = 0.376;
 export const ARM_LENGTHS = {
-  male: { upperArm: 0.1775, elbowToWrist: 0.1525, wristToFist: 0.0117, shoulderSpan: 0.19 },
-  female: { upperArm: 0.1775 * (0.1911 / 0.1909), elbowToWrist: 0.1482, wristToFist: 0.0117, shoulderSpan: 0.17 },
+  male: { upperArm: 0.1775, elbowToWrist: 0.1525, wristToFist: 0.0354, shoulderSpan: 0.19 },
+  female: { upperArm: 0.1775 * (0.1911 / 0.1909), elbowToWrist: 0.1482, wristToFist: 0.0362, shoulderSpan: 0.17 },
 };
 
 export const FRAMES = {

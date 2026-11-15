@@ -3979,7 +3979,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // onto the rig's roots (basebody.js baseBindJoints): `bindAt`, `bindFrames` what is returned for the renderer to bind to.
   const rigPoints = bindPoints(body);
   const baseBreadth = baseRig && !lowDetail && BASE_BODY.family.use ? baseFrame(body, baseRig.height) : { apart: 1, across: 1 };
-  const baseJoints = baseRig ? baseBindJoints(baseRig, jointsByName(rigPoints), body.heightM, baseBreadth.apart) : null;
+  const baseJoints = baseRig ? baseBindJoints(baseRig, jointsByName(rigPoints), body.heightM, baseBreadth.apart, body.lengths.wristToFist) : null;
   const byIndex = (named) => Object.keys(P).map((name) => named[name]);
   const points = baseJoints ? byIndex(baseJoints.loft) : rigPoints;
   const frames = boneFrames(points, body);
