@@ -82,9 +82,15 @@ WEAR = {
     'harnessEdge': ('steel', (0.05, 0.025)),
     'mail': ('mail', (0.048, 0.048)),
     'yokohagi': ('lacquer', (0.12, 0.08)),
+    'kozane': ('lacquer', (0.1, 0.12)),
+    'sugake': ('lacquer', (0.1, 0.1)),
     'knightSallet': ('steel', (0.4, 0.4)),
     'knightHounskull': ('steel', (0.4, 0.4)),
     'knightCloseHelmet': ('steel', (0.4, 0.4)),
+    # (A war mask's sheet is half a face, about 0.2 m to a side.)
+    'maskOni': ('lacquer', (0.2, 0.2)),
+    'maskRessei': ('lacquer', (0.2, 0.2)),
+    'maskTengu': ('lacquer', (0.2, 0.2)),
 }
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -146,13 +152,24 @@ def marks(shape, metres, rng, draw_one, count, oversample=4):
     return np.asarray(big.resize((columns, rows), Image.BOX), dtype=np.float64)
 
 
-def worn(name, colour, normal, orm):
+def laced_tiles():
+    """The tiles whose two masks are lacing (src/detailmaps.js DETAIL_ARMOUR, `masks: 'lace'`): drawn in the cords' colours."""
+    import re
+    with open(os.path.join(ROOT, 'src', 'detailmaps.js')) as file:
+        return set(re.findall(r"^  (\w+): \{[^\n]*masks: 'lace'", file.read(), re.M))
+
+
+def worn(name, colour, normal, orm, keep=None):
     """
     A tile's maps worn: `colour` (h, w, 3), `normal` (h, w, 3: 0..1, as packed), `orm` (h, w, 3: occlusion, roughness,
     metalness), floats 0..1, all one size. Returns the three, the same shapes. A tile not in WEAR comes back as it was.
+    `keep` (h, w; 0..1): how much of each pixel is another material than the map's kind, which keeps its clean maps: a laced
+    tile's lacing (its two masks; the shader draws the cords there in their own colours over this albedo), a war mask's
+    teeth, gilt and hair (all but its lacquer, the albedo's alpha). The plates' scratches, chips and dust are not theirs.
     """
     if name not in WEAR:
         return colour, normal, orm
+    clean = (colour.astype(np.float64).copy(), normal.astype(np.float64).copy(), orm.astype(np.float64).copy())
     kind, metres = WEAR[name]
     spec = WEAR_KINDS[kind]
     rng = np.random.default_rng(seed_of(name))
@@ -259,7 +276,11 @@ def worn(name, colour, normal, orm):
 
     orm[:, :, 1] = np.clip(roughness, 0.04, 1)
     orm[:, :, 2] = np.clip(metal, 0, 1)
-    return np.clip(colour, 0, 1), n * 0.5 + 0.5, orm
+    colour, n = np.clip(colour, 0, 1), n * 0.5 + 0.5
+    if keep is not None:
+        share = np.clip(keep, 0, 1)[:, :, None]
+        colour, n, orm = (worn_map * (1 - share) + clean_map * share for worn_map, clean_map in zip((colour, n, orm), clean))
+    return colour, n, orm
 
 
 def images_of(block):
@@ -287,6 +308,7 @@ def main():
         del arguments[at:at + 2]
         os.makedirs(preview, exist_ok=True)
     clean_dir, names = arguments[0], arguments[1:] or list(WEAR)
+    laced = laced_tiles()
     for file_name, table, quality in (
         ('detailmaps-data.js', pack.ARMOUR, lambda name, key: pack.ARMOUR[name]['quality']),
         ('helmmaps-data.js', packhelm.SHEETS, lambda name, key: packhelm.QUALITY[key]),
@@ -311,7 +333,12 @@ def main():
             albedo = np.asarray(images['albedo'], dtype=np.float64) / 255
             normal = np.asarray(images['normal'], dtype=np.float64) / 255
             orm = np.asarray(images['orm'].convert('RGB').resize(size, Image.BICUBIC), dtype=np.float64) / 255
-            colour, n, o = worn(name, albedo[:, :, :3], normal[:, :, :3], orm)
+            keep = None
+            if name in laced and albedo.shape[2] == 4 and normal.shape[2] == 4:
+                keep = np.maximum(albedo[:, :, 3], normal[:, :, 3])
+            elif packhelm.SHEETS.get(name, {}).get('alpha') and albedo.shape[2] == 4:
+                keep = 1 - albedo[:, :, 3]
+            colour, n, o = worn(name, albedo[:, :, :3], normal[:, :, :3], orm, keep)
             if preview:
                 for key, array in (('albedo', colour), ('normal', n), ('orm', o)):
                     Image.fromarray(pack.to8(array)).save(os.path.join(preview, f'{name}.{key}.png'))

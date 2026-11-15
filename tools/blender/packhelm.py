@@ -48,11 +48,11 @@ def pack(folder, name, spec, preview):
     rough = load(folder, name, 'src_rough')[:, :, None]
     metal = load(folder, name, 'src_metal')[:, :, None]
     # (The used look of the sheet's material, wear.py, laid on at the sheet's full size.)
-    colour, n, orm = wear.worn(name, colour, n, resample(np.concatenate([ao, rough, metal], axis=2), size))
+    lacquer = resample(load(folder, name, 'src_mask')[:, :, None], size) if spec.get('alpha') else None
+    colour, n, orm = wear.worn(name, colour, n, resample(np.concatenate([ao, rough, metal], axis=2), size), None if lacquer is None else 1 - lacquer[:, :, 0])
     orm = resample(orm, size // 2)
     out = {}
     if spec.get('alpha'):
-        lacquer = resample(load(folder, name, 'src_mask')[:, :, None], size)
         cut = resample(load(folder, name, 'src_cut')[:, :, None], size)
         out['albedo'] = webp(to8(np.concatenate([colour, lacquer], axis=2)), QUALITY['albedo'])
         out['normal'] = webp(to8(np.concatenate([n, cut], axis=2)), QUALITY['normal'])
