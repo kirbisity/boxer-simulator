@@ -137,14 +137,6 @@ export const ENV = {
     // mist shows no grain; a shaft 10 m off is softened by about a third of a metre, which mist's own
     // scattering of the light about does to a real one.
     shadeSpread: 0.3,
-    // How a falling drop or flake throws the sunlight it meets (particles.js): [share, g]. A drop or a crystal
-    // is many wavelengths across and diffracts and refracts most of its light forward, a lobe of asymmetry g
-    // (0.7 to 0.9 is the usual range given for cloud droplets and ice, approximate: 0.7); a crystal's faces
-    // also reflect light every way, and a flake drawn as a card stands for both. `share` of the light follows
-    // the lobe (Henyey-Greenstein, mean 1 over all directions), the rest goes evenly: by eye, so snow and rain
-    // shine against the sun's glow and stay white, dimmer, with the sun behind the eye (a lobe alone left them
-    // grey there).
-    flakeForward: [0.5, 0.7],
     // Looking up out of mist: the layer above the eye is `height` thick (e-folding), so the sky shows through
     // exp(-extinction x height / sin(elevation)): blue overhead, white at the horizon.
     // (No number here: it is the same integral as the land's haze taken to infinity.)

@@ -7,7 +7,7 @@
 /* global THREE */
 
 import { ENV } from './config.js';
-import { ENV_NOISE_CELLS, envNoiseTexture } from './noise.js';
+import { envNoiseTexture } from './noise.js';
 import { ENV_GLSL_FILM, envToneOf } from './post.js';
 
 const ENV_DEG = Math.PI / 180;
@@ -424,19 +424,6 @@ float envSunShare(vec3 world) {
   return 1.0 - uEnvCloud.y * smoothstep(edge - 0.12, edge + 0.16, broad * 0.68 + 0.16);
 }
 
-// The same with the cloud's small lumps (the octave the sky draws, envCloudDepth) laid on the broad masses by
-// \`fine\` (0..1) and the edge as sharp as the sky draws it: what a sight line toward the sun meets, where a stretch of
-// it reads one place of the sheet and the gaps between lumps stand as rays (envAirWalk).
-float envSunShareFine(vec3 world, float fine) {
-  if (uEnvCloud.y <= 0.0) return 1.0;
-  if (fine < 0.01) return envSunShare(world);
-  vec2 sheet = envCloudOver(world);
-  float broad = envCloudBroad(sheet);
-  float lumps = texture2D(uEnvNoise, sheet * 0.53 + vec2(0.37, 0.11) + broad * 0.12).a;
-  float depth = broad * 0.68 + 0.16 + (lumps - 0.5) * uEnvCloudForm.x * fine - mix(0.74, 0.26, uEnvCloud.x);
-  return 1.0 - uEnvCloud.y * smoothstep(mix(-0.12, -0.07 * uEnvCloudForm.z, fine), mix(0.16, 0.11 * uEnvCloudForm.z, fine), depth);
-}
-
 // What stands over the ground (terrain.js envBuildNearMap's cover), read as made (level 0) or as the mean over
 // a round 2^level texels across: the texture's own smaller copies. (Before WebGL 2 a shader cannot ask for one.)
 vec4 envCoverRead(vec2 at, float level) {
@@ -513,15 +500,11 @@ float envPlaceSun(vec3 point) {
 // point drawn that share of the way to the eye: in clear air each point's own cloud (the rays under a broken
 // sky), in mist, where all that is seen stands within a stone's throw, one shade for the view. (Read at the
 // point, a cloud's shadow stood in a low sun's mist as a seam, bright air one side and dark the other.)
-float envAirSunFine(vec3 point, vec3 eye, float spread, float fine) {
+float envAirSunOver(vec3 point, vec3 eye, float spread) {
   // (Over the cloud sheet nothing shades it.)
   if (point.y >= uEnvCloud.w) return 1.0;
   vec3 past = envSunwardOver(point, spread);
-  return envSunShareFine(mix(point, eye, uEnvCloudForm.w), fine) * past.x * past.y * past.z * envPlaceSun(point);
-}
-
-float envAirSunOver(vec3 point, vec3 eye, float spread) {
-  return envAirSunFine(point, eye, spread, 0.0);
+  return envSunShare(mix(point, eye, uEnvCloudForm.w)) * past.x * past.y * past.z * envPlaceSun(point);
 }
 
 float envAirSun(vec3 point) {
@@ -556,14 +539,6 @@ float envAirWalk(vec3 from, vec3 ray, float depth, float grain, int steps) {
   float level = length(uEnvSunDir.xz);
   vec2 lean = uEnvSunDir.xz / max(level, 1e-4) * min(${ENV.shadow.slantMost.toFixed(1)}, level / max(uEnvSunDir.y, 1e-3));
   float crossed = length(ray.xz - lean * ray.y) / float(count) * ${(ENV.air.shadeSpread * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)).toFixed(4)};
-  // The cloud is read where each point's sun ray meets the sheet, and a step's stretch of the line moves that
-  // place over the sheet by its run across the sun's rays (seen from the sheet): toward the sun hardly at all, so
-  // the cloud's small lumps (one lattice cell of the noise
-  // envCloudDepth reads at 0.53 of the sheet: ENV.clouds.scale / (0.53 x 16), 177 m) and the gaps between them stay told apart and draw rays;
-  // across the rays a stretch spans many lumps and only the broad masses are left. Light the haze has thrown wide
-  // comes from a wide round (uEnvCloudForm.w) and keeps none of them.
-  vec2 slant = uEnvSunDir.xz / max(uEnvSunDir.y, 0.12);
-  float sheetRun = length(ray.xz - slant * ray.y) / float(count) / ${(ENV.clouds.scale / (0.53 * ENV_NOISE_CELLS)).toFixed(1)};
   float sum = 0.0;
   for (int i = 0; i < ${Math.max(ENV.air.shadeSteps[0], ENV.air.frameSteps)}; i++) {
     if (i >= count) break;
@@ -572,8 +547,7 @@ float envAirWalk(vec3 from, vec3 ray, float depth, float grain, int steps) {
     if (abs(high - low) > 1e-3) along = (-log(max(mix(lowThin, highThin, along), 1e-6)) - low) / (high - low);
     // (The step's stretch of the line: along's rate of change with u, a share 1 / count of it.)
     float stretch = depth > 1e-3 ? gone / (depth * max(1.0 - u * gone, 1e-3)) : 1.0;
-    float fine = (1.0 - uEnvCloudForm.w) * clamp(1.0 - sheetRun * stretch, 0.0, 1.0);
-    sum += envAirSunFine(from + ray * along, from, log2(max(crossed * stretch, 1.0)), fine);
+    sum += envAirSunOver(from + ray * along, from, log2(max(crossed * stretch, 1.0)));
   }
   return sum / float(count);
 }

@@ -138,17 +138,9 @@ void main() {
   facing = 0.45 + 0.55 * abs(dot(cross(axis, other), uEnvSunDir));
 #endif
 
-  // Its light: the sun where it reaches this point of the air (the clouds, the crowns and trunks sunward of it,
-  // and what a place that draws itself has built: envAirSun), and the sky. A drop or a flake is many times the
-  // light's wavelength across and throws most of what it scatters forward, so against the sun it shines and
-  // with the sun behind the eye it is dull (ENV.air.flakeForward); a leaf is opaque and does not.
-  float sunShare = envAirSun(middle);
-#if STYLE == 2
-  float forward = 1.0;
-#else
-  float forward = ${(1 - ENV.air.flakeForward[0]).toFixed(3)} + ${ENV.air.flakeForward[0].toFixed(3)} * ${(1 - ENV.air.flakeForward[1] ** 2).toFixed(4)} / pow(${(1 + ENV.air.flakeForward[1] ** 2).toFixed(4)} - ${(2 * ENV.air.flakeForward[1]).toFixed(4)} * dot(-toEye, uEnvSunDir), 1.5);
-#endif
-  vec3 light = uEnvSunColour * sunShare * facing * forward + uEnvSkyLight;
+  // Its light: the sun where the clouds let it through, and the sky.
+  float sunShare = envSunShare(middle);
+  vec3 light = uEnvSunColour * sunShare * facing + uEnvSkyLight;
   vec3 colour = uColours[int(min(floor(r3 * uColourCount), 3.0))];
 #if GLOW == 1
   // A mote is seen by the sunlight it throws forward: bright toward the sun, nothing in shade.
