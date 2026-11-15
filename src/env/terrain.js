@@ -9,6 +9,7 @@
 import { ENV } from './config.js';
 import { envFbm, envValueNoise } from './noise.js';
 import { ENV_GLSL, envUniforms } from './air.js';
+import { ENV_GLSL_PRESS, ENV_PRESS, envPressUniforms } from './press.js';
 
 const envSmooth = (from, to, value) => {
   const t = Math.min(1, Math.max(0, (value - from) / (to - from)));
@@ -377,6 +378,7 @@ const ENV_TERRAIN_FRAGMENT = /* glsl */ `
 ${ENV_GLSL_SHADOW_FRAGMENT}
 ${ENV_GLSL}
 ${ENV_GLSL_MAP}
+${ENV_GLSL_PRESS}
 uniform vec3 uGrass;
 uniform vec3 uDry;
 uniform vec3 uSoil;
@@ -422,7 +424,12 @@ void main() {
 
   // Snow lies on what is level, first in the lee of the grain.
   float snow = uEnvWet.y * smoothstep(0.25, 0.6, normal.y - 0.45 + (fine - 0.5) * 0.4 * near + 0.5 * uEnvWet.y) * (1.0 - 0.35 * woods);
-  colour = mix(colour, vec3(${ENV.terrain.snowColour.join(', ')}), snow);
+  // Where it has been trodden (press.js): the print's walls turn the light, its packed bed is darker and bluer.
+  vec4 print = snow > 0.02 && near > 0.0 ? envSnowPrint(xz, uEnvWet.y * ${ENV_PRESS.snow.toFixed(3)}) : vec4(0.0);
+  normal = normalize(normal - vec3(print.y, 0.0, print.z) * snow);
+  // The sky a print's bed sees: a trench as wide as a sole, as deep as the print (the view factor of its floor).
+  float printSky = mix(1.0, ${(ENV_PRESS.sole / 2).toFixed(3)} / sqrt(${((ENV_PRESS.sole / 2) ** 2).toFixed(5)} + print.x * print.x), snow * step(0.0, print.x));
+  colour = mix(colour, vec3(${ENV.terrain.snowColour.join(', ')}) * mix(vec3(1.0), vec3(${ENV_PRESS.packedColour.join(', ')}), print.w), snow);
 
   // Rain: the earth darkens (more than the grass, which sheds it), and water stands in the worn hollows.
   float wet = uEnvWet.x;
@@ -431,7 +438,7 @@ void main() {
   vec2 over = mix(vec2(1.0), envCover(xz), inMap);
   float sunShare = shade * over.y * envSunShare(vWorld) * getShadowMask();
   float facing = max(dot(normal, uEnvSunDir), 0.0);
-  vec3 light = uEnvSunColour * facing * sunShare + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * normal.y) * over.x * (near > 0.0 ? envBodies(vWorld).z : 1.0);
+  vec3 light = uEnvSunColour * facing * sunShare + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * normal.y) * over.x * printSky * (near > 0.0 ? envBodies(vWorld).z : 1.0);
   colour *= light;
 
   vec3 view = normalize(vWorld - cameraPosition);
@@ -533,6 +540,7 @@ export function envBuildTerrain({ place, height, sun, map }) {
     uniforms: {
       ...envShadowUniforms(),
       ...envUniforms(),
+      ...envPressUniforms(),
       uEnvMap: map,
       uEnvCover: map.cover,
       uEnvSkyline: map.skyline,

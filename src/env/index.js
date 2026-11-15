@@ -33,6 +33,7 @@ import { envBuildGrass, envGrassQuality } from './grass.js';
 import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envSkySeen, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
+import { envPressForget, envPressStep } from './press.js';
 import { activeLook } from '../looks.js';
 import { hidePaintedSky, setRenderer } from '../looks/kit.js';
 import { probeLiteProject } from '../looks/probe-lite.js';
@@ -237,6 +238,7 @@ function envApplyTier(state) {
 export function envApply({ place, view, spec, group }) {
   const weather = envWeatherOf(view, place);
   const own = envPlaceIn(place, weather);
+  envPressForget();
   // (A place described again since this was made, by envRegisterPlace, is made again; so is one whose day has
   // changed with the weather: the sun's place is in the shadows laid on its land.)
   if (group.userData.envOf !== own) envFill(group, place, view, spec, own);
@@ -331,6 +333,7 @@ export function envLeave(view) {
   if (!view.env?.on) return;
   view.env.on = false;
   view.drawOver = null;
+  envPressForget();
   envUniforms().uEnvOn.value = 0;
   envUniforms().uEnvExposure.value = 1;
   envUniforms().uEnvPlaceSun.value = null;
@@ -475,8 +478,11 @@ function envCarryShadow(view, state, box) {
 
 let envLookWay = null;
 
-/** Once a frame, before drawing: the time, how far the air and the clouds have travelled, and the cloud over the fighters' sun. */
-export function envUpdate(view, world) {
+/**
+ * Once a frame, before drawing: the time, how far the air and the clouds have travelled, and the cloud over the
+ * fighters' sun; `lead` the body the pressed-ground record follows (the player; null: the one nearest the camera).
+ */
+export function envUpdate(view, world, lead = null) {
   const state = view.env;
   if (!state?.on || state.place !== view.place) return;
   const u = envUniforms();
@@ -570,6 +576,8 @@ export function envUpdate(view, world) {
   for (let at = 0; at < filled; at += 1) middle.set(middle.x + bodies[at].x / filled, middle.y + bodies[at].y / filled, middle.z + bodies[at].z / filled, 0);
   for (let at = 0; at < filled; at += 1) middle.w = Math.max(middle.w, Math.hypot(bodies[at].x - middle.x, bodies[at].y - middle.y, bodies[at].z - middle.z) + ENV.shadow.bodyReach);
   for (; filled < bodies.length; filled += 1) bodies[filled].w = 0;
+  // What the bodies near the lead press into the grass and the snow (press.js).
+  envPressStep({ world, lead, eye, tier: envChosen.tier, snowing: fall?.kind === 'snow' ? falling : 0 });
   envParticlesPixel(parts.particles, (view.camera.fov * Math.PI) / 180, view.renderer.domElement.height);
 }
 

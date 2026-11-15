@@ -327,8 +327,8 @@ export function tkDrift(builder, a, b, { run = 2.4, high = [0.25, 0.8], heightAt
   }
 }
 
-/** A tuft of grass or weed at world (x, y, z): `size` m high, two crossed cards (three where `full`). */
-export function tkTuft(builder, x, y, z, { size = 0.35, wide = 1, colour = TK_THINGS.green, yaw = 0, full = false } = {}) {
+/** A tuft of grass or weed at world (x, y, z): `size` m high, two crossed cards (three where `full`), of the kit's `material` (a tuft's sheet). */
+export function tkTuft(builder, x, y, z, { size = 0.35, wide = 1, colour = TK_THINGS.green, yaw = 0, full = false, material = 'tuft' } = {}) {
   const cards = full ? 3 : 2;
   const half = size * 0.55 * wide;
   // (Lit as the ground it stands on: its normals point up, so a card does not go dark edge on to the sun.)
@@ -336,7 +336,7 @@ export function tkTuft(builder, x, y, z, { size = 0.35, wide = 1, colour = TK_TH
   for (let k = 0; k < cards; k += 1) {
     const a = yaw + (k / cards) * Math.PI;
     const [cx, cz] = [Math.cos(a) * half, Math.sin(a) * half];
-    builder.quad('tuft', [x - cx, y - 0.02, z - cz], [x + cx, y - 0.02, z + cz], [x + cx, y + size, z + cz], [x - cx, y + size, z - cz], { uvs: [[0.02, 0.015], [0.98, 0.015], [0.98, 0.985], [0.02, 0.985]], colour: [colour.map((value) => value * 0.6), colour.map((value) => value * 0.6), colour, colour], normals: up });
+    builder.quad(material, [x - cx, y - 0.02, z - cz], [x + cx, y - 0.02, z + cz], [x + cx, y + size, z + cz], [x - cx, y + size, z - cz], { uvs: [[0.02, 0.015], [0.98, 0.015], [0.98, 0.985], [0.02, 0.985]], colour: [colour.map((value) => value * 0.6), colour.map((value) => value * 0.6), colour, colour], normals: up });
   }
 }
 

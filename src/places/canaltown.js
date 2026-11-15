@@ -318,7 +318,11 @@ const CT_AIR = {
   weathers: { damp: 'canalmist', rain: 'canalshowers', dry: 'canalcloudy' },
   first: 'damp',
   own: {
-    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.2, saturation: 0.95, ev: 0.6 }, cover: 0.42, gloom: 0.45, sun: 0.85, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.8 }],
+    // (`sun` 1, not the open air's mist's 0.85: the mist's own dimming of the beam is already the air's (env/air.js,
+    // the haze depth along the sun's path), and in a gap of the breaking cloud nothing else stands in the beam. Set
+    // against the square from overhead at T=200: lit paving about 3.7 times the east row's shadow (was 3.2), the
+    // sunward sky next to the sun no longer blown, the lanes' median unchanged.)
+    canalmist: ['mist', { label: 'After rain, mist on the water', grade: { contrast: 1.2, saturation: 0.95, ev: 0.6 }, cover: 0.42, gloom: 0.45, sun: 1, visibility: 380, hazeHeight: 12, wind: 0.6, gust: 0.05, wet: 0.8 }],
     // (A showery day's wind: 2.6 times the town's light air, about 3.6 m/s at the ground and 9 aloft, which carries a
     // shower over in a few minutes, so the rain comes and goes within one fight; a little less cloud, for the gaps.)
     canalshowers: ['showers', { label: 'Showers on the town', grade: { contrast: 1.24, saturation: 0.94, ev: 0.45 }, wind: 2.6, cover: 0.6 }],
@@ -547,7 +551,7 @@ export function buildCanalTown() {
 
   // The town's lie (townkit/lay.js): what is under a roof or a bridge, the shade of the lanes, the low places, and
   // where feet go (the ways below: the lanes' middles, the quay, the bridges, the square's crossings).
-  const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2 });
+  const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2, sun: CT_LIGHT.sun });
 
   // What grows and gathers, by the lie: weeds at the walls' feet and in the unworn margins of the paving, thick on
   // open earth; fallen leaves and straw in the corners.

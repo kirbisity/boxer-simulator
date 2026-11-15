@@ -8,11 +8,13 @@ import { ENV } from './config.js';
 import { ENV_GLSL, envUniforms } from './air.js';
 import { ENV_GLSL_MAP, ENV_GLSL_SHADOW_FRAGMENT, ENV_GLSL_SHADOW_VERTEX, envShadowUniforms } from './terrain.js';
 import { envRandom } from './noise.js';
+import { ENV_GLSL_PRESS, ENV_PRESS, envPressUniforms } from './press.js';
 
 const ENV_GRASS_VERTEX = /* glsl */ `
 ${ENV_GLSL_SHADOW_VERTEX}
 ${ENV_GLSL}
 ${ENV_GLSL_MAP}
+${ENV_GLSL_PRESS}
 // x: the tile's width (m); y: a blade's width at the root (m); z: how tall beside the place's grass; w: the radius inside which the ring is left to the finer one (m).
 uniform vec4 uLayer;
 // x, y: the least and most a blade stands (m); z: the share of tufts in flower; w: how much the blade turns to face the camera.
@@ -57,10 +59,22 @@ void main() {
   float shiver = sin(uEnvTime * (3.1 + 2.7 * r3) + r2 * 40.0) * 0.07 * min(speed * 0.35, 1.6);
   float turn = r2 * 6.2831853;
   vec2 rest = vec2(cos(turn), sin(turn)) * ${ENV.grass.lean.toFixed(2)} * (0.4 + r3);
-  // What stands on it presses it over, away from the foot.
+  // What stands on it presses it over, away from the foot (where the pressed-ground record is not kept).
   vec3 bodies = envBodies(vec3(xz.x, map.r, xz.y));
-  vec2 lean = rest + uEnvWind.xy * (bend * (0.75 + 0.5 * r3) + shiver) + bodies.xy * 1.2;
+  vec2 lean = rest + uEnvWind.xy * (bend * (0.75 + 0.5 * r3) + shiver) + bodies.xy * 1.2 * (1.0 - uEnvPressClock.w);
   float over = min(length(lean), 0.96);
+  // What has passed over it (press.js): the blade is laid over until its tip is under the height the body left
+  // clear, the way the record says it was pushed. A blade is caught wherever its own length lay under the body,
+  // so it reads the record halfway along its standing lean (a tall blade leaning over a trodden lane goes down
+  // with it), and a little off that, so a trail's edge is ragged as the blades are.
+  vec4 pressed = envPress(xz + lean * tall * 0.5 + (vec2(r2, r3) - 0.5) * ${(ENV_PRESS.texel * 1.5).toFixed(3)});
+  float laid = pressed.x < tall ? sqrt(max(1.0 - (pressed.x * pressed.x) / max(tall * tall, 1e-6), 0.0)) : 0.0;
+  // How far it was laid past where it stood: a laid blade lies on top of the sward, out of its neighbours' shade.
+  float trod = max(laid - over, 0.0);
+  if (laid > over) {
+    lean = length(pressed.zw) > 0.05 ? normalize(pressed.zw) + 0.35 * normalize(lean + vec2(1e-4, 0.0)) : lean;
+    over = min(laid, 0.995);
+  }
   lean = lean / max(length(lean), 1e-4) * over;
 
   // The blade is an arc of its own length: its tip comes down as it goes over.
@@ -77,14 +91,15 @@ void main() {
   // Colour: green to straw in broad patches and blade by blade, the root in its neighbours' shade.
   float dry = clamp(envDryAt(xz) + (r1 - 0.5) * 0.5, 0.0, 1.0);
   vec3 colour = mix(uGrass, uDry, dry * (1.0 - 0.5 * rank)) * (0.82 + 0.36 * r2) * (1.0 - ${ENV.grass.rank.darker.toFixed(2)} * rank);
-  colour *= mix(uRoot, 1.08, t);
+  colour *= mix(mix(uRoot, 1.0, trod), 1.08, t);
   float flower = step(1.0 - uBlades.z, r3) * smoothstep(0.7, 0.9, t);
   colour = mix(colour, mix(uFlowerA, uFlowerB, step(0.5, r1)), flower);
   colour = mix(colour, vec3(0.92, 0.94, 0.97), snow * smoothstep(0.25, 0.8, t) * 0.85);
   colour *= 1.0 - 0.18 * uEnvWet.x;
 
   // Light: the field's surface leans with the blades; against the sun the leaf glows; a bent blade shows its gloss to the sky.
-  vec3 normal = normalize(vec3(-lean.x * 0.8, 1.0, -lean.y * 0.8));
+  // (A blade laid flat by a body lies in the ground's plane: its face turns up to the sky and the sun.)
+  vec3 normal = normalize(vec3(-lean.x * 0.8 * (1.0 - trod), 1.0, -lean.y * 0.8 * (1.0 - trod)));
   vec3 view = normalize(world - cameraPosition);
   float facing = 0.35 + 0.65 * max(dot(normal, uEnvSunDir), 0.0);
   float through = pow(max(dot(view, uEnvSunDir), 0.0), 3.0) * ${ENV.grass.through.toFixed(2)} * t;
@@ -168,6 +183,7 @@ export function envBuildGrass({ place, map }) {
       uniforms: {
         ...envShadowUniforms(),
         ...envUniforms(),
+        ...envPressUniforms(),
         uEnvMap: map,
         uEnvCover: map.cover,
         uLayer: { value: new THREE.Vector4(layer.tile, layer.width, layer.tall, inner) },

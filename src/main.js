@@ -96,7 +96,7 @@ import { updateClothWind } from './clothwind.js';
 import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
 import { installStory } from './story/storyview.js';
 import { STORY_MUSTER_RADIUS, STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
-import { tkSetTier } from './townkit/place.js';
+import { tkSetTier, tkTier } from './townkit/place.js';
 import { tkWeatherNow } from './townkit/weather.js';
 import { createStoryPlaceMark } from './story/placemark.js';
 import { mountCameraTuner } from './camtuner.js';
@@ -505,6 +505,7 @@ const BUILD_BUDGET_MS = 24;
  */
 function rebuildViews({ progressive = false } = {}) {
   for (const view of state.views) disposeFighterView(scene, view);
+  disposeStoryFallen();
   // The horses (physics/mounted.js), one model each.
   for (const view of state.horseViews ?? []) disposeHorseView(scene, view);
   releaseSkinTextures();
@@ -1361,7 +1362,7 @@ function drawWorld(dt, drawIt = true) {
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
   updateClothWind(scene, world);
-  envUpdate(scene, world);
+  envUpdate(scene, world, state.mode === 'play' ? player() : null);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
@@ -2948,9 +2949,42 @@ function enterStoryWorld(setup, { paused = false } = {}) {
  * place's own builder, played on foot with the follow camera. `inputs`: the walker (the battle's hero); `weather`: the
  * place's weather for the day (the kit's values: townkit/weather.js); `at`, `facing`: where he starts, else the stage's.
  */
+/**
+ * The fallen of a battle in the walk after it (enterStoryRoam `after`): how many are drawn, by the town kit's tier
+ * (townkit/place.js tkTier), nearest the walker first. Each is a crowd model (render.js, the low-detail path an army
+ * is drawn with) posed once as the battle left him and never stepped or posed again: no physics, no per-frame cost.
+ * The counts by what each costs: measured in the canal town's walk after the wokou battle (13 to 18 men down of 72
+ * after 90 s), a crowd model of a lying man is about 7 draw calls and 16,000 triangles, about 0.13 ms a frame at
+ * 1600 x 900 in a headless browser. 32 on the high tier is about 4 ms, every man down in that battle and the
+ * nearest of a bigger one; 12 on the low tier (a phone) about 1.5 ms, the men round the walker. `lying`: the
+ * states (physics) of a man on the ground.
+ */
+const STORY_FALLEN = { high: 32, low: 12, lying: ['out', 'down', 'ground', 'falling'] };
+let storyFallenViews = [];
+function disposeStoryFallen() {
+  for (const view of storyFallenViews) disposeFighterView(scene, view);
+  storyFallenViews = [];
+}
+
+/** Those lying on the battle's field now, nearest `at` first (not the man who walks it: he gets up for the walk). */
+function storyFallenOf(world, at) {
+  if (!world?.fighters?.length || world.stage) return [];
+  const hero = leadOf(world.fighters, state.playSide, state.lead?.[state.playSide] ?? 0);
+  const pelvis = (fighter) => [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
+  return world.fighters
+    .filter((fighter) => fighter !== hero && !fighter.mount && STORY_FALLEN.lying.includes(fighter.state))
+    .map((fighter) => ({ fighter, away: Math.hypot(pelvis(fighter)[0] - at[0], pelvis(fighter)[1] - at[2]) }))
+    .sort((a, b) => a.away - b.away)
+    .slice(0, STORY_FALLEN[tkTier()] ?? STORY_FALLEN.low)
+    .map((each) => each.fighter);
+}
+
 function enterStoryRoam(key, { inputs, weather = null, day = null, after = false, at = null, facing = null } = {}) {
   const entry = STORY_PLACES[key];
   if (!entry) throw new Error(`no story place called ${key}`);
+  // (The battle is fought in the place itself, its view's scene the place walked: the fallen lie where they are.)
+  const fallen = after ? storyFallenOf(state.world, at ?? entry.after?.at ?? entry.muster) : [];
+  const fallenAt = state.world?.time ?? 0;
   if (state.game !== 'story') setGame('story');
   leaveStage();
   state.scenario = null;
@@ -2979,6 +3013,12 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   document.body.dataset.place = entry.place;
   $('#place').closest('label').hidden = true;
   rebuildViews({ progressive: true });
+  for (const fighter of fallen) {
+    const view = buildFighterView(scene, fighter, { simple: true });
+    setLayer(view, state.layer);
+    updateFighterView(view, 0, fallenAt);
+    storyFallenViews.push(view);
+  }
   state.eventCursor = 0;
   state.finishedAt = null;
   resetDrama(state.drama);
@@ -4149,6 +4189,11 @@ const boxer = window.boxer = {
   finishBuilding: () => {
     while (state.viewQueue?.length) state.views.push(state.buildView(state.viewQueue.shift()));
     showMustering();
+  },
+  // The fallen kept in the walk after a battle (enterStoryRoam): how many; `show` false hides them (to measure what they cost).
+  storyFallen: (show) => {
+    if (show !== undefined) for (const view of storyFallenViews) view.group.visible = Boolean(show);
+    return storyFallenViews.length;
   },
   advance: (seconds) => {
     tick(seconds, { budget: Infinity });
