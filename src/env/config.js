@@ -202,6 +202,13 @@ export const ENV = {
     // cards) that just reaches the ceiling, `warmth` moved from blue to red (0.02: 2 % each way). All by eye
     // against the two reference frames' tone ranges (their darkest 5 % under 0.13 of full scale, their median
     // near 0.3 to 0.4, measured from the files), and so that a fighter in shade is never under about 0.15.
+    // `hue`: how much of the curve is laid on the light as a whole (its brightness bent, its colour's proportions
+    // kept) rather than on each of red, green and blue apart (post.js envFilm). Bent channel by channel, a bright
+    // orange evening cloud had its red stop at the shoulder while green still rose, and came out mustard; the sky
+    // toward a low sun went olive and a face in the sun bleached grey. 1 is the whole, 0 film's own bend channel
+    // by channel; at 1 skin in the sun went ruddy. 0.7 by eye between, on the field's evening and the valley's
+    // close face (the frames' luminance is the same at every value: only colour moves).
+    hue: 0.7,
     grade: { ev: 0, contrast: 1.28, saturation: 1.06, white: 6, warmth: 0 },
   },
 
