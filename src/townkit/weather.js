@@ -488,7 +488,10 @@ const TK_COLOUR = `
   float lying = blot * 0.42 + fine * 0.28 + tkFbm(vTkPos.xz * 0.045 + 7.0) * 0.3 + uTkSnow * holds * 0.45 + (lies - 0.5) * 0.8;
   // (A patch's edge is broken at a hand's scale, and narrow: TK_WEATHER.snow.edge.)
   lying += (tkNoise(vTkPos.xz * 6.3 + 2.0) - 0.5) * 0.12 + (tkNoise(vTkPos.xz * 21.0) - 0.5) * 0.06;
-  tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(${(0.4 - TK_WEATHER.snow.edge / 2).toFixed(3)}, ${(0.4 + TK_WEATHER.snow.edge / 2).toFixed(3)}, lying) * (1.0 - tkPoolHere) * (1.0 - tkUnder);
+  // (Over a face the wind slides it on, it is swept into bands along the wind and the face is bare between: uTkLaid.w,
+  // the material's scour. The bands are the blown drifts' own: as long down the wind as those, as wide across.)
+  if (uTkLaid.w > 0.0) lying += uTkLaid.w * (tkNoise(vec2(dot(vTkPos.xz, uTkBlow.xy) / ${(TK_WEATHER.snow.blown.drift * TK_WEATHER.snow.blown.stretch).toFixed(2)}, dot(vTkPos.xz, vec2(-uTkBlow.y, uTkBlow.x)) / ${TK_WEATHER.snow.blown.drift.toFixed(2)})) - 0.6);
+  tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(${(0.4 - TK_WEATHER.snow.edge / 2).toFixed(3)}, ${(0.4 + TK_WEATHER.snow.edge / 2).toFixed(3)}, lying) * (1.0 - tkPoolHere) * (1.0 - tkUnder) * step(0.001, uTkHold);
   if (uTkLaid.x > 0.5) {
     // (Off a roof it has slid in sheets: strips down the slope lie bare.)
     float across = vTkPos.x * n.z - vTkPos.z * n.x;
@@ -793,7 +796,10 @@ export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1, dirt = [0, 0, 0
  * holds puddles; `blotch`: how strongly the blotches show; `dirt`: [streaks down from the top, moss, grime in the
  * joints and the shade, how much treading shows], 0..1 each, set against what the material is (lime plaster streaks
  * and stains most and sheds from its brick; fired brick and dressed stone less; timber greys but does not streak
- * much); `fall`: how much of its plaster may have fallen; `tiles`: a laid roof's tiles across and along its sheet.
+ * much); `fall`: how much of its plaster may have fallen; `tiles`: a laid roof's tiles across and along its sheet;
+ * `snow`: how well snow holds on it (0: none lies); `rough`: its roughness where nothing lies on it (1 when not given);
+ * `scour`: how freely the wind slides lying snow over it (a smooth face, ice: 1), sweeping it into bands along the
+ * wind (the blown drifts' own measure, TK_WEATHER.snow.blown) with the bare face between (0 when not given).
  * A place may add its own.
  */
 export const TK_MATERIALS = {
@@ -860,13 +866,13 @@ export function tkMaterials({ size = 512, ground = 0, anisotropy = 8, extra = {}
       if (!spec) throw new Error(`townkit: no material called ${name}`);
       const textures = sheet(spec.sheet);
       const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(...(spec.colour ?? [1, 1, 1])), vertexColors: true, metalness: 0, roughness: 1,
+        color: new THREE.Color(...(spec.colour ?? [1, 1, 1])), vertexColors: true, metalness: 0, roughness: spec.rough ?? 1,
         map: spec.plain ? null : textures.map, normalMap: textures.normalMap, roughnessMap: spec.plain ? null : textures.surfaceMap,
         alphaTest: spec.cutout ? 0.5 : 0, side: spec.cutout || spec.twoSided ? THREE.DoubleSide : THREE.FrontSide,
       });
       if (spec.normalScale) material.normalScale.set(spec.normalScale, spec.normalScale);
       material.name = `townkit:${name}`;
-      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1], spec.snow ?? 1, spec.dirt ?? [0, 0, 0, 0], [spec.tiles?.[0] ?? 0, spec.tiles?.[1] ?? 0, spec.fall ?? 0, 0], spec.hung ? { hung: true } : spec.sway ? { tree: spec.sway } : null);
+      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1], spec.snow ?? 1, spec.dirt ?? [0, 0, 0, 0], [spec.tiles?.[0] ?? 0, spec.tiles?.[1] ?? 0, spec.fall ?? 0, spec.scour ?? 0], spec.hung ? { hung: true } : spec.sway ? { tree: spec.sway } : null);
       made.set(name, material);
       return material;
     },

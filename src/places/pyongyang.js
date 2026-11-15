@@ -20,7 +20,8 @@ import { tkFbm, tkRandom } from '../townkit/tex.js';
 import { TK_HOUSE, tkFieldAt, tkFieldMesh, tkHouse, tkHouseSolid, tkPaving, tkRow, tkTree } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
 import { tkStir } from '../townkit/stir.js';
-import { TK_THINGS, tkArrows, tkBrazier, tkCampfire, tkCart, tkDrift, tkFirewood, tkIcicles, tkLadder, tkMantlet, tkSacks, tkScatter, tkStack } from '../townkit/things.js';
+import { TK_MATERIALS } from '../townkit/weather.js';
+import { TK_THINGS, tkArrows, tkBrazier, tkCampfire, tkCart, tkDrift, tkFirewood, tkIcicles, tkLadder, tkMantlet, tkSacks, tkScatter, tkStack, tkTuft } from '../townkit/things.js';
 import { tkGatehouse, tkGatehouseSolids, tkPavilion, tkPavilionSolids, tkRampart, tkRampartSolids, tkRock, tkWorksStair, tkWorksStairSolid } from '../townkit/works.js';
 
 /** The place's plan (m). Choices for the game's ground, set against the battle's field and a walker's reach; none is a measurement of the real town. */
@@ -54,6 +55,15 @@ export const PYONGYANG_PLACE = {
   snow: 0.62, fog: [150, 1500],
   // How well the snow holds on trodden ground (the road to the gate, the ground the columns cross, the streets), as a share of its hold elsewhere.
   trodden: 0.55,
+  // The frozen river to the south, which can be walked down to and crossed. `z`: where the land begins to fall to it,
+  // where its ice is whole, where the far bank begins and where it is land again (a river a few hundred metres wide);
+  // `ice`: the ice's level (m, a bank's height under the town's ground). `field`: the walked ground over the bank and
+  // the ice, west to east (from the outside field's west edge to past the wall's southern end) and south to `to`, past
+  // the far bank, where the walk's bound stands. `reeds`: the dead stems standing in the frozen edge, where the river's
+  // share (as pyRiver gives it) runs between `[from, to]`: clumps every `every` m along the bank, each `[least,
+  // most]` stems `high` m tall (common reed stands about two to three metres; winter-killed and broken, less;
+  // approximate). All choices for the game's ground, as the rest of this plan.
+  river: { z: [150, 200, 520, 600], ice: -2.2, field: { x: [-149, 61], to: 640 }, reeds: { from: 0.45, to: 0.9, every: 2.6, stems: [3, 8], high: [1.1, 2.2] } },
 };
 
 const pySmooth = (a, b, x) => {
@@ -112,6 +122,9 @@ export function pyongyangPlan() {
   const step = wall.bank / 2;
   const outside = grid(...t.outside.x, Math.round((t.outside.x[1] - t.outside.x[0]) / t.cell), ...t.outside.z, pyOutside);
   const inside = grid(head, head + t.inside.cells * step, t.inside.cells, ...t.inside.z, pyInside);
+  // The bank and the river's ice to the south: the far country's own heights, on the same cells, from the walked ground's edge.
+  const sx = t.river.field.x;
+  const south = grid(sx[0], sx[1], Math.round((sx[1] - sx[0]) / t.cell), t.outside.z[1], t.river.field.to, pyFar);
   // The wall's nodes, north to south (its outer side, the left of that walk as a frame has it, is west), cut at the gate.
   const node = (z) => [wall.x, z, pyFoot(z), pyFoot(z) + wall.high];
   const range = (z0, z1) => Array.from({ length: Math.round((z1 - z0) / t.cell) + 1 }, (_, k) => node(z0 + k * t.cell));
@@ -158,8 +171,15 @@ export function pyongyangPlan() {
   }
   for (const [x, z] of [[30, -96], [52, -104], [78, -92], [102, -108], [124, -98], [20, -84], [90, -80], [40, 36], [86, 34], [110, -30], [36, -32], [96, 84], [44, 88], [128, 20]]) trees.push({ at: [x, z], y: pyFoot(z), kind: z < t.hill.z[0] ? 'pine' : 'bare', high: 7 + 3 * random(), seed: Math.round(x + z), yard: z > t.hill.z[0] });
   const gateFrame = tkgFrame(wall.x - t.gate.out, 0, t.gate.z, -Math.PI / 2);
-  pyPlanMade = { wall, outside, inside, runs, gaps, houses, trees, rocks, gateFrame, head, east: head + t.inside.cells * step, edge: east + 0.8 };
+  pyPlanMade = { wall, outside, inside, south, runs, gaps, houses, trees, rocks, gateFrame, head, east: head + t.inside.cells * step, edge: east + 0.8 };
   return pyPlanMade;
+}
+
+/** The wall's unwalked run south of the walked one, toward the river, bending east: its nodes [x, z, foot, top], its foot a little into the bank's ground. */
+function pySouthRun() {
+  const t = PYONGYANG_PLACE;
+  const wall = pyWall();
+  return [[wall.x, t.wall.z[1]], [wall.x, t.wall.z[1] + 30], [wall.x + 8, t.wall.z[1] + 60]].map(([x, z]) => [x, z, pyFar(x, z) - 0.3, pyFar(x, z) - 0.3 + wall.high]);
 }
 
 /** The stairs from the walk up to the gate's terrace, either side of it: [from, to] ([x, z]) each. */
@@ -190,7 +210,10 @@ export function pyongyangSolids() {
   const solids = [
     fieldOf(plan.outside.at, plan.outside.size, plan.outside.cells, plan.outside.heights, { bottom: -8 }),
     fieldOf(plan.inside.at, plan.inside.size, plan.inside.cells, plan.inside.heights, { bottom: -8 }),
+    fieldOf(plan.south.at, plan.south.size, plan.south.cells, plan.south.heights, { bottom: -12 }),
   ];
+  // (The wall's unwalked run on toward the river, as drawn: it closes the town's south end from the bank.)
+  solids.push(...tkRampartSolids(pySouthRun(), wall));
   for (const run of plan.runs) solids.push(...tkRampartSolids(run, wall));
   solids.push(...tkGatehouseSolids(plan.gateFrame, t.gate));
   // (The passage's floor: the two fields of ground stop at the wall's two sides.)
@@ -207,7 +230,12 @@ export function pyongyangSolids() {
   const [ox0] = t.outside.x;
   const [z0, z1] = [t.outside.z[0] + 3, t.outside.z[1] - 3];
   const bound = (a, b) => wallLine(a, b, 0.6, -20, 60);
-  solids.push(bound([ox0 + 3, z0], [ox0 + 3, z1]), bound([ox0, z0], [wall.x, z0]), bound([ox0, z1], [wall.x, z1]));
+  // (South: past the river's far bank; west and east of the bank and the ice, the field's own edges.)
+  const [sx0, sx1] = [t.river.field.x[0] + 3, t.river.field.x[1] - 3];
+  const far = t.river.field.to - 3;
+  solids.push(bound([ox0 + 3, z0], [ox0 + 3, far]), bound([ox0, z0], [wall.x, z0]), bound([sx0, far], [sx1, far]), bound([sx1, t.outside.z[1]], [sx1, far]));
+  // (Between the wall's southern end and the field's east edge, the town's own south edge.)
+  solids.push(bound([wall.x, t.outside.z[1]], [sx1, t.outside.z[1]]));
   // (Inside: the north wall's inner face, the walk's corner, the town's last row of houses, the south end.)
   const north = t.wall.z[0] + wall.face + wall.walk + 0.3;
   solids.push(bound([plan.head + 0.1, north], [plan.east, north]), bound([plan.head + 0.1, t.wall.z[0] - 1], [plan.head + 0.1, north]), bound([wall.x, t.wall.z[1] - 0.5], [plan.east, t.wall.z[1] - 0.5]), bound([plan.edge, z0], [plan.edge, z1]));
@@ -220,7 +248,8 @@ export function pyongyangStage() {
   return {
     id: 'pyongyang', title: 'The walls of Pyongyang', place: 'pyongyang',
     start: { section: 'walls', at: t.start.at, facing: t.start.facing },
-    sections: [{ id: 'walls', name: 'The walls of Pyongyang', bounds: { at: [0, 0], size: [320, 280] }, terrain: pyongyangSolids(), spawns: [] }],
+    // (The section holds the walked ground, the town's square and the bank and ice to the south: its terrain is live only inside it.)
+    sections: [{ id: 'walls', name: 'The walls of Pyongyang', bounds: { at: [0, (t.river.field.to + 20 - 140) / 2], size: [320, t.river.field.to + 20 + 140] }, terrain: pyongyangSolids(), spawns: [] }],
   };
 }
 
@@ -286,7 +315,16 @@ const PY_WOODS = {
 };
 
 /** The river south of the ground (0..1: 1 on its ice), a few hundred metres wide, running east-west. */
-const pyRiver = (z) => pySmooth(150, 200, z) * (1 - pySmooth(520, 600, z));
+const pyRiver = (z) => { const [a, b, c, d] = PYONGYANG_PLACE.river.z; return pySmooth(a, b, z) * (1 - pySmooth(c, d, z)); };
+
+/** How far (m) a point lies outside the walked ground's fields (the town's square and the bank and ice to the south): 0 on them. */
+function pyOffWalked(x, z) {
+  const t = PYONGYANG_PLACE;
+  const square = Math.max(Math.abs(x) - 148, Math.abs(z) - 129, 0);
+  const [sx0, sx1] = t.river.field.x;
+  const south = Math.max(sx0 + 1 - x, x - (sx1 - 1), t.outside.z[1] - 1 - z, z - (t.river.field.to - 1), 0);
+  return Math.min(square, south);
+}
 
 /** The far country's height (m) at (x, z) beyond the walked ground: hills rising with distance, higher to the north, and the river's level of ice. */
 function pyFar(x, z) {
@@ -300,7 +338,7 @@ function pyFar(x, z) {
   const river = pyRiver(z);
   const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z));
   const near = x <= 1 ? pyOutside(Math.max(t.outside.x[0], x), zc) : pyFoot(zc);
-  return (near + hills) * (1 - river) - 2.2 * river;
+  return (near + hills) * (1 - river) + t.river.ice * river;
 }
 
 /** The name board's face: the gate's name painted on a dark board (a canvas: no picture is loaded). */
@@ -585,6 +623,31 @@ function pyDress(blocks, stir, plan, lay, eave, tier) {
   });
 }
 
+/** The dead reeds standing in the river's frozen edges, near and far bank (PYONGYANG_PLACE.river.reeds), on the south field's ground: fine detail. */
+function pyReeds(blocks, plan) {
+  const t = PYONGYANG_PLACE;
+  const r = t.river.reeds;
+  const random = tkRandom(7717);
+  const [x0, x1] = [t.river.field.x[0] + 4, t.river.field.x[1] - 4];
+  for (let z = t.river.z[0]; z < t.river.field.to - 4; z += r.every * 0.5) {
+    const share = pyRiver(z);
+    if (share < r.from || share > r.to) continue;
+    for (let x = x0; x < x1; x += r.every) {
+      const [px, pz] = [x + r.every * random(), z + r.every * 0.5 * random()];
+      // (In clumps, with gaps between where the ice comes to the bank.)
+      if (tkFbm((px + 500) / 1000, (pz + 500) / 1000, 60, 2, 31) < 0.48 || random() < 0.35) continue;
+      const builder = blocks.at(px, pz);
+      const stems = r.stems[0] + Math.floor(random() * (r.stems[1] - r.stems[0] + 1));
+      builder.at('near', () => {
+        for (let k = 0; k < stems; k += 1) {
+          const [sx, sz] = [px + (random() - 0.5) * 0.9, pz + (random() - 0.5) * 0.9];
+          tkTuft(builder, sx, tkFieldAt(plan.south, sx, sz), sz, { size: r.high[0] + (r.high[1] - r.high[0]) * random(), wide: 0.22 + 0.16 * random(), colour: TK_THINGS.dead.map((value) => value * (0.6 + 0.3 * random())), yaw: random() * Math.PI, material: 'reed' });
+        }
+      });
+    }
+  }
+}
+
 /** The place built (a THREE.Group for render.js's places). */
 export function buildPyongyang() {
   const t = PYONGYANG_PLACE;
@@ -596,6 +659,10 @@ export function buildPyongyang() {
   const road = (x, z) => 1 - pySmooth(2.2, 5, Math.abs(z - pyRoad(x)));
   blocks.wide.at('all', () => {
     tkFieldMesh(blocks.wide, 'earth', plan.outside, { colourAt: (x, z) => { const worn = Math.max(road(x, z), 0.5 * (1 - pySmooth(6, 12, Math.abs(z)))); return [0.78 - 0.2 * worn, 0.74 - 0.2 * worn, 0.6 - 0.16 * worn]; } });
+    // The bank and the ice to the south: earth where the land is, ice where the river is whole (as the far country draws it).
+    const icy = (x, z) => pyRiver(z) > 0.85;
+    tkFieldMesh(blocks.wide, 'earth', plan.south, { skip: icy, colourAt: () => [0.74, 0.7, 0.58] });
+    tkFieldMesh(blocks.wide, 'ice', plan.south, { skip: (x, z) => !icy(x, z), colourAt: () => [0.8, 0.86, 0.9] });
     tkFieldMesh(blocks.wide, 'earth', plan.inside, { colourAt: (x, z) => { const worn = 1 - pySmooth(2.5, 6, Math.abs(z - t.gate.z)); return [0.72 - 0.16 * worn, 0.68 - 0.16 * worn, 0.58 - 0.14 * worn]; } });
     // The far country: a grid drawn together toward the middle (finer where it is nearer), each point with the slope's own normal.
     const cells = tier === 'low' ? 36 : 64;
@@ -608,7 +675,7 @@ export function buildPyongyang() {
       const normal = [(pyFar(x - d, z) - pyFar(x + d, z)) / (2 * d), 1, (pyFar(x, z - d) - pyFar(x, z + d)) / (2 * d)];
       const length = Math.hypot(...normal);
       // (Sunk under the walked ground where the two overlap, so that it never shows through it.)
-      const out = Math.max(Math.abs(x) - 148, Math.abs(z) - 129, 0);
+      const out = pyOffWalked(x, z);
       return { p: [x, pyFar(x, z) - 0.3 - PY_FAR.sink * (1 - pySmooth(0, 30, out)), z], n: normal.map((value) => value / length), uv: [x / 6, -z / 6] };
     };
     const corners = Array.from({ length: cells + 1 }, (_, j) => Array.from({ length: cells + 1 }, (_, i) => corner(i, j)));
@@ -633,7 +700,7 @@ export function buildPyongyang() {
           const [px, pz] = [x + every * woodRandom(), z + every * woodRandom()];
           const [size, kept, shade, girth, old, laden, turn, kind] = [woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom()];
           const out = Math.max(Math.abs(px), Math.abs(pz));
-          if (out < from || out >= to || (Math.abs(px) < 156 && Math.abs(pz) < 137) || pyRiver(pz) > 0.05) continue;
+          if (out < from || out >= to || pyOffWalked(px, pz) < 8 || pyRiver(pz) > 0.05) continue;
           const thick = woodThick(px, pz);
           if (kept >= thick) continue;
           const tall = (high[0] + (high[1] - high[0]) * size) * (w.small + (1 - w.small) * Math.min(1, thick * 1.5)) * (old < w.oldOne ? w.old : 1);
@@ -684,7 +751,7 @@ export function buildPyongyang() {
       for (let i = 0; i < cells; i += 1) {
         const [a, b, c, e] = [corners[j][i], corners[j][i + 1], corners[j + 1][i + 1], corners[j + 1][i]];
         // (Left out where the walked ground's own fields are drawn.)
-        if (Math.max(Math.abs(a.p[0]), Math.abs(c.p[0])) < 148 && Math.max(Math.abs(a.p[2]), Math.abs(c.p[2])) < 129) continue;
+        if (pyOffWalked(a.p[0], a.p[2]) <= 0 && pyOffWalked(c.p[0], c.p[2]) <= 0 && pyOffWalked(a.p[0], c.p[2]) <= 0 && pyOffWalked(c.p[0], a.p[2]) <= 0) continue;
         const icy = pyRiver((a.p[2] + c.p[2]) / 2) > 0.85;
         const material = icy ? 'ice' : 'rock';
         const tone = icy ? [0.8, 0.86, 0.9] : [0.6, 0.58, 0.5];
@@ -697,7 +764,7 @@ export function buildPyongyang() {
   for (const [index, run] of plan.runs.entries()) tkRampart(blocks.at(run[0][0], run[0][1]), run, { ...wall, gaps: index ? plan.gaps : [] });
   const crest = pyFoot(t.wall.z[0]);
   tkRampart(blocks.wide, Array.from({ length: 9 }, (_, k) => [plan.east + 60 - k * ((plan.east + 60 - wall.x) / 8), t.wall.z[0], crest, crest + wall.high]), { ...wall, inner: () => crest });
-  tkRampart(blocks.wide, [[wall.x, t.wall.z[1], 0, wall.high], [wall.x, t.wall.z[1] + 30, -0.5, wall.high - 0.5], [wall.x + 8, t.wall.z[1] + 60, -1.5, wall.high - 1.5]], { ...wall, inner: (node) => node[2] });
+  tkRampart(blocks.wide, pySouthRun(), { ...wall, inner: (node) => node[2] });
   // The gate: its block, the stairs up from the walk, the pavilion on its terrace; the corner's pavilion.
   const gate = blocks.at(wall.x, t.gate.z);
   tkGatehouse(gate, plan.gateFrame, t.gate);
@@ -730,13 +797,19 @@ export function buildPyongyang() {
   const head = plan.head;
   const lay = tkLayOf(blocks, tier, {
     box: PY_LAY.box, ways: pyWays(plan), wind: PY_LAY.wind, seed: 3, sun: PY_LIGHT.sun, ...(tier === 'low' ? null : { texel: PY_LAY.texel }),
-    ground: (x, z) => (x <= wall.x ? tkFieldAt(plan.outside, x, z) : x < head ? pyFoot(z) : tkFieldAt(plan.inside, x, z)),
+    ground: (x, z) => (z > t.outside.z[1] ? tkFieldAt(plan.south, x, z) : x <= wall.x ? tkFieldAt(plan.outside, x, z) : x < head ? pyFoot(z) : tkFieldAt(plan.inside, x, z)),
   });
 
   const stir = tkStir(3);
   const scattered = pyDress(blocks, stir, plan, lay, eave, tier);
+  pyReeds(blocks, plan);
 
-  const materials = tkMaterialsFor(tier, { extra: { ice: { sheet: 'plaster', pools: 2, colour: [0.72, 0.8, 0.84], blotch: 0.5, plain: true }, track: { sheet: 'earth', blotch: 1.2, snow: t.trodden }, street: { sheet: 'cobble', snow: t.trodden * 1.3 } } });
+  // (The river's ice is frozen, not open water: no pool's mirror. The wind scours lying snow off smooth ice into drifts
+  // and bare patches more than off rough ground: it holds `snow` 0.6 of the ground's share (by eye against photographs
+  // of a frozen river under new snow), swept into bands along the wind with bare ice between (`scour`); bare, the ice
+  // is glossy, `rough` 0.15 (by eye). The reeds standing in its edge
+  // are dead stems: snow does not lie on their blades, only on the ground at their feet.)
+  const materials = tkMaterialsFor(tier, { extra: { ice: { sheet: 'plaster', colour: [0.72, 0.8, 0.84], blotch: 0.5, plain: true, snow: 0.6, rough: 0.15, scour: 1 }, reed: { ...TK_MATERIALS.tuft, snow: 0 }, track: { sheet: 'earth', blotch: 1.2, snow: t.trodden }, street: { sheet: 'cobble', snow: t.trodden * 1.3 } } });
   const meshes = tkMeshes(blocks, materials, { tier });
   const root = new THREE.Group();
   root.name = 'pyongyang';
@@ -757,7 +830,7 @@ export function buildPyongyang() {
   const air = {
     description: {
       sun: PY_SUN, air: { visibility: 25000, hazeHeight: 900 }, clouds: { cover: 0.35 }, ground: { albedo: PY_GROUND_ALBEDO },
-      height: (x, z) => { const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)); return x <= wall.x ? tkFieldAt(plan.outside, Math.max(t.outside.x[0], x), zc) : x < head ? pyFoot(zc) : tkFieldAt(plan.inside, Math.min(plan.east, x), zc); },
+      height: (x, z) => { if (z > t.outside.z[1] && x >= t.river.field.x[0] && x <= t.river.field.x[1]) return tkFieldAt(plan.south, x, Math.min(z, t.river.field.to)); const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)); return x <= wall.x ? tkFieldAt(plan.outside, Math.max(t.outside.x[0], x), zc) : x < head ? pyFoot(zc) : tkFieldAt(plan.inside, Math.min(plan.east, x), zc); },
       openings: [{ at: [mouth, 0, t.gate.z - t.gate.way / 2], a: [0, t.gate.spring + t.gate.rise * 0.6, 0], b: [0, 0, t.gate.way], floor: 0, dust: 0.06 }],
     },
     // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun:
@@ -804,4 +877,4 @@ export function buildPyongyang() {
 }
 
 /** The ground's height anywhere on the walked fields (tests; hooks). */
-export const pyongyangGround = (x, z) => (x <= pyWall().x ? tkFieldAt(pyongyangPlan().outside, x, z) : tkFieldAt(pyongyangPlan().inside, x, z));
+export const pyongyangGround = (x, z) => (z > PYONGYANG_PLACE.outside.z[1] ? tkFieldAt(pyongyangPlan().south, x, z) : x <= pyWall().x ? tkFieldAt(pyongyangPlan().outside, x, z) : tkFieldAt(pyongyangPlan().inside, x, z));

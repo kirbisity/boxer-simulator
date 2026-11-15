@@ -135,8 +135,9 @@ function reached(terrain, from, step, bounds) {
 // Each place's solids, where a man comes in, the bounds the walk must stay within (half sizes, m) and the battle's own
 // court (the old battleground: half sizes, m).
 const PLACES = {
-  canaltown: { solids: canalTownSolids, start: CANAL_TOWN.start.at, bounds: [160, 60], court: CANAL_TOWN.court },
-  pyongyang: { solids: pyongyangSolids, start: PYONGYANG_PLACE.start.at, bounds: [170, 140], court: PYONGYANG_1593.arena },
+  canaltown: { solids: canalTownSolids, start: CANAL_TOWN.start.at, bounds: [160, 60], court: CANAL_TOWN.court, step: 0.5 },
+  // (Pyongyang's walk runs over the river to its far bank: its grid is coarser, for time.)
+  pyongyang: { solids: pyongyangSolids, start: PYONGYANG_PLACE.start.at, bounds: [170, PYONGYANG_PLACE.river.field.to + 20], court: PYONGYANG_1593.arena, step: 1 },
 };
 
 for (const [key, entry] of Object.entries(STORY_PLACES)) {
@@ -157,7 +158,7 @@ for (const [key, entry] of Object.entries(STORY_PLACES)) {
       const [x, z] = [entry.muster[0] + Math.cos(k * Math.PI / 4) * STORY_MUSTER_RADIUS, entry.muster[2] + Math.sin(k * Math.PI / 4) * STORY_MUSTER_RADIUS];
       assert.ok(standing(terrain, x, z, entry.muster[1]) !== null, `the ring's edge at [${x.toFixed(1)}, ${z.toFixed(1)}] is clear`);
     }
-    const walk = reached(terrain, stage.start.at, 0.5, place.bounds);
+    const walk = reached(terrain, stage.start.at, place.step, place.bounds);
     for (const [name, at] of Object.entries(points)) {
       const floor = walk.at(at[0], at[2]);
       assert.ok(floor !== undefined && Math.abs(floor - at[1]) < 0.4, `${name} is reached on foot from the start (${floor})`);
@@ -165,7 +166,7 @@ for (const [key, entry] of Object.entries(STORY_PLACES)) {
     // The ground that can be walked (lanes, quays, streets, fields: the houses and the water are not counted) is at least
     // three times the battle's court, and the walk stays inside the place (nothing reached at the bounds given).
     const court = 4 * place.court.halfX * place.court.halfZ;
-    assert.ok(walk.size * 0.25 > 3 * court, `${walk.size * 0.25} m2 is walked, the court being ${court} m2`);
+    assert.ok(walk.size * place.step * place.step > 3 * court, `${walk.size * place.step * place.step} m2 is walked, the court being ${court} m2`);
     for (let x = -place.bounds[0]; x <= place.bounds[0]; x += 0.5) {
       for (const z of [-place.bounds[1], place.bounds[1]]) assert.equal(walk.at(x, z), undefined, `the walk does not reach the bound at [${x}, ${z}]`);
     }
@@ -225,4 +226,24 @@ test('a place\'s weather on a day is one of its own, whatever the draw', () => {
   // Jiangnan: wet stone more days than dry.
   const wet = Array.from({ length: 100 }, (_, k) => storyPlaceWeather('canaltown', k / 100)).filter((weather) => weather.wet > 0.3).length;
   assert.ok(wet > 50, `the water town is wet on most days (${wet} in 100)`);
+});
+
+test('pyongyang: the frozen river is reached on foot, the feet on the drawn bank and ice the whole way, and bounded past its far bank', () => {
+  const terrain = createTerrain(pyongyangSolids());
+  const { river } = PYONGYANG_PLACE;
+  for (const x of [-120, -60, -10]) {
+    let y = pyongyangGround(x, 100);
+    let lowest = Infinity;
+    let z = 100;
+    for (; z <= river.field.to + 10; z += 0.5) {
+      const floor = standing(terrain, x, z, y);
+      if (floor === null) break;
+      assert.ok(Math.abs(floor - pyongyangGround(x, z)) < 0.02, `at [${x}, ${z}] the feet stand on the drawn ground (${floor.toFixed(3)} against ${pyongyangGround(x, z).toFixed(3)})`);
+      y = floor;
+      lowest = Math.min(lowest, floor);
+    }
+    assert.ok(z > river.z[3], `from [${x}, 100] the walk goes over the river and up its far bank (stopped at z ${z})`);
+    assert.ok(z < river.field.to, `and is bounded before the field's end (z ${z})`);
+    assert.ok(Math.abs(lowest - river.ice) < 0.05, `on the way it is on the ice (${lowest.toFixed(2)} m)`);
+  }
 });

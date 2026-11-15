@@ -59,7 +59,7 @@ export const TK_LAY = {
   // sky's own light); `high` m: the range the shade's height is kept in.
   sun: { reach: 40, every: 2, eave: 0.6, band: 4, spread: 3, high: 16 },
   // Materials that are not built things: left out of the map.
-  skip: ['water', 'ice', 'foliage', 'needles', 'lattice', 'bark', 'tuft', 'scrap', 'icicle', 'cloth', 'drift'],
+  skip: ['water', 'ice', 'foliage', 'needles', 'lattice', 'bark', 'tuft', 'reed', 'scrap', 'icicle', 'cloth', 'drift'],
 };
 
 const layClamp = (value) => Math.max(0, Math.min(1, value));
