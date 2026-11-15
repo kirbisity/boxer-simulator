@@ -14,7 +14,7 @@ import { seededRandom } from '/src/physics.js';
 import { STORY_BATTLES } from '/src/story/battles/index.js';
 import { storyNorthLife } from '/tools/storynorth.js';
 
-const HIDE = 'header,footer,#fight-ui,#hud,.hud,#clock,#ghost-bar,.ghost-bar,#log,#banner,.level-hud,#speeds,.fu-pick,#pause,#restart,#menu,.menu,#modes,.arena::after,.toast,#toast,#sound-toggle,.audio-mixer,#icons,.event-icon{display:none!important}';
+const HIDE = 'header,footer,#fight-ui,#hud,.hud,#clock,#ghost-bar,.ghost-bar,#log,#banner,.level-hud,#speeds,.fu-pick,#pause,#restart,#menu,.menu,#modes,.arena::after,.toast,#toast,#sound-toggle,.audio-mixer,#icons,.event-icon,#camera-bar{display:none!important}';
 
 const lerp = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
 const ease = (k) => k * k * (3 - 2 * k);
@@ -95,7 +95,7 @@ export const TC = {
     if (!style) {
       style = document.createElement('style');
       style.id = 'trailer-play';
-      style.textContent = '#sound-toggle,.audio-mixer,#sandbox-menu,.sandbox-only,footer.controls,.zone-hints{display:none!important}';
+      style.textContent = '#sound-toggle,.audio-mixer,#sandbox-menu,.sandbox-only,footer.controls,.zone-hints,#camera-bar{display:none!important}';
       document.head.appendChild(style);
     }
     this.noCrowns = false;
@@ -139,6 +139,8 @@ export const TC = {
     return { gunner: 0, samurai: 1, samStyle: sam.style };
   },
   async settle() {
+    // The menus shut, as storyBattle does (fight() leaves the home screen over the fight).
+    window.boxer.closeMenus?.();
     if (window.boxer.fullModels()) window.boxer.fullModels(true);
     // Out of the training yard the page boots into (it starts its bout again when a man is out): a sandbox fight.
     window.boxer.state.game = 'sandbox';

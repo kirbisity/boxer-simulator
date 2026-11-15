@@ -3998,6 +3998,8 @@ const boxer = window.boxer = {
     if (BODY_STYLES.includes(style)) setBodyStyle(style);
     return BODY_STYLE;
   },
+  // Trailer capture: the menus shut over a fight started by a hook (fight() leaves them open).
+  closeMenus: () => menus.close(),
   // Trailer capture: the page's own loop stops (true) and boxer.playFrames is the only clock; false gives it back.
   capture: (on) => {
     if (on !== undefined) state.captureHeld = Boolean(on);
