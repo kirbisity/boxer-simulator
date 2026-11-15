@@ -114,6 +114,7 @@ WEAR = {
     'munitionPlate': ('munition', (0.16, 0.16)),
     'etched': ('steel', (0.12, 0.12)),
     'brigandine': ('studdedCloth', (0.096, 0.096)),
+    'euroBrigandine': ('studdedCloth', (0.128, 0.1)),
     'lamellae': ('steel', (0.09, 0.1)),
     'formKettleRidged': ('munition', (0.4, 0.4)),
     'formKettleBurgundian': ('munition', (0.4, 0.4)),
