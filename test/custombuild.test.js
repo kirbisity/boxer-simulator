@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CUSTOM_BUDGET, CUSTOM_GROUND_TILES, CUSTOM_STUBS, CUSTOM_TRANSFORMS } from '../tools/custom.js';
+import { CUSTOM_BUDGET, CUSTOM_CLEAN_MAPS, CUSTOM_GROUND_TILES, CUSTOM_STUBS, CUSTOM_TRANSFORMS } from '../tools/custom.js';
 import { DETAIL_MAP_DATA } from '../src/detailmaps-data.js';
 import { MUSIC_CUES } from '../src/audio/music/manifest.js';
 import { STORM_SKY_DATA } from '../src/levelmode/stormsky-data.js';
@@ -55,7 +55,10 @@ test('the custom page is one file under its budget, without the music, the storm
   for (const photo of Object.values(STORM_SKY_DATA)) if (photo.jpeg) assert.ok(!page.includes(piece(photo.jpeg)), 'a storm-sky photo is in the custom page');
   for (const [name, tile] of Object.entries(DETAIL_MAP_DATA)) {
     const data = JSON.stringify(tile).match(/"([A-Za-z0-9+/=]{4000,})"/)[1];
-    assert.equal(page.includes(piece(data)), tile.kind !== 'ground' || CUSTOM_GROUND_TILES.includes(name), `the ${name} tile`);
+    // (A tile carried clean, CUSTOM_CLEAN_MAPS: its worn image is not on the page, looked for whole, as a piece of a worn image
+    // can be found in its clean one, where both run through the same flat stretch.)
+    if (CUSTOM_CLEAN_MAPS['detailmaps-data'].includes(name)) assert.ok(!page.includes(data), `the ${name} tile is carried worn`);
+    else assert.equal(page.includes(piece(data)), tile.kind !== 'ground' || CUSTOM_GROUND_TILES.includes(name), `the ${name} tile`);
   }
   // It opens in the sandbox: the stand-in menu's way in.
   assert.match(page, /dataset\.game\s*!==\s*["']sandbox["']/);

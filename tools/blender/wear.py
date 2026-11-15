@@ -84,6 +84,17 @@ WEAR_KINDS = {
         'rust': None,
         'rings': [0.22, 0.0025],
     },
+    # Moulded polymer (riot armour): nothing to rust or tarnish; scuffs instead of scores, short and wide, paler and matte
+    # where the surface is abraded (`darker` below 0: lighter), and dust in the recesses. Set against the steel recipe's
+    # counts and judged on the riot kit's tile preview; no reference photograph was given for it.
+    'polymer': {
+        'scratches': [1000, 0.008, 0.04, 0.0005, 0.002, 0.15, 0.2, -0.06], 'across': 1,
+        'dull': [0.02, 0.05, 0.0], 'patch': [0.03, 0.1],
+        'tarnish': [0.0, (1.0, 1.0, 1.0)],
+        'grime': [0.0, (0.2, 0.17, 0.14), 0.8],
+        'rust': None,
+        'dust': [0.3, 0.02, (1.05, 1.05, 1.03)],
+    },
     # Lacquer over iron or rawhide (a tosei do's lames): hard and glossy, so it keeps its shine but gathers fine scratches and
     # dust, and flakes in small chips where edges knock.
     'lacquer': {
@@ -120,6 +131,23 @@ WEAR = {
     'formKettleBurgundian': ('munition', (0.4, 0.4)),
     'formSalletGerman': ('munition', (0.4, 0.4)),
     'formCabassetSpanish': ('munition', (0.4, 0.4)),
+    'segmentata': ('steel', (0.18, 0.156)),
+    'scale': ('steel', (0.12, 0.048)),
+    'krug': ('steel', (0.072, 0.063)),
+    'bifu': ('munition', (0.08, 0.15)),
+    'polymer': ('polymer', (0.1, 0.1)),
+    # (The arena helmets' sheets are grey: bronze or iron is the kit's colour over them, so they wear as steel.)
+    'formMurmillo': ('steel', (0.4, 0.4)),
+    'formThraex': ('steel', (0.4, 0.4)),
+    'formHoplomachus': ('steel', (0.4, 0.4)),
+    'formSecutor': ('steel', (0.4, 0.4)),
+    'formScissor': ('steel', (0.4, 0.4)),
+    'formTurbanTurkman': ('steel', (0.4, 0.4)),
+    'maskTiemian': ('steel', (0.2, 0.2)),
+    'maskShoumian': ('steel', (0.2, 0.2)),
+    'maskKipchak': ('steel', (0.2, 0.2)),
+    'maskHorde': ('steel', (0.2, 0.2)),
+    'maskVentail': ('mail', (0.2, 0.2)),
     # (A war mask's sheet is half a face, about 0.2 m to a side.)
     'maskOni': ('lacquer', (0.2, 0.2)),
     'maskRessei': ('lacquer', (0.2, 0.2)),
