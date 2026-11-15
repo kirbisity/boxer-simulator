@@ -144,6 +144,10 @@ export function installStory() {
   return { open() { throw new Error('story mode: not in the custom build (tools/custom.js)'); }, tick() {}, think() {}, steer() {}, close() {}, leave() {}, holding: () => false, held: () => [], pace: () => 1, placeMark: () => null, filming: false, active: false, hooks: {} };
 }
 `,
+  // A story scene's pose at ease: no story places to walk here, so never asked for.
+  'story/scenes/stage': `
+export const easeFor = () => null;
+`,
   // His place's mark (story mode's): nothing to mark.
   'story/placemark': `
 export function createStoryPlaceMark() {
