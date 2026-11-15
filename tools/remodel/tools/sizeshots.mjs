@@ -4,7 +4,7 @@ import { mkdirSync } from 'node:fs';
 import { openTab } from './cdp.mjs';
 import { units } from './units.mjs';
 const SP = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
-const WT = '/Users/yanlinzhu/Documents/unix_workspace/boxer-simulator/.claude/worktrees/unit-remodel';
+const WT = '/Users/yanlinzhu/Documents/unix_workspace/boxer-simulator/.claude/worktrees/agent-a48fadadcf3037dd6';
 const { FRAMES, normaliseInputs } = await import(`${WT}/src/body.js`);
 const { caloriesForWeight } = await import(`${WT}/src/physiology.js`);
 const [label, url, style, ...want] = process.argv.slice(2);
@@ -19,7 +19,7 @@ const built = (man, { bmi, exercise }) => {
   const h = base.heightCm / 100;
   return { ...structuredClone(man), ...(exercise !== undefined ? { exercise } : {}), calories: Math.round(caloriesForWeight(base, bmi * h * h, FRAMES[base.frame].lean)) };
 };
-const tab = await openTab(9336, url, { width: 760, height: 1100 });
+const tab = await openTab(9350, url, { width: 760, height: 1100 });
 const HIDE = 'header,footer,.screen,#home,#fight-ui,#hud,.hud,#clock,#ghost-bar,.ghost-bar,#log,#banner,.level-hud,#speeds,.fu-pick,#pause,#restart,#sheet-labels,.arena::after{display:none!important}';
 await tab.evaluate(`(() => { boxer.skipIntro(); boxer.adaptiveResolution?.(false); const s = document.createElement('style'); s.textContent = ${JSON.stringify(HIDE)}; document.head.append(s); boxer.bodyStyle(${JSON.stringify(style)});
   const r = boxer.scene.renderer; r.__orig = r.render.bind(r);
@@ -28,8 +28,9 @@ await tab.evaluate(`(() => { boxer.skipIntro(); boxer.adaptiveResolution?.(false
 const box = async () => tab.evaluate(`(() => { const b = document.querySelector('canvas').getBoundingClientRect(); return { x: b.left, y: b.top, width: b.width, height: b.height }; })()`);
 const camera = { distance: 4.6, pitch: 0.03, yaw: 0, height: 0.98 };
 const shoot = async (file, options, turn, spacing = 1) => {
+  const tall = Math.max(1, (options[0][0].inputs.heightCm ?? 175) / 180);
   const spec = { options, rows: [options[0][0].inputs], camera, spacing };
-  await tab.evaluate(`(() => { window.__cam = null; boxer.state.place = 'field'; boxer.designSheet(${JSON.stringify(spec)}, 0, null, ${turn}); boxer.finishSkins?.(); boxer.playFrames(2); const c = boxer.scene.camera; window.__cam = { pos: c.position.toArray(), look: [0, 1.02, 0], fov: 26.5 }; boxer.playFrames(1, 0); return 1; })()`);
+  await tab.evaluate(`(() => { window.__cam = null; boxer.state.place = 'field'; boxer.designSheet(${JSON.stringify(spec)}, 0, null, ${turn}); boxer.finishSkins?.(); boxer.playFrames(2); const c = boxer.scene.camera; window.__cam = { pos: c.position.toArray(), look: [0, 1.02 * ${tall}, 0], fov: 26.5 * ${tall} }; boxer.playFrames(1, 0); return 1; })()`);
   await tab.shot(file, await box());
 };
 const dir = `${SP}/size/shots`; mkdirSync(dir, { recursive: true });

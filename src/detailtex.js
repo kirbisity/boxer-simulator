@@ -73,7 +73,12 @@ export function preloadDetailMaps(names = ['mail', 'lamellae', 'kozane', 'plate'
  * are drawn in those colours, not the plates'. `repeat` ([u, v]): the tile read that many times over the geometry's own 0..1
  * coordinates (a piece built with plain UVs), in the shader, so the shared textures keep one transform.
  */
-export function armourDetailMaterial(material, name, { cords = null, matte = false, metalness = 1, repeat = null } = {}) {
+// A laced tile's plates each a little lighter or darker than the next, and their lacing likewise (ARMOUR_PLATE_TONES: the
+// share either way): each kozane or lamella was lacquered, laced and worn on its own, and one tile's plates, alike to the
+// pixel, repeated round a dō in a motif that read as a printed pattern.
+export const ARMOUR_PLATE_TONES = { plate: 0.12, lace: 0.16 };
+
+export function armourDetailMaterial(material, name, { cords = null, matte = false, metalness = 1, repeat = null, plates = null } = {}) {
   const entry = bakedTileTextures(name);
   if (!entry) return material;
   Object.assign(material, {
@@ -86,6 +91,10 @@ export function armourDetailMaterial(material, name, { cords = null, matte = fal
     uDetailCordB: { value: (cords?.[1] ?? cords?.[0] ?? new THREE.Color(1, 1, 1)).clone() },
     uDetailRepeat: { value: new THREE.Vector2(...(repeat ?? [1, 1])) },
   };
+  const tones = plates && cords ? `
+  vec2 detailPlate = floor(vUv * vec2(${plates[0].toFixed(1)}, ${plates[1].toFixed(1)}));
+  float detailTone = fract(sin(dot(detailPlate, vec2(12.9898, 78.233))) * 43758.5453) * 2.0 - 1.0;
+  float detailLaceTone = fract(sin(dot(detailPlate, vec2(39.3468, 11.135))) * 24634.6345) * 2.0 - 1.0;` : '';
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     if (repeat) shader.vertexShader = `uniform vec2 uDetailRepeat;\n${shader.vertexShader}`.replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_UV\n  vUv *= uDetailRepeat;\n#endif');
@@ -94,15 +103,18 @@ export function armourDetailMaterial(material, name, { cords = null, matte = fal
         '#include <color_fragment>',
         `#include <color_fragment>
 #if defined( USE_MAP ) && defined( USE_NORMALMAP )
-  float detailCordB = texture2D(normalMap, vUv).a;
-  diffuseColor.rgb = mix(diffuseColor.rgb, uDetailCordA * texelColor.rgb, texelColor.a);
-  diffuseColor.rgb = mix(diffuseColor.rgb, uDetailCordB * texelColor.rgb, detailCordB);
+  float detailCordB = texture2D(normalMap, vUv).a;${tones}
+  ${plates ? `diffuseColor.rgb *= 1.0 + detailTone * ${ARMOUR_PLATE_TONES.plate.toFixed(3)};` : ''}
+  vec3 detailLaceA = uDetailCordA${plates ? ` * (1.0 + detailLaceTone * ${ARMOUR_PLATE_TONES.lace.toFixed(3)})` : ''};
+  vec3 detailLaceB = uDetailCordB${plates ? ` * (1.0 + detailLaceTone * ${ARMOUR_PLATE_TONES.lace.toFixed(3)})` : ''};
+  diffuseColor.rgb = mix(diffuseColor.rgb, detailLaceA * texelColor.rgb, texelColor.a);
+  diffuseColor.rgb = mix(diffuseColor.rgb, detailLaceB * texelColor.rgb, detailCordB);
   diffuseColor.a = opacity;
 #endif`,
       );
     }
   };
-  material.customProgramCacheKey = () => `detail-${cords ? 'cords' : ''}-${repeat ? 'repeat' : ''}`;
+  material.customProgramCacheKey = () => `detail-${cords ? 'cords' : ''}-${repeat ? 'repeat' : ''}-${plates ? plates.join('x') : ''}`;
   return material;
 }
 

@@ -2416,7 +2416,9 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
     for (const [kind, indices] of Object.entries(detailIndices)) {
       const base = matte ? new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 1, metalness: 0 }) : steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
       const metalness = lacquer.metalness ?? (kind === 'kozane' ? 0.5 : 1);
-      const material = doubleSided(armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness }));
+      // (A laced tile's plates each their own tone: armourDetailMaterial `plates`.)
+      const laced = DETAIL_ARMOUR[kind]?.masks === 'lace' && DETAIL_ARMOUR[kind].columns ? [DETAIL_ARMOUR[kind].columns, DETAIL_ARMOUR[kind].rows] : null;
+      const material = doubleSided(armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness, plates: laced }));
       // The decoration over a plate harness (outfits.js ARMOUR_DECOR): its bands along the plates' field and fluting, its
       // borders gilt along the edge strips.
       if (dress.armor?.decor && DECOR_TILES.includes(kind)) armourDecorMaterial(material, dress.armor.decor, { tile: tileSize(kind)[0], edge: kind === 'harnessEdge' });

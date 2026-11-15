@@ -1,5 +1,10 @@
 // The featured units: each a list of columns (inputs) to show side by side, and which column is the close-up.
 import { readFileSync } from 'node:fs';
+const WTU = '/Users/yanlinzhu/Documents/unix_workspace/boxer-simulator/.claude/worktrees/agent-a48fadadcf3037dd6';
+const { SCENARIOS } = await import(WTU + '/src/scenarios.js');
+const { LEVEL_PRESETS } = await import(WTU + '/src/levelmode/presets.js');
+let seedU = 7; const randU = () => { seedU = (seedU * 16807) % 2147483647; return seedU / 2147483647; };
+const seki = SCENARIOS.sekigahara.cast(randU);
 export function units(castsFile) {
   const C = JSON.parse(readFileSync(castsFile));
   const all = [...C.qiJiguang.red, ...C.qiJiguang.blue, ...C.agincourt.red, ...C.agincourt.blue, ...C.cajamarca.red, ...C.cajamarca.blue, ...C.sarhu.red, ...C.sarhu.blue, ...C.storySarhu];
@@ -11,7 +16,7 @@ export function units(castsFile) {
   // The same man in another design or with another weapon (so only the kit differs across the columns).
   const as = (man, design, style) => ({ ...structuredClone(man), outfit: { ...man.outfit, design }, ...(style ? { style } : {}) });
   const foot = (man) => { const c = structuredClone(man); delete c.mounted; return c; };
-  const P = (name) => structuredClone(C['preset:' + name]);
+  const P = (name) => structuredClone(LEVEL_PRESETS[name] ?? C['preset:' + name]);
   const U = {};
   const eliteI = pick('mingEliteInfantry', 3, 'swordShield');
   U.mingEliteInfantry = { cols: [eliteI, as(eliteI, 3, 'langxian'), as(eliteI, 3, 'spear'), as(eliteI, 3, 'matchlock')], labels: ['shield+dao', 'langxian', 'spear', 'fowling piece'] };
@@ -51,7 +56,21 @@ export function units(castsFile) {
   U.incaUncu = { cols: [uncu, as(uncu, 1), as(uncu, 2), as(uncu, 3), as(uncu, 4)], labels: ['d0', 'd1', 'd2', 'd3', 'd4'] };
   const gar = pick('mingGarrison', 0, 'dao');
   U.mingGarrison = { cols: [gar, as(gar, 1), as(gar, 3), as(gar, 4)], labels: ['d0', 'd1', 'd3', 'd4'] };
+  const LP = (k) => { const c = structuredClone(LEVEL_PRESETS[k]); return c; };
+  U.eliteOlive = { cols: [as(eliteI, 0), as(eliteI, 0, 'langxian'), as(eliteI, 0, 'matchlock')], labels: ['d0 shield', 'd0 langxian', 'd0 fowling'] };
+  U.forgerTest = { cols: [{ ...P('forger'), outfit: { kind: 'forger', design: 0, colors: { top: '#ff0000', bottom: '#00ff00' } } }], labels: ['test'] };
+  U.alasdair = { cols: [LP('dunnottarPlateKnight')], labels: ['Sir Alasdair'] };
+  U.archerDn = { cols: [LP('dunnottarArcher')], labels: ['Dunnottar archer'] };
+  const ashE = seki.red.find((w) => w.outfit.kind === 'ashigaru' && w.style === 'matchlock');
+  U.ashigaruEast = { cols: [ashE, as(ashE, 0), as(ashE, 2)], labels: ['East d' + ashE.outfit.design, 'd0', 'd2'] };
+  const samW = seki.blue.find((w) => w.outfit.kind === 'samurai');
+  U.samuraiWest = { cols: [samW, as(samW, 0), as(samW, 2)], labels: ['West d' + samW.outfit.design, 'd0', 'd2'] };
   // Mounted men, as cast.
   U.mounted = { cols: [pick('bayara', 0, 'bayaraLance', true), pick('mingIronLamellar', 1, null, true), pick('conquistadorPlate', 1, 'lance', true), pick('knight', 1, 'lance', true)], labels: ['bayara', 'iron lamellar', 'conquistador', 'knight'], builds: false, wide: true };
+  // Mounted men one to a unit, for close framing of the rider over the saddle (mountshots.mjs).
+  U.mBayara = { cols: [U.mounted.cols[0]], labels: ['bayara'], mounted: true };
+  U.mLamellar = { cols: [U.mounted.cols[1]], labels: ['iron lamellar'], mounted: true };
+  U.mConquistador = { cols: [U.mounted.cols[2]], labels: ['conquistador'], mounted: true };
+  U.mKnight = { cols: [U.mounted.cols[3]], labels: ['knight'], mounted: true };
   return U;
 }
