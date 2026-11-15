@@ -466,11 +466,9 @@ void main() {
   vec3 light = uEnvSunColour * (facing * open + through) * sunShare + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * normal.y) * open;
   vec3 colour = aTint.rgb * (1.0 - 0.15 * uEnvWet.x);
   colour = mix(colour, vec3(0.9, 0.92, 0.96), uEnvWet.y * smoothstep(0.1, 0.7, normal.y) * 0.7);
-  // Wet, the leaves' film mirrors the sky (ENV.terrain.wetFilm), as much as the sky is open to them there.
-  float film = uEnvWet.x * ${(ENV.terrain.wetFilm * ENV.terrain.wetMirror).toFixed(4)} * open;
   vec3 through_;
   envHazeSplit(world, through_, vAir);
-  vColour = mix(colour * light, uEnvSkyLight, film) * through_;
+  vColour = colour * light * through_;
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
 }`;
 
