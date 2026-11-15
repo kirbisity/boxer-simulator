@@ -453,8 +453,11 @@ const TK_COLOUR = `
     float splash = 1.0 - smoothstep(0.04, ${TK_WEATHER.foot.splash.toFixed(2)}, high + (fine - 0.5) * 0.25);
     diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.foot.mud)} * (0.75 + 0.5 * fine), splash * 0.5);
     float north = 0.5 + 0.5 * dot(normalize(n.xz + 1e-4), uTkAir.yz);
-    float mossy = foot * smoothstep(0.5, 0.85, tkFbm(vTkPos.xz * 0.6 + vTkPos.y * 0.4 + 11.0) + 0.3 * (north - 0.5) + 0.16 * (1.0 - tkSky)) * (0.55 + 0.45 * blot);
-    diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.foot.moss)} * (0.6 + 0.5 * fine), mossy * 0.8 * uTkDirt.y * (1.0 - 0.6 * uTkSnow));
+    // (Above the damp band there is none: not worked out.)
+    if (foot > 0.0) {
+      float mossy = foot * smoothstep(0.5, 0.85, tkFbm(vTkPos.xz * 0.6 + vTkPos.y * 0.4 + 11.0) + 0.3 * (north - 0.5) + 0.16 * (1.0 - tkSky)) * (0.55 + 0.45 * blot);
+      diffuseColor.rgb = mix(diffuseColor.rgb, ${tkVec(TK_WEATHER.foot.moss)} * (0.6 + 0.5 * fine), mossy * 0.8 * uTkDirt.y * (1.0 - 0.6 * uTkSnow));
+    }
     // What runs down from the wall's top and from under its eave: dark streaks, each its own width and length.
     if (fall > -0.05) {
       float run = tkNoise(vec2(along * 1.9, 1.7)) * 0.6 + tkNoise(vec2(along * 7.0, 4.2)) * 0.4;
@@ -486,6 +489,9 @@ const TK_COLOUR = `
     // (The rim of a puddle is soaked.)
     tkWetHere = max(tkWetHere, uTkPool * smoothstep(0.9 - uTkPool * 0.62, 1.02 - uTkPool * 0.62, low) * level * (1.0 - tkUnder));
   }
+  diffuseColor.rgb *= mix(1.0, ${TK_WEATHER.wetDark.toFixed(2)}, max(tkWetHere, tkPoolHere * 0.8));
+  // (No snow in the weather: none lies or is caught anywhere, and none of it is worked out.)
+  if (uTkSnow > 0.0) {
   // Lying snow: white wherever it holds; less of it leaves bare patches, a few metres and a few tens of metres
   // across. The wind's work (the lie's map) piles it or thins it, feet tread it away, and nothing lies under cover.
   float holds = uTkHold * (1.0 - ${TK_WEATHER.snow.packed.toFixed(2)} * tkWear);
@@ -508,7 +514,6 @@ const TK_COLOUR = `
   float holdsHere = mix(0.3, 1.0, smoothstep(0.3, 0.75, tkFbm(vec2(faceAlong * 0.45, vTkPos.y * 0.8) + 23.0) + 0.22 * (1.0 - smoothstep(0.0, 2.0, high)) + 0.18 * (1.0 - smoothstep(0.0, 1.2, max(fall, 0.0))) * step(-0.05, fall)));
   float caught = uTkSnow * ${TK_WEATHER.snow.caught.toFixed(2)} * upright * smoothstep(0.1, 0.7, -dot(n.xz, uTkBlow.xy)) * smoothstep(0.66, 0.92, tkJoint + 0.8 * (blot - 0.5) + 0.3 * (fine - 0.5)) * holdsHere * (1.0 - tkUnder) * step(0.01, uTkKind.x);
   tkSnowHere = max(tkSnowHere, caught);
-  diffuseColor.rgb *= mix(1.0, ${TK_WEATHER.wetDark.toFixed(2)}, max(tkWetHere, tkPoolHere * 0.8));
   vec3 snow = mix(${tkVec(TK_WEATHER.snow.colour)}, ${tkVec(TK_WEATHER.snow.colourAir)}, uTkAir.x) * (1.0 - ${TK_WEATHER.snow.drift.toFixed(2)} * tkFbm(vTkPos.xz * 0.3 + 3.0));
   snow *= mix(vec3(1.0), ${tkVec(TK_WEATHER.snow.trodden)} * (0.85 + 0.3 * fine), clamp(tkWear * 1.3, 0.0, 1.0));
   // (The troughs between the wind's drifts: the same field the snow's own slopes are read from, below.)
@@ -525,6 +530,7 @@ const TK_COLOUR = `
     snow *= mix(vec3(1.0), vec3(${ENV_PRESS.packedColour.join(', ')}), tkPressPrint.w);
   }
   diffuseColor.rgb = mix(diffuseColor.rgb, snow, tkSnowHere);
+  }
 }
 `;
 
