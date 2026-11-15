@@ -22,7 +22,7 @@ export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KE
   || ['lastgate', 'lastgateview', 'squad', 'intro', 'tutorial', 'menu', 'battlethumbs', 'custombattleview'].includes(name);
 // Level mode's modules that the fights use too: the picture quality, water to wade in (and its config, its drawing in a battle's
 // field works), and the level's characters (offered among the builder's presets).
-const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitwater', 'levelmode/presets'];
+const CUSTOM_KEPT_LEVEL = ['levelmode/quality', 'levelmode/config', 'levelmode/water', 'levelmode/kitmirror', 'levelmode/kitwater', 'levelmode/presets'];
 
 /** The most a custom page may weigh (bytes, the page itself: nothing goes beside it). Set under the 16 MB a published test
  *  page may weigh, with room for the wrapper it is published in. */

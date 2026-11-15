@@ -137,7 +137,7 @@ export function setPlace(view, place, arena, weather = null) {
   // A place with weather of its own whenever a level brings none (PLACE_WEATHER: the open field's driven grey sky).
   weather ??= PLACE_WEATHER[place] ?? null;
   // A battle's fieldworks (its arena's `works`: stakes, palisades, woods, ditches, mud), over whatever place it is fought in.
-  showWorks(view, arena);
+  showWorks(view, arena, place);
   // A battle map's floor, much wider than the place's own, has the place built for it (scenery.js sceneryFor
   // pushes the backdrop out); the place's own floor and that one are kept side by side, each shown by turns.
   const home = PLACE_ARENAS[place];
@@ -1222,7 +1222,8 @@ function buildSengoku(arena = PLACE_ARENAS.sengoku) {
     g.fillRect(w * 0.42, h * 0.32, w * 0.16, h * 0.6);
   });
   // The curtains, the banners on their poles, and a bamboo palisade along both flanks, gapped (src/props/rural.js).
-  place.add(ruralSengokuCamps({
+  // (Not where a level fought here has no camps: its floor's `camps` false, Agincourt in this valley.)
+  if (arena.camps !== false) place.add(ruralSengokuCamps({
     sides: [[-1, '#b3161b'], [1, '#1f3f8a']],
     // (Beyond the floor's ends and flanks, whatever its size: 14.5 and 9.5 m on the place's own.)
     curtainX: arena.halfX + 3.5,

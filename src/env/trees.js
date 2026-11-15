@@ -80,6 +80,52 @@ export function envPlantTrees({ place, height, sun, keepOut, footprints }) {
 }
 
 /**
+ * The trees of a battle's wood edges (its works' walls of kind 'wood': physics/fieldworks.js, the undergrowth no horse
+ * goes through), in the place's own trees: rows of its tall kinds behind each line, in the mix its near stands have,
+ * and its plants of the ground along the line itself. The physics stops men at the line; this is what is drawn there.
+ */
+export function envPlantWoodEdges({ place, walls, height, sun }) {
+  const trees = [];
+  if (!walls.length) return trees;
+  const spec = ENV.trees.woodEdge;
+  const random = envRandom(place.terrain.seed * 977 + 61);
+  // The place's kinds near the floor (its first stands, nearer than spec.near m), each as often as it is planted there.
+  const near = place.trees.filter((stand) => stand.from < spec.near);
+  const pick = (low) => {
+    const kinds = near.filter((stand) => (ENV_TREES[stand.kind].height[1] > 4) !== low);
+    const total = kinds.reduce((sum, stand) => sum + stand.count, 0);
+    let at = random() * total;
+    for (const stand of kinds) if ((at -= stand.count) <= 0) return stand.kind;
+    return kinds[kinds.length - 1]?.kind ?? null;
+  };
+  const plant = (kind, x, z, size) => {
+    if (!kind) return;
+    const own = ENV_TREES[kind];
+    const y = height(x, z);
+    const tall = own.height[0] + (own.height[1] - own.height[0]) * size;
+    trees.push({ kind, x, y, z, height: tall, lit: envSunPast(height, sun, x, y + tall * own.crown.at, z) });
+  };
+  for (const wall of walls) {
+    // Outward: the side of the line away from the middle of the field.
+    const mid = [(wall.a[0] + wall.b[0]) / 2, (wall.a[1] + wall.b[1]) / 2];
+    let out = [-wall.u[1], wall.u[0]];
+    if (out[0] * -mid[0] + out[1] * -mid[1] > 0) out = [-out[0], -out[1]];
+    for (let row = 0; row < spec.rows; row += 1) {
+      for (let t = random() * spec.every; t < wall.length; t += spec.every * (0.7 + random() * 0.6)) {
+        const back = spec.first + row * spec.depth + random() * spec.scatter;
+        plant(pick(false), wall.a[0] + wall.u[0] * t + out[0] * back + (random() - 0.5) * spec.scatter, wall.a[1] + wall.u[1] * t + out[1] * back, random());
+      }
+    }
+    // The undergrowth on the line: brambles, fern and saplings.
+    for (let t = random() * spec.under; t < wall.length; t += spec.under * (0.6 + random() * 0.8)) {
+      const back = random() * spec.first;
+      plant(pick(true), wall.a[0] + wall.u[0] * t + out[0] * back, wall.a[1] + wall.u[1] * t + out[1] * back, random());
+    }
+  }
+  return trees;
+}
+
+/**
  * Where a place's rocks lie: [{ x, y, z, size (m, half its width), form, turn, lit }], from its `rocks` (stands, as
  * trees are planted) and its `outcrops` (each a knot of them at a point).
  */

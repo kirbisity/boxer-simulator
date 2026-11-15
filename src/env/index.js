@@ -30,7 +30,8 @@ import { envNoiseAt } from './noise.js';
 import { envBuildSky } from './sky.js';
 import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, envSunPast } from './terrain.js';
 import { envBuildGrass, envGrassQuality } from './grass.js';
-import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envTreeShadows, envTreesQuality } from './trees.js';
+import { worksOf } from '../physics/fieldworks.js';
+import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envPlantWoodEdges, envRockShadows, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { envPressForget, envPressStep } from './press.js';
@@ -193,6 +194,8 @@ function envFill(group, place, view, spec, own) {
   const height = envHeightField(own.terrain, keepOut, envLieOf(place, arena));
   const footprints = envFootprints(view.places[place]);
   const trees = envPlantTrees({ place: own, height, sun, keepOut, footprints });
+  // A battle's wood edges (its works' 'wood' walls), drawn in the place's own trees (worksview.js leaves them to the open air).
+  trees.push(...envPlantWoodEdges({ place: own, walls: (worksOf(arena)?.walls ?? []).filter((wall) => wall.kind === 'wood'), height, sun }));
   const rocks = envPlantRocks({ place: own, height, sun, keepOut, footprints });
   const map = { value: envBuildNearMap({ place: own, height, sun, keepOut, floor: [arena.halfX, arena.halfZ], shadows: envTreeShadows(trees, sun).concat(envRockShadows(rocks, sun)), footprints }) };
   map.cover = { value: map.value.envCover };

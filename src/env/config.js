@@ -556,6 +556,11 @@ export const ENV = {
     // and 6 at 70 m (900 lines, 50 degree lens): six sides near and four past that leave its outline round to a
     // pixel, and its shading is by the smooth normal either way. At eight and five sides with four rings each
     // the valley's wood (17 boughs to a pine) was 612 thousand triangles, a quarter of the place's frame.
+    // A battle's wood edge (trees.js envPlantWoodEdges): `rows` of trees behind its line, the first `first` m back,
+    // `depth` m between rows, one about every `every` m along, `scatter` m off their places; the undergrowth on the
+    // line one every `under` m; of the place's kinds planted nearer than `near` m. (A wood's edge stands closer than
+    // its inside: the light gets in, and saplings and brambles fill it.)
+    woodEdge: { rows: 3, first: 0.8, depth: 2.4, every: 3.2, scatter: 1.0, under: 1.1, near: 40 },
     bands: [
       { to: 70, cards: 340, trunk: true, limbs: true, wood: [6, 3] },
       { to: 140, cards: 120, trunk: true, limbs: true, wood: [4, 2] },
