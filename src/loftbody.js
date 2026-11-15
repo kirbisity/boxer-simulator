@@ -3518,8 +3518,6 @@ function fitClothToBase(mesh, parts, armoured) {
  * draw (`mesh.underLayer`). The collar is a piece of the neck and the coat of the trunk, which keepLayersInside keeps apart, so
  * the collar's foot stood over the coat on the trapezius as a plain patch down the back and a bib on the chest. (Not under a
  * plate cuirass, `ribPieces`: a mail standard is worn over the breastplate's top.)
- * So too the root of the shirt's sleeve (the `top` on an upper arm) within a kit's coat's top band: lofted from above the
- * shoulder's joint and fitted to the arm's flesh, it stood out of a jack over the shoulder as an open tube.
  */
 function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
   const trunk = frames.trunk;
@@ -3532,13 +3530,11 @@ function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
   };
   const collar = [];
   const coats = new Map();
-  const sleeve = new Set();
   for (const [vertex, { ring, name }] of shares) {
     if (name === 'neck' && ring.collar) collar.push(vertex);
-    if (/Upper$/.test(name) && mesh.colors[vertex] === 'top') { collar.push(vertex); sleeve.add(vertex); }
     if (name !== 'trunk' || ribPieces.has(ring.piece) || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk) continue;
     let rings = coats.get(ring.piece);
-    if (!rings) coats.set(ring.piece, rings = Object.assign(new Map(), { shirt: mesh.colors[vertex] === 'top' }));
+    if (!rings) coats.set(ring.piece, rings = new Map());
     if (!rings.has(ring)) rings.set(ring, []);
     rings.get(ring).push(vertex);
   }
@@ -3548,7 +3544,7 @@ function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
     const [top, below] = [...rings.keys()].sort((a, b) => b.t - a.t);
     if (!below) return null;
     const round = (ring) => rings.get(ring).map(placeOf).sort((a, b) => a.angle - b.angle);
-    return [round(top), round(below), rings.shirt];
+    return [round(top), round(below)];
   }).filter(Boolean);
   const atAngle = (round, angle) => {
     let after = round.findIndex((place) => place.angle >= angle);
@@ -3562,12 +3558,9 @@ function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
   for (const vertex of collar) {
     const place = placeOf(vertex);
     let inside = null;
-    for (const [top, below, shirt] of bands) {
-      // (A sleeve's root only under a coat of the kit, not the shirt's own body, and only within the band: below it the arm
-      // hangs out beside the trunk.)
-      if (sleeve.has(vertex) && shirt) continue;
+    for (const [top, below] of bands) {
       const [edge, foot] = [atAngle(top, place.angle), atAngle(below, place.angle)];
-      if (place.t >= edge.t || (sleeve.has(vertex) && place.t < foot.t)) continue;
+      if (place.t >= edge.t) continue;
       const share = Math.min(1, Math.max(0, (place.t - foot.t) / ((edge.t - foot.t) || 1)));
       const r = foot.r + (edge.r - foot.r) * share - LOFT.layers.margin;
       inside = inside === null ? r : Math.max(inside, r);
