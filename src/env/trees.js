@@ -11,6 +11,54 @@ import { envRandom } from './noise.js';
 import { envSunPast, envWoodsAt } from './terrain.js';
 
 /**
+ * The share of the sky's light that reaches the middle of the fought ground (eye height over its middle) past the
+ * crowns standing round it and the land's own horizon: the sky's cosine-weighted hemisphere (ENV.trees.skyRays
+ * rings by sectors, each ring an equal share of the light on a level card), each ray dimmed by every crown it
+ * passes through (an ellipsoid of the kind's `crown` proportions, letting ENV.trees.skyPast of the light through)
+ * and stopped where the land stands above it. The camera's meter and the fighters' sky light take it
+ * (index.js), where a place among walls says its own (`meter.sky`).
+ */
+export function envSkySeen(trees, height) {
+  const [rings, sectors] = ENV.trees.skyRays;
+  const eye = [0, height(0, 0) + 1.6, 0];
+  const crowns = trees.filter((tree) => tree.height > ENV.trees.underfoot * 4).map((tree) => {
+    const crown = ENV_TREES[tree.kind].crown;
+    return { x: tree.x, y: tree.y + tree.height * crown.at, z: tree.z, wide: tree.height * crown.wide, tall: tree.height * crown.tall };
+  });
+  let sum = 0;
+  for (let ring = 0; ring < rings; ring += 1) {
+    // (Equal steps of sin^2 of the angle from the zenith are equal shares of the light on a level card.)
+    const across = Math.sqrt((ring + 0.5) / rings);
+    const up = Math.sqrt(1 - across * across);
+    for (let sector = 0; sector < sectors; sector += 1) {
+      const turn = ((sector + (ring % 2) * 0.5) / sectors) * 2 * Math.PI;
+      const dx = across * Math.cos(turn);
+      const dz = across * Math.sin(turn);
+      let past = 1;
+      for (let far = 40; far < 6000 && past > 0; far *= 1.6) {
+        if (height(eye[0] + dx * far / across, eye[2] + dz * far / across) > eye[1] + (up / across) * far) past = 0;
+      }
+      for (const c of crowns) {
+        if (past < 1e-3) break;
+        // The ray in the crown's own frame, where the crown is a unit sphere.
+        const ox = (eye[0] - c.x) / c.wide;
+        const oy = (eye[1] - c.y) / c.tall;
+        const oz = (eye[2] - c.z) / c.wide;
+        const rx = dx / c.wide;
+        const ry = up / c.tall;
+        const rz = dz / c.wide;
+        const a = rx * rx + ry * ry + rz * rz;
+        const b = ox * rx + oy * ry + oz * rz;
+        const k = ox * ox + oy * oy + oz * oz - 1;
+        if (b * b - a * k > 0 && (b < 0 || k < 0)) past *= ENV.trees.skyPast;
+      }
+      sum += past;
+    }
+  }
+  return sum / (rings * sectors);
+}
+
+/**
  * Where a place's trees stand: [{ kind, x, y, z, height, lit }], `lit` the sun reaching the crown past the hills.
  * `footprints` (things standing on the ground) and the flat ground are kept clear.
  */
@@ -418,9 +466,11 @@ void main() {
   vec3 light = uEnvSunColour * (facing * open + through) * sunShare + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * normal.y) * open;
   vec3 colour = aTint.rgb * (1.0 - 0.15 * uEnvWet.x);
   colour = mix(colour, vec3(0.9, 0.92, 0.96), uEnvWet.y * smoothstep(0.1, 0.7, normal.y) * 0.7);
+  // Wet, the leaves' film mirrors the sky (ENV.terrain.wetFilm), as much as the sky is open to them there.
+  float film = uEnvWet.x * ${(ENV.terrain.wetFilm * ENV.terrain.wetMirror).toFixed(4)} * open;
   vec3 through_;
   envHazeSplit(world, through_, vAir);
-  vColour = colour * light * through_;
+  vColour = mix(colour * light, uEnvSkyLight, film) * through_;
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
 }`;
 

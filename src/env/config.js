@@ -137,6 +137,14 @@ export const ENV = {
     // mist shows no grain; a shaft 10 m off is softened by about a third of a metre, which mist's own
     // scattering of the light about does to a real one.
     shadeSpread: 0.3,
+    // How a falling drop or flake throws the sunlight it meets (particles.js): [share, g]. A drop or a crystal
+    // is many wavelengths across and diffracts and refracts most of its light forward, a lobe of asymmetry g
+    // (0.7 to 0.9 is the usual range given for cloud droplets and ice, approximate: 0.7); a crystal's faces
+    // also reflect light every way, and a flake drawn as a card stands for both. `share` of the light follows
+    // the lobe (Henyey-Greenstein, mean 1 over all directions), the rest goes evenly: by eye, so snow and rain
+    // shine against the sun's glow and stay white, dimmer, with the sun behind the eye (a lobe alone left them
+    // grey there).
+    flakeForward: [0.5, 0.7],
     // Looking up out of mist: the layer above the eye is `height` thick (e-folding), so the sky shows through
     // exp(-extinction x height / sin(elevation)): blue overhead, white at the horizon.
     // (No number here: it is the same integral as the land's haze taken to infinity.)
@@ -202,6 +210,13 @@ export const ENV = {
     // cards) that just reaches the ceiling, `warmth` moved from blue to red (0.02: 2 % each way). All by eye
     // against the two reference frames' tone ranges (their darkest 5 % under 0.13 of full scale, their median
     // near 0.3 to 0.4, measured from the files), and so that a fighter in shade is never under about 0.15.
+    // `hue`: how much of the curve is laid on the light as a whole (its brightness bent, its colour's proportions
+    // kept) rather than on each of red, green and blue apart (post.js envFilm). Bent channel by channel, a bright
+    // orange evening cloud had its red stop at the shoulder while green still rose, and came out mustard; the sky
+    // toward a low sun went olive and a face in the sun bleached grey. 1 is the whole, 0 film's own bend channel
+    // by channel; at 1 skin in the sun went ruddy. 0.7 by eye between, on the field's evening and the valley's
+    // close face (the frames' luminance is the same at every value: only colour moves).
+    hue: 0.7,
     grade: { ev: 0, contrast: 1.28, saturation: 1.06, white: 6, warmth: 0 },
   },
 
@@ -455,6 +470,15 @@ export const ENV = {
     // roughly half of dry), and takes a sheen of the sky at grazing angles.
     wetDarken: 0.58,
     wetSheen: 0.25,
+    // Wet leaves and blades: a film and beads of water over `wetFilm` of them (by eye, approximate), which
+    // mirror the sky over the leaf's own colour. Leaves and blades face every way, so what they mirror is the
+    // mean of water's Fresnel reflectance over the faces seen (Schlick's 0.02 + 0.98 (1 - cos)^5 averaged over
+    // a cosine-weighted hemisphere: 0.02 + 0.98 x 2 / 42 = 0.067, `wetMirror`, derived) of the sky's mean light.
+    // Under rain the sky is tens of times brighter than a dark leaf, so these few per cent double a dark
+    // conifer's light: a wet wood goes grey-green under a grey sky (grass.js, trees.js). (Taken by the crown's
+    // mass normal instead, a crown's edge mirrored the whole sky in white blotches.)
+    wetFilm: 0.6,
+    wetMirror: 0.02 + 0.98 * 2 / 42,
     // Water stands where the worn ground's hollows lie under this level (of a smooth noise, 0..1: under 0.4 is
     // about a third of the ground; by eye, against a trodden ring after rain: separate pools, not a sheet. With
     // every worn patch one pool and a sheen of 0.5 a rained-on floor was a single dark mirror).
@@ -540,6 +564,12 @@ export const ENV = {
 
   // ---- trees ----------------------------------------------------------------------------------------------------
   trees: {
+    // The sky the middle of the fought ground sees past the crowns round it (trees.js envSkySeen): `skyRays`
+    // [rings, sectors] of the hemisphere (14 x 36: the share settles to a hundredth, measured); `skyPast`, the
+    // share of the sky's light a crown lets through where a ray crosses it, its gaps between leaves and boughs
+    // (0.25 approximate, by eye: a wood's crowns seen from beneath show sky in about a quarter of their area).
+    skyRays: [14, 36],
+    skyPast: 0.25,
     // What grows no higher than this (m) is trodden through and stands on the fought ground as anywhere; a taller
     // plant, a bush or a tree would stand in the fight with no solid in the physics, and is kept off the level ground.
     underfoot: 0.4,
@@ -817,7 +847,8 @@ export const ENV_WEATHER = {
 //     texture or a function giving it (a light's is made at its first frame), bias: depth, left out 0.002 }.
 //     The air's walk and what falls through the air then take the place's walls and roofs for shade as they
 //     take crowns (air.js envPlaceSun). A map packed as three.js packs depth (not VSM).
-//   meter: { sky: the share of the sky its ground sees, frame: the share of a level frame that is sky }.
+//   meter: { sky: the share of the sky its ground sees (left out: worked out from its trees and hills, trees.js
+//   envSkySeen), frame: the share of a level frame that is sky }.
 // Its own materials take the haze, the wet and the snow through air.js envDress.
 export const ENV_PLACE_PLAIN = {
   weather: 'clear',
@@ -943,13 +974,12 @@ export const PLACE_ENV = {
     sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },
-    // The floor is a clearing some 16 m across each way in a wood 20 m tall: a solid wall of that height would
-    // leave its middle 0.4 to 0.6 of the sky's light (the cosine-weighted share above 40 to 50 degrees), and
-    // crowns pass some and the ride is open, so about three quarters (approximate). The meter is told, and
-    // opens up under a lid of cloud, where the fighters stood near black against a black wood. `frame`: the
+    // The floor is a clearing some 16 m across each way in a wood 20 m tall: what its middle sees of the sky is
+    // worked out from the crowns planted round it (trees.js envSkySeen: 0.735 here, where three quarters had
+    // been set by hand), and the meter opens up under a lid of cloud for it. `frame`: the
     // share of a level frame that is sky (ENV.tone.skyShare where a place does not say): none here, the wood
     // standing 40 to 50 degrees up all round, so a bright lid over it does not close the camera on the wood.
-    meter: { sky: 0.75, frame: 0 },
+    meter: { frame: 0 },
     terrain: {
       seed: 37,
       layers: [

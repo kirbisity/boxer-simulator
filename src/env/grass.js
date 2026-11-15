@@ -117,7 +117,9 @@ void main() {
   vec3 depth_ = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_;
   vec3 through_ = exp(-depth_);
   vLit = colour * sunLight * through_;
-  vBase = colour * skyLight * through_ + envAirlightIn(ray / max(distance_, 1e-3), envAirShare(cameraPosition, ray, depth_.g, mix(fract(sin(dot(xz, vec2(12.9898, 78.233))) * 43758.5453), 0.5, smoothstep(${ENV.grass.shadeOwn[0].toFixed(1)}, ${ENV.grass.shadeOwn[1].toFixed(1)}, distance_)), ${ENV.air.shadeSteps[2]})) * (1.0 - through_);
+  // Wet, the blades' film mirrors the sky over them (ENV.terrain.wetFilm), as much as the sky is open to them.
+  float film = uEnvWet.x * ${(ENV.terrain.wetFilm * ENV.terrain.wetMirror).toFixed(4)} * cover.x * bodies.z;
+  vBase = mix(colour * skyLight, uEnvSkyLight, film) * through_ + envAirlightIn(ray / max(distance_, 1e-3), envAirShare(cameraPosition, ray, depth_.g, mix(fract(sin(dot(xz, vec2(12.9898, 78.233))) * 43758.5453), 0.5, smoothstep(${ENV.grass.shadeOwn[0].toFixed(1)}, ${ENV.grass.shadeOwn[1].toFixed(1)}, distance_)), ${ENV.air.shadeSteps[2]})) * (1.0 - through_);
 
   envShadowCoords(world, vec3(0.0, 1.0, 0.0));
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);

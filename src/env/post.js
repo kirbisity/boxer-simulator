@@ -21,12 +21,12 @@ import { ENV_GLSL, envUniforms } from './air.js';
  * ground (a grey card, where neither the place's `meter`, the wet nor lying snow says otherwise) on the level sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
  * power as light), and `hazed`, the share of a view that is the haze's own light and not the land's.
  */
-export function envToneOf(air, weather, place) {
+export function envToneOf(air, weather, place, skySeen) {
   const tune = ENV.tone;
   const grade = { ...tune.grade, ...weather.grade };
   // What the place's ground sees of the sky (among walls less than all of it) and what it throws back: a grey
   // card's worth unless the place says, and moved toward snow's by the weather's lying snow.
-  const open = place?.meter?.sky ?? 1;
+  const open = skySeen ?? place?.meter?.sky ?? 1;
   const bare = place?.meter?.albedo ?? tune.grey;
   // (Wet, it throws back less: the same share the land's shader darkens it by.)
   const soaked = bare * (1 - (1 - ENV.terrain.wetDarken) * (weather.wet || 0));
@@ -93,7 +93,18 @@ vec3 envFilm(vec3 light, vec4 tone, vec2 grade) {
   light *= vec3(1.0 + grade.y, 1.0, 1.0 - grade.y);
   light = max(mix(vec3(dot(light, vec3(0.2126, 0.7152, 0.0722))), light, grade.x), 0.0);
   vec3 p = pow(light, vec3(tone.y));
-  return pow(tone.w * p / (p + tone.z), vec3(0.4545));
+  vec3 each = tone.w * p / (p + tone.z);
+  // The curve on the light as a whole (ENV.tone.hue): the brightness bent, the colour's proportions kept (raised
+  // to the curve's power, as the curve raises them in the middle tones), and a colour the display cannot hold
+  // let go toward white at its brightness rather than turned by its strongest channel stopping first.
+  float whole = dot(light, vec3(0.2126, 0.7152, 0.0722));
+  float bent = pow(whole, tone.y);
+  bent = tone.w * bent / (bent + tone.z);
+  vec3 part = pow(light / max(whole, 1e-6), vec3(tone.y));
+  vec3 kept = bent * part / max(dot(part, vec3(0.2126, 0.7152, 0.0722)), 1e-6);
+  float top = max(max(kept.r, kept.g), kept.b);
+  kept = mix(kept, vec3(bent), clamp((top - 1.0) / max(top - bent, 1e-4), 0.0, 1.0));
+  return pow(max(mix(each, kept, ${ENV.tone.hue.toFixed(2)}), 0.0), vec3(0.4545));
 }`;
 
 const ENV_POST_VERTEX = /* glsl */ `
