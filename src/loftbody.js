@@ -306,12 +306,13 @@ export const LOFT = {
   // towards the limb, `columns` faces across; laced lames each stand `tilt` (m) out at the head over the foot of the lame
   // above, `row` (m) tall where no laced tile gives the height.
   // Fitted to the body it is built on, it is laid `over` (m) off whatever is under it, giving by up to `give` (m out a m down) along its length (clearBoards).
-  // A coat's flap (studded cloth) is bound `bound` (m) deep round its edges.
+  // A coat's flap (studded cloth) is bound `bound` (m) deep round its edges. `hem`: the share of its length its sides fall
+  // short of its middle, the hem cut round between them as the fourth power of the way across, so the corners are rounded and the middle stays level (0: a straight hem, square corners).
   // Hakama worn long: how many times the leg's breadth above the knee it is at the knee, and (of that) at its hem.
   // Its pleats: `pleats` folds across the front of each leg, each standing `fold` of the leg's breadth out at its edge, the
   // first `shade` of each lying dark in the fold.
   hakama: { knee: 1.6, hem: 1.35, pleats: 3, fold: 0.24, shade: 0.34 },
-  board: { wide: 0.26, bow: 0.022, tilt: 0.012, row: 0.05, columns: 8, over: 0.012, give: 0.45, bound: 0.014 },
+  board: { wide: 0.26, bow: 0.022, tilt: 0.012, row: 0.05, columns: 8, over: 0.012, give: 0.45, bound: 0.014, hem: 0 },
   // A plate breastplate (`plate`, or a kit's `rigidBreastplate`: [waist, top]
   // up the trunk) is one rigid shell on the chest bone from its lower edge at
   // the waist to its top: the trunk under it, and whatever is worn between
@@ -1061,7 +1062,7 @@ function cumanLames() {
 
 // The shoulder guard of a Chinese coat of plates (披膊): a flap of the coat's own studded cloth, bound in its binding, hung from
 // the shoulder over the sleeve to above the elbow and bowed round the arm (boardOn).
-const SHOULDER_FLAP = { studded: 12, base: 'cloth', edge: 'cloth2', board: { wide: 0.25, bow: 0.06 } };
+const SHOULDER_FLAP = { studded: 12, base: 'cloth', edge: 'cloth2', board: { wide: 0.25, bow: 0.06, hem: 0.35 } };
 export const ARMOR_KINDS = {
   // Tosei gusoku: a solid cuirass of riveted horizontal steel lames, laced
   // skirt and sleeves, the war mask on the kabuto.
@@ -1868,14 +1869,17 @@ function boardOn(mesh, rings, outer, inflate, paint, tile = null, scale = 1) {
       const start = mesh.positions.length / 3;
       const grid = [0, 1].map((foot) => Array.from({ length: columns + 1 }, (_, column) => {
         const share = (column / columns) * 2 - 1;
-        const down = Math.min(length - bound, Math.max(bound, ((lame + foot) / lames) * length));
+        const reach = length * (1 - spec.hem * share ** 4);
+        const down = Math.min(reach - bound, Math.max(bound, ((lame + foot) / lames) * reach));
         const along = share * (half - bound);
         return point((down / length) * last, along, clear + lift + (foot || flap ? 0 : spec.tilt) - spec.bow * (along / half) ** 2);
       }));
       addGrid(mesh, rings, grid, role ?? (laced ? rows[0] : rows[lame % rows.length]), () => null);
       if (field && bound) {
         for (let index = 0; index < 2 * (columns + 1); index += 1) {
-          const down = Math.min(length - bound, Math.max(bound, ((lame + (index > columns ? 1 : 0)) / lames) * length));
+          const share = ((index % (columns + 1)) / columns) * 2 - 1;
+          const reach = length * (1 - spec.hem * share ** 4);
+          const down = Math.min(reach - bound, Math.max(bound, ((lame + (index > columns ? 1 : 0)) / lames) * reach));
           mesh.uvs.set(start + index, [field.band + (((index % (columns + 1)) / columns) * 2 * (half - bound)) / field.size[0], (length - down) / field.size[1]]);
         }
       }
@@ -3501,9 +3505,72 @@ function fitClothToBase(mesh, parts, armoured) {
   holdLegsUnderWaist(mesh, frames, shares);
   raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribPieces);
   keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured, pieceTop, ribPieces);
+  tuckCollars(mesh, frames, shares, pieceTop, ribPieces);
   // (A family body's belly is the model's own, not the loft's dome: the trunk's skin no piece lies over is found on the pieces
   // themselves, `open`. Under armour the skin is left out by the armour's own table, coverage.)
   if (mesh.base.family && !armoured) mesh.base.open = skinInTheOpen(mesh, 'trunk', frames, shares, nameOf, start, count);
+}
+
+/**
+ * A kit's collar (`ring.collar`: cloth or mail up the neck) worn with a coat closed at the neck lies under the coat as far up as
+ * the coat's top edge, raised up the trapezius (raiseCollars): each point of the collar below that edge, at its own place round,
+ * is drawn in to `LOFT.layers.margin` inside the coat's top band (between its top ring and the ring below) and left out of the
+ * draw (`mesh.underLayer`). The collar is a piece of the neck and the coat of the trunk, which keepLayersInside keeps apart, so
+ * the collar's foot stood over the coat on the trapezius as a plain patch down the back and a bib on the chest. (Not under a
+ * plate cuirass, `ribPieces`: a mail standard is worn over the breastplate's top.)
+ */
+function tuckCollars(mesh, frames, shares, pieceTop, ribPieces) {
+  const trunk = frames.trunk;
+  if (!trunk || !mesh.underLayer) return;
+  const placeOf = (vertex) => {
+    const rel = vec.sub(mesh.positions.slice(vertex * 3, vertex * 3 + 3), trunk.part.a);
+    const t = vec.dot(rel, trunk.axis) / trunk.length;
+    const out = vec.sub(rel, vec.scale(trunk.axis, t * trunk.length));
+    return { t, out, r: vec.length(out), angle: Math.atan2(vec.dot(out, trunk.widthAxis), vec.dot(out, trunk.depthAxis)) };
+  };
+  const collar = [];
+  const coats = new Map();
+  for (const [vertex, { ring, name }] of shares) {
+    if (name === 'neck' && ring.collar) collar.push(vertex);
+    if (name !== 'trunk' || ribPieces.has(ring.piece) || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk) continue;
+    let rings = coats.get(ring.piece);
+    if (!rings) coats.set(ring.piece, rings = new Map());
+    if (!rings.has(ring)) rings.set(ring, []);
+    rings.get(ring).push(vertex);
+  }
+  if (!collar.length || !coats.size) return;
+  // Each coat's top band: its top ring and the one below, as (t, r) by angle round the trunk.
+  const bands = [...coats.values()].map((rings) => {
+    const [top, below] = [...rings.keys()].sort((a, b) => b.t - a.t);
+    if (!below) return null;
+    const round = (ring) => rings.get(ring).map(placeOf).sort((a, b) => a.angle - b.angle);
+    return [round(top), round(below)];
+  }).filter(Boolean);
+  const atAngle = (round, angle) => {
+    let after = round.findIndex((place) => place.angle >= angle);
+    if (after < 0) after = 0;
+    const before = round[(after - 1 + round.length) % round.length];
+    const next = round[after];
+    const span = ((next.angle - before.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) || 1;
+    const share = (((angle - before.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2)) / span;
+    return { t: before.t + (next.t - before.t) * share, r: before.r + (next.r - before.r) * share };
+  };
+  for (const vertex of collar) {
+    const place = placeOf(vertex);
+    let inside = null;
+    for (const [top, below] of bands) {
+      const [edge, foot] = [atAngle(top, place.angle), atAngle(below, place.angle)];
+      if (place.t >= edge.t) continue;
+      const share = Math.min(1, Math.max(0, (place.t - foot.t) / ((edge.t - foot.t) || 1)));
+      const r = foot.r + (edge.r - foot.r) * share - LOFT.layers.margin;
+      inside = inside === null ? r : Math.max(inside, r);
+    }
+    if (inside === null) continue;
+    mesh.underLayer.add(vertex);
+    if (place.r <= inside) continue;
+    const point = vec.add(vec.add(trunk.part.a, vec.scale(trunk.axis, place.t * trunk.length)), vec.scale(place.out, inside / (place.r || 1)));
+    mesh.positions.splice(vertex * 3, 3, ...point);
+  }
 }
 
 /**
@@ -4658,6 +4725,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const mailMaps = kit?.collar === 'mail' && DETAIL_MAPS.on && !lowDetail ? { uv: mailUv(collarRings, 1) } : {};
     // (A plate gorget is stiff on the neck; a mail or cloth collar gives with it.)
     stiffen(mesh, collarRings, kit?.collar ? stiffnessOf(kit.collar) : 'plate');
+    // (A kit's collar goes under a coat closed at the neck as far up as the coat's top edge: tuckCollars.)
+    if (kit?.collar) for (const ring of collarRings) ring.collar = true;
     loft(mesh, collarRings, sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false, ...mailMaps });
   }
   // (Stiff as its paint is: one plate, or rows where it is painted in rows of plates and lacing.)
