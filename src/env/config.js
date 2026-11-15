@@ -382,6 +382,11 @@ export const ENV = {
     // clouds narrower by `taper` of the noise (a cloud's top is smaller than its base). By eye.
     deep: 700,
     levels: 3,
+    // Up close (the sheet nearer than `nearFrom` m along the sight line, fully by half that): a finer reading of
+    // the noise, `nearDetail[0]` times the sheet's scale (lumps of some 20 m at 1500 m), adding `nearDetail[1]` of
+    // the lumps' own share to the cloud's depth and as much to its grain. By eye overhead with a long lens.
+    nearFrom: 4000,
+    nearDetail: [4.3, 0.3],
     taper: 0.09,
     // The wind aloft is stronger than at the ground and the clouds ride it: this many times the ground wind
     // (approximate: the power-law profile u ~ z^0.14 over grass gives about 2 at 1500 m from 2 m; 2.5 by eye,
