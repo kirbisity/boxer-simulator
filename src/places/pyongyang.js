@@ -90,8 +90,10 @@ function pyOutside(x, z) {
   return pyFoot(z) * (1 + 0.5 * pySmooth(wall.x, -120, x)) + relief * free;
 }
 
-// (Where a walker comes in and where his column musters stand on the ground there: the strip is the land as it lies.)
-for (const at of [PYONGYANG_PLACE.start.at, PYONGYANG_PLACE.muster]) at[1] = pyOutside(at[0], at[2]);
+/** Where a walker comes in and where his column musters, stood on the ground there (the strip is the land as it lies). */
+const pyGrounded = () => {
+  for (const at of [PYONGYANG_PLACE.start.at, PYONGYANG_PLACE.muster]) at[1] = pyOutside(at[0], at[2]);
+};
 
 /** The ground's height inside the wall: the earth bank against it, the town's level beyond (the hill's slope in the north). */
 function pyInside(x, z) {
@@ -108,6 +110,7 @@ let pyPlanMade = null;
 /** The place laid out: its two fields of ground, the wall's nodes, the gate, the houses, trees and boulders. Seeded; made once. */
 export function pyongyangPlan() {
   if (pyPlanMade) return pyPlanMade;
+  pyGrounded();
   const t = PYONGYANG_PLACE;
   const wall = pyWall();
   const grid = (x0, x1, nu, z0, z1, height) => {
@@ -224,6 +227,7 @@ export function pyongyangSolids() {
 
 /** The place as a stage (levelmode/stage.js) to walk in: one section, nobody in it. */
 export function pyongyangStage() {
+  pyGrounded();
   const t = PYONGYANG_PLACE;
   return {
     id: 'pyongyang', title: 'The walls of Pyongyang', place: 'pyongyang',
