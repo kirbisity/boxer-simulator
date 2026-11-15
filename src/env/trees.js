@@ -11,54 +11,6 @@ import { envRandom } from './noise.js';
 import { envSunPast, envWoodsAt } from './terrain.js';
 
 /**
- * The share of the sky's light that reaches the middle of the fought ground (eye height over its middle) past the
- * crowns standing round it and the land's own horizon: the sky's cosine-weighted hemisphere (ENV.trees.skyRays
- * rings by sectors, each ring an equal share of the light on a level card), each ray dimmed by every crown it
- * passes through (an ellipsoid of the kind's `crown` proportions, letting ENV.trees.skyPast of the light through)
- * and stopped where the land stands above it. The camera's meter and the fighters' sky light take it
- * (index.js), where a place among walls says its own (`meter.sky`).
- */
-export function envSkySeen(trees, height) {
-  const [rings, sectors] = ENV.trees.skyRays;
-  const eye = [0, height(0, 0) + 1.6, 0];
-  const crowns = trees.filter((tree) => tree.height > ENV.trees.underfoot * 4).map((tree) => {
-    const crown = ENV_TREES[tree.kind].crown;
-    return { x: tree.x, y: tree.y + tree.height * crown.at, z: tree.z, wide: tree.height * crown.wide, tall: tree.height * crown.tall };
-  });
-  let sum = 0;
-  for (let ring = 0; ring < rings; ring += 1) {
-    // (Equal steps of sin^2 of the angle from the zenith are equal shares of the light on a level card.)
-    const across = Math.sqrt((ring + 0.5) / rings);
-    const up = Math.sqrt(1 - across * across);
-    for (let sector = 0; sector < sectors; sector += 1) {
-      const turn = ((sector + (ring % 2) * 0.5) / sectors) * 2 * Math.PI;
-      const dx = across * Math.cos(turn);
-      const dz = across * Math.sin(turn);
-      let past = 1;
-      for (let far = 40; far < 6000 && past > 0; far *= 1.6) {
-        if (height(eye[0] + dx * far / across, eye[2] + dz * far / across) > eye[1] + (up / across) * far) past = 0;
-      }
-      for (const c of crowns) {
-        if (past < 1e-3) break;
-        // The ray in the crown's own frame, where the crown is a unit sphere.
-        const ox = (eye[0] - c.x) / c.wide;
-        const oy = (eye[1] - c.y) / c.tall;
-        const oz = (eye[2] - c.z) / c.wide;
-        const rx = dx / c.wide;
-        const ry = up / c.tall;
-        const rz = dz / c.wide;
-        const a = rx * rx + ry * ry + rz * rz;
-        const b = ox * rx + oy * ry + oz * rz;
-        const k = ox * ox + oy * oy + oz * oz - 1;
-        if (b * b - a * k > 0 && (b < 0 || k < 0)) past *= ENV.trees.skyPast;
-      }
-      sum += past;
-    }
-  }
-  return sum / (rings * sectors);
-}
-
-/**
  * Where a place's trees stand: [{ kind, x, y, z, height, lit }], `lit` the sun reaching the crown past the hills.
  * `footprints` (things standing on the ground) and the flat ground are kept clear.
  */
@@ -466,11 +418,9 @@ void main() {
   vec3 light = uEnvSunColour * (facing * open + through) * sunShare + mix(uEnvBounce, uEnvSkyLight, 0.5 + 0.5 * normal.y) * open;
   vec3 colour = aTint.rgb * (1.0 - 0.15 * uEnvWet.x);
   colour = mix(colour, vec3(0.9, 0.92, 0.96), uEnvWet.y * smoothstep(0.1, 0.7, normal.y) * 0.7);
-  // Wet, the leaves' film mirrors the sky (ENV.terrain.wetFilm), as much as the sky is open to them there.
-  float film = uEnvWet.x * ${(ENV.terrain.wetFilm * ENV.terrain.wetMirror).toFixed(4)} * open;
   vec3 through_;
   envHazeSplit(world, through_, vAir);
-  vColour = mix(colour * light, uEnvSkyLight, film) * through_;
+  vColour = colour * light * through_;
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
 }`;
 
@@ -738,10 +688,8 @@ function envCrownMasses(kind, random) {
     const angle = limb * 2.39996 + random() * 0.9;
     // Low limbs reach furthest out; the ones that go up stay nearer the middle.
     const up = limb < 2 ? 0.55 + 0.3 * random() : random() * 1.1 - 0.5;
-    const [outLeast, outMost] = ENV.trees.clump.out;
-    const [sizeLeast, sizeMost] = ENV.trees.clump.size;
-    const out = (outLeast + (outMost - outLeast) * random()) * Math.sqrt(Math.max(0.15, 1 - up * up * 0.9));
-    const radius = (sizeLeast + (sizeMost - sizeLeast) * random()) * (limb < 2 ? 1.15 : 1);
+    const out = (0.32 + 0.4 * random()) * Math.sqrt(Math.max(0.15, 1 - up * up * 0.9));
+    const radius = (0.36 + 0.24 * random()) * (limb < 2 ? 1.15 : 1);
     masses.push({ x: Math.cos(angle) * out * crown.wide, y: crown.at + up * crown.tall * 0.62, z: Math.sin(angle) * out * crown.wide, radius: radius * crown.wide, flat: 0.8, from: [0, fork * (0.8 + 0.3 * random()), 0] });
   }
   return masses;
@@ -753,27 +701,20 @@ function envCrownPoint(kind, random, masses, out) {
   const mass = masses[Math.floor(random() * masses.length)];
   if (kind.shape === 'boughs') {
     // Along the bough from the trunk to its tip, fanning wider as it goes, drooping a little.
-    const t = 0.05 + 0.95 * Math.sqrt(random());
-    const side = (random() - 0.5) * ENV.trees.bough.fan * t;
+    const t = 0.15 + 0.85 * Math.sqrt(random());
+    const side = (random() - 0.5) * 0.7 * t;
     const length = Math.hypot(mass.x, mass.z) || 1e-3;
     const ax = mass.x / length;
     const az = mass.z / length;
     out[0] = (ax * t - az * side) * length;
-    const below = random() - 0.5;
-    out[1] = mass.from[1] + (mass.y - mass.from[1]) * t * t + below * mass.radius * mass.flat;
+    out[1] = mass.from[1] + (mass.y - mass.from[1]) * t * t + (random() - 0.5) * mass.radius * mass.flat;
     out[2] = (az * t + ax * side) * length;
-    // A spray faces up and out from its own bough, each a little its own way: lit spray by spray, not the
-    // bough as one slab; the sprays under the bough are in its shade (ENV.trees.bough).
-    // (Its own way from values already drawn, so the wood's other draws stay where they were.)
-    const turn = ((((side * 13.7 + t * 7.1) % 1) + 1) % 1 - 0.5) * ENV.trees.bough.vary;
     const lift = 0.9;
-    const bx = ax * Math.cos(turn) - az * Math.sin(turn);
-    const bz = az * Math.cos(turn) + ax * Math.sin(turn);
     const norm = Math.hypot(1, lift);
-    out[3] = bx / norm;
+    out[3] = ax / norm;
     out[4] = lift / norm;
-    out[5] = bz / norm;
-    out[6] = (0.35 + 0.65 * t) * (1 - ENV.trees.bough.under * Math.max(0, -below * 2));
+    out[5] = az / norm;
+    out[6] = 0.35 + 0.65 * t;
     return out;
   }
   // On the outside of the mass.
@@ -793,16 +734,14 @@ function envCrownPoint(kind, random, masses, out) {
   const py = (out[1] - crown.at) / crown.tall;
   const pz = out[2] / crown.wide;
   const whole = Math.hypot(px, py, pz) || 1;
-  const own = ENV.trees.clump.own;
-  const fx = nx * own + (px / whole) * (1 - own);
-  const fy = ny * own + (py / whole) * (1 - own);
-  const fz = nz * own + (pz / whole) * (1 - own);
+  const fx = nx * 0.45 + (px / whole) * 0.55;
+  const fy = ny * 0.45 + (py / whole) * 0.55;
+  const fz = nz * 0.45 + (pz / whole) * 0.55;
   const facing = Math.hypot(fx, fy, fz) || 1;
   out[3] = fx / facing;
   out[4] = fy / facing;
   out[5] = fz / facing;
-  // (Deep in the crown as a whole, and on its own mass's far side from the sky: a bough's underside is in its own shade.)
-  out[6] = Math.min(1, 0.25 + 0.75 * whole) * (0.55 + 0.45 * shell) * (1 - ENV.trees.clump.under * Math.max(0, -ny));
+  out[6] = Math.min(1, 0.25 + 0.75 * whole) * (0.55 + 0.45 * shell);
   // A plant of the ground has no inside: every leaf of it lies open to the sky, its face up and a little out, the
   // lowest ones under the others. (Shaded as a crown's underside they stood as black cut-outs in lit grass.)
   if (kind.shape === 'tuft') {
@@ -871,7 +810,7 @@ export function envBuildTrees({ place, trees }) {
         aCard[at] = point[0] * tree.height;
         aCard[at + 1] = point[1] * tree.height;
         aCard[at + 2] = point[2] * tree.height;
-        aCard[at + 3] = kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5) * (kind.shape === 'boughs' && order < 2 ? ENV.trees.bough.near : 1);
+        aCard[at + 3] = kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5);
         aShell[at] = point[3];
         aShell[at + 1] = point[4];
         aShell[at + 2] = point[5];

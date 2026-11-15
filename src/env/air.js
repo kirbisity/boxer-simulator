@@ -6,8 +6,8 @@
 
 /* global THREE */
 
-import { ENV, ENV_WEATHER } from './config.js';
-import { ENV_NOISE_CELLS, envNoiseTexture } from './noise.js';
+import { ENV } from './config.js';
+import { envNoiseTexture } from './noise.js';
 import { ENV_GLSL_FILM, envToneOf } from './post.js';
 
 const ENV_DEG = Math.PI / 180;
@@ -424,19 +424,6 @@ float envSunShare(vec3 world) {
   return 1.0 - uEnvCloud.y * smoothstep(edge - 0.12, edge + 0.16, broad * 0.68 + 0.16);
 }
 
-// The same with the cloud's small lumps (the octave the sky draws, envCloudDepth) laid on the broad masses by
-// \`fine\` (0..1) and the edge as sharp as the sky draws it: what a sight line toward the sun meets, where a stretch of
-// it reads one place of the sheet and the gaps between lumps stand as rays (envAirWalk).
-float envSunShareFine(vec3 world, float fine) {
-  if (uEnvCloud.y <= 0.0) return 1.0;
-  if (fine < 0.01) return envSunShare(world);
-  vec2 sheet = envCloudOver(world);
-  float broad = envCloudBroad(sheet);
-  float lumps = texture2D(uEnvNoise, sheet * 0.53 + vec2(0.37, 0.11) + broad * 0.12).a;
-  float depth = broad * 0.68 + 0.16 + (lumps - 0.5) * uEnvCloudForm.x * fine - mix(0.74, 0.26, uEnvCloud.x);
-  return 1.0 - uEnvCloud.y * smoothstep(mix(-0.12, -0.07 * uEnvCloudForm.z, fine), mix(0.16, 0.11 * uEnvCloudForm.z, fine), depth);
-}
-
 // What stands over the ground (terrain.js envBuildNearMap's cover), read as made (level 0) or as the mean over
 // a round 2^level texels across: the texture's own smaller copies. (Before WebGL 2 a shader cannot ask for one.)
 vec4 envCoverRead(vec2 at, float level) {
@@ -513,15 +500,11 @@ float envPlaceSun(vec3 point) {
 // point drawn that share of the way to the eye: in clear air each point's own cloud (the rays under a broken
 // sky), in mist, where all that is seen stands within a stone's throw, one shade for the view. (Read at the
 // point, a cloud's shadow stood in a low sun's mist as a seam, bright air one side and dark the other.)
-float envAirSunFine(vec3 point, vec3 eye, float spread, float fine) {
+float envAirSunOver(vec3 point, vec3 eye, float spread) {
   // (Over the cloud sheet nothing shades it.)
   if (point.y >= uEnvCloud.w) return 1.0;
   vec3 past = envSunwardOver(point, spread);
-  return envSunShareFine(mix(point, eye, uEnvCloudForm.w), fine) * past.x * past.y * past.z * envPlaceSun(point);
-}
-
-float envAirSunOver(vec3 point, vec3 eye, float spread) {
-  return envAirSunFine(point, eye, spread, 0.0);
+  return envSunShare(mix(point, eye, uEnvCloudForm.w)) * past.x * past.y * past.z * envPlaceSun(point);
 }
 
 float envAirSun(vec3 point) {
@@ -556,24 +539,15 @@ float envAirWalk(vec3 from, vec3 ray, float depth, float grain, int steps) {
   float level = length(uEnvSunDir.xz);
   vec2 lean = uEnvSunDir.xz / max(level, 1e-4) * min(${ENV.shadow.slantMost.toFixed(1)}, level / max(uEnvSunDir.y, 1e-3));
   float crossed = length(ray.xz - lean * ray.y) / float(count) * ${(ENV.air.shadeSpread * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)).toFixed(4)};
-  // The cloud is read where each point's sun ray meets the sheet, and a step's stretch of the line moves that
-  // place over the sheet by its run across the sun's rays (seen from the sheet): toward the sun hardly at all, so
-  // the cloud's small lumps (one lattice cell of the noise
-  // envCloudDepth reads at 0.53 of the sheet: ENV.clouds.scale / (0.53 x 16), 177 m) and the gaps between them stay told apart and draw rays;
-  // across the rays a stretch spans many lumps and only the broad masses are left. Light the haze has thrown wide
-  // comes from a wide round (uEnvCloudForm.w) and keeps none of them.
-  vec2 slant = uEnvSunDir.xz / max(uEnvSunDir.y, 0.12);
-  float sheetRun = length(ray.xz - slant * ray.y) / float(count) / ${(ENV.clouds.scale / (0.53 * ENV_NOISE_CELLS)).toFixed(1)};
   float sum = 0.0;
-  for (int i = 0; i < ${Math.max(ENV.air.shadeSteps[0], ...Object.values(ENV.quality).map((tier) => tier.airSteps ?? 0))}; i++) {
+  for (int i = 0; i < ${Math.max(ENV.air.shadeSteps[0], ENV.air.frameSteps)}; i++) {
     if (i >= count) break;
     float u = (float(i) + grain) / float(count);
     float along = depth > 1e-3 ? -log(1.0 - u * gone) / depth : u;
     if (abs(high - low) > 1e-3) along = (-log(max(mix(lowThin, highThin, along), 1e-6)) - low) / (high - low);
     // (The step's stretch of the line: along's rate of change with u, a share 1 / count of it.)
     float stretch = depth > 1e-3 ? gone / (depth * max(1.0 - u * gone, 1e-3)) : 1.0;
-    float fine = (1.0 - uEnvCloudForm.w) * clamp(1.0 - sheetRun * stretch, 0.0, 1.0);
-    sum += envAirSunFine(from + ray * along, from, log2(max(crossed * stretch, 1.0)), fine);
+    sum += envAirSunOver(from + ray * along, from, log2(max(crossed * stretch, 1.0)));
   }
   return sum / float(count);
 }
@@ -686,56 +660,14 @@ let envToneInstalled = false;
 export function envInstallTone() {
   if (envToneInstalled) return;
   envToneInstalled = true;
-  // Every grade the weathers known now carry, each compiled in once: the renderer hands its materials one number
-  // (the exposure), so the grade in force rides on it as a whole multiple of ENV_TONE_SLOT (envToneId), and a
-  // weather made later takes the grade of the weather it was made from.
-  envToneGrades.length = 0;
-  envToneIds.clear();
-  envToneGradeId(ENV.tone.grade);
-  for (const weather of Object.values(ENV_WEATHER)) envToneGradeId({ ...ENV.tone.grade, ...weather.grade });
-  const neutral = { sunColour: [1, 1, 1], sun: [0, 1, 0], skyLight: [0, 0, 0], extinction: 0 };
-  const call = (grade) => {
-    const tone = envToneOf(neutral, { grade });
-    return `envFilm( light, vec4( 1.0, ${tone.contrast.toFixed(3)}, ${tone.sigma.toFixed(4)}, ${tone.gain.toFixed(4)} ), vec2( ${tone.saturation.toFixed(3)}, ${tone.warmth.toFixed(3)} ) )`;
-  };
-  const cases = envToneGrades.slice(1).map((grade, at) => `    if ( id == ${at + 1} ) return ${call(grade)};`).join('\n');
+  const tone = envToneOf({ sunColour: [1, 1, 1], sun: [0, 1, 0], skyLight: [0, 0, 0], extinction: 0 }, {});
   const curve = `${ENV_GLSL_FILM}
   vec3 CustomToneMapping( vec3 color ) {
     if ( toneMappingExposure < 0.0 ) return color;
-    float slot = floor( toneMappingExposure / ${ENV_TONE_SLOT.toFixed(1)} );
-    int id = int( slot + 0.5 );
-    vec3 light = pow( max( color, 0.0 ), vec3( 2.2 ) ) * ( toneMappingExposure - slot * ${ENV_TONE_SLOT.toFixed(1)} );
-${cases}
-    return ${call(envToneGrades[0])};
+    return envFilm( pow( max( color, 0.0 ), vec3( 2.2 ) ) * toneMappingExposure, vec4( 1.0, ${tone.contrast.toFixed(3)}, ${tone.sigma.toFixed(4)}, ${tone.gain.toFixed(4)} ), vec2( ${tone.saturation.toFixed(3)}, ${tone.warmth.toFixed(3)} ) );
   }`;
   const chunk = THREE.ShaderChunk.tonemapping_pars_fragment;
   const replaced = chunk.replace(/vec3 CustomToneMapping\s*\(\s*vec3 color\s*\)\s*\{[^}]*\}/, curve);
   if (replaced === chunk) console.warn('env: the renderer has no CustomToneMapping to replace; the picture will be flat');
   THREE.ShaderChunk.tonemapping_pars_fragment = replaced;
-}
-
-// (The exposure stays well under a slot: a metered exposure runs to about 20, and a float keeps it to a
-// thousandth at ten slots up.)
-const ENV_TONE_SLOT = 1024;
-const envToneGrades = [];
-const envToneIds = new Map();
-function envToneGradeId(grade) {
-  const key = JSON.stringify(['ev', 'contrast', 'saturation', 'white', 'warmth'].map((name) => grade[name]));
-  if (!envToneIds.has(key)) {
-    envToneIds.set(key, envToneGrades.length);
-    envToneGrades.push(grade);
-  }
-  return envToneIds.get(key);
-}
-
-/**
- * The renderer's exposure for the tier without passes: the metered exposure with the weather's grade riding on it
- * (envInstallTone). A grade not compiled in (a weather made after the first place was shown) is the grade of the
- * weather it was made from, or the default.
- */
-export function envToneExposure(exposure, weather) {
-  const key = (grade) => JSON.stringify(['ev', 'contrast', 'saturation', 'white', 'warmth'].map((name) => ({ ...ENV.tone.grade, ...grade })[name]));
-  let id = envToneIds.get(key(weather?.grade));
-  if (id === undefined && weather?.madeFrom) id = envToneIds.get(key(ENV_WEATHER[weather.madeFrom]?.grade));
-  return exposure + (id ?? 0) * ENV_TONE_SLOT;
 }

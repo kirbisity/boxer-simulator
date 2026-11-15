@@ -25,12 +25,12 @@
 /* global THREE */
 
 import { ENV, ENV_PLACE_PLAIN, ENV_TREES, ENV_WEATHER, PLACE_ENV } from './config.js';
-import { envAirState, envAirToUniforms, envInstallTone, envSkyAt, envSunWay, envToneExposure, envUniforms } from './air.js';
+import { envAirState, envAirToUniforms, envInstallTone, envSkyAt, envSunWay, envUniforms } from './air.js';
 import { envNoiseAt } from './noise.js';
 import { envBuildSky } from './sky.js';
 import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, envSunPast } from './terrain.js';
 import { envBuildGrass, envGrassQuality } from './grass.js';
-import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envSkySeen, envTreeShadows, envTreesQuality } from './trees.js';
+import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { envPressForget, envPressStep } from './press.js';
@@ -96,7 +96,7 @@ export function envRegisterPlace(name, description) {
 
 /** A weather of a place's own: `values` laid over the ENV_WEATHER entry `over` (a town's damp morning over 'mist'). */
 export function envRegisterWeather(name, over, values) {
-  ENV_WEATHER[name] = { ...ENV_WEATHER[over], ...values, madeFrom: over };
+  ENV_WEATHER[name] = { ...ENV_WEATHER[over], ...values };
   return ENV_WEATHER[name];
 }
 
@@ -213,7 +213,6 @@ function envFill(group, place, view, spec, own) {
   // (The land the camera is kept above: render.js groundHeightAt reads a place's child that carries `heightAt`.)
   group.userData.heightAt = height;
   group.userData.envMap = map.value;
-  group.userData.envSkySeen = envSkySeen(trees, height);
   // Where the near crowns begin and where a point is over most of them (m over the ground): between the two the
   // near map stops telling what shades the air (air.js envSunward). A quarter of them begin below the first.
   const near = trees.filter((tree) => tree.height > 4 && Math.abs(tree.x) < ENV.terrain.mapHalf && Math.abs(tree.z) < ENV.terrain.mapHalf);
@@ -251,9 +250,7 @@ export function envApply({ place, view, spec, group }) {
   const st = view.lookState?.['probe-lite'];
 
   // The frame ends as a camera's does (post.js), here only (looks.js resets the renderer when the place is lit again).
-  // (What the fought ground sees of the sky: a place among walls says; else as its crowns and hills leave it.)
-  const skySeen = own.meter?.sky ?? group.userData.envSkySeen ?? 1;
-  const tone = envToneOf(air, weather, own, skySeen);
+  const tone = envToneOf(air, weather, own);
   envInstallTone();
   envInstallShadow();
   setRenderer(view, { toneMapping: THREE.CustomToneMapping });
@@ -268,10 +265,10 @@ export function envApply({ place, view, spec, group }) {
   if (st?.probe) view.scene.remove(st.probe);
   const probe = view.env?.probe ?? new THREE.LightProbe();
   probeLiteProject(probe.sh, (x, y, z, out) => envSkyAt(air, x, y, z, out));
-  // (Among walls or crowns the floor sees less than all of the sky, and so does who stands there: the share the
-  // meter takes, above. With the whole sky on them and the camera opened for less of it, skin in the valley's
-  // clearing stood a third of a stop over the land round it and washed out.)
-  probe.intensity = skySeen;
+  // (Among walls the floor sees less than all of it, and so does who stands there: the share the meter is told
+  // of, config.js `meter.sky`. With the whole sky on them and the camera opened for three quarters of it, skin
+  // in the valley's clearing stood a third of a stop over the land round it and washed out.)
+  probe.intensity = own.meter?.sky ?? 1;
   view.scene.add(probe);
 
   // The sun on the fighters and what stands on the floor: the colour the land is lit with, cut by what the hills
@@ -359,9 +356,8 @@ function envDraw(view) {
   if (!state?.on) return false;
   const level = ENV.quality[envChosen.tier].post;
   envUniforms().uEnvExposure.value = envMeter(state.tone, state.air, envLookWay.x, envLookWay.z);
-  if (level > 0 && envPostDraw(view, state.tone, level, state.shafts, state.airWalk === 'frame' ? ENV.quality[envChosen.tier] : null)) return true;
-  // (Without the passes the weather's grade rides on the exposure: air.js envToneExposure.)
-  view.renderer.toneMappingExposure = envToneExposure(state.tone.exposure, state.weather);
+  if (level > 0 && envPostDraw(view, state.tone, level, state.shafts, state.airWalk === 'frame')) return true;
+  view.renderer.toneMappingExposure = state.tone.exposure;
   return false;
 }
 
@@ -504,14 +500,7 @@ export function envUpdate(view, world, lead = null) {
   envLookWay ??= new THREE.Vector3();
   view.camera.getWorldDirection(envLookWay);
   u.uEnvLook.value.set(envLookWay.x, envLookWay.z);
-  // The cloud's shade on the fight. Where the tier draws the cloud's shadow over the land (ENV.quality
-  // `cloudShadow`) each surface reads its own; where it does not, the sun on everything is cut by the share over
-  // the fight, once a frame (the same shade, read at one place: without it the low tier lit a place under heavy
-  // cloud as if the sun were out, half again as bright as the tiers above).
-  const cloudShade = envCloudShareAt(state.air, wind.x * aloft, wind.z * aloft, ENV.clouds.shadow * (1 - state.air.lid));
-  view.lights.sun.intensity = state.sunPower * cloudShade;
-  const sunOnAll = ENV.quality[envChosen.tier].cloudShadow ? 1 : cloudShade;
-  u.uEnvSunColour.value.set(state.air.sunColour[0] * sunOnAll, state.air.sunColour[1] * sunOnAll, state.air.sunColour[2] * sunOnAll);
+  view.lights.sun.intensity = state.sunPower * envCloudShareAt(state.air, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y);
   const own = state.own;
   const parts = state.group.userData.envParts;
   const eye = view.camera.position;
@@ -542,9 +531,7 @@ export function envUpdate(view, world, lead = null) {
   view.scene.fog.density = Math.sqrt(extinction / ENV.air.fogMatch);
   // Shade in the air before the camera: the light of the fog on what the renderer hazes (fighters, props), the
   // meter's count of the air's light, and the frame's one share where sight lines are not walked.
-  // (The cloud's own strength, not the tier's: a tier that draws no cloud shadow on the land still has the frame's
-  // one share of shade in the air.)
-  const airShare = envAirShareAt(state, eye, envLookWay, wind.x * aloft, wind.z * aloft, ENV.clouds.shadow * (1 - state.air.lid), extinction);
+  const airShare = envAirShareAt(state, eye, envLookWay, wind.x * aloft, wind.z * aloft, u.uEnvCloud.value.y, extinction);
   state.airShare = state.tone.airShare = airShare;
   // (Where each line is walked: in the frame's own pass where it can be drawn through passes, which then takes
   // the shade's light off everything, the fighters' fog with the rest, post.js; else in the materials.)
