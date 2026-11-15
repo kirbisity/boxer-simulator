@@ -1362,7 +1362,7 @@ function drawWorld(dt, drawIt = true) {
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
   updateClothWind(scene, world);
-  envUpdate(scene, world);
+  envUpdate(scene, world, state.mode === 'play' ? player() : null);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
   placeLockRing();
