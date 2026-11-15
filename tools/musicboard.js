@@ -1,10 +1,10 @@
 // The music board: one self-contained page that plays every piece of music the game has, each with where it plays, how it was made and
 // how long it runs, to be heard one by one when choosing what to replace. "Play as in game" runs the game's own player (audio/music.js,
 // put in the page as it is, as tools/soundboard.js does with the effects): an opening looped and faded after its while, a boss cue looped
-// until stopped, a victory or defeat once, and a change of cue cross-faded. The cues are embedded as base64, as in the game.
+// until stopped, a victory or defeat once, and a change of cue cross-faded. The pieces are files beside the page (assets/music, copied there), the stings embedded as base64, as in the game.
 // Usage: node tools/musicboard.js [out.html] (default dist/music-board.html); npm run bundle:music.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import vm from 'node:vm';
 import { BOSS_MUSIC, MUSIC_CUES, SCENE_MUSIC } from '../src/audio/music/manifest.js';
@@ -94,22 +94,24 @@ const openingRule = `At the start of a battle or stage: faded in, looped for its
 /** Each cue: its card's facts, and how "Play as in game" plays it (a moment and a scene for the game's player). */
 function describe(id) {
   const cue = MUSIC_CUES[id];
-  const bytes = Buffer.from(cue.data, 'base64');
+  const bytes = cue.file ? readFileSync(cue.file) : Buffer.from(cue.data, 'base64');
   const length = mp3Length(bytes);
-  const prompt = PROMPTS.cues[id];
-  const made = prompt
+  const prompt = cue.file ? null : PROMPTS.cues[id];
+  const made = cue.file
+    ? { kind: 'Supplied recording', text: `A supplied piece (${cue.file}), converted from Opus to MP3; fetched when its scene first wants it.`, prompt: null, details: null }
+    : prompt
     ? { kind: 'Generated file', text: `Rendered offline with ACE-Step 1.5 (tools/music-prompts.json; seed ${promptTake(id) ?? 'n/a'}, the better take kept), embedded as MP3.`, prompt: `${prompt.prompt}${PROMPTS.common.suffix}`, details: `${prompt.bpm} bpm, ${prompt.key}` }
     : { kind: 'Supplied recording', text: 'A finished track added by hand (data/bosschoir.js), not from the generator; embedded as MP3.', prompt: null, details: null };
   const base = {
     id, made, loop: cue.loop, loopStart: cue.loopStart, loopEnd: cue.loopEnd, gain: cue.gain,
-    seconds: length.seconds, kbps: length.kbps, rate: length.rate, bytes: bytes.length, embedded: cue.data.length,
+    seconds: length.seconds, kbps: length.kbps, rate: length.rate, bytes: bytes.length, embedded: cue.data?.length ?? 0, file: cue.file ?? null, name: cue.title ?? null,
   };
   if (id === 'boss' || id === 'bossChoir') {
     const scenes = Object.entries(BOSS_MUSIC).filter(([, cue]) => cue === id).map(([scene]) => scene);
     const where = id === 'boss'
       ? [['Level Mode', 'any boss fight whose stage has no boss track of its own. Today that is only the test yard\'s boss dummy, reached only by the test hook boxer.levelMode(), so it is not heard in normal play (every Dunnottar boss has the choir)']]
       : [['Level Mode', `the boss fight of ${scenes.map(stageTitle).join(', ')} (from the moment his room is sealed or his bar shows)`]];
-    return { ...base, title: id === 'boss' ? 'Boss fight (generic)' : 'Dunnottar boss choir', used: id !== 'boss', tag: id === 'boss' ? 'Test only' : null, play: { moment: 'boss', scene: id === 'boss' ? 'yard' : scenes[0] }, where,
+    return { ...base, title: id === 'boss' ? `${cue.title ?? 'Boss fight'} (any boss without a track)` : 'Dunnottar boss choir', used: id !== 'boss', tag: id === 'boss' ? 'Test only' : null, play: { moment: 'boss', scene: id === 'boss' ? 'yard' : scenes[0] }, where,
       rule: `Loops while the boss fight is on; cross-faded in over ${MUSIC.fade} s from whatever played before.` };
   }
   if (id === 'victory' || id === 'defeat') {
@@ -118,7 +120,7 @@ function describe(id) {
       rule: 'Played once, not looped.' };
   }
   const { scenes, lines } = openingPlaces(id);
-  return { ...base, title: `${id[0].toUpperCase()}${id.slice(1)} opening`, used: lines.some(([label]) => label !== 'Mapped, not reached now'), play: { moment: 'opening', scene: scenes[0] }, where: lines, rule: openingRule };
+  return { ...base, title: cue.title ?? `${id[0].toUpperCase()}${id.slice(1)} opening`, used: lines.some(([label]) => label !== 'Mapped, not reached now'), play: { moment: 'opening', scene: scenes[0] }, where: lines, rule: openingRule };
 }
 
 /** The seed tools/music-convert.py kept for a cue, if it says. */
@@ -184,7 +186,7 @@ function board(DATA) {
     return ctx;
   }
   function buffer(id) {
-    if (!buffers.has(id)) buffers.set(id, ctx.decodeAudioData(bytesOf(MUSIC_CUES[id].data)));
+    if (!buffers.has(id)) buffers.set(id, (MUSIC_CUES[id].file ? fetch(MUSIC_CUES[id].file).then((response) => response.arrayBuffer()) : Promise.resolve(bytesOf(MUSIC_CUES[id].data))).then((bytes) => ctx.decodeAudioData(bytes)));
     return buffers.get(id);
   }
   function stopRaw(fade = 0.3) {
@@ -277,7 +279,7 @@ function board(DATA) {
       ['Made', `${cue.made.kind}. ${cue.made.text}`],
       ['Length', cue.seconds ? `${clock(cue.seconds)} file (${cue.seconds.toFixed(1)} s), ${cue.loop ? `looped ${cue.loopStart.toFixed(2)}-${cue.loopEnd.toFixed(2)} s (${(cue.loopEnd - cue.loopStart).toFixed(1)} s loop)` : 'played once'}` : 'a second or two'],
     ];
-    if (cue.bytes) rows.push(['File', `${cue.kbps} kbps, ${cue.rate / 1000} kHz, ${sizeOf(cue.bytes)} (${sizeOf(cue.embedded)} as base64 in the game); level ×${cue.gain.toFixed(2)}`]);
+    if (cue.bytes) rows.push(['File', `${cue.kbps} kbps, ${cue.rate / 1000} kHz, ${sizeOf(cue.bytes)} (${cue.file ? `${cue.file}, fetched` : `${sizeOf(cue.embedded)} as base64 in the game`}); level ×${cue.gain.toFixed(2)}`]);
     if (cue.made.details) rows.push(['Prompt', `${cue.made.details}. "${cue.made.prompt}"`]);
     rows.push(['In game', cue.rule]);
     return make('dl', { className: 'facts' }, ...rows.flatMap(([term, text]) => [make('dt', { textContent: term }), make('dd', { textContent: text })]));
@@ -382,5 +384,10 @@ new vm.Script(script);
 if (/<\/script/i.test(script)) throw new Error('a closing script tag inside the code');
 const page = `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<title>HACS Music Board</title>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<meta name="description" content="Every piece of music in HACS, with where it plays and how it was made.">\n<style>${STYLE}</style>\n</head>\n<body>\n${MARKUP}\n<script>\n${script}</script>\n</body>\n</html>\n`;
 mkdirSync(dirname(out), { recursive: true });
+// The pieces beside the page, at the paths the cues name (a published board takes them as its files).
 writeFileSync(out, page);
+for (const file of new Set(Object.values(MUSIC_CUES).filter((cue) => cue.file).map((cue) => cue.file))) {
+  mkdirSync(dirname(`${dirname(out)}/${file}`), { recursive: true });
+  copyFileSync(file, `${dirname(out)}/${file}`);
+}
 console.log(`${out}: ${(page.length / 1e6).toFixed(2)} MB (${page.length} bytes), ${CUES.length} cues and ${STINGS.length} stings`);

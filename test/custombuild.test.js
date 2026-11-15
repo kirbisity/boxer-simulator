@@ -21,7 +21,7 @@ const importsOf = (name) => [...sourceOf(name).matchAll(/^import \{([^}]*)\} fro
 
 test('the custom plan leaves out level mode, The Last Gate, the intro, the tutorial, the menus and the music', () => {
   const left = new Set([...plan.excluded, ...plan.stubbed]);
-  for (const name of ['menu', 'intro', 'tutorial', 'lastgate', 'lastgateview', 'levelmode/level', 'levelmode/stage', 'levelmode/storm', 'levelmode/stormsky-data', 'levelmode/stages/dunnottar', 'levelmode/kit', 'levelmode/story', 'levelmode/hud', 'audio/music/data/roman', 'audio/music/data/bosschoir']) assert.ok(left.has(name), `${name} is in the custom page`);
+  for (const name of ['menu', 'intro', 'tutorial', 'lastgate', 'lastgateview', 'levelmode/level', 'levelmode/stage', 'levelmode/storm', 'levelmode/stormsky-data', 'levelmode/stages/dunnottar', 'levelmode/kit', 'levelmode/story', 'levelmode/hud', 'audio/music/data/victory', 'audio/music/data/bosschoir']) assert.ok(left.has(name), `${name} is in the custom page`);
   // What the fights use is kept whole: the physics, the AI, the fire, the builder's presets, the sound effects, the faces.
   for (const name of ['physics', 'ai', 'physics/flame', 'flameview', 'outfits', 'weapons', 'roster', 'levelmode/presets', 'levelmode/water', 'audio/samples', 'audio/engine', 'photoface', 'main']) {
     assert.ok(plan.modules.includes(name), `${name} is not in the custom page`);
@@ -51,7 +51,7 @@ test('the custom page is one file under its budget, without the music, the storm
   assert.doesNotMatch(page, /sourceMappingURL/);
   // (Long strings survive minifying whole: a piece of each is enough to find it.)
   const piece = (base64) => base64.slice(2000, 2200);
-  for (const cue of Object.values(MUSIC_CUES)) assert.ok(!page.includes(piece(cue.data)), 'a music cue is in the custom page');
+  for (const cue of Object.values(MUSIC_CUES)) assert.ok(cue.file ? !page.includes(cue.file) : !page.includes(piece(cue.data)), 'a music cue is in the custom page');
   for (const photo of Object.values(STORM_SKY_DATA)) if (photo.jpeg) assert.ok(!page.includes(piece(photo.jpeg)), 'a storm-sky photo is in the custom page');
   for (const [name, tile] of Object.entries(DETAIL_MAP_DATA)) {
     const data = JSON.stringify(tile).match(/"([A-Za-z0-9+/=]{4000,})"/)[1];
