@@ -46,10 +46,15 @@ export const TC = {
         }
         // The commanders' crowns (generalmark.js, sprites sized once at boot) shrunk to nothing on a cutscene.
         if (window.TC.noCrowns) scene.traverse((o) => { if (o.isSprite && Math.abs(o.scale.x - 0.035) < 1e-6) o.scale.setScalar(1e-6); });
+        // (The game's resolution keeps pulling the ratio back to its cap of 2: the full device ratio, every frame.)
+        if (renderer.getPixelRatio() !== window.devicePixelRatio) renderer.setPixelRatio(window.devicePixelRatio);
         renderer.__orig(scene, camera);
       };
     }
     boxer.capture(true);
+    // A phone's layout (the driver's 405x720 CSS viewport, so the HUD is the size it is on a phone) drawn at the full 1080x1920: the
+    // game caps its pixel ratio at 2 (render.js), the capture at the device's.
+    boxer.scene.renderer.setPixelRatio(window.devicePixelRatio);
     return boxer.quality();
   },
   ui(show) {
@@ -102,6 +107,9 @@ export const TC = {
       document.head.appendChild(style);
     }
     this.noCrowns = false;
+    // A phone's HUD: touch, no keyboard hints.
+    const ui = document.getElementById('fight-ui');
+    if (ui) ui.dataset.device = 'touch';
     this.camera = null;
     // A third-person chase camera behind him, facing the foes nearest him (the game's own arm folds onto him in a packed crowd).
     this.chase(id, { back: zoom, pitch });
