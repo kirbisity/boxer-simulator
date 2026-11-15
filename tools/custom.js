@@ -10,6 +10,8 @@
 // where it would open a part of the game that is not here. tools/bundle.js refuses a build in which a kept module imports a
 // name an excluded module's stub does not declare.
 
+import { execFileSync } from 'node:child_process';
+
 /** Modules left out (each one's stub, if kept code imports it, is in STUBS). */
 export const CUSTOM_EXCLUDED = (name) => /^levelmode\//.test(name) && !CUSTOM_KEPT_LEVEL.includes(name)
   || /^audio\/music\/data\//.test(name)
@@ -36,9 +38,32 @@ export const CUSTOM_BUDGET = 15_500_000;
 // concrete (0.5 MB) left out as well: the port is painted. About 0.1 MB of the budget is left.
 export const CUSTOM_GROUND_TILES = ['sand', 'beach'];
 
+// The armour maps carried clean on the custom page, by data module: their wear (tools/blender/wear.py) is in the full game, and
+// none of the featured units wears them (the Roman hoops and scales, the mirror plates, the Ming arm guards, riot armour, the
+// arena and turban helmets, the steppe and Chinese war masks). Left clean here on 2026-11-15, when wearing them took the page
+// 4.5 KB past its budget; the clean ones are about 111 KB lighter (fine detail is what WebP packs worst).
+export const CUSTOM_CLEAN_MAPS = {
+  'detailmaps-data': ['segmentata', 'scale', 'krug', 'bifu', 'polymer'],
+  'helmmaps-data': ['formMurmillo', 'formThraex', 'formHoplomachus', 'formSecutor', 'formScissor', 'formTurbanTurkman', 'maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskVentail'],
+};
+// The clean maps are read from the commit whose armour data files were packed without wear (wear.py's clean source, main
+// 70afbbc): the maps are not kept twice in the tree.
+const CLEAN_MAPS_COMMIT = '70afbbc';
+const cleanMaps = {};
+for (const [module, names] of Object.entries(CUSTOM_CLEAN_MAPS)) {
+  const source = execFileSync('git', ['show', `${CLEAN_MAPS_COMMIT}:src/${module}.js`], { maxBuffer: 1 << 28 }).toString('base64');
+  const [data] = Object.values(await import(`data:text/javascript;base64,${source}`));
+  cleanMaps[module] = Object.fromEntries(names.map((name) => {
+    if (!data[name]) throw new Error(`tools/custom.js CUSTOM_CLEAN_MAPS: ${name} is not in ${module}.js at ${CLEAN_MAPS_COMMIT}`);
+    return [name, data[name]];
+  }));
+}
+const withClean = (module, data) => ({ ...data, ...cleanMaps[module] });
+
 /** Data modules cut down (as tools/bundle.js LITE does), by module: its one exported const → what is kept. */
 export const CUSTOM_DATA = {
-  'detailmaps-data': (data) => Object.fromEntries(Object.entries(data).filter(([name, tile]) => tile.kind !== 'ground' || CUSTOM_GROUND_TILES.includes(name))),
+  'detailmaps-data': (data) => Object.fromEntries(Object.entries(withClean('detailmaps-data', data)).filter(([name, tile]) => tile.kind !== 'ground' || CUSTOM_GROUND_TILES.includes(name))),
+  'helmmaps-data': (data) => withClean('helmmaps-data', data),
 };
 
 /** Source rewritten, by module. */
