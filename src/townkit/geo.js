@@ -622,9 +622,16 @@ export function tkgRoof(builder, frame, spec) {
  *   'boards'   shop boards the whole height (a shut shop);
  *   'door'     two plank leaves, a threshold;
  *   'open'     an open shopfront: a counter to `sill`, the dark of the shop behind.
- * `finish`: the timber's colour; `paint`: the lattice's colour if not the timber's.
+ * `finish`: the timber's colour; `paint`: the lattice's colour if not the timber's. `transom` (m): over an open or a
+ * boarded shopfront, a band of lattice leaves under its head that stays when the boards are taken down.
  */
-export function tkgBay(builder, frame, { kind = 'lattice', x0, x1, y0, y1, z = 0, sill = 0.9, leaf = 0.62, finish = [0.3, 0.22, 0.17], paint = null, back = 0.5, latticeMaterial = 'lattice' }) {
+export function tkgBay(builder, frame, { kind = 'lattice', x0, x1, y0, y1, z = 0, sill = 0.9, leaf = 0.62, finish = [0.3, 0.22, 0.17], paint = null, back = 0.5, latticeMaterial = 'lattice', transom = 0 }) {
+  if (transom > 0 && (kind === 'open' || kind === 'boards')) {
+    // (The band: framed lattice leaves over the dark, as the 'lattice' kind's above its sill; the opening under it.)
+    tkgBay(builder, frame, { kind: 'lattice', x0, x1, y0: y1 - transom, y1, z, sill: 0, leaf, finish, paint, back, latticeMaterial });
+    builder.box('timber', frame, x0, x1, y1 - transom - 0.06, y1 - transom, z - 0.06, z, { colour: finish.map((value) => value * 0.9), skip: 'back' });
+    y1 -= transom + 0.06;
+  }
   const wide = x1 - x0;
   const dark = [0.05, 0.045, 0.04];
   const frameSize = 0.055;
