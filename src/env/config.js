@@ -470,6 +470,15 @@ export const ENV = {
     // roughly half of dry), and takes a sheen of the sky at grazing angles.
     wetDarken: 0.58,
     wetSheen: 0.25,
+    // Wet leaves and blades: a film and beads of water over `wetFilm` of them (by eye, approximate), which
+    // mirror the sky over the leaf's own colour. Leaves and blades face every way, so what they mirror is the
+    // mean of water's Fresnel reflectance over the faces seen (Schlick's 0.02 + 0.98 (1 - cos)^5 averaged over
+    // a cosine-weighted hemisphere: 0.02 + 0.98 x 2 / 42 = 0.067, `wetMirror`, derived) of the sky's mean light.
+    // Under rain the sky is tens of times brighter than a dark leaf, so these few per cent double a dark
+    // conifer's light: a wet wood goes grey-green under a grey sky (grass.js, trees.js). (Taken by the crown's
+    // mass normal instead, a crown's edge mirrored the whole sky in white blotches.)
+    wetFilm: 0.6,
+    wetMirror: 0.02 + 0.98 * 2 / 42,
     // Water stands where the worn ground's hollows lie under this level (of a smooth noise, 0..1: under 0.4 is
     // about a third of the ground; by eye, against a trodden ring after rain: separate pools, not a sheet. With
     // every worn patch one pool and a sheen of 0.5 a rained-on floor was a single dark mirror).
