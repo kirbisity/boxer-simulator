@@ -2,7 +2,7 @@
 // on them for each sex: whole, symmetric, its texture coordinates the atlas's, its features where the atlas puts them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildLatticeHead, headLattice, headMix, latticeIndices, mirrorLattice, mirrorShares, simplexWeights, solveLinear } from '../src/headlattice.js';
+import { HEAD_LATTICE, buildLatticeHead, headLattice, headMix, latticeIndices, mirrorLattice, mirrorShares, simplexWeights, solveLinear } from '../src/headlattice.js';
 import { HEAD_GRID_DATA } from '../src/headgrid-data.js';
 
 // The drawn head's skull proportions and the photo atlas's marks, as face.js and photoface.js hand them in (both modules need
@@ -104,4 +104,55 @@ test('the skull proportions and atlas marks repeated here are the source\'s', as
   const photo = readFileSync(new URL('../src/photoface.js', import.meta.url), 'utf8');
   const atlas = photo.match(/export const PHOTO_ATLAS = (\{[^}]*\});/)[1];
   assert.deepEqual(Function(`return ${atlas}`)(), ATLAS);
+  const { HEAD_ATLAS } = await import('../tools/headrings.mjs');
+  const { HEAD_SKULL } = await import('../src/basebody.js');
+  assert.deepEqual(HEAD_ATLAS, ATLAS);
+  assert.deepEqual(HEAD_SKULL, SKULL);
+});
+
+test('the head is closed by a lid along its jaw line: every point past the line on the height of its column\'s point of it, drawn in towards the line\'s middle', () => {
+  for (const female of [false, true]) {
+    const lattice = headLattice(HEAD_GRID_DATA, female ? 'female' : 'male');
+    const open = build(female, { lid: false });
+    const closed = build(female);
+    const stride = closed.positions.length / 3 / lattice.rows.length;
+    const lidRow = lattice.rows.reduce((best, row, index) => (Math.abs(row - HEAD_LATTICE.lid) < Math.abs(lattice.rows[best] - HEAD_LATTICE.lid) ? index : best), 0);
+    const at = (head, row, column) => head.positions.slice((row * stride + column) * 3, (row * stride + column) * 3 + 3);
+    // (Above the line and on it, the head as it was.)
+    for (let row = 0; row <= lidRow; row += 1) for (let column = 0; column < stride; column += 7) assert.deepEqual(at(closed, row, column), at(open, row, column));
+    const middle = [0, 2].map((axis) => Array.from({ length: stride }, (_, column) => at(closed, lidRow, column)[axis]).reduce((a, b) => a + b, 0) / stride);
+    for (let row = lidRow + 1; row < lattice.rows.length; row += 1) {
+      for (let column = 0; column < stride; column += 1) {
+        const [line, p] = [at(closed, lidRow, column), at(closed, row, column)];
+        assert.ok(Math.abs(p[1] - line[1]) < 1e-9, 'on the line\'s height');
+        assert.ok(Math.hypot(p[0] - middle[0], p[2] - middle[1]) <= Math.hypot(line[0] - middle[0], line[2] - middle[1]) + 1e-9, 'no further out than the line');
+      }
+    }
+    // (The scan's neck stood well under the line: a man's chin's underside is at about 1.2 head radii under its middle.)
+    const lowest = (head) => Math.min(...head.positions.filter((_, index) => index % 3 === 1));
+    assert.ok(lowest(open) < lowest(closed) - 0.2, `${female ? 'female' : 'male'}: the lid takes up the scan's neck`);
+    // (No ink outline from the line down, a full one well above it; the line lit as the wall above it, near the scan's own neck's
+    // (at least 0.68 of the way round; averaged with the lid's it fell to 0.2 on the man), not rounded into the lid.)
+    const inkAt = (row) => closed.ink[row * stride];
+    for (let row = lidRow; row < lattice.rows.length; row += 1) assert.equal(inkAt(row), 0, 'no ink on the lid');
+    assert.equal(inkAt(lidRow - 4), 1, 'ink above the line');
+    for (let column = 0; column < stride; column += 5) {
+      const [normal, scan] = [closed, open].map((head) => head.normals.slice((lidRow * stride + column) * 3, (lidRow * stride + column) * 3 + 3));
+      const cosine = (normal[0] * scan[0] + normal[1] * scan[1] + normal[2] * scan[2]) / (Math.hypot(...normal) * Math.hypot(...scan));
+      assert.ok(cosine > 0.6, `${female ? 'female' : 'male'}: the line's normal is the wall's running on (as the scan's own neck's), not turned down into the lid`);
+    }
+  }
+});
+
+test('the base body\'s table of the jaw line, the throat\'s ring and the ring above the line (src/headrings-data.js) is the model\'s own (tools/headrings.mjs)', async () => {
+  const { headRings } = await import('../tools/headrings.mjs');
+  const { HEAD_RINGS } = await import('../src/headrings-data.js');
+  const rings = headRings();
+  for (const sex of ['male', 'female']) {
+    for (const ring of ['jaw', 'throat', 'above']) {
+      const made = rings[sex][ring].flat();
+      assert.equal(HEAD_RINGS[sex][ring].length, made.length, `${sex} ${ring}: as many points (run tools/headrings.mjs again)`);
+      made.forEach((value, index) => assert.ok(Math.abs(HEAD_RINGS[sex][ring][index] - value) < 1e-4, `${sex} ${ring}: the model's own (run tools/headrings.mjs again)`));
+    }
+  }
 });

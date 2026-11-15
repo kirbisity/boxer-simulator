@@ -32,7 +32,7 @@
 
 import { buildBodyMesh } from './bodymesh.js';
 import { baseBoneRelief, baseLoftOptions, baseRigOf, buildLoftBody, buildLoftBodySteps, LOFT, runSteps } from './loftbody.js';
-import { BASE_BODY, baseStarvedDetail } from './basebody.js';
+import { BASE_BODY, NECK_JOIN, baseStarvedDetail } from './basebody.js';
 import { outfitOf } from './outfits.js';
 import { buildFleshBody, fleshAnatomy, fleshField } from './fleshbody.js';
 import { buildDetailMap } from './skindetail.js';
@@ -84,7 +84,8 @@ export const coarseField = (body) => fleshField(fleshAnatomy(body, { refined: tr
 // (a body is made from its inputs alone), the most recently used last. A fighter takes his own copy of the positions (his dents move them).
 const MESHES = new Map();
 export const SKIN_MESH_CACHE = { limit: 24, map: MESHES };
-const meshKey = (body, style) => `${style}|${JSON.stringify(body.inputs)}`;
+// (The base body's neck is shaped to the head it meets: basebody.js NECK_JOIN.)
+const meshKey = (body, style) => `${style}${style === 'base' && !NECK_JOIN.photoHead ? '|drawnHead' : ''}|${JSON.stringify(body.inputs)}`;
 /** A body's built skin in a style, if one is kept (shared: copy the positions before moving them). */
 export function cachedSkinMesh(body, style) {
   const key = meshKey(body, style);

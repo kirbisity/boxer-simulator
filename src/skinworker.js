@@ -2,13 +2,14 @@
 // the page's thread, so a battle's first seconds are not spent on it (render.js asks; pumpSkinBuilds is the fallback that builds
 // it a few milliseconds a frame where no worker can be had). Plain numbers only: no Three.js, no page.
 //
-// A request: { id, inputs, style, check, known }: the body is made again from its inputs (a body is its inputs), `check` a few of
+// A request: { id, inputs, style, check, known, detailMaps, photoHead }: the body is made again from its inputs (a body is its inputs), `check` a few of
 // the page's own numbers for it (a body that came out otherwise is refused: `mismatch`), `known` the map keys the page has made.
 // The answer: { id, built, maps, ms }, the arrays handed over, not copied.
 
 import { buildBody } from './body.js';
 import { buildSkinMesh, makeSkinTextures, skinTextureKey } from './bodystyles.js';
 import { DETAIL_MAPS } from './detailmaps.js';
+import { NECK_JOIN } from './basebody.js';
 
 /** A few numbers that say whether two bodies are the same body. */
 export function bodyCheck(body) {
@@ -16,10 +17,11 @@ export function bodyCheck(body) {
 }
 
 /** Answer one request (also what the tests call). */
-export function skinWorkerAnswer({ id, inputs, style, check, known = [], detailMaps = DETAIL_MAPS.on }) {
+export function skinWorkerAnswer({ id, inputs, style, check, known = [], detailMaps = DETAIL_MAPS.on, photoHead = NECK_JOIN.photoHead }) {
   const started = performance.now();
-  // Armour drawn with the detail maps or not, as the page draws it (detailmaps.js).
+  // Armour drawn with the detail maps or not, as the page draws it (detailmaps.js); the neck shaped to the page's heads (basebody.js).
   DETAIL_MAPS.on = detailMaps;
+  NECK_JOIN.photoHead = photoHead;
   const body = buildBody(inputs);
   if (check && bodyCheck(body).some((value, index) => value !== check[index])) return { answer: { id, mismatch: true }, transfer: [] };
   const built = buildSkinMesh(body, style);

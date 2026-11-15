@@ -31,15 +31,19 @@ test('the base style builds for every body of the progression: finite, about a f
 });
 
 test('the reference build gets the base mesh as modelled: every point where the tool put it, scaled to its height (the arms aside)', (t) => {
-  // (The model as it is: no shoulder design (BASE_BODY.shoulder null), and the head drawn where and as large as the model has
-  // it. The default, D2, reshapes the shoulders on purpose, and the head's lift draws the neck's top up after it.)
+  // (The model as it is: no shoulder design (BASE_BODY.shoulder null), the head drawn where and as large as the model has it,
+  // and the neck not carried to it (BASE_BODY.neckUnder null). The default, D2, reshapes the shoulders on purpose, the head's
+  // lift draws the neck's top up after it, and neckUnder carries the neck's top forward under the head and up to its jaw line.)
   const design = BASE_BODY.shoulder;
   const head = BASE_BODY.head;
+  const under = BASE_BODY.neckUnder;
   BASE_BODY.shoulder = null;
   BASE_BODY.head = { ...head, lift: 0, smaller: 0 };
+  BASE_BODY.neckUnder = null;
   t.after(() => {
     BASE_BODY.shoulder = design;
     BASE_BODY.head = head;
+    BASE_BODY.neckUnder = under;
   });
   for (const sex of ['male', 'female']) {
     const data = baseBodyMesh(sex);
@@ -196,5 +200,73 @@ test('the frame: a body is drawn as broad as its skeleton, a thin one a little n
     const shoulders = large.bideltoid / small.bideltoid;
     assert.ok(small.bideltoid < medium.bideltoid && medium.bideltoid < large.bideltoid && shoulders > 1.08 && shoulders < 1.15, `${sex}: a large frame's shoulders ${shoulders.toFixed(3)} of a small one's`);
     assert.ok(small.chest < medium.chest && medium.chest < large.chest, `${sex}: its chest broader`);
+  }
+});
+
+test('the neck meets the head along its jaw line at rest: round the head the skin is the outer surface up to the line, the head above it', async () => {
+  const { boneFrames } = await import('../src/rig.js');
+  const { buildLatticeHead } = await import('../src/headlattice.js');
+  const { HEAD_GRID_DATA } = await import('../src/headgrid-data.js');
+  const { HEAD_SKULL, headJawLine } = await import('../src/basebody.js');
+  const { HEAD_ATLAS } = await import('../tools/headrings.mjs');
+  const { faceMorphWeights } = await import('../src/facemorph.js');
+  const { size, seat, lift, smaller } = BASE_BODY.head;
+  const sub = (a, b) => a.map((value, axis) => value - b[axis]);
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  // (The farthest a horizontal ray from the head's axis meets a mesh's triangles.)
+  const farthest = (o, d, points, indices) => {
+    let best = 0;
+    for (let k = 0; k < indices.length; k += 3) {
+      const [a, b, c] = [points[indices[k]], points[indices[k + 1]], points[indices[k + 2]]];
+      const [e1, e2] = [sub(b, a), sub(c, a)];
+      const p = cross(d, e2);
+      const det = dot(e1, p);
+      if (Math.abs(det) < 1e-12) continue;
+      const s = sub(o, a);
+      const u = dot(s, p) / det;
+      const q = cross(s, e1);
+      const v = dot(d, q) / det;
+      const along = dot(e2, q) / det;
+      if (u >= 0 && v >= 0 && u + v <= 1 && along > 0 && along < 2) best = Math.max(best, along);
+    }
+    return best;
+  };
+  for (const row of CAST.filter(({ key }) => key === 'average')) {
+    const body = row.body;
+    const female = body.inputs.sex === 'female';
+    const r = body.lengths.headRadius;
+    const unit = r * size * (1 - smaller);
+    const mesh = buildSkinMesh(body, 'base');
+    const frame = boneFrames(bindPoints(body), body)[BONE.head];
+    const origin = frame.origin.map((value, axis) => value - frame.y[axis] * (seat - lift) * r);
+    const local = (p) => {
+      const d = sub(p, origin);
+      return [dot(d, frame.x) / unit, dot(d, frame.y) / unit, dot(d, frame.z) / unit];
+    };
+    const skin = Array.from({ length: mesh.positions.length / 3 }, (_, index) => local(Array.from(mesh.positions.slice(index * 3, index * 3 + 3))));
+    const near = [];
+    for (let k = 0; k < mesh.indices.length; k += 3) {
+      const corners = [mesh.indices[k], mesh.indices[k + 1], mesh.indices[k + 2]];
+      if (corners.every((index) => mesh.regions[index] === 'skin') && Math.hypot(...skin[corners[0]]) < 3) near.push(...corners);
+    }
+    const head = buildLatticeHead({ data: HEAD_GRID_DATA, radius: 1, skull: HEAD_SKULL, shape: { morph: faceMorphWeights(body) }, atlas: HEAD_ATLAS, female });
+    const headPoints = Array.from({ length: head.positions.length / 3 }, (_, index) => Array.from(head.positions.slice(index * 3, index * 3 + 3)));
+    const jaw = headJawLine(female, faceMorphWeights(body));
+    for (const degrees of [0, 45, 90, 135, 180]) {
+      const angle = (degrees * Math.PI) / 180;
+      const d = [Math.cos(angle), 0, Math.sin(angle)];
+      // Going down from the head's middle: the head the outer surface, then the skin, and never the head again (by more than 1.5 mm).
+      let seam = null;
+      for (let y = -0.3; y >= -1.9; y -= 0.04) {
+        const o = [0, y, 0];
+        const [onHead, onSkin] = [farthest(o, d, headPoints, head.indices), farthest(o, d, skin, near)];
+        if (seam === null && onSkin > onHead) seam = y;
+        if (seam !== null) assert.ok(onHead <= onSkin + 0.0015 / unit, `${body.inputs.sex} at ${degrees} degrees: the head stands out of the neck ${((onHead - onSkin) * unit * 1000).toFixed(0)} mm at ${y.toFixed(2)} head radii, under the seam at ${seam.toFixed(2)}`);
+      }
+      // (The line itself: the lid is level with it, and the neck's top passes in over it.)
+      const line = jaw(angle).y;
+      assert.ok(seam !== null && Math.abs(seam - line) < 0.2, `${body.inputs.sex} at ${degrees} degrees: the seam at ${seam?.toFixed(2)} head radii, the jaw line at ${line.toFixed(2)}`);
+    }
   }
 });

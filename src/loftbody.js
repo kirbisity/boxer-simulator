@@ -6,6 +6,7 @@
 // seven sides and flat normals, for a low-poly art look.
 
 import { buildBody, FRAMES, P } from './body.js';
+import { faceMorphWeights } from './facemorph.js';
 import { BASE_BODY, baseBindJoints, baseBodyAvailable, baseHeatBones, baseBodyMesh, baseBodyUvs, baseStarvation, measureBaseBody, placeBaseBody } from './basebody.js';
 import { relax, skinWeights, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
@@ -4034,6 +4035,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   const frames = boneFrames(points, body);
   const bindAt = baseJoints ? byIndex(baseJoints.bind) : points;
   const bindFrames = baseJoints ? boneFrames(bindAt, body) : frames;
+  // (The head as it is drawn at rest, for the neck's top to run up into: basebody.js neckUnderHead.)
+  if (baseJoints) baseJoints.skin.drawnHead = { frame: bindFrames[BONE.head], morph: faceMorphWeights(body) };
   const at = (name) => points[P[name]];
   const seg = body.segments;
   const L = body.lengths;
