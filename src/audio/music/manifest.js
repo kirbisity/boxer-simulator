@@ -5,7 +5,6 @@
 // gain: the linear gain that brings the cue to about -18 LUFS (above 1 where the file was kept down for its peak).
 
 // <generated imports>
-import { MUSIC_DATA_MENU } from './data/menu.js';
 import { MUSIC_DATA_ROMAN } from './data/roman.js';
 import { MUSIC_DATA_MEDIEVAL } from './data/medieval.js';
 import { MUSIC_DATA_JAPAN } from './data/japan.js';
@@ -23,7 +22,6 @@ import { MUSIC_DATA_DEFEAT } from './data/defeat.js';
 
 export const MUSIC_CUES = {
   // <generated cues>
-  menu: { data: MUSIC_DATA_MENU, mime: 'audio/mpeg', loop: true, loopStart: 0.2000, loopEnd: 55.0570, gain: 1.000 },
   roman: { data: MUSIC_DATA_ROMAN, mime: 'audio/mpeg', loop: true, loopStart: 0.2000, loopEnd: 36.2000, gain: 1.047 },
   medieval: { data: MUSIC_DATA_MEDIEVAL, mime: 'audio/mpeg', loop: true, loopStart: 0.2000, loopEnd: 37.5328, gain: 1.000 },
   japan: { data: MUSIC_DATA_JAPAN, mime: 'audio/mpeg', loop: true, loopStart: 0.2000, loopEnd: 36.2000, gain: 1.000 },

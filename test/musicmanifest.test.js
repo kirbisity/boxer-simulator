@@ -56,6 +56,7 @@ test('cueFor covers every scenario, Dunnottar and the colosseum', () => {
   assert.equal(cueFor('ring', 'opening'), null);
   // (The menus have no music.)
   assert.equal(cueFor(null, 'menu'), null);
+  assert.equal(MUSIC_CUES.menu, undefined, 'the old menu theme is gone');
   assert.equal(cueFor(null, 'opening'), null);
 });
 
