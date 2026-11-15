@@ -24,14 +24,14 @@
 
 /* global THREE */
 
-import { ENV, ENV_PLACE_PLAIN, ENV_TREES, ENV_WEATHER, PLACE_ENV } from './config.js';
+import { ENV, ENV_PLACE_PLAIN, ENV_WEATHER, PLACE_ENV } from './config.js';
 import { envAirState, envAirToUniforms, envInstallTone, envSkyAt, envSunWay, envToneExposure, envUniforms } from './air.js';
 import { envNoiseAt } from './noise.js';
 import { envBuildSky } from './sky.js';
 import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, envSunPast } from './terrain.js';
 import { envBuildGrass, envGrassQuality } from './grass.js';
 import { worksOf } from '../physics/fieldworks.js';
-import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envPlantWoodEdges, envRockShadows, envTreeShadows, envTreesQuality } from './trees.js';
+import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envPlantWoodEdges, envRockShadows, envTreeCrown, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { envPressForget, envPressStep } from './press.js';
@@ -220,7 +220,7 @@ function envFill(group, place, view, spec, own) {
   // near map stops telling what shades the air (air.js envSunward). A quarter of them begin below the first.
   const near = trees.filter((tree) => tree.height > 4 && Math.abs(tree.x) < ENV.terrain.mapHalf && Math.abs(tree.z) < ENV.terrain.mapHalf);
   const part = (share, of) => (near.length ? near.map(of).sort((a, b) => a - b)[Math.floor(share * (near.length - 1))] : 0);
-  group.userData.envCrowns = [part(0.25, (tree) => tree.height * (ENV_TREES[tree.kind].crown.at - ENV_TREES[tree.kind].crown.tall)), 1 + part(0.5, (tree) => tree.height * (ENV_TREES[tree.kind].crown.at + ENV_TREES[tree.kind].crown.tall))];
+  group.userData.envCrowns = [part(0.25, (tree) => tree.height * (envTreeCrown(tree).at - envTreeCrown(tree).tall)), 1 + part(0.5, (tree) => tree.height * (envTreeCrown(tree).at + envTreeCrown(tree).tall))];
 }
 
 /** Draw the tier in force: what share of the blades, the leaf cards and the drift, and whether clouds shade the land. */

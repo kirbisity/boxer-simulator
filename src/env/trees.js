@@ -11,6 +11,28 @@ import { envRandom } from './noise.js';
 import { envSunPast, envWoodsAt } from './terrain.js';
 
 /**
+ * A tree's own crown: its kind's (ENV_TREES `crown`), or where the kind has `vary`, one of the forms the kind grows
+ * in, from a hash of where it stands (no draw from the planting's stream, so no other tree moves): { wide, tall,
+ * at, taper }. The crown's top stays where the kind's is; a longer or shorter crown reaches further down the stem.
+ */
+export function envTreeCrown(tree) {
+  if (tree.crown) return tree.crown;
+  const kind = ENV_TREES[tree.kind];
+  const vary = kind.vary;
+  if (!vary) return (tree.crown = { ...kind.crown, taper: 0.8 });
+  const hash = (salt) => {
+    const h = Math.sin(tree.x * 12.9898 + tree.z * 78.233 + salt * 37.719) * 43758.5453;
+    return h - Math.floor(h);
+  };
+  const other = hash(1) < vary.other;
+  const pick = (range, salt) => range[0] + (range[1] - range[0]) * hash(salt);
+  const tall = kind.crown.tall * pick(other ? vary.otherTall : vary.tall, 2);
+  const top = kind.crown.at + kind.crown.tall;
+  const taper = other ? pick(vary.taper.slice(2), 4) : pick(vary.taper.slice(0, 2), 4);
+  return (tree.crown = { wide: kind.crown.wide * pick(other ? vary.otherWide : vary.wide, 3), tall, at: top - tall, taper });
+}
+
+/**
  * Where a place's trees stand: [{ kind, x, y, z, height, lit }], `lit` the sun reaching the crown past the hills.
  * `footprints` (things standing on the ground) and the flat ground are kept clear.
  */
@@ -196,23 +218,24 @@ export function envTreeShadows(trees, sun) {
   for (const tree of trees) {
     if (Math.abs(tree.x) > reach || Math.abs(tree.z) > reach || tree.lit <= 0) continue;
     const kind = ENV_TREES[tree.kind];
-    const bare = tree.height * Math.max(0, kind.crown.at - kind.crown.tall * 0.8);
+    const crown = envTreeCrown(tree);
+    const bare = tree.height * Math.max(0, crown.at - crown.tall * 0.8);
     if (bare > 0.5) shadows.push({ x: tree.x, z: tree.z, toX: tree.x - (sun[0] / flat) * bare * slant, toZ: tree.z - (sun[2] / flat) * bare * slant, half: tree.height * kind.trunk, tall: bare });
     // Three rounds up the crown: a low sun draws them apart along the ground, and each out by `stretch` along
     // (`sunX`, `sunZ`), as a ball's shadow is on flat ground (1 / sin of the sun's height: the ball's width
     // across the light, laid along the ground). Left round they stood apart under a low sun and each shaded a
     // slab of air two metres thick: dark bars across the mist in front of a crown.
     for (const part of [-0.6, 0, 0.6]) {
-      const up = tree.height * (kind.crown.at + kind.crown.tall * part);
+      const up = tree.height * (crown.at + crown.tall * part);
       shadows.push({
         x: tree.x - (sun[0] / flat) * up * slant,
         z: tree.z - (sun[2] / flat) * up * slant,
-        radius: tree.height * kind.crown.wide * (part === 0 ? 1.15 : 0.9),
+        radius: tree.height * crown.wide * (part === 0 ? 1.15 : 0.9),
         depth: ENV.shadow.crown,
         sunX: sun[0] / flat,
         sunZ: sun[2] / flat,
         stretch: Math.hypot(1, slant),
-        over: part === 0 ? { x: tree.x, z: tree.z, radius: tree.height * kind.crown.wide * 1.3 } : null,
+        over: part === 0 ? { x: tree.x, z: tree.z, radius: tree.height * crown.wide * 1.3 } : null,
       });
     }
   }
@@ -640,7 +663,7 @@ export function envBuildSkyline(trees, footprints) {
     }
   };
   for (const tree of trees) {
-    const { crown } = ENV_TREES[tree.kind];
+    const crown = envTreeCrown(tree);
     stand(tree.x, tree.z, tree.height * crown.wide, tree.y + tree.height * (crown.at + crown.tall));
   }
   for (const print of footprints) stand(print.x, print.z, Math.max(print.halfX, print.halfZ), print.top ?? 0);
@@ -710,15 +733,14 @@ export function envBuildRocks({ place, rocks, height }) {
  * 'round' (a broadleaf): a ring of masses on spreading limbs and one or two on top. 'boughs' (a conifer): a spire of
  * boughs, each a flat fan, longest low down, with gaps between them the sky shows through.
  */
-function envCrownMasses(kind, random) {
-  const crown = kind.crown;
+function envCrownMasses(kind, random, crown = kind.crown) {
   const masses = [];
   if (kind.shape === 'boughs') {
     for (let bough = 0; bough < kind.limbs; bough += 1) {
       const u = (bough + 0.2 + 0.6 * random()) / kind.limbs;
       // The golden angle between one bough and the next: no two stand over each other.
       const angle = bough * 2.39996 + random() * 0.8;
-      const reach = crown.wide * (0.08 + Math.pow(1 - u, 0.8) * (0.7 + 0.5 * random()));
+      const reach = crown.wide * (0.08 + Math.pow(1 - u, crown.taper ?? 0.8) * (0.7 + 0.5 * random()));
       const y = crown.at - crown.tall + 2 * crown.tall * u;
       masses.push({ x: Math.cos(angle) * reach, y: y - 0.05 * (1 - u), z: Math.sin(angle) * reach, radius: reach, flat: 0.16, from: [0, y, 0] });
     }
@@ -747,20 +769,27 @@ function envCrownPoint(kind, random, masses, out) {
   const mass = masses[Math.floor(random() * masses.length)];
   if (kind.shape === 'boughs') {
     // Along the bough from the trunk to its tip, fanning wider as it goes, drooping a little.
-    const t = 0.15 + 0.85 * Math.sqrt(random());
-    const side = (random() - 0.5) * 0.7 * t;
+    const t = 0.05 + 0.95 * Math.sqrt(random());
+    const side = (random() - 0.5) * ENV.trees.bough.fan * t;
     const length = Math.hypot(mass.x, mass.z) || 1e-3;
     const ax = mass.x / length;
     const az = mass.z / length;
     out[0] = (ax * t - az * side) * length;
-    out[1] = mass.from[1] + (mass.y - mass.from[1]) * t * t + (random() - 0.5) * mass.radius * mass.flat;
+    const below = random() - 0.5;
+    out[1] = mass.from[1] + (mass.y - mass.from[1]) * t * t + below * mass.radius * mass.flat;
     out[2] = (az * t + ax * side) * length;
+    // A spray faces up and out from its own bough, each a little its own way: lit spray by spray, not the bough as
+    // one slab; the sprays under the bough are in its shade (ENV.trees.bough). (Its own way from values already
+    // drawn, so the wood's other draws stay where they were.)
+    const turn = ((((side * 13.7 + t * 7.1) % 1) + 1) % 1 - 0.5) * ENV.trees.bough.vary;
+    const bx = ax * Math.cos(turn) - az * Math.sin(turn);
+    const bz = az * Math.cos(turn) + ax * Math.sin(turn);
     const lift = 0.9;
     const norm = Math.hypot(1, lift);
-    out[3] = ax / norm;
+    out[3] = bx / norm;
     out[4] = lift / norm;
-    out[5] = az / norm;
-    out[6] = 0.35 + 0.65 * t;
+    out[5] = bz / norm;
+    out[6] = (0.35 + 0.65 * t) * (1 - ENV.trees.bough.under * Math.max(0, -below * 2));
     return out;
   }
   // On the outside of the mass.
@@ -839,7 +868,7 @@ export function envBuildTrees({ place, trees }) {
     let written = 0;
     for (const tree of members) {
       const kind = ENV_TREES[tree.kind];
-      const masses = envCrownMasses(kind, random);
+      const masses = envCrownMasses(kind, random, envTreeCrown(tree));
       tree.masses = masses;
       // A tree's own colour between the kind's, and each card a little off it.
       colour.set(kind.leaf[0]).lerp(other.set(kind.leaf[1]), random()).lerp(other.set(kind.leaf[2]), random() * 0.5);
@@ -856,7 +885,7 @@ export function envBuildTrees({ place, trees }) {
         aCard[at] = point[0] * tree.height;
         aCard[at + 1] = point[1] * tree.height;
         aCard[at + 2] = point[2] * tree.height;
-        aCard[at + 3] = kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5);
+        aCard[at + 3] = kind.card * tree.height * (kind.cards ? 1 : grow) * (0.8 + random() * 0.5) * (kind.shape === 'boughs' && order < 2 ? ENV.trees.bough.near : 1);
         aShell[at] = point[3];
         aShell[at + 1] = point[4];
         aShell[at + 2] = point[5];
@@ -919,7 +948,7 @@ export function envBuildTrees({ place, trees }) {
       };
       // A conifer's trunk runs to its tip; a broadleaf's to where its limbs have all left it, or, where the limbs
       // are not drawn, on into the crown they would have carried (which else hangs in the air over a stump).
-      const top = conifer ? kind.crown.at + kind.crown.tall * 0.96 : band.limbs ? Math.max(...tree.masses.map((mass) => mass.from[1])) : kind.crown.at + kind.crown.tall * 0.4;
+      const top = conifer ? envTreeCrown(tree).at + envTreeCrown(tree).tall * 0.96 : band.limbs ? Math.max(...tree.masses.map((mass) => mass.from[1])) : kind.crown.at + kind.crown.tall * 0.4;
       wood([0, -0.15, 0, radius], [0, top * tall, 0, radius * (conifer ? 0.12 : 0.6)]);
       if (!band.limbs) continue;
       for (const mass of tree.masses) {
