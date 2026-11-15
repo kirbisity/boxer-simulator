@@ -21,7 +21,36 @@ export const TK_WORKS = {
   stone: [0.8, 0.78, 0.74], dressed: [0.86, 0.84, 0.8],
   // The gate pavilion's paint (dancheong, as the reference shows it: dull red columns, green-blue beams, white rafter
   // ends), dulled as paint a winter old.
-  paint: { column: [0.5, 0.17, 0.13], beam: [0.2, 0.4, 0.36], rafter: [0.44, 0.2, 0.15], rafterEnd: [0.8, 0.78, 0.7], block: [0.2, 0.38, 0.4], board: [0.07, 0.06, 0.06], gilt: [0.75, 0.6, 0.25] },
+  // A town wall's face is not one job of work: it was raised in stretches by different gangs, from different
+  // quarries, and mended over centuries, so its masonry changes along it (Korean town and mountain walls show this
+  // plainly: big squared footing stones, runs of smaller rough stones above, later repairs in dressed blocks of a
+  // paler stone, the seams between them straight up the face). `footing`: the courses of large stones the face
+  // stands on (m high; their size as a share of the face's own: the sheet laid at `scale`); `stretch`: the length
+  // of one job (m, ±`stretchVary` of it); `kinds`: what a job is laid in, each { share, material, scale (the sheet's
+  // stones this many times smaller: under 1 larger stones), tone (on the stone's colour), warm (added to red, taken
+  // from blue), from (the share of the face's height the job starts at: a repair to the upper part only) }. All by
+  // eye against photographs of Korean fortress walls (Hwaseong, Seoul's city wall); none surveyed.
+  masonry: {
+    footing: { high: 0.85, scale: 0.55, tone: 0.9 },
+    stretch: 14, stretchVary: 0.5,
+    kinds: [
+      { share: 0.5, material: 'rubble', scale: 1, tone: 1, warm: 0, from: 0 },
+      { share: 0.22, material: 'rubble', scale: 0.72, tone: 0.92, warm: 0.02, from: 0 },
+      { share: 0.16, material: 'ashlar', scale: 1.15, tone: 1.06, warm: -0.01, from: 0.45 },
+      { share: 0.12, material: 'rubble', scale: 1.2, tone: 0.84, warm: -0.015, from: 0 },
+    ],
+  },
+  // `bands`: the ends of a painted beam (meori-cho), stripes from the column outward, each [colour, length m];
+  // `panel`: the beam's middle panel (byeolji-hwa) as a share of the bay; `blocks`: the small painted blocks in the
+  // band between the two beams, [length m, gap m], alternating red and green. All by eye from the gate reference.
+  paint: {
+    column: [0.5, 0.17, 0.13], beam: [0.2, 0.4, 0.36], rafter: [0.44, 0.2, 0.15], rafterEnd: [0.8, 0.78, 0.7], block: [0.2, 0.38, 0.4], board: [0.07, 0.06, 0.06], gilt: [0.75, 0.6, 0.25],
+    bands: [[[0.55, 0.17, 0.12], 0.08], [[0.8, 0.78, 0.7], 0.04], [[0.14, 0.24, 0.38], 0.12], [[0.8, 0.78, 0.7], 0.04], [[0.62, 0.48, 0.2], 0.16], [[0.8, 0.78, 0.7], 0.04], [[0.14, 0.24, 0.38], 0.08]],
+    panel: 0.34, panelColour: [0.6, 0.47, 0.24], blocks: [0.22, 0.12], blockColours: [[0.52, 0.17, 0.12], [0.2, 0.4, 0.34]],
+  },
+  // A gate pavilion's bracket sets stand not only on the columns but between them (the multi-bracket, dapo, manner
+  // of a Joseon gate's pavilion): `between` sets in each bay, of `tiers` tiers each. From the gate reference.
+  brackets: { between: 2, tiers: 3 },
 };
 
 /**
@@ -32,9 +61,11 @@ export const TK_WORKS = {
  * `inner`: an upright inner face down to `innerFoot(node)` (a free-standing wall), else none (an earth bank stands
  * against it, drawn by the ground).
  */
-export function tkRampart(builder, nodes, { face = 0.3, walk = 3.5, parapet = 1.1, thick = 0.6, gaps = [], inner = null, material = 'rubble', paving = 'cobble', colour = TK_WORKS.stone } = {}) {
+export function tkRampart(builder, nodes, { face = 0.3, walk = 3.5, parapet = 1.1, thick = 0.6, gaps = [], inner = null, material = 'rubble', paving = 'cobble', colour = TK_WORKS.stone, masonry = null, seed = 1 } = {}) {
   const [long, crenel] = TK_WORKS.merlon;
   let run = 0;
+  // (With `masonry` (TK_WORKS.masonry's form) the face is laid in jobs along the line, each on its footing.)
+  const jobs = masonry ? tkwJobs(nodes, masonry, seed) : null;
   for (let k = 0; k + 1 < nodes.length; k += 1) {
     const [ax, az, footA, topA] = nodes[k];
     const [bx, bz, footB, topB] = nodes[k + 1];
@@ -43,7 +74,8 @@ export function tkRampart(builder, nodes, { face = 0.3, walk = 3.5, parapet = 1.
     const top = (x) => topA + ((topB - topA) * x) / length;
     const dark = colour.map((value) => value * 0.82);
     // The outer face, battered; laid in metres along the whole line so that the courses run on from piece to piece.
-    builder.quad(material, frame(0, footA, 0), frame(length, footB, 0), frame(length, topB, -face), frame(0, topA, -face), { uvs: [[run, footA], [run + length, footB], [run + length, topB], [run, topA]], colour: [dark, dark, colour, colour] });
+    if (jobs) tkwFace(builder, frame, length, run, [footA, footB], [topA, topB], face, colour, masonry, jobs);
+    else builder.quad(material, frame(0, footA, 0), frame(length, footB, 0), frame(length, topB, -face), frame(0, topA, -face), { uvs: [[run, footA], [run + length, footB], [run + length, topB], [run, topA]], colour: [dark, dark, colour, colour] });
     builder.quad(paving, frame(0, topA, -face - walk), frame(0, topA, -face), frame(length, topB, -face), frame(length, topB, -face - walk), { uvs: [[run, 0], [run, walk], [run + length, walk], [run + length, 0]] });
     if (inner) {
       const [fa, fb] = [inner(nodes[k]), inner(nodes[k + 1])];
@@ -60,6 +92,51 @@ export function tkRampart(builder, nodes, { face = 0.3, walk = 3.5, parapet = 1.
       builder.box(material, frame, x0 + crenel / 2, x1 - crenel / 2, y + parapet * TK_WORKS.low, y + parapet, -face - thick, -face, { colour, skip: 'bottom' });
     }
     run += length;
+  }
+}
+
+/** The jobs a rampart's face is laid in: [{ from, to (m along the line), kind, shift (the sheet's offset) }], seeded. */
+function tkwJobs(nodes, masonry, seed) {
+  const random = tkRandom(seed * 977 + 13);
+  let total = 0;
+  for (let k = 0; k + 1 < nodes.length; k += 1) total += Math.hypot(nodes[k + 1][0] - nodes[k][0], nodes[k + 1][1] - nodes[k][1]);
+  const jobs = [];
+  for (let at = 0; at < total; ) {
+    const long = masonry.stretch * (1 + masonry.stretchVary * (2 * random() - 1));
+    let pick = random();
+    const kind = masonry.kinds.find((each) => (pick -= each.share) < 0) ?? masonry.kinds[0];
+    jobs.push({ from: at, to: at + long, kind, shift: random() * 7 });
+    at += long;
+  }
+  return jobs;
+}
+
+/**
+ * One piece of a rampart's battered face laid by jobs (tkwJobs): along the piece, cut where a job ends; up it, the
+ * footing, then the job's stone (an upper repair over the older work below it). `run`: the piece's start along the line.
+ */
+function tkwFace(builder, frame, length, run, [footA, footB], [topA, topB], face, colour, masonry, jobs) {
+  const old = masonry.kinds[0];
+  const lay = (material, kind, shift, x0, x1, s0, s1) => {
+    // (s: the share of the face's height from its foot; a point's place and its sheet coordinates, in metres.)
+    const point = (x, share) => {
+      const foot = footA + ((footB - footA) * x) / length;
+      const top = topA + ((topB - topA) * x) / length;
+      return { at: frame(x, foot + (top - foot) * share, -face * share), uv: [(run + x + shift) * kind.scale, (foot + (top - foot) * share) * kind.scale] };
+    };
+    const tone = (share) => colour.map((value, k) => value * kind.tone * (0.82 + 0.18 * share) + (k === 0 ? kind.warm : k === 2 ? -kind.warm : 0));
+    const [a, b, c, d] = [point(x0, s0), point(x1, s0), point(x1, s1), point(x0, s1)];
+    builder.quad(material, a.at, b.at, c.at, d.at, { uvs: [a.uv, b.uv, c.uv, d.uv], colour: [tone(s0), tone(s0), tone(s1), tone(s1)] });
+  };
+  for (const job of jobs) {
+    const [x0, x1] = [Math.max(0, job.from - run), Math.min(length, job.to - run)];
+    if (x1 <= x0 + 1e-6) continue;
+    const high = Math.max(0.5, Math.min(topA - footA, topB - footB));
+    const footing = Math.min(0.4, masonry.footing.high / high);
+    lay(old.material, { ...old, scale: masonry.footing.scale, tone: masonry.footing.tone }, job.shift, x0, x1, 0, footing);
+    const from = Math.max(footing, job.kind.from);
+    if (from > footing) lay(old.material, old, job.shift * 0.5, x0, x1, footing, from);
+    lay(job.kind.material, job.kind, job.shift, x0, x1, from, 1);
   }
 }
 
@@ -168,7 +245,7 @@ export function tkPavilion(builder, frame, { storeys, bay = 2.7, column = 0.19, 
     for (const [px, pz, turn] of posts) {
       builder.round('ashlar', frame, px, pz, floor, floor + 0.14, column * 1.7, column * 1.35, { sides: 8, colour: TK_WORKS.dressed });
       builder.round('timber', frame, px, pz, floor + 0.14, head - 0.28, column, column * 0.88, { sides: 8, colour: paint.column, caps: '' });
-      builder.at('near', () => tkgBracket(builder, frame.child(px, head - 0.28, pz, turn), { colour: paint.rafter, block: paint.block }));
+      builder.at('near', () => tkgBracket(builder, frame.child(px, head - 0.28, pz, turn), { colour: paint.rafter, block: paint.block, tiers: TK_WORKS.brackets.tiers }));
     }
     // The beams that tie the columns' heads (two, a painted band between them), on the four sides.
     for (const [turn, half, out] of [[0, w / 2, d / 2], [Math.PI, w / 2, d / 2], [Math.PI / 2, d / 2, w / 2], [-Math.PI / 2, d / 2, w / 2]]) {
@@ -176,6 +253,9 @@ export function tkPavilion(builder, frame, { storeys, bay = 2.7, column = 0.19, 
       builder.box('timber', side, -half - 0.12, half + 0.12, head - 0.62, head - 0.4, out - 0.1, out + 0.1, { colour: paint.beam });
       builder.box('timber', side, -half - 0.12, half + 0.12, head - 0.28, head - 0.1, out - 0.12, out + 0.12, { colour: paint.beam.map((value) => value * 0.85) });
       builder.box('timber', side, -half, half, head - 0.4, head - 0.28, out - 0.04, out + 0.04, { colour: paint.rafterEnd, skip: 'topbottom' });
+      // The paint on its outer face, and the bracket sets between the columns (near detail).
+      const count = turn === 0 || turn === Math.PI ? nx : nz;
+      builder.at('near', () => tkwPaint(builder, side, Array.from({ length: count + 1 }, (_, i) => -half + (2 * half * i) / count), head, out, paint, turn === 0 || turn === Math.PI ? TK_WORKS.brackets.between : 0));
       if (fill === 'lattice') {
         const count = Math.max(1, Math.round((2 * half) / bay));
         for (let n = 0; n < count; n += 1) tkgBay(builder, side, { kind: 'lattice', x0: -half + (n * 2 * half) / count + column, x1: -half + ((n + 1) * 2 * half) / count - column, y0: floor, y1: head - 0.62, z: out - 0.04, sill: 0.7, finish: paint.column, paint: paint.beam });
@@ -199,6 +279,34 @@ export function tkPavilion(builder, frame, { storeys, bay = 2.7, column = 0.19, 
     }
   });
   return y;
+}
+
+/**
+ * The dancheong on one side of a pavilion's storey (in `side`, the face at `out`, the columns at `posts` along x):
+ * banded ends and a middle panel on the lower beam, a row of small painted blocks in the band over it; and `between`
+ * bracket sets in each bay under the eave.
+ */
+function tkwPaint(builder, side, posts, head, out, paint, between) {
+  const z = [out + 0.1, out + 0.112];
+  for (let k = 0; k + 1 < posts.length; k += 1) {
+    const [a, b] = [posts[k], posts[k + 1]];
+    for (const [from, way] of [[a, 1], [b, -1]]) {
+      let at = from + way * 0.2;
+      for (const [colour, long] of paint.bands) {
+        const [x0, x1] = way > 0 ? [at, at + long] : [at - long, at];
+        builder.box('timber', side, x0, x1, head - 0.61, head - 0.41, ...z, { colour, skip: 'back' });
+        at += way * long;
+      }
+    }
+    const mid = (a + b) / 2;
+    const half = ((b - a) * paint.panel) / 2;
+    builder.box('timber', side, mid - half, mid + half, head - 0.58, head - 0.44, ...z, { colour: paint.panelColour, skip: 'back' });
+    const [long, gap] = paint.blocks;
+    const blocks = Math.max(1, Math.floor((b - a - 0.3) / (long + gap)));
+    const start = mid - (blocks * (long + gap) - gap) / 2;
+    for (let n = 0; n < blocks; n += 1) builder.box('timber', side, start + n * (long + gap), start + n * (long + gap) + long, head - 0.385, head - 0.295, out + 0.04, out + 0.052, { colour: paint.blockColours[n % 2], skip: 'back' });
+    for (let n = 1; n <= between; n += 1) tkgBracket(builder, side.child(a + ((b - a) * n) / (between + 1), head - 0.28, out - 0.05, 0), { colour: paint.rafter, block: paint.block, tiers: TK_WORKS.brackets.tiers });
+  }
 }
 
 /** The columns of tkPavilion's first storey as solids (each a small upright block). */

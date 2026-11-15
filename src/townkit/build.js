@@ -300,9 +300,11 @@ export function tkLantern(builder, x, y, z, { size = 0.2, colour = [0.82, 0.16, 
 /**
  * A storage jar's turning: `sides` round and `rings` up its body. At 10 and 4 a jar a pace from the eye was a
  * ten-sided lantern with a dark stripe down every side; 18 and 8 read as round at that distance (by eye, the canal
- * town's quay). A jar is then 18 x 11 x 2 = about 400 triangles, and a place stands a few dozen.
+ * town's quay), but still faintly faceted, its belly in bands and its rim a polygon, from half a pace (where a
+ * walker stands over a row of Korean storage jars); 26 and 14 read as turned ware there. A jar is then 26 x 17 x 2 =
+ * about 900 triangles, near detail only where a place stands many.
  */
-export const TK_JAR = { sides: 18, rings: 8 };
+export const TK_JAR = { sides: 26, rings: 14 };
 
 /** A glazed storage jar standing at world (x, y, z): `high` m, with a lid or open. */
 export function tkJar(builder, x, y, z, { high = 0.75, colour = [0.42, 0.3, 0.22], lid = true } = {}) {
