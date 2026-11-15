@@ -14,6 +14,8 @@ import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
 import { storyLadders } from './story/ground/wallview.js';
 import { storyProps, storyPropsTick } from './story/ground/props.js';
 import { disposeMaterialTextures } from './toon.js';
+import { PLACE_ENV } from './env/config.js';
+import { mudMaps, mudSurface } from './mudview.js';
 
 export const WORKS_VIEW = {
   // A daubed screen's mud (a palisade with `cover`): grey-brown dried clay.
@@ -65,9 +67,9 @@ function worksRandom(seed) {
 const worksLit = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
 
 /** Put the works of `arena` in the view (null: none), building them the first time. */
-export function showWorks(view, arena) {
+export function showWorks(view, arena, place = null) {
   const spec = arena?.works ?? null;
-  if (view.worksSpec === spec) return;
+  if (view.worksSpec === spec && view.worksPlace === place) return;
   if (view.works) {
     view.scene.remove(view.works.group);
     view.works.group.traverse((object) => {
@@ -80,6 +82,7 @@ export function showWorks(view, arena) {
   }
   view.works = null;
   view.worksSpec = spec;
+  view.worksPlace = place;
   if (!spec) return;
   const works = worksOf(arena);
   const group = new THREE.Group();
@@ -92,9 +95,11 @@ export function showWorks(view, arena) {
   const water = worksStandingWater(view, works, group);
   // (A place that draws its own walls and banks, townkit/works.js, says so: `placeDraws`. The ladders and the rest are still drawn here.)
   if (!spec.placeDraws) for (const ditch of works.ditches) group.add(ditch.bends ? worksRoughDitch(works, ditch, random) : worksDitchStrip(works, ditch));
+  // (In an open-air place the wood edges are the place's own trees, planted by env/index.js: env/trees.js envPlantWoodEdges.)
+  const envDrawsWoods = Boolean(PLACE_ENV[place] && !PLACE_ENV[place].own);
   const stakes = worksStakeMeshes(works.stakes);
   group.add(stakes.group);
-  if (!spec.placeDraws) for (const wall of works.walls) group.add(wall.kind === 'wood' ? worksWoodEdge(wall, random, arena) : wall.kind === 'stone' ? worksStoneWall(wall) : worksPalisade(wall));
+  if (!spec.placeDraws) for (const wall of works.walls) group.add(wall.kind === 'wood' ? (envDrawsWoods ? new THREE.Group() : worksWoodEdge(wall, random, arena)) : wall.kind === 'stone' ? worksStoneWall(wall) : worksPalisade(wall));
   if (spec.gatehouse) group.add(worksGatehouse(spec.gatehouse));
   // Siege ladders at the gaps of a wall to storm (story mode: story/ground/walls.js).
   if (spec.ladders?.length) group.add(storyLadders(works, spec.ladders));
@@ -584,6 +589,11 @@ function worksSoftGround(area, random) {
     water.position.set(centre[0], 0.02, centre[1]);
     water.receiveShadow = true;
     group.add(bed, water);
+    return group;
+  }
+  // Mud: the ground itself, shaped and mapped (mudview.js), the standing water lying in its hollows.
+  if (area.surface === 'mud') {
+    group.add(mudSurface(area, WORKS_VIEW.film.mud, mudMaps()));
     return group;
   }
   const spec = WORKS_VIEW.mud;

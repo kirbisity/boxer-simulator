@@ -137,7 +137,7 @@ export function setPlace(view, place, arena, weather = null) {
   // A place with weather of its own whenever a level brings none (PLACE_WEATHER: the open field's driven grey sky).
   weather ??= PLACE_WEATHER[place] ?? null;
   // A battle's fieldworks (its arena's `works`: stakes, palisades, woods, ditches, mud), over whatever place it is fought in.
-  showWorks(view, arena);
+  showWorks(view, arena, place);
   // A battle map's floor, much wider than the place's own, has the place built for it (scenery.js sceneryFor
   // pushes the backdrop out); the place's own floor and that one are kept side by side, each shown by turns.
   const home = PLACE_ARENAS[place];

@@ -23,8 +23,8 @@ export const KWT_LOOKS = {
   // Clay-water is thick with silt: grey-brown and opaque a few cm down (the furrows only just show), the sky lying grey on it, the silt in darker
   // brown clouds where it is stirred (they stay glossy: `scumRough`). On it floats what the plough turned in and the feet tread up (`litter`): straw and
   // stubble, pale, in short stalks lying every way, and dark crumbs of clod and leaf; m between pieces, the stalks' length, their colours.
-  mud: { colour: 0x564838, roughness: 0.22, metalness: 0.0, reflect: 0.7, opacity: 0.84, scum: 0.85, scumColour: 0x281d12, scumRough: 0.3, wave: 0.55, blood: true,
-    litter: { every: 0.16, length: [0.04, 0.22], straw: 0xa49676, dark: 0x221c14, share: 0.7, drift: 6, sunk: [0.35, 0.85] } },
+  mud: { colour: 0x3e3220, roughness: 0.12, metalness: 0.0, reflect: 0.8, opacity: 0.7, scum: 0.85, scumColour: 0x281d12, scumRough: 0.3, wave: 0.55, blood: true,
+    litter: { every: 0.16, length: [0.04, 0.22], straw: 0xa49676, dark: 0x221c14, share: 0.45, drift: 6, sunk: [0.25, 0.6] } },
   // Rain standing in the hollows of a trodden field (The Last Gate): clear water a few cm deep over dark mud, a mirror of the grey sky at a grazing look,
   // a little silt in it. Blood that falls in clouds it red (`blood`: blooddye.js, as the realistic grounds' puddles do).
   // Its rim (`edge`: from that share of the way out it thins to nothing, ragged by a noise) soaks into the mud rather than ending in a line.
