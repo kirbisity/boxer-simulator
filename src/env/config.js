@@ -896,6 +896,10 @@ export const PLACE_ENV = {
       fall: { from: 30, to: 420, drop: 46 },
       layers: [
         { from: 0, full: 60, height: 1.6, length: 46, shape: 'roll' },
+        // Hummocks: a pasture never grazed level, ant hills and tussock bases a hand or two high a few metres apart
+        // (by eye, against walks over old grassland; not measured). Beyond the fought ground they grow to their
+        // whole height over 15 m, so the land has no seam where the fight's gentler ground ends.
+        { from: 0, full: 15, height: 0.22, length: 5, shape: 'roll' },
         { from: 120, full: 500, height: 55, length: 520, shape: 'roll' },
         { from: 700, full: 2000, height: 190, length: 1500, shape: 'ridge' },
         { from: 2600, full: 5200, height: 520, length: 3600, shape: 'ridge' },
@@ -950,6 +954,8 @@ export const PLACE_ENV = {
       seed: 23,
       layers: [
         { from: 0, full: 90, height: 2.4, length: 90, shape: 'roll' },
+        // Hummocks and hoof-poached hollows of horse pasture (by eye, as the meadow's).
+        { from: 0, full: 15, height: 0.2, length: 6, shape: 'roll' },
         { from: 200, full: 900, height: 38, length: 800, shape: 'roll' },
         { from: 1500, full: 4200, height: 440, length: 3000, shape: 'ridge' },
       ],
@@ -1002,6 +1008,8 @@ export const PLACE_ENV = {
         // (The hills that shut the valley in stand 200 to 300 m over its floor a kilometre or two off, and the
         // mountain to the north over a thousand at about ten: approximate, from memory of the map.)
         { from: 0, full: 50, height: 1.2, length: 40, shape: 'roll' },
+        // Hummocks of the valley floor's rough grazing (by eye, as the meadow's).
+        { from: 0, full: 15, height: 0.18, length: 6, shape: 'roll' },
         { from: 70, full: 520, height: 170, length: 620, shape: 'ridge' },
         { from: 500, full: 2200, height: 560, length: 2000, shape: 'ridge' },
         { from: 2600, full: 7000, height: 1250, length: 4600, shape: 'ridge' },

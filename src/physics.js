@@ -37,6 +37,7 @@ import { ARM_CUTS, brokenLevel, feelShock, LEG_CUTS, MAIMING, openArtery, player
 import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
+import { envLieOf } from './env/lie.js';
 import { collideWorks, faceBetween, faceOutside, FIELDWORKS, floorFor, keepRootOff, looseFloor, mireStep, reliefAt, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { chooseHorseDetail, collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, SEATED_PARTICLES, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
@@ -1744,7 +1745,25 @@ export function fistsOf(body) {
  * @param arena half-sizes of the floor fighters can use, in x and z
  * (a ring is square; a subway platform long and narrow).
  */
+const arenasOnGround = new WeakMap();
+
+/**
+ * An open-air place's floor as the land lies there (env/lie.js: the place's own near rolls, gentler where men fight),
+ * as fieldworks `ground`: the arena with it added, the same object for the same arena and place (its works are
+ * compiled once). An arena that already has ground of its own, a ring, or a place with no lie, is as it was.
+ */
+function arenaOnItsGround(arena, place) {
+  if (!place || arena?.works?.ground) return arena;
+  const field = envLieOf(place, arena);
+  if (!field) return arena;
+  let byPlace = arenasOnGround.get(arena);
+  if (!byPlace) arenasOnGround.set(arena, (byPlace = new Map()));
+  if (!byPlace.has(place)) byPlace.set(place, { ...arena, works: { ...(arena.works ?? {}), ground: [field] } });
+  return byPlace.get(place);
+}
+
 export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null, artillery = null, timeLimit = null, general = null } = {}) {
+  arena = arenaOnItsGround(arena, place);
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.

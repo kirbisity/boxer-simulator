@@ -10,6 +10,7 @@ import { ENV } from './config.js';
 import { envFbm, envValueNoise } from './noise.js';
 import { ENV_GLSL, envUniforms } from './air.js';
 import { ENV_GLSL_PRESS, ENV_PRESS, envPressUniforms } from './press.js';
+import { ENV_LIE, envLieFieldAt, envLieHeight, envLieRoll } from './lie.js';
 
 const envSmooth = (from, to, value) => {
   const t = Math.min(1, Math.max(0, (value - from) / (to - from)));
@@ -18,27 +19,28 @@ const envSmooth = (from, to, value) => {
 
 /**
  * The land's height function for a place: `terrain` (PLACE_ENV's), `keepOut` [halfX, halfZ] the flat ground.
- * Returns (x, z) -> y. Zero, with zero slope, out to keepOut + ENV.terrain.flatMargin.
+ * Returns (x, z) -> y. Out to keepOut + ENV.terrain.flatMargin only the fought ground (lie.js), on `field` (the
+ * physics's own, envLieOf) where given; beyond it the land rises and falls with no slope where it starts.
  */
-export function envHeightField(terrain, keepOut) {
+export function envHeightField(terrain, keepOut, field = null) {
   const margin = ENV.terrain.flatMargin;
-  const seed = terrain.seed;
   const layers = terrain.layers;
   const fall = terrain.fall ?? null;
   return (x, z) => {
+    // The fought ground (lie.js): the near rolls, gentler, through the floor; on the physics's own field where it has one.
+    const fought = (field ? envLieFieldAt(field, x, z) : null) ?? envLieHeight(terrain, x, z) - (field?.base ?? 0);
     const outX = Math.max(0, Math.abs(x) - keepOut[0] - margin);
     const outZ = Math.max(0, Math.abs(z) - keepOut[1] - margin);
     const out = Math.hypot(outX, outZ);
-    if (out <= 0) return 0;
-    let y = 0;
+    if (out <= 0) return fought;
+    let y = fought;
     if (fall) y -= fall.drop * envSmooth(fall.from, fall.to, out);
     for (let index = 0; index < layers.length; index += 1) {
       const layer = layers[index];
-      const share = envSmooth(layer.from, layer.full, out);
+      // (A near roll is already there at ENV_LIE.fought of its height: beyond the floor it grows to the whole of it.)
+      const share = layer.from === 0 ? Math.max(0, envSmooth(layer.from, layer.full, out) - ENV_LIE.fought) : envSmooth(layer.from, layer.full, out);
       if (share <= 0) continue;
-      const octaves = layer.length > 200 ? 5 : 3;
-      if (layer.shape === 'ridge') y += layer.height * share * envFbm(x / layer.length, z / layer.length, seed + index * 7, octaves, true);
-      else y += layer.height * share * (envFbm(x / layer.length, z / layer.length, seed + index * 7, octaves, false) - 0.5) * 2;
+      y += share * envLieRoll(terrain, layer, index, x, z);
     }
     return y;
   };

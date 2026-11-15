@@ -682,7 +682,7 @@ export function walkingDistance(world, from, to) {
   const straight = Math.hypot(to[0] - from[0], to[1] - from[1]);
   if (!works) return straight;
   // Over a ditch and its bank, each stretch as long as its slope makes it to walk (FIELDWORKS.climb, as stepOnWorks slows him).
-  let longest = works.ditches.length ? climbedDistance(works, from, to) : straight;
+  let longest = works.relief ? climbedDistance(works, from, to) : straight;
   for (const wall of wallsOf(works, world)) {
     if (!wallCrosses(from, to, wall.a, wall.b)) continue;
     const round = (end) => Math.hypot(end[0] - from[0], end[1] - from[1]) + Math.hypot(to[0] - end[0], to[1] - end[1]);
@@ -693,8 +693,8 @@ export function walkingDistance(world, from, to) {
 
 /**
  * The way from `from` to `to` straight over the relief: its length, and for the stretch of it across each ditch's
- * profile, each `span` m of that lengthened as its slope slows a man (FIELDWORKS.climb). Only the stretch over a ditch is
- * sampled: a line that does not cross one costs no more than its length.
+ * profile, each `span` m of that lengthened as its slope slows a man (FIELDWORKS.climb), and over the lie of the land
+ * (`ground`) each of its cells the same way. Only those stretches are sampled: elsewhere a line costs its length.
  */
 export function climbedDistance(works, from, to) {
   const spec = FIELDWORKS.climb;
@@ -711,6 +711,23 @@ export function climbedDistance(works, from, to) {
     let before = reliefAt(works, ...at(Math.min(t0, t1)));
     for (let k = 1; k <= steps; k += 1) {
       const here = reliefAt(works, ...at(Math.min(t0, t1) + (Math.abs(t1 - t0) * k) / steps));
+      const grade = (here - before) / (stretch / steps);
+      total += (stretch / steps) * (grade > 0 ? spec.up * grade : -spec.down * grade);
+      before = here;
+    }
+  }
+  // The lie of the land (`ground`), read at its own cells (its triangles are flat inside one; finer reads add nothing).
+  for (const field of works.ground) {
+    const inside = clipToBox(from, to, field.box);
+    if (!inside) continue;
+    const [t0, t1] = [Math.min(...inside), Math.max(...inside)];
+    const stretch = length * (t1 - t0);
+    const cell = Math.min(field.size[0] / field.cells[0], field.size[1] / field.cells[1]);
+    const steps = Math.max(1, Math.ceil(stretch / cell));
+    const heightAt = (t) => fieldHeight(field.heights, field.cells[0], field.cells[1], (from[0] + (to[0] - from[0]) * t - field.box.x[0]) / field.size[0], (from[1] + (to[1] - from[1]) * t - field.box.z[0]) / field.size[1]);
+    let before = heightAt(t0);
+    for (let k = 1; k <= steps; k += 1) {
+      const here = heightAt(t0 + ((t1 - t0) * k) / steps);
       const grade = (here - before) / (stretch / steps);
       total += (stretch / steps) * (grade > 0 ? spec.up * grade : -spec.down * grade);
       before = here;
