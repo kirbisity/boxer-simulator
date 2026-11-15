@@ -1,0 +1,45 @@
+{
+  "about": "The launch video's cut (sample 1, English). entries: the timeline in order; a shot's in/out are seconds of its recording (trailer-out/shots/<shot>.mp4), a plate's card is drawn for `seconds`. cards: the text drawn by titles.html (index = trailer-out/cards/<n>.png); an entry's `cards` lay them over it from..to (seconds into the entry), faded `fade` s. music: pieces of assets/music by timeline second. sfx: which game samples (src/audio/samples) each physics event kind sounds as; ambience: loops under each shot. Read by tools/trailer/assemble.py.",
+  "output": "trailer-sample-en.mp4",
+  "fps": 60,
+  "cards": [
+    { "kind": "caption", "text": "Japanese pirates meet<br>Qi's drilled farmers." },
+    { "kind": "caption", "text": "Pyongyang, 1593. Japan's samurai hold the walls;<br>Ming troops march in under fire." },
+    { "kind": "caption", "text": "Agincourt, 1415,<br>when arrows find the gaps." },
+    { "kind": "caption", "text": "The mud is simulated too." },
+    { "kind": "plate", "kicker": "Level mode · Memories of Dunnottar", "text": "[ Dunnottar ]", "sub": "Not in this sample: the level crashes the page on open (live build too)." },
+    { "kind": "plate", "kicker": "Story · one life, 1587–1621", "text": "You can retry.<br>He couldn't.", "sub": "Stand-in for the game's own end page." },
+    { "kind": "closing", "text": "A gun made a peasant<br>a samurai's equal;" },
+    { "kind": "closing", "text": "Claude Fable 5.2 made one engineer a studio —<br>every age gets its gun." },
+    { "kind": "title", "text": "Historically<br>Accurate<br>Combat<br>Simulator", "sub": "Every blow is physics, not scripted.", "link": "kirbisity.github.io/boxer-simulator" }
+  ],
+  "entries": [
+    { "shot": "canal", "in": 0.8, "out": 9.8, "ambience": ["loop-rain", "loop-din"], "cards": [{ "card": 0, "from": 0.6, "to": 4.6 }] },
+    { "shot": "pyongyangGate", "in": 1.5, "out": 4.0, "ambience": ["loop-wind"], "cards": [{ "card": 1, "from": 0.3, "to": 2.5 }] },
+    { "shot": "pyongyangWall", "in": 0.5, "out": 6.5, "ambience": ["loop-wind", "loop-din"], "cards": [{ "card": 1, "from": 0, "to": 2.6 }] },
+    { "shot": "agincourt", "in": 0.3, "out": 2.4, "ambience": ["loop-wind", "loop-din"], "cards": [{ "card": 2, "from": 0.2, "to": 2.1 }] },
+    { "shot": "agincourtArrow", "in": 0, "out": 2.52, "ambience": ["loop-wind"], "cards": [{ "card": 2, "from": 0, "to": 2.3 }] },
+    { "shot": "agincourt", "in": 4.8, "out": 8.0, "ambience": ["loop-wind", "loop-din"], "cards": [{ "card": 3, "from": 0.4, "to": 3.0 }] },
+    { "plate": 4, "seconds": 2.0 },
+    { "plate": 5, "seconds": 3.5 },
+    { "shot": "sekigahara", "in": 0, "out": 5.4, "ambience": ["loop-wind"], "cards": [{ "card": 6, "from": 2.4, "to": 5.4 }] },
+    { "shot": "joust", "in": 0.6, "out": 11.3, "ambience": ["loop-wind"], "cards": [{ "card": 7, "from": 0, "to": 3.0 }, { "card": 8, "from": 6.6, "to": 10.7, "fade": 0.6 }] }
+  ],
+  "music": [
+    { "file": "forbidden-coast", "at": 0, "in": 24, "until": 17.5, "gain": 0.55, "fadeIn": 0.3, "fadeOut": 0.6 },
+    { "file": "gothic-boss", "at": 17.2, "in": 40, "until": 25.3, "gain": 0.5, "fadeIn": 0.4, "fadeOut": 0.8 },
+    { "file": "frost-palace", "at": 25.3, "in": 2, "until": 30.8, "gain": 0.35, "fadeIn": 0.8, "fadeOut": 0.5 },
+    { "file": "samurais-come", "at": 30.6, "in": 30, "until": 36.2, "gain": 0.5, "fadeIn": 0.2, "fadeOut": 0.4 },
+    { "file": "scottish-cliffs", "at": 36.0, "in": 50, "until": 46.9, "gain": 0.5, "fadeIn": 0.6, "fadeOut": 1.6 }
+  ],
+  "sfx": {
+    "clash": "clash", "bladeBlock": "clash", "parry": "clash",
+    "blocked": "woodshield", "glance": "platepunch", "shieldBroke": "break", "weaponBroke": "break", "broken": "break",
+    "shot": "gunshot", "matchlock": "gunshot",
+    "arrow": "stab", "severed": "slice", "beatenThrough": "bonehit", "impact": "bonehit",
+    "fell": "bodyfall", "floored": "bodyfall", "knockout": "bodyfall", "unhorsed": "bodyfall", "horseDown": "neigh",
+    "killed": "voice-male-dying", "staggered": "voice-male-hurt", "dazed": "voice-male-hurt", "panic": "voice-male-fear",
+    "disarmed": "clatter", "caught": "clash"
+  },
+  "mix": { "minGain": { "gunshot": 0.85, "neigh": 0.5, "bodyfall": 0.35 }, "sfxGain": 0.9, "ambienceGain": 0.22, "loudness": -14, "maxPerHalfSecond": 7 }
+}

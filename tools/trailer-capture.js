@@ -312,6 +312,30 @@ export const TC = {
     this.camera = { pos: [best.eye[0], height, best.eye[1]], look: [m[0], lookUp, m[1]], fov };
     return { room: +best.room.toFixed(2), bearing: +best.a.toFixed(2), middle: m.map((v) => +v.toFixed(1)) };
   },
+  // One recorded frame: the game stepped `dt` s (playFrames), and the events since the last step, each with how far it was from the camera
+  // (m) and whether it was the played man's (the sound mix's: tools/trailer/assemble.py).
+  step(dt = 1 / 60) {
+    const boxer = window.boxer;
+    const w = boxer.state.world;
+    this.cursor ??= w.events.length;
+    if (this.cursor > w.events.length) this.cursor = 0;
+    boxer.playFrames(1, dt);
+    const cam = boxer.scene.camera.position;
+    const out = [];
+    for (let i = this.cursor; i < w.events.length; i += 1) {
+      const e = w.events[i];
+      const who = e.fighter ?? e.attacker ?? e.defender;
+      const p = e.point ?? (who != null && w.fighters[who] ? [w.fighters[who].x[0], w.fighters[who].x[1], w.fighters[who].x[2]] : null);
+      out.push({ kind: e.kind, d: p ? Math.hypot(p[0] - cam.x, p[1] - cam.y, p[2] - cam.z) : 30, mine: who != null && Boolean(w.fighters[who]?.player), weapon: e.weapon, target: e.target });
+    }
+    this.cursor = w.events.length;
+    return out;
+  },
+  // Start the event log from now (the frames before a take are not heard).
+  mark() {
+    this.cursor = window.boxer.state.world.events.length;
+    return this.cursor;
+  },
   where(id) {
     const man = window.boxer.state.world.fighters[id];
     return { root: man.root, state: man.state, corner: man.corner, weapon: man.weapon?.kind };
