@@ -18,9 +18,9 @@ export const STAGE_ONE = {
   ],
 };
 
-// The Level Mode menu's list: Stage 1 is open, the next is shown and not open yet.
+// The stages as Story mode lists them (menu.js stories()): only the open ones are shown.
 export const STAGE_LIST = [
-  { key: STAGE_ONE.key, number: 1, ready: true, glyph: 'castle', kicker: 'Playable', title: `Stage 1 · ${STAGE_ONE.title}`, blurb: 'A sea-cliff fortress in a storm. Cut through the garrison to Lord Vaelen at the summit.' },
+  { key: STAGE_ONE.key, number: 1, ready: true, glyph: 'castle', kicker: 'Scotland · c. 1500', title: STAGE_ONE.title, blurb: 'A sea-cliff fortress in a storm. Cut through the garrison to Lord Vaelen at the summit.' },
   { key: null, number: 2, ready: false, glyph: 'lock', kicker: 'Locked', title: 'Stage 2 · Coming soon', blurb: 'Not yet unlocked.' },
 ];
 
