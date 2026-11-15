@@ -60,6 +60,30 @@ WEAR_KINDS = {
         'grime': [0.45, (0.2, 0.16, 0.12), 0.8],
         'rust': [2500, 0.0004, 0.0012, 0.5, (0.42, 0.25, 0.14)],
     },
+    # Munition plate (a footman's or a rōnin's limb plates, kettle hats, sallets for the rank and file): left from the hammer
+    # and only roughly ground, so the tile is already blotchy and rough. Set against `steel` and judged on the footman's and
+    # rōnin's sheets: a third of its fine scratches (a rough face hides them) and half its added dulling, a little more tarnish
+    # in the patches, more dirt in the dents and twice the rust freckles (kit kept by no squire).
+    'munition': {
+        'scratches': [1400, 0.006, 0.05, 0.00008, 0.0003, 0.4, 0.25, 0.1], 'across': 1.6,
+        'dull': [0.02, 0.045, 0.01], 'patch': [0.03, 0.11],
+        'tarnish': [0.07, (0.93, 0.87, 0.8)],
+        'grime': [0.6, (0.2, 0.17, 0.14), 0.8],
+        'rust': [2400, 0.0003, 0.0011, 0.6, (0.4, 0.24, 0.14)],
+    },
+    # Cloth with rivet heads over hidden plates (a brigandine, a coat of plates): no scratches on the cloth and nothing to
+    # rust on it, the heads dulled and a little tarnished as the steel is, the cloth's shade a little uneven in the same soft
+    # patches, and `rings` [how much darker, how far round (m)]: a dark ring of rubbed-in dirt on the cloth round each head
+    # (the tile's first mask), where it is handled and where the head stands proud. Set against the steel recipe and the
+    # Ming gunner's and banner coats' sheets; the cloth already reads as cloth, so the rings carry the used look.
+    'studdedCloth': {
+        'scratches': None, 'across': 1,
+        'dull': [0.03, 0.06, 0.0], 'patch': [0.03, 0.1],
+        'tarnish': [0.07, (0.92, 0.86, 0.78)],
+        'grime': [0.0, (0.2, 0.17, 0.14), 0.8],
+        'rust': None,
+        'rings': [0.22, 0.0025],
+    },
     # Lacquer over iron or rawhide (a tosei do's lames): hard and glossy, so it keeps its shine but gathers fine scratches and
     # dust, and flakes in small chips where edges knock.
     'lacquer': {
@@ -82,7 +106,24 @@ WEAR = {
     'harnessEdge': ('steel', (0.05, 0.025)),
     'mail': ('mail', (0.048, 0.048)),
     'yokohagi': ('lacquer', (0.12, 0.08)),
+    'kozane': ('lacquer', (0.1, 0.12)),
+    'sugake': ('lacquer', (0.1, 0.1)),
     'knightSallet': ('steel', (0.4, 0.4)),
+    'knightHounskull': ('steel', (0.4, 0.4)),
+    'knightCloseHelmet': ('steel', (0.4, 0.4)),
+    'munitionPlate': ('munition', (0.16, 0.16)),
+    'etched': ('steel', (0.12, 0.12)),
+    'brigandine': ('studdedCloth', (0.096, 0.096)),
+    'euroBrigandine': ('studdedCloth', (0.128, 0.1)),
+    'lamellae': ('steel', (0.09, 0.1)),
+    'formKettleRidged': ('munition', (0.4, 0.4)),
+    'formKettleBurgundian': ('munition', (0.4, 0.4)),
+    'formSalletGerman': ('munition', (0.4, 0.4)),
+    'formCabassetSpanish': ('munition', (0.4, 0.4)),
+    # (A war mask's sheet is half a face, about 0.2 m to a side.)
+    'maskOni': ('lacquer', (0.2, 0.2)),
+    'maskRessei': ('lacquer', (0.2, 0.2)),
+    'maskTengu': ('lacquer', (0.2, 0.2)),
 }
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -144,13 +185,25 @@ def marks(shape, metres, rng, draw_one, count, oversample=4):
     return np.asarray(big.resize((columns, rows), Image.BOX), dtype=np.float64)
 
 
-def worn(name, colour, normal, orm):
+def laced_tiles():
+    """The tiles whose two masks are lacing (src/detailmaps.js DETAIL_ARMOUR, `masks: 'lace'`): drawn in the cords' colours."""
+    import re
+    with open(os.path.join(ROOT, 'src', 'detailmaps.js')) as file:
+        return set(re.findall(r"^  (\w+): \{[^\n]*masks: 'lace'", file.read(), re.M))
+
+
+def worn(name, colour, normal, orm, keep=None, studs=None):
     """
     A tile's maps worn: `colour` (h, w, 3), `normal` (h, w, 3: 0..1, as packed), `orm` (h, w, 3: occlusion, roughness,
     metalness), floats 0..1, all one size. Returns the three, the same shapes. A tile not in WEAR comes back as it was.
+    `keep` (h, w; 0..1): how much of each pixel is another material than the map's kind, which keeps its clean maps: a laced
+    tile's lacing (its two masks; the shader draws the cords there in their own colours over this albedo), a war mask's
+    teeth, gilt and hair (all but its lacquer, the albedo's alpha). The plates' scratches, chips and dust are not theirs.
+    `studs` (h, w; 0..1): the tile's first mask where it marks rivet heads (a studded cloth's), for the kinds with `rings`.
     """
     if name not in WEAR:
         return colour, normal, orm
+    clean = (colour.astype(np.float64).copy(), normal.astype(np.float64).copy(), orm.astype(np.float64).copy())
     kind, metres = WEAR[name]
     spec = WEAR_KINDS[kind]
     rng = np.random.default_rng(seed_of(name))
@@ -245,6 +298,12 @@ def worn(name, colour, normal, orm):
         colour = colour * (1 - dust[:, :, None]) + np.minimum(1, colour * np.asarray(dust_colour)[None, None, :] + 0.25) * dust[:, :, None]
         roughness = roughness * (1 - dust) + 0.8 * dust
 
+    # Studded cloth: a ring of dirt on the cloth round each head.
+    if spec.get('rings') and studs is not None:
+        darker, reach = spec['rings']
+        ring = np.clip(blur_wrap(np.clip(studs, 0, 1), reach * per_metre[0]) * 2.5, 0, 1) * (1 - np.clip(studs, 0, 1)) * darker
+        colour *= 1 - ring[:, :, None]
+
     # The grooves and pits as slopes of the normal map (the height is in units of the slope a full mark has at its edge).
     if np.any(height):
         soft = blur_wrap(height, 0.5)
@@ -257,7 +316,11 @@ def worn(name, colour, normal, orm):
 
     orm[:, :, 1] = np.clip(roughness, 0.04, 1)
     orm[:, :, 2] = np.clip(metal, 0, 1)
-    return np.clip(colour, 0, 1), n * 0.5 + 0.5, orm
+    colour, n = np.clip(colour, 0, 1), n * 0.5 + 0.5
+    if keep is not None:
+        share = np.clip(keep, 0, 1)[:, :, None]
+        colour, n, orm = (worn_map * (1 - share) + clean_map * share for worn_map, clean_map in zip((colour, n, orm), clean))
+    return colour, n, orm
 
 
 def images_of(block):
@@ -285,6 +348,7 @@ def main():
         del arguments[at:at + 2]
         os.makedirs(preview, exist_ok=True)
     clean_dir, names = arguments[0], arguments[1:] or list(WEAR)
+    laced = laced_tiles()
     for file_name, table, quality in (
         ('detailmaps-data.js', pack.ARMOUR, lambda name, key: pack.ARMOUR[name]['quality']),
         ('helmmaps-data.js', packhelm.SHEETS, lambda name, key: packhelm.QUALITY[key]),
@@ -309,7 +373,13 @@ def main():
             albedo = np.asarray(images['albedo'], dtype=np.float64) / 255
             normal = np.asarray(images['normal'], dtype=np.float64) / 255
             orm = np.asarray(images['orm'].convert('RGB').resize(size, Image.BICUBIC), dtype=np.float64) / 255
-            colour, n, o = worn(name, albedo[:, :, :3], normal[:, :, :3], orm)
+            keep = None
+            if name in laced and albedo.shape[2] == 4 and normal.shape[2] == 4:
+                keep = np.maximum(albedo[:, :, 3], normal[:, :, 3])
+            elif packhelm.SHEETS.get(name, {}).get('alpha') and albedo.shape[2] == 4:
+                keep = 1 - albedo[:, :, 3]
+            studs = albedo[:, :, 3] if WEAR_KINDS[WEAR[name][0]].get('rings') and albedo.shape[2] == 4 else None
+            colour, n, o = worn(name, albedo[:, :, :3], normal[:, :, :3], orm, keep, studs)
             if preview:
                 for key, array in (('albedo', colour), ('normal', n), ('orm', o)):
                     Image.fromarray(pack.to8(array)).save(os.path.join(preview, f'{name}.{key}.png'))
