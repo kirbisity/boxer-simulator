@@ -1719,6 +1719,7 @@ function addPatch(mesh, rings, corners, role, bones) {
     mesh.colors.push(role);
     mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
     mesh.stiff.push(bodyAt(mesh, ring, angle));
+    (mesh.gridRing ??= new Map()).set(start + index, ring);
     patchUv(mesh, rings, role, start + index, place, angle);
     ridePiece(mesh, rings, place, angle, start + index);
   }
@@ -1750,6 +1751,7 @@ function addGrid(mesh, rings, grid, role, bones) {
       mesh.colors.push(role);
       mesh.bones.push(bones(rings[Math.round(Math.max(0, Math.min(rings.length - 1, place)))], Math.cos(angle)));
       mesh.stiff.push(bodyAt(mesh, ring, angle));
+      (mesh.gridRing ??= new Map()).set(mesh.positions.length / 3 - 1, ring);
       patchUv(mesh, rings, role, mesh.positions.length / 3 - 1, place, angle);
       ridePiece(mesh, rings, place, angle, mesh.positions.length / 3 - 1);
     }
@@ -3348,6 +3350,10 @@ function fitClothToBase(mesh, parts, armoured) {
   }
   // (Each worn point's part, for its weights: clothHeat.)
   mesh.wornPart = new Map([...shares].map(([vertex, { name }]) => [vertex, name]));
+  // (And the faces built over a part's rings, a sode's lames, a skirt's plates (addGrid, addPatch): their part is their rings'. Weighted
+  // by the nearest skin of any part, a fat samurai's skirt plates took the hanging forearm's beside the hip and were dragged
+  // out to the hand in bars.)
+  for (const [vertex, ring] of mesh.gridRing ?? []) if (!mesh.wornPart.has(vertex) && partOf(ring)) mesh.wornPart.set(vertex, partOf(ring));
   const byRing = new Map();
   // (The cloth that lies on the skin, found beneath it no further in than `tightest`: it turns as that skin does, clothHeat,
   // whatever bones its loft gave it. Trunks lofted to hang from the pelvis, the spine and both thighs parted from a fat belly
