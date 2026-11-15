@@ -29,6 +29,12 @@ const CLOTH_WIND_UNIFORMS = { uWindTime: { value: 0 }, uWindWay: { value: null }
 
 const clothWindWay = () => (CLOTH_WIND_UNIFORMS.uWindWay.value ??= new THREE.Vector2(1, 0));
 
+/** The shared wind uniforms ({ uWindTime, uWindWay, uWindStrength }), for a material of another module that moves in the same air. */
+export function clothWindUniforms() {
+  clothWindWay();
+  return CLOTH_WIND_UNIFORMS;
+}
+
 /** Set the air for this frame from the view's place and weather at the fight's time. */
 export function updateClothWind(view, world) {
   if (!view.clothWindBase || view.clothWindFor !== view.place || view.clothWindWeather !== (view.weather ?? null)) {

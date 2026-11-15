@@ -1,6 +1,7 @@
 # The helmets' and masks' maps (helmforms.py's and helmsheets.py's colour, roughness, metalness and masks; helmbake.py's
 # normal map and occlusion) packed as WebP into src/helmmaps-data.js. Plain Python 3 (numpy, Pillow). A sheet not baked
-# in the folder keeps the entry src/helmmaps-data.js has for it.
+# in the folder keeps the entry src/helmmaps-data.js has for it. A sheet goes through wear.py on the way (`worn`): the used
+# look of its material is part of the packed maps.
 #
 #   python3 tools/blender/packhelm.py <bake dir> [--preview]
 #
@@ -17,6 +18,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pack import normals, resample, to8, webp  # noqa: E402
+import wear  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SHEETS = {
@@ -45,7 +47,9 @@ def pack(folder, name, spec, preview):
     colour = resample(colour, size)
     rough = load(folder, name, 'src_rough')[:, :, None]
     metal = load(folder, name, 'src_metal')[:, :, None]
-    orm = resample(np.concatenate([ao, rough, metal], axis=2), size // 2)
+    # (The used look of the sheet's material, wear.py, laid on at the sheet's full size.)
+    colour, n, orm = wear.worn(name, colour, n, resample(np.concatenate([ao, rough, metal], axis=2), size))
+    orm = resample(orm, size // 2)
     out = {}
     if spec.get('alpha'):
         lacquer = resample(load(folder, name, 'src_mask')[:, :, None], size)

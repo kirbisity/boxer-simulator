@@ -15,7 +15,7 @@ import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildQingHood, buildTassel } from './chinahelmview.js';
-import { HONGYING_MOUNTS, mingHoodGrid, TASSELS } from './chinahelms.js';
+import { HONGYING_MOUNTS, mingHoodGrid, SWING, swingStep, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, headRadiusAt, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf, knightGrid } from './knighthelms.js';
 
@@ -704,7 +704,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'kabuto':
-      buildKabuto(group, head, r, steel, color);
+      buildKabuto(group, head, r, steel, color, lowDetail);
       fitted = true;
       break;
     case 'arenaHelm':
@@ -2522,49 +2522,96 @@ function metal(steel, hex) {
 // the bowl and falling over the neck guard to the shoulders, wild and uneven; never across the face.
 const SHAGUMA = { locks: 220, width: 0.13, length: [1.8, 3.7], lift: 0.25, droop: 4.2, segments: 7 };
 
+// A plume of yak hair (the white, red or black haguma of the tōsei kabuto of the 16th-17th
+// c.): bound at the bowl's point, standing a little from it and falling down the back and both sides to below the
+// chin, the brow and face kept clear; `tone`: how light its shadows stay (white hair is not grey at its roots).
+// `spread`: how far a lock keeps heading outward as it falls; `over` (head radii): how far it lies off the helmet it falls over.
+const HAGUMA = { locks: 420, width: 0.07, length: [3.3, 4.7], lift: 0.3, droop: 7, spread: 0.12, segments: 10, tone: [0.74, 0.26], over: 0.05 };
+// How helmet hair swings (maneSwing): its free ends on a spring `stiffness` (1/s²) and `damping` (1/s) behind the head, at most
+// `reach` of a lock's length off where it hangs.
+const MANE_SWING = { stiffness: 60, damping: 5, reach: 0.4 };
+
 /** The hair growing out of the kabuto's bowl (KABUTO_FORM): one mesh of tapering strands, greys varied lock by lock. */
-function shagumaHair(form, r, colour) {
-  const base = new THREE.Color(colour);
-  const positions = [];
-  const colours = [];
-  const indices = [];
-  // A fixed sequence, so every fighter's mane is the same hair.
-  let seed = 7;
-  const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-  for (let lock = 0; lock < SHAGUMA.locks; lock += 1) {
-    const side = lock % 2 ? 1 : -1;
-    // Round from over the brow's corner (u 0.14: the face kept clear) to the nape (u 1), up from near the foot to the crown.
+function shagumaHair(form, r, colour, still = false) {
+  // Round from over the brow's corner (u 0.14: the face kept clear) to the nape (u 1), up from near the foot to the crown.
+  return hairLocks(r, colour, SHAGUMA, still, (random, side) => {
     const u = 0.14 + 0.86 * random();
     const v = 0.3 + 0.62 * Math.sqrt(random());
     const root = formPoint(form.bowl, u, v).map((value) => value * r);
     root[2] *= side;
-    const outward = new THREE.Vector3(root[0], root[1] - 0.2 * r, root[2]).normalize();
-    // Longer behind than at the temples; the crown's locks stand up before they fall.
-    const length = (SHAGUMA.length[0] + (SHAGUMA.length[1] - SHAGUMA.length[0]) * (0.35 + 0.65 * u) * (0.6 + 0.4 * random())) * r;
-    const lift = SHAGUMA.lift * (random() - 0.35);
+    // Longer behind than at the temples.
+    return { root, outward: new THREE.Vector3(root[0], root[1] - 0.2 * r, root[2]).normalize(), reach: 0.35 + 0.65 * u };
+  });
+}
+
+/**
+ * A plume of yak hair (HAGUMA) bound at a bowl's point (`top`, head radii up) and falling round it, clear of the face, over
+ * the helmet's `hull` ([y, radius] up its axis, head radii: the bowl and the neck guard under it).
+ */
+function hagumaHair(r, colour, top, hull, still = false) {
+  return hairLocks(r, colour, { ...HAGUMA, hull }, still, (random, side) => {
+    // Round from beside the temple to the nape, thickest behind; each lock leaves the point outward and a little up.
+    const turn = Math.PI * (0.3 + 0.7 * Math.sqrt(random()));
+    const outward = new THREE.Vector3(Math.cos(turn), 0.25, side * Math.sin(turn)).normalize();
+    const root = [outward.x * 0.1 * r, (top - 0.12 * random()) * r, outward.z * 0.1 * r];
+    return { root, outward, reach: 0.6 + 0.4 * (turn / Math.PI) };
+  });
+}
+
+/**
+ * Hair set into a helmet: one mesh of tapering strands (`spec`: SHAGUMA, HAGUMA), each lock from `lockAt(random, side)`
+ * ({ root, outward, reach: its share of the full length }), its shade varied lock by lock. It swings (maneSwing) unless `still`.
+ */
+function hairLocks(r, colour, spec, still, lockAt) {
+  const base = new THREE.Color(colour);
+  const [dark, gain] = spec.tone ?? [0.45, 0.3];
+  // The helmet's radius at a height (`spec.hull`), which a lock lies over: none above or below it.
+  const hullAt = (y) => {
+    const hull = spec.hull;
+    if (!hull || y < hull[0][0] || y > hull.at(-1)[0]) return 0;
+    const upper = hull.findIndex(([height]) => height >= y) || 1;
+    const [[y0, r0], [y1, r1]] = [hull[upper - 1], hull[upper]];
+    return r0 + ((r1 - r0) * (y - y0)) / (y1 - y0 || 1);
+  };
+  const positions = [];
+  const colours = [];
+  const indices = [];
+  const shares = [];
+  // A fixed sequence, so every fighter's mane is the same hair.
+  let seed = 7;
+  const random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+  for (let lock = 0; lock < spec.locks; lock += 1) {
+    const { root, outward, reach } = lockAt(random, lock % 2 ? 1 : -1);
+    const length = (spec.length[0] + (spec.length[1] - spec.length[0]) * reach * (0.6 + 0.4 * random())) * r;
+    // The crown's locks stand up before they fall.
+    const lift = spec.lift * (random() - 0.35);
     const grey = base.clone().offsetHSL(0, 0, (random() - 0.5) * 0.22);
     const first = positions.length / 3;
     let at = new THREE.Vector3(...root);
     // Out from the bowl at first, a crown lock a little up or down, then falling.
     let heading = new THREE.Vector3(outward.x, outward.y * 0.45 + lift, outward.z).normalize();
-    for (let step = 0; step <= SHAGUMA.segments; step += 1) {
-      const t = step / SHAGUMA.segments;
+    for (let step = 0; step <= spec.segments; step += 1) {
+      const t = step / spec.segments;
       // The strand's breadth across it, flat to the bowl: tangent to the outward direction and the heading.
       const across = new THREE.Vector3().crossVectors(heading, outward).normalize();
       if (across.lengthSq() < 1e-6) across.set(0, 0, 1);
-      const half = SHAGUMA.width * r * (1 - 0.85 * t) * (0.7 + 0.6 * random());
+      const half = spec.width * r * (1 - 0.85 * t) * (0.7 + 0.6 * random());
       positions.push(at.x - across.x * half, at.y - across.y * half, at.z - across.z * half, at.x + across.x * half, at.y + across.y * half, at.z + across.z * half);
-      const shade = grey.clone().multiplyScalar(0.45 + 0.3 * t);
+      const shade = grey.clone().multiplyScalar(dark + gain * t);
       colours.push(shade.r, shade.g, shade.b, shade.r, shade.g, shade.b);
-      if (step < SHAGUMA.segments) {
+      shares.push((t * t * length) / (spec.length[1] * r), (t * t * length) / (spec.length[1] * r));
+      if (step < spec.segments) {
         const a = first + step * 2;
         indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
       }
       // Each segment bends the strand down under its weight and a little outward, with a kink of its own.
-      at = at.clone().addScaledVector(heading, length / SHAGUMA.segments);
+      at = at.clone().addScaledVector(heading, length / spec.segments);
+      const need = (hullAt(at.y / r) + (spec.over ?? 0)) * r;
+      const out = Math.hypot(at.x, at.z);
+      if (need > out && out > 1e-6) { at.x *= need / out; at.z *= need / out; }
       heading = heading.clone()
-        .addScaledVector(new THREE.Vector3(0, -1, 0), SHAGUMA.droop / SHAGUMA.segments)
-        .addScaledVector(new THREE.Vector3(outward.x, 0, outward.z), 0.5 / SHAGUMA.segments)
+        .addScaledVector(new THREE.Vector3(0, -1, 0), spec.droop / spec.segments)
+        .addScaledVector(new THREE.Vector3(outward.x, 0, outward.z), (spec.spread ?? 0.5) / spec.segments)
         .add(new THREE.Vector3((random() - 0.5) * 0.3, 0, (random() - 0.5) * 0.3))
         .normalize();
     }
@@ -2576,8 +2623,66 @@ function shagumaHair(form, r, colour) {
   geometry.computeVertexNormals();
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
   const mane = new THREE.Mesh(geometry, material);
+  mane.name = 'helm-hair';
   mane.userData.noOutline = true;
+  if (!still) mane.userData.swing = maneSwing(mane, shares, spec.length[1] * r);
   return mane;
+}
+
+const maneScratch = { inverse: null, from: null, to: null };
+
+/**
+ * Helmet hair's swing (`userData.swing`: update(dt, hitAt, time) each frame; render.js): a weight hung a lock's `length` (m)
+ * under the helmet (chinahelms.js swingStep), left behind by the head's running, turning and ducking and thrown by a blow to
+ * it; each vertex moved by its share (`shares`: none at the root, most at the longest lock's end) of how far the weight is
+ * off where it hangs.
+ */
+function maneSwing(mesh, shares, length) {
+  const s = maneScratch;
+  if (!s.inverse) Object.assign(s, { inverse: new THREE.Matrix4(), from: new THREE.Vector3(), to: new THREE.Vector3() });
+  const rest = Float32Array.from(mesh.geometry.attributes.position.array);
+  let state = null;
+  let lastHit = null;
+  let moved = false;
+  const swing = {
+    angle: 0,
+    kick(direction, speed) {
+      if (state) for (let axis = 0; axis < 3; axis += 1) state.velocity[axis] += direction[axis] * speed;
+    },
+    update(dt, hitAt = null, time = 0) {
+      const parent = mesh.parent;
+      if (!parent || !(dt > 0)) return;
+      parent.updateWorldMatrix(true, false);
+      const pivot = s.from.setFromMatrixPosition(parent.matrixWorld).toArray();
+      state = swingStep(state, { pivot, target: [0, -1, 0], length, stiffness: MANE_SWING.stiffness, damping: MANE_SWING.damping }, dt);
+      if (hitAt !== null && hitAt !== lastHit && time - hitAt >= 0 && time - hitAt < 0.2) {
+        lastHit = hitAt;
+        const angle = Math.random() * Math.PI * 2;
+        swing.kick([Math.cos(angle), 0.4, Math.sin(angle)], SWING.hitSpeed);
+      }
+      // How far the weight is off where it hangs (world), no more than `reach` of the length; in the helmet's frame.
+      const off = [state.tip[0] - pivot[0], state.tip[1] - pivot[1] + length, state.tip[2] - pivot[2]];
+      const far = Math.hypot(...off);
+      swing.angle = Math.min(far / length, MANE_SWING.reach);
+      if (swing.angle < 0.004 && !moved) return;
+      moved = swing.angle >= 0.004;
+      const scale = far > 1e-9 ? (swing.angle * length) / far : 0;
+      s.inverse.copy(parent.matrixWorld).invert();
+      s.to.set(pivot[0] + off[0] * scale, pivot[1] + off[1] * scale, pivot[2] + off[2] * scale).applyMatrix4(s.inverse);
+      s.from.applyMatrix4(s.inverse);
+      const [x, y, z] = [s.to.x - s.from.x, s.to.y - s.from.y, s.to.z - s.from.z];
+      const position = mesh.geometry.attributes.position;
+      const array = position.array;
+      for (let vertex = 0; vertex < shares.length; vertex += 1) {
+        const share = shares[vertex];
+        array[vertex * 3] = rest[vertex * 3] + x * share;
+        array[vertex * 3 + 1] = rest[vertex * 3 + 1] + y * share;
+        array[vertex * 3 + 2] = rest[vertex * 3 + 2] + z * share;
+      }
+      position.needsUpdate = true;
+    },
+  };
+  return swing;
 }
 
 /** A path of points over the kabuto's fitted bowl (helmforms.js formPoint: u round from the face, v up), a little proud of it. */
@@ -2590,10 +2695,16 @@ const NANBAN_SKULL = {
   outline: [[1.16, 0.12], [1.15, 0.4], [1.08, 0.78], [0.92, 1.18], [0.66, 1.58], [0.36, 1.92], [0.1, 2.14], [0, 2.18]],
   brim: 0.3, rivets: 14, rivetY: 0.24,
 };
+// The shiinari ("acorn-shaped") bowl of the tōsei kabuto (russet iron, 16th-17th c.):
+// plates raised tall to a blunt point, the join a ridge down the front and back, a close row of rivets round the foot and a
+// narrow flat brim all round in place of the peak.
+const SHIINARI_SKULL = {
+  outline: [[1.16, 0.12], [1.17, 0.5], [1.14, 0.9], [1.05, 1.32], [0.9, 1.72], [0.68, 2.08], [0.42, 2.36], [0.16, 2.52], [0, 2.56]],
+  brim: 0.14, rivets: 26, rivetY: 0.26,
+};
 
 /** The Nanban kabuto's skull: a lathe of NANBAN_SKULL's outline drawn in to the bowl's oval, its brim and its rivets. */
-function nanbanSkull(r, material) {
-  const spec = NANBAN_SKULL;
+function nanbanSkull(r, material, spec = NANBAN_SKULL) {
   const oval = KABUTO_FORM.side / KABUTO_FORM.front;
   const skull = new THREE.Mesh(new THREE.LatheGeometry(spec.outline.map(([radius, y]) => new THREE.Vector2(radius * r, y * r)).reverse(), 24), material);
   skull.scale.z = oval;
@@ -2623,6 +2734,8 @@ function nanbanSkull(r, material) {
  *   ring at the crown.
  * - nanban: the Nanban kabuto, a European cabasset's skull bought or copied from the Portuguese (nanbanSkull): one piece of
  *   thicker steel, no seams for a blow to open, its brim in place of the peak.
+ * - shiinari: the tall acorn-shaped bowl (SHIINARI_SKULL), its brim in place of the peak.
+ * `skull`: a bowl raised to a point (nanbanSkull's outline), not the fitted dome.
  * - zunari: the "head-shaped" bowl of three plain plates, the cheap strong helmet of the 1600s, its seam along the crown and
  *   its brow embossed in a scowl's wrinkles (the Met's zunari kabuto with menpo, 17th c.).
  */
@@ -2640,7 +2753,8 @@ const KABUTO_BOWLS = {
       group.add(crown);
     },
   },
-  nanban: { peak: false, dress() {} },
+  nanban: { peak: false, skull: NANBAN_SKULL, dress() {} },
+  shiinari: { peak: false, skull: SHIINARI_SKULL, dress() {} },
   zunari: {
     peak: true,
     dress(group, { form, r, bowlSteel }) {
@@ -2665,7 +2779,7 @@ const KABUTO_BOWLS = {
  * fitted over the head (helmforms.js KABUTO_FORM), longer than it is broad;
  * the shikoro hangs from its foot, oval as it is, rounding out as it flares.
  */
-function buildKabuto(group, head, r, steel, color) {
+function buildKabuto(group, head, r, steel, color, lowDetail = false) {
   const bowlSteel = metal(steel, color);
   const gold = metal(steel, head.gold ?? 0xd6a743);
   const lace = surface(head.lace ?? 0x1d2a4f);
@@ -2678,7 +2792,7 @@ function buildKabuto(group, head, r, steel, color) {
   bowlGeometry.computeVertexNormals();
   // The bowl in its construction (KABUTO_BOWLS): the suji-bachi's riveted plates, the Nanban's one-piece skull, the zunari.
   const build = KABUTO_BOWLS[head.design] ?? KABUTO_BOWLS.suji;
-  const bowl = build === KABUTO_BOWLS.nanban ? nanbanSkull(r, bowlSteel) : new THREE.Mesh(bowlGeometry, bowlSteel);
+  const bowl = build.skull ? nanbanSkull(r, bowlSteel, build.skull) : new THREE.Mesh(bowlGeometry, bowlSteel);
   bowl.name = 'kabuto-bowl';
   group.add(bowl);
   build.dress(group, { form, r, gold, bowlSteel, steel });
@@ -2701,6 +2815,8 @@ function buildKabuto(group, head, r, steel, color) {
     lame.material.side = THREE.DoubleSide;
     lame.position.y = -0.05 * r - tier * 0.24 * r;
     lame.scale.z = narrow;
+    // Each tier a row of laced scales (detailmaps.js HELMET_PART_TILES).
+    lame.userData.helmPart = 'shikoro';
     const cord = new THREE.Mesh(new THREE.CylinderGeometry(bottom * 1.005, bottom * 1.01, 0.05 * r, 22, 1, true, Math.PI * 0.82, Math.PI * 1.36), lace);
     cord.material = lace.clone();
     cord.material.side = THREE.DoubleSide;
@@ -2779,13 +2895,21 @@ function buildKabuto(group, head, r, steel, color) {
   const turnback = head.greatWings ? 0 : head.fukigaeshi ?? 1;
   for (const side of [1, -1]) {
     if (!turnback) break;
-    const flap = new THREE.Mesh(new THREE.BoxGeometry(0.45 * r * turnback, 0.42 * r * turnback, 0.06 * r), bowlSteel);
+    // A plate rounded at its outer corners, lacquered as the bowl, in a gilt border, the mon a gilt stud on its face.
+    const [wide, tall] = [0.24 * r * turnback, 0.23 * r * turnback];
+    const outline = (grow) => [[0, -tall - grow], [wide * 0.7 + grow, -tall - grow], [wide + grow, -tall * 0.55], [wide + grow, tall + grow], [0, tall + grow]];
+    const flap = new THREE.Group();
+    const border = plateShape(outline(0.03 * r), 0.04 * r, gold);
+    const face = plateShape(outline(-0.02 * r), 0.05 * r, bowlSteel);
+    face.position.x = 0.005 * r;
+    const mon = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * r * turnback, 0.1 * r * turnback, 0.07 * r, 12), gold);
+    mon.rotation.z = Math.PI / 2;
+    mon.position.x = 0.035 * r;
+    flap.add(border, face, mon);
     flap.position.set(0.55 * r, -0.05 * r, side * (Math.cos(Math.PI * 0.18) * shikoro(0).z / r + 0.29 + 0.25 * (turnback - 1)) * r);
-    flap.rotation.y = side * -0.6;
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.47 * r * turnback, 0.06 * r, 0.07 * r), gold);
-    edge.position.copy(flap.position).add(new THREE.Vector3(0, 0.2 * r * turnback, 0));
-    edge.rotation.y = flap.rotation.y;
-    group.add(flap, edge);
+    // Its face forward and out: the lame's end turned back beside the face.
+    flap.rotation.y = side * -0.7;
+    group.add(flap);
   }
   // The peak over the brow (the Nanban skull has its brim instead).
   if (build.peak) {
@@ -2797,20 +2921,36 @@ function buildKabuto(group, head, r, steel, color) {
   // The crest (maedate) is headgear of its own (kabutoCrest): it can be knocked off.
   // Shaguma: the whole helmet dressed in long yak hair, a shaggy cap over the
   // bowl and a mane over the neck guard to the shoulders, open at the face.
-  if (head.hair) group.add(shagumaHair(form, r, head.hair));
+  if (head.hair) group.add(shagumaHair(form, r, head.hair, lowDetail));
+  // Haguma: a plume of yak hair bound at the bowl's crown or point (`plume`, its colour).
+  if (head.plume) {
+    const outline = build.skull?.outline.map(([radius, y]) => [y, radius]) ?? [[0, form.front], [form.top * 0.55, form.front * 0.92], [form.top * 0.85, form.front * 0.6], [form.top, 0]];
+    const foot = shikoro((head.tiers ?? 4) - 1);
+    group.add(hagumaHair(r, head.plume, outline.at(-1)[0], [[-0.05 - (head.tiers ?? 4) * 0.24, foot.x / r + 0.2 + flare], [outline[0][0] - 0.02, outline[0][1] + (build.skull?.brim ?? 0.1)], ...outline], lowDetail));
+  }
   // A mask in a design under study (helmstyle.js `masks`), drawn with baked maps (menpo.js), set on the face (helmforms.js
   // MASK_FITS); the gorget under it, hanging from under the chin.
   // `own`: the kit's own mask design (`maskDesign`; an oni somen for `mask: 'oni'`, else the commoner ressei-men).
   const maskDesign = HELM_STYLE.masks === 'own' ? head.maskDesign ?? (head.mask === 'oni' ? 'oni' : 'ressei') : HELM_STYLE.masks;
-  const maskTint = head.mask === 'red' ? color : MENPO.black;
-  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, maskTint, steel.envMap)) {
-    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : lace);
-    throat.material = throat.material.clone();
-    throat.material.side = THREE.DoubleSide;
-    throat.position.y = MASK_THROAT_Y * r;
-    group.add(throat);
+  const maskTint = head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : MENPO.black;
+  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, maskTint, steel.envMap, null, Boolean(head.maskPlain))) {
+    // The throat guard (yodare-kake): three laced lames hung from the mask's chin, each wider than the one above, a cord at
+    // the foot of each.
+    for (let tier = 0; tier < 3; tier += 1) {
+      const [top, bottom] = [0.75 + tier * 0.075, 0.83 + tier * 0.075];
+      const lame = new THREE.Mesh(new THREE.CylinderGeometry(top * r, bottom * r, 0.15 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : head.mask === 'iron' ? metal(steel, MENPO.throat) : bowlSteel);
+      lame.material = lame.material.clone();
+      lame.material.side = THREE.DoubleSide;
+      lame.position.y = (MASK_THROAT_Y + 0.14 - tier * 0.14) * r;
+      lame.userData.helmPart = 'shikoro';
+      const cord = new THREE.Mesh(new THREE.CylinderGeometry(bottom * 1.005 * r, bottom * 1.012 * r, 0.035 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), lace);
+      cord.material = lace.clone();
+      cord.material.side = THREE.DoubleSide;
+      cord.position.y = lame.position.y - 0.075 * r;
+      group.add(lame, cord);
+    }
     // A half mask (the ressei-men) made an oni's: a scowling brow over the eyes and tusks at the corners of the mouth.
-    if (MENPO.scowled.includes(maskDesign)) oniScowl(group, r, metal(steel, maskTint));
+    if (MENPO.scowled.includes(maskDesign)) oniScowl(group, r, metal(steel, maskTint), !head.maskPlain);
   } else if (head.mask === 'oni') {
   // An oni somen: the whole face in black iron, heavy brows, glaring eye
   // holes, a snarl with fangs, and two short horns at the brow.
@@ -2853,7 +2993,7 @@ function buildKabuto(group, head, r, steel, color) {
     group.add(face, brow, ...eyes, nose, mouth, ...fangs, ...horns, throat);
   } else if (head.mask) {
   // Menpo: the lower face guard, with a nose and a bristling moustache.
-    const maskSteel = metal(steel, head.mask === 'red' ? color : 0x141416);
+    const maskSteel = metal(steel, head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : 0x141416);
     // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
     const menpo = new THREE.Mesh(new THREE.SphereGeometry(1.06 * r, 18, 10, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.52, Math.PI * 0.36), maskSteel);
     menpo.material = maskSteel.clone();
@@ -2879,12 +3019,13 @@ const MASK_THROAT_Y = -1.5;
 // The samurai's half masks read as an oni's face (the menpo of the 16th-17th c. were made to frighten: the Met's 13.112.15,
 // the British Museum's menpo with their hooked noses, open snarls and moustaches): `scowled`, the mask designs (menpo.js) given
 // a heavy scowling brow of iron over the eyes (its inner ends drawn down to the nose, two furrows between) and tusks at the
-// mouth's corners. `black`: black-lacquered iron, drawn a little lighter than black so the mask's relief reads.
+// mouth's corners. `black`: black-lacquered iron, drawn a little lighter than black so the mask's relief reads; `iron`: russet
+// iron (sabi-nuri: the bare iron rusted brown and lacquered clear, the commonest finish of a menpo), its throat lames `throat`.
 // `brow` [inner, outer] (z, y) of each brow on the face, head radii; `tusks` (z, y, height) on the lower lip.
-const MENPO = { scowled: ['ressei'], black: 0x2c2b2f, brow: [[0.06, -0.01], [0.46, 0.13]], stand: 0.1, thick: 0.065, tusks: [0.15, -0.86, 0.2] };
+const MENPO = { scowled: ['ressei'], black: 0x2c2b2f, iron: 0x4a3830, throat: 0x1b1a1d, brow: [[0.06, -0.01], [0.46, 0.13]], stand: 0.1, thick: 0.065, tusks: [0.15, -0.86, 0.2] };
 
-/** The scowl and tusks on a half mask (MENPO), in `iron` the mask's own metal, on the face as the mask is (helmforms.js headRadiusAt). */
-function oniScowl(group, r, iron) {
+/** The scowl and (`tusked`) tusks on a half mask (MENPO), in `iron` the mask's own metal, on the face as the mask is (helmforms.js headRadiusAt). */
+function oniScowl(group, r, iron, tusked = true) {
   const onFace = (z, y, stand) => {
     const azimuth = Math.asin(Math.max(-0.95, Math.min(0.95, z / 1.05)));
     const radius = headRadiusAt(azimuth, y) + stand;
@@ -2903,6 +3044,7 @@ function oniScowl(group, r, iron) {
     const furrow = [onFace(side * 0.03, -0.06, MENPO.stand - 0.02), onFace(side * 0.045, 0.06, MENPO.stand - 0.01), onFace(side * 0.05, 0.13, MENPO.stand - 0.02)];
     group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(furrow), 6, 0.022 * r, 4, false), iron));
     // A tusk up from the corner of the mouth.
+    if (!tusked) continue;
     const [tuskZ, tuskY, tall] = MENPO.tusks;
     const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, tall * r, 6), bone);
     tusk.position.copy(onFace(side * tuskZ, tuskY + tall / 2, 0.17));
@@ -3101,25 +3243,37 @@ export function kabutoCrest(head, r, steel) {
   const crestMetal = head.crest === 'antlers' ? surface(0x16161a, { roughness: 0.5 }) : gold;
   switch (head.crest) {
     case 'crescent': {
-      const moon = new THREE.Mesh(new THREE.TorusGeometry(0.9 * r, 0.07 * r, 6, 24, Math.PI), crestMetal);
-      moon.scale.set(1, 0.75, 0.35);
-      moon.rotation.y = Math.PI / 2;
-      moon.position.y = 0.05 * r;
-      crest.add(moon);
+      // A crescent moon cut from gilt sheet, its horns up: what lies between two circles' arcs, leant back with the bowl.
+      const arc = (centre, radius, from, to) => Array.from({ length: 9 }, (_, step) => {
+        const angle = from + ((to - from) * step) / 8;
+        return [Math.cos(angle) * radius * 0.75 * r, (centre + Math.sin(angle) * radius) * 0.75 * r];
+      });
+      const moon = plateShape([...arc(0.9, 0.9, -Math.PI / 2, 0.627), ...arc(1.15, 0.78, 0.364, -Math.PI / 2)], 0.03 * r, crestMetal);
+      const stand = new THREE.Group();
+      stand.rotation.z = 0.16;
+      stand.add(moon);
+      crest.add(stand);
       break;
     }
     case 'kuwagata': case 'tall': {
-      for (const side of [1, -1]) {
-        const horn = new THREE.Mesh(new THREE.BoxGeometry(0.04 * r, (head.crest === 'tall' ? 1.9 : 1.3) * r, 0.18 * r), crestMetal);
-        horn.position.set(0, (head.crest === 'tall' ? 0.9 : 0.6) * r, side * 0.32 * r);
-        horn.rotation.x = side * (head.crest === 'tall' ? 0.22 : 0.42);
-        crest.add(horn);
-      }
+      // The kuwagata: two flat gilt horns cut from one sheet with their base plate (the kuwagata-dai) at the brow, spreading
+      // up and out, broadening to a notched tip; leant back with the bowl. Between them a maedate: a small flame of bright
+      // steel, or on the tall pair a gilt disc.
+      const [reach, rise] = head.crest === 'tall' ? [0.82, 1.45] : [1, 1];
+      const horns = plateShape(KUWAGATA_HALF.map(([across, up]) => [across * reach * r, up * rise * r]), 0.03 * r, crestMetal);
+      const stand = new THREE.Group();
+      stand.rotation.z = 0.16;
+      stand.add(horns);
+      crest.add(stand);
       if (head.crest === 'tall') {
         const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * r, 0.22 * r, 0.04 * r, 18), gold);
         disc.rotation.z = Math.PI / 2;
-        disc.position.y = 0.2 * r;
+        disc.position.set(0.03 * r, 0.3 * r, 0);
         crest.add(disc);
+      } else {
+        const flame = plateShape(FLAME_HALF.map(([across, up]) => [across * 0.26 * r, up * 0.4 * r]), 0.03 * r, metal(steel, 0xc9ccd2));
+        flame.position.set(0.04 * r, 0.16 * r, 0);
+        crest.add(flame);
       }
       break;
     }
@@ -3224,6 +3378,10 @@ function plateShape(half, thick, material) {
   mesh.rotation.y = Math.PI / 2;
   return mesh;
 }
+
+// The kuwagata's half outline (the crest's own radii, [across, up]): from the middle of the base plate's foot out along it, up
+// the horn's outer edge to its outer point, the notch, its inner point, and down its inner edge to the base plate's top.
+const KUWAGATA_HALF = [[0, 0], [0.32, 0.02], [0.46, 0.12], [0.62, 0.4], [0.82, 0.72], [0.96, 1.0], [1.04, 1.28], [0.86, 1.12], [0.74, 1.32], [0.6, 1.02], [0.42, 0.72], [0.26, 0.48], [0.14, 0.32], [0, 0.28]];
 
 // The flame maedate's half outline (head radii, from its foot in the middle round its three tongues to the notch at its top).
 const FLAME_HALF = [[0, 0], [0.5, 0], [0.9, 0.12], [1.15, 0.35], [1.22, 0.68], [1.45, 1.02], [1.1, 0.86], [0.95, 0.6], [0.8, 0.74], [0.86, 1.16], [0.62, 0.96], [0.5, 0.7], [0.38, 0.96], [0.44, 1.42], [0.2, 1.12], [0.1, 0.82], [0, 0.96]];
@@ -3330,24 +3488,39 @@ const KAWARI_CRESTS = {
  * it shades the eyes. Worn as a helmet would be, or as a loose hat (a prop
  * that a blow or a fall can knock off).
  */
+// A sugegasa: a cone of woven sedge on a bamboo frame, `wide` head radii at its rim and `tall` from rim to point, the rim
+// `rim` above the head's middle (below it: the brim comes down over the brow and shades the face); `ribs` ribs, `hoops` rows.
+const KASA = { wide: 2.75, tall: 1.75, rim: -0.12, ribs: 16, hoops: 7 };
 function buildKasa(group, r, color, head = {}) {
+  const { wide, tall, rim: rimAt, ribs: ribCount, hoops } = KASA;
   const straw = surface(color, { roughness: 0.95 });
   straw.flatShading = true;
   straw.side = THREE.DoubleSide;
-  const cone = new THREE.Mesh(new THREE.ConeGeometry(3.3 * r, 1.15 * r, 40, 1, true), straw);
-  cone.position.y = 0.62 * r;
-  const ribs = surface(new THREE.Color(color).multiplyScalar(0.72).getHex(), { roughness: 1 });
-  for (let rib = 0; rib < 16; rib += 1) {
-    const angle = (rib / 16) * Math.PI * 2;
-    const line = new THREE.Mesh(new THREE.BoxGeometry(3.4 * r, 0.025 * r, 0.04 * r), ribs);
-    line.position.set(Math.cos(angle) * 1.65 * r, 0.64 * r, Math.sin(angle) * 1.65 * r);
-    line.rotation.set(0, -angle, -Math.atan2(1.15, 3.3));
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(wide * r, tall * r, 40, 1, true), straw);
+  cone.position.y = (rimAt + tall / 2) * r;
+  const dark = surface(new THREE.Color(color).multiplyScalar(0.72).getHex(), { roughness: 1 });
+  // The frame's ribs down the slope, and the rows of the weave round it.
+  const slope = Math.hypot(wide, tall);
+  for (let rib = 0; rib < ribCount; rib += 1) {
+    const angle = (rib / ribCount) * Math.PI * 2;
+    const line = new THREE.Mesh(new THREE.BoxGeometry(slope * 1.01 * r, 0.025 * r, 0.04 * r), dark);
+    line.position.set(Math.cos(angle) * (wide / 2) * r, (rimAt + tall / 2 + 0.02) * r, Math.sin(angle) * (wide / 2) * r);
+    line.rotation.set(0, -angle, -Math.atan2(tall, wide));
     line.userData.noOutline = true;
     group.add(line);
   }
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(3.3 * r, 0.06 * r, 5, 40), surface(head.rim ?? 0x1c1a18, { roughness: 0.8 }));
+  for (let hoop = 1; hoop < hoops; hoop += 1) {
+    const share = hoop / hoops;
+    const row = new THREE.Mesh(new THREE.TorusGeometry(wide * share * r, 0.016 * r, 4, 36), dark);
+    row.rotation.x = Math.PI / 2;
+    row.position.y = (rimAt + tall * (1 - share) + 0.012) * r;
+    row.userData.noOutline = true;
+    group.add(row);
+  }
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(wide * r, 0.06 * r, 5, 40), surface(head.rim ?? 0x1c1a18, { roughness: 0.8 }));
   rim.rotation.x = Math.PI / 2;
-  rim.position.y = 0.05 * r;
+  rim.position.y = rimAt * r;
+  // The padded ring inside that sits on the head, and the chin cords from it.
   const band = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.08 * r, 0.32 * r, 18, 1, true), surface(0x2a2420));
   band.position.y = 0.22 * r;
   for (const side of [1, -1]) {
@@ -3873,6 +4046,38 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
         piece.rotation.y = strip.angle + Math.PI / 2;
         tatter.group.add(piece);
         dangles.push(tatter);
+      }
+    } else if (extra.kind === 'sashEnds') {
+      // A sash's two ends hanging from its knot at the front of the left hip, one longer than the other.
+      const front = body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.02 * scale;
+      for (const [across, length] of [[0.05, 0.3], [0.085, 0.22]]) {
+        const end = new Dangle(hips, [front, 0.03 * scale, across * scale], [0.15, -1, across], length * scale, { sag: 0.75, damping: 0.2 });
+        const strip = new THREE.Mesh(new THREE.BoxGeometry(0.006 * scale, length * scale, 0.045 * scale), surface(new THREE.Color(color).getHex(), { roughness: 0.9 }));
+        strip.position.y = (-length * scale) / 2;
+        end.group.add(strip);
+        dangles.push(end);
+      }
+    } else if (extra.kind === 'daisho') {
+      // The pair of scabbards (the katana's and the wakizashi's) thrust through the sash at the left hip, edge up, their
+      // mouths before the belly and their ends behind; lacquered, a cord (sageo) knotted round each. Rigid on the hips.
+      const lacquer = surface(new THREE.Color(color).getHex(), { roughness: 0.3 });
+      const cord = surface(new THREE.Color(extra.cord ?? color).getHex(), { roughness: 0.9 });
+      const side = body.segments.trunk.skinRadius * 1.02 + 0.015 * scale;
+      for (const [length, lift, slope, inward] of [[0.74, 0.05, 0.36, 0], [0.5, 0.075, 0.2, 0.03]]) {
+        const heading = new THREE.Vector3(-1, -slope, 0.12).normalize();
+        const saya = new THREE.Group();
+        const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * scale, 0.017 * scale, length * scale, 8), lacquer);
+        tube.scale.z = 0.62;
+        const knot = new THREE.Mesh(new THREE.TorusGeometry(0.019 * scale, 0.005 * scale, 5, 10), cord);
+        knot.rotation.x = Math.PI / 2;
+        knot.scale.y = 0.62;
+        knot.position.y = length * scale * 0.24;
+        saya.add(tube, knot);
+        // Its length (the cylinder's y) along `heading`, a third of it before the hip.
+        saya.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), heading);
+        saya.position.set(0, lift * scale, side - inward * scale).addScaledVector(heading, length * scale * 0.2);
+        hips.add(saya);
+        inkAll(saya, 0.0025);
       }
     } else if (extra.kind === 'tabard') {
       for (const facing of [1, -1]) {

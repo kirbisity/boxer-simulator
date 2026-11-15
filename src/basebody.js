@@ -140,6 +140,13 @@ export const BASE_BODY = {
   family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3', 'F4'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.4, 0.6] }, hold: [0.3, 0.55] },
   // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
   headHold: 0.85,
+  // The head as it is drawn on its joint (render.js HEAD_SCALE, HEAD_SEAT), in head radii (body.js headRadius, 0.055 of
+  // stature: 96 mm on a man of 1.75 m). `size` and `seat`: 1.12 of the radius and 0.18 of a radius under the joint, as the
+  // helmets and the neck's top were fitted. `lift`: how far above that seat it is drawn, and `smaller`: the share taken off
+  // that size, helmet, hair and all: the jaw's line stands higher by both, and that much more of the neck shows under it. The
+  // neck's skin goes up with it (neckToHead; headHold's reach and neckCut's plane less by `smaller`): `draw`, the shares of
+  // the way up the neck between which its skin is drawn out.
+  head: { size: 1.12, seat: 0.18, lift: 0.13, smaller: 0.045, draw: [0.05, 0.4] },
   // PROOF OF CONCEPT, round 11 (noted: D is better, but the shoulders and arms smaller still, the neck longer, the woman's
   // shoulder a sharper joint, not a tube): D's rest shape, then (shoulderPlus):
   //   `in`      the shoulder's zone moved in towards the midline (m per 1.8 m): shorter clavicles, the acromion in;
@@ -851,6 +858,10 @@ export function baseBindJoints(rig, joints, height, apart = 1) {
     const shift = vec.sub(joints[root], loft[root]);
     for (const name of names) bind[name] = vec.add(loft[name], shift);
   }
+  // (Where the head bone stands at rest among the skin's points, which are bound as they lie about the model's own neck: the
+  // rig's neck and head, in front of the model's by the model's stoop (28 mm on the man). The head is drawn there: neckToHead.)
+  skin.boundNeck = bind.neck;
+  skin.boundHead = bind.head;
   return { loft, skin, bind, reach };
 }
 
@@ -1113,6 +1124,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
     if (!BASE_BODY.shoulderPlus[design]) shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKeep, height });
   }
   if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf, joints.gameHead ?? joints.head, across);
+  if (joints.boundHead && frames.neck) neckToHead(rig, placed, joints.boundHead, joints.boundNeck, frames.neck, height);
   // (PROOF OF CONCEPT: the widths ANSUR II measures, when asked for (globalThis.BASE_WIDTHS, a list): biacromial (across the
   // shoulders' tops, from 1 cm above the shoulder joints up), chest breadth (the trunk's own skin across at the nipples, 0.72 of
   // height) and bideltoid (everything across, arms included, from 12 cm under the joints to them), in the bind pose.)
@@ -1313,6 +1325,33 @@ function shoulderDesign(design, { rig, parts, frames, placed, smooth, shoulderKe
  * in a fin); only the throat's middle under the chin is the neck's own, and nothing is held that stands more than the head's
  * radius out from the line (none of it from 1.5 radii).
  */
+/**
+ * The neck's top taken up to the head as it is drawn (BASE_BODY.head), on the placed points (changed in place), the neck's
+ * own and the trunk's that climb it: drawn up along the head's upright axis by as much as the head's underside stands higher
+ * (its `lift`, and half its radius' `smaller`: the jaw's angle and the hairline at the nape lie about half a radius under its
+ * middle), none of it below `draw`'s first share of the way up the neck and all of it from the second, nor on what stands
+ * further out from the neck's line than the head is wide (the trapezius' slope to the shoulder).
+ * `head` and `neck` the joints the head bone stands on at rest (baseBindJoints boundHead, boundNeck: its upright axis the line
+ * between them, not as the skin's own neck leans), `frame` the skin's neck's.
+ */
+function neckToHead(rig, placed, head, neck, frame, height) {
+  const { size, lift, smaller, draw } = BASE_BODY.head;
+  const radius = 0.055 * height;
+  const raise = vec.scale(vec.normalize(vec.sub(head, neck)), (lift + 0.5 * size * smaller) * radius);
+  const rise = (a, b, value) => {
+    const u = Math.min(1, Math.max(0, (value - a) / (b - a)));
+    return u * u * (3 - 2 * u);
+  };
+  const { names, sources } = rig;
+  const under = names.map((name) => name === 'neck' || name === 'trunk');
+  for (let vertex = 0; vertex < placed.length / 3; vertex += 1) {
+    if (!under[sources.part[vertex]]) continue;
+    const [t, x, y] = axisCoords(frame, [placed[vertex * 3], placed[vertex * 3 + 1], placed[vertex * 3 + 2]]);
+    if (t <= draw[0]) continue;
+    const up = rise(draw[0], draw[1], t) * (1 - rise(radius, 1.6 * radius, Math.hypot(x, y)));
+    for (let axis = 0; axis < 3; axis += 1) placed[vertex * 3 + axis] += raise[axis] * up;
+  }
+}
 function headHold(point, head, height, t, x, y, [from, to] = [0.3, 0.7]) {
   const rise = (from, to, value) => {
     const u = Math.min(1, Math.max(0, (value - from) / (to - from)));
@@ -1320,7 +1359,7 @@ function headHold(point, head, height, t, x, y, [from, to] = [0.3, 0.7]) {
   };
   const off = vec.sub(point, head);
   const reach = vec.length(off);
-  const radius = 0.055 * height;
+  const radius = 0.055 * height * (1 - BASE_BODY.head.smaller);
   const hold = BASE_BODY.headHold * radius;
   if (reach <= hold) return [0, 0, 0];
   const r0 = Math.hypot(x, y) || 1;
@@ -1404,7 +1443,7 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
       if (head && spec.neckCut) {
         const after = vec.add(p, shift);
         const along = vec.dot(vec.sub(after, head), neck.axis);
-        const plane = -spec.neckCut * 0.055 * height;
+        const plane = -spec.neckCut * 0.055 * height * (1 - BASE_BODY.head.smaller);
         if (along > plane) shift = vec.add(shift, vec.scale(neck.axis, -(along - plane) * ease(0.2, 0.5, tN)));
       }
       shifts.set(shift, vertex * 3);

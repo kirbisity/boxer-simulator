@@ -9,7 +9,9 @@
 # Fore and aft the shoulder is as deep as the humerus' head under its skin and no deeper, and the collarbone is a bone of the
 # girdle like the acromion: the skin hangs between it and the trapezius' border behind (the hollow over the collarbone), so
 # the bone stands as its rim.
-# The other builds keep their cover over the bone, and less of the trapezius over it (TRAPEZIUS, top_line).
+# The other builds keep their cover over the bone, and less of it: of the trapezius over the collar line (TRAPEZIUS) and of
+# the deltoid outside the arm's line and the humerus' head (DELTOID), both in top_line.
+# Every build's neck is then drawn slimmer about its own middle line (NECK, column).
 # The emaciated build's waist is drawn in between its ribs and its hip bones (WAIST) and its arms thinned to a wasted arm's
 # girth (ARMS).
 # Reads even/<build>-<sex>.npy, writes shaped/: dump.py's last argument.
@@ -18,8 +20,11 @@ import os, shutil, numpy as np, bodylib as bl, relax
 GIRDLE = dict(
     # The acromion's top over the shoulder joint's centre (units of stature). The game's skeleton carries the joint at 0.775
     # and ANSUR II's acromion stands at 0.820 on the fed (both sexes): 0.045 between them, less what the fed have over the bone
-    # there (the deltoid's origin and the fat on it: 15 mm, 0.009). A bone does not sink as its cover wastes.
-    rise=0.036,
+    # there (the deltoid's origin and the fat on it: 15 mm, 0.009): 0.036. A bone does not sink as its cover wastes.
+    # The figures are drawn with it lower than the survey's: 0.024 (42 mm at 1.75 m), which is the least a shoulder's own
+    # bones leave (the humerus' head's radius, 24 mm, the cuff's tendons and the bursa over it, 8, the acromion's thickness,
+    # 8 to 10): the shoulders' line lower under the head, and the neck longer between them.
+    rise=0.024,
     # The acromion's edge out past the joint's centre: the head's centre lies 10 to 15 mm inside the acromion's lateral edge.
     reach=0.008,
     # The line's rise from the acromion to the neck's root, per unit across: the collarbone lies nearly level (its inner end's
@@ -80,6 +85,23 @@ GIRDLE = dict(
     last=2,
 )
 
+ramp = lambda a, b, v: (lambda u: u * u * (3 - 2 * u))(np.clip((v - a) / (b - a), 0, 1))
+
+def ball(X, s, e, sign, spec):
+    # The shoulder's depth fore and aft of the joint: in front from the head's inner side out, behind on the arm, and down
+    # the arm to the deltoid's insertion. Returns each point's distance before the joint and how far it stands past that depth.
+    z = X[:, 2] * sign; y = X[:, 1]; zs = s[2] * sign
+    d3 = np.array([0.0, e[1] - s[1], (e[2] - s[2]) * sign]); L3 = np.linalg.norm(d3)
+    ta = ((y - s[1]) * d3[1] + (z - zs) * d3[2]) / (L3 * L3)
+    held = 1 - ramp(*spec['insertion'], ta)
+    depth = spec['depth']; fore = X[:, 0] - s[0]
+    # (Only what lies about the bone: the flank and the armpit's folds, farther from it across the body, are not the shoulder's.)
+    # (Over the joint the bone is the girdle's, not the arm's: there the distance is the one across, whatever the height.)
+    tc = np.clip(ta, 0, 1); up = y - s[1] - tc * d3[1]; off = np.hypot(np.where(tc > 0, up, np.minimum(up, 0)), z - zs - tc * d3[2])
+    bone = 1 - ramp(*spec['about'], off)
+    allowed = depth + spec['sheet'] * np.clip(off - spec['about'][0], 0, None)
+    return fore, held * np.where(fore > 0, np.clip(fore - allowed, 0, None), ramp(*spec['back'], z - zs) * bone * np.clip(-fore - depth, 0, None))
+
 def bound(X, V, J, E, spec, hollows):
     # One pass: `X` held inside the bone's outline (and, with `hollows`, the first: the mesh's edges laid along the crease and
     # the skin hung between the bones). Returns it and which moved.
@@ -88,19 +110,7 @@ def bound(X, V, J, E, spec, hollows):
         s = J[side + 'Shoulder']; e = J[side + 'Elbow']
         z = X[:, 2] * sign; y = X[:, 1].copy(); zs = s[2] * sign
         edge = zs + spec['reach']; root = spec['root'] * zs; r = spec['corner']; k = spec['knee']
-        # The shoulder's depth fore and aft of the joint: in front from the head's inner side out, behind on the arm, and down
-        # the arm to the deltoid's insertion.
-        d3 = np.array([0.0, e[1] - s[1], (e[2] - s[2]) * sign]); L3 = np.linalg.norm(d3)
-        ta = ((y - s[1]) * d3[1] + (z - zs) * d3[2]) / (L3 * L3)
-        ua = np.clip((ta - spec['insertion'][0]) / (spec['insertion'][1] - spec['insertion'][0]), 0, 1); held = 1 - ua * ua * (3 - 2 * ua)
-        ramp = lambda a, b, v: (lambda u: u * u * (3 - 2 * u))(np.clip((v - a) / (b - a), 0, 1))
-        depth = spec['depth']; fore = X[:, 0] - s[0]
-        # (Only what lies about the bone: the flank and the armpit's folds, farther from it across the body, are not the shoulder's.)
-        # (Over the joint the bone is the girdle's, not the arm's: there the distance is the one across, whatever the height.)
-        tc = np.clip(ta, 0, 1); up = y - s[1] - tc * d3[1]; off = np.hypot(np.where(tc > 0, up, np.minimum(up, 0)), z - zs - tc * d3[2])
-        bone = 1 - ramp(*spec['about'], off)
-        allowed = depth + spec['sheet'] * np.clip(off - spec['about'][0], 0, None)
-        push = held * np.where(fore > 0, np.clip(fore - allowed, 0, None), ramp(*spec['back'], z - zs) * bone * np.clip(-fore - depth, 0, None))
+        depth = spec['depth']; fore, push = ball(X, s, e, sign, spec)
         X[:, 0] -= np.sign(fore) * push; moved |= push > 1e-5
         # (The ball is the head's: inside it the girdle is as deep as from the collarbone to the blade's spine, and has its own hollow.)
         web = spec['web']
@@ -207,10 +217,11 @@ TRAPEZIUS = dict(
     # skin stands 40 to 60 mm over the bone's collar line from the neck to the acromion, the trapezius' upper fibres a slab
     # there and a cone up the neck's flank, and the neck shows short under the jaw. So a build's skin outside its own neck's
     # side and over the bone's collar line (carried on out past the acromion, so the cap's top comes down with it and the
-    # deltoid's face below it stays) keeps `keep` of its height over them: 0.65 lowers the top line 13 to 20 mm from beside
-    # the neck to the shoulder's middle and 10 at the acromion, which then stands at 0.822 on the ordinary man and 0.823 on
-    # the woman (the survey's spread of it is 0.009 of stature, 16 mm), and the neck shows that much longer.
-    keep=0.65,
+    # deltoid's face below it stays) keeps `keep` of its height over them. With the bone's line at GIRDLE.rise, 0.35 leaves
+    # the ordinary man's top line 0.820 of stature beside the neck and 0.808 over the shoulder's middle (0.836 and 0.822 at
+    # the survey's rise and a keep of 0.65: 25 to 28 mm lower), the muscular and the fat within 2 mm of that, and the neck
+    # shows that much longer.
+    keep=0.35,
     # The neck's own side: its half-breadth `column` of the way from its joint to the head's (where the fighter's skin is
     # all the game's neck: src/basebody.js BASE_BODY.family.ease.neck), read within `band` of that height; over it nothing moves.
     column=0.6, band=0.006,
@@ -218,6 +229,40 @@ TRAPEZIUS = dict(
     beside=0.008,
     # What was brought in is faired as the emaciated build's is (Taubin's, GIRDLE.step): `fair` rounds.
     fair=3,
+)
+
+DELTOID = dict(
+    # The other builds' shoulder cap. The emaciated build's arm leaves straight from under the acromion's corner along its
+    # bone, and its shoulder is as deep as the humerus' head under its skin (GIRDLE: the arm's line, `depth`); a fed build
+    # has the deltoid over both, and the model's is a boxer's. Of what stands outside the arm's line, and before and behind
+    # the head's depth, a build keeps `keep`: the cap narrower across the shoulders and flatter fore and aft (at 0.7 the
+    # ordinary man's stands 62 mm out past the joint for the model's 70, the muscular man's 94 for 115, and both a fifth
+    # shallower). 1 leaves the model's cap.
+    keep=0.7,
+    # All of that down to the deltoid's insertion and easing out to nothing over the arm's belly below it (shares of the upper
+    # arm's length): a cap cut off at the insertion would leave the arm standing wider under it than the shoulder over it.
+    ends=(0.3, 0.85),
+    # The muscle is soft over the bone's lines: its loss begins over `knee` either side of them (10 mm), where the bone's own
+    # knee (GIRDLE.knee) would leave a ridge down the cap's front and back.
+    knee=0.006,
+)
+
+NECK = dict(
+    # Every build's neck: its column kept `slim` of its breadth and depth about its own middle line (the section's middle
+    # fore and aft, read through the column and taken straight). The fighter's neck above the builds' own is the game's,
+    # drawn to a girth (src/loftbody.js LOFT.neck), which takes the same share (LOFT.neck.slim): the two are one dial.
+    # 1 is the survey's neck (ANSUR II's girths, on a head the figures carry larger than the survey's): at 0.85 the ordinary
+    # man's column is 92 to 98 mm across under the jaw for 115 to 119, the woman's 80 to 88 for 94 to 112.
+    slim=0.85,
+    # None of it at `foot` of the way from the neck's joint to the head's (the pit of the throat and the collarbones' inner
+    # ends: the trunk's) and all of it from `full` (where the trapezius leaves the column).
+    foot=0.12, full=0.34,
+    # ... within `within[0]` of the middle line, none past `within[1]` (units of stature: the widest neck's half-breadth is
+    # 0.04): the shoulders' top beside the column eases in with it.
+    within=(0.05, 0.085),
+    # The middle line is read between these heights (of the same way up), in bands `band` high, from the column's middle
+    # slice (within `slice` of the body's middle).
+    read=(0.3, 0.6), band=0.006, slice=0.012,
 )
 
 WAIST = dict(
@@ -264,8 +309,8 @@ def arms(V, b, own=ARMS):
             X[m] = foot + (V[m] - foot) * (1 - draw * share(along / length))[:, None]
     return X
 
-def top_line(V, J, T, rest, spec=GIRDLE, own=TRAPEZIUS):
-    # A build's trapezius lessened: the neck's wall its own, the collar line the bone's.
+def top_line(V, J, T, rest, spec=GIRDLE, own=TRAPEZIUS, cap=DELTOID):
+    # A build's trapezius and deltoid lessened: the neck's wall its own, the collar line and the arm's line the bone's.
     weld = bl.weld_map(rest); TW = weld[T]; TW = TW[(TW[:, 0] != TW[:, 1]) & (TW[:, 1] != TW[:, 2]) & (TW[:, 0] != TW[:, 2])]
     M = bl.laplacian(len(V), TW); X = V.copy(); k = spec['knee']
     height = J['neck'][1] + own['column'] * (J['head'][1] - J['neck'][1])
@@ -274,10 +319,32 @@ def top_line(V, J, T, rest, spec=GIRDLE, own=TRAPEZIUS):
         root = z[(np.abs(y - height) < own['band']) & (z < zs / 2)].max()
         out, up = z - root, y - (s[1] + spec['rise'] + spec['slope'] * (edge - z))
         X[:, 1] -= (1 - own['keep']) * k * np.logaddexp(0, up / k) * np.clip(out / own['beside'], 0, 1) * (y < height)
+        # The cap: what stands outside the arm's line through the acromion's corner (in the plane across: its normal out and
+        # up; the line carried on up past the corner, so the cap's top comes in with its face) ...
+        e = J[side + 'Elbow']; d = np.array([(e[2] - s[2]) * sign, e[1] - s[1]]); L = np.linalg.norm(d); d /= L; n2 = np.array([-d[1], d[0]])
+        pz, py = z - edge, y - (s[1] + spec['rise']); held = 1 - ramp(*cap['ends'], (pz * d[0] + py * d[1]) / L); c = cap['knee']
+        less = (1 - cap['keep']) * held * c * np.logaddexp(0, (pz * n2[0] + py * n2[1]) / c)
+        X[:, 2] -= sign * n2[0] * less; X[:, 1] -= n2[1] * less
+        # ... and what stands before and behind the humerus' head's depth, from the head's inner side out (GIRDLE.ball).
+        fore = V[:, 0] - s[0]
+        X[:, 0] -= (1 - cap['keep']) * held * ramp(*spec['ball'], z - zs) * np.sign(fore) * c * np.logaddexp(0, (np.abs(fore) - spec['depth']) / c)
     near = np.clip(2 * bl.smooth((np.linalg.norm(X - V, axis=1) > 1e-5).astype(float), M, 2, 1.0), 0, 1)
     for _ in range(own['fair']):
         for step in spec['step']: X = bl.smooth(X, M, 1, step, near)[weld]
     return X[weld]
+
+def column(V, J, own=NECK):
+    # A build's neck drawn slimmer about its middle line.
+    t = (V[:, 1] - J['neck'][1]) / (J['head'][1] - J['neck'][1])
+    levels = np.arange(own['read'][0], own['read'][1] + 1e-9, 0.05); middles = []
+    for level in levels:
+        fore = V[(np.abs(t - level) * (J['head'][1] - J['neck'][1]) < own['band']) & (np.abs(V[:, 2]) < own['slice']), 0]
+        middles.append((fore.max() + fore.min()) / 2)
+    lean, at = np.polyfit(levels, middles, 1)
+    off = V[:, 0] - (at + lean * t)
+    share = (1 - own['slim']) * ramp(own['foot'], own['full'], t) * (1 - ramp(*own['within'], np.hypot(off, V[:, 2])))
+    X = V.copy(); X[:, 0] -= share * off; X[:, 2] -= share * V[:, 2]
+    return X
 
 if __name__ == '__main__':
     os.makedirs('shaped', exist_ok=True)
@@ -286,6 +353,7 @@ if __name__ == '__main__':
         for name in ('E', 'N', 'M', 'F1', 'F2', 'F3'):
             V = np.load(f'even/{name}-{sex}.npy'); X = (girdle if name == 'E' else top_line)(V, b['J'], np.asarray(b['T']), b['V'])
             if name == 'E': X = arms(waist(X, np.asarray(b['part']) == b['parts'].index('trunk')), b)
+            X = column(X, b['J'])
             moved = np.linalg.norm(X - V, axis=1)
             print(f'{sex} {name}: {int((moved > 1e-4).sum())} points brought in, most {moved.max() * 1750:.0f} mm')
             np.save(f'shaped/{name}-{sex}.npy', X)

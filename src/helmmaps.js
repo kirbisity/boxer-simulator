@@ -144,25 +144,28 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
 
 /**
  * A war mask's lacquer wearing its sheet: the lacquer (the albedo's alpha) drawn in `tint`, the rest (teeth, gilt, the
- * mouth's red, hair) in the sheet's own colours; the outline cut by the normal map's alpha; both sides drawn.
+ * mouth's red, hair) in the sheet's own colours, or `plain`: the mask without its horsehair and gilding, its teeth and the
+ * moustache's ground the bare lacquered iron (most surviving menpo have lost the hair, and many never had it); the outline
+ * cut by the normal map's alpha; both sides drawn.
  */
-export function maskMaterial(name, tint, envMap) {
+export function maskMaterial(name, tint, envMap, plain = false) {
   const sheet = helmMapSheet(name);
   if (!sheet) return null;
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff, map: sheet.map, normalMap: sheet.normalMap, roughnessMap: sheet.ormMap, metalnessMap: sheet.ormMap,
     roughness: 1, metalness: 1, envMap: envMap ?? null, envMapIntensity: 1.1, side: THREE.DoubleSide,
   });
-  const uniforms = { uMaskTint: { value: new THREE.Color(tint) } };
+  const uniforms = { uMaskTint: { value: new THREE.Color(tint) }, uMaskPlain: { value: plain ? 1 : 0 } };
   material.userData.crowdColor = new THREE.Color(tint).getHex();
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
-    shader.fragmentShader = `uniform vec3 uMaskTint;\n${shader.fragmentShader}`.replace(
+    shader.fragmentShader = `uniform vec3 uMaskTint;\nuniform float uMaskPlain;\n${shader.fragmentShader}`.replace(
       '#include <map_fragment>',
       `#include <map_fragment>
 #if defined( USE_MAP ) && defined( USE_NORMALMAP )
   if ( texture2D( normalMap, vUv ).a < 0.5 ) discard;
-  diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uMaskTint + max( texelColor.rgb - vec3( 0.86 ), 0.0 ) * vec3( 1.7, 0.6, 0.35 ), texelColor.a );
+  vec3 maskBare = uMaskTint * ( 0.55 + 0.5 * dot( texelColor.rgb, vec3( 0.3333 ) ) );
+  diffuseColor.rgb = mix( mix( diffuseColor.rgb, maskBare, uMaskPlain ), diffuseColor.rgb * uMaskTint + max( texelColor.rgb - vec3( 0.86 ), 0.0 ) * vec3( 1.7, 0.6, 0.35 ) * ( 1.0 - uMaskPlain ), texelColor.a );
   diffuseColor.a = opacity;
 #endif`,
     );

@@ -1,0 +1,12 @@
+const root = process.argv[2];
+const { STORY_SETS, storySetSetup } = await import(root + '/src/story/scenes/sets.js');
+const { storyNewLife } = await import(root + '/src/story/life.js');
+const { readFileSync, writeFileSync } = await import('node:fs');
+const life = storyNewLife(null, { seed: 7 });
+const s = storySetSetup(STORY_SETS.carryingPole, life, { year: 1576 });
+console.log(Object.keys(s), (s.fighters ?? s.entries ?? []).length);
+const list = s.fighters ?? s.entries ?? s.figures;
+const out = JSON.parse(readFileSync(process.argv[3]));
+out.storyPole = list.map((f) => f.inputs ?? f);
+for (const m of out.storyPole) console.log(m.name, m.age, m.heightCm, JSON.stringify(m.outfit), m.style, m.accessories);
+writeFileSync(process.argv[3], JSON.stringify(out));

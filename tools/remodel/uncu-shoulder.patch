@@ -1,0 +1,25 @@
+diff --git a/src/loftbody.js b/src/loftbody.js
+index 6a505fa..835590b 100644
+--- a/src/loftbody.js
++++ b/src/loftbody.js
+@@ -1219,16 +1219,19 @@ export const ARMOR_KINDS = {
+   // the Inca gave his soldiers and guards, `uncuChecks`); and the tocapu all
+   // over (the Sapa Inca's own, `uncuRoyal`: none but he wore it).
+   uncu: {
+-    trunk: [-0.1, 0.95, 1.08, 'cloth'], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
++    trunk: [-0.1, 0.95, 1.08, 'cloth'], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }], upperArm: [-0.2, 0.24, 1.08, 'cloth'],
+   },
+   uncuTocapu: {
+     trunk: [-0.1, 0.95, 1.08, { tocapu: [-0.12, 0.16], base: 'cloth' }], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
++    upperArm: [-0.2, 0.24, 1.08, 'cloth'],
+   },
+   uncuChecks: {
+     trunk: [-0.1, 0.95, 1.08, { checks: true, yoke: [0.8, 'lace'] }], skirt: [0.88, 0.32, 1.16, { checks: true }],
++    upperArm: [-0.2, 0.24, 1.08, { checks: true }],
+   },
+   uncuRoyal: {
+     trunk: [-0.1, 0.95, 1.08, { tocapu: true }], skirt: [0.88, 0.32, 1.16, { tocapu: true }],
++    upperArm: [-0.2, 0.24, 1.08, { tocapu: true }],
+   },
+   // The jaguar knight's suit: the spotted skin over everything, to the wrists and ankles.
+   jaguarSuit: {

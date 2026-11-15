@@ -1,0 +1,10 @@
+const repo = process.argv[2];
+const { buildBody } = await import(`${repo}/src/body.js`);
+const { buildSkinMesh } = await import(`${repo}/src/bodystyles.js`);
+const { progression } = await import(`${repo}/tools/bodysheet-cast.js`);
+const row = progression('male').find((r) => r.key === 'average');
+globalThis.NAPE = [];
+buildSkinMesh(buildBody(row.inputs), 'base');
+const rows = globalThis.NAPE; console.log(rows.length);
+const back = rows.filter((r) => r[2] < -0.2 && Math.abs(r[3]) < 0.3).sort((a, b) => a[1] - b[1]);
+for (const r of back) console.log(r.join(' '));

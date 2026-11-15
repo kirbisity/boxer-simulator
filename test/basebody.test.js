@@ -31,11 +31,15 @@ test('the base style builds for every body of the progression: finite, about a f
 });
 
 test('the reference build gets the base mesh as modelled: every point where the tool put it, scaled to its height (the arms aside)', (t) => {
-  // (The model as it is: no shoulder design (BASE_BODY.shoulder null). The default, D2, reshapes the shoulders on purpose.)
+  // (The model as it is: no shoulder design (BASE_BODY.shoulder null), and the head drawn where and as large as the model has
+  // it. The default, D2, reshapes the shoulders on purpose, and the head's lift draws the neck's top up after it.)
   const design = BASE_BODY.shoulder;
+  const head = BASE_BODY.head;
   BASE_BODY.shoulder = null;
+  BASE_BODY.head = { ...head, lift: 0, smaller: 0 };
   t.after(() => {
     BASE_BODY.shoulder = design;
+    BASE_BODY.head = head;
   });
   for (const sex of ['male', 'female']) {
     const data = baseBodyMesh(sex);
@@ -48,13 +52,14 @@ test('the reference build gets the base mesh as modelled: every point where the 
     const { sources } = placeBaseBody(rig, baseParts, () => 1, H, 0, placed.skin, placed.reach);
     let worst = 0;
     // (All but the arms: the upper arm drawn to the game's length, the forearm out to its hand, basebody.js baseBindJoints. The
-    // legs and the neck run at the game's lengths too, a few millimetres off the model's.)
+    // legs and the neck run at the game's lengths too, a few millimetres off the model's: the neck's top 6 mm, the head's joint
+    // standing higher over the neck's than the model's does, body.js NECK_RISE.)
     const arm = (index) => /Upper$|Fore$/.test(data.parts[index]);
     for (let vertex = 0; vertex < data.count; vertex += 1) {
       if (arm(data.part[vertex]) || (data.blend[vertex] > 0 && arm(data.part2[vertex]))) continue;
       worst = Math.max(worst, Math.hypot(...[0, 1, 2].map((axis) => sources[vertex * 3 + axis] - data.positions[vertex * 3 + axis] * H)));
     }
-    assert.ok(worst < 0.004, `${sex}: a point lands ${(worst * 1000).toFixed(2)} mm from where it was modelled`);
+    assert.ok(worst < 0.007, `${sex}: a point lands ${(worst * 1000).toFixed(2)} mm from where it was modelled`);
   }
 });
 

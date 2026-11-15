@@ -10,6 +10,8 @@ import { buildJoustKit } from './stechzeug.js';
 import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { dualQuaternionSkinning } from './dqskin.js';
+import { ClothSwing, swayCloth } from './clothsway.js';
+import { BASE_BODY } from './basebody.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps, cachedSkinMesh, readySkinTextures, skinTextureKey, skinTexturesNow, skinTexturesSteps, storeSkinMesh, styleSpec } from './bodystyles.js';
 import { bodyCheck } from './skinworker.js';
@@ -70,8 +72,9 @@ const skinHex = (look) => (look.skinColor ? new THREE.Color(look.skinColor).getH
 
 // Drawn characters carry slightly large heads; it is what makes them read
 // as characters rather than as small-headed mannequins.
-const HEAD_SCALE = 1.12;
-const HEAD_SEAT = 0.18; // head radii the head sits lower than the physics head
+// (Less by BASE_BODY.head.smaller, and seated higher by BASE_BODY.head.lift: more neck under the jaw.)
+const HEAD_SCALE = BASE_BODY.head.size * (1 - BASE_BODY.head.smaller);
+const HEAD_SEAT = BASE_BODY.head.seat - BASE_BODY.head.lift; // head radii the head sits lower than the physics head
 const HEAD_SCALES = new THREE.Vector3(HEAD_SCALE, HEAD_SCALE, HEAD_SCALE);
 const v3 = (array) => new THREE.Vector3(array[0], array[1], array[2]);
 
@@ -1991,6 +1994,8 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
     geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(built.skinIndex, 4));
     geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(built.skinWeight, 4));
+    // How loose each point of the cloth hangs (clothsway.js); none on a crowd's body.
+    if (built.sway) geometry.setAttribute('clothSway', new THREE.BufferAttribute(built.sway, 1));
     // The detail style's coordinates: the bump map's, and the same again for the occlusion map.
     if (built.uvs) {
       geometry.setAttribute('uv', new THREE.BufferAttribute(built.uvs, 2));
@@ -2007,6 +2012,8 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
     dressedSkin.userData.fullMaps = { normalMap: dressedSkin.normalMap, roughnessMap: dressedSkin.roughnessMap, roughness: dressedSkin.roughness };
     skinForTier(dressedSkin);
   }
+  // Loose cloth swings behind his bones and in the wind (clothsway.js): one swing for the man, kept with his bones.
+  if (built.sway) swayCloth(dressedSkin, (bones.swing ??= new ClothSwing(bones.length)));
   // (A base-mesh body (bodystyles.js 'base') skins by dual quaternions, SKIN_DQ: its joints keep their thickness when they bend.)
   if (built.dualQuaternion && SKIN_DQ.base) dualQuaternionSkinning(dressedSkin);
   const mesh = new THREE.SkinnedMesh(geometry, dressedSkin);
@@ -3260,6 +3267,7 @@ export function updateFighterView(fighterView, dt, time) {
     fighterView.skeleton[index].matrix.fromArray(matrix);
     fighterView.skeleton[index].matrixWorldNeedsUpdate = true;
   });
+  fighterView.bones.swing?.update(frames, dt);
   // Bones whose part was cut off: what skin is left on them shrinks into the joint.
   for (const index of fighterView.severedBones ?? []) {
     const at = frames[index].origin;

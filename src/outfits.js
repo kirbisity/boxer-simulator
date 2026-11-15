@@ -79,6 +79,8 @@ export const ARMOUR_DECOR = {
 };
 
 // What the plate harnesses offer: every steel but the lacquer, and the three gilt and brass decorations.
+// A piece made with the brass borders (as finishedLook lays a chosen decoration on).
+const GOTHIC_BRASS = { decor: { kind: ARMOUR_DECOR.brass.kind, gold: ARMOUR_DECOR.brass.gold }, gold: ARMOUR_DECOR.brass.gold };
 const PLATE_FINISHES = { steels: ['bright', 'white', 'blued', 'blackened', 'russet'], decors: ['etched', 'embossed', 'brass'], pieces: ['armor', 'head', 'feet'] };
 // The Ming helmets: bright or black lacquer, and their two decorations (on the helmet alone).
 const MING_FINISHES = { steels: ['bright', 'blackLacquer'], decors: ['tunshou', 'guardians'], pieces: ['head'] };
@@ -284,8 +286,9 @@ function mingGarrisonDesign(label, vest, sash, wrap) {
 // `look`: the same protection drawn as lamellar (`kind: 'mingLamellar'`, its `lace`).
 // `helm`: the hat's design and finish (chinahelms.js MING_HELMS, CHINA_FINISHES).
 // The vest's (no `look.kind`) arms in the quilted cotton sleeves of the coat under it, undyed; the lamellar's and the scale's under their arm guards in the coat's cloth.
+// The vest's man wears a head cloth of the same undyed cotton under the iron hat, round the head and the neck (wardrobe.js mingHat `hood`).
 function mingBrigandineDesign(label, cloth, iron, look = {}, helm = {}, extra = {}) {
-  return { label, ...extra, top: { kind: 'longsleeve', color: look.kind ? shade(cloth, 0.7) : '#d6cbb2' }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
+  return { label, ...extra, top: { kind: 'longsleeve', color: look.kind ? shade(cloth, 0.7) : '#d6cbb2' }, bottom: { kind: 'pants', color: '#22201e' }, armor: { kind: 'mingBrigandine', color: iron, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHat', color: iron, tassel: '#b3161b', ...(look.kind ? null : { hood: '#d6cbb2' }), ...helm }, feet: { kind: 'compactBoot', color: '#17171c' } };
 }
 // Qi Jiguang's elite infantry: the coat's cloth (its binding a shade of it, or `bind`), brass studs, the bright riveted kettle
 // hat over a cream cloth hood (chinahelms.js MING_HELMS rivetedTube; wardrobe.js mingHat `hood`). The sleeves are the coat's
@@ -359,10 +362,12 @@ function soheiDesign(label, { hood, robe, hakama, lacquer, lace, beads }) {
 }
 function roninDesign(label, { kosode, hakama, steel, lace, sash, band, linen, headband }) {
   return {
-    label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama },
+    // The hakama worn long and untied, the sash's ends hanging, and the pair of scabbards thrust through it at the left hip.
+    label, top: { kind: 'kosode', color: kosode }, bottom: { kind: 'hakama', color: hakama, long: true },
     armor: { kind: 'roninDo', color: steel, lace, gold: band, cloth: linen, cloth2: sash },
     head: { kind: 'hachimaki', color: headband },
     feet: { kind: 'sandal', color: '#5a3a22' },
+    extras: [{ kind: 'sashEnds', color: sash }, { kind: 'daisho', color: '#15151a', cord: sash }],
   };
 }
 // A hex colour darker (or lighter) by a share.
@@ -887,11 +892,13 @@ export const OUTFITS = {
     // The designs in play (picked from the five); the game shuffles among them.
     picked: [0, 1, 2, 3],
     designs: [
-      // The gothic shape — fluted plate, the German sallet and bevor — in bright polished steel.
-      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#2a2622' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: true }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet' }, feet: { kind: 'sabaton', color: '#b7bcc4', ...SABATONS.sallet } },
+      // The gothic shape — smooth plate with sprays of flutes (`fluted: 'sprays'`, not the close fluting of the 1510s-20s), a
+      // sharp keel and a narrow waist, the German sallet and bevor — in bright polished steel.
+      // Its borders of applied gilt brass (ARMOUR_DECOR.brass), the arming doublet under it a dull purple.
+      { label: 'Gothic plate', top: { kind: 'longsleeve', color: '#4a2f4f' }, bottom: { kind: 'tights', color: '#1e1b18' }, armor: { kind: 'plate', color: '#b7bcc4', fluted: 'sprays', ...GOTHIC_BRASS }, head: { kind: 'bascinet', color: '#b7bcc4', pointed: true, design: 'sallet', ...GOTHIC_BRASS }, feet: { kind: 'sabaton', color: '#b7bcc4', ...SABATONS.sallet, ...GOTHIC_BRASS } },
       // Italian plate of about 1400 under the visored (hounskull) bascinet and its mail.
       plateDesign('Milanese', '#a7adb6', false, false, '#3a2a22', 'hounskull'),
-      plateDesign('Blackened', '#3a3d42', true, true, '#1c1a18', 'sallet'),
+      plateDesign('Blackened', '#3a3d42', 'sprays', true, '#1c1a18', 'sallet'),
       // The fluted harness of the 1510s-20s and its close helmet.
       plateDesign('Bright, wine arming coat', '#c4c9d0', true, false, '#5a1a22', 'closeHelmet'),
       plateDesign('Russeted', '#7a5a42', false, true, '#2a2622', 'hounskull'),
@@ -1103,11 +1110,11 @@ export const OUTFITS = {
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
     courage: 0.85,
     designs: [
-      { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743', panel: true, leather: '#5a3a22', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25, panel: true, leather: '#3a2a3a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'kuwagata', mask: 'red', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
-      { label: 'Sun disc', top: { kind: 'longsleeve', color: '#2a2a30' }, bottom: { kind: 'pants', color: '#2a2a30' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#e8e4da', gold: '#d6a743', panel: true, leather: '#6a4a2a', trim: true }, head: { kind: 'kabuto', color: '#17171a', crest: 'sun', lace: '#e8e4da', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#e8e4da' } },
-      { label: 'Daimyo', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#2a0c0e' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#d6a743', gold: '#d6a743', sode: 1.3, panel: true, leather: '#2a3a5a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'tall', mask: 'red', maskDesign: 'oni', lace: '#d6a743', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Antlers', top: { kind: 'longsleeve', color: '#16201a' }, bottom: { kind: 'pants', color: '#1a221c' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#2f5a3a', gold: '#d6a743', panel: true, leather: '#4a3a1a', trim: true }, head: { kind: 'kabuto', color: '#b3161b', crest: 'antlers', mask: 'black', lace: '#2f5a3a', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#16201a' } },
+      { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743', panel: true, leather: '#5a3a22', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25, panel: true, leather: '#3a2a3a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'kuwagata', mask: 'iron', maskPlain: true, lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
+      { label: 'Sun disc', top: { kind: 'longsleeve', color: '#2a2a30' }, bottom: { kind: 'pants', color: '#2a2a30' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#e8e4da', gold: '#d6a743', panel: true, leather: '#6a4a2a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#17171a', crest: 'sun', lace: '#e8e4da', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#e8e4da' } },
+      { label: 'Daimyo', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#2a0c0e' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#d6a743', gold: '#d6a743', sode: 1.3, panel: true, leather: '#2a3a5a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'tall', mask: 'iron', maskDesign: 'oni', lace: '#d6a743', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Antlers', top: { kind: 'longsleeve', color: '#16201a' }, bottom: { kind: 'pants', color: '#1a221c' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#2f5a3a', gold: '#d6a743', panel: true, leather: '#4a3a1a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'antlers', mask: 'black', lace: '#2f5a3a', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#16201a' } },
     ],
   },
   // Ō-yoroi, the great armour of the Heian and Kamakura mounted archer: a
@@ -1196,8 +1203,9 @@ export const OUTFITS = {
     courage: 0.85,
     designs: [
       toseiDesign('Iron', '#3b3e44', '#1d2a4f', 'crescent', 'black', '#1c1d26'),
-      toseiDesign('Russet', '#6b4a32', '#2a1a10', 'kuwagata', 'red', '#2a1f18'),
-      { ...toseiDesign('Black lacquer', '#17171a', '#b3161b', 'tall', 'black', '#141416'), head: { kind: 'kabuto', color: '#17171a', crest: 'tall', mask: 'black', maskDesign: 'oni', lace: '#b3161b', gold: '#d6a743' } },
+      // Russet iron under a shiinari bowl dressed in white yak hair, laced dark blue.
+      { ...toseiDesign('Russet', '#6b4a32', '#1d2a4f', null, 'red', '#2a1f18'), head: { kind: 'kabuto', design: 'shiinari', color: '#6b4a32', mask: 'red', maskPlain: true, plume: '#e9e3d2', lace: '#1d2a4f', gold: '#d6a743' } },
+      { ...toseiDesign('Black lacquer', '#17171a', '#b3161b', 'tall', 'black', '#141416'), head: { kind: 'kabuto', color: '#17171a', crest: 'crescent', mask: 'black', maskDesign: 'oni', plume: '#e9e3d2', lace: '#b3161b', gold: '#d6a743' } },
       toseiDesign('Silver', '#9aa0a8', '#1d2a4f', 'sun', 'black', '#23202b'),
       toseiDesign('Blued steel', '#2c3a4a', '#d6a743', 'antlers', 'red', '#16201a'),
       // Kojima's own (`special`: his alone, never dealt at random; the same

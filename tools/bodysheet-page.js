@@ -103,7 +103,7 @@ const SHEET = {
   distance: 6.1,
   target: [0, 0.97, 0],
   // Camera bearings from the fighter's front (+x), degrees.
-  views: { front: 0, rear: 215, side: 90, face: 0, face3q: 38, front3q: 35, high: 145 },
+  views: { front: 0, rear: 215, back: 180, side: 90, face: 0, face3q: 38, front3q: 35, high: 145 },
   // Views seen from above (m the camera is raised over the target, at the full-body distance): the shoulders' tops.
   raised: { high: 1.6 },
   header: 78,
@@ -311,9 +311,9 @@ function addExtremities(group, body, built, frames, points, { helmet = null, hai
   const hex = SHEET.clay;
   const faceLook = { hairStyle: hair, facialHair: beard, hairColor: '#2a1d14', faceMorph: Boolean(styleSpec(STYLE).face) };
   const head = buildHead(body, faceLook, hex, 0x888888);
-  const seat = body.lengths.headRadius * 0.18;
+  const seat = body.lengths.headRadius * (BASE_BODY.head.seat - BASE_BODY.head.lift);
   const headFrame = frames[BONE.head];
-  head.group.matrix.fromArray(frameMatrix({ ...headFrame, origin: headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat) })).scale(new THREE.Vector3(1.12, 1.12, 1.12));
+  head.group.matrix.fromArray(frameMatrix({ ...headFrame, origin: headFrame.origin.map((value, axis) => value - headFrame.y[axis] * seat) })).scale(new THREE.Vector3(1, 1, 1).multiplyScalar(BASE_BODY.head.size * (1 - BASE_BODY.head.smaller)));
   head.group.matrixAutoUpdate = false;
   const skullSkin = head.shell.mesh.material;
   const faceMaterial = lightLike(skullSkin);

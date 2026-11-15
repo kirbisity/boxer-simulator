@@ -156,7 +156,7 @@ export const ARMOUR_EDGES = {
 export const ARMOUR_COVERAGE = {
   heavyRiot: ['polymer'], riot: ['polymer'], patrolVest: null, plateCarrier: null,
   plate: ['plate', 'fluted', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['euroBrigandine', 'munitionPlate', 'harnessEdge'], haubergeon: ['mail'], breastplate: ['munitionPlate', 'harnessEdge'],
-  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake'], roninDo: ['mail', 'munitionPlate'],
+  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake', 'plate'], roninDo: ['mail', 'munitionPlate'],
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
@@ -214,7 +214,7 @@ export const HELMET_TILES = {
  * off or in a crowd the builder draws the plates one by one. The Song and Jin helmet's aventail was rows of the same small
  * lamellae as the coat (https://dragonsarmory.blogspot.com/2017/07/heavy-jin-dynasty-armor.html).
  */
-export const HELMET_PART_TILES = { pagodaHelm: { aventail: 'lamellae' } };
+export const HELMET_PART_TILES = { pagodaHelm: { aventail: 'lamellae' }, kabuto: { shikoro: 'kozane' } };
 /** The tiles worn by every opaque part of a piece (a moulded shell, a machine), not only its metal. */
 export const MOULDED_TILES = new Set(['polymer', 'panels']);
 /** Machines' bodies (robotview.js's shells, exoview.js's frame) and the tile they wear. */
