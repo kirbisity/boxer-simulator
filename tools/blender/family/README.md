@@ -20,7 +20,7 @@ directory they run from):
 | File | From |
 | --- | --- |
 | `emac/base-<sex>.json`, `base-rigged.json`, `ref.json` | `node tools/blender/family/export.mjs <repo> <work>/emac`: the base mesh as modelled, its joints and skin weights |
-| `emac/her3d-b-aligned.npz`, `-aligned-male.npz` | tools/blender/emaciatedbody.py on the emaciated reference sculpt (ax_model.blend, "anabelle.001"), out `<work>/emac/her3d-b.json`: her sculpt in the base's pose and on its joints |
+| `emac/her3d-b-aligned.npz`, `-aligned-male.npz` | Not made by any script in the repository: regE.py reads their `A` (her points) and `T` (her triangles), her sculpt aligned to the base's pose and joints. The nearest step kept is `Blender -b ax_model.blend --python tools/blender/emaciatedbody.py -- <ref.json> <base-female.json> <base-male.json> <out.json> <her-joints.json>` (her-joints.json: her joints placed by eye), which writes her re-posed surface sampled at the base's points as JSON, not the aligned mesh; the step from her sculpt to the `.npz` was a scratch script, lost with the work directory |
 | `remodel/body-rest.npz` | `Blender -b skeleton/body.blend --python bodyrest.py -- <work>/emac/base-female.json <work>/remodel/body-rest.npz`: the ordinary reference woman as she stands |
 
 ## The order
@@ -40,9 +40,10 @@ From `<work>/remodel`, with `F=<repo>/tools/blender/family`:
                                              # (TRAPEZIUS.keep) and their shoulder caps lessened (DELTOID.keep), every neck
                                              # drawn slimmer (NECK.slim, with src/loftbody.js LOFT.neck.slim)
     python3 $F/swell.py                      # shaped/F4: F3 grown as fat grows to a BMI of 100; prints LOFT.family.swell
-    python3 $F/composition.py shaped         # each build's [fat, fat-free mass index] as drawn, for LOFT.family
-                                             # (and `even`: the emaciated build before girdle.py, LOFT.boneCover.sculpt)
-    python3 $F/dump.py family-even.json shaped
+    python3 $F/composition.py shaped         # each build's [fat, fat-free mass index] as drawn, for LOFT.family: E to
+                                             # F3 (F4's are swell.py's printout); `even`: the emaciated build before
+                                             # girdle.py, LOFT.boneCover.sculpt
+    python3 $F/dump.py family-even.json shaped   # the seven builds and the base (the folder defaults to reg/)
     node <repo>/tools/basebody-family.js family-even.json
 
 `centre2.py` and `borders.py` are register.py's measures (run alone they report each build's miss from the base's bones);
