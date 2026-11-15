@@ -2041,8 +2041,11 @@ export function setBodyStyle(style) {
  * `simple`: drawn as a crowd member, whatever his inputs say: one baked
  * body shared with those who look like him (see crowdview.js).
  */
+/** Trailer capture's extra-high mode (`boxer.fullModels(true)`): every man his own full model, never a crowd's baked body. */
+export const FULL_MODELS = { on: false };
+
 export function buildFighterView(view, fighter, { simple: crowd = false } = {}) {
-  if (crowd || fighter.body.inputs.simple) {
+  if (!FULL_MODELS.on && (crowd || fighter.body.inputs.simple)) {
     view.crowdTemplates ??= new Map();
     const key = crowdKey(fighter);
     if (!view.crowdTemplates.has(key)) view.crowdTemplates.set(key, bakeCrowdTemplate(view, fighter));

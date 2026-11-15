@@ -1,0 +1,192 @@
+// Trailer capture helper (launch video spec 2026-11-14), driven over CDP from a 540x960 @2x viewport (1080x1920):
+//   const { TC } = await import('/tools/trailer-capture.js');
+//   TC.prep();                         // top graphics, adaptive resolution off, UI hidden, the page's loop held (boxer.capture)
+//   await TC.battle('agincourt', 1);   // a Battle Mode scenario at a seed, watched
+//   await TC.story('wokou', 2);        // a story chapter's battle at a seed (the hero an AI soldier)
+//   TC.skip(30);                       // run the fight on 30 s without drawing every frame
+//   TC.focus(23);                      // the game's watch camera on a man
+//   TC.cam({ pos, look, fov });        // a fixed camera; TC.cam(fn) a camera from the world's time; TC.cam(null) the game's own
+//   TC.follow(id, { back, up, side, lookUp, fov })   a camera held at an offset from a man, looking at him
+// Not part of the game; nothing imports it.
+
+import { battleOf } from '/src/scenarios.js';
+import { seededRandom } from '/src/physics.js';
+import { STORY_BATTLES } from '/src/story/battles/index.js';
+import { storyNorthLife } from '/tools/storynorth.js';
+
+const HIDE = 'header,footer,#fight-ui,#hud,.hud,#clock,#ghost-bar,.ghost-bar,#log,#banner,.level-hud,#speeds,.fu-pick,#pause,#restart,#menu,.menu,#modes,.arena::after,.toast,#toast,#sound-toggle,.audio-mixer,#icons,.event-icon{display:none!important}';
+
+const lerp = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+const ease = (k) => k * k * (3 - 2 * k);
+
+export const TC = {
+  camera: null,
+  prep({ hideUi = true } = {}) {
+    const boxer = window.boxer;
+    boxer.skipIntro?.();
+    boxer.quality('high');
+    boxer.adaptiveResolution(false);
+    // Extra high: every man his own full model, at any distance (main.js boxer.fullModels).
+    boxer.fullModels(true);
+    this.ui(!hideUi);
+    // No commanders' crowns on a cutscene (a sprite sized to nothing).
+    TC.noCrowns = hideUi;
+    const renderer = boxer.scene.renderer;
+    if (!renderer.__orig) {
+      renderer.__orig = renderer.render.bind(renderer);
+      renderer.render = (scene, camera) => {
+        const T = window.TC; const k = typeof T.camera === "function" ? T.camera(boxer.state.world?.time ?? 0, boxer.state.world) : T.camera;
+        if (k && camera === boxer.scene.camera) {
+          camera.position.set(...k.pos);
+          camera.lookAt(...k.look);
+          camera.fov = k.fov ?? 50;
+          camera.updateProjectionMatrix();
+          camera.updateMatrixWorld();
+        }
+        // The commanders' crowns (generalmark.js, sprites sized once at boot) shrunk to nothing on a cutscene.
+        if (window.TC.noCrowns) scene.traverse((o) => { if (o.isSprite && Math.abs(o.scale.x - 0.035) < 1e-6) o.scale.setScalar(1e-6); });
+        renderer.__orig(scene, camera);
+      };
+    }
+    boxer.capture(true);
+    return boxer.quality();
+  },
+  ui(show) {
+    let style = document.getElementById('trailer-hide');
+    if (!show && !style) {
+      style = document.createElement('style');
+      style.id = 'trailer-hide';
+      style.textContent = HIDE;
+      document.head.appendChild(style);
+    }
+    if (show && style) style.remove();
+    return show;
+  },
+  async battle(key, seed = 1) {
+    const s = battleOf(key);
+    const cast = s.cast(seededRandom(seed));
+    const fighters = Object.entries(cast).flatMap(([corner, side]) => side.map((inputs) => ({ inputs, corner })));
+    const count = window.boxer.storyBattle({ fighters, options: { seed, arena: s.arena, rules: s.rules, formation: s.formation, place: s.scene }, view: { scene: s.scene, camera: s.camera ?? {}, weather: s.weather } });
+    await this.settle();
+    return count;
+  },
+  async story(id, seed = 1, { rank = 'soldier', place = 'front' } = {}) {
+    const battle = STORY_BATTLES[id];
+    const setup = battle.setup(storyNorthLife(battle, { rank, place }), seed, {});
+    const count = window.boxer.storyBattle({ ...setup, view: { ...battle.view, ...(setup.view ?? {}) } });
+    this.player = setup.player;
+    await this.settle();
+    return { count, player: setup.player, scene: setup.view?.scene };
+  },
+  // The gun shot (spec shot 6): an East ashigaru with a teppō against a West samurai, both from Sekigahara's own cast at `seed`, on the
+  // Sengoku battlefield (its camps) in mist, `distance` m apart. Returns the pair's ids [gunner, samurai].
+  async duel(seed = 1, distance = 14, { castSeed = 1, samurai = 0 } = {}) {
+    const cast = battleOf('sekigahara').cast(seededRandom(castSeed));
+    const gun = cast.red.find((i) => i.style === 'matchlock' && i.outfit?.kind === 'ashigaru');
+    const sam = cast.blue.filter((i) => i.outfit?.kind === 'samurai')[samurai];
+    window.boxer.fight([structuredClone(gun)], [structuredClone(sam)], { seed, distance, place: 'sengoku' });
+    // Watched: both men the AI's (fight() leaves the first as the player's, standing still).
+    document.querySelector('#modes button[data-value="watch"]')?.click();
+    window.boxer.weather('mist');
+    await this.settle();
+    return { gunner: 0, samurai: 1, samStyle: sam.style };
+  },
+  async settle() {
+    if (window.boxer.fullModels()) window.boxer.fullModels(true);
+    // Out of the training yard the page boots into (it starts its bout again when a man is out): a sandbox fight.
+    window.boxer.state.game = 'sandbox';
+    window.boxer.finishBuilding?.();
+    window.boxer.finishSkins?.();
+    window.boxer.playFrames(2, 0);
+  },
+  // Run the fight on without drawing each frame (the simulation as the scout ran it; draws a frame every second so views keep up).
+  skip(seconds) {
+    const boxer = window.boxer;
+    for (let t = 0; t < seconds; t += 1) boxer.playFrames(1, Math.min(1, seconds - t));
+    return boxer.state.world.time;
+  },
+  focus(id) {
+    this.camera = null;
+    return window.boxer.focusOn(id);
+  },
+  cam(spec) {
+    this.camera = spec;
+    return Boolean(spec);
+  },
+  // A path: keys [{ t, pos, look, fov }] by world time, eased between.
+  path(keys) {
+    this.camera = (time) => {
+      if (time <= keys[0].t) return keys[0];
+      for (let i = 1; i < keys.length; i += 1) {
+        if (time <= keys[i].t) {
+          const k = ease((time - keys[i - 1].t) / (keys[i].t - keys[i - 1].t));
+          return { pos: lerp(keys[i - 1].pos, keys[i].pos, k), look: lerp(keys[i - 1].look, keys[i].look, k), fov: (keys[i - 1].fov ?? 50) + ((keys[i].fov ?? 50) - (keys[i - 1].fov ?? 50)) * k };
+        }
+      }
+      return keys[keys.length - 1];
+    };
+  },
+  // Held at an offset from a man (in the world's axes, smoothed), looking at his chest.
+  follow(id, { back = 3.2, up = 1.5, side = 1.2, lookUp = 1.2, fov = 45, dir = [0, 0, 1] } = {}) {
+    let eye = null;
+    this.camera = (time, world) => {
+      const man = world.fighters[id];
+      const root = man.root ?? man.x?.slice?.(0, 3);
+      const at = [root[0], 0, root[1]];
+      const want = [at[0] + dir[0] * back + dir[2] * side, at[1] + up, at[2] + dir[2] * back - dir[0] * side];
+      eye = eye ? lerp(eye, want, 0.08) : want;
+      return { pos: eye, look: [at[0], at[1] + lookUp - 1, at[2]], fov };
+    };
+  },
+  // The men with the most mechanics (distinct weighted kinds) in the last `seconds`, richest first: [{ id, corner, weapon, kinds, at:[x,z] }].
+  busiest(seconds = 5, corner = null) {
+    const W = { glance: 3, parry: 3, bladeBlock: 3, clash: 2, blocked: 2, caught: 4, disarmed: 4, shieldBroke: 4, weaponBroke: 4, helmet: 4, misfire: 5, shot: 2, arrow: 1, staggered: 2, floored: 3, fell: 2, thrown: 3, throw: 3, knockout: 4, severed: 2, dazed: 2, jump: 3, clinch: 3, beatenThrough: 4 };
+    const w = window.boxer.state.world;
+    const mine = new Map();
+    for (const e of w.events) {
+      if (e.time < w.time - seconds || !W[e.kind]) continue;
+      for (const id of new Set([e.fighter, e.attacker, e.defender])) {
+        if (id == null || id < 0) continue;
+        if (!mine.has(id)) mine.set(id, new Set());
+        mine.get(id).add(e.kind);
+      }
+    }
+    return [...mine].map(([id, kinds]) => ({ id, corner: w.fighters[id].corner, weapon: w.fighters[id].weapon?.kind, state: w.fighters[id].state, kinds: [...kinds], worth: [...kinds].reduce((s, k) => s + W[k], 0), at: w.fighters[id].root.map((v) => +v.toFixed(1)) }))
+      .filter((m) => !corner || m.corner === corner).sort((a, b) => b.worth - a.worth).slice(0, 5);
+  },
+  // A camera on a circle round some men, at the bearing with the most room (no body within the line of sight), looking at their middle.
+  clear(ids, { radius = 3.5, height = 1.1, lookUp = 1.25, fov = 42, prefer = null } = {}) {
+    const w = window.boxer.state.world;
+    const pts = ids.map((id) => w.fighters[id].root);
+    const m = [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+    const others = w.fighters.filter((f) => !ids.includes(f.id) && f.state !== 'gone').map((f) => f.root);
+    let best = null;
+    for (let k = 0; k < 48; k += 1) {
+      const a = (k / 48) * Math.PI * 2;
+      const eye = [m[0] + Math.cos(a) * radius, m[1] + Math.sin(a) * radius];
+      // Room: the nearest body to the segment eye -> middle (and the eye itself).
+      let room = Infinity;
+      for (const o of others) {
+        const dx = m[0] - eye[0], dz = m[1] - eye[1];
+        const t = Math.max(0, Math.min(0.85, ((o[0] - eye[0]) * dx + (o[1] - eye[1]) * dz) / (dx * dx + dz * dz)));
+        room = Math.min(room, Math.hypot(eye[0] + dx * t - o[0], eye[1] + dz * t - o[1]));
+      }
+      // Side-on to the pair when two are given (both faces seen), and an optional bearing preferred.
+      let score = Math.min(room, 2.5);
+      if (pts.length === 2) score += 0.6 * Math.abs(Math.sin(a - Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0])));
+      if (prefer != null) score += 0.4 * Math.cos(a - prefer);
+      if (!best || score > best.score) best = { score, room, eye, a };
+    }
+    this.camera = { pos: [best.eye[0], height, best.eye[1]], look: [m[0], lookUp, m[1]], fov };
+    return { room: +best.room.toFixed(2), bearing: +best.a.toFixed(2), middle: m.map((v) => +v.toFixed(1)) };
+  },
+  where(id) {
+    const man = window.boxer.state.world.fighters[id];
+    return { root: man.root, state: man.state, corner: man.corner, weapon: man.weapon?.kind };
+  },
+  info() {
+    const w = window.boxer.state.world;
+    return { time: w.time, men: w.fighters.length, quality: window.boxer.quality(), camera: window.boxer.scene.camera.position.toArray() };
+  },
+};
+window.TC = TC;
