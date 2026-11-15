@@ -83,6 +83,8 @@ WEAR = {
     'mail': ('mail', (0.048, 0.048)),
     'yokohagi': ('lacquer', (0.12, 0.08)),
     'knightSallet': ('steel', (0.4, 0.4)),
+    'knightHounskull': ('steel', (0.4, 0.4)),
+    'knightCloseHelmet': ('steel', (0.4, 0.4)),
 }
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
