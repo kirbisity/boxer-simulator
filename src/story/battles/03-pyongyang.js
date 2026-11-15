@@ -63,6 +63,9 @@ export const PYONGYANG_1593 = {
   // The fowling pieces behind the columns, shooting at the walk; the column's officer (a 把总) with them.
   guns: { count: 8, x: PYONGYANG_FRONT - 5, from: -7, to: 7 },
   officer: [PYONGYANG_FRONT - 4.5, 0],
+  // The generals' household men (家丁: OUTFITS mingElite, the roster's General's Retainer) in the front rank of each ladder's column, one on each flank (the front stays on the form-up line), two to a
+  // ladder: the paid retainers led the storming (user, 2026-11-15: the column was all one kit).
+  retainers: { ahead: 0, apart: 2.6, styles: ['guandao', 'dao'] },
   // The guns (physics/artillery.js). Li Rusong brought 200+ guns (Hawley, The Imjin War, 2005, p. 54); on the 8th they
   // pounded the gates (a gate broken by them, Turnbull 2008 p. 60) and drove back Konishi's sortie (p. 61). His southern
   // troops were Qi Jiguang's, whose cart camps carried the folangji and the great general (练兵实纪 杂集). At the army's
@@ -136,6 +139,14 @@ export const pyongyangBattle = {
     for (const [style, z] of spec.defenders.back) {
       blue.men.push(sengokuWarrior(random, spec.japanese, style, 'samurai'));
       blue.places.push([walk[0] + spec.defenders.backAt, z]);
+    }
+    // The retainers, from a stream of their own (the rest of the cast is as it was at every seed).
+    const household = seededRandom(seed + 7919);
+    for (const z of spec.wall.ladders) {
+      spec.retainers.styles.forEach((style, k) => {
+        red.men.push(mingSoldier(household, style, 'elite', { people: 'qi', design: spec.design.mingElite }));
+        red.places.push([spec.column.front + spec.retainers.ahead, z + (k ? spec.retainers.apart : -spec.retainers.apart)]);
+      });
     }
     const built = koreaAssemble({ red, blue, heroCorner: 'red', hero: seated.hero, comrades: seated.comrades });
     const slot = red.places[seated.hero];
