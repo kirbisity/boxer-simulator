@@ -193,7 +193,8 @@ export const ENV = {
     // the sky fills, about a quarter to a third at the heights the camera works at (approximate): the excess
     // is metered by it, so toward an evening sun the camera closes one to two stops and the land goes to
     // silhouette under a sky that keeps its glow and cloud bars. Through thick air the haze's own term above
-    // stands for the sky, and this one fades by the haze's share.
+    // stands for the sky, and this one fades by the haze's share. A place shut in by walls or a wood says how
+    // much of its level frame is sky (`meter.frame`).
     skyOver: 8,
     skyShare: 0.25,
     // The grade, where a weather does not say otherwise (ENV_WEATHER `grade`): `ev` stops over the metered
@@ -811,6 +812,12 @@ export const ENV_WEATHER = {
 //   openings: where the sun comes into a dark space, each { at: [x, y, z] a corner, a: [x, y, z], b: [x, y, z]
 //     the two edges from it (m), floor: m the ground the light lands on, dust: extinction per metre of the air
 //     inside (left out: ENV.beams.dust) }; the light passes the way of a x b (the other way: no beam).
+//   sunMap: the place's own shadow map of the sun, where it casts its own shadows: { matrix: a THREE.Matrix4,
+//     world to the map's [0, 1] cube (the light's shadow.matrix, kept up by three.js), texture: the map's
+//     texture or a function giving it (a light's is made at its first frame), bias: depth, left out 0.002 }.
+//     The air's walk and what falls through the air then take the place's walls and roofs for shade as they
+//     take crowns (air.js envPlaceSun). A map packed as three.js packs depth (not VSM).
+//   meter: { sky: the share of the sky its ground sees, frame: the share of a level frame that is sky }.
 // Its own materials take the haze, the wet and the snow through air.js envDress.
 export const ENV_PLACE_PLAIN = {
   weather: 'clear',
@@ -939,8 +946,10 @@ export const PLACE_ENV = {
     // The floor is a clearing some 16 m across each way in a wood 20 m tall: a solid wall of that height would
     // leave its middle 0.4 to 0.6 of the sky's light (the cosine-weighted share above 40 to 50 degrees), and
     // crowns pass some and the ride is open, so about three quarters (approximate). The meter is told, and
-    // opens up under a lid of cloud, where the fighters stood near black against a black wood.
-    meter: { sky: 0.75 },
+    // opens up under a lid of cloud, where the fighters stood near black against a black wood. `frame`: the
+    // share of a level frame that is sky (ENV.tone.skyShare where a place does not say): none here, the wood
+    // standing 40 to 50 degrees up all round, so a bright lid over it does not close the camera on the wood.
+    meter: { sky: 0.75, frame: 0 },
     terrain: {
       seed: 37,
       layers: [

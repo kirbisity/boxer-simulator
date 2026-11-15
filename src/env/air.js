@@ -255,6 +255,16 @@ export const ENV_UNIFORMS = {
   // How far (m, x and z) the gust over the floor has carried the crowns' shade: the flecks on the ground move by
   // it where they lie (terrain.js envCover), and the shafts in the air with them.
   uEnvShadeSway: { value: null },
+  // The camera's exposure this frame (post.js envMeter): what a place's own emissive or added light multiplies
+  // itself against so that it sits in the frame as the land does. 1 where no open-air place is shown.
+  uEnvExposure: { value: 1 },
+  // A place's own sun map (a place that draws itself and casts its own shadows: config.js `sunMap`), read by
+  // the air's walk and by whatever falls through the air, so that its walls and roofs shade the mist and the
+  // flakes as its crowns would. `uEnvPlaceSunBy`: world to the map's [0, 1] cube (a light's shadow.matrix);
+  // `uEnvPlaceSunOn`: x 1 while there is one, y the depth bias.
+  uEnvPlaceSun: { value: null },
+  uEnvPlaceSunBy: { value: null },
+  uEnvPlaceSunOn: { value: null },
 };
 
 /** Fill the uniforms' values in (the first use needs THREE). */
@@ -279,6 +289,8 @@ export function envUniforms() {
   u.uEnvWet.value = new THREE.Vector2(0, 0);
   u.uEnvShade.value = new THREE.Vector4(0, 0, 1, 1);
   u.uEnvShadeSway.value = new THREE.Vector2(0, 0);
+  u.uEnvPlaceSunBy.value = new THREE.Matrix4();
+  u.uEnvPlaceSunOn.value = new THREE.Vector2(0, 0);
   u.uEnvLook.value = new THREE.Vector2(0, 0);
   u.uEnvBodiesAt.value = new THREE.Vector4(0, 0, 0, 0);
   for (let at = 0; at < ENV.shadow.bodyCount; at += 1) u.uEnvBodies.value.push(new THREE.Vector4(0, 0, 0, 0));
@@ -341,6 +353,10 @@ uniform sampler2D uEnvMap;
 uniform sampler2D uEnvCover;
 uniform vec4 uEnvShade;
 uniform vec2 uEnvShadeSway;
+uniform float uEnvExposure;
+uniform sampler2D uEnvPlaceSun;
+uniform mat4 uEnvPlaceSunBy;
+uniform vec2 uEnvPlaceSunOn;
 
 vec3 envSky(vec3 dir) {
   vec2 level = normalize(dir.xz + vec2(1e-5, 0.0));
@@ -467,6 +483,17 @@ vec3 envSunward(vec3 point) {
   return envSunwardOver(point, 0.0);
 }
 
+// Whether the sun reaches a point past what a place that draws itself has built: its own sun map, where it has
+// handed one over (depth packed in four bytes as three.js packs a shadow map; outside the map, in the sun).
+float envPlaceSun(vec3 point) {
+  if (uEnvPlaceSunOn.x < 0.5) return 1.0;
+  vec4 spot = uEnvPlaceSunBy * vec4(point, 1.0);
+  spot.xyz /= spot.w;
+  if (spot.x < 0.0 || spot.x > 1.0 || spot.y < 0.0 || spot.y > 1.0 || spot.z > 1.0) return 1.0;
+  float held = dot(texture2D(uEnvPlaceSun, spot.xy), vec4(1.0 / 16777216.0, 1.0 / 65536.0, 1.0 / 256.0, 1.0)) * (255.0 / 256.0);
+  return step(spot.z - uEnvPlaceSunOn.y, held);
+}
+
 // The share of the sun on a point in the air seen from eye: the cloud over it and what stands sunward of it.
 // Light the haze has thrown wide (uEnvCloudForm.w: its share of the beam, envAirState) comes to the point from
 // all round, under the cloud over a wide round and not the cloud over the point, so the cloud is read over a
@@ -477,7 +504,7 @@ float envAirSunOver(vec3 point, vec3 eye, float spread) {
   // (Over the cloud sheet nothing shades it.)
   if (point.y >= uEnvCloud.w) return 1.0;
   vec3 past = envSunwardOver(point, spread);
-  return envSunShare(mix(point, eye, uEnvCloudForm.w)) * past.x * past.y * past.z;
+  return envSunShare(mix(point, eye, uEnvCloudForm.w)) * past.x * past.y * past.z * envPlaceSun(point);
 }
 
 float envAirSun(vec3 point) {
