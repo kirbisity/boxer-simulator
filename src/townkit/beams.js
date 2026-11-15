@@ -55,6 +55,9 @@ import { ktShadow, ktShadowInit, KT_SHADOW_PARS } from '../levelmode/kitshadow.j
  *    snow and of the haze near the sun's own direction, which the open air's haze counts once for the whole sky.
  */
 export const TK_BEAMS = {
+  // `built`: whether the sheets for built shade are drawn. Off since the open air's walk reads the kit's sun map
+  // itself (place.js TK_PLACE.airMap, R10 a): drawn as well, the shade of a wall in the air is taken twice.
+  built: false,
   slabs: 12, from: 1.2, to: 400, least: 0.00002, most: 0.9, bias: 0.25,
   rays: { slabs: 8, from: 120, to: 9000, reads: 3, sunward: 0.3, gain: 6 },
 };
@@ -142,7 +145,7 @@ export function tkBeams() {
     for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) slab.push(x, y, k);
     index.push(first, first + 1, first + 2, first, first + 2, first + 3);
   };
-  for (let k = 0; k < slabs; k += 1) sheet(k);
+  if (TK_BEAMS.built) for (let k = 0; k < slabs; k += 1) sheet(k);
   for (let k = 0; k < rays.slabs; k += 1) sheet(100 + k);
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(slab.length), 3));
