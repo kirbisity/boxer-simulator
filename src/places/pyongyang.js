@@ -729,7 +729,7 @@ export function buildPyongyang() {
   // columns and the town's people trod, and how the wind laid the snow against the wall.
   const head = plan.head;
   const lay = tkLayOf(blocks, tier, {
-    box: PY_LAY.box, ways: pyWays(plan), wind: PY_LAY.wind, seed: 3, ...(tier === 'low' ? null : { texel: PY_LAY.texel }),
+    box: PY_LAY.box, ways: pyWays(plan), wind: PY_LAY.wind, seed: 3, sun: PY_LIGHT.sun, ...(tier === 'low' ? null : { texel: PY_LAY.texel }),
     ground: (x, z) => (x <= wall.x ? tkFieldAt(plan.outside, x, z) : x < head ? pyFoot(z) : tkFieldAt(plan.inside, x, z)),
   });
 

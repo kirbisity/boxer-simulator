@@ -89,7 +89,21 @@ export const TK_WEATHER = {
   // on the screen (measured: medians of 21 against 94 of 255), a silhouette. At 1.6 it sits about three and a
   // half under: a dim interior in which timber and lattice still read. By eye against the arcade, the lane and
   // the gate passage, on the open air's high tier.
-  shade: { most: 0.85, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, street: 1.6 },
+  // `sun`: what sunlit stone throws into the shade round it, from the lie's sun sheet (lay.js sheet C), on top of
+  // `street` (which is directionless, from the sky and the open ground): a face is lit by what it faces. Worked as
+  // a lit Lambert surface's radiance times the share of the receiving face's view it fills (its view factor):
+  //   ground onto an upright face: the face sees the ground before it over half its view (`view` 0.5), lit by the
+  //   sun at its height above the horizon, read `reach` m out from the face (as `bounce`);
+  //   a lit wall onto the face across the way: a face in a lane about half as wide as it is high sees the opposite
+  //   wall over about half its view (two parallel strips, by crossed strings: 0.45 to 0.6 up a 7 m wall across a
+  //   4 m lane) (`across`), only where the face is turned from the sun (the lit face is turned to it);
+  //   a lit wall onto the floor: from the middle of such a lane a floor sees one wall over about a third of its
+  //   view (`floor`), the lit band at the top of it a share of that, which the sheet's own measure stands for.
+  // `ground` and `wall` the throwers' reflectance: wet dark paving about 0.12 (the canal town's meter is told 0.1
+  // for its wet stone, approximate), grey brick and weathered plaster about 0.3 (approximate), lying snow about
+  // 0.8 (`snow`, fresh snow's albedo, approximate). All of it goes out under cloud with the sun's own (the open
+  // air's cloud share at the point).
+  shade: { most: 0.85, dirt: 0.22, joint: 0.4, bounce: { reach: 2.4, share: 0.5, snow: 0.5 }, street: 1.6, sun: { reach: 2.4, ground: 0.12, snow: 0.8, wall: 0.3, view: 0.5, across: 0.5, floor: 0.33 } },
   // A way's worn middle is this much paler and smoother than its edges; its edges this much darker.
   tread: { pale: 0.16, edge: 0.4, patch: 0.3, green: { low: 0.7, shade: 0.35, joint: 0.3 } },
   // (`green`: the moss in the joints gathers where damp does, not only along a wall's foot: `low` is how much the
@@ -155,10 +169,13 @@ export const tkWeather = {
   // The lie (lay.js): its two sheets, where the map lies (its corner's x and z, 1 / its width and depth), and how
   // its heights are read (the height at 0, the range, 1 while a map is in force).
   uTkLayA: { value: null }, uTkLayB: { value: null }, uTkLay: { value: null }, uTkLayH: { value: null },
+  // The lie's sun sheet (lay.js sheet C; black where the place gave no sun: nothing thrown).
+  uTkLayC: { value: null },
   // (1 in the open air, north's x and z, 0); the wind (the way it blows: x, z; its speed m/s; 0).
   uTkAir: { value: null }, uTkBlow: { value: null },
 };
 
+let tkLayDark = null;
 function tkWeatherInit() {
   if (tkWeather.uTkMist.value) return;
   tkWeather.uTkMist.value = new THREE.Vector3(0, 0, 0.5);
@@ -168,6 +185,9 @@ function tkWeatherInit() {
   blank.needsUpdate = true;
   tkWeather.uTkLayA.value = blank;
   tkWeather.uTkLayB.value = blank;
+  tkLayDark = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, THREE.RGBAFormat);
+  tkLayDark.needsUpdate = true;
+  tkWeather.uTkLayC.value = tkLayDark;
   tkWeather.uTkLay.value = new THREE.Vector4(0, 0, 1, 1);
   tkWeather.uTkLayH.value = new THREE.Vector3(0, 1, 0);
   tkWeather.uTkAir.value = new THREE.Vector4(0, 0, -1, 1);
@@ -208,6 +228,7 @@ export function tkSetLay(lay, textures, north = [0, -1]) {
   }
   tkWeather.uTkLayA.value = textures.a;
   tkWeather.uTkLayB.value = textures.b;
+  tkWeather.uTkLayC.value = textures.c ?? tkLayDark;
   tkWeather.uTkLay.value.set(lay.min[0], lay.min[1], 1 / lay.size[0], 1 / lay.size[1]);
   tkWeather.uTkLayH.value.set(lay.base, lay.range, 1);
 }
@@ -240,6 +261,7 @@ uniform vec4 uTkDirt;
 uniform vec4 uTkLaid;
 uniform sampler2D uTkLayA;
 uniform sampler2D uTkLayB;
+uniform sampler2D uTkLayC;
 uniform vec4 uTkLay;
 uniform vec3 uTkLayH;
 uniform vec4 uTkAir;
@@ -282,6 +304,8 @@ vec3 tkUp = vec3(0.0, 1.0, 0.0);
 // From the lie: the sky's share here, how far under cover (0..1), the wear, and the joint's depth (the sheet's).
 float tkSky = 1.0;
 float tkBounce = 0.0;
+// The sun's light thrown here by lit stone round it, as a share of the sun's own (TK_WEATHER.shade.sun).
+float tkSunBack = 0.0;
 float tkUnder = 0.0;
 float tkWear = 0.0;
 float tkJoint = 0.0;
@@ -338,6 +362,19 @@ const TK_COLOUR = `
       nearWall = lb.b;
       // (The light off the ground before an upright face: weather.js TK_WEATHER.shade.bounce.)
       if (upright > 0.01) tkBounce = upright * ${TK_WEATHER.shade.bounce.share.toFixed(2)} * (1.0 + ${TK_WEATHER.shade.bounce.snow.toFixed(2)} * uTkSnow) * texture2D(uTkLayA, (vTkPos.xz + n.xz * ${TK_WEATHER.shade.bounce.reach.toFixed(2)} - uTkLay.xy) * uTkLay.zw).r;
+      // (The sun's light off lit ground and lit walls round here: TK_WEATHER.shade.sun. A face reads the sheet out
+      // before it, the floor where it is. Faces turned up or down past upright and level get none: an arch's soffit
+      // sees the dark passage.)
+      {
+        vec2 sunWay = normalize(uKitSunDir.xz + vec2(1e-5, 0.0));
+        vec4 lc = texture2D(uTkLayC, (vTkPos.xz + n.xz * ${TK_WEATHER.shade.sun.reach.toFixed(2)} * upright - uTkLay.xy) * uTkLay.zw);
+        float thrownGround = mix(${TK_WEATHER.shade.sun.ground.toFixed(2)}, ${TK_WEATHER.shade.sun.snow.toFixed(2)}, uTkSnow);
+        float away = max(0.0, -dot(normalize(n.xz + vec2(1e-5, 0.0)), sunWay));
+        float sunAcross = sqrt(max(0.0, 1.0 - uKitSunDir.y * uKitSunDir.y));
+        tkSunBack = upright * (${TK_WEATHER.shade.sun.view.toFixed(2)} * thrownGround * max(uKitSunDir.y, 0.0) * lc.r
+          + ${TK_WEATHER.shade.sun.across.toFixed(2)} * ${TK_WEATHER.shade.sun.wall.toFixed(2)} * sunAcross * lc.g * away)
+          + level * ${TK_WEATHER.shade.sun.floor.toFixed(2)} * ${TK_WEATHER.shade.sun.wall.toFixed(2)} * sunAcross * lc.g;
+      }
       if (upright > 0.01) fall = texture2D(uTkLayB, (vTkPos.xz - n.xz * 0.35 - uTkLay.xy) * uTkLay.zw).r * uTkLayH.y + uTkLayH.x - vTkPos.y;
     }
   }
@@ -538,6 +575,8 @@ const TK_SHADE = `
   reflectedLight.indirectSpecular *= tkOpen * (1.0 - tkJoint * (1.0 - smoothstep(0.25, 0.6, abs(normalize(vTkNrm).y))));
   // The light of the lit walls and ground round a shut-in place (TK_WEATHER.shade.street).
   if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.street.toFixed(2)} * (1.0 - tkOpen)) * material.diffuseColor;
+  // The sun's light thrown by lit stone round here (TK_WEATHER.shade.sun), out under cloud with the sun's own.
+  if (uTkAir.x > 0.5 && tkSunBack > 0.0) reflectedLight.indirectDiffuse += uEnvSunColour * (tkSunBack * envSunShare(vTkPos)) * material.diffuseColor;
   // The sun's glint on wet stone, held under the glare (TK_WEATHER.glare).
   reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(${TK_WEATHER.glare.toFixed(2)} / max(uTkAir.w, 1e-4) * mix(1.0, ${TK_WEATHER.glint.toFixed(1)}, tkPoolHere)));
 }
