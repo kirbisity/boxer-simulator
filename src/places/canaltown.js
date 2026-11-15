@@ -14,11 +14,12 @@ import { slabOf, wallLine, wallOf } from '../physics/terrain.js';
 import { tkgBay, tkgFrame } from '../townkit/geo.js';
 import { tkRandom } from '../townkit/tex.js';
 import {
-  TK_HOUSE, tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
+  TK_HOUSE, TK_JAR, tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
   tkSlabBridgeSolids, tkTree, tkWaterSteps, tkWaterStepsSolids, tkYardWall, tkYardWallSolid,
 } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
 import { tkStir } from '../townkit/stir.js';
+import { TK_MATERIALS } from '../townkit/weather.js';
 import { TK_THINGS, tkBasket, tkCart, tkFirewood, tkPoles, tkSacks, tkScatter, tkTub } from '../townkit/things.js';
 
 /** The town's plan (m). Every figure is a choice for the game's ground, set against the battle's court and a walker's reach; none is a measurement of a real town. */
@@ -31,10 +32,11 @@ export const CANAL_TOWN = {
   // town canal of about 7 m, a boat's length across; the water a man's waist under the quay.
   canal: { z: [11.5, 18.5], water: -1.25, bed: -2.2, reach: 150 },
   // The lanes along the north quay (z), closed at `end` (|x|) by a wall and gate; the cross lanes (x, from the back street to
-  // the far bank's street) and the lane north out of the square, with its brick gate at `gate` (z).
+  // the far bank's street) and the lane north out of the square, with its brick gate at `gate` (z), running on across the
+  // back street between houses to a yard wall and gate at `far` (z): through the gate's arch a lane goes on into the mist.
   quayLane: { z: [6.5, 11.5], end: 70 },
   crossLanes: [[-48, -44], [44, 48]],
-  northLane: { x: [4, 7.5], gate: -18.5 },
+  northLane: { x: [4, 7.5], gate: -18.5, far: -62 },
   // The back street (z) and the far bank's street (z); how far each runs (|x|).
   backStreet: { z: [-30, -26], reach: 48 },
   southStreet: { z: [27, 31], reach: 48 },
@@ -51,7 +53,11 @@ export const CANAL_TOWN = {
   muster: [11, 0, 0],
 };
 
-const CT_SHOPS = [['open', 'boards'], ['open', 'open', 'door'], ['boards', 'door', 'lattice'], ['open', 'door']];
+// A shop's ground floor, bay by bay. Shops of the region stand open to the street by day, their boards taken down, a band
+// of lattice (`transom` m) under the beam over the opening; or shut with lattice leaves (by eye against the reference
+// photographs of Jiangnan water towns: lattice on nearly every shopfront).
+const CT_SHOPS = [['open', 'lattice'], ['open', 'open', 'door'], ['boards', 'door', 'lattice'], ['lattice', 'open', 'lattice']];
+const CT_SHOPFRONT = { transom: 0.5 };
 const CT_HOMES = [['lattice', 'door', 'lattice'], ['boards', 'door'], ['wall', 'door', 'wall'], ['lattice', 'door']];
 
 /**
@@ -81,7 +87,11 @@ function ctRows() {
     // The back street: its south side (back to back with the square's north rows) and its north side.
     ['backSouthWest', [lane0, back.z[1]], [w1, back.z[1]], { ...twin, seed: 21 }],
     ['backSouthEast', [e0, back.z[1]], [lane1, back.z[1]], { ...twin, seed: 22 }],
-    ['backNorth', [-back.reach - 7, back.z[0]], [back.reach + 7, back.z[0]], { ...side, seed: 23 }],
+    ['backNorth', [-back.reach - 7, back.z[0]], [lane0, back.z[0]], { ...side, seed: 23 }],
+    ['backNorthEast', [lane1, back.z[0]], [back.reach + 7, back.z[0]], { ...side, seed: 24 }],
+    // The north lane beyond the back street: its houses start behind the back street's (their ends close it first).
+    ['northLaneWest', [lane0, back.z[0] - side.depth * (1 + side.vary / 2)], [lane0, t.northLane.far], { ...side, vary: 0, seed: 25 }],
+    ['northLaneEast', [lane1, t.northLane.far], [lane1, back.z[0] - side.depth * (1 + side.vary / 2)], { ...side, vary: 0, seed: 26 }],
     // The cross lanes: the houses on each side of each.
     ['westLaneEast', [w1, party], [w1, quay - 7], { ...side, seed: 31 }],
     ['westLaneWest', [w0, quay - 7], [w0, back.z[0]], { ...side, seed: 32 }],
@@ -102,7 +112,8 @@ function ctRows() {
     ['waterEastFar', [t.quayLane.end + 4, south.z[0]], [far, south.z[0]], { depth: south.z[0] - t.canal.z[1], vary: 0, seed: 55, far: true }],
     ['southStreet', [south.reach + 7, south.z[1]], [-south.reach - 7, south.z[1]], { ...side, seed: 56 }],
     // Roofs beyond the last streets, for the view over the nearer ones.
-    ['beyondNorth', [-80, back.z[0] - 16], [80, back.z[0] - 16], { ...side, seed: 61, far: true }],
+    ['beyondNorth', [-80, back.z[0] - 16], [lane0 - side.depth - 0.5, back.z[0] - 16], { ...side, seed: 61, far: true }],
+    ['beyondNorthEast', [lane1 + side.depth + 0.5, back.z[0] - 16], [80, back.z[0] - 16], { ...side, seed: 63, far: true }],
     ['beyondSouth', [80, south.z[1] + 16], [-80, south.z[1] + 16], { ...side, seed: 62, far: true }],
   ];
 }
@@ -119,7 +130,7 @@ export function canalTownPlan() {
   const t = CANAL_TOWN;
   const houses = [];
   for (const [row, from, to, { shops = false, far = false, ...options }] of ctRows()) {
-    for (const house of tkRow({ from, to, ...options, ...(shops ? { grounds: CT_SHOPS } : { grounds: CT_HOMES, two: options.two ?? 0.7 }) })) houses.push({ ...house, row, shops, far });
+    for (const house of tkRow({ from, to, ...options, ...(shops ? { grounds: CT_SHOPS, extra: { transom: CT_SHOPFRONT.transom } } : { grounds: CT_HOMES, two: options.two ?? 0.7 }) })) houses.push({ ...house, row, shops, far });
   }
   const [qz0, qz1] = t.quayLane.z;
   const [cz0, cz1] = t.canal.z;
@@ -130,6 +141,7 @@ export function canalTownPlan() {
     { a: [t.quayLane.end, qz1], b: [t.quayLane.end, qz0], gate: true },
     { a: [-south.reach, south.z[0]], b: [-south.reach, south.z[1]], gate: true },
     { a: [south.reach, south.z[1]], b: [south.reach, south.z[0]], gate: true },
+    { a: [t.northLane.x[0], t.northLane.far], b: [t.northLane.x[1], t.northLane.far], gate: true },
   ];
   const bridges = [
     { kind: 'arch', at: t.archBridge.at, yaw: -Math.PI / 2, span: cz1 - cz0, high: t.archBridge.high, flat: t.archBridge.flat, water: t.canal.water },
@@ -215,7 +227,71 @@ function ctDressing(house) {
   if (more() < f.baskets) for (let k = 0, lx = spot(), count = 1 + Math.floor(more() * 3); k < count; k += 1) things.stands.push({ kind: 'basket', x: lx + k * 0.58, z: 0.4 + 0.3 * more(), wide: 0.4 + 0.2 * more(), full: more() < 0.5 });
   if (more() < f.tub) things.stands.push({ kind: 'tub', x: spot(), z: 0.38 + 0.3 * more() });
   if (house.shops && more() < f.sacks) things.stands.push({ kind: 'sacks', x: spot(), count: 2 + Math.floor(more() * 4) });
+  // (The household's other things, from a stream of their own after the older ones: CT_HOUSEHOLD.)
+  const own = tkRandom(house.seed + 477);
+  const h = CT_HOUSEHOLD;
+  const place = () => (own() - 0.5) * (house.width - 1.8);
+  if (own() < h.bench) things.stands.push({ kind: 'bench', x: place(), long: 1.1 + 0.6 * own() });
+  if (own() < h.vat) things.stands.push({ kind: 'vat', x: place(), wide: 0.62 + 0.2 * own() });
+  if (own() < (house.shops ? h.trays.shop : h.trays.home)) things.stands.push({ kind: 'trays', x: place(), crop: Math.floor(own() * CT_CROPS.length) });
+  if (own() < h.mortar) things.stands.push({ kind: 'mortar', x: place() });
+  if (own() < h.buckets) things.stands.push({ kind: 'buckets', x: place(), turn: (own() - 0.5) * 0.8 });
   return things;
+}
+
+/**
+ * The rest of what stands at a house's front, how often (0..1 of houses): a bench, a glazed water vat (a household kept
+ * its water in one by the door), bamboo trays of something drying on a trestle (more at a shop), a stone mortar for
+ * husking grain, a pair of buckets with their carrying pole. By eye against the reference photographs of such towns.
+ */
+const CT_HOUSEHOLD = { bench: 0.22, vat: 0.2, trays: { shop: 0.3, home: 0.14 }, mortar: 0.08, buckets: 0.16 };
+// What dries on the trays: red chillies, green beans, pale bamboo shoots, dark fungus.
+const CT_CROPS = [[0.62, 0.14, 0.1], [0.4, 0.46, 0.22], [0.78, 0.72, 0.5], [0.22, 0.16, 0.12]];
+
+/** A bench: a plank on four splayed legs, `long` m, in `frame` (along x, standing on y 0). */
+function ctBench(builder, frame, { long = 1.4, high = 0.45, colour = TK_THINGS.oldWood } = {}) {
+  builder.box('timber', frame, -long / 2, long / 2, high - 0.055, high, -0.12, 0.12, { colour });
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const at = frame(sx * (long / 2 - 0.14), high - 0.06, sz * 0.06);
+      const foot = frame(sx * (long / 2 - 0.08), 0, sz * 0.14);
+      builder.tube('timber', [foot, at], 0.025, 0.022, { sides: 5, colour: colour.map((value) => value * 0.85) });
+    }
+  }
+}
+
+/** A glazed water vat standing at world (x, y, z): wide-mouthed, open, the water dark in it. */
+function ctVat(builder, x, y, z, { wide = 0.7, colour = [0.2, 0.16, 0.13] } = {}) {
+  const r = wide / 2;
+  const high = wide * 0.92;
+  const frame = tkgFrame(x, y, z);
+  builder.lathe('ware', frame, 0, 0, [[r * 0.6, 0], [r * 0.86, high * 0.25], [r * 0.98, high * 0.6], [r * 0.96, high * 0.9], [r * 1.02, high * 0.96], [r * 1.0, high], [r * 0.9, high], [r * 0.86, high * 0.9]], { colour, sides: TK_JAR.sides });
+  builder.round('ware', frame, 0, 0, high * 0.82, high * 0.84, r * 0.88, r * 0.88, { colour: [0.05, 0.06, 0.06], sides: TK_JAR.sides });
+}
+
+/** Bamboo trays of `crop` drying on a trestle in `frame` (along x, standing on y 0). */
+function ctTrays(builder, frame, { crop = CT_CROPS[0] } = {}) {
+  const high = 0.62;
+  for (const sx of [-0.45, 0.45]) {
+    for (const sz of [-1, 1]) builder.tube('timber', [frame(sx, 0, sz * 0.3), frame(sx, high, 0)], 0.022, 0.02, { sides: 5, colour: TK_THINGS.bamboo });
+  }
+  builder.box('timber', frame, -0.55, 0.55, high - 0.03, high + 0.01, -0.02, 0.02, { colour: TK_THINGS.bamboo });
+  for (const tx of [-0.3, 0.32]) {
+    const tray = frame.child(tx, high + 0.01, 0);
+    builder.lathe('timber', tray, 0, 0, [[0.34, 0], [0.36, 0.05], [0.33, 0.05]], { colour: TK_THINGS.wicker, sides: TK_THINGS.sides.vessel });
+    builder.round('ware', tray, 0, 0, 0.0, 0.035, 0.32, 0.26, { colour: crop, sides: TK_THINGS.sides.vessel });
+  }
+}
+
+/** A stone mortar for husking grain at world (x, y, z): a drum with a bowl cut in its top. */
+function ctMortar(builder, x, y, z) {
+  builder.lathe('ashlar', tkgFrame(x, y, z), 0, 0, [[0.24, 0], [0.27, 0.12], [0.26, 0.4], [0.2, 0.41], [0.13, 0.3], [0.01, 0.25]], { colour: TK_THINGS.stone, sides: TK_THINGS.sides.vessel });
+}
+
+/** A pair of buckets with their carrying pole laid across them, in `frame`. */
+function ctBuckets(builder, frame) {
+  for (const sx of [-0.55, 0.55]) tkTub(builder, ...frame(sx, 0, 0), { wide: 0.36, high: 0.34 });
+  builder.tube('timber', [frame(-0.85, 0.36, 0.02), frame(0.85, 0.36, -0.02)], 0.025, 0.025, { sides: 5, colour: TK_THINGS.bamboo });
 }
 
 /** The solids of the town: everything a walker's body meets. */
@@ -335,7 +411,7 @@ export const CANAL_TOWN_LIGHT = {
 // over roofs), and the way the air moves for what the wind lays (toward [x, z]: along the canal, a light air from the west).
 // How well weeds take (things.js tkScatter `grows`): in a paving's joints, and on open earth.
 const CT_GROWS = { paved: 0.6, earth: 1 };
-const CT_LAY = { box: { x: [-152, 152], z: [-40, 40] }, wind: [1, 0.15] };
+const CT_LAY = { box: { x: [-152, 152], z: [-64, 40] }, wind: [1, 0.15] };
 
 /**
  * Where feet go (lay.js `ways`): the middle of every lane and street, the quay's length, over the bridges, and across
@@ -351,7 +427,7 @@ function ctWays() {
   const north = mid(t.northLane.x);
   const ways = [
     { line: [[-t.canal.reach, quay], [t.canal.reach, quay]], half: 1.1, kind: 'foot', strength: 0.85 },
-    { line: [[north, t.backStreet.z[1]], [north, t.square.z[0]], [north - 2, 0], [t.steps.x - 1, quay]], half: 1.3, kind: 'foot', strength: 0.9 },
+    { line: [[north, t.northLane.far], [north, t.backStreet.z[1]], [north, t.square.z[0]], [north - 2, 0], [t.steps.x - 1, quay]], half: 1.3, kind: 'foot', strength: 0.9 },
     { line: [[t.square.x[0], quay - 3], [-8, 1], [north, t.square.z[0] + 1]], half: 1.2, kind: 'foot', strength: 0.6 },
     { line: [[t.square.x[1], quay - 2], [10, 2], [north, t.square.z[0] + 1]], half: 1.2, kind: 'foot', strength: 0.6 },
     { line: [[-t.backStreet.reach, mid(t.backStreet.z)], [t.backStreet.reach, mid(t.backStreet.z)]], half: 1.2, kind: 'foot', strength: 0.8 },
@@ -374,10 +450,17 @@ const CT_WATERSIDE = {
   steps: { share: 0.45, wide: 1.2, out: 0.9, rise: 0.19, tread: 0.3 },
   posts: { share: 0.7, out: 1.6, high: 0.85 },
   washing: { share: 0.4, out: 2.3, rise: 0.25 },
+  // Where no gallery hangs: the upper floor thrown out over the water on its joists and struts (`jetty`: `out` m, under
+  // the roof's eave), or faced in timber and lattice as the street fronts are (`face`); small lattice windows on the
+  // floor at the bank's level (`low`: how many in each house, by its width, `sill` and `head` m). By eye against the
+  // reference photograph of the canal: a house there rises from the water as a wall of timber and window, not a blank wall.
+  jetty: { share: 0.45, out: 0.7, wide: [2.4, 4.4], joist: 0.6 },
+  face: { share: 0.75 },
+  low: { every: 3.2, sill: 0.95, head: 2.0, wide: 0.9 },
 };
 
 /** What a quay's edge collects, a walker's reach from its rail (`deep` m, so the way stays clear): one group about every `every` m where `share` allows, each of a boatman's or a porter's things. By eye. */
-const CT_QUAY = { every: 5.5, share: 0.6, deep: 0.62, clear: 3.2 };
+const CT_QUAY = { every: 5.5, share: 0.6, deep: 0.62, clear: 3.2, rope: 0.22 };
 
 function ctWaterside(builder, house, stir, water) {
   const w = CT_WATERSIDE;
@@ -386,7 +469,9 @@ function ctWaterside(builder, house, stir, water) {
   const half = house.width / 2;
   const timber = (scale) => TK_HOUSE.timber.map((value) => value * scale);
   const stone = [0.8, 0.8, 0.78];
+  let gallery = false;
   if (house.storeys > 1 && random() < w.gallery.share) {
+    gallery = true;
     const g = w.gallery;
     const wide = Math.min(house.width - 1, g.wide[0] + (g.wide[1] - g.wide[0]) * random());
     const x0 = -half + 0.5 + random() * (house.width - 1 - wide);
@@ -408,12 +493,14 @@ function ctWaterside(builder, house, stir, water) {
     builder.quad('rooftile', back(x0 - 0.2, rb[0], rb[1]), back(x1 + 0.2, rb[0], rb[1]), back(x1 + 0.2, ra[0], ra[1]), back(x0 - 0.2, ra[0], ra[1]), { uvs: [[x0, 0], [x1 + 0.4, 0], [x1 + 0.4, long], [x0, long]] });
     builder.quad('timber', back(x0 - 0.2, ra[0] - 0.05, ra[1]), back(x1 + 0.2, ra[0] - 0.05, ra[1]), back(x1 + 0.2, rb[0] - 0.05, rb[1]), back(x0 - 0.2, rb[0] - 0.05, rb[1]), { colour: timber(0.6) });
   }
+  let steps = null;
   if (random() < w.steps.share) {
     const st = w.steps;
     const way = random() < 0.5 ? -1 : 1;
     const count = Math.ceil(-water / st.rise);
     const sx = (-half + 1.2 + random() * Math.max(0.1, house.width - 2.4 - count * st.tread)) * 1 + (way < 0 ? count * st.tread : 0);
     const door = Math.max(-half + 0.7, Math.min(half - 0.7, sx));
+    steps = door;
     tkgBay(builder, back, { kind: 'door', x0: door - 0.55, x1: door + 0.55, y0: 0.02, y1: 2.05, z: 0.03, finish: TK_HOUSE.timber });
     builder.box('ashlar', back, door - st.wide / 2, door + st.wide / 2, water - 0.7, 0, 0, st.out, { colour: stone, skip: 'back bottom' });
     for (let k = 0; k < count; k += 1) {
@@ -429,6 +516,60 @@ function ctWaterside(builder, house, stir, water) {
     const [lx, top] = [(random() - 0.5) * half, house.heights[0] + house.heights[1]];
     stir.washing(back(lx, top - 1.2, 0.05), back(lx, top - 1.2 + w.washing.rise, w.washing.out), { pole: 0.02, dry: random() });
   }
+  // (Drawn from a stream of their own, after the older things, so those stand where they did.)
+  const more = tkRandom(house.seed + 377);
+  const [h0, eave] = [house.heights[0], house.heights[0] + (house.storeys > 1 ? house.heights[1] : 0)];
+  if (house.storeys > 1 && !gallery) {
+    if (more() < w.jetty.share) ctJetty(builder, back, house, more, timber);
+    else if (more() < w.face.share) {
+      // The upper floor faced in timber posts and lattice, a little proud of the wall, the dark of the rooms behind.
+      const bays = Math.max(1, Math.round(house.width / TK_HOUSE.bay));
+      const each = (house.width - 0.2) / bays;
+      for (let k = 0; k < bays; k += 1) {
+        const [x0, x1] = [-half + 0.1 + k * each + 0.07, -half + 0.1 + (k + 1) * each - 0.07];
+        tkgBay(builder, back, { kind: 'lattice', x0, x1, y0: h0 + 0.05, y1: eave - 0.28, z: 0.09, back: 0.06, sill: 0.75, finish: TK_HOUSE.timber });
+      }
+      for (let k = 0; k <= bays; k += 1) builder.box('timber', back, -half + 0.1 + k * each - 0.07, -half + 0.1 + k * each + 0.07, h0 - 0.1, eave - 0.1, 0, 0.11, { colour: timber(0.9), skip: 'back' });
+      builder.box('timber', back, -half + 0.03, half - 0.03, h0 - 0.12, h0 + 0.05, 0, 0.12, { colour: timber(0.85), skip: 'back' });
+      builder.box('timber', back, -half + 0.03, half - 0.03, eave - 0.28, eave - 0.1, 0, 0.12, { colour: timber(0.85), skip: 'back' });
+    }
+  }
+  // Small lattice windows on the bank's floor (none where a door and its steps went down to the water).
+  if (!house.row.includes('Far')) {
+    const count = Math.max(1, Math.floor(house.width / w.low.every));
+    for (let k = 0; k < count; k += 1) {
+      if (more() < 0.35) continue;
+      const x = -half + ((k + 0.5) * house.width) / count + (more() - 0.5) * 0.6;
+      if (Math.abs(x - (steps ?? 1e3)) < 1.6) continue;
+      tkgBay(builder, back, { kind: 'lattice', x0: x - w.low.wide / 2, x1: x + w.low.wide / 2, y0: w.low.sill, y1: Math.min(w.low.head, h0 - 0.4), z: 0.07, back: 0.05, sill: 0, finish: TK_HOUSE.timber });
+      builder.box('timber', back, x - w.low.wide / 2 - 0.06, x + w.low.wide / 2 + 0.06, w.low.sill - 0.08, w.low.sill, 0, 0.12, { colour: timber(0.8), skip: 'back' });
+    }
+  }
+}
+
+/** An upper floor thrown out over the water from a house's back (`back`: its frame, +z over the water), on joists and struts, its front all lattice. */
+function ctJetty(builder, back, house, random, timber) {
+  const j = CT_WATERSIDE.jetty;
+  const half = house.width / 2;
+  const wide = Math.min(house.width - 0.6, j.wide[0] + (j.wide[1] - j.wide[0]) * random());
+  const x0 = -half + 0.3 + random() * (house.width - 0.6 - wide);
+  const x1 = x0 + wide;
+  const [y0, y1] = [house.heights[0], house.heights[0] + house.heights[1] - 0.12];
+  const out = j.out;
+  // The floor on its joists, their ends showing; a strut under every other one, from the wall to the floor's edge.
+  builder.box('timber', back, x0, x1, y0 - 0.1, y0 + 0.02, 0, out, { colour: timber(0.75), skip: 'back' });
+  const joists = Math.max(2, Math.round(wide / j.joist));
+  for (let k = 0; k <= joists; k += 1) {
+    const x = x0 + 0.06 + ((wide - 0.12) * k) / joists;
+    builder.box('timber', back, x - 0.05, x + 0.05, y0 - 0.24, y0 - 0.1, 0, out + 0.08, { colour: timber(0.6), skip: 'back' });
+    if (k % 2 === 0) builder.tube('timber', [back(x, y0 - 1.05, 0.03), back(x, y0 - 0.22, out - 0.1)], 0.045, 0.045, { sides: 5, colour: timber(0.6) });
+  }
+  // Its front: lattice over boards, posts at its corners; its ends boarded; closed over under the roof's eave.
+  const front = back.child(0, 0, out);
+  tkgBay(builder, front, { kind: 'lattice', x0: x0 + 0.08, x1: x1 - 0.08, y0: y0 + 0.02, y1: y1 - 0.12, z: 0, back: 0.45, sill: 0.8, finish: TK_HOUSE.timber });
+  for (const x of [x0, x1 - 0.08]) builder.box('timber', back, x, x + 0.08, y0 - 0.1, y1, out - 0.08, out, { colour: timber(0.85) });
+  builder.box('timber', back, x0, x1, y1 - 0.12, y1, 0, out, { colour: timber(0.7) });
+  for (const x of [x0, x1 - 0.03]) builder.box('timber', back, x, x + 0.03, y0, y1, 0, out - 0.08, { colour: timber(0.7), skip: 'back' });
 }
 
 /** A quay's edge dressed from `x0` to `x1` along its rail at `z` (the water on the +z side when `side` is 1), leaving `gaps` ([x, half]) clear. */
@@ -446,6 +587,25 @@ function ctQuayThings(blocks, x0, x1, z, side, gaps, seed) {
     else if (pick < 0.82) tkPoles(builder, tkgFrame(px, 0, z - side * 0.28, side > 0 ? Math.PI : 0), { count: 2 + Math.floor(r1 * 3), long: 2.6 + r2, seed: seed + Math.round(px) });
     else for (let k = 0, count = 1 + Math.floor(r1 * 3); k < count; k += 1) tkJar(builder, px + k * 0.6, 0, pz, { high: 0.5 + 0.35 * ((r2 + k * 0.37) % 1), lid: k !== 1 });
   }
+  // (A boatman's coiled rope between them, `rope` of the places: from a stream of its own, so the rest stand as they did.)
+  const own = tkRandom(seed * 131 + 19);
+  for (let x = x0 + q.every; x < x1; x += q.every) {
+    const px = x + (own() - 0.5) * 1.2;
+    if (own() > q.rope || gaps.some(([gx, half]) => Math.abs(px - gx) < half)) continue;
+    ctRope(blocks.at(px, z), tkgFrame(px, 0, z - side * q.deep, own() * 6));
+  }
+}
+
+/** A rope coiled on the ground in `frame`: a few turns, each laid on the last. */
+function ctRope(builder, frame, { r = 0.2, turns = 3, thick = 0.022, colour = TK_THINGS.hemp.map((value) => value * 0.7) } = {}) {
+  const points = [];
+  const cuts = 12;
+  for (let k = 0; k <= turns * cuts; k += 1) {
+    const angle = (k / cuts) * Math.PI * 2;
+    const reach = r - (k / (turns * cuts)) * thick * 2.5;
+    points.push(frame(Math.cos(angle) * reach, thick + (k / (turns * cuts)) * thick * 1.6, Math.sin(angle) * reach));
+  }
+  builder.tube('timber', points, thick, thick, { sides: 5, colour });
 }
 
 /** The town built (a THREE.Group for render.js's places): its meshes, sky, rain and keeping. */
@@ -470,6 +630,11 @@ export function buildCanalTown() {
       else if (stand.kind === 'basket') tkBasket(builder, ...front(stand.x, 0, stand.z), { wide: stand.wide, high: stand.wide * 0.7, full: stand.full ? [0.5, 0.56, 0.3] : null });
       else if (stand.kind === 'tub') tkTub(builder, ...front(stand.x, 0, stand.z));
       else if (stand.kind === 'sacks') tkSacks(builder, ...front(stand.x, 0, 0.35), { count: stand.count, seed });
+      else if (stand.kind === 'bench') ctBench(builder, front.child(stand.x, 0, 0.3), stand);
+      else if (stand.kind === 'vat') ctVat(builder, ...front(stand.x, 0, stand.wide / 2 + 0.12), stand);
+      else if (stand.kind === 'trays') ctTrays(builder, front.child(stand.x, 0, 0.42), { crop: CT_CROPS[stand.crop] });
+      else if (stand.kind === 'mortar') ctMortar(builder, ...front(stand.x, 0, 0.4));
+      else if (stand.kind === 'buckets') ctBuckets(builder, front.child(stand.x, 0, 0.35, stand.turn));
     }
     if (!house.far && house.row.startsWith('water')) ctWaterside(builder, house, stir, t.canal.water);
     if (!house.far) {
@@ -522,7 +687,7 @@ export function buildCanalTown() {
   const [cz0, cz1] = t.canal.z;
   tkPaving(ground, 'earth', -reach, reach, -110, cz0, -0.05, [0.8, 0.8, 0.78]);
   tkPaving(ground, 'earth', -reach, reach, cz1, 110, -0.05, [0.8, 0.8, 0.78]);
-  tkPaving(ground, 'flags', t.square.x[0], t.square.x[1], t.square.z[0], t.square.z[1]);
+  tkPaving(ground, 'slabs', t.square.x[0], t.square.x[1], t.square.z[0], t.square.z[1]);
   // (What is paved, for what grows: weeds take in a paving's joints, thinly.)
   const paved = [[t.square.x[0], t.square.x[1], t.square.z[0], t.square.z[1]]];
   const lane = (x0, x1, z0, z1) => {
@@ -536,6 +701,7 @@ export function buildCanalTown() {
   lane(-reach, t.square.x[0], ...t.quayLane.z);
   lane(t.square.x[1], reach, ...t.quayLane.z);
   lane(...t.northLane.x, t.backStreet.z[1], t.square.z[0]);
+  lane(...t.northLane.x, t.northLane.far, t.backStreet.z[0]);
   lane(-t.backStreet.reach, t.backStreet.reach, ...t.backStreet.z);
   lane(-t.southStreet.reach, t.southStreet.reach, ...t.southStreet.z);
   for (const [x0, x1] of t.crossLanes) {
@@ -547,7 +713,7 @@ export function buildCanalTown() {
 
   // The town's lie (townkit/lay.js): what is under a roof or a bridge, the shade of the lanes, the low places, and
   // where feet go (the ways below: the lanes' middles, the quay, the bridges, the square's crossings).
-  const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2 });
+  const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2, sun: CT_LIGHT.sun });
 
   // What grows and gathers, by the lie: weeds at the walls' feet and in the unworn margins of the paving, thick on
   // open earth; fallen leaves and straw in the corners.
@@ -559,7 +725,8 @@ export function buildCanalTown() {
     });
   }
 
-  const materials = tkMaterialsFor(tier, { extra: { quay: { sheet: 'ashlar', foot: 1.6, ground: t.canal.water, blotch: 1.3 } } });
+  // (`slabs`: the square's paving, the kit's flags on a sheet of its own, tex.js TK_TEX.slabs.)
+  const materials = tkMaterialsFor(tier, { extra: { quay: { sheet: 'ashlar', foot: 1.6, ground: t.canal.water, blotch: 1.3 }, slabs: { ...TK_MATERIALS.flags, sheet: 'slabs' } } });
   const meshes = tkMeshes(blocks, materials, { tier });
   const root = new THREE.Group();
   root.name = 'canaltown';

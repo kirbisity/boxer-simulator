@@ -30,6 +30,7 @@ const tkbScale = (colour, by) => colour.map((value) => value * by);
  *   wall               'plaster' | 'brick' | 'rubble': its side and back walls
  *   ground, upper      what each bay of the front is, in turn (repeated to fill): 'open' | 'boards' | 'door' | 'lattice' | 'wall'
  *   pent               a pent roof over the shopfront (two storeys only)
+ *   transom            m: a band of lattice over each open or boarded bay of the ground floor (geo.js tkgBay)
  *   firewall           stepped gable walls standing above the roof at its ends ('both' | 'left' | 'right' | null)
  *   roof               { kind, rise, overhang, sag, lift, tint } over tkgRoof's defaults
  *   base               the ground's height under it (default 0)
@@ -95,7 +96,7 @@ export function tkHouse(builder, spec) {
       const x0 = -w / 2 + k * each + post;
       const x1 = -w / 2 + (k + 1) * each - post;
       if (kind === 'wall') tkgWall(builder, front, { material: wall, x0: x0 - post, x1: x1 + post, y0, y1, colour: paint, openings: [{ x: (x0 + x1) / 2, width: 0.9, sill: y0 + 1.0, head: y1 - 0.5 }], inside: dark, reveal: 0.14 });
-      else tkgBay(builder, front, { kind, x0, x1, y0, y1, finish: timber, sill: kind === 'open' ? 0.95 : y0 > plinth + 0.1 ? 0.8 : 0.9 });
+      else tkgBay(builder, front, { kind, x0, x1, y0, y1, finish: timber, sill: kind === 'open' ? 0.95 : y0 > plinth + 0.1 ? 0.8 : 0.9, transom: y0 < plinth + 0.1 ? spec.transom ?? 0 : 0 });
     }
   };
   storey(ground, plinth, h0 - 0.24, seed);
