@@ -91,7 +91,7 @@ function openingPlaces(id) {
 
 const openingRule = `At the start of a battle or stage: faded in, looped for its first ${MUSIC.openingSeconds} s, then faded out over ${MUSIC.fade * 2} s.`;
 
-/** Each cue: its card's facts, and how "Play as in game" plays it (a moment and a scene for the game's player, or the bench's loop). */
+/** Each cue: its card's facts, and how "Play as in game" plays it (a moment and a scene for the game's player). */
 function describe(id) {
   const cue = MUSIC_CUES[id];
   const bytes = Buffer.from(cue.data, 'base64');
@@ -104,11 +104,6 @@ function describe(id) {
     id, made, loop: cue.loop, loopStart: cue.loopStart, loopEnd: cue.loopEnd, gain: cue.gain,
     seconds: length.seconds, kbps: length.kbps, rate: length.rate, bytes: bytes.length, embedded: cue.data.length,
   };
-  if (id === 'menu') {
-    return { ...base, title: 'Home menu theme', used: false, play: { bench: true },
-      where: [['Not played', 'Was the music of the home screen and the menus opened from it; the menus are now silent. Still embedded in the game (its manifest).']],
-      rule: 'Not played. "Play as in game" loops it as it used to play on the menus.' };
-  }
   if (id === 'boss' || id === 'bossChoir') {
     const scenes = Object.entries(BOSS_MUSIC).filter(([, cue]) => cue === id).map(([scene]) => scene);
     const where = id === 'boss'
@@ -208,12 +203,11 @@ function board(DATA) {
     now = null;
   }
 
-  /** As the game plays it: the game's player told the moment (a new one cross-fades from the last), or the bench's loop. */
+  /** As the game plays it: the game's player told the moment (a new one cross-fades from the last). */
   function playInGame(cue) {
     sound();
     stopRaw();
-    if (cue.play.bench) music.play(cue.id);
-    else music.update({ moment: cue.play.moment, key: `board:${cue.id}:${ctx.currentTime}`, scene: cue.play.scene, duck: 0 }, ctx.currentTime);
+    music.update({ moment: cue.play.moment, key: `board:${cue.id}:${ctx.currentTime}`, scene: cue.play.scene, duck: 0 }, ctx.currentTime);
     now = { label: `${cue.title}, as in game`, from: ctx.currentTime, game: true, cue, seen: false };
   }
   /** The file, start to end once, or its loop's seam: from a few seconds before the loop's end, looping. */

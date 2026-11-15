@@ -21,7 +21,7 @@ const importsOf = (name) => [...sourceOf(name).matchAll(/^import \{([^}]*)\} fro
 
 test('the custom plan leaves out level mode, The Last Gate, the intro, the tutorial, the menus and the music', () => {
   const left = new Set([...plan.excluded, ...plan.stubbed]);
-  for (const name of ['menu', 'intro', 'tutorial', 'lastgate', 'lastgateview', 'levelmode/level', 'levelmode/stage', 'levelmode/storm', 'levelmode/stormsky-data', 'levelmode/stages/dunnottar', 'levelmode/kit', 'levelmode/story', 'levelmode/hud', 'audio/music/data/menu', 'audio/music/data/bosschoir']) assert.ok(left.has(name), `${name} is in the custom page`);
+  for (const name of ['menu', 'intro', 'tutorial', 'lastgate', 'lastgateview', 'levelmode/level', 'levelmode/stage', 'levelmode/storm', 'levelmode/stormsky-data', 'levelmode/stages/dunnottar', 'levelmode/kit', 'levelmode/story', 'levelmode/hud', 'audio/music/data/roman', 'audio/music/data/bosschoir']) assert.ok(left.has(name), `${name} is in the custom page`);
   // What the fights use is kept whole: the physics, the AI, the fire, the builder's presets, the sound effects, the faces.
   for (const name of ['physics', 'ai', 'physics/flame', 'flameview', 'outfits', 'weapons', 'roster', 'levelmode/presets', 'levelmode/water', 'audio/samples', 'audio/engine', 'photoface', 'main']) {
     assert.ok(plan.modules.includes(name), `${name} is not in the custom page`);

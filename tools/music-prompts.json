@@ -5,17 +5,6 @@
     "suffix": ", instrumental, no vocals, no singing, no choir, no voice"
   },
   "cues": {
-    "menu": {
-      "prompt": "ancient Roman gladiator arena theme, solemn and slow, low bronze cornu horn calls, frame drum, lyre, distant deep drum, sparse, atmospheric, cinematic",
-      "bpm": 70,
-      "key": "D minor",
-      "render": 70,
-      "loop": 54.86,
-      "seeds": [
-        101,
-        102
-      ]
-    },
     "roman": {
       "prompt": "ancient Roman legion on the march, low bronze horns, frame drum and tympanum, steady slow march rhythm, sparse, ominous, atmospheric",
       "bpm": 80,
