@@ -2,6 +2,7 @@
 // a heavier body is lower; the voice follows the body's size; the ambience follows the place; the music only at its moments.
 
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { gainOfLevel, levelFromEnergy } from '../src/audio/synth.js';
 import { impactParams } from '../src/audio/sfx/impact.js';
@@ -101,7 +102,8 @@ test('music only at its moments', () => {
   assert.equal(musicMoment({ menu: true, game: 'home', worldId: 1, worldAge: 3 }).moment, null);
   assert.equal(musicMoment({ menu: true, game: 'level', worldId: 2, worldAge: 5 }).moment, null);
   assert.equal(musicMoment({ game: 'level', worldId: 2, worldAge: 5 }).moment, 'opening');
-  assert.equal(musicMoment({ game: 'level', worldId: 2, worldAge: 90 }).moment, null);
+  // (A battle's piece plays on, faint, the whole battle.)
+  assert.equal(musicMoment({ game: 'level', worldId: 2, worldAge: 900 }).moment, 'opening');
   assert.equal(musicMoment({ game: 'quick', worldId: 3, worldAge: 5 }).moment, null);
   assert.equal(musicMoment({ game: 'level', boss: true, worldId: 2, worldAge: 300 }).moment, 'boss');
   assert.equal(musicMoment({ game: 'level', boss: true, outcome: 'defeat', worldId: 2, worldAge: 300 }).moment, 'defeat');
@@ -127,12 +129,15 @@ function fakeAudio() {
 test('music: the boss fight starts its cue (Dunnottar: the choir track), plays it through a retry, and a death changes it', async () => {
   const ctx = fakeAudio();
   const music = createMusic(ctx, { connect() {} });
+  // (A piece is a file beside the page: here read from the repo.)
+  globalThis.fetch = async (file) => ({ ok: true, arrayBuffer: async () => new Uint8Array(readFileSync(file)).buffer });
   const tick = async (info, when) => {
     music.update({ ...musicMoment({ game: 'level', worldId: 7, worldAge: 300, ...info }), scene: 'dunnottar' }, when);
     await new Promise((resolve) => setTimeout(resolve, 0));
   };
   await tick({}, 1);
-  assert.equal(music.status().id, null, 'no fight: no music');
+  // No boss fight: the stage's own piece, under everything (it sank to faint after its opening).
+  assert.equal(music.status().id, 'scottish', 'no boss: the stage piece');
   await tick({ boss: true }, 2);
   assert.equal(music.status().id, 'bossChoir');
   assert.equal(music.status().moment, 'boss');
@@ -147,7 +152,7 @@ test('music: the boss fight starts its cue (Dunnottar: the choir track), plays i
   await tick({}, 70);
   await tick({ boss: true }, 80);
   assert.equal(music.status().id, 'bossChoir');
-  // The boss down: the cue goes.
+  // The boss down: his choir goes, and the stage's piece comes back.
   await tick({}, 90);
-  assert.equal(music.status().id, null);
+  assert.equal(music.status().id, 'scottish');
 });

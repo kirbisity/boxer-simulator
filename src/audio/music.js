@@ -1,5 +1,5 @@
-// The music, sparse: only at moments. A level's opening (the cue once, or looped a short while, then
-// faded out); the Noname boss fight while his bar shows; victory and defeat (once). The rest of the time there is none: the ambience
+// The music, at moments. A battle's own piece: loud at its opening, then faint under the fight for the rest of it (looped until
+// the battle ends); the Noname boss fight while his bar shows; victory and defeat (once). The rest of the time there is none: the ambience
 // and the fight are the sound. The menus (the home screen and the screens opened from it) have none.
 //
 // The cues (audio/music/manifest.js): the scenes' pieces are supplied recordings fetched from beside the page (`file`), the stings
@@ -10,8 +10,12 @@
 
 import { MUSIC_CUES, cueFor } from './music/manifest.js';
 
-/** The music's numbers (s): the fade of one cue into the next; how long an opening may loop; the duck's depth. */
-export const MUSIC = { fade: 2, openingSeconds: 45, duck: 0.55 };
+/**
+ * The music's numbers: the fade of one cue into the next (s); how long a battle's piece plays loud at its opening (s), how loud
+ * (`loud`, over the cue's own level: +3 dB), and the faint level it then sinks to over `sink` s and keeps under the fight to its end
+ * (`bed`, a share of the cue's level: -13 dB, heard under the steel and the shouting, not over them); the duck's depth.
+ */
+export const MUSIC = { fade: 2, openingSeconds: 45, loud: 1.41, bed: 0.22, sink: 8, duck: 0.55 };
 
 /**
  * The moment the game is at, for the music: { moment ('opening' | 'boss' | 'victory' | 'defeat' | null), key (one occurrence of
@@ -24,7 +28,8 @@ export function musicMoment(info) {
   if (info.boss) return { moment: 'boss', key: `${info.worldId}:boss` };
   // A menu screen is silent: a moment of its own all the same, so that whatever played before it is let go.
   if (info.menu) return { moment: null, key: 'menu' };
-  if (info.game === 'level' && info.worldAge < MUSIC.openingSeconds) return { moment: 'opening', key: `${info.worldId}:opening` };
+  // A battle's piece plays the whole battle: loud at first, then faint (createMusic's maintain).
+  if (info.game === 'level') return { moment: 'opening', key: `${info.worldId}:opening` };
   return { moment: null, key: null };
 }
 
@@ -122,7 +127,9 @@ export function createMusic(ctx, out, { onMissing = () => {} } = {}) {
     const bus = ctx.createGain();
     bus.connect(master);
     const at = Math.max(when, ctx.currentTime);
-    const track = { id, key, moment, buffer, cue, bus, copies: [], begun: at, released: false };
+    const track = { id, key, moment, buffer, cue, bus, copies: [], begun: at, released: false, sunk: false };
+    // (A battle's piece opens loud.)
+    if (moment === 'opening') bus.gain.setValueAtTime(MUSIC.loud, at);
     release(current, at);
     track.copies.push(copyOf(track, at, current ? MUSIC.fade : 0.5));
     current = track;
@@ -133,11 +140,12 @@ export function createMusic(ctx, out, { onMissing = () => {} } = {}) {
     const track = current;
     if (!track || track.released) return;
     const last = track.copies[track.copies.length - 1];
-    // An opening loops a short while and fades; a cue that does not loop is done when it ends.
-    if (track.moment === 'opening' && when - track.begun > MUSIC.openingSeconds - MUSIC.fade) {
-      finished.add(track.key);
-      release(track, when, MUSIC.fade * 2);
-      current = null;
+    // A battle's piece, its opening over, sinks to faint and plays on under the fight; a cue that does not loop is done when it ends.
+    if (track.moment === 'opening' && !track.sunk && when - track.begun > MUSIC.openingSeconds) {
+      track.sunk = true;
+      track.bus.gain.cancelScheduledValues(when);
+      track.bus.gain.setValueAtTime(track.bus.gain.value, when);
+      track.bus.gain.linearRampToValueAtTime(MUSIC.bed, when + MUSIC.sink);
       return;
     }
     if (!track.cue.loop && when > last.ends) {

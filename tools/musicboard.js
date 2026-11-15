@@ -89,7 +89,7 @@ function openingPlaces(id) {
   return { scenes, lines };
 }
 
-const openingRule = `At the start of a battle or stage: faded in, looped for its first ${MUSIC.openingSeconds} s, then faded out over ${MUSIC.fade * 2} s.`;
+const openingRule = `The whole battle or stage: faded in loud (×${MUSIC.loud}) for its first ${MUSIC.openingSeconds} s, then sunk over ${MUSIC.sink} s to faint (×${MUSIC.bed}) and looped under the fight until it ends.`;
 
 /** Each cue: its card's facts, and how "Play as in game" plays it (a moment and a scene for the game's player). */
 function describe(id) {
@@ -142,7 +142,6 @@ const SILENT = [
   'Story chapters: no opening music (a fight\'s end still has its victory or defeat)',
   'Quick fights, Versus, Last Stand, the training yard and the Sandbox: no opening (victory or defeat at the end)',
   `Custom battles on ${Object.keys(CUSTOM_BATTLE.maps).filter((key) => !SCENE_MUSIC[key]).map(mapLabel).join(', ')}: no opening`,
-  `Every opening after its first ${MUSIC.openingSeconds} s: the ambience and the fight are the sound`,
 ];
 const DATA = {
   cues: CUES, stings: STINGS, silent: SILENT,
@@ -270,7 +269,7 @@ function board(DATA) {
     }
     const at = ctx.currentTime - now.from;
     let text = `Playing: ${now.label}, ${clock(at)}`;
-    if (now.game && now.cue.play.moment === 'opening') text += ` (fades out at ${clock(DATA.numbers.openingSeconds - DATA.numbers.fade)})`;
+    if (now.game && now.cue.play.moment === 'opening') text += ` (sinks to faint at ${clock(DATA.numbers.openingSeconds)})`;
     status.textContent = text;
   }
 
@@ -368,7 +367,7 @@ const MARKUP = `<div class="wrap">
 <h2>How the game uses music</h2>
 <ul class="rules">
   <li>Music only at moments; one cue at a time, never layered. A change of cue cross-fades over ${DATA.numbers.fade} s.</li>
-  <li>Openings: the first ${DATA.numbers.openingSeconds} s of a Battle Mode battle or Level Mode stage, looped, then faded out over ${DATA.numbers.fade * 2} s.</li>
+  <li>A battle's piece: loud for the first ${DATA.numbers.openingSeconds} s of a Battle Mode battle or Level Mode stage, then faint under the fight to its end.</li>
   <li>Boss: loops while a Level Mode boss fight is on. Victory and defeat: once, at the end of a fight with a man played.</li>
   <li>Under loud fighting the music ducks by up to ${Math.round(DATA.numbers.duck * 100)}%. The music slider defaults to ${Math.round(DATA.numbers.musicLevel * 100)}% under the master's ${Math.round(DATA.numbers.masterLevel * 100)}%; this board plays at the volume above.</li>
 </ul>
