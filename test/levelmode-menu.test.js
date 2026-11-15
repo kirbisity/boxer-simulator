@@ -50,7 +50,7 @@ test('Story mode holds both stories (no Level Mode card): the soldier\'s life an
     const menus = installMenus({ onMenu() {}, attract() {}, onStage: (key) => started.push(key), story: () => { lives += 1; }, level() {}, tutorial() {} });
     menus.home();
     const titles = cards(byId.home).map(titleOf);
-    assert.deepEqual(titles, ['Career', 'Story', 'Battle Mode', 'Last Stand Squad', 'Deadliest Warrior', 'Who Wins?', 'Sandbox']);
+    assert.deepEqual(titles, ['Career', 'Story', 'Battle Mode', 'Last Stand Squad', 'Deadliest Warrior', 'Who Wins?'], 'the sandbox is a link beside the tutorial, not a mode');
     cardTitled(byId.home, 'Story').onclick();
     assert.equal(byId['stages-screen'].hidden, false);
     assert.equal(byId.home.hidden, true);

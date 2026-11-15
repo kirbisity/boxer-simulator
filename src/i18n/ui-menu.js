@@ -20,7 +20,6 @@ export const UI_MENU = {
   'menu.home.quick.kicker': { en: 'Play now', zh: '马上开打' },
   'menu.home.quick.title': { en: 'Who Wins?', zh: '谁会赢？' },
   'menu.home.quick.text': { en: 'A random fighter against whoever comes. One tap.', zh: '随机一个战士，对上谁算谁。点一下就开打。' },
-  'menu.home.sandbox.kicker': { en: 'Expert', zh: '高手' },
   'menu.home.sandbox.title': { en: 'Sandbox', zh: '沙盒' },
   'menu.home.sandbox.text': { en: 'Every setting: teams, bodies grown from diet and training, every layer.', zh: '什么都能调：阵营、靠饮食和训练长出来的身体、每一层透视。' },
   'menu.home.tutorial': { en: 'Tutorial', zh: '教学' },

@@ -162,10 +162,11 @@ export function installMenus(game) {
       choice({ glyph: 'banner', kicker: t('menu.home.battle.kicker'), title: t('menu.home.battle.title'), text: t('menu.home.battle.text'), onClick: levels, tone: 'gold' }),
       choice({ glyph: 'shield', kicker: t('menu.home.gate.kicker'), title: tname(LAST_GATE.title), text: t('menu.home.gate.text'), onClick: () => lastGate(), tone: 'mist' }),
       choice({ glyph: 'skull', kicker: t('menu.home.versus.kicker'), title: t('menu.home.versus.title'), text: t('menu.home.versus.text'), onClick: versus }),
-      choice({ glyph: 'bolt', kicker: t('menu.home.quick.kicker'), title: t('menu.home.quick.title'), text: t('menu.home.quick.text'), onClick: quickEvent }),
-      choice({ glyph: 'flask', kicker: t('menu.home.sandbox.kicker'), title: t('menu.home.sandbox.title'), text: t('menu.home.sandbox.text'), onClick: () => { close(); game.sandbox(); } })),
+      choice({ glyph: 'bolt', kicker: t('menu.home.quick.kicker'), title: t('menu.home.quick.title'), text: t('menu.home.quick.text'), onClick: quickEvent })),
       el('div', { className: 'home-links' },
         el('button', { className: 'replay-intro', type: 'button', icon: 'target', textContent: t('menu.home.tutorial'), onclick: () => { close(); game.tutorial(); } }),
+        // The sandbox (every setting: teams, bodies, layers) is a tool, not a way to play: a link here, beside the tutorial.
+        el('button', { className: 'replay-intro', type: 'button', icon: 'flask', textContent: t('menu.home.sandbox.title'), title: t('menu.home.sandbox.text'), onclick: () => { close(); game.sandbox(); } }),
         // The intro (intro.js) again: the legends, then back here.
         el('button', { className: 'replay-intro', type: 'button', textContent: t('menu.home.intro'), onclick: () => { close(); game.intro(home); } }),
         // How the player attacks (fightui/): tapping his man or the buttons; a tap flips it.
