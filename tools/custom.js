@@ -95,6 +95,7 @@ export function storyPlaceWeather() {
 `,
   'townkit/place': `
 export function tkSetTier() {}
+export const tkTier = () => 'low';
 `,
   'townkit/weather': `
 export const tkWeatherNow = () => ({});
