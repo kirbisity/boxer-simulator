@@ -1267,6 +1267,13 @@ body.cutscene .fight-ui, body.cutscene .hud, body.cutscene .player-status, body.
 .custom-side.red h2 { color: #ff8a8e; }
 .custom-side.blue h2 { color: #8db2ff; }
 .custom-sides { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; min-height: 0; }
+.custom-ground-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; min-width: 0; }
+.custom-weathers { display: flex; align-items: center; gap: 6px; overflow: auto hidden; min-width: 0; padding-bottom: 2px; }
+.custom-weathers-head { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted, inherit); opacity: 0.8; white-space: nowrap; }
+.custom-weather { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: 36px; padding: 4px 10px; font-size: 13px; white-space: nowrap; }
+.custom-weather .glyph { font-size: 17px; display: inline-flex; }
+.custom-weather.on { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); background: rgba(var(--gilt), 0.14); color: var(--fg); }
+.custom-map .glyph.drawn { display: inline-flex; font-size: 24px; }
 .custom-maps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; align-content: start; overflow: hidden auto; min-height: 0; }
 .custom-map { position: relative; display: grid; align-content: end; gap: 4px; min-height: 64px; padding: 8px 10px; border-radius: var(--r-plate); text-align: left; overflow: hidden; }
 .custom-map .glyph { font-size: 22px; }

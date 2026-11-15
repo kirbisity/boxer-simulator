@@ -4,7 +4,8 @@
 // kept in the browser at once, so the last battle is there to change and fight again.
 
 import { addBattleThumb } from './battlethumbs.js';
-import { changeBattle, CUSTOM_BATTLE, customCounts, customSetup, customFactions, customLevel, readCustomBattle, settleBattle, writeCustomBattle } from './custombattle.js';
+import { changeBattle, CUSTOM_BATTLE, customCounts, customSetup, customFactions, customLevel, customWeathersOf, readCustomBattle, settleBattle, writeCustomBattle } from './custombattle.js';
+import { uiIcon } from './uiicons.js';
 import { unitOf } from './muster.js';
 import { musterScreen } from './musterview.js';
 import { getLang, onLangChange, SEP, t, tname } from './i18n.js';
@@ -53,9 +54,17 @@ export function customBattleScreen(root, { onBack, onFight, storage = globalThis
       const card = customEl('button', {
         type: 'button', role: 'radio', className: `custom-map${battle.map === key ? ' on' : ''}`, ariaChecked: String(battle.map === key),
         onclick: () => { battle = changeBattle(battle, { map: key }); keep(); picker(); },
-      }, customEl('span', { className: 'glyph', textContent: map.glyph, ariaHidden: 'true' }), customEl('b', { textContent: tname(map.label) }));
+      }, map.icon ? uiIcon(map.icon) : customEl('span', { className: 'glyph', textContent: map.glyph, ariaHidden: 'true' }), customEl('b', { textContent: tname(map.label) }));
       return addBattleThumb(card, `map-${key}`);
     }));
+    // The ground's own weathers, its default first: picked beside the ground, shown only where it has more than one.
+    const weathers = customWeathersOf(battle.map);
+    const weatherRow = weathers.length > 1 ? customEl('div', { className: 'custom-weathers', role: 'radiogroup', ariaLabel: t('battle.weather') },
+      customEl('span', { className: 'custom-weathers-head', textContent: t('battle.weather') }),
+      ...weathers.map((weather) => customEl('button', {
+        type: 'button', role: 'radio', className: `custom-weather${battle.weather === weather.key ? ' on' : ''}`, ariaChecked: String(battle.weather === weather.key),
+        onclick: () => { battle = changeBattle(battle, { weather: weather.key }); keep(); picker(); },
+      }, uiIcon(weather.icon), customEl('span', { textContent: tname(weather.label) })))) : null;
     const factions = customFactions();
     const side = (corner) => customEl('section', { className: `custom-side ${corner}` },
       customEl('h2', { textContent: t(corner === 'red' ? 'battle.redSide' : 'battle.blueSide') }),
@@ -69,7 +78,7 @@ export function customBattleScreen(root, { onBack, onFight, storage = globalThis
       customEl('button', { type: 'button', className: 'primary custom-next', textContent: t('battle.placing'), onclick: placing }));
     root.append(head,
       customEl('div', { className: 'custom-body' },
-        customEl('section', { className: 'custom-ground' }, customEl('h2', { textContent: t('battle.ground') }), maps),
+        customEl('section', { className: `custom-ground${weatherRow ? ' has-weather' : ''}` }, customEl('div', { className: 'custom-ground-head' }, customEl('h2', { textContent: t('battle.ground') }), weatherRow), maps),
         customEl('div', { className: 'custom-sides' }, side('red'), side('blue'))),
       foot);
     root.querySelector('.custom-map.on')?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });

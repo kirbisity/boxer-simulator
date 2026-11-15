@@ -12,6 +12,7 @@ import { WARRIORS } from './roster.js';
 import { drawUp, intoZone, MUSTER } from './muster.js';
 import { tname } from './i18n.js';
 import { SUBWAY_ARENA } from './props/subway.js';
+import { wallWorks } from './story/ground/walls.js';
 
 export const CUSTOM_BATTLE = {
   // Its key where a level's would be (main.js state.scenario; the menu's card).
@@ -44,6 +45,12 @@ export const CUSTOM_BATTLE = {
     coastVillage: { label: 'Coast village', glyph: '🛖', arena: { halfX: 12, halfZ: 8 }, camera: { yaw: -0.5, pitch: 0.42, distance: 13, maxDistance: 17 } },
     subway: { label: 'Subway', glyph: '🚇', arena: SUBWAY_ARENA, camera: { yaw: -0.25, pitch: 0.3, distance: 8, maxDistance: 10 } },
     stadium: { label: 'Stadium', glyph: '🏟️', arena: { halfX: 10, halfZ: 7 }, camera: { yaw: -0.35, pitch: 0.36, distance: 12, maxDistance: 15 } },
+    // The level strip before the walls of Pyongyang (places/pyongyang.js), the wall itself standing at the floor's east
+    // end as chapter 3's battle has it (story/battles/03-pyongyang.js: its height and foot), without that day's ladders:
+    // both sides draw up before it (`zones`, facing each other across `middle`), the gate and the wall behind the
+    // second. The strip is level for 10 m either side of the road (`halfZ` 9 inside it) the whole way to the wall's foot.
+    // (Made on first use: the wall's works come from story/ground/walls.js, which the bundle may set up after this file.)
+    get pyongyang() { return (customPyongyangMade ??= customPyongyang()); },
   },
   // A side drawn up as the level has it: ten or twelve abreast, the bows and guns in front (formation.js), the riders on the flanks.
   order: { spacing: 1.2, rowSpacing: 1.5, perRow: 12, shootersFront: 4, frontShare: 0.3, frontMost: 14 },
@@ -52,6 +59,9 @@ export const CUSTOM_BATTLE = {
 };
 
 const CUSTOM_CORNERS = ['red', 'blue'];
+
+/** The ground's weathers (`weathers`: the place's own names, its default first; each one's label and icon), or [] where it has none. */
+export const customWeathersOf = (map) => CUSTOM_BATTLE.maps[map]?.weathers ?? [];
 
 /** The factions a side may be: those with fighters in the roster, in FACTIONS' order ({ key, label, glyph }). */
 export function customFactions() {
@@ -85,6 +95,32 @@ export function customUnitsOf(faction) {
   return units;
 }
 
+let customPyongyangMade = null;
+/** The walls of Pyongyang as a custom battle's ground (CUSTOM_BATTLE.maps.pyongyang). */
+function customPyongyang() {
+  // (The wall's foot and height are the battle's own, story/battles/03-pyongyang.js PYONGYANG_1593.wall: written here
+  // because the custom test page carries this file without the story's battles; test/custombattle.test.js holds the two together.)
+  const wall = { x: 1, height: 4.5 };
+  const halfZ = 9;
+  const { works } = wallWorks({ x: wall.x, z: [-halfZ - 0.5, halfZ + 0.5], height: wall.height });
+  // (Red's ground from 70 m out to 36, blue's from 30 to 7 m short of the wall's foot: the 6 m between them the two lines' no man's land.)
+  const zone = (from, to) => ({ x: [wall.x - from, wall.x - to], z: [-halfZ + 1, halfZ - 1] });
+  return {
+    label: 'Walls of Pyongyang', icon: 'castle',
+    arena: { halfX: 70, halfZ, works: { ...works, placeDraws: true } },
+    zones: { red: zone(67, 37), blue: zone(31, 7) },
+    middle: wall.x - 34,
+    camera: { yaw: -0.9, pitch: 0.38, distance: 22, maxDistance: 30 },
+    // The place's own weathers (places/pyongyang.js PYONGYANG_WEATHER and its open air's), the story's first: snow showers
+    // under a clear cold sky; the same in the hazier sky the gate views had before; and the ground bare of snow, clear.
+    weathers: [
+      { key: 'snow', label: 'Snow showers', icon: 'snowflake' },
+      { key: 'hazy', label: 'Snow showers, hazier sky', icon: 'haze' },
+      { key: 'bare', label: 'Clear, no snow lying', icon: 'sun' },
+    ],
+  };
+}
+
 /** The ground a battle is fought on (its map's, else the first's). */
 const mapOf = (battle) => CUSTOM_BATTLE.maps[battle.map] ?? CUSTOM_BATTLE.maps[CUSTOM_BATTLE.first.map];
 
@@ -109,6 +145,10 @@ export function customLevel(battle) {
     blurb: { en: `${sideNames.red} against ${sideNames.blue}, on the ${map.label.toLowerCase()}.`, zh: `${tname(sideNames.red)}对阵${tname(sideNames.blue)}，战于${tname(map.label)}。` },
     scene: battle.map in CUSTOM_BATTLE.maps ? battle.map : CUSTOM_BATTLE.first.map,
     arena: { ...map.arena },
+    ...(map.zones ? { zones: map.zones } : null),
+    ...(map.middle !== undefined ? { middle: map.middle } : null),
+    // (A ground with weathers of its own: the one picked, by its name, which the place reads: render.js setPlace.)
+    ...(map.weathers ? { weather: { town: { name: battle.weather ?? map.weathers[0].key } } } : null),
     camera: { ...map.camera },
     formation: { red: customOrder(map.arena), blue: customOrder(map.arena) },
     units,
@@ -140,10 +180,13 @@ export function settleBattle(battle) {
   const settled = {
     version: 1,
     map: battle?.map in CUSTOM_BATTLE.maps ? battle.map : first.map,
+    weather: null,
     factions: Object.fromEntries(CUSTOM_CORNERS.map((corner) => [corner, factions.has(battle?.factions?.[corner]) ? battle.factions[corner] : first.factions[corner]])),
     sides: {},
     lead: null,
   };
+  const weathers = customWeathersOf(settled.map);
+  settled.weather = weathers.length ? (weathers.some((weather) => weather.key === battle?.weather) ? battle.weather : weathers[0].key) : null;
   const level = customLevel({ ...settled, sides: { red: { men: [] }, blue: { men: [] } } });
   for (const corner of CUSTOM_CORNERS) {
     const known = new Set(level.units[corner].map((unit) => unit.id));
@@ -200,14 +243,14 @@ export function writeCustomBattle(battle, storage = globalThis.localStorage) {
   }
 }
 
-/** The battle with its map or a side's faction changed: a side of a new faction starts as a first visit's; any side moved onto a new map kept in its ground. */
-export function changeBattle(battle, { map = battle.map, factions = {} } = {}) {
+/** The battle with its map, its weather or a side's faction changed: a side of a new faction starts as a first visit's; any side moved onto a new map kept in its ground; a new map opens in its first weather. */
+export function changeBattle(battle, { map = battle.map, factions = {}, weather = map === battle.map ? battle.weather : null } = {}) {
   const sides = Object.fromEntries(CUSTOM_CORNERS.map((corner) => {
     const faction = factions[corner] ?? battle.factions[corner];
     return [corner, faction === battle.factions[corner] ? battle.sides[corner] : freshSide(map, faction, corner)];
   }));
   const fresh = Object.fromEntries(CUSTOM_CORNERS.map((corner) => [corner, factions[corner] ?? battle.factions[corner]]));
-  const changed = settleBattle({ map, factions: fresh, sides, lead: battle.lead });
+  const changed = settleBattle({ map, weather, factions: fresh, sides, lead: battle.lead });
   // A floor of another size: each side drawn up again in its own order (places on the old floor mean little on the new).
   if (map !== battle.map) {
     const level = customLevel(changed);

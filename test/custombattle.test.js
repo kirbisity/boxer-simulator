@@ -112,3 +112,23 @@ test('a first visit has men on both sides; a new faction starts its side afresh;
     assert.ok(moved.sides[corner].men.every((man) => inZone(level, corner, man.at, 1e-9)), `${corner} on the port's floor`);
   }
 });
+
+test('the walls of Pyongyang: the battle\'s own wall, both sides drawn up before it, the place\'s weathers offered, the first by default', async () => {
+  const { PYONGYANG_1593 } = await import('../src/story/battles/03-pyongyang.js');
+  const { PYONGYANG_WEATHER } = await import('../src/places/pyongyang.js');
+  const { changeBattle, firstBattle, customLevel, customWeathersOf } = await import('../src/custombattle.js');
+  const battle = changeBattle(firstBattle(), { map: 'pyongyang' });
+  const level = customLevel(battle);
+  const walls = level.arena.works.walls[0].points;
+  assert.equal(walls[0][0], PYONGYANG_1593.wall.x);
+  assert.equal(level.arena.works.ditches[0].profile[1][1], PYONGYANG_1593.wall.height);
+  for (const corner of ['red', 'blue']) for (const man of battle.sides[corner].men) assert.ok(man.at[0] < PYONGYANG_1593.wall.x - 5, `${corner} stands before the wall (${man.at})`);
+  const weathers = customWeathersOf('pyongyang');
+  assert.deepEqual(weathers.map((weather) => weather.key).sort(), Object.keys(PYONGYANG_WEATHER).sort());
+  assert.equal(battle.weather, weathers[0].key);
+  assert.equal(level.weather.town.name, 'snow');
+  const hazy = changeBattle(battle, { weather: 'hazy' });
+  assert.equal(customLevel(hazy).weather.town.name, 'hazy');
+  assert.equal(changeBattle(hazy, { map: 'field' }).weather, null, 'a ground without weathers of its own has none');
+  assert.equal(customLevel(changeBattle(hazy, { map: 'field' })).weather, undefined);
+});

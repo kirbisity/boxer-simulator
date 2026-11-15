@@ -573,7 +573,7 @@ export function buildCanalTown() {
   root.add(meshes, moved.group, sky, rain);
   tkKeep(root, meshes, {
     sun: CT_LIGHT.sun, shadow: 0.55, sky, rain, key: 'canaltown', tier, mirrorAt: [0, 1.5, 4], lay, north: [0, -1], air: CT_AIR, stir: moved.tick,
-    weather: (view) => ({ ...CANAL_TOWN_WEATHER.damp, ...(view.weather?.town ?? null) }),
+    weather: (view) => ({ ...(CANAL_TOWN_WEATHER[view.weather?.town?.name] ?? CANAL_TOWN_WEATHER.damp), ...(view.weather?.town ?? null) }),
   });
   root.userData.lay = lay.lay;
   root.userData.dispose = () => {
