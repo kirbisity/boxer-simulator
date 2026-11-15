@@ -1,4 +1,4 @@
-// The music, sparse (the user's choice): only at moments. A level's opening (the cue once, or looped a short while, then
+// The music, sparse: only at moments. A level's opening (the cue once, or looped a short while, then
 // faded out); the Noname boss fight while his bar shows; victory and defeat (once). The rest of the time there is none: the ambience
 // and the fight are the sound. The menus (the home screen and the screens opened from it) have none.
 //
