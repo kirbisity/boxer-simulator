@@ -12,8 +12,8 @@
 /* global THREE */
 
 export const MUD_VIEW = {
-  // The mesh's cell (m): fine enough for a furrow's shape and a pool's shore, coarse enough for a whole field.
-  cell: 0.2,
+  // The mesh's cell (m): fine enough for a furrow's shape and a small puddle's shore, coarse enough for a whole field.
+  cell: 0.15,
   // The shape (m): plough furrows `furrow.every` apart across the field, `furrow.height` from trough to crest; the churn
   // of feet and hooves, `churn.height` over patches `churn.size` across; pits trodden in it, `pits` per m², `pit.depth`
   // deep and `pit.size` across. The standing water's level is its works' `water` over the field's own: the shape is set
@@ -21,8 +21,9 @@ export const MUD_VIEW = {
   furrow: { every: 0.85, height: 0.035, wander: 2.5 },
   churn: { height: 0.1, size: 1.7 },
   pit: { depth: 0.05, size: 0.35, per: 0.6 },
-  // Raised by this much over the field's level (m): the water (4 cm over it) then lies in the lower third.
-  lift: 0.06,
+  // Raised by this much over the field's level (m): the water (4 cm over it) then lies only in the deepest hollows,
+  // small puddles a stride or two apart (by eye, against larger pools and against water only in the hoofprints).
+  lift: 0.08,
   // The tiled maps: `pixels` square over `tile` m; the normal map's strength.
   pixels: 512,
   tile: 1.6,

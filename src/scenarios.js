@@ -1072,7 +1072,8 @@ const AGINCOURT_LEVEL = {
   // Drawn in Sekigahara's valley and its morning (the wooded place built for that battle), the field's mud over it: the works'.
   scene: 'sengoku',
   weather: SEKIGAHARA_WEATHER,
-  arena: { ...AGINCOURT.arena, works: agincourtWorks() },
+  // (Sekigahara's valley without its two camps' curtains and banners: render.js buildSengoku `camps`.)
+  arena: { ...AGINCOURT.arena, works: agincourtWorks(), camps: false },
   spread: 1,
   // From behind the English line, looking down the field between the woods (further round, the woods stand in the way).
   camera: { yaw: 1.25, pitch: 1.0, distance: 44, maxDistance: 46 },

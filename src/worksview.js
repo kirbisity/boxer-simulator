@@ -9,7 +9,8 @@
 
 /* global THREE */
 import { reliefAt, softAt, worksOf } from './physics/fieldworks.js';
-import { kwtCreate } from './levelmode/kitwater.js';
+import { KWT_LOOKS, kwtCreate } from './levelmode/kitwater.js';
+import { kwtMirror } from './levelmode/kitmirror.js';
 import { BATTLE_WATER, worksWaters } from './levelmode/water.js';
 import { storyLadders } from './story/ground/wallview.js';
 import { storyProps, storyPropsTick } from './story/ground/props.js';
@@ -74,6 +75,7 @@ export function showWorks(view, arena, place = null) {
     view.scene.remove(view.works.group);
     view.works.group.traverse((object) => {
       object.geometry?.dispose?.();
+      object.userData.kwMirrorTarget?.dispose();
       for (const material of [].concat(object.material ?? [])) {
         disposeMaterialTextures(material);
         material.dispose?.();
@@ -157,6 +159,8 @@ function worksStandingWater(view, works, group) {
   water.addSection('field', water.waters, holder);
   holder.traverse((object) => {
     if (!object.material) return;
+    // (A look with a mirror: kitmirror.js draws what stands over it into it.)
+    if (object.material.userData.kwMirror) kwtMirror(object, KWT_LOOKS.mud.mirror);
     // The grey sky lies in it (the one reflection of the battlefield, taken in render.js for the steel and the wet ground); no cube map of the scene is taken here.
     object.material.envMap = view.steelEnv ?? null;
     object.material.needsUpdate = true;

@@ -20,10 +20,12 @@ export const KWT_LOOKS = {
   sludge: { colour: 0x24260e, roughness: 0.3, metalness: 0.0, reflect: 0.75, opacity: 1, scum: 0.75, scumColour: 0x4b4a24, wave: 0.35 },
   // The water standing on a ploughed field after a night's rain: thin brown clay-water over the furrows (they show through it), a grey sky in it, silt churned up
   // in patches where it lies pale and rough. (Drawn as a film a few cm deep: what is under it, the field's painted mud, is seen through.)
-  // Clay-water is thick with silt: grey-brown and opaque a few cm down (the furrows only just show), the sky lying grey on it, the silt in darker
-  // brown clouds where it is stirred (they stay glossy: `scumRough`). On it floats what the plough turned in and the feet tread up (`litter`): straw and
+  // Clay-water is thick with silt: dark and opaque a few cm down, so what is seen in a puddle is what it mirrors; the silt in darker brown clouds
+  // where it is stirred (they stay glossy: `scumRough`). On it floats what the plough turned in and the feet tread up (`litter`): straw and
   // stubble, pale, in short stalks lying every way, and dark crumbs of clod and leaf; m between pieces, the stalks' length, their colours.
-  mud: { colour: 0x3e3220, roughness: 0.12, metalness: 0.0, reflect: 0.8, opacity: 0.7, scum: 0.85, scumColour: 0x281d12, scumRough: 0.3, wave: 0.55, blood: true,
+  mud: { colour: 0x1a1816, roughness: 0.12, metalness: 0.0, reflect: 0.8, opacity: 0.95, scum: 0.85, scumColour: 0x281d12, scumRough: 0.3, wave: 0.55, blood: true,
+    // Still, it is a mirror (kitmirror.js): the men and the trees stand in it, bent a little by its ripples.
+    mirror: { scale: 0.5, distort: 0.012, floor: 0.65, strength: 1 },
     litter: { every: 0.16, length: [0.04, 0.22], straw: 0xa49676, dark: 0x221c14, share: 0.45, drift: 6, sunk: [0.25, 0.6] } },
   // Rain standing in the hollows of a trodden field (The Last Gate): clear water a few cm deep over dark mud, a mirror of the grey sky at a grazing look,
   // a little silt in it. Blood that falls in clouds it red (`blood`: blooddye.js, as the realistic grounds' puddles do).
@@ -87,6 +89,12 @@ function kwtMaterial(look, uniforms, max = KWT_MAX) {
   const own = { uKwScum: { value: look.scum }, uKwScumColour: { value: new THREE.Color(look.scumColour) }, uKwWave: { value: look.wave } };
   const litter = look.litter;
   if (litter) Object.assign(own, { uKwStraw: { value: new THREE.Color(litter.straw) }, uKwDark: { value: new THREE.Color(litter.dark) } });
+  // A mirror (kitmirror.js feeds these): the reflection's picture and where each point of the water lies in it.
+  const mirror = look.mirror;
+  if (mirror) {
+    Object.assign(own, { uKwMirror: { value: null }, uKwMirrorMatrix: { value: new THREE.Matrix4() } });
+    material.userData.kwMirror = own;
+  }
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms, own);
     // Blood in it (a battle's standing water): the shared clouds of blooddye.js, the water tinted where they lie.
@@ -145,6 +153,24 @@ float kwLitter = 0.0;`)
   }
   #include <roughnessmap_fragment>`);
     }
+    if (mirror) {
+      // Still water's reflectance (Schlick: 2 % looking straight down, all of it at a grazing look), at least `floor`
+      // of it (the muddy water under it is dark, and what it gives back is what is seen), the picture moved by the
+      // surface's slope (`distort`: the ripples and the swell bend it); not where litter floats on it.
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>
+uniform sampler2D uKwMirror;
+uniform mat4 uKwMirrorMatrix;`)
+        .replace('#include <tonemapping_fragment>', `{
+    vec4 kwM = uKwMirrorMatrix * vec4(vKwAt, 1.0);
+    vec2 kwUv = kwM.xy / kwM.w + kwG * ${mirror.distort.toFixed(3)};
+    vec3 kwSee = normalize(cameraPosition - vKwAt);
+    float kwFresnel = 0.02 + 0.98 * pow(1.0 - max(0.0, dot(kwSee, vec3(0.0, 1.0, 0.0))), 5.0);
+    float kwGive = max(${mirror.floor.toFixed(2)}, kwFresnel) * ${mirror.strength.toFixed(2)}${look.litter ? ' * (1.0 - kwLitter)' : ''};
+    gl_FragColor.rgb = mix(gl_FragColor.rgb, texture2D(uKwMirror, kwUv).rgb, kwGive);
+  }
+  #include <tonemapping_fragment>`);
+    }
     if (look.edge) {
       // (The mesh is a disc of radius 0.5 scaled to the puddle: twice its local radius is the share of the way to the rim.)
       shader.fragmentShader = shader.fragmentShader
@@ -162,7 +188,7 @@ float kwLitter = 0.0;`)
         .replace('#include <tonemapping_fragment>', 'gl_FragColor.rgb *= mix(vec3(1.0), bloodDyeFilter, kwBlood);\n#include <tonemapping_fragment>');
     }
   };
-  material.customProgramCacheKey = () => `kitwater-${look.scum > 0 ? 'sludge' : 'clear'}-${max}${look.blood ? '-blood' : ''}${look.edge ? `-edge${look.edge}` : ''}${look.scumRough ?? ''}${litter ? '-litter' : ''}`;
+  material.customProgramCacheKey = () => `kitwater-${look.scum > 0 ? 'sludge' : 'clear'}-${max}${look.blood ? '-blood' : ''}${look.edge ? `-edge${look.edge}` : ''}${look.scumRough ?? ''}${litter ? '-litter' : ''}${mirror ? `-mirror${mirror.distort}${mirror.floor}${mirror.strength}` : ''}`;
   return material;
 }
 
