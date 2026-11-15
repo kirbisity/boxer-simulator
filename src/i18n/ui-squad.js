@@ -26,7 +26,7 @@ export const UI_SQUAD = {
   'squad.note.text': { en: 'Shared.', zh: '已分享。' },
   'squad.rankBest': { en: 'Your best run yet', zh: '你迄今最好的一局' },
   'squad.rank': { en: 'Your #{n} run', zh: '你的第 {n} 好成绩' },
-  'squad.board': { en: '🏆 Best runs', zh: '🏆 最佳战绩' },
+  'squad.board': { en: 'Best runs', zh: '最佳战绩' },
   'squad.boardClose': { en: '✕ Close', zh: '✕ 关闭' },
   'squad.score.yours': { en: 'yours', zh: '亲手' },
   'squad.score.squad': { en: 'squad', zh: '小队' },
@@ -35,7 +35,7 @@ export const UI_SQUAD = {
   'squad.score.lasted': { en: 'lasted', zh: '坚持' },
   'squad.newBest': { en: '★ New best', zh: '★ 新纪录' },
   'squad.menu': { en: 'Menu', zh: '菜单' },
-  'squad.squad': { en: '⚔ Squad', zh: '⚔ 小队' },
+  'squad.squad': { en: 'Squad', zh: '小队' },
   'squad.squadTip': { en: 'Change the squad', zh: '重新挑选小队' },
   'squad.share': { en: '↗ Share', zh: '↗ 分享' },
   'squad.again': { en: '↻ Again', zh: '↻ 再来一局' },
@@ -113,7 +113,7 @@ export const UI_SQUAD = {
   'muster.playAs': { en: '▶ Play as him', zh: '▶ 扮演他' },
   'muster.remove': { en: '✕ Remove', zh: '✕ 撤下' },
   'muster.hintLocked': { en: 'Drag a man to his place · or tap him, then the ground', zh: '把人拖到位 · 或先点人，再点地面' },
-  'muster.hintPan': { en: 'Drag to move the map · ✋ again to place men', zh: '拖动地图 · 再点 ✋ 继续布兵' },
+  'muster.hintPan': { en: 'Drag to move the map · tap the hand again to place men', zh: '拖动地图 · 再点一下手形按钮继续布兵' },
   'muster.hint': { en: 'Tap the shaded ground to place · drag a man to move him · drag open ground for a block', zh: '点阴影区放人 · 拖人挪位 · 在空地上一拖，放下一整队' },
 
   // ---- The custom battle's first screen (custombattleview.js).

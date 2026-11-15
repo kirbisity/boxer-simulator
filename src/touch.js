@@ -28,6 +28,17 @@ import { throwableOf } from './physics/throwable.js';
 import { bleedingFast } from './maiming.js';
 import { horseHealth } from './physics/mounted.js';
 import { getLang, t, tname } from './i18n.js';
+import { uiIconHtml, uiIconMarkup } from './uiicons.js';
+
+// A button's mark by the name of its drawn icon (uiicons.js): set again only when the name changes (this is asked every frame).
+// With no drawing of that name, `plain` (a typographic mark) or nothing.
+const drawMark = (node, name, plain = '') => {
+  if (node.dataset.drawn === name) return;
+  node.dataset.drawn = name;
+  const drawn = uiIconMarkup(name);
+  if (drawn) node.innerHTML = drawn;
+  else node.textContent = plain;
+};
 
 export const TOUCH = {
   // A tap's line of sight passing within this (m) of a man's body is aimed at him.
@@ -87,7 +98,7 @@ export function installFightControls(root, hooks) {
   const mark = root.appendChild(uiElement('div', 'tap-mark'));
   mark.hidden = true;
   const guard = root.appendChild(uiElement('button', 'fight-button guard-button'));
-  guard.innerHTML = `<b>🛡</b><span data-i18n="touch.guard">${t('touch.guard')}</span>`;
+  guard.innerHTML = `<b>${uiIconMarkup('shield') ?? ''}</b><span data-i18n="touch.guard">${t('touch.guard')}</span>`;
   const action = root.appendChild(uiElement('button', 'fight-button action-button'));
   action.innerHTML = '<b></b><span></span>';
   // The weapon art's own button (weaponarts.js): shown, glowing, from the moment the art is charged until it is made; dimmed
@@ -98,10 +109,11 @@ export function installFightControls(root, hooks) {
   // The sidearm (the bow slung for it, and back: physics.js swapSidearm) and the horse (down from it, up onto one beside him:
   // physics/mounted.js): small, beside the right-hand stack, there only while they can be pressed.
   const swap = root.appendChild(uiElement('button', 'fight-button swap-button'));
-  swap.innerHTML = '<b>🗡</b><span class="label">Sidearm</span><kbd>.</kbd>';
+  swap.innerHTML = '<b></b><span class="label">Sidearm</span><kbd>.</kbd>';
+  drawMark(swap.querySelector('b'), 'blade');
   swap.hidden = true;
   const horseButton = root.appendChild(uiElement('button', 'fight-button horse-button'));
-  horseButton.innerHTML = '<b>🐎</b><span class="label">Dismount</span><kbd>/</kbd>';
+  horseButton.innerHTML = `<b>${uiIconMarkup('horse') ?? ''}</b><span class="label">Dismount</span><kbd>/</kbd>`;
   horseButton.hidden = true;
   const lock = root.appendChild(uiElement('button', 'fight-button lock-button'));
   lock.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.lock}</b><span class="label">Lock</span><span class="who"></span><kbd>Tab</kbd>`;
@@ -116,11 +128,11 @@ export function installFightControls(root, hooks) {
   crawl.setAttribute('aria-label', t('touch.crawl'));
   crawl.dataset.i18nAria = 'touch.crawl';
   const status = root.appendChild(uiElement('div', 'player-status'));
-  status.innerHTML = `<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i><b class="due" hidden></b></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" data-i18n-title="touch.adrenaline" title="${t('touch.adrenaline')}"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>`;
+  status.innerHTML = `<div class="top"><span class="name"></span><span class="tag"></span></div><div class="bar health"><i></i><b class="due" hidden></b></div><div class="bar stamina"><i></i></div><div class="bar adrenaline" data-i18n-title="touch.adrenaline" title="${t('touch.adrenaline')}"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}">${uiIconHtml('horse', 'glyph')}<div class="bar horse-bar"><i></i></div></div>`;
   // Adrenaline: a hair-thin line under stamina, a tick where his weapon's art comes within reach (weaponarts.js ARTS.ready).
   status.querySelector('.adrenaline').style.setProperty('--ready', `${ARTS.ready * 100}%`);
   const marker = root.appendChild(uiElement('div', 'target-marker'));
-  marker.innerHTML = `<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}"><span class="glyph" aria-hidden="true">🐎</span><div class="bar horse-bar"><i></i></div></div>`;
+  marker.innerHTML = `<span class="incoming"></span><span class="name"></span><div class="bar health"><i></i></div><div class="horse-row" hidden title="${t('touch.horse')}">${uiIconHtml('horse', 'glyph')}<div class="bar horse-bar"><i></i></div></div>`;
   let incoming = null;
   const touches = new Map();
   let stickId = null;
@@ -492,7 +504,7 @@ export function installFightControls(root, hooks) {
       lastAction = name;
       action.disabled = !name;
       action.classList.toggle('idle', !name);
-      action.querySelector('b').textContent = name ? ACTIONS[name].icon : '·';
+      drawMark(action.querySelector('b'), name ? ACTIONS[name].icon : '', '·');
       action.querySelector('span').textContent = name ? t(`action.${name}`) : t('touch.action');
     }
     // The art's own button: there while charged, named for his weapon's art; dimmed, with a word why, while winded.
@@ -504,8 +516,7 @@ export function installFightControls(root, hooks) {
       const winded = artBlocked(me) === 'winded';
       // (A grenade carried has the button first: its own mark, no adrenaline asked: physics/throwable.js.)
       const grenade = Boolean(throwableOf(me));
-      const glyph = grenade ? '💣' : '✦';
-      if (art.querySelector('b').textContent !== glyph) art.querySelector('b').textContent = glyph;
+      drawMark(art.querySelector('b'), grenade ? 'bomb' : '', '✦');
       art.classList.toggle('winded', winded);
       art.querySelector('.why').textContent = winded ? t('touch.winded') : '';
       art.setAttribute('aria-label', t(grenade ? 'touch.artThrow' : winded ? 'touch.artWinded' : 'touch.artReady', { label }));
@@ -516,7 +527,7 @@ export function installFightControls(root, hooks) {
     if (swapping) {
       const label = me.stowed ? (me.stowed.weapon?.spec.label ? tname(me.stowed.weapon.spec.label) : t('touch.bow')) : t('touch.sidearm');
       if (swap.querySelector('.label').textContent !== label) swap.querySelector('.label').textContent = label;
-      swap.querySelector('b').textContent = me.stowed ? '🏹' : '🗡';
+      drawMark(swap.querySelector('b'), me.stowed ? 'bow' : 'blade');
     }
     const riding = horseAction(world, me);
     if (horseButton.hidden === Boolean(riding)) horseButton.hidden = !riding;

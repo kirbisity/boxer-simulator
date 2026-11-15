@@ -93,30 +93,30 @@ const STORY_PACE = { speeds: [1, 3], hudAway: 0.5 };
 const STORY_DEPLOY_VIEW = { pitch: 0.9, perMetre: 2.6, least: 14, most: 60, toward: 0.3 };
 
 const STORY_STYLE = `
-#story-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; font-family: 'Noto Serif SC', 'Songti SC', Georgia, serif; color: #efe6d2; }
+#story-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; font-family: 'Cormorant Garamond', 'Songti SC', 'STSong', 'Noto Serif CJK SC', 'Source Han Serif SC', Georgia, 'SimSun', serif; color: var(--fg); }
 #story-layer > * { pointer-events: auto; }
-#story-layer .sv-lang { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 14px; display: flex; gap: 2px; background: rgba(12,10,8,0.6); border: 1px solid rgba(239,230,210,0.25); border-radius: 18px; padding: 2px; z-index: 3; }
-#story-layer .sv-lang button { background: none; border: 0; color: #cfc4ad; padding: 6px 11px; border-radius: 15px; font: inherit; font-size: 14px; cursor: pointer; }
-#story-layer .sv-lang button.on { background: #efe6d2; color: #1b1712; }
-#story-layer .sv-screen { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(30,24,18,0.86), rgba(8,7,6,0.97)); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px 16px; text-align: center; overflow-y: auto; }
-#story-layer .sv-screen h1 { font-size: clamp(34px, 7vw, 60px); letter-spacing: 0.12em; margin: 0; font-weight: 600; }
-#story-layer .sv-screen p { margin: 0; color: #bdb29c; max-width: 34em; line-height: 1.6; }
+#story-layer .sv-lang { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 14px; display: flex; gap: 2px; background: rgba(var(--pit), 0.6); border: 1px solid rgba(var(--ink), 0.25); border-radius: var(--r-pill); padding: 2px; z-index: 3; }
+#story-layer .sv-lang button { background: none; border: 0; color: var(--soft); padding: 6px 11px; border-radius: var(--r-pill); font: inherit; font-size: 14px; cursor: pointer; }
+#story-layer .sv-lang button.on { background: var(--gold); color: var(--on-gold); }
+#story-layer .sv-screen { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(30,24,18,0.86), rgba(var(--pit), 0.97)); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px 16px; text-align: center; overflow-y: auto; }
+#story-layer .sv-screen h1 { font-family: var(--title); font-size: clamp(38px, 7.5vw, 68px); letter-spacing: 0.06em; margin: 0; font-weight: 700; }
+#story-layer .sv-screen p { margin: 0; color: var(--soft); max-width: 34em; line-height: 1.6; }
 #story-layer .sv-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; width: min(340px, 100%); }
-#story-layer button.sv-go { background: rgba(239,230,210,0.08); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 6px; padding: 13px 16px; font: inherit; font-size: 17px; cursor: pointer; text-align: left; }
-#story-layer button.sv-go:hover { background: rgba(239,230,210,0.16); }
-#story-layer button.sv-go.main { background: #efe6d2; color: #1b1712; border-color: #efe6d2; }
-#story-layer .sv-card-wrap { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(28px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, rgba(6,5,4,0.85), rgba(6,5,4,0.15) 60%, rgba(6,5,4,0)); }
-#story-layer .sv-card { width: min(640px, 100%); background: rgba(16,13,10,0.9); border: 1px solid rgba(239,230,210,0.22); border-radius: 8px; padding: 20px 22px 18px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-#story-layer .sv-kicker { font-size: 13px; letter-spacing: 0.14em; color: #a89c84; text-transform: uppercase; margin-bottom: 10px; }
+#story-layer button.sv-go { background: rgba(var(--ink), 0.08); color: var(--fg); border: 1px solid rgba(var(--ink), 0.35); border-radius: var(--r-plate); padding: 13px 16px; font: inherit; font-size: 17px; cursor: pointer; text-align: left; }
+#story-layer button.sv-go:hover { background: rgba(var(--ink), 0.16); }
+#story-layer button.sv-go.main { background: var(--gold); color: var(--on-gold); border-color: var(--gold); font-weight: 600; }
+#story-layer .sv-card-wrap { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; padding: 16px 16px calc(28px + env(safe-area-inset-bottom, 0px)); background: linear-gradient(to top, rgba(var(--pit), 0.85), rgba(var(--pit), 0.15) 60%, rgba(var(--pit), 0)); }
+#story-layer .sv-card { width: min(640px, 100%); background: rgba(var(--pit), 0.9); border: 1px solid rgba(var(--ink), 0.22); border-top: 1px solid rgba(var(--gilt), 0.7); border-radius: var(--r-plate); padding: 20px 22px 18px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+#story-layer .sv-kicker { font: 600 12px/1.3 var(--display); letter-spacing: 0.16em; color: rgba(var(--gilt), 0.9); text-transform: uppercase; margin-bottom: 10px; }
 #story-layer .sv-text { font-size: 19px; line-height: 1.7; margin: 0 0 14px; white-space: pre-line; }
 #story-layer .sv-choices { display: flex; flex-direction: column; gap: 8px; }
-#story-layer .sv-hud { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); background: rgba(12,10,8,0.62); border-radius: 6px; padding: 7px 14px; font-size: 14px; color: #ddd2bb; max-width: calc(100% - 180px); text-align: center; pointer-events: none; }
-#story-layer .sv-hud b { display: block; font-size: 12px; letter-spacing: 0.12em; color: #a89c84; font-weight: 400; }
+#story-layer .sv-hud { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); background: rgba(var(--pit), 0.62); border-radius: var(--r-plate); padding: 7px 14px; font-size: 14px; color: var(--soft); max-width: calc(100% - 180px); text-align: center; pointer-events: none; }
+#story-layer .sv-hud b { display: block; font-size: 12px; letter-spacing: 0.12em; color: var(--muted); font-weight: 400; }
 #story-layer .sv-hud .sv-away { color: #ff9b7a; display: block; margin-top: 3px; }
-#story-layer .sv-hud .sv-heads { display: block; margin-top: 4px; font-size: 11px; letter-spacing: 0.08em; color: #a89c84; opacity: 0.8; font-variant-numeric: tabular-nums; }
+#story-layer .sv-hud .sv-heads { display: block; margin-top: 4px; font-size: 11px; letter-spacing: 0.08em; color: var(--muted); opacity: 0.8; font-variant-numeric: tabular-nums; }
 #story-layer .sv-heads-line { opacity: 0.75; font-size: 0.92em; }
-#story-layer .sv-hud button.sv-speed { pointer-events: auto; display: block; margin: 5px auto 0; background: rgba(239,230,210,0.1); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 12px; padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
-#story-layer .sv-hud button.sv-speed.on { background: #efe6d2; color: #1b1712; }
+#story-layer .sv-hud button.sv-speed { pointer-events: auto; display: block; margin: 5px auto 0; background: rgba(var(--ink), 0.1); color: var(--fg); border: 1px solid rgba(var(--ink), 0.35); border-radius: var(--r-pill); padding: 3px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+#story-layer .sv-hud button.sv-speed.on { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
 #story-layer .sv-scene { position: absolute; inset: 0; pointer-events: auto; }
 #story-layer .sv-black { position: absolute; inset: 0; background: #000; opacity: 0; }
 #story-layer .sv-bar { position: absolute; left: 0; right: 0; height: 14vh; background: #000; transform: scaleY(0); }
@@ -127,33 +127,65 @@ const STORY_STYLE = `
 #story-layer .sv-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.85) 100%); opacity: 0; pointer-events: none; }
 #story-layer .sv-line.finale { color: #ece4d0; font-size: clamp(17px, 2.3vw, 21px); letter-spacing: 0.02em; }
 #story-layer .sv-line.letter { display: block; height: auto; bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(620px, calc(100% - 32px)); font-size: clamp(17px, 2.2vw, 20px); line-height: 1.9; color: #e8dfc8; }
-#story-layer .sv-page { position: absolute; inset: 0; background: rgba(8,7,6,0.94); overflow-y: auto; display: flex; justify-content: center; padding: 48px 16px 32px; }
+#story-layer .sv-page { position: absolute; inset: 0; background: rgba(var(--pit), 0.94); overflow-y: auto; display: flex; justify-content: center; padding: 48px 16px 32px; }
 #story-layer .sv-page article { width: min(640px, 100%); }
-#story-layer .sv-page h1 { font-size: clamp(30px, 6vw, 46px); margin: 0 0 4px; font-weight: 600; letter-spacing: 0.06em; }
-#story-layer .sv-page h2 { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: #a89c84; font-weight: 400; margin: 22px 0 6px; }
+#story-layer .sv-page h1 { font-family: var(--title); font-size: clamp(32px, 6vw, 50px); margin: 0 0 4px; font-weight: 700; letter-spacing: 0.04em; }
+#story-layer .sv-page h2 { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 400; margin: 22px 0 6px; }
 #story-layer .sv-page p { margin: 0 0 6px; line-height: 1.65; font-size: 17px; }
-#story-layer .sv-page .sv-luck { font-size: 22px; color: #f3dca0; }
+#story-layer .sv-page .sv-luck { font-size: 22px; color: var(--gold); }
 #story-layer .sv-page ul { margin: 0; padding: 0; list-style: none; line-height: 1.6; }
 #story-layer .sv-page .sv-buttons { margin-top: 26px; }
 body[data-game="story"] #restart { display: none !important; }
 #story-layer .sv-deploy { padding: 16px 18px 14px; }
-#story-layer .sv-deploy h2 { font-size: 21px; margin: 0 0 10px; font-weight: 600; letter-spacing: 0.04em; }
+#story-layer .sv-deploy h2 { font-family: var(--title); font-size: 23px; margin: 0 0 10px; font-weight: 700; letter-spacing: 0.03em; }
 #story-layer .sv-group { margin: 0 0 10px; }
-#story-layer .sv-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #a89c84; margin: 0 0 6px; }
+#story-layer .sv-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px; }
 #story-layer .sv-seg { display: flex; flex-wrap: wrap; gap: 6px; }
-#story-layer .sv-seg button { flex: 1 1 0; min-width: 6.5em; min-height: 40px; background: rgba(239,230,210,0.08); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 15px; cursor: pointer; touch-action: manipulation; }
-#story-layer .sv-seg button:hover { background: rgba(239,230,210,0.16); }
-#story-layer .sv-seg button.on { background: #efe6d2; color: #1b1712; border-color: #efe6d2; }
-#story-layer .sv-note { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: #cfc4ad; min-height: 3em; }
+#story-layer .sv-seg button { flex: 1 1 0; min-width: 6.5em; min-height: 40px; background: rgba(var(--ink), 0.08); color: var(--fg); border: 1px solid rgba(var(--ink), 0.35); border-radius: var(--r-plate); padding: 6px 8px; font: inherit; font-size: 15px; cursor: pointer; touch-action: manipulation; }
+#story-layer .sv-seg button:hover { background: rgba(var(--ink), 0.16); }
+#story-layer .sv-seg button.on { background: var(--gold); color: var(--on-gold); border-color: var(--gold); }
+#story-layer .sv-note { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--soft); min-height: 3em; }
 #story-layer .sv-deploy .sv-go.main { width: 100%; text-align: center; margin-top: 2px; }
-#story-layer .sv-hud button.sv-horse { pointer-events: auto; display: block; margin: 6px auto 0; background: rgba(239,230,210,0.1); color: #efe6d2; border: 1px solid rgba(239,230,210,0.35); border-radius: 14px; padding: 5px 14px; font: inherit; font-size: 14px; cursor: default; touch-action: manipulation; }
-#story-layer .sv-hud button.sv-horse.ready { background: #f3dca0; color: #1b1712; border-color: #f3dca0; cursor: pointer; font-weight: 600; }
+#story-layer .sv-hud button.sv-horse { pointer-events: auto; display: block; margin: 6px auto 0; background: rgba(var(--ink), 0.1); color: var(--fg); border: 1px solid rgba(var(--ink), 0.35); border-radius: var(--r-pill); padding: 5px 14px; font: inherit; font-size: 14px; cursor: default; touch-action: manipulation; }
+#story-layer .sv-hud button.sv-horse.ready { background: var(--gold); color: var(--on-gold); border-color: var(--gold); cursor: pointer; font-weight: 600; }
 #story-layer .sv-hud button.sv-horse kbd { font: inherit; font-size: 12px; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 6px; opacity: 0.75; }
 @media (pointer: coarse) { #story-layer .sv-hud button.sv-horse kbd { display: none; } }
 @media (max-width: 520px) { #story-layer .sv-deploy h2 { font-size: 18px; margin-bottom: 8px; } #story-layer .sv-seg button { font-size: 14px; min-width: 5.5em; } #story-layer .sv-note { font-size: 13px; } }
 @media (max-height: 560px) { #story-layer .sv-note { min-height: 0; } #story-layer .sv-deploy { padding: 10px 14px; } #story-layer .sv-group { margin-bottom: 6px; } }
 body.story-card .fight-ui, body.story-card .hud, body.story-card #icons, body.story-card .camera-bar, body.story-scene .fight-ui, body.story-scene .hud, body.story-scene #icons { visibility: hidden !important; }
 @media (max-width: 520px) { #story-layer .sv-text { font-size: 17px; } #story-layer .sv-hud { max-width: calc(100% - 130px); font-size: 12px; } }
+/* English is set in the book face, which runs small for its size: a step larger, so it reads as the old face did. Chinese keeps the system's Song. */
+html:not(:lang(zh)) #story-layer .sv-text { font-size: 21.5px; line-height: 1.5; }
+html:not(:lang(zh)) #story-layer button.sv-go { font-size: 19px; }
+html:not(:lang(zh)) #story-layer .sv-screen p, html:not(:lang(zh)) #story-layer .sv-page p { font-size: 19px; }
+html:not(:lang(zh)) #story-layer .sv-seg button, html:not(:lang(zh)) #story-layer .sv-note { font-size: 16.5px; }
+html:not(:lang(zh)) #story-layer .sv-hud { font-size: 16px; }
+html:not(:lang(zh)) #story-layer .sv-line { font-size: clamp(19px, 2.6vw, 24px); }
+html:not(:lang(zh)) #story-layer .sv-line.finale { font-size: clamp(19px, 2.5vw, 23px); }
+html:not(:lang(zh)) #story-layer .sv-line.letter { font-size: clamp(19px, 2.4vw, 22px); }
+#story-layer .sv-page h2, #story-layer .sv-label, #story-layer .sv-hud b { font-family: var(--display); font-weight: 600; }
+@media (max-width: 520px) { html:not(:lang(zh)) #story-layer .sv-text { font-size: 19px; } html:not(:lang(zh)) #story-layer .sv-seg button { font-size: 15px; } html:not(:lang(zh)) #story-layer .sv-note, html:not(:lang(zh)) #story-layer .sv-hud { font-size: 14px; } }
+#story-layer .sv-screen h1::after { content: ''; display: block; width: min(300px, 62%); height: 9px; margin: 0.28em auto 0; background: var(--gold); opacity: 0.85; -webkit-mask: var(--rule-mask); mask: var(--rule-mask); }
+/* A desk's screen: the page composed for it, the type a step up, the card wider. */
+@media (min-width: 900px) and (min-height: 640px) {
+  #story-layer .sv-screen { gap: 18px; }
+  #story-layer .sv-screen h1 { font-size: clamp(72px, 7.6vw, 116px); }
+  #story-layer .sv-screen p { font-size: 21px; }
+  #story-layer .sv-buttons { width: min(460px, 100%); gap: 12px; margin-top: 22px; }
+  #story-layer button.sv-go { padding: 16px 22px; font-size: 20px; }
+  #story-layer .sv-card { width: min(800px, 100%); padding: 26px 32px 24px; }
+  #story-layer .sv-kicker { font-size: 13.5px; margin-bottom: 12px; }
+  #story-layer .sv-text { font-size: 21.5px; margin-bottom: 18px; }
+  #story-layer .sv-choices { gap: 10px; }
+  #story-layer .sv-page article { width: min(740px, 100%); }
+  #story-layer .sv-page p { font-size: 19px; }
+  #story-layer .sv-lang button { font-size: 15px; padding: 7px 13px; }
+  html:not(:lang(zh)) #story-layer .sv-screen p { font-size: 24px; }
+  html:not(:lang(zh)) #story-layer button.sv-go { font-size: 22.5px; }
+  html:not(:lang(zh)) #story-layer .sv-text { font-size: 25px; line-height: 1.45; }
+  html:not(:lang(zh)) #story-layer .sv-page p { font-size: 21.5px; }
+  html:not(:lang(zh)) #story-layer .sv-lang button { font-size: 17px; }
+}
 `;
 
 const svEl = (tag, { dataset = null, ...props } = {}, ...children) => {
