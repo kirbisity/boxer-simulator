@@ -128,9 +128,11 @@ test('the crowd\'s body (the low-detail loft) is byte for byte what it was', () 
   const paint = (mesh) => createHash('sha256').update(`${mesh.regions.join(',')}|${mesh.rigid.join(',')}`).digest('hex').slice(0, 16);
   // Made before V7 came into the game (the low-detail loft of these presets); samurai and hanCrossbow since re-cut to their period's build (163 and 169 cm).
   // Made again on 2026-11-14, with the base meshes the game's body: every body's arms and shoulders are the models' (body.js ARM_LENGTHS).
+  // Made again on 2026-11-15: the unit remodel's armour fit (3732114), the arms and fist from ANSUR II (a15b385) and the steel
+  // shoulder piece closed over the shoulder (8fe2953: the crossbowman's spaulder; open, its mouth showed dark in a crowd too).
   const before = {
-    contender: ['910073bf1eb7a0b4', 'a132c7944de33631'], knight: ['b73ac88d5e97a351', '1dd77ca0785dcb63'], samurai: ['31ee242d6a6a5e98', '984738ad34524b74'],
-    hanCrossbow: ['c5dae3e5327a2fc7', '721b46fd40ea145d'], crossbow: ['59f2081dd4cd9d62', 'ba8f41a002601561'], templar: ['20fd85c6b3305c52', '9d1016be266f106f'], heavy: ['1f8cbe2cdd58dfb7', '8d77b60ca133d7e4'],
+    contender: ['067c0a50887c5773', 'a132c7944de33631'], knight: ['9d80eacd4acea017', '45b73f3ec39f21c3'], samurai: ['c61786594d611c12', '071bc9eba4bd532e'],
+    hanCrossbow: ['dbbd5d4ca217f609', '721b46fd40ea145d'], crossbow: ['475297df62f41f0b', '50215bb092808308'], templar: ['4b1c0a0dc67faa10', '9d1016be266f106f'], heavy: ['8ddc40dfe7d018e7', '8d77b60ca133d7e4'],
   };
   for (const [preset, [geometry, regions]] of Object.entries(before)) {
     const mesh = buildLoftBody(buildBody(PRESETS[preset]), { lowDetail: true });
