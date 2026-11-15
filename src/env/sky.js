@@ -25,7 +25,14 @@ varying vec3 vDir;
 // colour, a its cover. (The 0.05 bends the sheet down a little at the horizon, as the earth does.)
 vec4 envSkyCloud(vec3 dir, float lift) {
   vec2 sheet = (cameraPosition.xz + dir.xz / (max(dir.y, 0.0) + 0.05) * (uEnvCloud.w + lift * ${ENV.clouds.deep.toFixed(1)})) * uEnvCloud.z - uEnvCloudTravel;
-  float depth = envCloudDepth(sheet) - lift * ${ENV.clouds.taper.toFixed(3)};
+  // Near overhead a pixel spans a few metres of cloud, and the noise's finest lumps (some 50 m at the sheet's
+  // scale) were drawn blown up into a soft grain. There the cloud is given the next, finer lumps of the same noise
+  // (ENV.clouds.nearDetail), faded in as the sheet comes nearer than \`nearFrom\` m: a cumulus's edge has lumps on
+  // lumps down to tens of metres, and from below it is sharp-edged, not a blur.
+  float away = (uEnvCloud.w + lift * ${ENV.clouds.deep.toFixed(1)}) / (max(dir.y, 0.0) + 0.05);
+  float near = 1.0 - smoothstep(${(ENV.clouds.nearFrom * 0.5).toFixed(1)}, ${ENV.clouds.nearFrom.toFixed(1)}, away);
+  float finer = texture2D(uEnvNoise, sheet * ${ENV.clouds.nearDetail[0].toFixed(2)} + vec2(0.53, 0.19)).a;
+  float depth = envCloudDepth(sheet) + near * (finer - 0.5) * uEnvCloudForm.x * ${ENV.clouds.nearDetail[1].toFixed(2)} - lift * ${ENV.clouds.taper.toFixed(3)};
   // A cloud is seen from below: where it is thick the sun does not come through and the base is dark, and its
   // thin edges are bright. The side toward the sun is brighter again: less cloud that way to shade it. Above the
   // base it is the cloud's flank that is seen, in the sun but for the cloud between, and only as far as it is the
@@ -38,7 +45,7 @@ vec4 envSkyCloud(vec3 dir, float lift) {
   float thick = smoothstep(0.02, uEnvCloudForm.y, depth) * (1.0 - lift * phase);
   float lit = (1.0 - thick) * (1.0 - 0.3 * behind) + 0.3 * (1.0 - behind) * (1.0 - 0.6 * beyond);
   // The grain of the cloud itself.
-  lit = clamp(lit * (1.0 + 1.25 * uEnvCloudForm.x * (texture2D(uEnvNoise, sheet * 1.9).a - 0.5)), 0.0, 1.0);
+  lit = clamp(lit * (1.0 + 1.25 * uEnvCloudForm.x * (texture2D(uEnvNoise, sheet * 1.9).a - 0.5 + near * (finer - 0.5))), 0.0, 1.0);
   return vec4(mix(uEnvCloudDark, uEnvCloudLit, lit), smoothstep(-0.07 * uEnvCloudForm.z, 0.11 * uEnvCloudForm.z, depth));
 }
 
