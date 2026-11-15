@@ -91,7 +91,9 @@ def pack(folder, name, spec, kind, preview):
     out = {}
     if kind == 'armour':
         mask = resample(load(folder, name, 'mask'), size) if spec.get('masks') else None
-        colour, n, o = wear.worn(name, colour, n, o, np.maximum(mask[:, :, 0], mask[:, :, 1]) if mask is not None and name in wear.laced_tiles() else None)
+        laced = mask is not None and name in wear.laced_tiles()
+        studs = mask[:, :, 0] if mask is not None and not laced and name in wear.WEAR and wear.WEAR_KINDS[wear.WEAR[name][0]].get('rings') else None
+        colour, n, o = wear.worn(name, colour, n, o, np.maximum(mask[:, :, 0], mask[:, :, 1]) if laced else None, studs)
         if spec.get('masks'):
             out['albedo'] = webp(to8(np.concatenate([colour, mask[:, :, 0:1]], axis=2)), spec['quality'])
             out['normal'] = webp(to8(np.concatenate([n, mask[:, :, 1:2]], axis=2)), spec['quality'])

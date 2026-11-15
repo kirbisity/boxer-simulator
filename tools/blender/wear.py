@@ -71,6 +71,19 @@ WEAR_KINDS = {
         'grime': [0.6, (0.2, 0.17, 0.14), 0.8],
         'rust': [2400, 0.0003, 0.0011, 0.6, (0.4, 0.24, 0.14)],
     },
+    # Cloth with rivet heads over hidden plates (a brigandine, a coat of plates): no scratches on the cloth and nothing to
+    # rust on it, the heads dulled and a little tarnished as the steel is, the cloth's shade a little uneven in the same soft
+    # patches, and `rings` [how much darker, how far round (m)]: a dark ring of rubbed-in dirt on the cloth round each head
+    # (the tile's first mask), where it is handled and where the head stands proud. Set against the steel recipe and the
+    # Ming gunner's and banner coats' sheets; the cloth already reads as cloth, so the rings carry the used look.
+    'studdedCloth': {
+        'scratches': None, 'across': 1,
+        'dull': [0.03, 0.06, 0.0], 'patch': [0.03, 0.1],
+        'tarnish': [0.07, (0.92, 0.86, 0.78)],
+        'grime': [0.0, (0.2, 0.17, 0.14), 0.8],
+        'rust': None,
+        'rings': [0.22, 0.0025],
+    },
     # Lacquer over iron or rawhide (a tosei do's lames): hard and glossy, so it keeps its shine but gathers fine scratches and
     # dust, and flakes in small chips where edges knock.
     'lacquer': {
@@ -100,6 +113,7 @@ WEAR = {
     'knightCloseHelmet': ('steel', (0.4, 0.4)),
     'munitionPlate': ('munition', (0.16, 0.16)),
     'etched': ('steel', (0.12, 0.12)),
+    'brigandine': ('studdedCloth', (0.096, 0.096)),
     'lamellae': ('steel', (0.09, 0.1)),
     'formKettleRidged': ('munition', (0.4, 0.4)),
     'formKettleBurgundian': ('munition', (0.4, 0.4)),
@@ -177,13 +191,14 @@ def laced_tiles():
         return set(re.findall(r"^  (\w+): \{[^\n]*masks: 'lace'", file.read(), re.M))
 
 
-def worn(name, colour, normal, orm, keep=None):
+def worn(name, colour, normal, orm, keep=None, studs=None):
     """
     A tile's maps worn: `colour` (h, w, 3), `normal` (h, w, 3: 0..1, as packed), `orm` (h, w, 3: occlusion, roughness,
     metalness), floats 0..1, all one size. Returns the three, the same shapes. A tile not in WEAR comes back as it was.
     `keep` (h, w; 0..1): how much of each pixel is another material than the map's kind, which keeps its clean maps: a laced
     tile's lacing (its two masks; the shader draws the cords there in their own colours over this albedo), a war mask's
     teeth, gilt and hair (all but its lacquer, the albedo's alpha). The plates' scratches, chips and dust are not theirs.
+    `studs` (h, w; 0..1): the tile's first mask where it marks rivet heads (a studded cloth's), for the kinds with `rings`.
     """
     if name not in WEAR:
         return colour, normal, orm
@@ -282,6 +297,12 @@ def worn(name, colour, normal, orm, keep=None):
         colour = colour * (1 - dust[:, :, None]) + np.minimum(1, colour * np.asarray(dust_colour)[None, None, :] + 0.25) * dust[:, :, None]
         roughness = roughness * (1 - dust) + 0.8 * dust
 
+    # Studded cloth: a ring of dirt on the cloth round each head.
+    if spec.get('rings') and studs is not None:
+        darker, reach = spec['rings']
+        ring = np.clip(blur_wrap(np.clip(studs, 0, 1), reach * per_metre[0]) * 2.5, 0, 1) * (1 - np.clip(studs, 0, 1)) * darker
+        colour *= 1 - ring[:, :, None]
+
     # The grooves and pits as slopes of the normal map (the height is in units of the slope a full mark has at its edge).
     if np.any(height):
         soft = blur_wrap(height, 0.5)
@@ -356,7 +377,8 @@ def main():
                 keep = np.maximum(albedo[:, :, 3], normal[:, :, 3])
             elif packhelm.SHEETS.get(name, {}).get('alpha') and albedo.shape[2] == 4:
                 keep = 1 - albedo[:, :, 3]
-            colour, n, o = worn(name, albedo[:, :, :3], normal[:, :, :3], orm, keep)
+            studs = albedo[:, :, 3] if WEAR_KINDS[WEAR[name][0]].get('rings') and albedo.shape[2] == 4 else None
+            colour, n, o = worn(name, albedo[:, :, :3], normal[:, :, :3], orm, keep, studs)
             if preview:
                 for key, array in (('albedo', colour), ('normal', n), ('orm', o)):
                     Image.fromarray(pack.to8(array)).save(os.path.join(preview, f'{name}.{key}.png'))
