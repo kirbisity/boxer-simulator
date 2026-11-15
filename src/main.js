@@ -4,6 +4,7 @@
 import { greyedHair } from './aging.js';
 import { getLang, LANG_NAMES, onLangChange, SEP, t, tname, toggleLang, translatePage } from './i18n.js';
 import { uiIconHtml } from './uiicons.js';
+import { logPart, logWords } from './i18n/names-log.js';
 import { buildBody, fighterFile, FRAMES, normaliseInputs, P, PRESETS } from './body.js';
 import { calorieRange, caloriesForWeight, deriveStats, exerciseHours } from './physiology.js';
 import { paintHealth, thinkAll } from './ai.js';
@@ -20,7 +21,7 @@ import { builderCharacters, WEAPON_KINDS, weaponCategoryOf } from './pickgroups.
 import { installMenus } from './menu.js';
 import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
-import { breakRun, contextAction, directFighter, keyStick, MOVE_KEYS, newOrders, playerCrawl, swingAt } from './control.js';
+import { breakRun, contextAction, directFighter, keyStick, MOVE_KEYS, moveName, newOrders, playerCrawl, swingAt } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
 import { canCommand, chooseGroup, chosenGroup, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
@@ -1494,68 +1495,79 @@ const logIcon = (name) => uiIconHtml(name, 'glyph log-glyph');
 function logEvent(event) {
   const world = state.world;
   const name = (id) => shortName(world.fighters[id].body.inputs.name);
+  // Each line in either language (the Chinese beside the English: same event, same numbers); the physics' own words through
+  // logWords (i18n/names-log.js).
+  const zh = getLang() === 'zh';
+  const L = (english, chinese) => (zh ? chinese : english);
+  const fx = (list = event.effects) => list.map((effect) => logWords(effect)).join(zh ? '，' : ', ');
+  const what = (words) => logWords(words);
+  // A blow by its key ('gyakuKesa'): its name in Chinese; the English line keeps the key, as it always has.
+  const blow = (key) => (zh && key ? logWords(moveName(key)?.name ?? key) : key);
   // A rider's horse, or a robot dog by its own name (what it carries is bolted on: robotdogs.js).
-  const steed = (event) => (world.horses?.[event.horse]?.spec?.robot && event.rider !== undefined ? `<b>${name(event.rider)}</b>` : event.rider !== undefined ? `<b>${name(event.rider)}</b>'s horse` : 'a horse');
-  const steedGlyph = (event) => logIcon(world.horses?.[event.horse]?.spec?.robot ? 'robot' : 'horse');
+  const robot = world.horses?.[event.horse]?.spec?.robot;
+  const steed = (event) => (robot && event.rider !== undefined ? `<b>${name(event.rider)}</b>` : event.rider !== undefined ? L(`<b>${name(event.rider)}</b>'s horse`, `<b>${name(event.rider)}</b>的马`) : L('a horse', '一匹马'));
+  const Steed = (event) => (zh ? steed(event) : steed(event).replace(/^a /, 'A '));
+  const steedGlyph = () => logIcon(robot ? 'robot' : 'horse');
+  const who = (id) => `<b>${name(id)}</b>`;
+  const tail = (list = event.effects) => ` · <em>${fx(list)}</em>`;
   let text;
-  if (event.kind === 'stopped') text = `<b>${name(event.fighter)}</b> cannot continue`;
-  else if (event.kind === 'knockout') text = `${logIcon('burst')} <b>${name(event.fighter)}</b> is out cold · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'broken') text = `${logIcon('snapped')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'heavy') text = `<b>${name(event.attacker)}</b> loads up a heavy ${event.punch}`;
-  else if (event.kind === 'art') text = `${logIcon('spark')} <b>${name(event.attacker)}</b> · <em>${event.effects.join(', ')}</em>`;
+  if (event.kind === 'stopped') text = L(`${who(event.fighter)} cannot continue`, `${who(event.fighter)} 无法再战`);
+  else if (event.kind === 'knockout') text = `${logIcon('burst')} ${L(`${who(event.fighter)} is out cold`, `${who(event.fighter)} 被打昏`)}${tail()}`;
+  else if (event.kind === 'broken') text = `${logIcon('snapped')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'heavy') text = L(`${who(event.attacker)} loads up a heavy ${event.punch}`, `${who(event.attacker)} 蓄力一记重${blow(event.punch)}`);
+  else if (event.kind === 'art') text = `${logIcon('spark')} ${who(event.attacker)}${tail()}`;
   else if (event.kind === 'focus') return;
-  else if (event.kind === 'strategy') text = `<b>${name(event.fighter)}</b> switches to ${STRATEGIES[event.strategy]?.label ?? event.strategy}`;
-  else if (event.kind === 'accessory') text = `${logIcon(event.icon)} <b>${name(event.fighter)}</b>'s ${event.item} goes flying`;
-  else if (event.kind === 'dazed') text = `${logIcon('down')} <b>${name(event.fighter)}</b> is dazed · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'fell') text = `<b>${name(event.fighter)}</b> goes over · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'clinch') text = `<b>${name(event.attacker)}</b> takes the clinch`;
-  else if (event.kind === 'severed') text = `${logIcon('drop')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'strategy') text = L(`${who(event.fighter)} switches to ${STRATEGIES[event.strategy]?.label ?? event.strategy}`, `${who(event.fighter)} 改为${what(STRATEGIES[event.strategy]?.label ?? event.strategy)}`);
+  else if (event.kind === 'accessory') text = `${logIcon(event.icon)} ${L(`${who(event.fighter)}'s ${event.item} goes flying`, `${who(event.fighter)} 的${what(event.item)}飞了出去`)}`;
+  else if (event.kind === 'dazed') text = `${logIcon('down')} ${L(`${who(event.fighter)} is dazed`, `${who(event.fighter)} 被打懵`)}${tail()}`;
+  else if (event.kind === 'fell') text = `${L(`${who(event.fighter)} goes over`, `${who(event.fighter)} 倒地`)}${tail()}`;
+  else if (event.kind === 'clinch') text = L(`${who(event.attacker)} takes the clinch`, `${who(event.attacker)} 抱住缠斗`);
+  else if (event.kind === 'severed') text = `${logIcon('drop')} ${who(event.fighter)}${tail()}`;
   else if (event.kind === 'loosed') return;
   // His arrows (bolts, charges) all spent, or more brought up to him (physics/ranged.js spendMissile).
-  else if (event.kind === 'quiverEmpty' || event.kind === 'ammoEmpty' || event.kind === 'resupplied') text = `${logIcon(event.kind === 'resupplied' ? 'crate' : 'bow')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'arrow') text = `${logIcon('bow')} <b>${name(event.attacker)}</b> → <b>${name(event.defender)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'shot') text = `${logIcon('gun')} <b>${name(event.attacker)}</b> fires${event.defender !== undefined ? ` → <b>${name(event.defender)}</b>` : ''} · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'generalFell') text = `${logIcon('crown')} <b>${name(event.fighter)}</b>, the ${world.fighters[event.fighter].corner} general, has fallen`;
-  else if (event.kind === 'newGeneral') text = `${logIcon('crown')} <b>${name(event.fighter)}</b> takes command`;
-  else if (event.kind === 'panic' || event.kind === 'rally') text = `${logIcon(event.kind === 'panic' ? 'panic' : 'flame')} <b>${name(event.fighter)}</b> ${event.effects.join(', ')}`;
-  else if (event.kind === 'staggered') text = `${logIcon('reel')} <b>${name(event.fighter)}</b> staggers · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'killed') text = `${logIcon('skull')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'died') text = `${logIcon('skull')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'bledOut') text = `${logIcon('drop')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'drowned') text = `${logIcon('wave')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'disarmed' || event.kind === 'drew') text = `${logIcon('blade')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'quiverEmpty' || event.kind === 'ammoEmpty' || event.kind === 'resupplied') text = `${logIcon(event.kind === 'resupplied' ? 'crate' : 'bow')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'arrow') text = `${logIcon('bow')} ${who(event.attacker)} → ${who(event.defender)}${tail()}`;
+  else if (event.kind === 'shot') text = `${logIcon('gun')} ${who(event.attacker)} ${L('fires', '开火')}${event.defender !== undefined ? ` → ${who(event.defender)}` : ''}${tail()}`;
+  else if (event.kind === 'generalFell') text = `${logIcon('crown')} ${L(`${who(event.fighter)}, the ${world.fighters[event.fighter].corner} general, has fallen`, `${L('', world.fighters[event.fighter].corner === 'red' ? '红方' : '蓝方')}主将 ${who(event.fighter)} 阵亡`)}`;
+  else if (event.kind === 'newGeneral') text = `${logIcon('crown')} ${L(`${who(event.fighter)} takes command`, `${who(event.fighter)} 接掌指挥`)}`;
+  else if (event.kind === 'panic' || event.kind === 'rally') text = `${logIcon(event.kind === 'panic' ? 'panic' : 'flame')} ${who(event.fighter)} ${fx()}`;
+  else if (event.kind === 'staggered') text = `${logIcon('reel')} ${L(`${who(event.fighter)} staggers`, `${who(event.fighter)} 踉跄`)}${tail()}`;
+  else if (event.kind === 'killed' || event.kind === 'died') text = `${logIcon('skull')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'bledOut') text = `${logIcon('drop')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'drowned') text = `${logIcon('wave')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'disarmed' || event.kind === 'drew') text = `${logIcon('blade')} ${who(event.fighter)}${tail()}`;
   else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
-  else if (event.kind === 'parry') text = `${logIcon('swords')} <b>${name(event.fighter)}</b> parries <b>${name(event.attacker)}</b>'s ${event.punch} · <em>${event.effects.join(', ')}${event.answering ? ', cutting as he does' : ''}</em>`;
-  else if (event.kind === 'bladeBlock') text = `<b>${name(event.attacker)}</b> meets <b>${name(event.defender)}</b>'s ${event.punch ?? 'strike'} with the blade · <em>${event.effects.join(', ') || 'fended off'}</em>`;
-  else if (event.kind === 'pickup') text = `${logIcon('blade')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'styleSwitch') text = `<b>${name(event.fighter)}</b> switches to ${STYLES[event.style].label}`;
-  else if (event.kind === 'pinning') text = `<b>${name(event.attacker)}</b> goes to hold <b>${name(event.defender)}</b> down`;
-  else if (event.kind === 'held') text = `${logIcon('hold')} <b>${name(event.fighter)}</b> is held down`;
-  else if (event.kind === 'pinBroken') text = `<b>${name(event.fighter)}</b> breaks the hold`;
-  else if (event.kind === 'pinned') text = `${logIcon('hold')} <b>${name(event.fighter)}</b> held down · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'impact') text = `${logIcon('burst')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'pain') text = `${logIcon('wince')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'unhorsed') text = `${logIcon('horse')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'horseDown') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} goes down · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'parry') text = `${logIcon('swords')} ${L(`${who(event.fighter)} parries ${who(event.attacker)}'s ${event.punch}`, `${who(event.fighter)} 架开 ${who(event.attacker)} 的${blow(event.punch)}`)} · <em>${fx()}${event.answering ? L(', cutting as he does', '，顺势反斩') : ''}</em>`;
+  else if (event.kind === 'bladeBlock') text = `${L(`${who(event.attacker)} meets ${who(event.defender)}'s ${event.punch ?? 'strike'} with the blade`, `${who(event.attacker)} 以刃接住 ${who(event.defender)} 的${event.punch ? blow(event.punch) : what('strike')}`)} · <em>${fx() || what('fended off')}</em>`;
+  else if (event.kind === 'pickup') text = `${logIcon('blade')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'styleSwitch') text = L(`${who(event.fighter)} switches to ${STYLES[event.style].label}`, `${who(event.fighter)} 换成${what(STYLES[event.style].label)}`);
+  else if (event.kind === 'pinning') text = L(`${who(event.attacker)} goes to hold ${who(event.defender)} down`, `${who(event.attacker)} 扑上去压制 ${who(event.defender)}`);
+  else if (event.kind === 'held') text = `${logIcon('hold')} ${L(`${who(event.fighter)} is held down`, `${who(event.fighter)} 被压住`)}`;
+  else if (event.kind === 'pinBroken') text = L(`${who(event.fighter)} breaks the hold`, `${who(event.fighter)} 挣脱压制`);
+  else if (event.kind === 'pinned') text = `${logIcon('hold')} ${L(`${who(event.fighter)} held down`, `${who(event.fighter)} 被死死压住`)}${tail()}`;
+  else if (event.kind === 'impact') text = `${logIcon('burst')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'pain') text = `${logIcon('wince')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'unhorsed') text = `${logIcon('horse')} ${who(event.fighter)}${tail()}`;
+  else if (event.kind === 'horseDown') text = `${steedGlyph()} ${L(`${Steed(event)} goes down`, `${Steed(event)} 倒下`)}${tail()}`;
   // A robot dog's leg cut off (physics/mounted.js severMountLeg): its stump shorts out.
-  else if (event.kind === 'legSevered') text = `${logIcon('snapped')} ${steed(event).replace(/^a /, 'A ')} · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'horseHit') text = `${event.attacker < 0 ? `A ${event.weapon}` : `<b>${name(event.attacker)}</b>`} ${event.punch ?? (event.weapon === 'stake' ? 'meets' : 'hits')} → ${steed(event)} (${event.target}) · ${event.speed === undefined ? '' : `${event.speed.toFixed(1)} m/s · `}${event.energy.toFixed(0)} J${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
-  else if (event.kind === 'horseCrash') text = `${steedGlyph(event)} ${steed(event).replace(/^a /, 'A ')} · ${event.speed.toFixed(1)} m/s · <em>${event.effects.join(', ')}</em>`;
-  else if (event.kind === 'trampled') text =`${logIcon('horse')} <b>${name(event.fighter)}</b> · <em>${event.effects.join(', ')}</em>`;
+  else if (event.kind === 'legSevered') text = `${logIcon('snapped')} ${Steed(event)}${tail()}`;
+  else if (event.kind === 'horseHit') text = `${event.attacker < 0 ? L(`A ${event.weapon}`, what(event.weapon)) : who(event.attacker)} ${event.punch ? blow(event.punch) : event.weapon === 'stake' ? L('meets', '刺中') : L('hits', '击中')} → ${steed(event)} (${logPart(event.target)}) · ${event.speed === undefined ? '' : `${event.speed.toFixed(1)} m/s · `}${event.energy.toFixed(0)} J${event.effects.length ? tail() : ''}`;
+  else if (event.kind === 'horseCrash') text = `${steedGlyph()} ${Steed(event)} · ${event.speed.toFixed(1)} m/s${tail()}`;
+  else if (event.kind === 'trampled') text = `${logIcon('horse')} ${who(event.fighter)}${tail()}`;
   // A man's foot on one on the floor (physics.js footDown): logged when it did something.
   else if (event.kind === 'trodden') {
     if (!event.flattened && !event.harmed && !event.fell && !event.effects.includes('stumbles')) return;
-    text = `<b>${name(event.attacker)}</b> treads on <b>${name(event.defender)}</b> (${event.part}) · <em>${event.effects.join(', ')}</em>`;
+    text = `${L(`${who(event.attacker)} treads on ${who(event.defender)}`, `${who(event.attacker)} 踩到 ${who(event.defender)}`)} (${logPart(event.part)})${tail()}`;
   }
-  else if (event.kind === 'crash') text = `${logIcon('burst')} <b>${name(event.defender)}</b> crashed into${event.attacker === undefined ? '' : ` by <b>${name(event.attacker)}</b>`} (${event.target}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J · ${(event.force / 1000).toFixed(1)} kN${event.effects.length ? ` · <em>${event.effects.join(', ')}</em>` : ''}`;
-  else if (event.kind === 'collision') text = `<b>${name(event.attacker)}</b> charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`;
+  else if (event.kind === 'crash') text = `${logIcon('burst')} ${L(`${who(event.defender)} crashed into${event.attacker === undefined ? '' : ` by ${who(event.attacker)}`}`, `${who(event.defender)} ${event.attacker === undefined ? '撞上' : `被 ${who(event.attacker)} 撞上`}`)} (${logPart(event.target)}) · ${event.speed.toFixed(1)} m/s · ${event.energy.toFixed(0)} J · ${(event.force / 1000).toFixed(1)} kN${event.effects.length ? tail() : ''}`;
+  else if (event.kind === 'collision') text = L(`${who(event.attacker)} charges in · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(0)} N·s of momentum`, `${who(event.attacker)} 冲撞 · ${event.speed.toFixed(1)} m/s · 动量 ${event.impulse.toFixed(0)} N·s`);
   // A strike's line needs its numbers; anything else without a line of its own is not logged.
   else if (event.attacker === undefined || event.speed === undefined || event.impulse === undefined || event.force === undefined || !event.effects) return;
   else {
-    const where = event.kind === 'blocked' ? `blocked by ${event.target.replace(/^[lr]/, '').toLowerCase()}` : `→ ${event.target}`;
-    const head = event.target === 'head' ? ` · head Δv <b>${event.headDeltaV.toFixed(2)}</b> m/s` : '';
-    text = `<b>${name(event.attacker)}</b> ${event.punch} ${where} · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(1)} N·s · ${Math.round(event.force).toLocaleString()} N${head}`;
-    if (event.effects.length) text += ` · <em>${event.effects.join(', ')}</em>`;
+    const where = event.kind === 'blocked' ? L(`blocked by ${event.target.replace(/^[lr]/, '').toLowerCase()}`, `被${logPart(event.target)}挡住`) : `→ ${logPart(event.target)}`;
+    const head = event.target === 'head' ? ` · ${L('head Δv', '头部 Δv')} <b>${event.headDeltaV.toFixed(2)}</b> m/s` : '';
+    text = `${who(event.attacker)} ${blow(event.punch)} ${where} · ${event.speed.toFixed(1)} m/s · ${event.impulse.toFixed(1)} N·s · ${Math.round(event.force).toLocaleString()} N${head}`;
+    if (event.effects.length) text += tail();
   }
   const row = document.createElement('li');
   row.innerHTML = text;
@@ -3052,7 +3064,7 @@ const story = installStory({
   world: () => state.world,
   pause: (on) => {
     state.paused = Boolean(on);
-    $('#pause').textContent = state.paused ? 'Play' : 'Pause';
+    labelKeyed($('#pause'), state.paused ? 'fight.play' : 'fight.pause');
   },
   orbit: () => scene.orbit,
   // The battle's pace (its speed button): the frame's multiple of real time, as the speeds bar sets it (the physics step is

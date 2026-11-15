@@ -2027,3 +2027,42 @@ button.on, .card-choice.on { box-shadow: inset 0 -2px 0 var(--gold); }
 .intro .glyph.drawn { font-size: 1.1em; }
 .intro p > .glyph.drawn { margin: 0 0.25em; }
 .muster-zoom .glyph.drawn, .muster-unit .label-glyph { color: inherit; }
+
+/* ---- The fight's footer: Pause and Restart carry their drawn marks (a mask in the text's colour), and on a phone the three
+   fight buttons are the marks alone, so the footer is one row (their words stay as the buttons' names for a screen reader) ---- */
+#pause::before, #restart::before { content: ''; display: inline-block; width: 1.15em; height: 1.15em; margin-right: 0.42em; vertical-align: -0.2em; background: currentColor; -webkit-mask: var(--mark) center / contain no-repeat; mask: var(--mark) center / contain no-repeat; opacity: 0.85; }
+#pause { --mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 5v14M15.5 5v14'/%3E%3C/svg%3E"); }
+#pause[data-i18n="fight.play"] { --mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 5l11 7-11 7z'/%3E%3C/svg%3E"); }
+#restart { --mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19.5 12a7.5 7.5 0 1 1-2.2-5.3'/%3E%3Cpath d='M19.5 4.5v3.8h-3.8'/%3E%3C/svg%3E"); }
+@media (max-width: 640px) {
+  .controls { flex-wrap: nowrap; justify-content: center; }
+  body[data-game="sandbox"] .controls { flex-wrap: wrap; }
+  .controls > #pause, .controls > #restart, .controls > #open-menu { font-size: 0 !important; letter-spacing: 0 !important; padding: 0 !important; min-width: 46px; width: 46px; height: 44px; display: inline-grid; place-items: center; flex: none; }
+  .controls > #pause::before, .controls > #restart::before { width: 19px; height: 19px; margin: 0; }
+  .controls > #open-menu .label-glyph { font-size: 20px; margin: 0; }
+  .controls .fu-pick { flex: 0 1 auto; min-width: 0; }
+}
+
+/* ---- A phone's name plates: the whole name, on two lines if it needs them, never cut ("NOBLE K..."); the count of
+   knock-downs sits after it when it fits and under it when it does not ---- */
+@media (max-width: 640px) {
+  .card .top { height: auto; min-height: 26px; max-height: none; overflow: visible; flex-wrap: wrap; align-items: center; row-gap: 0; font-size: 12.5px; letter-spacing: 0.02em; padding-top: 3px; padding-bottom: 3px; }
+  .card .name { white-space: normal; overflow: hidden; text-overflow: clip; line-height: 1.12; padding: 1px 5px 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .card .kd { height: auto; margin: 1px 0 1px auto; }
+  .card.blue .kd { margin: 1px auto 1px 0; }
+  html:lang(zh) .card .top { font-size: 13px; }
+}
+
+/* ---- A phone's first-fight key of the blows: smaller and higher, under the opponent's marker rather than over it (the marker
+   is the one that matters while he moves) ---- */
+.target-marker { z-index: 4; }
+.fu-legend-first { z-index: 1; }
+@media (max-width: 640px) {
+  .fu-legend-first { top: 31%; padding: 6px 8px 6px 6px; gap: 3px; font-size: 10px; letter-spacing: 0.08em; background: rgba(var(--pit), 0.3); }
+  .fu-legend-first .fu-key i { width: 24px; height: 24px; }
+}
+
+/* A phone's title page: a plate's kicker whole ("NEW · STAGE 1", "WHO WOULD WIN?") on up to two short lines, never cut. */
+@media (max-width: 760px) {
+  .choices.home-choices .choice:not(.career):not(:nth-child(2)) em { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; letter-spacing: 0.07em; text-wrap: balance; }
+}
