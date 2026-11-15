@@ -17,12 +17,12 @@ import { fieldOf, slabOf, wallLine, wallOf } from '../physics/terrain.js';
 import { STORY_WALL } from '../story/ground/walls.js';
 import { tkgFrame } from '../townkit/geo.js';
 import { tkFbm, tkRandom } from '../townkit/tex.js';
-import { TK_HOUSE, tkFieldAt, tkFieldMesh, tkHouse, tkHouseSolid, tkPaving, tkRow, tkTree } from '../townkit/build.js';
+import { TK_HOUSE, tkFieldAt, tkFieldMesh, tkHouse, tkHouseSolid, tkJar, tkPaving, tkRow, tkTree } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
 import { tkStir } from '../townkit/stir.js';
 import { TK_MATERIALS } from '../townkit/weather.js';
-import { TK_THINGS, tkArrows, tkBrazier, tkCampfire, tkCart, tkDrift, tkFirewood, tkIcicles, tkLadder, tkMantlet, tkSacks, tkScatter, tkStack, tkTuft } from '../townkit/things.js';
-import { tkGatehouse, tkGatehouseSolids, tkPavilion, tkPavilionSolids, tkRampart, tkRampartSolids, tkRock, tkWorksStair, tkWorksStairSolid } from '../townkit/works.js';
+import { TK_THINGS, tkArrows, tkBasket, tkBrazier, tkCampfire, tkCart, tkDrift, tkFirewood, tkIcicles, tkLadder, tkMantlet, tkPoles, tkSacks, tkScatter, tkStack, tkTub, tkTuft } from '../townkit/things.js';
+import { TK_WORKS, tkGatehouse, tkGatehouseSolids, tkPavilion, tkPavilionSolids, tkRampart, tkRampartSolids, tkRock, tkWorksStair, tkWorksStairSolid } from '../townkit/works.js';
 
 /** The place's plan (m). Choices for the game's ground, set against the battle's field and a walker's reach; none is a measurement of the real town. */
 export const PYONGYANG_PLACE = {
@@ -82,8 +82,22 @@ const pyWall = () => ({ x: PYONGYANG_PLACE.wall.x, high: PYONGYANG_PLACE.wall.hi
 /** The ground's height at the wall's foot, along it: level, then up the hill to the north. */
 const pyFoot = (z) => PYONGYANG_PLACE.hill.high * pySmooth(...PYONGYANG_PLACE.hill.z, z);
 
-/** The road out from the gate: its middle's z at x (it wanders a little, as a worn track does). */
-const pyRoad = (x) => PYONGYANG_PLACE.gate.z + 6 * Math.sin(Math.min(0, x - 1) / 40);
+// The old tracks over the field (the road out from the gate, the strip the columns beat flat before the wall). A
+// track worn by carts and feet over open ground is never ruled: it bends round soft ground and knolls, and its
+// edges fray where wheels and feet strayed. `sway`: [length m, reach m] waves of its middle (the road's long bend
+// besides), dying away over `settle` m before the gate, where every cart must come to the passage; `fray`: how
+// far its width wanders either way (a share), over a noise `frayLength` m long. The strip's middle wanders by
+// `stripSway`, its half-width `strip` m either way of the battle's ground. By eye, against photographs of cart
+// tracks over snowfields; approximate.
+const PY_TRACKS = { sway: [[110, 4.5], [47, 2.0], [19, 0.6]], settle: 24, fray: 0.28, frayLength: 23, strip: 8, stripSway: [[70, 1.3], [26, 0.5]] };
+
+const pyWaves = (x, waves, seed) => waves.reduce((sum, [length, reach], i) => sum + reach * Math.sin((x / length) * 2 * Math.PI + seed * 1.9 + i * 2.7), 0);
+
+/** The road out from the gate: its middle's z at x (it wanders, as a worn track does: PY_TRACKS). */
+const pyRoad = (x) => PYONGYANG_PLACE.gate.z + 6 * Math.sin(Math.min(0, x - 1) / 40) + pyWaves(x, PY_TRACKS.sway, 1) * pySmooth(0, PY_TRACKS.settle, 1 - x);
+
+/** How wide a track is at x, as a share of its own width (its fraying edges). */
+const pyFray = (x, seed) => 1 + PY_TRACKS.fray * (2 * tkFbm((x + 500) / 1000, seed / 7, Math.round(1000 / PY_TRACKS.frayLength), 2, 13 + seed) - 1);
 
 // Knolls and hollows outside the wall: [x, z, radius, height]. Low enough to walk over (the steepest about one in three).
 const PY_KNOLLS = [[-42, 38, 17, 3.6], [-88, -44, 21, 4.4], [-28, -40, 12, -1.5], [-112, 52, 23, 5.2], [-64, 78, 18, 3.0], [-20, 92, 14, -1.3], [-128, -96, 26, 6.5], [-58, -98, 20, 4.0], [-132, 104, 22, 3.5]];
@@ -481,6 +495,15 @@ const PY_SIEGE = {
   hearths: 0.34, icicles: 0.6,
   drift: { wall: { high: [0.3, 0.95], run: 2.8 }, house: { high: [0.08, 0.34], run: 1.1 } },
   grows: { field: 0.5, town: 0.7, thick: 3 },
+  //   fronts     what stands along a near house's front, each a share of the houses (one die each): `jars`, the
+  //              brown-black glazed storage jars (onggi) of a Korean house, kept outside in rows of `jarCount`, as
+  //              a yard's jar terrace keeps them, lidded (`jarHigh` m); `wood`, a stack of firewood for the winter
+  //              against the wall; `tubs`, a tub, a basket or both; `spears`, the garrison's spare spears and poles
+  //              leaned on the wall (the town was held as a fortress). `onggi`: the glaze's colour (approximate).
+  //   dropped    poles and spears dropped on the field before the wall by the columns, in bundles of 1 to 3
+  //              (how many), and baskets and tubs left in the camps.
+  fronts: { jars: 0.32, jarCount: [2, 6], jarHigh: [0.48, 0.95], onggi: [0.24, 0.15, 0.1], wood: 0.26, tubs: 0.22, spears: 0.12 },
+  dropped: { poles: 14, campThings: 4 },
 };
 
 /**
@@ -583,6 +606,27 @@ function pyDress(blocks, stir, plan, lay, eave, tier) {
       tkSacks(blocks.at(sx, sz), sx, outside(sx, sz), sz, { count: 3 + k, seed: index * 8 + k });
     }
   }
+  // Poles and spears dropped on the field, lying in the snow; baskets and tubs left about the camps.
+  for (let k = 0; k < s.dropped.poles; k += 1) {
+    const [x, z] = [-6 - 70 * random() * random(), off()];
+    if (Math.abs(z - pyRoad(x)) < 3) continue;
+    const yaw = random() * Math.PI;
+    for (let n = 0, count = 1 + Math.floor(random() * 3); n < count; n += 1) {
+      const [dx, dz] = [Math.cos(yaw + 1.6) * n * 0.12, Math.sin(yaw + 1.6) * n * 0.12];
+      const half = 1.4 + 0.6 * random();
+      const [ax, az, bx, bz] = [x + dx - Math.cos(yaw) * half, z + dz - Math.sin(yaw) * half, x + dx + Math.cos(yaw) * half, z + dz + Math.sin(yaw) * half];
+      blocks.at(x, z).tube('timber', [[ax, outside(ax, az) + 0.03, az], [bx, outside(bx, bz) + 0.03, bz]], 0.02, 0.018, { sides: 5, colour: TK_THINGS.oldWood.map((value) => value * (0.8 + 0.4 * random())) });
+    }
+  }
+  for (const camp of s.camps) {
+    for (let k = 0; k < s.dropped.campThings; k += 1) {
+      const a = random() * Math.PI * 2;
+      const d = 4 + 8 * random();
+      const [x, z] = [camp.at[0] + Math.cos(a) * d, camp.at[1] + Math.sin(a) * d * 0.8];
+      if (k % 2) tkTub(blocks.at(x, z), x, outside(x, z), z, { wide: 0.45 + 0.2 * random() });
+      else tkBasket(blocks.at(x, z), x, outside(x, z), z, { full: random() < 0.6 ? TK_THINGS.hemp : null });
+    }
+  }
   // Dressed stone for mending the wall, stacked inside by the gate; sacks under the passage's inner mouth.
   for (const side of [-1, 1]) tkStack(blocks.at(head + 13, t.gate.z), tkgFrame(head + 13, 0, t.gate.z + side * 6.5, 0.2 * side), { kind: 'stone', long: 2.2, high: 0.9, deep: 1.1, seed: 5 + side });
 
@@ -596,6 +640,34 @@ function pyDress(blocks, stir, plan, lay, eave, tier) {
       stir.smoke(x, 2.4, z, house.far ? 1.5 : 1.1);
     }
     if (house.far) continue;
+    // (Along its front, inside the eave's line: PY_SIEGE.fronts. At its two ends, clear of the doors in its middle.)
+    const f = s.fronts;
+    const front = frame.child(0, 0, house.depth / 2);
+    const foot = (x, z) => { const [wx, , wz] = front(x, 0, z); return [wx, tkFieldAt(plan.inside, wx, wz), wz]; };
+    const end = (dice() < 0.5 ? -1 : 1) * (house.width / 2 - 0.55);
+    const builder = blocks.at(house.at[0], house.at[1]);
+    builder.at('near', () => {
+      if (dice() < f.jars) {
+        const count = f.jarCount[0] + Math.floor(dice() * (f.jarCount[1] - f.jarCount[0] + 1));
+        for (let k = 0; k < count; k += 1) {
+          const high = f.jarHigh[0] + (f.jarHigh[1] - f.jarHigh[0]) * dice();
+          const [x, y, z] = foot(end - Math.sign(end) * k * 0.62, 0.45 + 0.2 * dice() + (k % 2) * 0.35);
+          tkJar(builder, x, y, z, { high, colour: f.onggi.map((value) => value * (0.85 + 0.35 * dice())), lid: dice() < 0.8 });
+        }
+      } else if (dice() < f.wood) {
+        const [x, y, z] = foot(end - Math.sign(end) * 0.5, 0.25);
+        tkFirewood(builder, tkgFrame(x, y, z, (house.yaw ?? 0)), { long: 1.2 + 0.8 * dice(), high: 0.6 + 0.5 * dice(), seed: house.seed });
+      }
+      if (dice() < f.tubs) {
+        const [x, y, z] = foot(-end * 0.6, 0.5);
+        if (dice() < 0.5) tkTub(builder, x, y, z, { wide: 0.4 + 0.2 * dice() });
+        else tkBasket(builder, x, y, z, { wide: 0.45 + 0.15 * dice(), full: dice() < 0.5 ? TK_THINGS.splitWood : null });
+      }
+      if (dice() < f.spears) {
+        const [x, y, z] = foot(-end * 0.3, 0);
+        tkPoles(builder, tkgFrame(x, y, z, (house.yaw ?? 0) + Math.PI), { count: 2 + Math.floor(dice() * 4), long: 3.2, colour: TK_THINGS.oldWood, seed: house.seed + 1 });
+      }
+    });
     const h = house.heights?.[0] ?? 3;
     const reach = house.depth / 2 + (house.roof?.overhang ?? TK_HOUSE.overhang) - 0.03;
     for (const side of [-1, 1]) {
@@ -784,10 +856,12 @@ export function buildPyongyang() {
     }
   });
   // The wall: its two walked runs, and beyond them, unwalked: east along the hill's crest from the corner, and on south.
-  for (const [index, run] of plan.runs.entries()) tkRampart(blocks.at(run[0][0], run[0][1]), run, { ...wall, gaps: index ? plan.gaps : [] });
+  // (Its face laid in jobs of different stone along it: TK_WORKS.masonry.)
+  const masonry = TK_WORKS.masonry;
+  for (const [index, run] of plan.runs.entries()) tkRampart(blocks.at(run[0][0], run[0][1]), run, { ...wall, gaps: index ? plan.gaps : [], masonry, seed: index + 1 });
   const crest = pyFoot(t.wall.z[0]);
-  tkRampart(blocks.wide, Array.from({ length: 9 }, (_, k) => [plan.east + 60 - k * ((plan.east + 60 - wall.x) / 8), t.wall.z[0], crest, crest + wall.high]), { ...wall, inner: () => crest });
-  tkRampart(blocks.wide, pySouthRun(), { ...wall, inner: (node) => node[2] });
+  tkRampart(blocks.wide, Array.from({ length: 9 }, (_, k) => [plan.east + 60 - k * ((plan.east + 60 - wall.x) / 8), t.wall.z[0], crest, crest + wall.high]), { ...wall, inner: () => crest, masonry, seed: 7 });
+  tkRampart(blocks.wide, pySouthRun(), { ...wall, inner: (node) => node[2], masonry, seed: 9 });
   // The gate: its block, the stairs up from the walk, the pavilion on its terrace; the corner's pavilion.
   const gate = blocks.at(wall.x, t.gate.z);
   tkGatehouse(gate, plan.gateFrame, t.gate);
@@ -804,16 +878,20 @@ export function buildPyongyang() {
   // The trodden ground: the road out from the gate (a ribbon laid on the ground's own heights) and the columns' way to the wall.
   // (Each strip of the ribbon takes the ground's height under its own corners, a finger above it: it has no sides to show
   // where the ground falls away across the road.)
-  const lane = [-2.3, -0.8, 0.8, 2.3];
-  const trod = (x, across) => [x, tkFieldAt(plan.outside, x, pyRoad(x) + across) + PY_ROAD.proud, pyRoad(x) + across];
-  for (let x = wall.x - t.gate.out; x - PY_ROAD.step >= t.outside.x[0] + 2; x -= PY_ROAD.step) {
-    for (let k = 0; k + 1 < lane.length; k += 1) {
-      const [a, b, c, d] = [trod(x, lane[k]), trod(x, lane[k + 1]), trod(x - PY_ROAD.step, lane[k + 1]), trod(x - PY_ROAD.step, lane[k])];
-      // (Anticlockwise seen from above.)
-      blocks.wide.quad('track', a, d, c, b, { uvs: [a, d, c, b].map((at) => [at[0], at[2]]), colour: [0.92, 0.78, 0.56] });
+  // (Each edge frays on its own: PY_TRACKS.)
+  const ribbon = (from, to, middle, lane, seed, colour) => {
+    const trod = (x, across) => { const z = middle(x) + across * pyFray(x, across < 0 ? seed : seed + 3); return [x, tkFieldAt(plan.outside, x, z) + PY_ROAD.proud, z]; };
+    for (let x = to; x - PY_ROAD.step >= from; x -= PY_ROAD.step) {
+      for (let k = 0; k + 1 < lane.length; k += 1) {
+        const [a, b, c, d] = [trod(x, lane[k]), trod(x, lane[k + 1]), trod(x - PY_ROAD.step, lane[k + 1]), trod(x - PY_ROAD.step, lane[k])];
+        // (Anticlockwise seen from above.)
+        blocks.wide.quad('track', a, d, c, b, { uvs: [a, d, c, b].map((at) => [at[0], at[2]]), colour });
+      }
     }
-  }
-  tkPaving(blocks.wide, 'track', -135, wall.x, -8, 8, 0.03, [0.95, 0.82, 0.6]);
+  };
+  ribbon(t.outside.x[0] + 2, wall.x - t.gate.out, pyRoad, [-2.3, -0.8, 0.8, 2.3], 1, [0.92, 0.78, 0.56]);
+  const strip = PY_TRACKS.strip;
+  ribbon(-135, wall.x, (x) => pyWaves(x, PY_TRACKS.stripSway, 2) * pySmooth(0, 10, 1 - x), [-strip, -strip / 3, strip / 3, strip], 2, [0.95, 0.82, 0.6]);
 
   // The place's lie (townkit/lay.js): the gate's passage and the eaves' shade, the ground's low places, where the
   // columns and the town's people trod, and how the wind laid the snow against the wall.
@@ -848,13 +926,16 @@ export function buildPyongyang() {
   // cloud that passes, the low sun between them on the new snow); without it, its clear day. The ground's own
   // heights for what lies and blows on it, and the gate passage's outer mouth, through which the afternoon sun
   // slants into the dark of the vault (an upright opening the passage's width and the arch's height to about its
-  // haunches; a x b points in through it; `dust`: the air of a trodden passage, env/config.js's own range for one).
+  // haunches; a x b points in through it; `dust`: extinction per metre of the passage's air: 0.2, a sight of about
+  // 15 m, as in blowing snow (spindrift and the showers' fine snow are funnelled through a gate's passage by the
+  // wind, on top of a trodden passage's dust). At the 0.06 of dust alone the lit wedge of air between the mouth and
+  // the sunlit north side, a few metres long at this sun, did not show against the bright mouth; at 0.2 it does).
   const mouth = wall.x - t.gate.out;
   const air = {
     description: {
       sun: PY_SUN, air: { visibility: 25000, hazeHeight: 900 }, clouds: { cover: 0.35 }, ground: { albedo: PY_GROUND_ALBEDO },
       height: (x, z) => { if (z > t.outside.z[1] && x >= t.river.field.x[0] && x <= t.river.field.x[1]) return tkFieldAt(plan.south, x, Math.min(z, t.river.field.to)); const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)); return x <= wall.x ? tkFieldAt(plan.outside, Math.max(t.outside.x[0], x), zc) : x < head ? pyFoot(zc) : tkFieldAt(plan.inside, Math.min(plan.east, x), zc); },
-      openings: [{ at: [mouth, 0, t.gate.z - t.gate.way / 2], a: [0, t.gate.spring + t.gate.rise * 0.6, 0], b: [0, 0, t.gate.way], floor: 0, dust: 0.06 }],
+      openings: [{ at: [mouth, 0, t.gate.z - t.gate.way / 2], a: [0, t.gate.spring + t.gate.rise * 0.6, 0], b: [0, 0, t.gate.way], floor: 0, dust: 0.2 }],
     },
     // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun: a bright pale
     // winter sky with the low sun whole on the wall between passing showers.

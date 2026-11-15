@@ -131,7 +131,14 @@ export const TK_WEATHER = {
     // (ENV_PRESS.snow), times the lie's drift share over its middle (`drift` 0.5 where the wind neither piles nor
     // thins it: lay.js sheet A's alpha), so a print bottoms out on stone where the wind has scoured it thin and is
     // deep in a drift against a wall; at most `most` times the land's depth (a knee-deep drift).
-    pressed: { drift: 0.5, most: 2.5 } },
+    pressed: { drift: 0.5, most: 2.5 },
+    // `under`: what is blown in under a roof's edge. Flakes falling at about 1 m/s in a wind of a few m/s come down
+    // on a slant of one in three to one in six, so on the side the wind blows from snow lies in under an eave for
+    // up to `reach` m, thinning inward, its edge broken by the gusts (`ragged`: the share of the reach the edge
+    // wanders by); on the lee side it stops near the drip line, which the drips and the gusts leave ragged by up to
+    // `jitter` m either way. By eye, against photographs of village streets under snow; approximate. The lie is read
+    // a second time, `reach` m up the wind and `jitter` m aside.
+    under: { reach: 0.9, ragged: 0.6, jitter: 0.3 } },
 };
 
 /**
@@ -448,13 +455,25 @@ const TK_COLOUR = `
   // Lying snow: white wherever it holds; less of it leaves bare patches, a few metres and a few tens of metres
   // across. The wind's work (the lie's map) piles it or thins it, feet tread it away, and nothing lies under cover.
   float holds = uTkHold * (1.0 - ${TK_WEATHER.snow.packed.toFixed(2)} * tkWear);
+  // (Under a roof's edge, what the wind blows in: the cover read again up the wind, a ragged reach from the edge;
+  // the deeper under, the less: TK_WEATHER.snow.under.)
+  float tkSnowUnder = tkUnder;
+  if (uTkSnow > 0.0 && tkUnder > 0.0 && uTkLayH.z > 0.5) {
+    float reach = ${TK_WEATHER.snow.under.reach.toFixed(2)} * (1.0 - ${TK_WEATHER.snow.under.ragged.toFixed(2)} * (tkNoise(vTkPos.xz * 2.3 + 11.0) * 0.7 + fine * 0.3));
+    vec2 aside = vec2(tkNoise(vTkPos.xz * 3.1 + 2.0), tkNoise(vTkPos.xz * 3.1 + 9.0)) * 2.0 - 1.0;
+    vec2 qw = (vTkPos.xz - uTkBlow.xy * reach + aside * ${TK_WEATHER.snow.under.jitter.toFixed(2)} - uTkLay.xy) * uTkLay.zw;
+    if (qw.x > 0.0 && qw.x < 1.0 && qw.y > 0.0 && qw.y < 1.0) {
+      float topUp = texture2D(uTkLayB, qw).r * uTkLayH.y + uTkLayH.x;
+      tkSnowUnder = smoothstep(0.35, 0.9, topUp - vTkPos.y);
+    }
+  }
   float lying = blot * 0.42 + fine * 0.28 + tkFbm(vTkPos.xz * 0.045 + 7.0) * 0.3 + uTkSnow * holds * 0.45 + (lies - 0.5) * 0.8;
   // (A patch's edge is broken at a hand's scale, and narrow: TK_WEATHER.snow.edge.)
   lying += (tkNoise(vTkPos.xz * 6.3 + 2.0) - 0.5) * 0.12 + (tkNoise(vTkPos.xz * 21.0) - 0.5) * 0.06;
   // (Over a face the wind slides it on, it is swept into bands along the wind and the face is bare between: uTkLaid.w,
   // the material's scour. The bands are the blown drifts' own: as long down the wind as those, as wide across.)
   if (uTkLaid.w > 0.0) lying += uTkLaid.w * (tkNoise(vec2(dot(vTkPos.xz, uTkBlow.xy) / ${(TK_WEATHER.snow.blown.drift * TK_WEATHER.snow.blown.stretch).toFixed(2)}, dot(vTkPos.xz, vec2(-uTkBlow.y, uTkBlow.x)) / ${TK_WEATHER.snow.blown.drift.toFixed(2)})) - 0.6);
-  tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(${(0.4 - TK_WEATHER.snow.edge / 2).toFixed(3)}, ${(0.4 + TK_WEATHER.snow.edge / 2).toFixed(3)}, lying) * (1.0 - tkPoolHere) * (1.0 - tkUnder) * step(0.001, uTkHold);
+  tkSnowHere = smoothstep(0.0, 0.5, uTkSnow) * smoothstep(${TK_WEATHER.snow.holds[0].toFixed(2)}, ${TK_WEATHER.snow.holds[1].toFixed(2)}, n.y) * smoothstep(${(0.4 - TK_WEATHER.snow.edge / 2).toFixed(3)}, ${(0.4 + TK_WEATHER.snow.edge / 2).toFixed(3)}, lying) * (1.0 - tkPoolHere) * (1.0 - tkSnowUnder) * step(0.001, uTkHold);
   if (uTkLaid.x > 0.5) {
     // (Off a roof it has slid in sheets: strips down the slope lie bare.)
     float across = vTkPos.x * n.z - vTkPos.z * n.x;
