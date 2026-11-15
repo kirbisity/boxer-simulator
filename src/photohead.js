@@ -44,7 +44,8 @@ export const PHOTO_HEAD = {
   model: { on: true },
   // Of the shading normal, how much is the smooth head's (the rest the face's): softens the nose's and sockets' facets.
   softNormal: 0.4,
-  // The shadow under the nose and in the sockets, painted per vertex (1 is none).
+  // The shadow under the nose and in the sockets, painted per vertex (1 is none): the drawn head's, whose flat face needs it
+  // (the head model's are HEAD_LATTICE.occlusion).
   occlusion: { socket: 0.16, underNose: 0.14, wing: 0.1, mouth: 0.08 },
 };
 
@@ -138,7 +139,7 @@ export function photoLandmarks(atlas, jitter = {}) {
 }
 
 /** The face's structure at an atlas place (u from the middle, row down): its height out of the head (unit radius), and its shadow. */
-export function faceStructure(du, row, marks, region) {
+export function faceStructure(du, row, marks, region, occlusion = PHOTO_HEAD.occlusion) {
   const h = PHOTO_HEAD;
   const { eyeRow, mouthRow, chinRow, noseRow, eyeU } = marks;
   const r = (name) => region[name] ?? 0;
@@ -171,7 +172,7 @@ export function faceStructure(du, row, marks, region) {
   height -= 0.008 * headBump(du, row - mouthRow - 0.045, 0.035, 0.008);
   height += h.chin.height * (1 + 0.6 * r('chin')) * headBump(du, row - chinRow + 0.03, h.chin.width, h.chin.depth);
   // Shadow: in the sockets, under the nose and beside its wings, at the mouth's corners.
-  const o = h.occlusion;
+  const o = occlusion;
   let shade = 0;
   for (const side of [-1, 1]) {
     shade += o.socket * headBump(du - side * eyeU, row - eyeRow + 0.004, 0.03, 0.02) * (1 - 0.5 * Math.max(0, r('lidFold')));

@@ -33,6 +33,13 @@ NEUTRAL = 0.45  # (low, so whites of the eyes can be brighter than a dark skin: 
 RELIEF_GAIN = 3.0  # (half the 1024-wide atlas' 6: the same slopes at half the texels)
 DELIGHT = 0.85  # how much of the face's broad light is divided out: most of it, the head model's sockets, nose and lips shading themselves (0.6 while the head was a smooth ball left the photo's socket shadow to be shaded twice: a bruise round a man's eyes)
 DELIGHT_RANGE = (0.7, 1.7)  # the most a shadow is lifted and a highlight lowered: the lid under a brow is down to 0.47 of its cheek's luminance over the 86 tiles, 0.57 at the median, which this lifts most of the way to the cheek's
+# The strip between the brow and the eye, where the photographed shade under the brow lies: narrower than the broad light's blur
+# above (a few texels between the brow's darkest row and the lid), so that left it in (0.73 of the cheek's luminance at the
+# lid's crease over the men's tiles), and the head model's own brow shaded the same place again: the men's brown band over the
+# eyes. Divided out the same way (DELIGHT, DELIGHT_RANGE) over a blur of `sigma` texels, from `gap` (share of the atlas's
+# height) below the brow's darkest row, keeping the brow's own hair, to `lid` eye half-heights above the eye's middle, over
+# `across` (share of its width, a Gaussian's) about each eye; the eyes' openings kept as they are.
+UNDER_BROW = {'gap': 0.012, 'lid': 1.2, 'sigma': 2.0, 'across': 0.035}
 
 
 def smoothstep(a, b, x):
@@ -199,6 +206,33 @@ def colour_at(tile, x, y, r):
     return np.median(patch, axis=0)
 
 
+def brow_rows_of(img):
+    """Where the composite's brows are: the darkest row over each eye."""
+    band = gaussian_filter(lum(img), 1.0)
+    rows = []
+    for side in (-1, 1):
+        x0, x1 = int(CX + side * E - 0.02 * W), int(CX + side * E + 0.02 * W)
+        y0, y1 = int(ER - 0.09 * H), int(ER - 0.025 * H)
+        rows.append(y0 + float(np.argmin(band[y0:y1, min(x0, x1):max(x0, x1)].mean(axis=1))))
+    return rows
+
+
+def under_brow(img, ref):
+    """The photographed shade between brow and eye divided out (UNDER_BROW), the brow's hair and the eyes kept."""
+    spec = UNDER_BROW
+    m = np.zeros((H, W))
+    for side, brow in zip((-1, 1), brow_rows_of(img)):
+        top = brow + spec['gap'] * H
+        bottom = ER - spec['lid'] * 0.013 * H
+        vertical = smoothstep(top - 1.0, top + 1.5, YY) * smoothstep(bottom + 1.0, bottom - 1.5, YY)
+        across = np.exp(-(((XX - (CX + side * E)) / (spec['across'] * W)) ** 2))
+        m = np.maximum(m, vertical * across)
+    m = m * (1 - eye_mask())
+    lo = gaussian_filter(lum(img), spec['sigma'])
+    gain = np.clip((ref / np.maximum(lo, 1e-3)) ** DELIGHT, *DELIGHT_RANGE)
+    return img * (1 + (gain - 1) * m)[..., None]
+
+
 def build(key, mark, tiles_dir, out):
     tile = np.asarray(Image.open(f'{tiles_dir}/tiles/{key}.png').convert('RGB'), dtype=np.float32) / 255
     face, mask, (cx, ey, half, my, chin) = project(tile, mark)
@@ -217,6 +251,7 @@ def build(key, mark, tiles_dir, out):
     ref = lum(skin[None, None])[0, 0]
     flat = face * np.clip((ref / np.maximum(lo, 1e-3)) ** DELIGHT, *DELIGHT_RANGE)[..., None]
     flat = flat * mask[..., None] + skin * (1 - mask[..., None])
+    flat = under_brow(flat, ref)
     # The rest of the head: the face's colours pushed out (blur over the mask) and eased to the skin's mean.
     reach = gaussian_filter(mask, 14)
     ext = np.stack([gaussian_filter(flat[..., c] * mask, 14) for c in range(3)], axis=2) / np.maximum(reach, 1e-3)[..., None]
@@ -248,13 +283,7 @@ def build(key, mark, tiles_dir, out):
     rng = np.random.default_rng(zlib.crc32(key.encode()))
     brow_tone = np.array([colour_at(tile, cx + s * half, mark['brow'], max(1.5, half * 0.12)) for s in (-1, 1)]).mean(axis=0)
     hair_rel = np.minimum(brow_tone, hair * 1.2 + 0.02) / skin * 0.75
-    # Where the composite's brows are: the darkest row over each eye.
-    band = gaussian_filter(lum(albedo), 1.0)
-    brow_rows = []
-    for side in (-1, 1):
-        x0, x1 = int(CX + side * E - 0.02 * W), int(CX + side * E + 0.02 * W)
-        y0, y1 = int(ER - 0.09 * H), int(ER - 0.025 * H)
-        brow_rows.append(y0 + float(np.argmin(band[y0:y1, min(x0, x1):max(x0, x1)].mean(axis=1))))
+    brow_rows = brow_rows_of(albedo)
     lines = strokes(rng, 1.0, brow_rows)
     rel = rel + (hair_rel - rel) * (lines[..., None] * 0.6)
     rel = rel * NEUTRAL

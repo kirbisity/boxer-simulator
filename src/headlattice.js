@@ -32,6 +32,10 @@ export const HEAD_LATTICE = {
   // own (the men's alar breadths 35.1, 36.9, 39.0 and 43.6 mm at keys -0.4, 0, 0.3 and 0.9, tools/headbases.mjs: 6.5 mm a
   // unit over 37 mm), fading `round` (share of the way round) and `rows` from the wings.
   nose: { perKey: 0.18, round: 0.07, rows: 0.035 },
+  // The shadow painted per vertex (photohead.js PHOTO_HEAD.occlusion's terms). None in the sockets: the model's own brow and
+  // lids shade them, and the photos carry no broad socket shadow of their own (their strip between brow and eye is 0.8 to
+  // 0.95 of the cheek's brightness, for both sexes, measured over the 86 faces); painted over that the socket was shaded twice.
+  occlusion: { ...PHOTO_HEAD.occlusion, socket: 0 },
   // A crowd's head: every `coarse`-th point each way.
   coarse: 2,
   // The ears' texture coordinates are the nearest point's, of those this far round (share) and down (rows): the sides.
@@ -320,7 +324,7 @@ export function buildLatticeHead({ data, radius, skull, shape, atlas, region = {
     uvs.push(0.5 + du, 1 - row);
     // Per vertex: the body's marks (hollows, jowls, red cheeks: facemorph.js) and the face's shadow (sockets, under the nose).
     const paint = morph ? faceMarks(p[0], p[1], p[2], morph) : [1, 1, 1];
-    const shade = Math.abs(du) < HEAD_LATTICE.faceSpan ? faceStructure(du, row, marks, {}).shade * headSmooth(-0.2, 0.3, p[0]) : 0;
+    const shade = Math.abs(du) < HEAD_LATTICE.faceSpan ? faceStructure(du, row, marks, {}, HEAD_LATTICE.occlusion).shade * headSmooth(-0.2, 0.3, p[0]) : 0;
     colors.push(...paint.map((value) => Math.min(1, value * (1 - shade))));
   });
   // The hair's and the beard's ground: the lattices' own, mixed as they are, with what is left of his shape and the morph.
