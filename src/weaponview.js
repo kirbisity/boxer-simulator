@@ -2217,8 +2217,11 @@ export function updateDebris(view, world) {
   }
 }
 
-/** A new bout: clear what lay on the floor. */
-export function clearGore(view) {
+/**
+ * A new bout: clear what lay on the floor. `keepBlood`: the blood already on the ground and in the water stays (the walk
+ * over a battle's field after it); what is still in the air, and the stumps' pumping, end.
+ */
+export function clearGore(view, { keepBlood = false } = {}) {
   battleFxClear(view);
   if (view.machineFx) machineFxClear(view.machineFx);
   for (const shot of view.shots ?? []) {
@@ -2235,13 +2238,15 @@ export function clearGore(view) {
   if (view.blood) {
     view.blood.drops = [];
     view.blood.emitters = [];
-    view.blood.stainCount = 0;
-    view.blood.stains.count = 0;
     view.blood.dropMesh.count = 0;
     view.blood.spare.push(...view.blood.sparks);
     view.blood.sparks = [];
-    bloodDyeClear(view.blood.dye);
-    bloodDyeUpload(view.blood.dye, view.clock ?? 0);
+    if (!keepBlood) {
+      view.blood.stainCount = 0;
+      view.blood.stains.count = 0;
+      bloodDyeClear(view.blood.dye);
+      bloodDyeUpload(view.blood.dye, view.clock ?? 0);
+    }
   }
 }
 

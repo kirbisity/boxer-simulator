@@ -2107,3 +2107,35 @@ button.on, .card-choice.on { box-shadow: inset 0 -2px 0 var(--gold); }
 .camtune-row output.changed { color: var(--gold); }
 .camtune-code { font-family: var(--mono); background: rgba(var(--pit), 0.6); color: var(--fg); border: 1px solid var(--line); border-radius: 2px; }
 .camtune input[type="range"] { accent-color: var(--gold); }
+
+/* ==== Dunnottar's story cards and the boss's bar on the catalogue's plate (src/levelmode/story.js) =======================
+   The storm, the parchment and the red of YOU DIED stay; what carries words takes the plate: the opening's words and the
+   finale on a plate with the four corner marks, ruled above and below in gilt as the verdict is; the chapter and every
+   prompt in the label face; the titles in the book face at the verdict's weight; the rule the gilt one with its lozenge;
+   the finale's buttons the verdict's. The boss's bar is the fight board's gauge: square, ticked in tenths, his title in gilt. */
+.story-plate { --corner: rgba(var(--gilt), 0.6); --corner-len: 18px; --corner-in: 7px; position: relative; display: grid; justify-items: center; gap: 10px; width: min(980px, 100%); padding: clamp(22px, 4vh, 36px) clamp(18px, 4vw, 48px) clamp(18px, 3vh, 28px); background: var(--corners), rgba(var(--pit), 0.62); border-top: 1px solid rgba(var(--gilt), 0.7); border-bottom: 1px solid rgba(var(--gilt), 0.7); box-shadow: 0 18px 60px rgba(var(--pit), 0.55); }
+.story-finale .story-plate { width: min(820px, 100%); background: var(--corners), rgba(var(--pit), 0.88); }
+.story-chapter { font: 600 clamp(11px, 2.6vw, 13px) var(--display); letter-spacing: 0.26em; color: var(--gold); }
+.story-title, .story-fin-title { font-weight: 600; color: #fff; }
+.story-title { text-shadow: 0 2px 0 rgba(var(--pit), 0.9), 0 0 34px rgba(120, 150, 230, 0.35); }
+.story-rule { width: min(260px, 60%); height: 9px; margin: 6px 0 8px; background: var(--gold); opacity: 0.85; -webkit-mask: var(--rule-mask); mask: var(--rule-mask); }
+.story-prompt { font: 600 11.5px var(--display); letter-spacing: 0.24em; color: rgba(var(--ink), 0.72); }
+.story-note h2 { font: 600 clamp(19px, 5vw, 23px)/1.15 var(--title); letter-spacing: 0.01em; text-transform: none; }
+.story-note .story-prompt { color: rgba(74, 44, 18, 0.7); }
+.story-line.story-end { font: 600 clamp(11px, 3vw, 13px) var(--display); letter-spacing: 0.24em; }
+.story-line.story-count, .story-fin-attempts { font-family: var(--mono); color: var(--gold); }
+.story-fin-sub { font-family: var(--title); font-size: clamp(16px, 3.8vw, 20px); color: var(--soft); }
+.story-buttons { gap: 8px; margin-top: 4px; }
+.story-button { min-height: 44px; padding: 8px 20px; border-radius: var(--r-plate); border: 1px solid var(--line-strong); background: rgba(var(--ink), 0.06); color: var(--fg); font: 600 13px var(--display); letter-spacing: 0.1em; }
+.story-button.story-primary { background: var(--gold); border-color: transparent; color: var(--on-gold); }
+.story-button:hover, .story-button:focus-visible { background: rgba(var(--ink), 0.14); border-color: var(--gold); }
+.story-button.story-primary:hover, .story-button.story-primary:focus-visible { background: #e6c475; outline: 1px solid rgba(var(--gilt), 0.6); outline-offset: 2px; }
+.boss-name { font: 600 clamp(18px, 4.4vw, 24px)/1 var(--title); letter-spacing: 0.06em; color: #fff; }
+.boss-title { font: 600 11px var(--display); letter-spacing: 0.18em; color: var(--gold); }
+.boss-track { height: 11px; border: 0; background: rgba(var(--pit), 0.62); box-shadow: inset 0 0 0 1px rgba(var(--ink), 0.5), 0 1px 3px rgba(var(--pit), 0.6); }
+.boss-track::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), rgba(var(--pit), 0.78) calc(10% - 1px), rgba(var(--pit), 0.78) 10%); }
+html:lang(zh) .story-chapter, html:lang(zh) .story-prompt, html:lang(zh) .boss-title, html:lang(zh) .story-button { letter-spacing: 0.06em; }
+@media (max-width: 760px) {
+  .story-plate { padding: 20px 16px 16px; }
+  .boss-track { height: 9px; }
+}

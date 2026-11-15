@@ -199,13 +199,16 @@ export function showOpening(onDone, stage = STAGE_ONE) {
     storyFadeOut(card, 0.9, onDone);
   }, { bodyClass: 'card-up' });
   card.root.style.setProperty('--story-fade', `${STORY_TIMING.openingFade}s`);
-  card.root.append(
+  // (On a plate: the catalogue's corner marks hold the words over the storm.)
+  const plate = storyEl('div', 'story-plate');
+  plate.append(
     storyEl('p', 'story-chapter', stage.chapter),
     storyEl('h1', 'story-title', stage.title),
     storyEl('div', 'story-rule'),
     storyEl('div', 'story-lore', undefined),
     storyEl('p', 'story-prompt', 'Tap to begin'),
   );
+  card.root.append(plate);
   card.root.querySelector('.story-lore').append(...stage.lore.map((line) => storyEl('p', '', line)));
   setTimeout(() => { ready = true; card.root.classList.add('ready'); }, STORY_TIMING.openingLock * 1000 + 1200);
   return { close: card.close };
@@ -307,7 +310,9 @@ export function showFinale({ onMenu, onAgain, attempts = null, sandbox = null },
     return control;
   };
   const again = button('Play again', 'story-primary', onAgain);
-  card.root.append(
+  const plate = storyEl('div', 'story-plate');
+  card.root.append(plate);
+  plate.append(
     storyEl('p', 'story-chapter', stage.chapter),
     storyEl('h2', 'story-fin-title', `Stage 1 complete`),
     storyEl('p', 'story-fin-sub', stage.title),
