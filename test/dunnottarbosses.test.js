@@ -170,7 +170,8 @@ test('boss music: on from the moment the seal shuts (Vaelen not yet roused), thr
   const moment = () => musicMoment({ game: 'level', boss: bossFightOn(w), worldId: 1, worldAge: 300 });
   step(0.5);
   assert.equal(bossFightOn(w), false, 'outside: no fight');
-  assert.equal(moment().moment, null);
+  // (Outside the fight the stage's own piece plays on, faint.)
+  assert.equal(moment().moment, 'opening');
   placeOnFloor(me, DN_CHAPEL.x1 - 2.5, DN_CHAPEL.axis, DN_Y.ladderRoom, Math.PI);
   step(0.3);
   assert.equal(w.stage.mechanisms.chapelportcullis, 'closed');
