@@ -222,15 +222,18 @@ export function drawUp(level, corner, men, key = 'level') {
   }
   // Too deep for the zone (a block of fifty on a short floor): the whole drawn up nearer the middle, as far as it must and may.
   const deepest = Math.max(0, ...places.filter(Boolean).map(([back]) => back));
-  const over = Math.max(0, front + deepest - Math.abs(sign < 0 ? zone.x[0] : zone.x[1]));
+  // (`level.middle`: the x the two sides face each other across, where a level's ground is not centred on the floor's middle:
+  // the walls of Pyongyang's field, all of it before the wall. 0 where none is given.)
+  const middle = level.middle ?? 0;
+  const over = Math.max(0, front + deepest - (sign < 0 ? middle - zone.x[0] : zone.x[1] - middle));
   const forward = Math.min(over, front - MUSTER.neutral);
-  for (const man of foot) places[man.index] = intoZone(level, corner, [sign * (front - forward + places[man.index][0]), places[man.index][1]]);
+  for (const man of foot) places[man.index] = intoZone(level, corner, [middle + sign * (front - forward + places[man.index][0]), places[man.index][1]]);
   // The riders on the flanks of the foot (as a level's wings stand), or all abreast if there is no foot.
   if (riders.length) {
     const wings = { ...(order.wings ?? {}) };
     const fake = riders.map((man) => ({ man }));
     placeWings(fake, sign, { wings }, { front: foot.length ? front : front - (wings.back ?? WINGS.back), width }, level.arena, (rider, x, z) => {
-      places[rider.man.index] = intoZone(level, corner, [x, z]);
+      places[rider.man.index] = intoZone(level, corner, [middle + x, z]);
     });
   }
   return places;

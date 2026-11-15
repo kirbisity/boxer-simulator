@@ -119,6 +119,7 @@ export const UI_SQUAD = {
   // ---- The custom battle's first screen (custombattleview.js).
   'battle.customLede': { en: 'Pick the ground and a faction a side; then count in the fighters and place them.', zh: '先选战场，两边各挑一个阵营；再点兵、布阵。' },
   'battle.ground': { en: 'The ground', zh: '战场' },
+  'battle.weather': { en: 'Weather', zh: '天气' },
   'battle.redSide': { en: 'Red side', zh: '红方' },
   'battle.blueSide': { en: 'Blue side', zh: '蓝方' },
   'battle.faction': { en: '{side} faction', zh: '{side}阵营' },
