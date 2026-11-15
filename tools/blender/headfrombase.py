@@ -1,4 +1,5 @@
-# The photo heads' base model from the user's base meshes (Base_Male_Mesh.blend, female.blend, 2026-11-10): the head of the
+# The photo heads' base model from the base meshes in ~/Documents/3d_modeling/blender/assets/ (Base Male Mesh.blend,
+# female..blend, 2026-11-10): the head of the
 # body, its modifiers applied (the mirror, the subdivision), cut at the neck, put in the game's head frame (x forward, y up,
 # z to the left, in head radii: the vertex at +1.078, the chin at -1.158, the eyes about midway, as tools/headmodel.py's), and
 # sampled as its outer surface's distance along each direction from the centre (the ears passed through: the game has its
