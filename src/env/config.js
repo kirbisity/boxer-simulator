@@ -1026,3 +1026,15 @@ export const PLACE_ENV = {
     drift: [{ kind: 'leaves', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }, { kind: 'motes', share: 0.6, colours: [0xfff0c8] }, { kind: 'litter', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }],
   },
 };
+
+// The hills by the Hun River (Sarhu, 1619; the story's Liaodong battles of 1593 to 1621): the open field as it is, its
+// land, grass, trees, sky and light, without its rail (the rail is the field's own build, render.js buildField; this
+// place is built by buildOpenPlain and has none). One thing differs: the fought ground is level. The field's near
+// rolls (its layers that begin at the floor, `from: 0`) run on under the fighters (lie.js), and the fights fought here
+// were made on level ground; here they begin a metre past the floor's level margin and grow to their whole height
+// over the same distance, so the floor is flat (envLieOf finds no near rolls and the physics is as it was) and the
+// land rolls beyond it.
+PLACE_ENV.sarhu = {
+  ...PLACE_ENV.field,
+  terrain: { ...PLACE_ENV.field.terrain, layers: PLACE_ENV.field.terrain.layers.map((layer) => (layer.from === 0 ? { ...layer, from: 1 } : layer)) },
+};

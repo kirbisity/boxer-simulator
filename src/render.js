@@ -1019,7 +1019,10 @@ function buildOpenPlain(key, arena = PLACE_ARENAS[key]) {
     hill.userData.scenery = 'hills';
     place.add(hill);
   }
-  place.add(...fieldLitter(key.length * 7 + 3, arena, { ...spec.litter, half: [55 + outX, 45 + outZ] }));
+  const litter = fieldLitter(key.length * 7 + 3, arena, { ...spec.litter, half: [55 + outX, 45 + outZ] });
+  // (Tagged as the field's are, so where the place is drawn as open air its own grass and stones stand in: scenery.js OPEN_AIR.)
+  for (const mesh of litter) mesh.userData.scenery = 'litter';
+  place.add(...litter);
   place.add(...spec.props(arena));
   return place;
 }
