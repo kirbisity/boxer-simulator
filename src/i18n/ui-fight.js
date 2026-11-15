@@ -27,6 +27,11 @@ export const UI_FIGHT = {
   'page.goTo': { en: 'Go to', zh: '前往' },
   'page.goToPick': { en: 'Go to…', zh: '前往…' },
   'page.menu': { en: 'Menu', zh: '菜单' },
+  // The sandbox's test tools: the body model drawn, the follow camera's tuner.
+  'page.bodyStyle': { en: 'Body', zh: '身体模型' },
+  'page.bodyGame': { en: 'Game', zh: '游戏' },
+  'page.bodyV7': { en: 'Before (V7)', zh: '旧版（V7）' },
+  'page.cameraFeel': { en: 'Camera feel', zh: '镜头手感' },
   'page.retry': { en: '↻ Retry', zh: '↻ 重试' },
   'page.chooseSide': { en: 'Choose your side', zh: '选边站' },
   'page.justWatch': { en: 'Just watch', zh: '只看不打' },
