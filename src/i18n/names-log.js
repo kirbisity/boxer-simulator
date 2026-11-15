@@ -35,7 +35,7 @@ const LOG_PHRASES_ZH = {
   'one clean shot': '一记干净的重击', 'right': '右', 'left': '左', 'hip': '胯', 'wrist': '手腕', 'ankle': '脚踝', 'jaw': '下巴', 'nose': '鼻子',
   'skull': '颅骨', 'ribs': '肋骨', 'collarbone': '锁骨', 'fighter': '斗士',
   'glances off the helmet': '被头盔滑开', 'glances off the plate': '被板甲滑开', 'glanced off the armour': '被甲胄滑开', 'braced for it': '稳住了',
-  'Fighter': '斗士', 'scutum': '大盾', 'parma': '小圆盾', 'shield torn away': '盾被夺走', 'ridden down': '被马踏倒', 'trampled': '被践踏', 'unhorsed': '落马',
+  'stopped by the armour': '被甲胄挡住', 'through the armour': '穿透甲胄', 'collapsed from blood loss': '失血倒下', 'scutum': '大盾', 'parma': '小圆盾', 'shield torn away': '盾被夺走', 'ridden down': '被马踏倒', 'trampled': '被践踏', 'unhorsed': '落马',
   // Parts struck.
   head: '头部', trunk: '躯干', torso: '躯干', chest: '胸口', belly: '腹部', legs: '腿', leg: '腿', arm: '手臂', arms: '手臂', hand: '手', hands: '手',
   shield: '盾', neck: '脖子', face: '脸', body: '身体', back: '后背', foot: '脚', feet: '脚', hip: '胯', pelvis: '骨盆', shoulder: '肩', forearm: '前臂',
@@ -54,6 +54,7 @@ const LOG_PATTERNS_ZH = [
   [/^jumps \((.+)\)$/, (m) => `跃起（${logWords(m[1])}）`],
   [/^ridden down at ([\d.]+) m\/s$/, (m) => `以 ${m[1]} m/s 被马撞倒`],
   [/^trampled at ([\d.]+) m\/s$/, (m) => `以 ${m[1]} m/s 被践踏`],
+  [/^knocked from the saddle \(([\d.]+) m\/s\)$/, (m) => `被撞下马（${m[1]} m/s）`],
   [/^knockdown \((.+)\)$/, (m) => `击倒（${logWords(m[1])}）`],
   [/^(.+) cut off$/, (m) => `${logWords(m[1])}被斩断`],
   [/^(.+) torn from his arm$/, (m) => `${logWords(m[1])}被扯离手臂`],

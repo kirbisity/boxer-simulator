@@ -1,8 +1,8 @@
 // names-events: the fight's words as its data keeps them (English) → Chinese, read at display with tname() (src/i18n/names.js):
 // the blows' names on the buttons, the toasts and over an incoming man (control.js moveName, its mirrored "Switch …" and
 // "Reverse …" too), the weapon arts' names on their button and in the art's caption (weaponarts.js ARTS.labels, artdrama.js
-// ARTDRAMA.titles), and the grenades' button names (weapons.js THROWABLES). The sandbox's event log (main.js logEvent: the
-// physics' own words and numbers, a readout for testing) stays English.
+// ARTDRAMA.titles), and the grenades' button names (weapons.js THROWABLES). The fight log (main.js logEvent) has its own Chinese
+// templates, and reads the physics' words through i18n/names-log.js.
 export const NAMES_EVENTS = {
   // The blows (control.js MOVE_NAMES and the names made from move keys).
   'Jab': '刺拳', 'Cross': '后手直拳', 'Hook': '勾拳', 'Rear hook': '后手勾拳', 'Uppercut': '上勾拳', 'Liver hook': '肝区勾拳',

@@ -2066,3 +2066,30 @@ button.on, .card-choice.on { box-shadow: inset 0 -2px 0 var(--gold); }
 @media (max-width: 760px) {
   .choices.home-choices .choice:not(.career):not(:nth-child(2)) em { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; letter-spacing: 0.07em; text-wrap: balance; }
 }
+
+/* ==== The third pass: the remaining screens take the catalogue's plate =================================================
+   Every panel a player reads (a side to pick, a story pop-up, a corner of the custom battle, an army's side in the setup, the
+   sandbox's drawer, the builder's sheet, the tutorial's card, the Last Stand's hero, the settings' groups) is a plate with the
+   four corner marks; its head carries the half rules; a row that scrolls sideways fades at its edges to say so. */
+.side-pick .side, .info-pop-card, .custom-side, .muster-side, .sandbox-panel, .builder .sheet, .tutorial-card, .ls-hero, .audio-mixer, .wizard-panel {
+  --corner: rgba(var(--gilt), 0.6); --corner-len: 14px; --corner-in: 5px;
+  background-image: var(--corners);
+}
+.side-pick .side { --corner-len: 18px; --corner-in: 6px; background-color: var(--plate); border-radius: 2px; padding: 18px 22px 16px; transition: transform var(--quick) var(--ease), box-shadow var(--quick) var(--ease); }
+.side-pick .side:hover, .side-pick .side:focus-visible { --corner: var(--gold); transform: translateY(-3px); box-shadow: inset 0 -3px 0 var(--gold), 0 14px 34px rgba(0, 0, 0, 0.45); }
+.side-pick .side b { font-weight: 600; text-transform: none; letter-spacing: 0.01em; font-size: 26px; }
+.side-pick h2 { text-transform: none; letter-spacing: 0.02em; font-weight: 600; }
+.side-pick h2::after, .audio-mixer h2::after, .custom-side h2::after { content: ''; display: block; height: 7px; margin: 8px auto 0; width: min(220px, 70%); background: var(--gold); opacity: 0.75; --rule: linear-gradient(90deg, transparent, #000 30%, #000 70%, transparent) center / 100% 1px no-repeat, var(--lozenge) center / 7px 7px no-repeat; -webkit-mask: var(--rule); mask: var(--rule); }
+.audio-mixer h2::after, .custom-side h2::after { --rule: linear-gradient(90deg, #000, #000 60%, transparent) left center / calc(100% - 12px) 1px no-repeat, var(--lozenge) right center / 7px 7px no-repeat; }
+.audio-mixer h2::after, .custom-side h2::after { margin: 6px 0 0; width: 140px; }
+.audio-mixer h2, .custom-side h2 { font-family: var(--title); text-transform: none; letter-spacing: 0.01em; font-weight: 600; font-size: 20px; }
+.info-pop-card { --corner-len: 18px; --corner-in: 7px; background-color: var(--plate); }
+.tutorial-card { background-color: rgba(var(--pit), 0.88); border-radius: 2px; }
+.custom-side, .muster-side, .ls-hero { border-radius: 2px; }
+/* Rows that scroll sideways on a phone: faded at the edges. */
+@media (max-width: 760px) {
+  .custom-maps, .custom-factions, .dw-tabs { -webkit-mask: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); mask: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); }
+}
+/* The settings' language: two equal halves, each a thumb's height. */
+.lang-seg { display: grid; grid-template-columns: 1fr 1fr; }
+.lang-seg button { min-height: 44px; font-size: 15px; }
