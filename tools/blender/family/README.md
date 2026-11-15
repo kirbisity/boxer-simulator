@@ -67,3 +67,21 @@ One mesh a sex with a shape key a build (not used by the game; the stature only 
 
 That tool writes src/basebody-data.js anew: tools/baseweights-pack.js, tools/basebody-family.js and tools/basebody-detail.js
 are then to be run again, in that order.
+
+## Where the files live
+
+Outside the repository (they are binary, and the repository is published as it stands):
+
+| What | Where |
+| --- | --- |
+| The base meshes | `~/Documents/3d_modeling/blender/assets/Base Male Mesh.blend`, `female..blend` |
+| The emaciated reference sculpt ("anabelle.001") | `~/Documents/3d_modeling/blender/ax_fm/ax_model.blend` |
+| The ordinary reference woman (bodyrest.py) | `~/Documents/3d_modeling/blender/skeleton/body.blend` |
+| The inspection blends | `~/Documents/3d_modeling/blender/hacs_family/hacs-family-<sex>.blend` |
+
+The work directory (`emac/`, `ansur/`, `remodel/`) is not kept anywhere: to run the order again, export `emac/` anew, fetch
+ANSUR II's public tables into `ansur/`, and rebuild `remodel/` from the start.
+
+Running the order again also rewrites what composition.py and swell.py print for src/loftbody.js `LOFT.family` (each build's
+place and the fattest build's swell). The builds in the game were placed with the figures now in LOFT.family; take the new
+figures only when the builds themselves are meant to change, or bodies come out fuller than before.
