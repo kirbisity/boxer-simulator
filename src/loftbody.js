@@ -279,6 +279,8 @@ export const LOFT = {
   // A plate harness's edges with the detail maps (harnessEdgesOn): a band `depth` (m; at most `most` of a short piece) at each
   // end of a piece, `lift` (share of the radius) proud of it; a couter's and a poleyn's `copLames` articulating lames.
   harnessEdge: { depth: 0.025, most: 0.3, lift: 0.012, copLames: 2 },
+  // A worn loft's closed end on a base body (capsFollow): its middle this share of the ring's radius out past the ring.
+  capDome: 0.3,
   // A brigandine's rivet heads: three rows to a ring, each `size` of its column
   // across (and as tall, along the piece), a hair proud of the cloth.
   studs: { rowsPerRing: 3, size: 0.3, tall: 0.07, lift: 0.012 },
@@ -673,6 +675,11 @@ function loft(mesh, rings, sides, { capStart = true, capEnd = true, color = 'ski
       const b = uv ? a + 1 : start + row * sides + ((step + 1) % sides);
       if (flip) mesh.indices.push(center, b, a);
       else mesh.indices.push(center, a, b);
+    }
+    // (Where the ring is fitted to a base body afterwards, the cap's middle goes with it: capsFollow.)
+    if (mesh.ringOf && rings.length > 1) {
+      const away = vec.sub(rings[row].center, rings[row === 0 ? 1 : row - 1].center);
+      (mesh.caps ??= []).push({ center, from: start + row * stride, count: sides, away: vec.scale(away, 1 / (vec.length(away) || 1)) });
     }
   };
   if (capStart) cap(0, false);
@@ -1693,6 +1700,23 @@ function ridePiece(mesh, rings, place, angle, vertex) {
   (mesh.riders ??= []).push({ vertex, angle, centre: ringAt(rings, place).center, under });
 }
 
+/**
+ * A loft's cap (its end closed at a point in its ring's middle) kept on its ring once the ring is fitted to a base body: the
+ * middle is not a ring point and stayed where the lean ring had it, so a pauldron's top, its ring carried out and up over the
+ * shoulder, was drawn as a dish sunk in it. Its middle stands `LOFT.capDome` of the ring's radius out past the ring, a low
+ * dome, as a closed end of a shell is raised.
+ */
+function capsFollow(mesh) {
+  for (const { center, from, count, away } of mesh.caps ?? []) {
+    const middle = [0, 0, 0];
+    for (let vertex = from; vertex < from + count; vertex += 1) for (let axis = 0; axis < 3; axis += 1) middle[axis] += mesh.positions[vertex * 3 + axis] / count;
+    let radius = 0;
+    for (let vertex = from; vertex < from + count; vertex += 1) radius += vec.length(vec.sub(mesh.positions.slice(vertex * 3, vertex * 3 + 3), middle)) / count;
+    const top = vec.add(middle, vec.scale(away, radius * LOFT.capDome));
+    for (let axis = 0; axis < 3; axis += 1) mesh.positions[center * 3 + axis] = top[axis];
+  }
+}
+
 /** The points riding a piece (ridePiece) moved out or in with it, once it is fitted: boards apart, which lie on the whole (clearBoards). */
 function ridePieces(mesh) {
   const onBoard = (vertex) => (mesh.boards ?? []).some(({ from, to }) => vertex >= from && vertex < to);
@@ -2163,6 +2187,24 @@ function breastplateOn(mesh, rings, inflate, shape, range, { lanceRest = false, 
     face([-1, -1, stand], [-1, 1, stand], [1, 1, stand], [1, -1, stand]);
     for (const round of [-1, 1]) face([-1, round, spec.lift], [-1, round, stand], [1, round, stand], [1, round, spec.lift]);
   }
+}
+
+/**
+ * A breastplate's brass border (LOFT.ridged.rope) at its hem, round the waist: its own strip of faces over the plate and its
+ * sharp front (breastplateOn), under the rivets, riding the plate where it is fitted. As a ring's paint on the plate the gilt
+ * bled over the faces either side, a smear up the sides and across the back. (Its neck's border lies under the gorget: drawn
+ * at the breast's top it showed only its ends, two gilt slabs beside the gorget, and behind it crossed the back, where the
+ * plate runs on up to the backplate's own neck.)
+ */
+function ropedBorders(mesh, rings, inflate, shape, range, bones) {
+  const lift = LOFT.ridgedFront.lift * 1.5;
+  const steps = LOFT.sides;
+  const places = [placeAt(rings, range[0]), placeAt(rings, range[0] + 2 * LOFT.ridged.rope)];
+  const grid = places.map((place) => Array.from({ length: steps + 1 }, (_, step) => {
+    const angle = (step / steps) * Math.PI * 2;
+    return [place, angle, inflate * shape(ringAt(rings, place), angle) + lift];
+  }));
+  addGrid(mesh, rings, grid, 'gold', bones);
 }
 
 /**
@@ -4134,8 +4176,10 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     const flare = spec.flare * Math.max(0, 1 - (ring.t - breastplate[0]) / spec.flareOver);
     return 1 + keel + flare - (gothicPlate ? spec.waist * Math.max(0, 1 - along / spec.waistOver) : 0);
   };
-  // Roped borders on the breastplate: a twisted band at its neck and its hem (of brass on a harness with brass borders).
-  const roped = (ring, step) => breastplate && (Math.abs(ring.t - breastplate[1] + LOFT.ridged.rope) < LOFT.ridged.rope || Math.abs(ring.t - breastplate[0] - LOFT.ridged.rope) < LOFT.ridged.rope) ? (brassBorders ? 'gold' : step % 2 ? 'steel2' : 'steel') : null;
+  // Roped borders on the breastplate: a twisted band at its neck and its hem (of brass on a harness with brass borders: drawn
+  // as a strip of its own at the hem, ropedBorders, except in a crowd).
+  const brassStrips = brassBorders && !lowDetail;
+  const roped = (ring, step) => breastplate && !brassStrips && (Math.abs(ring.t - breastplate[1] + LOFT.ridged.rope) < LOFT.ridged.rope || Math.abs(ring.t - breastplate[0] - LOFT.ridged.rope) < LOFT.ridged.rope) ? (brassBorders ? 'gold' : step % 2 ? 'steel2' : 'steel') : null;
   // Clothes hide the anatomy beneath them: no fine detail on the skin where trunks or a top cover it.
   const coveredTrunk = [];
   const dressed = outfitOf(body.inputs).look;
@@ -4485,6 +4529,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     mesh.patchTile = armor.fluted === true && mesh.steelUv ? mesh.steelTile : null;
     if (plate && !lowDetail && !armor.over) breastplateOn(mesh, shellRings, shell[2], ridgedPlate, breastplate, { lanceRest: true, sprays: gothicPlate ? LOFT.gothic : null }, abdomen);
     mesh.patchTile = null;
+    if (plate && brassStrips) ropedBorders(mesh, shellRings, shell[2], ridgedPlate, breastplate, abdomen);
   }
   // A field per pale is drawn sharp down the middle (paleOn), except in a crowd; a device over it (chargeOn) likewise.
   const sharpPale = (paint) => paint?.heraldry && armor?.heraldry === 'pale' && !lowDetail;
@@ -4497,6 +4542,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     mesh.patchTile = ridgedPiece && mesh.steelUv ? armourTileOf(armor.kind, 'steel', 'trunk') : null;
     if (ridgedPiece && !lowDetail) breastplateOn(mesh, rings, inflate, ridgedPlate, breastplate, {}, abdomen);
     mesh.patchTile = null;
+    if (ridgedPiece && brassStrips) ropedBorders(mesh, rings, inflate, ridgedPlate, breastplate, abdomen);
     if (sharpPale(paint)) paleOn(mesh, rings, inflate * 1.02, 'cloth2', abdomen);
     if (paint?.heraldry && armor?.charge && !lowDetail) chargeOn(mesh, rings, armor.charge.kind, inflate * 1.06, 'charge', abdomen);
   }
@@ -4822,6 +4868,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     addBaseSkin(mesh, baseRig, baseParts, baseTraits, textured, body.heightM, baseStarvation(body), baseJoints, lowDetail ? null : rulesTraits(body), baseWasting(body), lowDetail ? 0 : baseNeckGirth(body), lowDetail || !BASE_BODY.family.use ? null : baseFamilyWeights(body, baseRig.height), baseBreadth.across);
     fitClothToBase(mesh, baseParts, armoured);
     ridePieces(mesh);
+    capsFollow(mesh);
     clearBoards(mesh);
   }
   retile(mesh);
