@@ -3,7 +3,7 @@
 // and the place's keeping each frame (the sun following the camera so the fighters' shadows fall wherever they go,
 // the buildings' own shadow baked once, the mirror the puddles show taken once).
 
-import { ktShadow, ktShadowBake, ktShadowInfo, ktShadowInit } from '../levelmode/kitshadow.js';
+import { ktShadow, ktShadowBake } from '../levelmode/kitshadow.js';
 import { placeWind } from '../wind.js';
 import { tkgBuilder } from './geo.js';
 import { TK_LAY, tkLayBake, tkLayTextures } from './lay.js';
@@ -23,12 +23,6 @@ export const TK_PLACE = {
   // lit probe and the lie map's share, not a flat fill the shadow has to leave room for (a place's own `shadow`
   // share is for the flat light of the open air off).
   sun: { half: 16, distance: 60, openShadow: 1 },
-  // The baked sun map handed to the open air (its `sunMap`: env/air.js envPlaceSun), so that its own walk of each
-  // sight line finds the shade of walls, roofs and the gate's vault standing in the haze. `bias` m: how far past
-  // the map's depth a point of air must be to count as behind what cast it; a quarter metre, as the kit's own
-  // sheets in the air read it (beams.js TK_BEAMS.bias): air has no surface to speckle, so only the map's texel
-  // (about 0.1 to 0.2 m over a place) matters.
-  airMap: { bias: 0.25 },
   // The cube mirror's side (px) and the rain's streaks: how many, the box they fall in round the camera (m), their length and speed.
   mirror: 128, rain: { count: 2600, box: [34, 16, 34], length: 0.55, speed: 13 },
 };
@@ -247,8 +241,6 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
     TK_AIR.place(key, {
       own: true,
       shadowBox: { half: TK_PLACE.sun.half, depth: TK_PLACE.sun.distance },
-      // (The map is baked on the first frame and its matrix filled in place; its depth runs over the bake's range in metres.)
-      sunMap: { get matrix() { ktShadowInit(); return ktShadow.uKitShadowMat.value; }, texture: () => ktShadow.uKitShadowMap.value, get bias() { return TK_PLACE.airMap.bias / (ktShadowInfo()?.range ?? 1e6); } },
       ...air.description,
       weather: state.aired,
       ...(lay ? { cover: { texture: lay.textures.b, min: lay.lay.min, size: lay.lay.size, scale: lay.lay.range, base: lay.lay.base, channel: 0 } } : null),
