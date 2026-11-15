@@ -424,6 +424,12 @@ float envPastCrowns(float deep) {
   return 1.0 - min(deep * 2.5, 1.0) * smoothstep(0.3, 0.72, 0.5 + (deep - 0.5) * 0.62);
 }
 
+// The masses of leaf in a crown and the gaps between its boughs (ENV.shadow.boughs), 0..1 over the ground where
+// the crown's shadow falls: the part of the pattern of sun under a crown that the air shows as shafts.
+float envBoughs(vec2 xz) {
+  return texture2D(uEnvNoise, xz / ${(ENV.shadow.boughs * 16).toFixed(2)} + vec2(0.13, 0.57)).g * 0.65 + texture2D(uEnvNoise, xz / ${(ENV.shadow.boughs * 6.1).toFixed(2)} + vec2(0.71, 0.29)).a * 0.35;
+}
+
 // What stands sunward of a point in the air, read off the near map where the point's sun ray comes to the ground:
 // the share of the sun past the crowns (x), past the trunks (y) and past the land itself (z). Off the map all is
 // open, and over the crowns the map no longer tells (a point there is above the shade it is drawn in).
@@ -436,9 +442,25 @@ vec3 envSunwardOver(vec3 point, float spread) {
   float above = max(point.y - land.r, 0.0);
   float level = length(uEnvSunDir.xz);
   vec2 lean = uEnvSunDir.xz / max(level, 1e-4) * min(${ENV.shadow.slantMost.toFixed(1)}, level / max(uEnvSunDir.y, 1e-3));
-  vec4 over = envCoverRead((point.xz - lean * above + uEnvShadeSway) / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5, spread);
+  vec2 foot = point.xz - lean * above + uEnvShadeSway;
+  vec4 over = envCoverRead(foot / ${(2 * ENV.terrain.mapHalf).toFixed(1)} + 0.5, spread);
   float open = smoothstep(uEnvShade.y, uEnvShade.z, above);
-  return vec3(mix(envPastCrowns(over.g), 1.0, open), mix(over.b, 1.0, open), land.b);
+  // (Up among the crowns a point has part of their depth under it and not sunward of it: the share of the
+  // depth still over it falls from all at the crowns' foot to none at their tops. Their depth, not their
+  // shade: under a low sun a ray has passed several crowns, and half way up them the air is still dark.)
+  float deep = over.g * (1.0 - open);
+  float crowns = envPastCrowns(deep);
+  // Read finer than a bough, the crowns are their boughs: sun down the gaps, shade behind the masses. Read
+  // over a round wider than that, the mean of the two (which envPastCrowns is).
+  if (deep > 0.004 && spread < ${(Math.log2(ENV.shadow.boughs * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)) + 1).toFixed(2)}) {
+    float least = 0.5 + (deep - 0.5) * 0.62;
+    float gaps = 1.0 - min(deep * 2.5, 1.0) * (1.0 - smoothstep(least - 0.06, least + 0.08, envBoughs(foot)));
+    crowns = mix(gaps, crowns, smoothstep(${(Math.log2(ENV.shadow.boughs * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)) - 1.5).toFixed(2)}, ${(Math.log2(ENV.shadow.boughs * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)) + 1).toFixed(2)}, spread));
+  }
+  // (A trunk shades the air between it and its band on the ground, not the air sunward of it: terrain.js, the
+  // near map's fourth value.)
+  float clear = smoothstep(over.a * ${ENV.shadow.reachMost.toFixed(1)}, over.a * ${ENV.shadow.reachMost.toFixed(1)} + ${ENV.shadow.reachSoft.toFixed(2)}, above);
+  return vec3(crowns, mix(over.b, 1.0, max(open, clear)), land.b);
 }
 
 vec3 envSunward(vec3 point) {
@@ -452,6 +474,8 @@ vec3 envSunward(vec3 point) {
 // sky), in mist, where all that is seen stands within a stone's throw, one shade for the view. (Read at the
 // point, a cloud's shadow stood in a low sun's mist as a seam, bright air one side and dark the other.)
 float envAirSunOver(vec3 point, vec3 eye, float spread) {
+  // (Over the cloud sheet nothing shades it.)
+  if (point.y >= uEnvCloud.w) return 1.0;
   vec3 past = envSunwardOver(point, spread);
   return envSunShare(mix(point, eye, uEnvCloudForm.w)) * past.x * past.y * past.z;
 }
@@ -464,8 +488,7 @@ float envAirSun(vec3 point) {
 // over it), each stretch counted by the light it sends the eye: the steps are even in what the haze has taken by
 // then, and start grain of a step in, which differs between neighbouring pixels so that a few steps draw the
 // edge of a shaft and not as many bands.
-float envAirShare(vec3 from, vec3 ray, float depth, float grain, int steps) {
-  if (uEnvShade.w >= 0.0) return uEnvShade.w;
+float envAirWalk(vec3 from, vec3 ray, float depth, float grain, int steps) {
   float gone = 1.0 - exp(-depth);
   // The haze thins with height, so on a line that climbs out of it most of what it takes is taken low down, near
   // the line's lower end: a share of the depth lies that share of the way along in exp(-y / H), not in distance.
@@ -478,17 +501,34 @@ float envAirShare(vec3 from, vec3 ray, float depth, float grain, int steps) {
   int count = gone < ${ENV.air.shadeFrom.toFixed(3)} ? 1 : (gone < ${ENV.air.shadeFull.toFixed(3)} ? (steps + 1) / 2 : steps);
   // A step stands for a stretch of the line, and the shade at one point of it is not the stretch's: a far
   // stretch crosses many shadows, and read at a point it came out all lit or all dark, pixel by pixel, as a
-  // grain on everything seen through a wood. The cover is read spread over ENV.air.shadeSpread of the stretch.
-  float spread = log2(max(length(ray.xz) / float(count) * ${(ENV.air.shadeSpread * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)).toFixed(4)}, 1.0));
+  // grain on everything seen through a wood. The cover is read spread over ENV.air.shadeSpread of the stretch,
+  // and the stretch is measured where the cover is read, on the ground along the sun's rays (envSunwardOver):
+  // a line looking up the rays stays in one shadow or one shaft however long it is, so toward the sun the
+  // read is as fine as the cover and the shafts stand apart, fanning from the sun; across the rays a stretch
+  // crosses shadows at its full length. (Measured by the line's own length, shafts seen end on were spread over
+  // metres and only a glow was left.) Each step by its own stretch: the near ones are short.
+  float level = length(uEnvSunDir.xz);
+  vec2 lean = uEnvSunDir.xz / max(level, 1e-4) * min(${ENV.shadow.slantMost.toFixed(1)}, level / max(uEnvSunDir.y, 1e-3));
+  float crossed = length(ray.xz - lean * ray.y) / float(count) * ${(ENV.air.shadeSpread * ENV.terrain.mapSize * ENV.shadow.coverFine / (2 * ENV.terrain.mapHalf)).toFixed(4)};
   float sum = 0.0;
-  for (int i = 0; i < ${ENV.air.shadeSteps[0]}; i++) {
+  for (int i = 0; i < ${Math.max(ENV.air.shadeSteps[0], ENV.air.frameSteps)}; i++) {
     if (i >= count) break;
     float u = (float(i) + grain) / float(count);
     float along = depth > 1e-3 ? -log(1.0 - u * gone) / depth : u;
     if (abs(high - low) > 1e-3) along = (-log(max(mix(lowThin, highThin, along), 1e-6)) - low) / (high - low);
-    sum += envAirSunOver(from + ray * along, from, spread);
+    // (The step's stretch of the line: along's rate of change with u, a share 1 / count of it.)
+    float stretch = depth > 1e-3 ? gone / (depth * max(1.0 - u * gone, 1e-3)) : 1.0;
+    sum += envAirSunOver(from + ray * along, from, log2(max(crossed * stretch, 1.0)));
   }
   return sum / float(count);
+}
+
+// (uEnvShade.w: under 0 each sight line is walked here, in the material; otherwise it is the share itself: the
+// frame's one share on the lower tiers, and 1 where the frame's own pass walks the lines after the scene is
+// drawn and takes the shade's light off the picture, post.js.)
+float envAirShare(vec3 from, vec3 ray, float depth, float grain, int steps) {
+  if (uEnvShade.w >= 0.0) return uEnvShade.w;
+  return envAirWalk(from, ray, depth, grain, steps);
 }
 
 float envGrain(vec2 pixel) {

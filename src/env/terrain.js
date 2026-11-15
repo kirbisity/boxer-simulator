@@ -179,11 +179,14 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
     }
   };
   // What stands over the ground, kept finer than the map (ENV.shadow.coverFine). r: the share of the sky seen from
-  // the ground; g: how deep the crowns' shade lies between the ground and the sun; b: the sun past the trunks.
+  // the ground; g: how deep the crowns' shade lies between the ground and the sun; b: the sun past the trunks; a: how
+  // high over the ground the line from there to the sun meets the trunk that shades it (of ENV.shadow.reachMost):
+  // a point on that line is in the trunk's shade below that height and sunward of the trunk, in the sun, above it.
   const tune = ENV.shadow;
   const fine = mapSize * tune.coverFine;
   const fineTexel = texel / tune.coverFine;
   const cover = new Uint8Array(fine * fine * 4).fill(255);
+  for (let at = 3; at < cover.length; at += 4) cover[at] = 0;
   const stampFine = (x, z, halfX, halfZ, soft, write) => {
     const c0 = Math.max(0, Math.floor((x - halfX - soft + mapHalf) / fineTexel));
     const c1 = Math.min(fine - 1, Math.ceil((x + halfX + soft + mapHalf) / fineTexel));
@@ -204,11 +207,14 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
         const off = Math.hypot(dx + ax / 2 - ax * along, dz + az / 2 - az * along);
         const covered = Math.min(1, Math.min(2 * shadow.half, fineTexel) / fineTexel) * Math.min(1, Math.max(0, (shadow.half + fineTexel / 2 - off) / fineTexel));
         cover[at + 2] *= 1 - covered;
+        cover[at + 3] = Math.max(cover[at + 3], Math.min(255, (255 * along * (shadow.tall ?? 0)) / tune.reachMost));
       });
       continue;
     }
-    stampFine(shadow.x, shadow.z, shadow.radius, shadow.radius, 0, (at, dx, dz) => {
-      const inside = 1 - envSmooth(0.45, 1, Math.hypot(dx, dz) / shadow.radius);
+    const stretch = shadow.stretch ?? 1;
+    const [sunX, sunZ] = [shadow.sunX ?? 1, shadow.sunZ ?? 0];
+    stampFine(shadow.x, shadow.z, shadow.radius * stretch, shadow.radius * stretch, 0, (at, dx, dz) => {
+      const inside = 1 - envSmooth(0.45, 1, Math.hypot(dx * sunZ - dz * sunX, (dx * sunX + dz * sunZ) / stretch) / shadow.radius);
       cover[at + 1] *= 1 - shadow.depth * inside;
     });
     const over = shadow.over;
@@ -263,6 +269,8 @@ vec2 envCover(vec2 xz) {
   if (over.g < 0.004) return vec2(over.r, over.b);
   vec2 p = xz + uEnvWind.xy * envGust(xz) * ${ENV.shadow.dappleSway.toFixed(3)};
   float gaps = texture2D(uEnvNoise, p / ${(ENV.shadow.dapple * 16).toFixed(2)}).g * 0.6 + texture2D(uEnvNoise, p / ${(ENV.shadow.dapple * 5.3).toFixed(2)} + 0.37).a * 0.4;
+  // (The boughs' gaps under the leaves': a shaft in the air comes down on a patch of sun, air.js envBoughs.)
+  gaps = mix(gaps, envBoughs(xz + uEnvShadeSway), ${ENV.shadow.boughShare.toFixed(2)});
   float least = 0.5 + (over.g - 0.5) * 0.62;
   return vec2(over.r, over.b * (1.0 - min(over.g * 2.5, 1.0) * (1.0 - smoothstep(least - 0.03, least + 0.05, gaps))));
 }
