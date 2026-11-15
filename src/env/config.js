@@ -123,8 +123,8 @@ export const ENV = {
     // cover, but once a point of the picture and not once a corner of a tree or a blade, so a shaft stands
     // before a far wood as it does before the ground (worked once a corner, the air before the trees had no
     // shafts in it: a glow only); and it is a quarter of the points, so it has the steps to spare. 14: the
-    // least at which a trunk's band of shade in the air is not broken into grain at 20 m, by eye. (The steps
-    // and the pass's size are the tier's: ENV.quality `airSteps`, `airSize`.)
+    // least at which a trunk's band of shade in the air is not broken into grain at 20 m, by eye.
+    frameSteps: 14,
     // Fewer steps where the haze has taken little by then (the share of the light behind it that it has put its
     // own in place of): under `shadeFrom` one step. On a clear day that is all the land within a few hundred
     // metres; in mist everything past a few metres is walked in full. (At 1600 x 900 the full walk on every pixel
@@ -679,14 +679,8 @@ export const ENV = {
   // straight to the screen and each material bends its own light by the same curve at the weather's exposure,
   // with the default grade (no glare, no shafts, no vignette, and edges smoothed by the screen's own samples).
   quality: {
-    // `airShade`: the air's shade and its shafts walked sight line by sight line (ENV.air.frameSteps), in a pass
-    // `airSize` times smaller than the frame each way with `airSteps` steps (the pass's own grain and the
-    // depth-aware spread back to the frame hide the coarser walk). Medium: a quarter each way and half the
-    // steps, an eighth of the high tier's work, where without it a device that stepped down lost every shaft
-    // and all shade in the air. By eye: the fewest at which trunks' bands in the air at the Sengoku fight stay
-    // bands and not grain.
-    high: { grass: 1, far: 1, cards: 1, particles: 1, cloudShadow: true, post: 2, airShade: true, airSize: 2, airSteps: 14 },
-    medium: { grass: 0.5, far: 0.7, cards: 0.6, particles: 0.6, cloudShadow: true, post: 1, airShade: true, airSize: 4, airSteps: 7 },
+    high: { grass: 1, far: 1, cards: 1, particles: 1, cloudShadow: true, post: 2, airShade: true },
+    medium: { grass: 0.5, far: 0.7, cards: 0.6, particles: 0.6, cloudShadow: true, post: 1 },
     low: { grass: 0.2, far: 0.4, cards: 0.3, particles: 0.35, cloudShadow: false, post: 0 },
   },
 
