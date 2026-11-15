@@ -26,6 +26,8 @@
 
 import { ENV_GLSL, envUniforms } from '../env/air.js';
 import { ENV } from '../env/config.js';
+import { ENV_GLSL_PRESS, ENV_PRESS, envPressUniforms } from '../env/press.js';
+import { ENV_GLSL_MAP } from '../env/terrain.js';
 import { ktShadow, ktShadowInit, KT_SHADOW_FUNCTION, KT_SHADOW_PARS } from '../levelmode/kitshadow.js';
 import { TK_TEX, tkxTextures } from './tex.js';
 
@@ -137,7 +139,13 @@ export const TK_WEATHER = {
   // 0.3 blurred a patch's edge over a metre; thawed and trodden patches have edges a hand wide).
   snow: { colour: [0.76, 0.79, 0.84], colourAir: ENV.terrain.snowColour, holds: [0.45, 0.8], drift: 0.16, trodden: [0.7, 0.64, 0.56], caught: 0.55, packed: 0.5, edge: 0.07,
     blown: { drift: 4.5, stretch: 2.6, driftSlope: 0.3, ripple: 0.42, rippleSlope: 0.2, rippleTo: [22, 55], hollow: 0.14 },
-    print: { cell: 0.45, long: 0.28, wide: 0.11, dark: 0.3, slope: 0.9, to: [16, 34] } },
+    print: { cell: 0.45, long: 0.28, wide: 0.11, dark: 0.3, slope: 0.9, to: [16, 34] },
+    // `pressed`: the live prints of the bodies near the player (env/press.js, the open air's record, the same the
+    // land's snow reads). The snow they sink into is the land's own depth where a weather whitens fully
+    // (ENV_PRESS.snow), times the lie's drift share over its middle (`drift` 0.5 where the wind neither piles nor
+    // thins it: lay.js sheet A's alpha), so a print bottoms out on stone where the wind has scoured it thin and is
+    // deep in a drift against a wall; at most `most` times the land's depth (a knee-deep drift).
+    pressed: { drift: 0.5, most: 2.5 } },
 };
 
 /**
@@ -267,6 +275,8 @@ uniform vec3 uTkLayH;
 uniform vec4 uTkAir;
 uniform vec4 uTkBlow;
 ${ENV_GLSL}
+${ENV_GLSL_MAP}
+${ENV_GLSL_PRESS}
 ${KT_SHADOW_PARS}
 // (The castle's shadow function asks its own material's tier and soft-edge distance: here the fuller tier, soft within 30 m.)
   const vec4 uKitFlags = vec4(0.0, 2.0, 0.0, 0.0);
@@ -310,6 +320,8 @@ float tkUnder = 0.0;
 float tkWear = 0.0;
 float tkJoint = 0.0;
 float tkPrintNear = 0.0;
+// A live print here (env/press.js envSnowPrint: depth under fresh snow, slope x and z, packed 0..1), on the floor the bodies stand on.
+vec4 tkPressPrint = vec4(0.0);
 `;
 
 // After the colour is read: where this is (the lie), the dirt, the wet, the snow. uTkKind: (x: over 0 a wall with a
@@ -499,6 +511,12 @@ const TK_COLOUR = `
     tkPrintNear = 1.0 - smoothstep(${TK_WEATHER.snow.print.to[0].toFixed(1)}, ${TK_WEATHER.snow.print.to[1].toFixed(1)}, length(vTkPos - cameraPosition));
     if (tkPrintNear > 0.0) snow *= 1.0 - ${TK_WEATHER.snow.print.dark.toFixed(2)} * tkPrintNear * tkPrint(vTkPos.xz, clamp(tkWear * 1.5, 0.0, 0.92)) * vec3(1.0, 0.94, 0.86);
   }
+  // (The live prints of the bodies near the player, on the floor they walk: TK_WEATHER.snow.pressed.)
+  if (uTkAir.x > 0.5 && tkSnowHere > 0.01 && level > 0.5) {
+    float deep = ${ENV_PRESS.snow.toFixed(3)} * uTkSnow * min(lies / ${TK_WEATHER.snow.pressed.drift.toFixed(2)}, ${TK_WEATHER.snow.pressed.most.toFixed(2)});
+    tkPressPrint = envSnowPrint(vTkPos.xz, deep) * envPressLayer(vTkPos.y);
+    snow *= mix(vec3(1.0), vec3(${ENV_PRESS.packedColour.join(', ')}), tkPressPrint.w);
+  }
   diffuseColor.rgb = mix(diffuseColor.rgb, snow, tkSnowHere);
 }
 `;
@@ -560,6 +578,8 @@ if (tkSnowHere > 0.0) {
     vec2 g = (ga + gb) * (0.35 + 0.65 * tkSky) * (1.0 - clamp(tkWear * 1.5, 0.0, 1.0)) * smoothstep(0.7, 0.95, tkLie.y);
     tkLie = normalize(tkLie - vec3(along.x * g.x / ${TK_WEATHER.snow.blown.stretch.toFixed(2)} + across.x * g.y, 0.0, along.y * g.x / ${TK_WEATHER.snow.blown.stretch.toFixed(2)} + across.y * g.y));
   }
+  // (A live print's walls turn the light: env/press.js.)
+  tkLie = normalize(tkLie - vec3(tkPressPrint.y, 0.0, tkPressPrint.z));
   tkLie = normalize((viewMatrix * vec4(tkLie, 0.0)).xyz) * (gl_FrontFacing ? 1.0 : -1.0);
   normal = normalize(mix(normal, tkLie, tkSnowHere * 0.85));
 }
@@ -569,12 +589,17 @@ if (tkSnowHere > 0.0) {
 const TK_SHADE = `
 {
   float tkOpen = mix(1.0, max(tkSky, tkBounce), ${TK_WEATHER.shade.most.toFixed(2)}) * (1.0 - ${TK_WEATHER.shade.joint.toFixed(2)} * tkJoint * (1.0 - tkSnowHere) * step(0.01, uTkDirt.z));
-  reflectedLight.indirectDiffuse *= tkOpen;
+  // (The sky a body near the player leaves the surface under and beside him: the open air's contact shade,
+  // env/terrain.js envBodies, the same the land and the grass take; and the sky a live print's bed sees, a trench
+  // a sole wide and as deep as the print: the view factor of its floor, as the land's snow takes it.)
+  float tkContact = uTkAir.x > 0.5 ? envBodies(vTkPos).z : 1.0;
+  float tkPrintSky = mix(1.0, ${(ENV_PRESS.sole / 2).toFixed(3)} / sqrt(${((ENV_PRESS.sole / 2) ** 2).toFixed(5)} + tkPressPrint.x * tkPressPrint.x), tkSnowHere * step(0.0, tkPressPrint.x));
+  reflectedLight.indirectDiffuse *= tkOpen * tkContact * tkPrintSky;
   // (An upright face's joint is a rough recess that sees its own sides, not the sky: it mirrors nothing. Without
   // this a wet wall seen along its length shows every joint that leans toward the eye as a bright line.)
-  reflectedLight.indirectSpecular *= tkOpen * (1.0 - tkJoint * (1.0 - smoothstep(0.25, 0.6, abs(normalize(vTkNrm).y))));
+  reflectedLight.indirectSpecular *= tkOpen * tkContact * (1.0 - tkJoint * (1.0 - smoothstep(0.25, 0.6, abs(normalize(vTkNrm).y))));
   // The light of the lit walls and ground round a shut-in place (TK_WEATHER.shade.street).
-  if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.street.toFixed(2)} * (1.0 - tkOpen)) * material.diffuseColor;
+  if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.street.toFixed(2)} * (1.0 - tkOpen) * tkContact) * material.diffuseColor;
   // The sun's light thrown by lit stone round here (TK_WEATHER.shade.sun), out under cloud with the sun's own.
   if (uTkAir.x > 0.5 && tkSunBack > 0.0) reflectedLight.indirectDiffuse += uEnvSunColour * (tkSunBack * envSunShare(vTkPos)) * material.diffuseColor;
   // The sun's glint on wet stone, held under the glare (TK_WEATHER.glare).
@@ -735,7 +760,7 @@ export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1, dirt = [0, 0, 0
   // (`stir`: what the wind does with it, TK_STIR_RULE: { tree: [bend, flutter] } or { hung: true }.)
   if (stir) material.defines = { ...material.defines, ...(stir.hung ? { TK_HUNG: 1 } : { TK_TREE: 1 }) };
   material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, envUniforms(), tkWeather, ktShadow, own);
+    Object.assign(shader.uniforms, envUniforms(), envPressUniforms(), tkWeather, ktShadow, own);
     if (stir) {
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>\n${TK_STIR_PARS}`)
