@@ -14,7 +14,7 @@
 /* global THREE */
 
 import { P, SEGMENTS } from '../body.js';
-import { floorAt } from '../physics/terrain.js';
+import { floorUnder } from '../physics.js';
 
 export const ENV_PRESS = {
   // The record: `size` texels a side, each `texel` m. A boot's sole is about 0.1 by 0.28 m (by eye): 0.07 draws a
@@ -236,13 +236,13 @@ export function envPressStep({ world, lead = null, eye = null, tier = 'high', sn
   press.row = row;
   const reach = (size * texel) / 2;
 
-  // The floor each body stands on: the physics's own (the floors of a place that has them, else the level plane).
-  const terrain = world?.arena?.terrain ?? null;
+  // The floor each body stands on: the physics's own (a place's floors, the lie of the land, else the level plane).
+  const arena = world?.arena ?? null;
   const floorOf = (fighter) => {
     const x = fighter.x;
     let low = Infinity;
     for (let at = 0; at < 15; at += 1) low = Math.min(low, x[at * 3 + 1] - (fighter.radius?.[at] ?? 0.05));
-    return terrain ? floorAt(terrain, x[24], x[26], low + tune.layer) : 0;
+    return floorUnder(arena, x[26], x[24], low + tune.layer);
   };
   const leadFloor = floorOf(lead);
   u.uEnvPressAt.value.set((column + 0.5) * texel, (row + 0.5) * texel, reach, 1 / (size * texel));

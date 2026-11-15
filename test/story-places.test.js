@@ -5,6 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTerrain, floorAt, pushOut } from '../src/physics/terrain.js';
+import { reliefAt, worksOf } from '../src/physics/fieldworks.js';
+import { storyNewLife } from '../src/story/life.js';
 import { PYONGYANG_1593 } from '../src/story/battles/03-pyongyang.js';
 import { wokouBattle } from '../src/story/battles/02-wokou.js';
 import { pyongyangBattle } from '../src/story/battles/03-pyongyang.js';
@@ -191,14 +193,22 @@ test('pyongyang: the place draws the wall the battle is fought on, and its groun
   assert.deepEqual(PYONGYANG_PLACE.wall.ladders, PYONGYANG_1593.wall.ladders);
   assert.equal(pyongyangBattle.view.roam, 'pyongyang');
   const terrain = createTerrain(pyongyangSolids());
-  // The strip the columns cross: level ground, clear, from behind the form-up line to the wall's foot.
+  // The strip the columns cross, from behind the form-up line to the wall's foot: the land as it lies, clear, and the
+  // battle's physics stands on the ground the place draws (fieldworks `ground`), walked or fought on alike.
   const { halfX, halfZ } = PYONGYANG_1593.arena;
+  const battle = pyongyangBattle.setup(storyNewLife(1), 1);
+  const works = worksOf(battle.options.arena);
+  let [stripLow, stripHigh] = [Infinity, -Infinity];
   for (let x = -halfX; x <= PYONGYANG_PLACE.wall.x - 1.5; x += 1) {
     for (let z = -halfZ; z <= halfZ; z += 1) {
-      assert.ok(Math.abs(pyongyangGround(x, z)) < 1e-6, `the drawn ground at [${x}, ${z}] is level`);
-      assert.ok(Math.abs(standing(terrain, x, z, 0) ?? 9) < 1e-6, `the strip at [${x}, ${z}] is clear and level`);
+      const drawn = pyongyangGround(x, z);
+      [stripLow, stripHigh] = [Math.min(stripLow, drawn), Math.max(stripHigh, drawn)];
+      assert.ok(Math.abs(reliefAt(works, x, z) - drawn) < 1e-6, `the battle's ground at [${x}, ${z}] is the drawn ground`);
+      assert.ok(Math.abs((standing(terrain, x, z, drawn) ?? 99) - drawn) < 1e-6, `the strip at [${x}, ${z}] is clear, on the drawn ground`);
     }
   }
+  assert.ok(stripHigh - stripLow > 0.5, `the strip is not levelled (${stripLow.toFixed(2)} to ${stripHigh.toFixed(2)} m)`);
+  assert.ok(Math.abs(pyongyangGround(PYONGYANG_PLACE.wall.x, 0)) < 1e-6, 'the berm at the wall\'s foot is at the foot\'s level');
   // The wall bars the way at the ground and carries a walk at its top.
   const wall = PYONGYANG_PLACE.wall;
   for (const z of wall.ladders) {

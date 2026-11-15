@@ -7,7 +7,7 @@ import { surfaceAt } from '../audio/surface.js';
 import { BODY, buildBody, FRAMES, normaliseInputs, P, PRESETS } from '../body.js';
 import { STYLES } from '../moves.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
-import { aimPoint, BLOCKING, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
+import { aimPoint, BLOCKING, floorUnder, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
 import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRegion, GUN, pointThrough, slerpDir, SUPPLY } from '../weapons.js';
@@ -692,8 +692,10 @@ export function flyArrows(world, dt) {
       continue;
     }
     arrow.x = to;
-    if (arrow.x[1] <= 0.02 || Math.abs(arrow.x[0]) > 60 || Math.abs(arrow.x[2]) > 60) {
-      arrow.x[1] = Math.max(0.02, arrow.x[1]);
+    // (Into the ground where it is: the arena's floor under it, the lie of the land or a level's floors, 0 on a flat one.)
+    const floor = floorUnder(world.arena, arrow.x[2], arrow.x[0], arrow.x[1]) + 0.02;
+    if (arrow.x[1] <= floor || Math.abs(arrow.x[0]) > 60 || Math.abs(arrow.x[2]) > 60) {
+      arrow.x[1] = Math.max(floor, arrow.x[1]);
       // Heard: into the ground (or on stone, or boards), at the speed it came down.
       if (world.ear) {
         const ground = surfaceAt(world, arrow.x[0], arrow.x[1], arrow.x[2]);
