@@ -351,9 +351,11 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   const female = body.inputs.sex === 'female';
   // A photographed face (photoface.js; `look.photoFace`, with `photoPainted` in a crowd): its eyes, brows and mouth are in its
   // maps, so none is drawn; its head is photohead.js's: the drawn head's shape and the body's morph, the region's changes, and
-  // a real face's structure. The hair and a beard are drawn, in the photo's hair colour (stubble is the photo's shader's).
+  // a real face's structure. The hair and a beard are drawn (stubble is the photo's shader's).
   const photo = look.photoFace ?? null;
-  if (photo) Object.assign(look, { hairColor: photo.hair, facialHair: look.facialHair === 'stubble' ? 'none' : look.facialHair, makeup: null });
+  // (The hair, scalp and beard alike, in the fighter's own hair colour where his look gives one, else the photo's.)
+  const photoHair = photo ? lookInput?.hairColor ?? photo.hair : null;
+  if (photo) Object.assign(look, { hairColor: photoHair, facialHair: look.facialHair === 'stubble' ? 'none' : look.facialHair, makeup: null });
   // `faceMorph`: the face follows the body (facemorph.js): the skull, hair and beard bent alike, and a map of its shading.
   const morph = look.faceMorph ? faceMorphWeights(body) : null;
   // Chosen from the design sheet: shonen for women, seinen for men; a photo head a real one's, shaped by the body (photoShape).
@@ -368,7 +370,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
   }) : null;
   if (photoHead) shape = { ...shape, photoPoint: photoHead.point };
   const group = new THREE.Group();
-  const skinMaterial = photo ? photoSkinMaterial(photo, { painted: look.photoPainted }) : surface(skinHex, { steps: STYLE.faceSteps });
+  const skinMaterial = photo ? photoSkinMaterial(photo, { painted: look.photoPainted, hair: photoHair }) : surface(skinHex, { steps: STYLE.faceSteps });
   if (morph && !photo) {
     skinMaterial.map = faceMap(shape);
     skinMaterial.color.multiplyScalar(1 / FACE_MORPH.neutral);
@@ -569,14 +571,14 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     if (look.photoPainted) {
       const uv = skullGeometry.attributes.uv;
       const colour = skullGeometry.attributes.color;
-      const hair = new THREE.Color(photo.hair);
+      const hair = new THREE.Color(photoHair);
       for (let index = 0; index < uv.count; index += 1) {
         const cover = scalpCover(uv.getX(index), uv.getY(index), scalp);
         colour.setXYZ(index, ...[hair.r, hair.g, hair.b].map((value, channel) => colour.array[index * 3 + channel] + (value - colour.array[index * 3 + channel]) * cover));
       }
     }
     // The hair's volume, the style's own shape (hairmass.js), and a beard's cards (photohair.js); a crowd's are painted only.
-    const colour = new THREE.Color(photo.hair);
+    const colour = new THREE.Color(photoHair);
     const coarse = Boolean(look.photoPainted);
     photo.hairTriangles = buildPhotoBeard({ group, head: photoHead, r, facialHair: look.facialHair, colour, random, coarse });
     if (!coarse) {

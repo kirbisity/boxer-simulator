@@ -284,7 +284,7 @@ function hairStrandSheet() {
 
 // ---- The material: a lit hair surface with a sheen along its strands (Kajiya-Kay, two lobes) --------------------------------
 
-function sheenMaterial(colour, map, { alphaTest = 0 } = {}) {
+export function sheenMaterial(colour, map, { alphaTest = 0 } = {}) {
   const material = new THREE.MeshStandardMaterial({ color: colour, map, alphaTest, side: THREE.DoubleSide, roughness: 0.75, metalness: 0 });
   const { primary, secondary, width } = HAIR_MASS.sheen;
   material.onBeforeCompile = (shader) => {
