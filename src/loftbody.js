@@ -3420,7 +3420,7 @@ function fitClothToBase(mesh, parts, armoured) {
     }
   }
   holdLegsUnderWaist(mesh, frames, shares);
-  raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count);
+  raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribPieces);
   keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured, pieceTop, ribPieces);
   // (A family body's belly is the model's own, not the loft's dome: the trunk's skin no piece lies over is found on the pieces
   // themselves, `open`. Under armour the skin is left out by the armour's own table, coverage.)
@@ -3527,7 +3527,7 @@ function skinInTheOpen(mesh, name, frames, shares, nameOf, start, count) {
  * the neck's foot or beyond (`neckShare` of the neck's radius), stood off it by `standoff` (m: the cloth's own thickness and
  * the layer margin) along the point's own line out from the axis. A piece already higher there stays.
  */
-function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count) {
+function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribPieces = new Set()) {
   const spec = LOFT.collar;
   const trunk = frames.trunk;
   if (!trunk) return;
@@ -3577,6 +3577,9 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count) {
   const topOf = (sector) => bridged[((sector % sectors) + sectors) % sectors];
   for (const [vertex, { ring, name, standoff }] of shares) {
     if (name !== 'trunk' || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk || ring.t < pieceTop.get(ring.piece)) continue;
+    // (Not cloth under a cuirass that reaches as high, `ribPieces`: it is worn inside the plate's collar, and carried up the
+    // trapezius past it a thin man's arming coat showed round his neck between the cuirass and the gorget.)
+    if (!ribPieces.has(ring.piece) && [...ribPieces].some((piece) => pieceTop.get(piece) >= pieceTop.get(ring.piece))) continue;
     const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
     if (Math.abs(place.angle) < spec.from) continue;
     // (The highest skin of a sector and those beside it, and between two sectors' middles the line from one to the other: the
