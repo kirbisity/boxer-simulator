@@ -2011,6 +2011,8 @@ function placeAlong(measure, distance) {
 /**
  * A plate harness piece's two edges (detailmaps.js `harnessEdge`): at each end of the run a band LOFT.harnessEdge.depth (m) deep,
  * a hair proud of the plate, wearing the edge strip (the turned, roped roll at the edge, a file line, the lining rivets).
+ * The strip is part of its plate's edge, so on a base body it rides the fitted plate (ridePiece) and is not fitted to the
+ * flesh itself: fitted as a piece of its own it stood 4 to 9 mm off its plate, a hoop round the limb.
  */
 function harnessEdgesOn(mesh, rings, inflate, sides, bones = () => null) {
   const spec = LOFT.harnessEdge;
@@ -2021,7 +2023,19 @@ function harnessEdgesOn(mesh, rings, inflate, sides, bones = () => null) {
     const edge = ringAt(rings, edgePlace);
     const inner = ringAt(rings, innerPlace);
     // (In the run's own order, so the faces wind outward as the piece's do.)
+    const places = edgePlace === 0 ? [edgePlace, innerPlace] : [innerPlace, edgePlace];
+    const fitted = mesh.ringOf;
+    const start = mesh.positions.length / 3;
+    mesh.ringOf = null;
     loft(mesh, edgePlace === 0 ? [edge, inner] : [inner, edge], sides, { color: 'steel', inflate: inflate + spec.lift, capStart: false, capEnd: false, bones, uv: stripUv(edge, inner, inflate) });
+    mesh.ringOf = fitted;
+    if (!fitted) continue;
+    const stride = (mesh.positions.length / 3 - start) / 2;
+    for (let vertex = start; vertex < start + stride * 2; vertex += 1) {
+      const row = Math.floor((vertex - start) / stride);
+      (mesh.gridRing ??= new Map()).set(vertex, row === 0 ? (edgePlace === 0 ? edge : inner) : (edgePlace === 0 ? inner : edge));
+      ridePiece(mesh, rings, places[row], (((vertex - start) % stride) / sides) * Math.PI * 2, vertex);
+    }
   }
 }
 
