@@ -989,17 +989,12 @@ export const PLACE_ENV = {
     weather: 'mist',
     // A wood's morning mist is thin and lies low: the sun comes into it under the crowns nearly whole, so trunks
     // lay bands of shade across the ground and through the air, and the gaps between crowns are shafts (the
-    // second reference). At 200 m in a layer 16 m deep the sun at 24 degrees crosses an optical depth of
-    // 3.9 / 200 x 16 / sin 24 = 0.77 of mist and keeps exp(-0.42 x 0.77) = 0.72 of its key on the ground
+    // second reference). At 200 m in a layer 16 m deep the sun at 15 degrees crosses an optical depth of
+    // 3.9 / 200 x 16 / sin 15 = 1.2 of mist and keeps exp(-0.42 x 1.2) = 0.6 of its key on the ground
     // (ENV.air.hazeForward: most of what the mist scatters still goes on down the beam); in the weather's
-    // own 150 m and 26 m (at 15 degrees) it kept 0.33 and the bands were lost in the mist's own light. By eye.
+    // own 150 m and 26 m it keeps 0.33 and the bands were lost in the mist's own light. By eye between the two.
     weatherHere: { visibility: 200, hazeHeight: 16 },
-    // The sun of the morning's fighting as the fog lifted: at Sekigahara (35.4 N) on 21 October (declination
-    // about -11 degrees) the sun stands 17 degrees up at 8 by the sun's clock, 22 at 8.30 and 27 at 9 (from the
-    // standard formula sin h = sin lat sin dec + cos lat cos dec cos hour angle; the hours of the battle are
-    // approximate, from memory). 24: about 8.40, still a morning sun, high enough that the shafts between the
-    // crowns come down to the ground at a slant, as in the second reference, where at 15 they ran nearly level.
-    sun: { azimuth: -0.4, elevation: 24 },
+    sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },
     // The floor is a clearing some 16 m across each way in a wood 20 m tall: what its middle sees of the sky is

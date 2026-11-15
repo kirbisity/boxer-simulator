@@ -24,11 +24,13 @@ const chromePath = option('chrome', '/Applications/Google Chrome.app/Contents/Ma
 const plan = JSON.parse(readFileSync('tools/battle-posters.json', 'utf8'));
 const { CUSTOM_BATTLE } = await import('../src/custombattle.js');
 
-/** A ground's camera: its battles' own (CUSTOM_BATTLE.maps: yaw, pitch, distance, as render.js orbits), at `mapDistance` of the distance and `mapPitch`. */
+/** A ground's camera: its battles' own (CUSTOM_BATTLE.maps: yaw, pitch, distance, as render.js orbits), at `mapDistance` of the distance and `mapPitch`, about the ground's middle (its `middle` x where it has one: the walls of Pyongyang's field lies before the wall). */
 function groundCamera(place, shot) {
-  const { yaw, distance } = CUSTOM_BATTLE.maps[place].camera;
+  const { camera: { yaw: battleYaw, distance }, middle = 0 } = CUSTOM_BATTLE.maps[place];
+  // (`mapYaw`: a card's own, where the battles' camera looks away from what the ground is known by.)
+  const yaw = shot.mapYaw ?? battleYaw;
   const far = distance * shot.mapDistance;
-  return { eye: [Math.cos(shot.mapPitch) * Math.cos(yaw) * far, shot.look[1] + Math.sin(shot.mapPitch) * far, Math.cos(shot.mapPitch) * Math.sin(yaw) * far], look: shot.look };
+  return { eye: [middle + Math.cos(shot.mapPitch) * Math.cos(yaw) * far, shot.look[1] + Math.sin(shot.mapPitch) * far, Math.cos(shot.mapPitch) * Math.sin(yaw) * far], look: [middle + shot.look[0], shot.look[1], shot.look[2]] };
 }
 
 const profile = mkdtempSync(join(tmpdir(), 'battle-posters-'));
@@ -161,7 +163,8 @@ const HARNESS = `(async () => {
       const battle = { map, factions: shot.factions, sides: { red: { men: [] }, blue: { men: [] } }, lead: null };
       level = customLevel(battle);
       cast = Object.fromEntries(['red', 'blue'].map((corner) => [corner, shot.units[corner].map((id) => level.units[corner].find((unit) => unit.id === id).make())]));
-      const places = Object.fromEntries(['red', 'blue'].map((corner) => [corner, placesOf(cast[corner], corner, shot)]));
+      // (About the ground's middle, where it is not the floor's: CUSTOM_BATTLE.maps[place].middle.)
+      const places = Object.fromEntries(['red', 'blue'].map((corner) => [corner, placesOf(cast[corner], corner, shot).map(([x, z]) => [x + (level.middle ?? 0), z])]));
       battle.sides = Object.fromEntries(['red', 'blue'].map((corner) => [corner, { men: cast[corner].map((man, index) => ({ unit: shot.units[corner][index], at: places[corner][index] })), formation: 'hand' }]));
       setup = customSetup(battle);
       key = CUSTOM_BATTLE.key;
