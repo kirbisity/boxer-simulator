@@ -96,7 +96,8 @@ def main():
             a, b = piece['entries']
             piece = {**piece, 'at': timeline[a][1], 'until': timeline[b][1] + timeline[b][2]}
         length = piece['until'] - piece['at']
-        sound = decode(os.path.join(ROOT, 'assets/music', f"{piece['file']}.mp3"), piece.get('in', 0), length) * piece.get('gain', 0.5)
+        source = os.path.join(ROOT, piece['path']) if 'path' in piece else os.path.join(ROOT, 'assets/music', f"{piece['file']}.mp3")
+        sound = decode(source, piece.get('in', 0), length) * piece.get('gain', 0.5)
         add(music, faded(sound, piece.get('fadeIn', 0.3), piece.get('fadeOut', 0.5)), piece['at'])
 
     samples = os.path.join(ROOT, 'src/audio/samples')
