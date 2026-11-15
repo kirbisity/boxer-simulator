@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CUSTOM_BUDGET, CUSTOM_CLEAN_MAPS, CUSTOM_GROUND_TILES, CUSTOM_STUBS, CUSTOM_TRANSFORMS } from '../tools/custom.js';
 import { DETAIL_MAP_DATA } from '../src/detailmaps-data.js';
+import { CLOTH_MAP_DATA } from '../src/clothmaps-data.js';
 import { MUSIC_CUES } from '../src/audio/music/manifest.js';
 import { STORM_SKY_DATA } from '../src/levelmode/stormsky-data.js';
 
@@ -60,6 +61,10 @@ test('the custom page is one file under its budget, without the music, the storm
     if (CUSTOM_CLEAN_MAPS['detailmaps-data'].includes(name)) assert.ok(!page.includes(data), `the ${name} tile is carried worn`);
     else assert.equal(page.includes(piece(data)), tile.kind !== 'ground' || CUSTOM_GROUND_TILES.includes(name), `the ${name} tile`);
   }
+  // (The cloth atlas carried clean: its worn picture is not on the page, the clean one is.)
+  const cleanCloth = execFileSync('git', ['show', '70afbbc:src/clothmaps-data.js'], { maxBuffer: 1 << 26 }).toString().split("atlas: '")[1].split("'")[0];
+  if (CLOTH_MAP_DATA.atlas !== cleanCloth) assert.ok(!page.includes(CLOTH_MAP_DATA.atlas), 'the cloth atlas is carried worn');
+  assert.ok(page.includes(piece(cleanCloth)), 'the clean cloth atlas is not on the page');
   // It opens in the sandbox: the stand-in menu's way in.
   assert.match(page, /dataset\.game\s*!==\s*["']sandbox["']/);
 });

@@ -42,12 +42,15 @@ export const CUSTOM_GROUND_TILES = ['sand', 'beach'];
 // none of the featured units wears them (the Roman hoops and scales, the mirror plates, the Ming arm guards, riot armour, the
 // arena and turban helmets, the steppe and Chinese war masks). Left clean here on 2026-11-15, when wearing them took the page
 // 4.5 KB past its budget; the clean ones are about 111 KB lighter (fine detail is what WebP packs worst).
+// The cloth atlas (clothmaps-data: one picture, so its `atlas` and the cells' `means` together) carried clean as well since its
+// wear (wear.py CLOTH_WEAR) took the page about 0.45 MB past its budget on 2026-11-15.
 export const CUSTOM_CLEAN_MAPS = {
   'detailmaps-data': ['segmentata', 'scale', 'krug', 'bifu', 'polymer'],
   'helmmaps-data': ['formMurmillo', 'formThraex', 'formHoplomachus', 'formSecutor', 'formScissor', 'formTurbanTurkman', 'maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskVentail'],
+  'clothmaps-data': ['atlas', 'means'],
 };
-// The clean maps are read from the commit whose armour data files were packed without wear (wear.py's clean source, main
-// 70afbbc): the maps are not kept twice in the tree.
+// The clean maps are read from the commit whose armour and cloth data files were packed without wear (wear.py's clean source,
+// main 70afbbc): the maps are not kept twice in the tree.
 const CLEAN_MAPS_COMMIT = '70afbbc';
 const cleanMaps = {};
 for (const [module, names] of Object.entries(CUSTOM_CLEAN_MAPS)) {
@@ -64,6 +67,7 @@ const withClean = (module, data) => ({ ...data, ...cleanMaps[module] });
 export const CUSTOM_DATA = {
   'detailmaps-data': (data) => Object.fromEntries(Object.entries(withClean('detailmaps-data', data)).filter(([name, tile]) => tile.kind !== 'ground' || CUSTOM_GROUND_TILES.includes(name))),
   'helmmaps-data': (data) => withClean('helmmaps-data', data),
+  'clothmaps-data': (data) => withClean('clothmaps-data', data),
 };
 
 /** Source rewritten, by module. */
