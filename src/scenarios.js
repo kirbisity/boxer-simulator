@@ -383,11 +383,12 @@ const QI = {
   // Squads side by side, this far (m) between their middles: the brushes of the two a gap of 0.7 m apart.
   squads: 2,
   squadWidth: 4.9,
-  // One colour to a kind: his squad men in his elite infantry's coat, dark, bound in red (OUTFITS mingEliteInfantry
-  // design 3; the user's call, 2026-11-10: in place of the red-laced iron lamellar, its sleeves of plates and the steel
-  // tube on the front forearm guarding the arms the sleeveless vest left bare to the wokou's long swords), and the
-  // iron lamellar laced in crimson for the guards of his household (OUTFITS mingElite's level design: the setup screen's, ARMIES.qi).
-  design: { eliteInfantry: 3, elite: 5 },
+  // One colour to a kind: his squad men in his elite infantry's coat, the olive of the reference photograph, bound dark
+  // (OUTFITS mingEliteInfantry design 0, 2026-11-15, in place of the dark coat bound in red; the coat chosen 2026-11-10 in
+  // place of the red-laced iron lamellar: its sleeves of plates and the steel tube on the front forearm guarding the arms
+  // the sleeveless vest left bare to the wokou's long swords), and the iron lamellar laced in crimson for the guards of
+  // his household (OUTFITS mingElite's level design: the setup screen's, ARMIES.qi).
+  design: { eliteInfantry: 0, elite: 5 },
 };
 
 /** The mandarin-duck squad as Qi drilled it ([style, back, across] a man): the story's southern squads stand so (src/story/battles). */
