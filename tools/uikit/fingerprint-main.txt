@@ -1,0 +1,12 @@
+# node tools/fingerprint.js on main at 30ec269: scene, hash, events (the times vary from run to run; the hashes and counts must not)
+boxing duel            48912ea0  21 events
+muay thai v sumo       b8dd2773  37 events
+knight v samurai       3024d0ad  100 events
+iron pagoda v kanabo   a0d85104  33 events
+archers                abe99335  15 events
+rifle v shotgun        b522acdf  19 events
+police v katana        4b9709ac  38 events
+rhodes 1522            8f9ef429  523 events
+sekigahara             ced6ddc6  347 events
+legion                 40b44805  1544 events
+cajamarca              c8e110c8  583 events
