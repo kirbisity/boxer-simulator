@@ -30,7 +30,7 @@ import { envNoiseAt } from './noise.js';
 import { envBuildSky } from './sky.js';
 import { envBuildNearMap, envBuildTerrain, envHeightField, envInstallShadow, envSunPast } from './terrain.js';
 import { envBuildGrass, envGrassQuality } from './grass.js';
-import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envSkySeen, envTreeShadows, envTreesQuality } from './trees.js';
+import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantTrees, envRockShadows, envTreeShadows, envTreesQuality } from './trees.js';
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { envPressForget, envPressStep } from './press.js';
@@ -213,7 +213,6 @@ function envFill(group, place, view, spec, own) {
   // (The land the camera is kept above: render.js groundHeightAt reads a place's child that carries `heightAt`.)
   group.userData.heightAt = height;
   group.userData.envMap = map.value;
-  group.userData.envSkySeen = envSkySeen(trees, height);
   // Where the near crowns begin and where a point is over most of them (m over the ground): between the two the
   // near map stops telling what shades the air (air.js envSunward). A quarter of them begin below the first.
   const near = trees.filter((tree) => tree.height > 4 && Math.abs(tree.x) < ENV.terrain.mapHalf && Math.abs(tree.z) < ENV.terrain.mapHalf);
@@ -251,9 +250,7 @@ export function envApply({ place, view, spec, group }) {
   const st = view.lookState?.['probe-lite'];
 
   // The frame ends as a camera's does (post.js), here only (looks.js resets the renderer when the place is lit again).
-  // (What the fought ground sees of the sky: a place among walls says; else as its crowns and hills leave it.)
-  const skySeen = own.meter?.sky ?? group.userData.envSkySeen ?? 1;
-  const tone = envToneOf(air, weather, own, skySeen);
+  const tone = envToneOf(air, weather, own);
   envInstallTone();
   envInstallShadow();
   setRenderer(view, { toneMapping: THREE.CustomToneMapping });
@@ -268,10 +265,10 @@ export function envApply({ place, view, spec, group }) {
   if (st?.probe) view.scene.remove(st.probe);
   const probe = view.env?.probe ?? new THREE.LightProbe();
   probeLiteProject(probe.sh, (x, y, z, out) => envSkyAt(air, x, y, z, out));
-  // (Among walls or crowns the floor sees less than all of the sky, and so does who stands there: the share the
-  // meter takes, above. With the whole sky on them and the camera opened for less of it, skin in the valley's
-  // clearing stood a third of a stop over the land round it and washed out.)
-  probe.intensity = skySeen;
+  // (Among walls the floor sees less than all of it, and so does who stands there: the share the meter is told
+  // of, config.js `meter.sky`. With the whole sky on them and the camera opened for three quarters of it, skin
+  // in the valley's clearing stood a third of a stop over the land round it and washed out.)
+  probe.intensity = own.meter?.sky ?? 1;
   view.scene.add(probe);
 
   // The sun on the fighters and what stands on the floor: the colour the land is lit with, cut by what the hills

@@ -544,12 +544,6 @@ export const ENV = {
 
   // ---- trees ----------------------------------------------------------------------------------------------------
   trees: {
-    // The sky the middle of the fought ground sees past the crowns round it (trees.js envSkySeen): `skyRays`
-    // [rings, sectors] of the hemisphere (14 x 36: the share settles to a hundredth, measured); `skyPast`, the
-    // share of the sky's light a crown lets through where a ray crosses it, its gaps between leaves and boughs
-    // (0.25 approximate, by eye: a wood's crowns seen from beneath show sky in about a quarter of their area).
-    skyRays: [14, 36],
-    skyPast: 0.25,
     // What grows no higher than this (m) is trodden through and stands on the fought ground as anywhere; a taller
     // plant, a bush or a tree would stand in the fight with no solid in the physics, and is kept off the level ground.
     underfoot: 0.4,
@@ -827,8 +821,7 @@ export const ENV_WEATHER = {
 //     texture or a function giving it (a light's is made at its first frame), bias: depth, left out 0.002 }.
 //     The air's walk and what falls through the air then take the place's walls and roofs for shade as they
 //     take crowns (air.js envPlaceSun). A map packed as three.js packs depth (not VSM).
-//   meter: { sky: the share of the sky its ground sees (left out: worked out from its trees and hills, trees.js
-//   envSkySeen), frame: the share of a level frame that is sky }.
+//   meter: { sky: the share of the sky its ground sees, frame: the share of a level frame that is sky }.
 // Its own materials take the haze, the wet and the snow through air.js envDress.
 export const ENV_PLACE_PLAIN = {
   weather: 'clear',
@@ -960,12 +953,13 @@ export const PLACE_ENV = {
     sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },
-    // The floor is a clearing some 16 m across each way in a wood 20 m tall: what its middle sees of the sky is
-    // worked out from the crowns planted round it (trees.js envSkySeen: 0.735 here, where three quarters had
-    // been set by hand), and the meter opens up under a lid of cloud for it. `frame`: the
+    // The floor is a clearing some 16 m across each way in a wood 20 m tall: a solid wall of that height would
+    // leave its middle 0.4 to 0.6 of the sky's light (the cosine-weighted share above 40 to 50 degrees), and
+    // crowns pass some and the ride is open, so about three quarters (approximate). The meter is told, and
+    // opens up under a lid of cloud, where the fighters stood near black against a black wood. `frame`: the
     // share of a level frame that is sky (ENV.tone.skyShare where a place does not say): none here, the wood
     // standing 40 to 50 degrees up all round, so a bright lid over it does not close the camera on the wood.
-    meter: { frame: 0 },
+    meter: { sky: 0.75, frame: 0 },
     terrain: {
       seed: 37,
       layers: [

@@ -21,12 +21,12 @@ import { ENV_GLSL, envUniforms } from './air.js';
  * ground (a grey card, where neither the place's `meter`, the wet nor lying snow says otherwise) on the level sends back (sun x sine of its elevation + sky; display values summed, their luminance to the 2.2
  * power as light), and `hazed`, the share of a view that is the haze's own light and not the land's.
  */
-export function envToneOf(air, weather, place, skySeen) {
+export function envToneOf(air, weather, place) {
   const tune = ENV.tone;
   const grade = { ...tune.grade, ...weather.grade };
   // What the place's ground sees of the sky (among walls less than all of it) and what it throws back: a grey
   // card's worth unless the place says, and moved toward snow's by the weather's lying snow.
-  const open = skySeen ?? place?.meter?.sky ?? 1;
+  const open = place?.meter?.sky ?? 1;
   const bare = place?.meter?.albedo ?? tune.grey;
   // (Wet, it throws back less: the same share the land's shader darkens it by.)
   const soaked = bare * (1 - (1 - ENV.terrain.wetDarken) * (weather.wet || 0));
