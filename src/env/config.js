@@ -641,6 +641,16 @@ export const ENV = {
     litter: { box: [36, 3, 36], count: 700, fall: 0, ride: 0.06, size: 0.06, streak: 0, wander: 0.5, lift: [4.2, 7.5, 1.7, 3.2] },
   },
 
+  // ---- what metal mirrors -------------------------------------------------------------------------------------------
+  // The map plate, mail, lacquer and helmets mirror in an open-air place (index.js envSteelSky): `size` [width,
+  // height] of the picture before it is prefiltered (the sky table it is read from has 64 x 32 cells, two texels a cell; finer
+  // holds nothing more), and `cloudLit` the share of a cloud's lit flank in its mean as seen from below (the rest
+  // its shaded base): from below most of a cloud is base. By eye, approximate.
+  // `again`: how far the cloud's share of the sun on the fight may move before the map is made again (its
+  // ground lies in that cloud's shade; a tenth, by eye: a change the plate shows, made no more than as often as
+  // a cloud's edge crosses the fight).
+  steel: { size: [128, 64], cloudLit: 0.3, again: 0.1 },
+
   // ---- what a weak device drops ---------------------------------------------------------------------------------------
   // The share of each thing drawn at each quality tier (levelmode/quality.js names them; adaptres.js steps
   // down when frames run long). Blades and cards are shuffled when built, so drawing a share leaves an even
