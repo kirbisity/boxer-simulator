@@ -3998,6 +3998,8 @@ const boxer = window.boxer = {
     if (BODY_STYLES.includes(style)) setBodyStyle(style);
     return BODY_STYLE;
   },
+  // Trailer capture: a rider and his horse put at (x, z) facing `yaw` (physics/mounted.js placeMounted): the joust's two lanes.
+  placeRider: (id, x, z, yaw) => placeMounted(state.world.fighters[id], x, z, yaw),
   // Trailer capture: the menus shut over a fight started by a hook (fight() leaves them open).
   closeMenus: () => menus.close(),
   // Trailer capture: the page's own loop stops (true) and boxer.playFrames is the only clock; false gives it back.

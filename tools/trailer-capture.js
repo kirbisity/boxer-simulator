@@ -13,6 +13,7 @@ import { battleOf } from '/src/scenarios.js';
 import { seededRandom } from '/src/physics.js';
 import { STORY_BATTLES } from '/src/story/battles/index.js';
 import { storyNorthLife } from '/tools/storynorth.js';
+import { skirmish, SKIRMISH_ARENA } from '/tools/trailer-skirmish.js';
 
 const HIDE = 'header,footer,#fight-ui,#hud,.hud,#clock,#ghost-bar,.ghost-bar,#log,#banner,.level-hud,#speeds,.fu-pick,#pause,#restart,#menu,.menu,#modes,.arena::after,.toast,#toast,#sound-toggle,.audio-mixer,#icons,.event-icon,#camera-bar{display:none!important}';
 
@@ -62,10 +63,12 @@ export const TC = {
     if (show && style) style.remove();
     return show;
   },
-  async battle(key, seed = 1) {
+  async battle(key, seed = 1, { masked = false } = {}) {
     const s = battleOf(key);
     const cast = s.cast(seededRandom(seed));
-    const fighters = Object.entries(cast).flatMap(([corner, side]) => side.map((inputs) => ({ inputs, corner })));
+    // Every samurai masked (the two unmasked kabuto designs swapped; as tools/trailer-seki-scout.js MASKED).
+    const mask = (inputs) => { const swap = masked ? { samurai: { 0: 3, 2: 4 } }[inputs.outfit?.kind]?.[inputs.outfit.design] : null; return swap == null ? inputs : { ...inputs, outfit: { ...inputs.outfit, design: swap } }; };
+    const fighters = Object.entries(cast).flatMap(([corner, side]) => side.map((inputs) => ({ inputs: mask(inputs), corner })));
     const count = window.boxer.storyBattle({ fighters, options: { seed, arena: s.arena, rules: s.rules, formation: s.formation, place: s.scene }, view: { scene: s.scene, camera: s.camera ?? {}, weather: s.weather } });
     await this.settle();
     return count;
@@ -138,6 +141,29 @@ export const TC = {
     await this.settle();
     return { gunner: 0, samurai: 1, samStyle: sam.style };
   },
+  // Sekigahara's skirmish (tools/trailer-skirmish.js: the East's teppō rank and spears against the West's masked samurai and ashigaru), in
+  // the Sengoku camps and the battle's morning, at `seed` (the scout's seeds are the same fight).
+  async skirmish(seed = 11) {
+    const s = battleOf('sekigahara');
+    const sides = skirmish(1);
+    const fighters = Object.entries(sides).flatMap(([corner, side]) => side.map((inputs) => ({ inputs: structuredClone(inputs), corner })));
+    window.boxer.storyBattle({ fighters, options: { seed, arena: SKIRMISH_ARENA, rules: s.rules, formation: s.formation, place: 'sengoku' }, view: { scene: 'sengoku', camera: s.camera ?? {}, weather: s.weather } });
+    await this.settle();
+    return window.boxer.state.world.fighters.length;
+  },
+  // The ending's duel: two knights at the gallop with couched lances on the open field, `distance` m apart. [red, blue] presets.
+  async joust(seed = 1, distance = 60, { lane = 0, red = { preset: 'maximilian', mounted: true }, blue = { preset: 'knight', style: 'lance', mounted: true }, place = 'field' } = {}) {
+    window.boxer.fight([structuredClone(red)], [structuredClone(blue)], { seed, distance, place });
+    document.querySelector('#modes button[data-value="watch"]')?.click();
+    window.boxer.weather(null);
+    // Either side of a tilt `lane` m wide: red rides +x along z = -lane/2, blue -x along z = +lane/2 (yaw 0 faces +x).
+    if (lane) {
+      window.boxer.placeRider(0, -distance / 2, -lane / 2, 0);
+      window.boxer.placeRider(1, distance / 2, lane / 2, Math.PI);
+    }
+    await this.settle();
+    return window.boxer.state.world.fighters.map((f) => ({ id: f.id, weapon: f.weapon?.kind, mounted: Boolean(f.mount), at: f.mount?.at, yaw: f.mount?.yaw }));
+  },
   async settle() {
     // The menus shut, as storyBattle does (fight() leaves the home screen over the fight).
     window.boxer.closeMenus?.();
@@ -148,6 +174,18 @@ export const TC = {
     window.boxer.finishBuilding?.();
     window.boxer.finishSkins?.();
     window.boxer.playFrames(2, 0);
+  },
+  // Before a take: `frames` frames drawn with the clock held (no time passes), pausing now and then, so the place's grass, textures and
+  // skins have come in before the first frame recorded (the first second of a fresh scene is otherwise half loaded).
+  async warm(frames = 120) {
+    const boxer = window.boxer;
+    boxer.finishSkins?.();
+    for (let i = 0; i < frames; i += 1) {
+      boxer.playFrames(1, 0);
+      if (i % 10 === 9) await new Promise((ok) => setTimeout(ok, 60));
+    }
+    boxer.finishSkins?.();
+    return boxer.skins?.().waiting ?? 0;
   },
   // Run the fight on without drawing each frame (the simulation as the scout ran it; draws a frame every second so views keep up).
   skip(seconds) {
