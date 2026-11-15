@@ -34,21 +34,21 @@ export const DRAMA = {
 };
 
 const ICONS = {
-  knockout: { glyph: '💥', label: 'KO', tone: 'ko' },
-  knockdown: { glyph: '💫', label: 'DOWN', tone: 'down' },
-  broken: { glyph: '🦴', label: 'BROKEN', tone: 'bone' },
-  accessory: { glyph: '🎧', label: 'KNOCKED OFF', tone: 'gear' },
-  severed: { glyph: '🩸', label: 'SEVERED', tone: 'ko' },
-  killed: { glyph: '☠️', label: 'KILLED', tone: 'ko' },
-  bledOut: { glyph: '🩸', label: 'BLED OUT', tone: 'ko' },
-  disarmed: { glyph: '🗡️', label: 'DISARMED', tone: 'gear' },
-  staggered: { glyph: '🌀', label: 'STAGGERED', tone: 'down' },
-  panic: { glyph: '😱', label: 'PANIC', tone: 'down' },
-  rally: { glyph: '🔥', label: 'FIGHTS ON', tone: 'gear' },
+  knockout: { glyph: 'burst', label: 'KO', tone: 'ko' },
+  knockdown: { glyph: 'down', label: 'DOWN', tone: 'down' },
+  broken: { glyph: 'snapped', label: 'BROKEN', tone: 'bone' },
+  accessory: { glyph: 'cap', label: 'KNOCKED OFF', tone: 'gear' },
+  severed: { glyph: 'drop', label: 'SEVERED', tone: 'ko' },
+  killed: { glyph: 'skull', label: 'KILLED', tone: 'ko' },
+  bledOut: { glyph: 'drop', label: 'BLED OUT', tone: 'ko' },
+  disarmed: { glyph: 'blade', label: 'DISARMED', tone: 'gear' },
+  staggered: { glyph: 'reel', label: 'STAGGERED', tone: 'down' },
+  panic: { glyph: 'panic', label: 'PANIC', tone: 'down' },
+  rally: { glyph: 'flame', label: 'FIGHTS ON', tone: 'gear' },
   // A comrade cut down and he goes for the killer (ai.js AI.rage).
-  rage: { glyph: '💢', label: 'RAGE', tone: 'gear' },
-  held: { glyph: '🤼', label: 'HOLD', tone: 'down' },
-  pinned: { glyph: '🤼', label: 'HELD DOWN', tone: 'ko' },
+  rage: { glyph: 'rage', label: 'RAGE', tone: 'gear' },
+  held: { glyph: 'hold', label: 'HOLD', tone: 'down' },
+  pinned: { glyph: 'hold', label: 'HELD DOWN', tone: 'ko' },
 };
 
 /** What a world event means for the viewer: a moment kind and the particle it centres on, or null. */
@@ -153,11 +153,10 @@ export function addIcon(drama, moment, now) {
   if (!spec || !holder) return;
   const element = document.createElement('div');
   element.className = `event-icon ${spec.tone}`;
-  // Drawn in the interface's own line (uiicons.js). A thing knocked off keeps the one drawing whatever it was
-  // (a crown, a plume, a cap: the outfit's own picture is an emoji, and reads as another game's sticker here).
-  const glyph = moment.kind === 'accessory' ? spec.glyph : moment.icon ?? spec.glyph;
-  const drawn = uiIconMarkup(glyph);
-  element.innerHTML = `<span class="glyph ${drawn ? 'drawn' : 'emoji'}">${drawn ?? glyph}</span><b>${t(`drama.${moment.kind}`)}</b>`;
+  // Drawn in the interface's own line (uiicons.js), by the moment's kind. A thing knocked off keeps the one drawing whatever it
+  // was (a crown, a plume, a cap). A kind with no drawing shows its word alone.
+  const drawn = uiIconMarkup(spec.glyph);
+  element.innerHTML = `${drawn ? `<span class="glyph drawn">${drawn}</span>` : ''}<b>${t(`drama.${moment.kind}`)}</b>`;
   holder.append(element);
   drama.icons.push({ element, fighter: moment.fighter, particle: moment.particle, start: now });
 }

@@ -67,8 +67,8 @@
 
   <!-- The ghost walk's own bar (the sandbox's stage debug): the pace, and who he walks as. -->
   <div class="ghost-bar" id="ghost-bar" role="group" aria-label="Sandbox level" data-i18n-aria="page.ghostBar">
-    <span class="seg" id="ghost-mode" aria-label="Mode" data-i18n-aria="page.mode"><button type="button" data-mode="ghost" title="Unseen by the garrison, every door open" data-i18n="page.ghost" data-i18n-title="page.ghostTitle">👻 Ghost</button><button type="button" data-mode="real" title="The real run: the garrison fights you, doors by the real rules" data-i18n="page.real" data-i18n-title="page.realTitle">⚔ Real</button></span>
-    <button type="button" id="ghost-character" title="Build the character you play the level as" data-i18n="page.character" data-i18n-title="page.characterTitle">🧍 Character</button>
+    <span class="seg" id="ghost-mode" aria-label="Mode" data-i18n-aria="page.mode"><button type="button" data-mode="ghost" title="Unseen by the garrison, every door open" data-icon="ghost" data-i18n="page.ghost" data-i18n-title="page.ghostTitle">Ghost</button><button type="button" data-mode="real" title="The real run: the garrison fights you, doors by the real rules" data-icon="swords" data-i18n="page.real" data-i18n-title="page.realTitle">Real</button></span>
+    <button type="button" id="ghost-character" title="Build the character you play the level as" data-icon="figure" data-i18n="page.character" data-i18n-title="page.characterTitle">Character</button>
     <button type="button" data-speed="0.25">¼×</button><button type="button" data-speed="1">1×</button><button type="button" data-speed="4">4×</button>
     <label id="ghost-as-label"><span data-i18n="page.as">As</span><select id="ghost-as"></select></label>
     <label><span data-i18n="page.look">Look</span><select id="ghost-look"></select></label>
@@ -81,7 +81,7 @@
     <div class="banner-eyebrow" id="banner-eyebrow" hidden></div>
     <p id="banner-text"></p>
     <div class="battle-summary" id="battle-summary" hidden></div>
-    <div class="banner-actions"><button id="banner-menu" data-i18n="page.menu">☰ Menu</button><button id="banner-retry" data-i18n="page.retry" hidden>↻ Retry</button><button id="banner-again" class="primary">Next bout</button></div>
+    <div class="banner-actions"><button id="banner-menu" data-icon="menu" data-i18n="page.menu">Menu</button><button id="banner-retry" data-i18n="page.retry" hidden>↻ Retry</button><button id="banner-again" class="primary">Next bout</button></div>
   </div>
 
   <!-- The fight's controls in play mode (touch.js): the game surface, stick, Guard, special action, lock, and the fight HUD. -->
@@ -91,13 +91,13 @@
     <button type="button" class="back side-back" data-i18n="common.back">← Back</button>
     <h2 data-i18n="page.chooseSide">Choose your side</h2>
     <div class="sides"><button data-side="red" class="side red"></button><button data-side="blue" class="side blue"></button></div>
-    <button data-side="watch" class="watch" data-i18n="page.justWatch">👁 Just watch</button>
+    <button data-side="watch" class="watch" data-icon="eye" data-i18n="page.justWatch">Just watch</button>
   </div>
 
   <footer class="controls">
-    <button id="open-menu" class="menu-button" data-i18n="page.menu">☰ Menu</button>
+    <button id="open-menu" class="menu-button" data-icon="menu" data-i18n="page.menu">Menu</button>
     <!-- The sandbox's tools: out of sight until the Sandbox button at the top is tapped, so the view is clear and the footer is the same as in any game. -->
-    <button type="button" id="sandbox-menu" class="sandbox-menu sandbox-only" aria-expanded="false" aria-controls="sandbox-panel" title="Layers, scene, teams, who stands still, watch or play, and the fighter builder" data-i18n="page.sandbox" data-i18n-title="page.sandboxTitle">⚙ Sandbox</button>
+    <button type="button" id="sandbox-menu" class="sandbox-menu sandbox-only" aria-expanded="false" aria-controls="sandbox-panel" title="Layers, scene, teams, who stands still, watch or play, and the fighter builder" data-icon="cog" data-i18n="page.sandbox" data-i18n-title="page.sandboxTitle">Sandbox</button>
     <div class="sandbox-panel sandbox-only" id="sandbox-panel" role="group" aria-label="Sandbox tools" data-i18n-aria="page.sandboxTools">
       <div class="seg sandbox-only" id="layers" aria-label="Layer" data-i18n-aria="page.layer">
         <button data-value="skin" class="on" data-i18n="page.layerSkin">Skin</button>
@@ -115,28 +115,28 @@
       </div>
       <div class="teams sandbox-only" aria-label="Fighters a side" data-i18n-aria="page.perSide">
         <label class="team red"><span data-i18n="page.red">Red</span><select id="team-red"></select></label>
-        <button class="dice" data-corner="red" title="Re-roll Red's other fighters as anyone at random" data-i18n-title="page.diceRed">🎲</button>
+        <button class="dice" data-corner="red" title="Re-roll Red's other fighters as anyone at random" data-icon="die" data-i18n-title="page.diceRed"></button>
         <span class="versus">v</span>
         <label class="team blue"><span data-i18n="page.blue">Blue</span><select id="team-blue"></select></label>
-        <button class="dice" data-corner="blue" title="Re-roll Blue's other fighters as anyone at random" data-i18n-title="page.diceBlue">🎲</button>
+        <button class="dice" data-corner="blue" title="Re-roll Blue's other fighters as anyone at random" data-icon="die" data-i18n-title="page.diceBlue"></button>
       </div>
       <label class="teams scene-pick sandbox-only" aria-label="Scene" data-i18n-aria="page.scene"><span data-i18n="page.scene">Scene</span><select id="place"><option value="ring" data-i18n="page.place.ring">Ring</option><option value="colosseum" data-i18n="page.place.colosseum">Colosseum</option><option value="subway" data-i18n="page.place.subway">Subway</option><option value="meadow" data-i18n="page.place.meadow">Village green</option><option value="stadium" data-i18n="page.place.stadium">Stadium</option><option value="town" data-i18n="page.place.town">Town square</option><option value="port" data-i18n="page.place.port">Port at night</option><option value="sengoku" data-i18n="page.place.sengoku">Sengoku battlefield</option><option value="plain" data-i18n="page.place.plain">Valley of Mexico</option><option value="coastFort" data-i18n="page.place.coastFort">Shore and fort</option><option value="coastVillage" data-i18n="page.place.coastVillage">Coastal village</option><option value="field" data-i18n="page.place.field">Open field</option></select></label>
-      <button type="button" id="mounted" class="mount-pick sandbox-only" title="Put everyone who can ride on horseback, or all on foot; each fighter's own choice is in Build fighters">🐎 Mount all</button>
+      <button type="button" id="mounted" class="mount-pick sandbox-only" title="Put everyone who can ride on horseback, or all on foot; each fighter's own choice is in Build fighters" data-icon="horse">Mount all</button>
       <label class="teams still-pick sandbox-only" aria-label="Stand still or crawl" title="That side stands still, no guard, no blows (a target for testing armour), or goes down on its knees and crawls (still in the fight)" data-i18n-aria="page.standStillAria" data-i18n-title="page.standStillTitle"><span data-i18n="page.standStill">Stand still</span><select id="stand-still"><option value="" data-i18n="page.nobody">Nobody</option><option value="red" data-i18n="page.red">Red</option><option value="blue" data-i18n="page.blue">Blue</option><option value="crawl:red" data-i18n="page.redCrawls">Red crawls</option><option value="crawl:blue" data-i18n="page.blueCrawls">Blue crawls</option></select></label>
       <div class="seg" id="modes" aria-label="Mode" data-i18n-aria="page.mode">
         <button data-value="watch" class="on" data-i18n="page.watch">Watch</button>
         <button data-value="play" data-i18n="page.playRed">Play red</button>
         <button data-value="play" data-side="blue" data-i18n="page.playBlue">Play blue</button>
       </div>
-      <button type="button" id="level-character" class="sandbox-only" title="Build the character you play the Dunnottar level as (saved in this browser)" data-i18n="page.levelCharacter" data-i18n-title="page.levelCharacterTitle">🧍 My level character…</button>
-      <button type="button" id="ghost-walk" class="sandbox-only" title="Walk the Dunnottar stage unseen: the garrison never notices you (for looking the castle over)" data-i18n="page.ghostWalk" data-i18n-title="page.ghostWalkTitle">👻 Ghost walk · Dunnottar</button>
-      <button type="button" id="real-walk" class="sandbox-only" title="Play the real Dunnottar level with your own character: the garrison fights you, doors by the real rules, the whole story to the end" data-i18n="page.realWalk" data-i18n-title="page.realWalkTitle">⚔ Play for real with my character</button>
-      <button type="button" id="camera-feel" class="sandbox-only" aria-expanded="false" aria-controls="camera-tuner" title="Sliders on the follow camera's inertia, turn speeds and look-ahead (kept in this browser)">🎥 Camera feel</button>
+      <button type="button" id="level-character" class="sandbox-only" title="Build the character you play the Dunnottar level as (saved in this browser)" data-icon="figure" data-i18n="page.levelCharacter" data-i18n-title="page.levelCharacterTitle">My level character…</button>
+      <button type="button" id="ghost-walk" class="sandbox-only" title="Walk the Dunnottar stage unseen: the garrison never notices you (for looking the castle over)" data-icon="ghost" data-i18n="page.ghostWalk" data-i18n-title="page.ghostWalkTitle">Ghost walk · Dunnottar</button>
+      <button type="button" id="real-walk" class="sandbox-only" title="Play the real Dunnottar level with your own character: the garrison fights you, doors by the real rules, the whole story to the end" data-icon="swords" data-i18n="page.realWalk" data-i18n-title="page.realWalkTitle">Play for real with my character</button>
+      <button type="button" id="camera-feel" class="sandbox-only" aria-expanded="false" aria-controls="camera-tuner" title="Sliders on the follow camera's inertia, turn speeds and look-ahead (kept in this browser)" data-icon="camera">Camera feel</button>
       <button id="open-builder" class="primary sandbox-only" data-i18n="page.buildFighters">Build fighters</button>
       <div class="camtune sandbox-only" id="camera-tuner" hidden></div>
     </div>
     <!-- How the player attacks in a fight (fightui/toggle.js): tapping his man, or a button for each kind of blow; the key shows the colours. -->
-    <div class="seg fu-pick" id="fightui-pick" role="group" aria-label="Controls" data-i18n-aria="page.controls"><span class="fu-pick-label" data-i18n="page.controls">Controls</span><button type="button" data-value="target" data-i18n="page.controlsBody">Body</button><button type="button" data-value="buttons" data-i18n="page.controlsButtons">Buttons</button><button type="button" class="fu-pick-key" aria-label="Colours of the blows" aria-expanded="false" title="Colours of the blows" data-i18n-aria="page.blowColours" data-i18n-title="page.blowColours">🎨</button></div>
+    <div class="seg fu-pick" id="fightui-pick" role="group" aria-label="Controls" data-i18n-aria="page.controls"><span class="fu-pick-label" data-i18n="page.controls">Controls</span><button type="button" data-value="target" data-i18n="page.controlsBody">Body</button><button type="button" data-value="buttons" data-i18n="page.controlsButtons">Buttons</button><button type="button" class="fu-pick-key" aria-label="Colours of the blows" aria-expanded="false" title="Colours of the blows" data-icon="palette" data-i18n-aria="page.blowColours" data-i18n-title="page.blowColours"></button></div>
     <button id="pause" data-i18n="fight.pause">Pause</button>
     <button id="restart" data-i18n="fight.restart">Restart</button>
     <!-- The language (src/i18n.js): one tap flips English and 中文, live, kept in this browser. -->

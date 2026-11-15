@@ -1795,3 +1795,214 @@ html:lang(zh) .event-icon.ko b { font-size: 15px; }
 .lock-button.on { border: 2px solid #ffd9cc; background: #c03a22; color: #fff; text-shadow: 0 1px 2px rgba(60, 10, 0, 0.6); box-shadow: 0 0 0 4px rgba(242, 96, 63, 0.28), 0 0 22px rgba(242, 96, 63, 0.8); }
 .lock-button kbd { border-color: rgba(242, 96, 63, 0.6); color: #ffd9cc; }
 @keyframes lock-on { 50% { box-shadow: 0 0 0 7px rgba(242, 96, 63, 0.12), 0 0 28px rgba(242, 96, 63, 0.9); } }
+
+/* ==== The second pass: the fight's board, the title page, what a plate carries =========================================
+   The first pass changed faces and colours and left the shapes. Here the shapes are drawn.
+
+   The marks: --device is the book's device (two swords crossed behind a round shield); --corners are the four corner
+   marks of a plate, in --corner; --flank-l and --flank-r are the half rules that stand either side of a head. */
+:root {
+  --device: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64' fill='none' stroke='%23d8b25e' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='32' cy='32' r='13'/%3E%3Ccircle cx='32' cy='32' r='8.5' stroke-width='1' opacity='.7'/%3E%3Ccircle cx='32' cy='32' r='3'/%3E%3Cpath d='M12 52L22.8 41.2M41.2 22.8L54 10M52 52L41.2 41.2M22.8 22.8L10 10M15.5 40.5l8 8M48.5 40.5l-8 8'/%3E%3Ccircle cx='10' cy='54' r='2.2'/%3E%3Ccircle cx='54' cy='54' r='2.2'/%3E%3C/svg%3E");
+  --lozenge: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 9 9'%3E%3Cpath d='M4.5 0L9 4.5 4.5 9 0 4.5z'/%3E%3C/svg%3E");
+  --flank-l: linear-gradient(90deg, transparent, #000) left center / calc(100% - 13px) 1px no-repeat, var(--lozenge) right center / 7px 7px no-repeat;
+  --flank-r: linear-gradient(270deg, transparent, #000) right center / calc(100% - 13px) 1px no-repeat, var(--lozenge) left center / 7px 7px no-repeat;
+  --corner: rgba(var(--gilt), 0.55);
+  --corner-len: 12px;
+  --corner-in: 5px;
+  --corners:
+    linear-gradient(var(--corner), var(--corner)) left var(--corner-in) top var(--corner-in) / var(--corner-len) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) left var(--corner-in) top var(--corner-in) / 1px var(--corner-len) no-repeat,
+    linear-gradient(var(--corner), var(--corner)) right var(--corner-in) top var(--corner-in) / var(--corner-len) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) right var(--corner-in) top var(--corner-in) / 1px var(--corner-len) no-repeat,
+    linear-gradient(var(--corner), var(--corner)) left var(--corner-in) bottom var(--corner-in) / var(--corner-len) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) left var(--corner-in) bottom var(--corner-in) / 1px var(--corner-len) no-repeat,
+    linear-gradient(var(--corner), var(--corner)) right var(--corner-in) bottom var(--corner-in) / var(--corner-len) 1px no-repeat,
+    linear-gradient(var(--corner), var(--corner)) right var(--corner-in) bottom var(--corner-in) / 1px var(--corner-len) no-repeat;
+  --red-deep: #b5301e;
+  --blue-deep: #2c5cb0;
+}
+
+/* ---- The fight's board ----
+   One instrument across the top: each side's name on its standard (a pennon in its colour, the tail towards the middle, the
+   count of knock-downs in a dark box at the staff), under it the health as a gauge ticked in tenths, then wind and the lesser
+   bars close under that, then the side's men as small shields. Blue's is the mirror of red's, bars and all, so the two drain
+   towards the clock. The clock is a cut-cornered tablet between them. All of it within the cards' old boxes. */
+.hud { gap: 14px; }
+.card { gap: 2px; padding: 0 0 6px; }
+.card .top { align-items: stretch; gap: 0; min-height: 32px; padding: 0 18px 0 0; border: 0; margin-bottom: 3px; color: #fff; font: 700 17.5px/1 var(--display); letter-spacing: 0.045em; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5); clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 50%, 100% 100%, 0 100%); }
+.card.red .top, .card.blue .top { border: 0; padding-left: 0; }
+.card.red .top { background: linear-gradient(180deg, #c93a24, var(--red-deep)); }
+.card.blue .top { background: linear-gradient(180deg, #3a6cc4, var(--blue-deep)); flex-direction: row-reverse; padding: 0 0 0 18px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 12px 50%); }
+.card .name { align-self: center; padding: 2px 8px 0; }
+.card { max-width: 380px; }
+.card .top { min-width: 0; }
+.card.blue .name { text-align: right; }
+.card .kd { order: -1; display: grid; place-items: center; padding: 2px 9px 0; background: rgb(var(--pit)); color: var(--gold); font: 700 15px/1 var(--display); letter-spacing: 0.08em; box-shadow: inset 0 0 0 1px rgba(var(--gilt), 0.55); }
+.card .kd:empty { display: none; }
+.card .bar { border-radius: 0; background: rgba(var(--pit), 0.62); box-shadow: inset 0 0 0 1px rgba(var(--ink), 0.5), 0 1px 3px rgba(var(--pit), 0.6); }
+.card .bar.health { height: 11px; }
+.card .bar.health::after, .player-status .bar.health::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(90deg, transparent 0, transparent calc(10% - 1px), rgba(var(--pit), 0.78) calc(10% - 1px), rgba(var(--pit), 0.78) 10%); }
+.card .bar.stamina, .card .bar.blood { height: 6px; }
+.card .bar.brain { height: 5px; }
+.card.blue .bar { transform: scaleX(-1); }
+.card .meta { padding: 2px 2px 0; }
+.card.blue .meta { text-align: right; }
+.card .roster { margin-top: 5px; gap: 3px; }
+.card.blue .roster { justify-content: flex-end; }
+.roster span::before, body:not([data-game="sandbox"]) .roster span::before { content: ''; display: inline-block; width: 8px; height: 11px; margin-right: 4px; vertical-align: -1px; background: currentColor; clip-path: polygon(0 0, 100% 0, 100% 58%, 50% 100%, 0 58%); }
+body:not([data-game="sandbox"]) .roster span::before { margin: 0; }
+.roster span.out::before { clip-path: polygon(0 0, 100% 0, 100% 58%, 50% 100%, 0 58%, 0 0, 2px 2px, 2px 54%, 50% 78%, 6px 54%, 6px 2px, 2px 2px); }
+
+.clock { position: relative; isolation: isolate; min-width: 3em; padding: 8px 18px 6px; border: 0; background: rgba(var(--gilt), 0.9); color: #fff; font: 700 31px/1 var(--title); text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6); clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 9px, 100% calc(100% - 9px), calc(100% - 9px) 100%, 9px 100%, 0 calc(100% - 9px), 0 9px); }
+.clock::before { content: ''; position: absolute; inset: 1.5px; z-index: -1; background: rgb(var(--pit)); clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px); }
+.clock::after { content: ''; position: absolute; left: 7px; right: 7px; bottom: 4px; height: 1px; z-index: -1; background: linear-gradient(90deg, transparent, rgba(var(--gilt), 0.7), transparent); }
+.camera-bar { top: calc(64px + env(safe-area-inset-top, 0px)); border-radius: var(--r); padding: 5px 8px 4px 12px; background: rgba(var(--pit), 0.78); border-color: var(--line-strong); font: 600 11.5px var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--soft); }
+.camera-bar button { border-radius: var(--r); }
+html:lang(zh) .camera-bar { letter-spacing: 0.06em; font-size: 12.5px; }
+
+/* His own state, bottom left: the same gauge, his name on a gilt staff. */
+.player-status { gap: 2px; }
+.player-status .top { font: 700 15px/1.2 var(--display); letter-spacing: 0.08em; color: #fff; padding: 0 0 3px 9px; border-left: 3px solid var(--gold); margin-bottom: 2px; }
+.player-status .bar { border-radius: 0; background: rgba(var(--pit), 0.62); box-shadow: inset 0 0 0 1px rgba(var(--ink), 0.5), 0 1px 3px rgba(var(--pit), 0.6); }
+.player-status .bar.health { height: 10px; }
+.player-status .bar.stamina { height: 6px; }
+
+/* The dials under the thumbs: a ring, a second ring inside it, the drawing and its word; the stick a compass card. */
+.stick { border: 1.5px solid rgba(var(--ink), 0.45); background: radial-gradient(circle, rgba(var(--pit), 0.1) 0 54%, rgba(var(--pit), 0.4) 55% 100%); }
+.stick::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: repeating-conic-gradient(from -0.6deg, rgba(var(--ink), 0.7) 0 1.2deg, transparent 1.2deg 22.5deg); -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px)); mask: radial-gradient(circle closest-side, transparent calc(100% - 9px), #000 calc(100% - 8px)); }
+.stick .knob { background: rgba(var(--ink), 0.3); box-shadow: inset 0 0 0 1px rgba(var(--ink), 0.7), inset 0 0 0 5px rgba(var(--pit), 0.35), 0 2px 8px rgba(var(--pit), 0.45); }
+.stick.held .knob { background: rgba(var(--ink), 0.72); }
+.stick .move { font: 600 10.5px var(--display); letter-spacing: 0.2em; color: rgba(var(--ink), 0.8); }
+.fight-button { border: 1.5px solid rgba(var(--ink), 0.72); background: rgba(var(--pit), 0.5); box-shadow: inset 0 0 0 4px rgba(var(--pit), 0.55), inset 0 0 0 5px rgba(var(--ink), 0.32), 0 2px 10px rgba(var(--pit), 0.5); }
+.fight-button span { font: 700 10.5px var(--display); letter-spacing: 0.16em; color: #fff; }
+.guard-button.on, .jump-button.on { background: rgba(var(--ink), 0.34); border-color: #fff; box-shadow: inset 0 0 0 4px rgba(var(--pit), 0.3), inset 0 0 0 5px rgba(var(--ink), 0.8), 0 0 16px rgba(var(--ink), 0.45); }
+.crawl-button.on { box-shadow: inset 0 0 0 4px rgba(var(--pit), 0.3), inset 0 0 0 5px var(--gold), 0 0 16px rgba(var(--gilt), 0.5); }
+.lock-button { border: 1.5px dashed var(--lock); box-shadow: inset 0 0 0 4px rgba(var(--pit), 0.55), inset 0 0 0 5px rgba(242, 96, 63, 0.4), 0 2px 10px rgba(var(--pit), 0.5); }
+.lock-button span { color: #ffd9cc; }
+
+/* The rail the fight stands on: a rule with its lozenge across the foot, the buttons plates on it. */
+.controls { background: linear-gradient(transparent, rgba(var(--pit), 0.92) 42%); }
+.controls::before { content: ''; position: absolute; left: 50%; top: 0; width: min(720px, 92%); height: 9px; transform: translateX(-50%); background: var(--gold); opacity: 0.6; pointer-events: none; -webkit-mask: var(--rule-mask); mask: var(--rule-mask); }
+.controls > button, .controls > .seg { background: rgba(var(--pit), 0.82); border-color: var(--line-strong); }
+.controls > button:hover { border-color: var(--gold); color: var(--gold); background: rgba(var(--pit), 0.92); }
+.controls .menu-button { border-color: rgba(var(--gilt), 0.7); color: var(--gold); }
+
+/* ---- A head ----
+   A screen's name stands between two half rules, larger than it was. The title page: the device, the initials on their rule,
+   the name cut in capitals and gilt as on the arena's wall behind it, the line, the long rule; corner marks hold the block. */
+.screen-head h1 { position: relative; max-width: 100%; font: 700 clamp(34px, 5vw, 62px)/1.02 var(--title); color: #fff; text-shadow: 0 2px 0 rgba(var(--pit), 0.9), 0 0 30px rgba(var(--pit), 0.9); }
+.screen-head h1::before, .screen-head h1::after { content: ''; position: absolute; top: calc(50% - 3px); width: clamp(28px, 8vw, 120px); height: 9px; background: var(--gold); }
+.screen-head h1::before { right: calc(100% + clamp(10px, 1.6vw, 22px)); -webkit-mask: var(--flank-l); mask: var(--flank-l); }
+.screen-head h1::after { left: calc(100% + clamp(10px, 1.6vw, 22px)); -webkit-mask: var(--flank-r); mask: var(--flank-r); }
+@media (max-width: 760px) { .screen-head h1::before, .screen-head h1::after { width: 26px; } }
+.screen-head .titles::after { display: none; }
+.screen-head .lede { font-size: 16px; color: var(--fg); }
+
+.home .screen-head { width: min(1240px, 100%); }
+.home .screen-body { width: min(1120px, 100%); }
+.home .screen-head .titles { gap: 8px; padding: 10px clamp(18px, 4vw, 54px) 14px; --corner: rgba(var(--gilt), 0.8); --corner-len: 26px; --corner-in: 0px; background: var(--corners); }
+.home .screen-head .titles::before { padding: 52px 0 8px; background: var(--device) top center / 46px 46px no-repeat; }
+.home .screen-head .titles::after { display: block; }
+.home .screen-head h1 { display: block; max-width: none; font: 700 clamp(38px, 5.3vw, 80px)/1 var(--title); letter-spacing: 0.045em; text-transform: uppercase; text-wrap: balance; color: #e9c877; background: linear-gradient(180deg, #fbe7ab 0%, #e3bd63 42%, #b8892f 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; text-shadow: none; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.85)) drop-shadow(0 0 26px rgba(0, 0, 0, 0.7)); }
+.home .screen-head h1::before, .home .screen-head h1::after { display: none; }
+.home .screen-head .lede { color: var(--fg); }
+html:lang(zh) .home .screen-head h1 { letter-spacing: 0.12em; text-indent: 0.12em; font-size: clamp(42px, 6.6vw, 98px); line-height: 1.1; }
+@media (max-height: 760px) and (min-width: 761px) { .home .screen-head h1 { font-size: clamp(34px, 8.4vh, 62px); } .home .screen-head .titles::before { padding-top: 0; background: none; } .home .screen-head .titles { padding-top: 10px; padding-bottom: 12px; } }
+@media (max-width: 760px) { .home .screen-head .titles::before { padding-top: 46px; background-size: 40px 40px; } .home .screen-head .titles { --corner-len: 18px; } }
+
+/* ---- A plate ----
+   Four corner marks, which run out along the edges under the hand; the plate lifts and takes a gilt foot. The title page's
+   plates carry their drawing in a ring, as a seal. What is chosen keeps the gilt foot. */
+.choice { background: var(--corners), var(--plate); transition: transform var(--quick) var(--ease), border-color var(--quick) var(--ease), background-size 0.18s var(--ease), box-shadow var(--quick) var(--ease); }
+.choice:hover, .choice:focus-visible { --corner: var(--gold); --corner-len: 24px; background: var(--corners), rgba(40, 34, 25, 0.98); border-color: var(--gold); transform: translateY(-3px); box-shadow: inset 0 -3px 0 var(--gold), 0 14px 34px rgba(0, 0, 0, 0.55); }
+.choice:active { transform: translateY(0); }
+.choice.storm, .choice.mist { background: var(--corners), var(--plate); }
+.choice.storm:hover, .choice.mist:hover, .choice.storm:focus-visible, .choice.mist:focus-visible { background: var(--corners), rgba(40, 34, 25, 0.98); border-color: var(--gold); }
+.choice.soon, .choice.soon:hover, .choice.soon:focus-visible { --corner: transparent; background: var(--plate); box-shadow: none; transform: none; border-color: var(--line); }
+.choices.stages .choice.soon, .choices.stages .choice.soon:hover, .choices.stages .choice.soon:focus-visible { background: rgba(var(--pit), 0.82); }
+.choice b { color: #fff; }
+.choices.home-choices .choice { gap: 16px; padding: 14px 18px 14px 16px; }
+.choices.home-choices .choice .glyph { width: 50px; height: 50px; margin: 0; font-size: 26px; border-radius: 50%; border: 1px solid rgba(var(--gilt), 0.7); background: rgb(var(--pit)); box-shadow: inset 0 0 0 3px rgb(var(--pit)), inset 0 0 0 4px rgba(var(--gilt), 0.3); transition: background var(--quick) var(--ease), color var(--quick) var(--ease); }
+.choices.home-choices .choice:hover .glyph, .choices.home-choices .choice:focus-visible .glyph { background: var(--gold); color: var(--on-gold); }
+.choices.home-choices .choice b { font-size: 28px; font-weight: 700; }
+.choices.home-choices .career .glyph { width: 30px; height: 30px; font-size: 17px; box-shadow: none; }
+.choices.home-choices .choice.soon .glyph { border-color: var(--line-strong); }
+@media (max-width: 760px) { .choices.home-choices .choice .glyph { width: 42px; height: 42px; font-size: 22px; } .choices.home-choices .choice b { font-size: 23px; } }
+@media (max-height: 760px) and (min-width: 761px) { .choices.home-choices .choice .glyph { width: 40px; height: 40px; font-size: 21px; } .choices.home-choices .choice b { font-size: 24px; } }
+button.on, .card-choice.on { box-shadow: inset 0 -2px 0 var(--gold); }
+.fight-button.on:not(.crawl-button):not(.lock-button) { box-shadow: inset 0 0 0 4px rgba(var(--pit), 0.3), inset 0 0 0 5px rgba(var(--ink), 0.8), 0 0 16px rgba(var(--ink), 0.45); }
+
+/* The verdict: the same corner marks, the line larger. */
+.banner { --corner: rgba(var(--gilt), 0.8); --corner-len: 18px; --corner-in: 7px; background: var(--corners), rgba(var(--pit), 0.92); }
+.banner p { font: 700 clamp(30px, 4.4vw, 54px)/1.05 var(--title); color: #fff; }
+
+/* The compact verdict over a battle still running: its line no smaller to the eye than the capitals it replaced. */
+.banner.summary-mode { --corner-len: 12px; --corner-in: 5px; }
+.banner.summary-mode p { font-size: 25px; line-height: 1.08; }
+.banner.summary-mode p::after { margin: 7px auto 8px; }
+.banner.summary-mode .banner-eyebrow { font-size: 10.5px; }
+.banner.summary-mode::after { font-size: 10.5px; color: var(--muted); }
+
+/* A phone: the board keeps its drawing in less room. The name has the pennon first, the count what is left; the rail is one row. */
+@media (max-width: 640px) {
+  .hud { gap: 8px; }
+  .card { padding: 0 0 4px; }
+  .card .top { min-height: 26px; font-size: 14px; letter-spacing: 0.03em; padding-right: 12px; clip-path: polygon(0 0, 100% 0, calc(100% - 9px) 50%, 100% 100%, 0 100%); }
+  .card.blue .top { padding: 0 0 0 12px; clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 9px 50%); }
+  .card .name { padding: 1px 5px 0; }
+  .card .kd { flex: none; padding: 1px 4px 0; font-size: 11.5px; letter-spacing: 0.02em; }
+  .card .bar.health { height: 10px; }
+  .clock { min-width: 2.5em; padding: 7px 9px 5px; font-size: 23px; clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px); }
+  .clock::before { clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px); }
+  .camera-bar { top: calc(56px + env(safe-area-inset-top, 0px)); }
+  .controls { gap: 5px; padding-inline: 6px; }
+  .controls button, .controls .seg button, body:not([data-game="sandbox"]) .controls button { padding: 8px 9px; font-size: 12.5px; letter-spacing: 0.05em; }
+  body:not([data-game="sandbox"]) .controls button { padding: 9px 13px; font-size: 13.5px; letter-spacing: 0.07em; }
+  .banner.summary-mode p { font-size: 22px; }
+}
+
+/* A phone's board: the name has the pennon; the word beside it (a count of knock-downs, a state) is shown whole when both fit
+   and not at all when they do not (it wraps under, out of the pennon's height), never cut mid-word. */
+@media (max-width: 640px) {
+  .card .top { flex-wrap: wrap; align-content: flex-start; align-items: center; height: 26px; min-height: 0; overflow: hidden; }
+  .card .name { flex: 0 1 auto; min-width: 0; max-width: 100%; line-height: 26px; padding: 0 5px; }
+  .card .kd { order: 1; height: 18px; margin: 4px 0 4px auto; }
+  .card.blue .kd { margin: 4px auto 4px 0; }
+}
+
+/* ---- A moment's tag over a man: one small plate, the drawing and the word side by side (a field of them stays readable) ---- */
+.event-icon { flex-direction: row; align-items: stretch; gap: 0; filter: drop-shadow(0 2px 5px rgba(var(--pit), 0.55)); }
+.event-icon .glyph, .event-icon .glyph.drawn { width: 24px; height: auto; min-height: 22px; font-size: 16px; border-radius: 0; border-right: 0; filter: none; }
+.event-icon b { display: grid; place-items: center; border-radius: 0; padding: 3px 7px 2px; }
+.event-icon.ko .glyph { width: 32px; height: auto; min-height: 28px; font-size: 21px; }
+.event-icon.ko b { padding: 4px 9px 3px; }
+@media (max-width: 640px) {
+  .event-icon .glyph, .event-icon .glyph.drawn { width: 20px; min-height: 19px; font-size: 13.5px; }
+  .event-icon b { font-size: 10.5px; letter-spacing: 0.1em; padding: 2px 5px 1px; }
+  .event-icon.ko .glyph { width: 26px; min-height: 24px; font-size: 17px; }
+  .event-icon.ko b { font-size: 12.5px; }
+  html:lang(zh) .event-icon b { font-size: 11.5px; }
+}
+
+/* ---- A phone's title page: the story a plate across, the rest two to a row, so the contents stand on the first screen ---- */
+@media (max-width: 760px) {
+  .home .screen-head { padding-top: 0; }
+  .home .screen-head .titles { padding: 6px 14px 8px; }
+  .home .screen-head .titles::before { padding: 40px 0 5px; background-size: 34px 34px; }
+  .home .screen-head h1 { font-size: clamp(30px, 9.4vw, 40px); line-height: 1.02; }
+  .home .screen-head .lede { font-size: 15px; margin-top: 6px; }
+  .choices.home-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .choices.home-choices .choice, .choices.home-choices .choice:not(.career), .choices.home-choices .choice:nth-child(3), .choices.home-choices .choice:last-child, .choices.home-choices .choice:nth-child(n+7) { grid-column: auto; }
+  .choices.home-choices .choice.career, .choices.home-choices .choice:nth-child(2) { grid-column: 1 / -1; }
+  .choices.home-choices .choice:not(.career):not(:nth-child(2)) { grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px 8px; padding: 9px 10px 10px; min-height: 0; }
+  .choices.home-choices .choice:not(.career):not(:nth-child(2)) .words { display: contents; }
+  .choices.home-choices .choice:not(.career):not(:nth-child(2)) .glyph { width: 28px; height: 28px; font-size: 15px; box-shadow: none; }
+  .choices.home-choices .choice:not(.career):not(:nth-child(2)) em { padding-right: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .choices.home-choices .choice:not(.career):not(:nth-child(2)) b { grid-column: 1 / -1; font-size: 19.5px; line-height: 1.08; }
+  .choices.home-choices .choice .note { display: none; }
+  .choices.home-choices .choice:nth-child(2) { padding: 9px 12px; min-height: 0; }
+  .choices.home-choices .choice:nth-child(2) .glyph { width: 38px; height: 38px; font-size: 20px; }
+  .choices.home-choices .choice::after { top: 8px; right: 9px; font-size: 14px; }
+  .choices.home-choices .career { min-height: 38px; padding: 5px 12px; }
+  html:lang(zh) .choices.home-choices .choice:not(.career):not(:nth-child(2)) b { font-size: 19px; }
+}

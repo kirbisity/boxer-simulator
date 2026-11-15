@@ -30,16 +30,16 @@ import { getLang, LANG_NAMES, LANGS, onLangChange, pick, SEP, setLang, t, tname 
 import { LAST_GATE, LAST_GATE_MODES, LAST_GATE_MODE_KEYS } from './lastgate.js';
 import { lastGateBoardList, lastStandBuilder } from './lastgateview.js';
 import { lastStandLevel } from './squad.js';
-import { dressLabels, uiIcon } from './uiicons.js';
+import { uiIcon, withIcon } from './uiicons.js';
 
 // The two quick battles: what each is called, where it is fought, who fights.
 export const EVENTS = {
   boxing: {
-    title: { en: 'Prize Fight', zh: '职业拳赛' }, kicker: { en: 'Boxing', zh: '拳击' }, place: 'ring', glyph: '🥊',
+    title: { en: 'Prize Fight', zh: '职业拳赛' }, kicker: { en: 'Boxing', zh: '拳击' }, place: 'ring', glyph: 'glove',
     blurb: { en: 'Gloves on, in the ring, one weight class. Any unarmed style — and they mix them.', zh: '戴上拳套，上擂台，同一个量级。徒手流派随便用——还能混着来。' },
   },
   gladiator: {
-    title: { en: 'Blood & Sand', zh: '血与沙' }, kicker: { en: 'Gladiator', zh: '角斗' }, place: 'colosseum', glyph: '⚔️',
+    title: { en: 'Blood & Sand', zh: '血与沙' }, kicker: { en: 'Gladiator', zh: '角斗' }, place: 'colosseum', glyph: 'swords',
     blurb: { en: 'The Colosseum. Knights, samurai, gladiators — steel, any weight, no rules.', zh: '罗马斗兽场。骑士、武士、角斗士——真刀真枪，不分量级，没有规矩。' },
   },
 };
@@ -93,10 +93,11 @@ const optionWords = (key) => (OPTION_WORDS[key] ? pick(OPTION_WORDS[key]) : word
 /** A line of names joined by ' · ' ("Longsword · Gothic harness"), each part in the language in force. */
 const nameLine = (line) => String(line ?? '').split(SEP).map(tname).join(SEP);
 
-const el = (tag, props = {}, ...children) => {
+// (`icon`: the name of the drawn icon in front of its words, uiicons.js.)
+const el = (tag, { icon, ...props } = {}, ...children) => {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children.filter((child) => child !== null && child !== undefined));
-  return node;
+  return icon ? withIcon(node, icon) : node;
 };
 
 /** A screen: title, subtitle, body, and a back button. */
@@ -113,7 +114,7 @@ function screen(id, title, subtitle, onBack) {
 }
 
 /**
- * A choice: glyph, kicker and title, kept small (its line of text is its tooltip, and a battle's whole story is behind
+ * A choice: glyph (the name of its drawn icon), kicker and title, kept small (its line of text is its tooltip, and a battle's whole story is behind
  * its ⓘ: `withStory`). Without `onClick`, not open yet: shown, dimmed, and saying so.
  */
 function choice({ glyph, kicker, title, text, onClick, tone = '' }) {
@@ -144,7 +145,6 @@ export function installMenus(game) {
     if (!id) redraw = null;
     for (const other of ['home', 'quick', 'lastgate-screen', 'levels-screen', 'muster-screen', 'custom-screen', 'stages-screen', 'versus', 'wizard', 'settings-screen']) document.getElementById(other).hidden = other !== id;
     document.body.dataset.overlay = id ?? '';
-    if (id) dressLabels(document.getElementById(id));
   };
   const close = () => show(null);
 
@@ -156,22 +156,22 @@ export function installMenus(game) {
     const body = screen('home', t('game.title'), t('menu.home.lede'), null);
     body.parentElement.classList.add('home');
     body.append(el('div', { className: 'choices home-choices' },
-      choice({ glyph: '🏆', kicker: t('menu.home.career.kicker'), title: t('menu.home.career.title'), text: t('menu.home.career.text'), tone: 'career' }),
+      choice({ glyph: 'trophy', kicker: t('menu.home.career.kicker'), title: t('menu.home.career.title'), text: t('menu.home.career.text'), tone: 'career' }),
       // Story mode (src/story/): one Ming conscript's life, its own screen (storyview.js), opened over the fight behind the menus.
-      choice({ glyph: '📜', kicker: pick({ en: 'New · 1587-1621', zh: '新 · 1587-1621' }), title: pick({ en: 'Story', zh: '故事' }), text: pick({ en: 'One Ming soldier\'s life, from the register to the Hun River.', zh: '一个明朝兵的一生，从入军籍到浑河。' }), onClick: () => { close(); game.story?.(); }, tone: 'gold' }),
-      choice({ glyph: '🗺️', kicker: t('menu.home.battle.kicker'), title: t('menu.home.battle.title'), text: t('menu.home.battle.text'), onClick: levels, tone: 'gold' }),
-      choice({ glyph: '🏰', kicker: t('menu.home.level.kicker'), title: t('menu.home.level.title'), text: t('menu.home.level.text'), onClick: stages, tone: 'storm' }),
-      choice({ glyph: '🛡️', kicker: t('menu.home.gate.kicker'), title: tname(LAST_GATE.title), text: t('menu.home.gate.text'), onClick: () => lastGate(), tone: 'mist' }),
-      choice({ glyph: '☠️', kicker: t('menu.home.versus.kicker'), title: t('menu.home.versus.title'), text: t('menu.home.versus.text'), onClick: versus }),
-      choice({ glyph: '⚡', kicker: t('menu.home.quick.kicker'), title: t('menu.home.quick.title'), text: t('menu.home.quick.text'), onClick: quickEvent }),
-      choice({ glyph: '🧪', kicker: t('menu.home.sandbox.kicker'), title: t('menu.home.sandbox.title'), text: t('menu.home.sandbox.text'), onClick: () => { close(); game.sandbox(); } })),
+      choice({ glyph: 'book', kicker: pick({ en: 'New · 1587-1621', zh: '新 · 1587-1621' }), title: pick({ en: 'Story', zh: '故事' }), text: pick({ en: 'One Ming soldier\'s life, from the register to the Hun River.', zh: '一个明朝兵的一生，从入军籍到浑河。' }), onClick: () => { close(); game.story?.(); }, tone: 'gold' }),
+      choice({ glyph: 'banner', kicker: t('menu.home.battle.kicker'), title: t('menu.home.battle.title'), text: t('menu.home.battle.text'), onClick: levels, tone: 'gold' }),
+      choice({ glyph: 'castle', kicker: t('menu.home.level.kicker'), title: t('menu.home.level.title'), text: t('menu.home.level.text'), onClick: stages, tone: 'storm' }),
+      choice({ glyph: 'shield', kicker: t('menu.home.gate.kicker'), title: tname(LAST_GATE.title), text: t('menu.home.gate.text'), onClick: () => lastGate(), tone: 'mist' }),
+      choice({ glyph: 'skull', kicker: t('menu.home.versus.kicker'), title: t('menu.home.versus.title'), text: t('menu.home.versus.text'), onClick: versus }),
+      choice({ glyph: 'bolt', kicker: t('menu.home.quick.kicker'), title: t('menu.home.quick.title'), text: t('menu.home.quick.text'), onClick: quickEvent }),
+      choice({ glyph: 'flask', kicker: t('menu.home.sandbox.kicker'), title: t('menu.home.sandbox.title'), text: t('menu.home.sandbox.text'), onClick: () => { close(); game.sandbox(); } })),
       el('div', { className: 'home-links' },
-        el('button', { className: 'replay-intro', type: 'button', textContent: t('menu.home.tutorial'), onclick: () => { close(); game.tutorial(); } }),
+        el('button', { className: 'replay-intro', type: 'button', icon: 'target', textContent: t('menu.home.tutorial'), onclick: () => { close(); game.tutorial(); } }),
         // The intro (intro.js) again: the legends, then back here.
         el('button', { className: 'replay-intro', type: 'button', textContent: t('menu.home.intro'), onclick: () => { close(); game.intro(home); } }),
         // How the player attacks (fightui/): tapping his man or the buttons; a tap flips it.
-        fightUiHomeSwitch((textContent, onclick) => el('button', { className: 'replay-intro', type: 'button', textContent, onclick })),
-        el('button', { className: 'replay-intro', type: 'button', textContent: t('menu.home.settings'), onclick: settings })));
+        fightUiHomeSwitch((textContent, onclick) => el('button', { className: 'replay-intro', type: 'button', icon: 'pad', textContent, onclick })),
+        el('button', { className: 'replay-intro', type: 'button', icon: 'cog', textContent: t('menu.home.settings'), onclick: settings })));
     show('home');
   }
 
@@ -193,7 +193,7 @@ export function installMenus(game) {
     panel.append(langRow);
     if (game.audio) panel.append(audioMixer(game.audio));
     if (game.hitFeel) panel.append(hitFeelPanel(game.hitFeel.settings, game.hitFeel.save));
-    panel.append(el('button', { className: 'bench-open', type: 'button', textContent: t('settings.bench'), onclick: () => game.soundBench?.() }));
+    panel.append(el('button', { className: 'bench-open', type: 'button', icon: 'headset', textContent: t('settings.bench'), onclick: () => game.soundBench?.() }));
     body.append(panel);
     show('settings-screen');
   }
@@ -207,7 +207,7 @@ export function installMenus(game) {
     body.append(
       el('div', { className: 'choices two' }, ...Object.entries(EVENTS).map(([key, event]) => choice({ glyph: event.glyph, kicker: pick(event.kicker), title: pick(event.title), text: pick(event.blurb), onClick: () => startQuick(key, random(key)) }))),
       el('div', { className: 'quick-make' }, el('span', { textContent: t('menu.quick.make') }),
-        ...Object.entries(EVENTS).map(([key, event]) => el('button', { type: 'button', textContent: `🛠️ ${pick(event.title)}`, onclick: () => wizard({ event: key, start: random(key), finish: () => t('wizard.fight'), onDone: (inputs) => startQuick(key, inputs), onBack: quickEvent }) }))),
+        ...Object.entries(EVENTS).map(([key, event]) => el('button', { type: 'button', icon: 'pencil', textContent: pick(event.title), onclick: () => wizard({ event: key, start: random(key), finish: () => t('wizard.fight'), onDone: (inputs) => startQuick(key, inputs), onBack: quickEvent }) }))),
     );
     show('quick');
   }
@@ -230,7 +230,7 @@ export function installMenus(game) {
   // The levels as cards (the hero's look, the level and its land, the hero and his weapon, what he is good for, the horde he
   // faces, the level's best); a tap opens its squad builder (lastgateview.js), then the squad's placing before the gate
   // (musterview.js, locked), then the run. The best runs in this browser, a board for each, behind a button. `key`: straight
-  // to that level's builder (the end card's ⚔ Squad).
+  // to that level's builder (the end card's Squad).
   function lastGate(key = null) {
     if (key in LAST_GATE_MODES) return lastStandSquad(key);
     redraw = () => lastGate();
@@ -245,7 +245,7 @@ export function installMenus(game) {
         el('span', { className: 'lg-hero-look' }, image),
         el('span', { className: 'lg-hero-words' },
           el('em', { textContent: t('menu.gate.level', { level: spec.level, region: tname(pick(spec.region)) }) }),
-          el('b', { textContent: `${spec.glyph} ${tname(spec.title)}` }),
+          el('b', { icon: spec.glyph, textContent: tname(spec.title) }),
           el('em', { textContent: `${tname(spec.label)} · ${tname(spec.weapon)}` }),
           el('span', { textContent: pick(spec.strength) }),
           el('small', { textContent: pick(spec.blurb) }),
@@ -253,11 +253,12 @@ export function installMenus(game) {
     }));
     const board = el('div', { className: 'lg-menu-board', hidden: true }, el('h2', { textContent: t('menu.gate.board') }),
       ...LAST_GATE_MODE_KEYS.map((mode) => el('section', { className: 'lg-menu-board-mode' },
-        el('h3', { textContent: `${LAST_GATE_MODES[mode].glyph} ${tname(LAST_GATE_MODES[mode].title)}` }),
+        el('h3', { icon: LAST_GATE_MODES[mode].glyph, textContent: tname(LAST_GATE_MODES[mode].title) }),
         lastGateBoardList(game.lastGateBoard?.list(mode) ?? []))));
-    const toggle = el('button', { type: 'button', className: 'lg-board-toggle', textContent: t('menu.gate.boardButton'), onclick: () => {
+    const toggle = el('button', { type: 'button', className: 'lg-board-toggle', icon: 'trophy', textContent: t('menu.gate.boardButton'), onclick: () => {
       board.hidden = !board.hidden;
       cards.hidden = !board.hidden;
+      toggle.dataset.icon = board.hidden ? 'trophy' : '';
       toggle.textContent = board.hidden ? t('menu.gate.boardButton') : t('menu.gate.levels');
     } });
     body.append(cards, board, toggle);
@@ -307,21 +308,21 @@ export function installMenus(game) {
   }
 
   // ---- Battle Mode: the levels --------------------------------------------------
-  // A battle is one tap from here as the level has it; its ⚙ opens the setup (musterview.js): the armies, their order, the man played;
+  // A battle is one tap from here as the level has it; its Set up button opens the setup (musterview.js): the armies, their order, the man played;
   // its ⓘ its story. The custom battle first (custombattleview.js): the player's own ground, sides and men.
   function levels() {
     redraw = levels;
     const body = screen('levels-screen', t('menu.home.battle.title'), t('menu.levels.lede'), home);
-    const custom = addBattleThumb(choice({ glyph: '⚔️', kicker: t('menu.levels.custom.kicker'), title: tname(CUSTOM_BATTLE.title), text: t('menu.levels.custom.text'), onClick: customBattle, tone: 'gold' }), CUSTOM_BATTLE.key);
+    const custom = addBattleThumb(choice({ glyph: 'swords', kicker: t('menu.levels.custom.kicker'), title: tname(CUSTOM_BATTLE.title), text: t('menu.levels.custom.text'), onClick: customBattle, tone: 'gold' }), CUSTOM_BATTLE.key);
     // The training yard: every control, one at a time.
-    const yard = choice({ glyph: '🎯', kicker: t('menu.levels.yard.kicker'), title: t('menu.levels.yard.title'), text: t('menu.levels.yard.text'), onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
+    const yard = choice({ glyph: 'target', kicker: t('menu.levels.yard.kicker'), title: t('menu.levels.yard.title'), text: t('menu.levels.yard.text'), onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
     const card = ([key, level]) => {
-      const play = choice({ glyph: { rebellion: '🌾', pride: '🥊', port: '🚢', agincourt: '🏹', cerignola: '🔥', sekigahara: '🏯', pyongyang: '🐉', cajamarca: '☀️', zeelandia: '⚓', wokou: '🏴‍☠️', qiJiguang: '🛡️', rhodes: '🌙' }[key] ?? '🚇', kicker: tname(pick(level.place)).split(' · ').pop(), title: tname(level.title), text: pick(level.blurb), onClick: () => { close(); game.level(key); } });
+      const play = choice({ glyph: { rebellion: 'wheat', pride: 'glove', port: 'ship', agincourt: 'bow', cerignola: 'flame', sekigahara: 'torii', pyongyang: 'pagoda', cajamarca: 'sun', zeelandia: 'anchor', wokou: 'pennon', qiJiguang: 'shield', rhodes: 'moon' }[key] ?? 'banner', kicker: tname(pick(level.place)).split(' · ').pop(), title: tname(level.title), text: pick(level.blurb), onClick: () => { close(); game.level(key); } });
       addBattleThumb(play, key);
       const told = withStory(play, { title: tname(level.title), kicker: tname(pick(level.place)), lines: [pick(level.blurb), pick(level.roster)] });
       // (The card's kicker is the date alone, to fit one line; the ⓘ has the place too.) A battle of armies (a `cast`) can be set up; a duel cannot.
       if (!level.cast) return told;
-      return el('div', { className: 'level-card' }, told, el('button', { className: 'level-setup', type: 'button', textContent: t('menu.levels.setup'), title: t('menu.levels.setupTitle', { title: tname(level.title) }), onclick: () => muster(key) }));
+      return el('div', { className: 'level-card' }, told, el('button', { className: 'level-setup', type: 'button', icon: 'cog', textContent: t('menu.levels.setup'), title: t('menu.levels.setupTitle', { title: tname(level.title) }), onclick: () => muster(key) }));
     };
     body.append(el('div', { className: 'choices levels' }, custom, yard, ...Object.entries(SCENARIOS).map(card)));
     show('levels-screen');
@@ -360,7 +361,7 @@ export function installMenus(game) {
     const sides = {};
     for (const corner of ['red', 'blue']) {
       const tabs = el('div', { className: 'dw-tabs', role: 'tablist' }, ...FACTION_KEYS.filter((key) => WARRIORS.some((warrior) => warrior.faction === key)).map((key) => {
-        const tab = el('button', { type: 'button', className: 'dw-tab', role: 'tab', title: pick(FACTIONS[key].blurb) }, el('span', { textContent: FACTIONS[key].glyph }), el('b', { textContent: tname(FACTIONS[key].label) }));
+        const tab = el('button', { type: 'button', className: 'dw-tab', role: 'tab', title: pick(FACTIONS[key].blurb) }, uiIcon(FACTIONS[key].glyph), el('b', { textContent: tname(FACTIONS[key].label) }));
         tab.dataset.faction = key;
         tab.onclick = () => {
           faction[corner] = key;
@@ -380,7 +381,7 @@ export function installMenus(game) {
       const title = el('div', { className: 'dw-name' });
       const prev = el('button', { className: 'dw-arrow prev', type: 'button', ariaLabel: t('menu.versus.prev'), textContent: '‹', onclick: () => turn(corner, -1) });
       const next = el('button', { className: 'dw-arrow next', type: 'button', ariaLabel: t('menu.versus.next'), textContent: '›', onclick: () => turn(corner, 1) });
-      const own = el('button', { className: 'dw-own', type: 'button', textContent: t('menu.versus.own'), onclick: () => wizard({ event: 'any', start: randomCharacter(), finish: () => t('menu.versus.use'), onDone: (inputs) => { custom[corner] = { key: `custom-${corner}-${Date.now()}`, title: inputs.name, line: styleName(STYLES[inputs.style]), inputs }; game.attract(); show('versus'); redraw = () => versus({ faction, custom, mounted, at }); draw(corner); }, onBack: () => { show('versus'); redraw = () => versus({ faction, custom, mounted, at }); } }) });
+      const own = el('button', { className: 'dw-own', type: 'button', icon: 'pencil', textContent: t('menu.versus.own'), onclick: () => wizard({ event: 'any', start: randomCharacter(), finish: () => t('menu.versus.use'), onDone: (inputs) => { custom[corner] = { key: `custom-${corner}-${Date.now()}`, title: inputs.name, line: styleName(STYLES[inputs.style]), inputs }; game.attract(); show('versus'); redraw = () => versus({ faction, custom, mounted, at }); draw(corner); }, onBack: () => { show('versus'); redraw = () => versus({ faction, custom, mounted, at }); } }) });
       const portraits = new Map();
       // Swipe across the stage to turn it.
       let downAt = null;
@@ -449,13 +450,13 @@ export function installMenus(game) {
       const kit = rides ? mountOf(shown.inputs) : null;
       // (A robot dog is its own legs: boltedOn, never on foot.)
       const bolted = rides && boltedOn(shown.inputs);
-      const mount = el('button', { type: 'button', className: `dw-mount${rides && (mounted[corner] || bolted) ? ' on' : ''}`, disabled: !rides || bolted, textContent: bolted ? `🤖 ${tname(breedOf(kit.breed).label)}` : rides ? (mounted[corner] ? `${t('menu.versus.mounted', { breed: tname(breedOf(kit.breed).label) })}${kit.barding === 'bare' ? '' : t('menu.versus.barding', { barding: optionWords(kit.barding) })}` : t('menu.versus.onFoot')) : t('menu.versus.footOnly'), title: bolted ? t('menu.versus.robot') : rides ? t('menu.versus.rideTitle') : t('menu.versus.noRide') });
+      const mount = el('button', { type: 'button', className: `dw-mount${rides && (mounted[corner] || bolted) ? ' on' : ''}`, disabled: !rides || bolted, icon: bolted ? 'robot' : rides ? 'horse' : 'walker', textContent: bolted ? tname(breedOf(kit.breed).label) : rides ? (mounted[corner] ? `${t('menu.versus.mounted', { breed: tname(breedOf(kit.breed).label) })}${kit.barding === 'bare' ? '' : t('menu.versus.barding', { barding: optionWords(kit.barding) })}` : t('menu.versus.onFoot')) : t('menu.versus.footOnly'), title: bolted ? t('menu.versus.robot') : rides ? t('menu.versus.rideTitle') : t('menu.versus.noRide') });
       mount.onclick = () => {
         mounted[corner] = !mounted[corner];
         draw(corner);
       };
       // His armour: its card (setcard.js) in a pop-up (infopop.js), its words selectable.
-      const loreButton = el('button', { type: 'button', className: 'dw-mount', textContent: t('menu.versus.armour'), title: t('menu.versus.armourTitle') });
+      const loreButton = el('button', { type: 'button', className: 'dw-mount', icon: 'armour', textContent: t('menu.versus.armour'), title: t('menu.versus.armourTitle') });
       loreButton.onclick = () => openInfoPop(setCardElement(wornCard(shown.inputs), () => game.portrait(shown.key ?? `lore:${shown.title}`, shown.inputs)), { label: t('menu.versus.armourLabel', { name: tname(shown.title) }) });
       // Under his name: on horseback or not, his armour, and making your own instead, side by side.
       side.title.replaceChildren(el('b', { textContent: tname(shown.title) }), starLine, el('span', { textContent: custom[corner] ? nameLine(shown.line) : lineShown(shown.inputs) }), el('div', { className: 'dw-buttons' }, mount, loreButton, side.own));
@@ -618,7 +619,7 @@ export function installMenus(game) {
     function stepStyle(content) {
       const groups = FACTION_KEYS.map((faction) => [faction, styles.filter((key) => STYLE_FACTION(key) === faction)]).filter(([, keys]) => keys.length);
       content.append(...groups.map(([faction, keys]) => el('div', { className: 'style-group' },
-        el('b', { className: 'style-faction', textContent: `${FACTIONS[faction].glyph} ${tname(FACTIONS[faction].label)}` }),
+        el('b', { className: 'style-faction', icon: FACTIONS[faction].glyph, textContent: tname(FACTIONS[faction].label) }),
         el('div', { className: 'cards compact' }, ...keys.map(styleCard)))));
     }
     function styleCard(key) {
@@ -673,7 +674,7 @@ export function installMenus(game) {
         ] : []),
         el('div', { className: 'field' }, el('b', { textContent: t('wizard.head') }), buttons(headgearOptions(outfit.kind), () => inputs.accessories?.[0] ?? 'none', (item) => { gearTouched = true; inputs.accessories = item === 'none' ? [] : [item]; }, (item) => (item === 'none' ? t('wizard.nothing') : tname(HEADGEAR[item].label)))),
         ...FACTION_KEYS.map((faction) => [faction, sets.filter((each) => each.faction === faction)]).filter(([, group]) => group.length).map(([faction, group]) => el('div', { className: 'style-group' },
-          el('b', { className: 'style-faction', textContent: `${FACTIONS[faction].glyph} ${tname(FACTIONS[faction].label)}` }),
+          el('b', { className: 'style-faction', icon: FACTIONS[faction].glyph, textContent: tname(FACTIONS[faction].label) }),
           el('div', { className: 'set-cards' }, ...group.map((each) => {
             const card = setCard(each.kind, each.key);
             const tile = setCardElement(card, () => game.setPortrait?.(each.kind, each.key), { tile: true, tag: 'button', chosen: each.kind === worn.kind && each.key === worn.set });
@@ -686,7 +687,7 @@ export function installMenus(game) {
     function helmPicker() {
       const helms = helmChoices();
       const select = el('select', { ariaLabel: t('wizard.helmet') }, el('option', { value: 'own', textContent: t('wizard.helmet.own') }), el('option', { value: 'none', textContent: t('wizard.helmet.none') }),
-        ...FACTION_KEYS.map((faction) => [faction, helms.filter((helm) => helm.faction === faction)]).filter(([, group]) => group.length).map(([faction, group]) => el('optgroup', { label: `${FACTIONS[faction].glyph} ${tname(FACTIONS[faction].label)}` },
+        ...FACTION_KEYS.map((faction) => [faction, helms.filter((helm) => helm.faction === faction)]).filter(([, group]) => group.length).map(([faction, group]) => el('optgroup', { label: tname(FACTIONS[faction].label) },
           ...group.map((helm) => el('option', { value: helm.key, textContent: `${tname(helm.name)} (${helm.kg.toFixed(1)} kg)` })))));
       select.value = helmSlotOf(inputs);
       select.onchange = () => { gearTouched = true; setHelmSlot(inputs, select.value); draw(); };

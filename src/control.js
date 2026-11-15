@@ -1109,23 +1109,24 @@ function defend(world, fighter, orders) {
 
 // ---- Special actions ---------------------------------------------------------
 
+// (`icon`: the name of each action's drawn icon, uiicons.js.)
 export const ACTIONS = {
-  disengage: { label: 'Disengage', icon: '↩' },
-  throw: { label: 'Throw', icon: '🤼' },
-  reload: { label: 'Reload', icon: '⟳' },
-  fire: { label: 'Fire', icon: '◎' },
-  drawSidearm: { label: 'Draw sidearm', icon: '🗡' },
-  pickUp: { label: 'Pick up', icon: '✋' },
-  clinch: { label: 'Clinch', icon: '🫂' },
-  finish: { label: 'Finish him', icon: '🔪' },
+  disengage: { label: 'Disengage', icon: 'back' },
+  throw: { label: 'Throw', icon: 'hold' },
+  reload: { label: 'Reload', icon: 'reload' },
+  fire: { label: 'Fire', icon: 'target' },
+  drawSidearm: { label: 'Draw sidearm', icon: 'blade' },
+  pickUp: { label: 'Pick up', icon: 'hand' },
+  clinch: { label: 'Clinch', icon: 'hold' },
+  finish: { label: 'Finish him', icon: 'knife' },
   // His weapon's art (weaponarts.js): not the special button's (it has its own, shown while the art is charged), but asked
   // for the same way, in `orders.actions`; its button names it (weaponarts.js artLabel).
-  art: { label: 'Weapon art', icon: '✦' },
+  art: { label: 'Weapon art', icon: 'spark' },
   // Their own buttons too, apart from the special one (touch.js): the bow slung for the sidearm and back (physics.js swapSidearm),
   // and getting down from a horse or up onto one (physics/mounted.js).
-  swapWeapon: { label: 'Sidearm', icon: '🗡' },
-  dismount: { label: 'Dismount', icon: '🐎' },
-  mount: { label: 'Mount', icon: '🐎' },
+  swapWeapon: { label: 'Sidearm', icon: 'blade' },
+  dismount: { label: 'Dismount', icon: 'horse' },
+  mount: { label: 'Mount', icon: 'horse' },
 };
 
 /** What the horse button does now: get down from his horse, up onto one beside him, or nothing. */

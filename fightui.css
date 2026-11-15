@@ -224,3 +224,17 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 .lv-kit-title { font: 700 13px var(--display); letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
 .lv-kit .lv-kit-card { grid-template-columns: minmax(0, 1fr); border: 0; padding: 0; background: none; }
 .lv-kit-close { font: 11px var(--mono); color: var(--muted); text-align: center; }
+
+/* The key to the blows, on the catalogue's plate: a gilt head rule, each blow's square in its colour, its name in the label face. */
+.fu-legend { font: 600 12px var(--display); letter-spacing: 0.12em; color: #fff; }
+.fu-key { gap: 8px; color: #fff; }
+.fu-key i { border-width: 1.5px; border-radius: 0; background: rgb(var(--pit)); box-shadow: inset 0 0 0 3px rgb(var(--pit)), inset 0 0 0 4px color-mix(in srgb, var(--fu-col) 35%, transparent); }
+.fu-legend-first { padding: 9px 12px 9px 9px; border-radius: 0; background: rgba(var(--pit), 0.4); border: 0; border-top: 1px solid rgba(var(--gilt), 0.7); }
+.fu-legend-pop { border-radius: 0; border: 1px solid var(--line-strong); border-top: 1px solid var(--gold); }
+.fu-legend-pop > b { font: 700 12px var(--display); letter-spacing: 0.16em; color: var(--gold); }
+.fu-btn { box-shadow: inset 0 0 0 4px rgba(var(--pit), 0.55), inset 0 0 0 5px color-mix(in srgb, var(--fu-col) 45%, transparent), 0 2px 10px rgba(var(--pit), 0.5); }
+.fu-btn-name { font: 700 9.5px/1.05 var(--display); letter-spacing: 0.08em; color: #fff; }
+.fu-toast { border-radius: 0; border-width: 1.5px; background: rgba(var(--pit), 0.86); }
+.fu-toast-name { font: 700 16px/1 var(--display); letter-spacing: 0.1em; }
+.fu-toast-outcome { border-radius: 0; font: 700 12px var(--display); letter-spacing: 0.14em; }
+html:lang(zh) :is(.fu-legend, .fu-toast-name, .fu-toast-outcome, .fu-btn-name) { letter-spacing: 0.04em; }
