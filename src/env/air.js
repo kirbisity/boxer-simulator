@@ -541,8 +541,10 @@ float envAirWalk(vec3 from, vec3 ray, float depth, float grain, int steps) {
   float lowThin = exp(-low);
   float highThin = exp(-high);
   // Where the haze has taken next to nothing its light is next to nothing too and how much of it is in shade
-  // cannot be seen: one step there, half of them up to ENV.air.shadeFull, all of them past it.
-  int count = gone < ${ENV.air.shadeFrom.toFixed(3)} ? 1 : (gone < ${ENV.air.shadeFull.toFixed(3)} ? (steps + 1) / 2 : steps);
+  // cannot be seen: one step there, all of them past it. (A middle tier of half the steps drew the depth where
+  // it began as a dark line across the crowns in a lit shaft: the half walk's grain read a crown's bough gaps
+  // differently from the whole one, and the two met edge to edge.)
+  int count = gone < ${ENV.air.shadeFrom.toFixed(3)} ? 1 : steps;
   // A step stands for a stretch of the line, and the shade at one point of it is not the stretch's: a far
   // stretch crosses many shadows, and read at a point it came out all lit or all dark, pixel by pixel, as a
   // grain on everything seen through a wood. The cover is read spread over ENV.air.shadeSpread of the stretch,

@@ -126,11 +126,11 @@ export const ENV = {
     // least at which a trunk's band of shade in the air is not broken into grain at 20 m, by eye. (The steps
     // and the pass's size are the tier's: ENV.quality `airSteps`, `airSize`.)
     // Fewer steps where the haze has taken little by then (the share of the light behind it that it has put its
-    // own in place of): under `shadeFrom` one step, under `shadeFull` half of them. On a clear day that is all the
-    // land within a few hundred metres; in mist everything past the fighters is walked in full. (At 1600 x 900 the
-    // full walk on every pixel cost 5 to 6 ms a frame on the bench machine; set so no step is seen in the picture.)
+    // own in place of): under `shadeFrom` one step. On a clear day that is all the land within a few hundred
+    // metres; in mist everything past a few metres is walked in full. (At 1600 x 900 the full walk on every pixel
+    // cost 5 to 6 ms a frame on the bench machine; set so no step is seen in the picture. A middle tier of half
+    // the steps, from shadeFrom to 0.25, is gone: it drew its threshold's depth as a dark line on lit crowns.)
     shadeFrom: 0.04,
-    shadeFull: 0.25,
     // The share of a step's stretch of the line that its read of the shade is spread over (a round on the
     // ground, where the true mean is along the line only: the whole stretch would take away the shafts seen
     // end on, toward the sun, with the grain). By eye: the least at which the far land seen through the wood in
@@ -613,6 +613,13 @@ export const ENV = {
     // Masses half the crown wide, a third of the way out, read as one ball (a lollipop); smaller masses further
     // out with sky between them read as boughs, as a hedgerow oak does. By eye against the meadow and field.
     clump: { size: [0.22, 0.4], out: [0.45, 0.85], own: 0.7, under: 0.35 },
+    // A conifer's boughs (trees.js envCrownPoint): its sprays fan `fan` of the bough's length to either side at its
+    // tip (narrower than the gap to the next bough, so sky shows between tiers), each turned up to `vary` rad from
+    // the bough's own way, the sprays under the bough darker by `under`, and the near bands' cards `near` of the
+    // kind's size (smaller sprays, more of an edge). By eye against the second reference's airy wood: at 0.7, 0,
+    // 0 and 1 the cedars read as stacks of rounded blocks lit flat. (Sprays now start at 0.05 of the bough, not
+    // 0.15, so a cedar seen from under it has no empty ring round its trunk.)
+    bough: { fan: 0.45, vary: 0.9, under: 0.45, near: 0.75 },
     // Shading inside a crown: the inside and the underside are darker (leaves shade leaves) by up to this share.
     inner: 0.55,
     // Light through the leaves when the sun is behind the crown.
