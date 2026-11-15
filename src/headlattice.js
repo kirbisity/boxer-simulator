@@ -42,6 +42,9 @@ export const HEAD_LATTICE = {
   // scan's neck is taken up into a lid: the body's own neck meets the head along it. The scan's neck stood out of the body's
   // in front and at the sides (by up to 40 mm under a man's chin) and the two crossed at a glancing angle in a ragged seam.
   lid: 0.88,
+  // The ink outline (toon.js outlineFor) fades out from `ink` (row) down to the lid: the head's skin runs on into the neck's
+  // there, and an outline along the lid's rim drew a dark line round the neck at the join.
+  ink: 0.835,
   // The ears' texture coordinates are the nearest point's, of those this far round (share) and down (rows): the sides.
   earBand: { round: [0.15, 0.4], rows: [0.3, 0.8] },
 };
@@ -324,6 +327,16 @@ export function buildLatticeHead({ data, radius, skull, shape, atlas, region = {
   // head there (basebody.js neckUnderHead). Each column's points past the line on its point of the line, drawn in towards the
   // line's middle by how far past it they were; the line's own points stay.
   const lidRow = nearestRow(HEAD_LATTICE.lid);
+  // (The wall's own surface run on past the lid's rim, for the normals there: the rim is lit as the wall above it is, and as
+  // the neck that carries on below it, not rounded off into the lid.)
+  const wall = final.slice();
+  for (let row = lidRow + 1; lid && row < rows.length; row += 1) {
+    for (let column = 0; column < stride; column += 1) {
+      const [rim, above] = [final[lidRow * stride + column], final[(lidRow - 1) * stride + column]];
+      const steps = (rows[row] - rows[lidRow]) / (rows[lidRow] - rows[lidRow - 1]);
+      wall[row * stride + column] = rim.map((value, axis) => value + (value - above[axis]) * steps);
+    }
+  }
   if (lid && lidRow < rows.length - 1) {
     const ring = Array.from({ length: stride }, (_, column) => final[lidRow * stride + column]);
     const middle = [0, 2].map((axis) => ring.reduce((sum, p) => sum + p[axis], 0) / stride);
@@ -361,6 +374,8 @@ export function buildLatticeHead({ data, radius, skull, shape, atlas, region = {
     if (du >= band.round[0] && du <= band.round[1] && row >= band.rows[0] && row <= band.rows[1]) sides.push(vertex);
   });
   const normals = gridNormals(final, rows.length, stride);
+  if (lid) normals.set(gridNormals(wall, rows.length, stride).subarray(0, (lidRow + 1) * stride * 3));
+  const ink = rows.flatMap((row) => new Array(stride).fill(lid ? 1 - headSmooth(HEAD_LATTICE.ink, HEAD_LATTICE.lid, row) : 1));
   return {
     positions: final.flat(),
     normals,
@@ -368,6 +383,8 @@ export function buildLatticeHead({ data, radius, skull, shape, atlas, region = {
     uvs,
     colors,
     indices: latticeIndices(rows.length, stride),
+    /** The ink outline's share of its width per point (toon.js outlineFor): none along the lid, where the neck meets the head. */
+    ink,
     /** Texture coordinates for a point near the head (an ear), in the head's local space: the nearest point's of its sides. */
     uvAt: (x, y, z) => {
       let nearest = sides[0];

@@ -388,6 +388,7 @@ export function buildHead(body, lookInput, skinHex, cornerHex) {
     skullGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(photoHead.uvs, 2));
     if (photoHead.tangents) skullGeometry.setAttribute('tangent', new THREE.BufferAttribute(photoHead.tangents, 4));
     skullGeometry.setAttribute('color', new THREE.Float32BufferAttribute(photoHead.colors, 3));
+    if (photoHead.ink) skullGeometry.setAttribute('ink', new THREE.Float32BufferAttribute(photoHead.ink, 1));
     skullGeometry.setIndex(photoHead.indices);
     if (look.photoPainted) paintFromFace(skullGeometry, photo);
   } else skullGeometry = headGeometry(r, shape, morph ? 48 : 36);

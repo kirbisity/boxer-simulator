@@ -131,15 +131,25 @@ test('the head is closed by a lid along its jaw line: every point past the line 
     // (The scan's neck stood well under the line: a man's chin's underside is at about 1.2 head radii under its middle.)
     const lowest = (head) => Math.min(...head.positions.filter((_, index) => index % 3 === 1));
     assert.ok(lowest(open) < lowest(closed) - 0.2, `${female ? 'female' : 'male'}: the lid takes up the scan's neck`);
+    // (No ink outline from the line down, a full one well above it; the line lit as the wall above it, near the scan's own neck's
+    // (at least 0.68 of the way round; averaged with the lid's it fell to 0.2 on the man), not rounded into the lid.)
+    const inkAt = (row) => closed.ink[row * stride];
+    for (let row = lidRow; row < lattice.rows.length; row += 1) assert.equal(inkAt(row), 0, 'no ink on the lid');
+    assert.equal(inkAt(lidRow - 4), 1, 'ink above the line');
+    for (let column = 0; column < stride; column += 5) {
+      const [normal, scan] = [closed, open].map((head) => head.normals.slice((lidRow * stride + column) * 3, (lidRow * stride + column) * 3 + 3));
+      const cosine = (normal[0] * scan[0] + normal[1] * scan[1] + normal[2] * scan[2]) / (Math.hypot(...normal) * Math.hypot(...scan));
+      assert.ok(cosine > 0.6, `${female ? 'female' : 'male'}: the line's normal is the wall's running on (as the scan's own neck's), not turned down into the lid`);
+    }
   }
 });
 
-test('the base body\'s table of the jaw line and the throat\'s ring (src/headrings-data.js) is the model\'s own (tools/headrings.mjs)', async () => {
+test('the base body\'s table of the jaw line, the throat\'s ring and the ring above the line (src/headrings-data.js) is the model\'s own (tools/headrings.mjs)', async () => {
   const { headRings } = await import('../tools/headrings.mjs');
   const { HEAD_RINGS } = await import('../src/headrings-data.js');
   const rings = headRings();
   for (const sex of ['male', 'female']) {
-    for (const ring of ['jaw', 'throat']) {
+    for (const ring of ['jaw', 'throat', 'above']) {
       const made = rings[sex][ring].flat();
       assert.equal(HEAD_RINGS[sex][ring].length, made.length, `${sex} ${ring}: as many points (run tools/headrings.mjs again)`);
       made.forEach((value, index) => assert.ok(Math.abs(HEAD_RINGS[sex][ring][index] - value) < 1e-4, `${sex} ${ring}: the model's own (run tools/headrings.mjs again)`));

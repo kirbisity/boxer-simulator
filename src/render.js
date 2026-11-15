@@ -11,7 +11,7 @@ import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { dualQuaternionSkinning } from './dqskin.js';
 import { ClothSwing, swayCloth } from './clothsway.js';
-import { BASE_BODY } from './basebody.js';
+import { BASE_BODY, NECK_JOIN } from './basebody.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps, cachedSkinMesh, readySkinTextures, skinTextureKey, skinTexturesNow, skinTexturesSteps, storeSkinMesh, styleSpec } from './bodystyles.js';
 import { bodyCheck } from './skinworker.js';
@@ -2575,7 +2575,7 @@ export function pumpSkinBuilds(view, budgetMs = SKIN_BUILD.sliceMs) {
       job.id = (skinWorkerState.next += 1);
       job.phase = 'worker';
       skinWorkerState.asked.set(job.id, { job, worker });
-      worker.thread.postMessage({ id: job.id, inputs: job.body.inputs, style: job.style, check: bodyCheck(job.body), known: [...skinTextureCache.map.keys()], detailMaps: DETAIL_MAPS.on });
+      worker.thread.postMessage({ id: job.id, inputs: job.body.inputs, style: job.style, check: bodyCheck(job.body), known: [...skinTextureCache.map.keys()], detailMaps: DETAIL_MAPS.on, photoHead: NECK_JOIN.photoHead });
     }
   }
   // What no worker takes (none could be made, or the body was refused), or everything now (`all`): built here, a slice at a time.

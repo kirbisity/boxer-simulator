@@ -139,10 +139,11 @@ export const BASE_BODY = {
   family: { builds: ['E', 'N', 'M', 'F1', 'F2', 'F3', 'F4'], use: true, ease: { Fore: [0.55, 0.85], Shin: [0.6, 0.88], neck: [0.4, 0.6] }, hold: [0.3, 0.55] },
   // (D+'s neck top held within this share of the head's radius of its centre, behind and at the sides.)
   headHold: 0.85,
-  // The neck's top run up into the head over its jaw line (neckUnderHead): from `from` head radii under the jaw line's lowest
-  // point; its top `rise` above the line all round; out or in to the scan's neck's ring at row `throat` (or the line, where
-  // the skin between them is a wall) less `margin`, from `band` under the line up, and above it drawn in at `inward` a height;
-  // what stands past `reach` of the line's outline (the trapezius' slope) left where it is.
+  // The neck's top run up into the head over its jaw line (neckUnderHead): the points from `from` head radii under the jaw
+  // line's lowest point read; its top `rise` above the line all round, its points from `band` under the line up spread over
+  // that height; out or in to the head's wall run on below the line (to the scan's neck's ring at row `throat` where the skin
+  // between them is a floor, under the jaw) less `margin`, and above the line drawn in, `inward` times `rise` at its top; what
+  // stands past `reach` of the line's outline (the trapezius' slope) left where it is.
   neckUnder: { throat: 0.914, from: 0.8, rise: 0.12, margin: 0.005, band: 0.4, inward: 1, reach: [1.4, 2] },
   // The head as it is drawn on its joint (render.js HEAD_SCALE, HEAD_SEAT), in head radii (body.js headRadius, 0.055 of
   // stature: 96 mm on a man of 1.75 m). `size` and `seat`: 1.12 of the radius and 0.18 of a radius under the joint, as the
@@ -1130,7 +1131,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
   }
   if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf, joints.gameHead ?? joints.head, across);
   if (joints.boundHead && frames.neck) neckToHead(rig, placed, joints.boundHead, joints.boundNeck, frames.neck, height, BASE_BODY.neckUnder ? joints.gameHead : joints.boundHead);
-  if (joints.drawnHead && BASE_BODY.neckUnder) neckUnderHead(rig, placed, joints.drawnHead, height);
+  if (joints.drawnHead && BASE_BODY.neckUnder && NECK_JOIN.photoHead) neckUnderHead(rig, placed, joints.drawnHead, height);
   // (PROOF OF CONCEPT: the widths ANSUR II measures, when asked for (globalThis.BASE_WIDTHS, a list): biacromial (across the
   // shoulders' tops, from 1 cm above the shoulder joints up), chest breadth (the trunk's own skin across at the nipples, 0.72 of
   // height) and bideltoid (everything across, arms included, from 12 cm under the joints to them), in the bind pose.)
@@ -1363,6 +1364,11 @@ function neckToHead(rig, placed, head, neck, frame, height, held = head) {
   }
 }
 
+// Which head the neck meets: the photo head model's (photoface.js photoFacesOn, set there; a skin worker is told it with each
+// body), whose jaw line neckUnderHead runs the neck up to, or the drawn head (#faces=off), a closed shape with no such line and a
+// shorter chin: the photo head's line under it stood out round the neck's top in a collar under the chin.
+export const NECK_JOIN = { photoHead: true };
+
 // The drawn head's skull proportions (face.js SKULL), as face.js hands them to the head model.
 export const HEAD_SKULL = [0.94, 1.06, 0.86];
 
@@ -1399,8 +1405,9 @@ const jawLines = new Map();
  * The head's jaw line as it is drawn (headlattice.js: the lattice's ring at HEAD_LATTICE.lid, under which the head is closed
  * by a lid) and the ring of the scan's neck under it (BASE_BODY.neckUnder `throat`), on the photo head's model, its mix of no
  * particular face (src/headrings-data.js, tools/headrings.mjs), bent by the body's morph `morph`, round the head's upright
- * axis in its unit space (its radius 1, x forward, y up): `jaw(θ)` = { y, r, fill }, the line's height and distance from the
- * axis at an azimuth (0 in front), and how far out the neck is to meet it; each smoothed round (a cosine series to the 4th).
+ * axis in its unit space (its radius 1, x forward, y up): `jaw(θ)` = { y, r, fill, slope }, the line's height and distance from
+ * the axis at an azimuth (0 in front), how far out the neck is to meet it and how the head's wall leans there (its distance from
+ * the axis per unit of height); each smoothed round (a cosine series to the 4th).
  */
 export function headJawLine(female, morph) {
   const key = `${female}|${morph ? ['gaunt', 'full', 'defined', 'square', 'sag'].map((name) => (morph[name] ?? 0).toFixed(2)).join(',') : ''}`;
@@ -1408,8 +1415,8 @@ export function headJawLine(female, morph) {
   const rings = HEAD_RINGS[female ? 'female' : 'male'];
   const points = (flat) => Array.from({ length: flat.length / 3 }, (_, index) => flat.slice(index * 3, index * 3 + 3));
   const angleOf = (p) => Math.atan2(Math.abs(p[2]), p[0]);
-  const [y, r, fill, fillY] = [[0, 1], [0, 'r'], [1, 'r'], [1, 1]].map(([which, what]) => {
-    const ring = points(which ? rings.throat : rings.jaw).map((p) => {
+  const [y, r, fill, fillY, aboveY, aboveR] = [['jaw', 1], ['jaw', 'r'], ['throat', 'r'], ['throat', 1], ['above', 1], ['above', 'r']].map(([which, what]) => {
+    const ring = points(rings[which]).map((p) => {
       const moved = morph ? morphHeadPoint(p[0], p[1], p[2], morph).map((value, axis) => p[axis] + (value - p[axis]) * PHOTO_HEAD.morphGain) : p;
       return moved.map((value, axis) => value * HEAD_SKULL[axis]);
     }).filter((p) => Math.hypot(p[0], p[2]) > 1e-6);
@@ -1422,7 +1429,11 @@ export function headJawLine(female, morph) {
     const [high, low] = [{ y: y(angle), r: r(angle) }, { y: fillY(angle), r: fill(angle) }];
     const steep = Math.abs(high.y - low.y) / Math.max(1e-6, Math.abs(high.r - low.r));
     const wall = Math.min(1, Math.max(0, (steep - 0.5) / 1));
-    return { y: high.y, r: high.r, fill: Math.min(high.r, low.r + (high.r - low.r) * wall * wall * (3 - 2 * wall)) };
+    const share = wall * wall * (3 - 2 * wall);
+    // (`slope`: how the head's wall leans just over the line, its distance from the axis per unit of height (the ring above the
+    // line's to the line's), for the neck to run on from it; none where the line is a floor's edge, the neck under it upright.)
+    const lean = (high.r - aboveR(angle)) / Math.min(-1e-6, high.y - aboveY(angle));
+    return { y: high.y, r: high.r, fill: Math.min(high.r, low.r + (high.r - low.r) * share), slope: Math.max(-1, Math.min(1, lean)) * share };
   };
   jawLines.set(key, line);
   return line;
@@ -1433,9 +1444,9 @@ export function headJawLine(female, morph) {
  * neck's own and the trunk's that climb it, round the head's upright axis. The head is closed by a lid across its jaw line
  * (headlattice.js HEAD_LATTICE.lid: the chin's underside, the jaw's angle, the nape under the hairline) and the neck meets it
  * there: its skin from `from` (head radii under the line's lowest point) up drawn up, where its own top falls short, so that
- * its top stands `rise` above the line all round; from `band` under the line up drawn out or in to the line's `fill`
- * (headJawLine: the throat under the jaw, the jaw's angle and the nape themselves at the sides and behind) less `margin`, and
- * above the line in at `inward` a height. On the body as modelled the neck stood about the model's own joints, 28 mm behind
+ * its top stands `rise` above the line all round, its points from `band` under the line up spread over that height; from
+ * there up drawn out or in to the head's wall run on below the line (headJawLine `fill` and `slope`: the throat under the jaw,
+ * the jaw's angle and the nape themselves at the sides and behind) less `margin`, and above the line in, `inward` at the top. On the body as modelled the neck stood about the model's own joints, 28 mm behind
  * the head's on the man (baseBindJoints; neckToHead now carries it forward), the scan's neck the head model carries stood out
  * of it under the jaw by up to 40 mm, and the two surfaces crossed at a glancing angle in a ragged seam. `drawn`: the head
  * bone's frame at rest ({ origin, x, y, z }, x forward) and the body's morph (facemorph.js faceMorphWeights).
@@ -1462,25 +1473,47 @@ function neckUnderHead(rig, placed, { frame, morph }, height) {
     const [x, y, z] = [vec.dot(d, frame.x) / unit, vec.dot(d, frame.y) / unit, vec.dot(d, frame.z) / unit];
     if (y > from) local.push({ vertex, x, y, z, angle: Math.atan2(z, x), neck: name === 'neck' });
   }
-  // The neck's own top round the head, as placed (its highest point in each twelfth of the way round, smoothed).
-  const highest = new Array(12).fill(-Infinity);
-  for (const point of local) if (point.neck) highest[Math.min(11, Math.floor((Math.abs(point.angle) / Math.PI) * 12))] = Math.max(highest[Math.min(11, Math.floor((Math.abs(point.angle) / Math.PI) * 12))], point.y);
-  const ownTop = cosineSeries(highest.map((y, bin) => [((bin + 0.5) / 12) * Math.PI, y]).filter(([, y]) => Number.isFinite(y)), 4);
+  // The neck's own top round the head, as placed (the trapezius' points that climb the nape too): its highest point in each of `bins` round, each bin's the most of its own and
+  // its neighbours', read between the bins' middles (so no point stands above it: a fitted curve fell short of the nape's
+  // highest points, and they all came down onto one ring, leaving a single long edge up the back of the neck to the head).
+  const bins = 24;
+  const highest = new Array(bins).fill(-Infinity);
+  const binOf = (angle) => Math.min(bins - 1, Math.floor((Math.abs(angle) / Math.PI) * bins));
+  for (const point of local) highest[binOf(point.angle)] = Math.max(highest[binOf(point.angle)], point.y);
+  const filled = highest.map((y, bin) => Math.max(y, highest[Math.max(0, bin - 1)], highest[Math.min(bins - 1, bin + 1)]));
+  // (A bin with no point of the neck in it takes its nearest neighbour's.)
+  for (let pass = 0; pass < bins && filled.some((y) => !Number.isFinite(y)); pass += 1) {
+    filled.forEach((y, bin) => { if (!Number.isFinite(y)) filled[bin] = Math.max(filled[Math.max(0, bin - 1)], filled[Math.min(bins - 1, bin + 1)]); });
+  }
+  const ownTop = (angle) => {
+    const at = Math.min(bins - 1, Math.max(0, (Math.abs(angle) / Math.PI) * bins - 0.5));
+    const low = Math.floor(at);
+    const high = Math.min(bins - 1, low + 1);
+    return filled[low] + (filled[high] - filled[low]) * (at - low);
+  };
   for (const { vertex, x, y, z, angle } of local) {
     const line = jaw(angle);
     const own = ownTop(angle);
-    const top = Math.max(own, line.y + rise);
-    // (None of it above that top: the trapezius' points that climb the nape past the neck's own top are brought down to it.)
-    const up = Math.min(top, own - from > 1e-3 ? from + ((y - from) * (top - from)) / (own - from) : y);
+    const top = line.y + rise;
+    // (From `band` under the line up, the neck's points spread over the height to its new top, up or down: the points it had
+    // inside the head give the join its rows. Bent in a curve, not a line, so the neck under the band is not kinked.)
+    const base = line.y - band;
+    const span = own - base;
+    let up = y;
+    if (y > base && span > 1e-3) {
+      const curve = (top - own) / (span * span);
+      up = 2 * top - own - base > 0 ? y + curve * (y - base) ** 2 : base + ((y - base) * (top - base)) / span;
+    }
     const rho = Math.hypot(x, z);
     // (What stands much further out than the lid, the trapezius' slope to the shoulder, is left where it is.)
     const weight = 1 - ease(reach[0], reach[1], rho / line.r);
-    // (Out or in to the scan's own neck under the lid, inside the lid's outline; and whatever reaches above the lid, the
-    // trapezius' slope too, inside it.)
     const lifted = Math.min(top, y + (up - y) * weight);
-    // (Above the line drawn in at `inward` a height: the head may narrow over its jaw line, behind the jaw's angle.)
-    const edge = line.fill - margin - inward * Math.max(0, lifted - line.y);
-    const toward = ease(line.y - band, line.y, lifted) * (edge / Math.max(1e-6, rho) - 1);
+    // (Out or in to the head's wall run on below the line (its `fill` and `slope`: the jaw's angle and the nape, or the throat
+    // under the jaw), less `margin`, by a curve flat at both ends: the neck leaves its own course smoothly, and meets the head's
+    // wall along it, so the two are lit alike across the join. Above the line drawn in, inside the head, more as it rises.)
+    const over = lifted - line.y;
+    const edge = line.fill + line.slope * over - margin - (inward * Math.max(0, over) ** 2) / rise;
+    const toward = ease(base, line.y, lifted) * (edge / Math.max(1e-6, rho) - 1);
     const scale = 1 + (rho > edge ? Math.max(weight, ease(line.y - band / 2, line.y, lifted)) : weight) * toward;
     placed.set(vec.add(origin, vec.add(vec.scale(frame.y, lifted * unit), vec.add(vec.scale(frame.x, x * scale * unit), vec.scale(frame.z, z * scale * unit)))), vertex * 3);
   }

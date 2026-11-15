@@ -24,6 +24,7 @@ import { hasOrigin, nearestRegion, regionGroup, regionShape, regionsFor, REGION_
 import { luminance, shadeColor } from './skintones.js';
 import { SCALP_GLSL } from './photohair.js';
 import { PHOTO_HEAD } from './photohead.js';
+import { NECK_JOIN } from './basebody.js';
 
 /**
  * Where the landmarks sit in the atlas: u from the face's centre (eyes, ears); rows from the crown (eye line, lip line, chin, and
@@ -70,6 +71,8 @@ export function photoFacesOn() {
     const hash = typeof location === 'undefined' ? '' : location.hash.replace(/^#/, '');
     photoWanted = new URLSearchParams(hash).get('faces') !== 'off';
   }
+  // (The base body's neck is shaped to the head it meets.)
+  NECK_JOIN.photoHead = photoWanted;
   return photoWanted;
 }
 
@@ -82,6 +85,7 @@ const photoFile = (file) => PHOTO_FACE_EMBED?.[file] ?? `${PHOTO_FACES.base}${fi
 /** Turn photo faces on or off (the next heads built follow it); loads the manifest on the way on. */
 export function setPhotoFaces(on) {
   photoWanted = Boolean(on);
+  NECK_JOIN.photoHead = photoWanted;
   return photoWanted ? loadPhotoFaces() : Promise.resolve(0);
 }
 
