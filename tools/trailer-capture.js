@@ -78,6 +78,53 @@ export const TC = {
     await this.settle();
     return { count, player: setup.player, scene: setup.view?.scene };
   },
+  // Played, not watched: man `id` becomes the player's (his side and his place in it, as the side picker sets them), the fight AI plays him
+  // (boxer.autopilot), the HUD shown and the game's own follow camera. Only the sound button is kept off the picture.
+  play(id, { zoom = 8.5, pitch = 0.34 } = {}) {
+    const boxer = window.boxer;
+    const state = boxer.state;
+    const man = state.world.fighters[id];
+    const index = state.world.fighters.filter((f) => f.corner === man.corner).indexOf(man);
+    state.lead[man.corner] = index;
+    document.querySelector(`#modes button[data-value="play"]${man.corner === 'blue' ? '[data-side="blue"]' : ':not([data-side])'}`)?.click();
+    state.playSide = man.corner;
+    state.lead[man.corner] = index;
+    boxer.autopilot(true);
+    this.ui(true);
+    let style = document.getElementById('trailer-play');
+    if (!style) {
+      style = document.createElement('style');
+      style.id = 'trailer-play';
+      style.textContent = '#sound-toggle,.audio-mixer,#sandbox-menu,.sandbox-only,footer.controls,.zone-hints{display:none!important}';
+      document.head.appendChild(style);
+    }
+    this.noCrowns = false;
+    this.camera = null;
+    // A third-person chase camera behind him, facing the foes nearest him (the game's own arm folds onto him in a packed crowd).
+    this.chase(id, { back: zoom, pitch });
+    boxer.playFrames(2, 0);
+    return { mode: state.mode, side: state.playSide, player: boxer.state.world.fighters.find((f) => f.player)?.id ?? null };
+  },
+  // Behind man `id`, `back` m from him and raised by `pitch` rad, looking past him at the foes nearest him (their middle within 12 m, else
+  // the whole enemy side's): both the eye and the aim eased, as a follow camera would.
+  chase(id, { back = 8.5, pitch = 0.34, lookUp = 1.1, fov = 50, ease = 0.06 } = {}) {
+    let eye = null;
+    let aim = null;
+    this.camera = (time, world) => {
+      const man = world.fighters[id];
+      const at = man.root;
+      const foes = world.fighters.filter((f) => f.corner !== man.corner && f.state === 'up');
+      const near = foes.filter((f) => Math.hypot(f.root[0] - at[0], f.root[1] - at[1]) < 12);
+      const set = near.length ? near : foes;
+      const mid = set.length ? [set.reduce((s, f) => s + f.root[0], 0) / set.length, set.reduce((s, f) => s + f.root[1], 0) / set.length] : [at[0] + 1, at[1]];
+      const dx = mid[0] - at[0], dz = mid[1] - at[1], L = Math.hypot(dx, dz) || 1;
+      const wantEye = [at[0] - (dx / L) * back * Math.cos(pitch), 1.2 + back * Math.sin(pitch), at[1] - (dz / L) * back * Math.cos(pitch)];
+      const wantAim = [at[0] + (dx / L) * 2.5, lookUp, at[1] + (dz / L) * 2.5];
+      eye = eye ? lerp(eye, wantEye, ease) : wantEye;
+      aim = aim ? lerp(aim, wantAim, ease * 1.5) : wantAim;
+      return { pos: eye, look: aim, fov };
+    };
+  },
   // The gun shot (spec shot 6): an East ashigaru with a teppō against a West samurai, both from Sekigahara's own cast at `seed`, on the
   // Sengoku battlefield (its camps) in mist, `distance` m apart. Returns the pair's ids [gunner, samurai].
   async duel(seed = 1, distance = 14, { castSeed = 1, samurai = 0 } = {}) {
@@ -95,6 +142,7 @@ export const TC = {
     if (window.boxer.fullModels()) window.boxer.fullModels(true);
     // Out of the training yard the page boots into (it starts its bout again when a man is out): a sandbox fight.
     window.boxer.state.game = 'sandbox';
+    document.body.dataset.game = 'sandbox';
     window.boxer.finishBuilding?.();
     window.boxer.finishSkins?.();
     window.boxer.playFrames(2, 0);
