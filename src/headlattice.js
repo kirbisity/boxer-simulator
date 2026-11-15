@@ -38,6 +38,10 @@ export const HEAD_LATTICE = {
   occlusion: { ...PHOTO_HEAD.occlusion, socket: 0 },
   // A crowd's head: every `coarse`-th point each way.
   coarse: 2,
+  // The jaw line (the atlas' row: the chin's underside, the jaw's angle, the nape under the hairline), under which the
+  // scan's neck is taken up into a lid: the body's own neck meets the head along it. The scan's neck stood out of the body's
+  // in front and at the sides (by up to 40 mm under a man's chin) and the two crossed at a glancing angle in a ragged seam.
+  lid: 0.88,
   // The ears' texture coordinates are the nearest point's, of those this far round (share) and down (rows): the sides.
   earBand: { round: [0.15, 0.4], rows: [0.3, 0.8] },
 };
@@ -271,7 +275,7 @@ export function headMix(lattice, region) {
  * mouthY, earZ }, the head's local space, radius applied). `data`: HEAD_GRID_DATA; `skull`: face.js SKULL; `shape`: the drawn
  * shape (its `morph` only); `atlas`: PHOTO_ATLAS; `region`: the fighter's shape; `jitter`: his proportions; `coarse`: a crowd's.
  */
-export function buildLatticeHead({ data, radius, skull, shape, atlas, region = {}, jitter = {}, coarse = false, female = false }) {
+export function buildLatticeHead({ data, radius, skull, shape, atlas, region = {}, jitter = {}, coarse = false, female = false, lid = true }) {
   const lattice = headLattice(data, female ? 'female' : 'male');
   const { shares, residual } = headMix(lattice, region);
   const step = coarse ? HEAD_LATTICE.coarse : 1;
@@ -316,6 +320,21 @@ export function buildLatticeHead({ data, radius, skull, shape, atlas, region = {
   };
   const finalUnit = own.map(morphed);
   const final = finalUnit.map((p) => [p[0] * skull[0] * radius, p[1] * skull[1] * radius, p[2] * skull[2] * radius]);
+  // The scan's neck under the jaw line taken up into a lid across it (HEAD_LATTICE.lid): the body's neck is drawn to meet the
+  // head there (basebody.js neckUnderHead). Each column's points past the line on its point of the line, drawn in towards the
+  // line's middle by how far past it they were; the line's own points stay.
+  const lidRow = nearestRow(HEAD_LATTICE.lid);
+  if (lid && lidRow < rows.length - 1) {
+    const ring = Array.from({ length: stride }, (_, column) => final[lidRow * stride + column]);
+    const middle = [0, 2].map((axis) => ring.reduce((sum, p) => sum + p[axis], 0) / stride);
+    for (let row = lidRow + 1; row < rows.length; row += 1) {
+      const share = (rows[row] - rows[lidRow]) / (rows[rows.length - 1] - rows[lidRow]);
+      for (let column = 0; column < stride; column += 1) {
+        const p = ring[column];
+        final[row * stride + column] = [p[0] + (middle[0] - p[0]) * share, p[1], p[2] + (middle[1] - p[2]) * share];
+      }
+    }
+  }
   const uvs = [];
   const colors = [];
   finalUnit.forEach((p, vertex) => {
