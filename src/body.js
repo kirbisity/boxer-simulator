@@ -48,16 +48,17 @@ const LENGTH = {
 // (10 mm on a man of 1.75 m): a longer neck. A build with a neck of its own (the apes) keeps it. The head's segment is as
 // heavy as it was and as thick as on the table's length (its radii: the neck's capsule).
 const NECK_RISE = 0.0057;
-// The arms and shoulders, fractions of standing height, one table per sex (2026-11-11: "size down the entire
-// shoulder and arm assembly"; set to the numbers given). The figures now are the base models' own (src/basebody-data.js
+// The arms and shoulders, fractions of standing height, one table per sex (2026-11-11: the whole shoulder and arm
+// assembly sized down). The figures now are the base models' own (src/basebody-data.js
 // joints): `upperArm` the shoulder joint to the elbow (male 0.1775, female 0.1623); `forearmToFist` the elbow to the point the
 // game's hand is drawn on, the model's elbow to wrist (male 0.1422, female 0.1300) and the hand's heel to its point
 // (basebody.js BASE_BODY.handSeat, 0.0117); `shoulderSpan` between the shoulder joints, narrower than the models' (male
-// 0.2022, female 0.1914) as asked. Were Drillis & Contini's 0.186 and 0.19 for both, and 0.2 (x 0.92 for a woman).
+// 0.2022, female 0.1914). Were Drillis & Contini's 0.186 and 0.19 for both, and 0.2 (x 0.92 for a woman).
 // The arm's reach (upper arm and forearm to the fist, a share of height) the game's blows were timed and its fights spaced
-// at: Drillis & Contini's 0.186 + 0.19. A body's `reachScale` is its own reach over this at its height: a shorter arm straightens
-// in less time (an arm's blow is timed by its length, not its build: physics.js advances it 1 / reachScale as fast), and the
-// distances a fight was measured at are this much shorter for it.
+// at: Drillis & Contini's 0.186 + 0.19. A body's `reachScale` is its own reach over this at its height; the tests that place two
+// men at a measured distance shorten it by this much. Nothing in the simulation reads it: a blow's timing is the move's own
+// (moves.js), and the fist's top speed is set per metre of arm (BODY.topSpeedPerMetre), so a shorter arm is slower at the fist
+// by the same share and straightens in about the same time.
 export const REACH_REFERENCE = 0.376;
 export const ARM_LENGTHS = {
   male: { upperArm: 0.1775, forearmToFist: 0.1539, shoulderSpan: 0.19 },
