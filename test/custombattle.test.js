@@ -136,3 +136,20 @@ test('the walls of Pyongyang: the battle\'s own wall, both sides drawn up before
   assert.equal(changeBattle(hazy, { map: 'field' }).weather, null, 'a ground without weathers of its own has none');
   assert.equal(customLevel(changeBattle(hazy, { map: 'field' })).weather, undefined);
 });
+
+test('the Jiangnan canal town: the wokou battle\'s court on the place\'s square, its weathers offered, the first by default', async () => {
+  const { CANAL_TOWN, CANAL_TOWN_WEATHER } = await import('../src/places/canaltown.js');
+  const { wokouBattle } = await import('../src/story/battles/02-wokou.js');
+  const { changeBattle, firstBattle, customLevel, customWeathersOf } = await import('../src/custombattle.js');
+  const battle = changeBattle(firstBattle(), { map: 'canaltown' });
+  const level = customLevel(battle);
+  // The same place and floor as the battle (test/story-places.test.js holds the court clear, level paving).
+  assert.equal(level.scene, wokouBattle.view.scene);
+  assert.deepEqual(level.arena, CANAL_TOWN.court);
+  for (const corner of ['red', 'blue']) for (const man of battle.sides[corner].men) assert.ok(Math.abs(man.at[0]) <= CANAL_TOWN.court.halfX && Math.abs(man.at[1]) <= CANAL_TOWN.court.halfZ, `${corner} stands on the court (${man.at})`);
+  const weathers = customWeathersOf('canaltown');
+  assert.deepEqual(weathers.map((weather) => weather.key).sort(), Object.keys(CANAL_TOWN_WEATHER).sort());
+  assert.equal(weathers[0].key, Object.keys(CANAL_TOWN_WEATHER)[0]);
+  assert.equal(level.weather.town.name, 'damp');
+  assert.equal(customLevel(changeBattle(battle, { weather: 'rain' })).weather.town.name, 'rain');
+});

@@ -121,6 +121,10 @@ const UI_ICON_PATHS = {
   // ---- The weather of a ground (custombattleview.js) ----
   // Snow falling: a flake.
   snowflake: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/><path d="M9.6 4.6L12 6.6l2.4-2M9.6 19.4l2.4-2 2.4 2M4.6 10.6l2.9-1.1-.5-3M19.4 13.4l-2.9 1.1.5 3M4.6 13.4l2.9 1.1-.5 3M19.4 10.6l-2.9-1.1.5-3"/>',
+  // Showers: a cloud and its rain.
+  rain: '<path d="M7.2 13.5a3.8 3.8 0 0 1 .4-7.6 4.9 4.9 0 0 1 9.2 1.6 3 3 0 0 1-.3 6z"/><path d="M8.5 16.5l-1 3M12.5 16.5l-1 3M16.5 16.5l-1 3"/>',
+  // Broken cloud: a cloud with the sun behind it.
+  cloud: '<path d="M8 19a3.6 3.6 0 0 1 .4-7.2 4.6 4.6 0 0 1 8.7 1.5 2.9 2.9 0 0 1-.3 5.7z"/><path d="M14 8.5a3.5 3.5 0 0 1 6.2 2.2M17.5 3.5v1.5M21.5 6.5l-1.1.9"/>',
   // A hazier sky: a cloud over the haze's bands.
   haze: '<path d="M7.2 13.5a3.8 3.8 0 0 1 .4-7.6 4.9 4.9 0 0 1 9.2 1.6 3 3 0 0 1-.3 6z"/><path d="M4 17h16M6.5 20.5h11"/>',
 

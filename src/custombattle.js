@@ -14,6 +14,7 @@ import { tname } from './i18n.js';
 import { SUBWAY_ARENA } from './props/subway.js';
 import { wallWorks } from './story/ground/walls.js';
 import { pyongyangPlan } from './places/pyongyang.js';
+import { CANAL_TOWN, canalTownPlan } from './places/canaltown.js';
 
 export const CUSTOM_BATTLE = {
   // Its key where a level's would be (main.js state.scenario; the menu's card).
@@ -52,6 +53,9 @@ export const CUSTOM_BATTLE = {
     // second. The strip is level for 10 m either side of the road (`halfZ` 9 inside it) the whole way to the wall's foot.
     // (Made on first use: the wall's works come from story/ground/walls.js, which the bundle may set up after this file.)
     get pyongyang() { return (customPyongyangMade ??= customPyongyang()); },
+    // The Jiangnan canal town of the wokou chapter (places/canaltown.js): its quay square, the court chapter 2's battle
+    // is fought on (story/battles/02-wokou.js), level paving at the ground's own height, so the floor is the place's.
+    get canaltown() { return (customCanalTownMade ??= customCanalTown()); },
   },
   // A side drawn up as the level has it: ten or twelve abreast, the bows and guns in front (formation.js), the riders on the flanks.
   order: { spacing: 1.2, rowSpacing: 1.5, perRow: 12, shootersFront: 4, frontShare: 0.3, frontMost: 14 },
@@ -61,6 +65,7 @@ export const CUSTOM_BATTLE = {
 
 // (Where the place is not on the page, the custom test page's stand-in says so: its ground is not offered.)
 if (pyongyangPlan.absent) delete CUSTOM_BATTLE.maps.pyongyang;
+if (canalTownPlan.absent) delete CUSTOM_BATTLE.maps.canaltown;
 
 const CUSTOM_CORNERS = ['red', 'blue'];
 
@@ -100,6 +105,24 @@ export function customUnitsOf(faction) {
 }
 
 let customPyongyangMade = null;
+let customCanalTownMade = null;
+
+/** The Jiangnan canal town as a custom battle's ground (CUSTOM_BATTLE.maps.canaltown). */
+function customCanalTown() {
+  return {
+    label: 'Jiangnan canal town', icon: 'pagoda',
+    // (The square's court, the battle's own: places/canaltown.js CANAL_TOWN.court, kept clear and level by the place.)
+    arena: { ...CANAL_TOWN.court },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 22, maxDistance: 28 },
+    // The place's own weathers (places/canaltown.js CANAL_TOWN_WEATHER and its open air's), its first the default: the
+    // morning after rain with mist on the water, showers passing, broken cloud on a dry day.
+    weathers: [
+      { key: 'damp', label: 'Mist after rain', icon: 'haze' },
+      { key: 'rain', label: 'Showers', icon: 'rain' },
+      { key: 'dry', label: 'Broken cloud, dry', icon: 'cloud' },
+    ],
+  };
+}
 /** The walls of Pyongyang as a custom battle's ground (CUSTOM_BATTLE.maps.pyongyang). */
 function customPyongyang() {
   // (The wall's foot and height are the battle's own, story/battles/03-pyongyang.js PYONGYANG_1593.wall: written here

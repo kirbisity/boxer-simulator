@@ -72,6 +72,8 @@ export const SCENE_MUSIC = {
   coastFort: 'china',
   coastVillage: 'china',
   jiangnan: 'china',
+  // The story's canal town, as a custom battle's ground (custombattle.js).
+  canaltown: 'china',
   // The horse-archer battles and their plains (no music of the steppe or of Parthia here): Mobei is the Han army's, the
   // Catalaunian Plains and Carrhae the Romans' (the side the player leads).
   mobei: 'china',
