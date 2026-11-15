@@ -945,25 +945,26 @@ export function buildPyongyang() {
       height: (x, z) => { if (z > t.outside.z[1] && x >= t.river.field.x[0] && x <= t.river.field.x[1]) return tkFieldAt(plan.south, x, Math.min(z, t.river.field.to)); const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)); return x <= wall.x ? tkFieldAt(plan.outside, Math.max(t.outside.x[0], x), zc) : x < head ? pyFoot(zc) : tkFieldAt(plan.inside, Math.min(plan.east, x), zc); },
       openings: [{ at: [mouth, 0, t.gate.z - t.gate.way / 2], a: [0, t.gate.spring + t.gate.rise * 0.6, 0], b: [0, 0, t.gate.way], floor: 0, dust: 0.2 }],
     },
-    // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun: a bright pale
-    // winter sky with the low sun whole on the wall between passing showers.
-    //   cover, sun   the cloud a little broken, two fifths of the sky, the sun whole in the gaps: the sun between the
-    //                showers draws the wall and lays the long shadows;
-    //   gloom        the showers' cloud a little darker underneath than a fair cumulus (0.45): grey forms on a pale
-    //                sky. At 0.85 (with 60 km of sight) the gate views showed hard slate cloud on saturated blue;
-    //   visibility,  25 km of sight in a 700 m layer (the place's own figure for a continental winter's air; a
-    //   hazeHeight,  shallower layer than the open air's own): enough haze to pale the sky's blue to the white of a
-    //   fine         cold morning and to warm the low sun, with the far hills still seen; `fine` 0.95, ice-crystal haze
-    //                greying more evenly than fine dust does. At 60 km in 300 m the sky was deep blue overhead;
+    // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun: a bright, pale
+    // winter sky, washed blue with thin pearly cloud, the low sun whole on the wall, a few flakes on the wind.
+    //   cover, deck  a quarter of the sky in thin cloud (0.26), its forms soft slabs with wide veiled edges
+    //                (deck 0.6) rather than lumps with outlines: at 0.42 and lumps the gate views showed blotches;
+    //   gloom        0: the cloud's underside as light as the open air draws it (a thin cloud lit through by a low
+    //                sun). At 0.45 it was mid-grey, at 0.85 near black against saturated blue behind the gate;
+    //   sun          the sun whole between the clouds: it draws the wall and lays the long shadows;
+    //   visibility,  35 km in an 800 m layer, `fine` 1.6 (small-particle haze, scattering blue more than red):
+    //   hazeHeight,  enough haze to pale the blue to a washed one without greying it. Turned against the sky
+    //   fine         behind the gate (median and colour of its top corners): 9 km with fine 0.6 made it an even
+    //                grey lid (median 122, neutral); 16 to 20 km with fine 1.2 to 1.5 a pale grey (129 to 138, nearly
+    //                neutral); 35 km with 1.6 a pale blue (144, rgb about 126 146 159);
     //   fall.thick   12 km of sight in the thick of a shower, against the open air's 900 m: a showery snow, not a
     //                blizzard. The falling snow's veil is lit as if the sun reached all of it, so toward the sun a
     //                thick one is a white wall in front of the cloud that sheds it (at 4000 m 1.8 percent of the
     //                sunward frame clipped in a shower). A workaround, asked of the open air as R10 (c);
-    //   grade.ev     0.6 of a stop under what the open air's meter gives (0.9 kept a darker day): the meter allows for
-    //                the snow, but a low sun in front of the camera over a frame of snow puts the sunlit drifts on the
-    //                curve's shoulder; at 0.6 the sunward frames clip 0.2 percent or less, all of it in the glow at
-    //                the sun, and the gate views sit a third of a stop brighter than at 0.9. Warmth a little up, for
-    //                the low sun; contrast a little down, for the paler sky.
+    //   grade        ev +0.1 of a stop over the open air's meter and contrast 0.95 (a bright, soft morning look:
+    //                the gate's median 151, the sky behind it 144); saturation 0.95, warmth +0.02 for the low sun.
+    //                Sunward frames clip 0.01 percent (the strip at T 420): the haze and the thin cloud spread
+    //                the sun's glow instead of standing it against dark cloud.
     // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall.
     // 'siegesnowhazy': the same showers in the hazier, darker sky the gate views had before the sunward work (the
     // open air's own flurries haze: 14 km in its 900 m layer, and 4 km in the thick of a shower), kept to be compared
@@ -971,7 +972,7 @@ export function buildPyongyang() {
     weathers: { snow: 'siegesnow', hazy: 'siegesnowhazy', bare: 'clear' },
     first: 'snow',
     own: {
-      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.24, saturation: 0.94, warmth: 0.03, ev: -0.6 }, cover: 0.42, sun: 1, gloom: 0.45, fine: 0.95, visibility: 25000, hazeHeight: 700, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 0.95, saturation: 0.95, warmth: 0.02, ev: 0.1 }, cover: 0.26, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
       siegesnowhazy: ['flurries', { label: 'Snow showers on the wall, hazier sky', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }],
     },
   };
