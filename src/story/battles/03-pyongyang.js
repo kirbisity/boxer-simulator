@@ -63,9 +63,13 @@ export const PYONGYANG_1593 = {
   // The fowling pieces behind the columns, shooting at the walk; the column's officer (a 把总) with them.
   guns: { count: 8, x: PYONGYANG_FRONT - 5, from: -7, to: 7 },
   officer: [PYONGYANG_FRONT - 4.5, 0],
-  // The generals' household men (家丁: OUTFITS mingElite, the roster's General's Retainer) in the front rank of each ladder's column, one on each flank (the front stays on the form-up line), two to a
-  // ladder: the paid retainers led the storming (user, 2026-11-15: the column was all one kit).
-  retainers: { ahead: 0, apart: 2.6, styles: ['guandao', 'dao'] },
+  // The generals' household men (家丁: OUTFITS mingElite, the roster's General's Retainer) on the flanks of each ladder's column's front rank (the
+  // front stays on the form-up line; the battle stays at 90 men), two to a ladder, in crimson lamellar or crimson brigandine (designs 5, 0): the paid retainers led the storming (user, 2026-11-15: the column was all one kit).
+  retainers: { ahead: 0, apart: 2.6, styles: ['guandao', 'dao'], designs: [5, 0] },
+  // Within each column (user, 2026-11-15: more retainers, and men in the bell helmet and the plain brigandine): its two dao men are
+  // retainers too, and its second rank (the spears) wears the brigandine under the bell helmet (OUTFITS mingBrigandine 0, the yong bell; 2,
+  // the cloud bell). Their builds and weapons are their own; only the kit changes.
+  kits: { retainer: ['dao'], brigandine: { rank: 1, designs: [0, 2] } },
   // The guns (physics/artillery.js). Li Rusong brought 200+ guns (Hawley, The Imjin War, 2005, p. 54); on the 8th they
   // pounded the gates (a gate broken by them, Turnbull 2008 p. 60) and drove back Konishi's sortie (p. 61). His southern
   // troops were Qi Jiguang's, whose cart camps carried the folangji and the great general (练兵实纪 杂集). At the army's
@@ -116,7 +120,19 @@ export const pyongyangBattle = {
       red.men.push(...part.men);
       red.places.push(...part.places);
     };
-    for (const z of spec.wall.ladders) add(koreaRows({ at: [spec.column.front, z], styles: spec.column.styles, abreast: spec.column.abreast, spacing: spec.column.spacing, rowSpacing: spec.column.rowSpacing, make: (style) => southern(style) }));
+    const columns = [];
+    for (const z of spec.wall.ladders) {
+      columns.push(red.men.length);
+      add(koreaRows({ at: [spec.column.front, z], styles: spec.column.styles, abreast: spec.column.abreast, spacing: spec.column.spacing, rowSpacing: spec.column.rowSpacing, make: (style) => southern(style) }));
+    }
+    // The column's own men re-kitted (no draw of the random stream: the cast is the same men at every seed).
+    for (const first of columns) {
+      spec.column.styles.forEach((style, k) => {
+        const man = red.men[first + k];
+        if (spec.kits.retainer.includes(style)) man.outfit = { kind: 'mingElite', design: spec.retainers.designs[k % 2] };
+        else if (Math.floor(k / spec.column.abreast) === spec.kits.brigandine.rank) man.outfit = { kind: 'mingBrigandine', design: spec.kits.brigandine.designs[k % 2] };
+      });
+    }
     const gunsAt = (k) => spec.guns.from + ((spec.guns.to - spec.guns.from) * k) / (spec.guns.count - 1);
     for (let k = 0; k < spec.guns.count; k += 1) add({ men: [southern('matchlock')], places: [[spec.guns.x, gunsAt(k)]] });
     add({ men: [southern('dao', 'elite')], places: [spec.officer] });
@@ -144,7 +160,7 @@ export const pyongyangBattle = {
     const household = seededRandom(seed + 7919);
     for (const z of spec.wall.ladders) {
       spec.retainers.styles.forEach((style, k) => {
-        red.men.push(mingSoldier(household, style, 'elite', { people: 'qi', design: spec.design.mingElite }));
+        red.men.push(mingSoldier(household, style, 'elite', { people: 'qi', design: spec.retainers.designs[k % 2] }));
         red.places.push([spec.column.front + spec.retainers.ahead, z + (k ? spec.retainers.apart : -spec.retainers.apart)]);
       });
     }
