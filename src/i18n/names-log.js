@@ -35,11 +35,11 @@ const LOG_PHRASES_ZH = {
   'one clean shot': '一记干净的重击', 'right': '右', 'left': '左', 'hip': '胯', 'wrist': '手腕', 'ankle': '脚踝', 'jaw': '下巴', 'nose': '鼻子',
   'skull': '颅骨', 'ribs': '肋骨', 'collarbone': '锁骨', 'fighter': '斗士',
   'glances off the helmet': '被头盔滑开', 'glances off the plate': '被板甲滑开', 'glanced off the armour': '被甲胄滑开', 'braced for it': '稳住了',
-  'scutum': '大盾', 'parma': '小圆盾', 'shield torn away': '盾被夺走', 'ridden down': '被马踏倒', 'trampled': '被践踏', 'unhorsed': '落马',
+  'Fighter': '斗士', 'scutum': '大盾', 'parma': '小圆盾', 'shield torn away': '盾被夺走', 'ridden down': '被马踏倒', 'trampled': '被践踏', 'unhorsed': '落马',
   // Parts struck.
   head: '头部', trunk: '躯干', torso: '躯干', chest: '胸口', belly: '腹部', legs: '腿', leg: '腿', arm: '手臂', arms: '手臂', hand: '手', hands: '手',
   shield: '盾', neck: '脖子', face: '脸', body: '身体', back: '后背', foot: '脚', feet: '脚', hip: '胯', pelvis: '骨盆', shoulder: '肩', forearm: '前臂',
-  upperarm: '上臂', thigh: '大腿', shin: '小腿', knee: '膝', elbow: '肘', guard: '格挡', weapon: '武器', blade: '刃',
+  upperarm: '上臂', shank: '小腿', limb: '四肢', fore: '前腿', hind: '后腿', foreleg: '前腿', hindleg: '后腿', flank: '侧腹', rump: '臀部', thigh: '大腿', shin: '小腿', knee: '膝', elbow: '肘', guard: '格挡', weapon: '武器', blade: '刃',
 };
 
 // Phrases with a name or a number in them: [pattern, its Chinese].
