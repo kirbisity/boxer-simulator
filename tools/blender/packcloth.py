@@ -5,6 +5,7 @@
 #
 # A family not baked in <bake dir> keeps its cell (and its means) from the atlas already in src/clothmaps-data.js, so a new
 # family can be baked alone and added (its cells re-encoded once more).
+# A baked family's tile is worn (tools/blender/wear.py worn_cloth) before it is laid in; a kept cell is as it was (already worn).
 #
 # The atlas is 8 x 8 cells of CELL pixels (2048² in all: the GPU budget, and a power of two so every mipmap level halves
 # every cell exactly), each family's tile filtered down to CELL - 2 PAD and wrapped PAD pixels round on
@@ -26,6 +27,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pack import normals, resample, to8  # noqa: E402
+import wear  # noqa: E402
 
 # In the order of src/detailmaps.js CLOTH_FAMILIES (each one's cell is its index); the tile's side in metres as baked.
 FAMILIES = ['plain', 'twill', 'denim', 'quilt', 'diamondQuilt', 'felt', 'damask', 'leather', 'fur', 'feathers', 'straw', 'cordura', 'ripstop', 'knit',
@@ -49,10 +51,11 @@ def cell_of(folder, family):
     n = normals(normal, inner)
     shade = resample(albedo, inner)[:, :, 0] * (1 - AO_IN_SHADE * (1 - resample(orm, inner)[:, :, 0]))
     rough = resample(orm, inner)[:, :, 1]
-    tile = np.dstack([n[:, :, 0], n[:, :, 1], shade, rough])
+    # The used look (tools/blender/wear.py worn_cloth, by the family's kind of material), and the means taken from the worn tile.
+    tile = wear.worn_cloth(family, np.dstack([n[:, :, 0], n[:, :, 1], shade, rough]))
     # Wrapped round by PAD on every side.
     index = (np.arange(CELL) - PAD) % inner
-    return tile[np.ix_(index, index)], [round(float(shade.mean()), 4), round(float(rough.mean()), 4)]
+    return tile[np.ix_(index, index)], [round(float(tile[:, :, 2].mean()), 4), round(float(tile[:, :, 3].mean()), 4)]
 
 
 def current_atlas():

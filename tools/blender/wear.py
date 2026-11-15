@@ -12,6 +12,9 @@
 #       worn files: the wear would be laid on twice. (The clean images have been through WebP once already and go through
 #       it again here: where the bakes are at hand, pack them afresh instead.)
 #   python3 tools/blender/wear.py <clean dir> --preview <dir> [name ...]   the worn maps as PNGs, nothing written.
+#   The cloth atlas (src/clothmaps-data.js) the same way: a name of a cloth family (CLOTH_WEAR) wears that family's cell of the
+#   atlas in <clean dir>/clothmaps-data.js (`git show 70afbbc:src/clothmaps-data.js`), and the whole atlas is packed once
+#   more; packcloth.py wears a freshly baked family (worn_cloth). --preview writes the atlas as cloth-atlas.png.
 #
 # What a tile's wear is made of (each a layer over the baked maps; all of them repeat with the tile):
 #   scratches  fine straight scores, mostly a few centimetres long, every way round but more of them across than along (the
@@ -106,6 +109,97 @@ WEAR_KINDS = {
         'chips': [5000, 0.00025, 0.0009, (0.5, 0.44, 0.4)],
         'dust': [0.45, 0.04, (1.12, 1.1, 1.05)],
     },
+    # ---- Cloth, lacing, leather (the cloth atlas, src/clothmaps-data.js: CLOTH_WEAR below). A cell holds only a grey shade (the
+    # fibre's grey times its occlusion, which multiplies the garment's colour over the cell's mean), a roughness and a normal,
+    # and repeats every 4 to 100 mm; so its wear is what shows within a cell: dirt worked into the weave's hollows (the
+    # shade's own dark places stand in for the occlusion), the shade a little uneven in soft patches (rubbed, faded, sweated),
+    # pills, scuffs and creases, and the roughness. Nothing torn, frayed through or holed. The renderer divides the shade by
+    # the cell's mean, which the packer takes from the worn cell, so the garment's colour is kept on average and the wear
+    # shows as unevenness, never as the whole cloth turning darker; fading and dirt across a garment (hems, knees, where it
+    # is handled) are larger than any cell and are not here. `pills` [to a square metre, least and greatest radius (m),
+    # how much paler]. Values set against the steel recipe's "slight" (a full figure shows no mark, only a cloth a little
+    # less new) and judged on the cells' previews and the wearers' sheets.
+    # Wool (twill, felt, an Andean tapestry, jersey): its fibres felt and pill where it rubs, and dirt and grease work in.
+    'wool': {
+        'scratches': None, 'across': 1,
+        'dull': [0.01, 0.02, 0.02], 'patch': [0.003, 0.04],
+        'tarnish': [0.07, (0.9, 0.9, 0.9)],
+        'grime': [0.18, (0.22, 0.2, 0.18), 0.97],
+        'rust': None,
+        'pills': [60000, 0.0003, 0.0008, 0.12],
+    },
+    # Plant-fibre and woven synthetic cloth (linen, cotton, hemp, canvas, denim, ripstop, Cordura, printed camouflage): grey
+    # dirt in the weave's gaps, the shade broken in soft sweated and washed patches, a few short pale rubs where it is
+    # chafed.
+    'linen': {
+        'scuffs': [3000, 0.002, 0.008, 0.0003, 0.0008, 0.08, 0.04, -0.05], 'across': 1,
+        'dull': [0.01, 0.02, 0.015], 'patch': [0.003, 0.04],
+        'tarnish': [0.08, (0.9, 0.9, 0.9)],
+        'grime': [0.2, (0.22, 0.2, 0.18), 0.97],
+        'rust': None,
+    },
+    # Quilted and stitched-through padding (gambesons, arming coats, an ichcahuipilli, a jack): dirt along the stitched
+    # channels, the puffed tops rubbed a little paler.
+    'padded': {
+        'scuffs': [1500, 0.004, 0.015, 0.0008, 0.002, 0.05, 0.03, -0.04], 'across': 1,
+        'dull': [0.01, 0.02, 0.015], 'patch': [0.01, 0.08],
+        'tarnish': [0.08, (0.9, 0.9, 0.9)],
+        'grime': [0.28, (0.22, 0.2, 0.18), 0.97],
+        'rust': None,
+    },
+    # Silk (satin damask, kikko brocade, cloud damask; the lacing braid of Japanese armour): the satin's sheen rubbed duller in
+    # patches and fine lines where the floats are chafed, a shade uneven; little dirt sits on so smooth a face.
+    'silk': {
+        'scratches': [6000, 0.003, 0.02, 0.0001, 0.0003, 0.1, 0.12, -0.02], 'across': 1,
+        'dull': [0.03, 0.08, 0.015], 'patch': [0.01, 0.08],
+        'tarnish': [0.025, (0.9, 0.9, 0.9)],
+        'grime': [0.08, (0.22, 0.2, 0.18), 0.8],
+        'rust': None,
+    },
+    # Vegetable-tanned leather (shoes, boots, belts, straps, hardened hide): darker and glossier where hands and sweat oil it
+    # (the patches: `dull` below 0 there), scuffed pale and matte in short marks, creased dark, dirt in its grain.
+    'leather': {
+        'scuffs': [3000, 0.002, 0.012, 0.0004, 0.0015, 0.12, 0.12, -0.1], 'across': 1,
+        'creases': [600, 0.006, 0.025, 0.0003, 0.0006, 0.3, 0.02, 0.12],
+        'dull': [0.0, -0.06, 0.015], 'patch': [0.01, 0.06],
+        'tarnish': [0.05, (0.9, 0.9, 0.9)],
+        'grime': [0.2, (0.22, 0.2, 0.18), 0.85],
+        'rust': None,
+    },
+    # Fur and feathers: dirt at the roots between the locks or the rows, matted a shade darker in patches.
+    'pelt': {
+        'scratches': None, 'across': 1,
+        'dull': [0.01, 0.03, 0.0], 'patch': [0.005, 0.04],
+        'tarnish': [0.08, (0.9, 0.9, 0.9)],
+        'grime': [0.18, (0.22, 0.2, 0.18), 0.9],
+        'rust': None,
+    },
+    # Plaited straw (waraji, kasa): dirt in the plait, the straw a shade uneven where it has dried and been trodden.
+    'straw': {
+        'scratches': None, 'across': 1,
+        'dull': [0.01, 0.03, 0.01], 'patch': [0.005, 0.03],
+        'tarnish': [0.08, (0.9, 0.9, 0.9)],
+        'grime': [0.22, (0.22, 0.2, 0.18), 0.9],
+        'rust': None,
+    },
+    # Aluminized film (a proximity or fire-entry suit): the mirror film dulled in patches and fine scuffs, soot in its
+    # crinkles. (Its scorching in a fire is the fire's, not this.)
+    'foil': {
+        'scratches': [3000, 0.003, 0.02, 0.0001, 0.0004, 0.2, 0.2, 0.06], 'across': 1,
+        'dull': [0.04, 0.08, 0.02], 'patch': [0.01, 0.06],
+        'tarnish': [0.05, (0.9, 0.9, 0.9)],
+        'grime': [0.25, (0.2, 0.19, 0.18), 0.8],
+        'rust': None,
+    },
+}
+
+# Each cloth family's kind (src/detailmaps.js CLOTH_FAMILIES, whose `metres` size the wear). The lacing of armour is drawn in
+# silk (damask) or cord (twill) and wears with them.
+CLOTH_WEAR = {
+    'plain': 'linen', 'twill': 'wool', 'denim': 'linen', 'quilt': 'padded', 'diamondQuilt': 'padded', 'felt': 'wool',
+    'damask': 'silk', 'leather': 'leather', 'fur': 'pelt', 'feathers': 'pelt', 'straw': 'straw', 'cordura': 'linen',
+    'ripstop': 'linen', 'knit': 'wool', 'jack': 'padded', 'camo': 'linen', 'kikko': 'silk', 'cloudDamask': 'silk',
+    'tapestry': 'wool', 'aluminized': 'foil', 'aluminizedQuilt': 'foil',
 }
 
 # Each tile's material, and the tile's side in metres round and up (detailmaps.js DETAIL_ARMOUR), which sizes the wear. A
@@ -231,9 +325,13 @@ def worn(name, colour, normal, orm, keep=None, studs=None):
     """
     if name not in WEAR:
         return colour, normal, orm
-    clean = (colour.astype(np.float64).copy(), normal.astype(np.float64).copy(), orm.astype(np.float64).copy())
     kind, metres = WEAR[name]
-    spec = WEAR_KINDS[kind]
+    return wear_layers(name, WEAR_KINDS[kind], metres, colour, normal, orm, keep, studs)
+
+
+def wear_layers(name, spec, metres, colour, normal, orm, keep=None, studs=None):
+    """The layers of one kind's recipe (`spec`, a WEAR_KINDS entry) over a tile `metres` (round, up) across, seeded by `name`."""
+    clean = (colour.astype(np.float64).copy(), normal.astype(np.float64).copy(), orm.astype(np.float64).copy())
     rng = np.random.default_rng(seed_of(name))
     shape = colour.shape[:2]
     area = metres[0] * metres[1]
@@ -252,9 +350,11 @@ def worn(name, colour, normal, orm, keep=None, studs=None):
     darker, tint = spec['tarnish']
     colour *= 1 - darker * patch[:, :, None] * (1 - np.asarray(tint))[None, None, :] / max(1e-6, 1 - min(tint))
 
-    # Scratches.
-    if spec.get('scratches'):
-        density, shortest, longest, thin, thick, deep, rougher, dark = spec['scratches']
+    # Scratches (and a cloth's or leather's scuffs and creases, drawn the same way: `creases` softened to their own width).
+    for marking in ('scratches', 'scuffs', 'creases'):
+        if not spec.get(marking):
+            continue
+        density, shortest, longest, thin, thick, deep, rougher, dark = spec[marking]
         across = spec['across']
 
         def scratch(rng, scale):
@@ -269,6 +369,8 @@ def worn(name, colour, normal, orm, keep=None, studs=None):
             return [('line', [(0, 0), (np.cos(angle) * length * scale[0], np.sin(angle) * length * scale[1])], float((0.4 + 0.6 * rng.random()) * faint), max(1, int(round(wide))))]
 
         scored = np.clip(marks(shape, metres, rng, scratch, int(density * area)), 0, 1)
+        if marking == 'creases':
+            scored = np.clip(blur_wrap(scored, thick * per_metre[0]) * 2, 0, 1)
         roughness += rougher * scored
         colour *= 1 - dark * scored[:, :, None]
         height -= deep * scored
@@ -326,6 +428,21 @@ def worn(name, colour, normal, orm, keep=None, studs=None):
         colour = colour * (1 - dust[:, :, None]) + np.minimum(1, colour * np.asarray(dust_colour)[None, None, :] + 0.25) * dust[:, :, None]
         roughness = roughness * (1 - dust) + 0.8 * dust
 
+    # Cloth: pills, small balls of fibre rubbed up out of the cloth where it is handled and chafed (the soft patches), a shade
+    # paler and rougher than the cloth and standing a little proud of it.
+    if spec.get('pills'):
+        density, least, most, paler = spec['pills']
+
+        def pill(rng, scale):
+            radius = least + (most - least) * rng.random() ** 2
+            rx, ry = max(0.6, radius * scale[0]), max(0.6, radius * scale[1])
+            return [('dot', [(-rx, -ry), (rx, ry)], float(0.5 + 0.5 * rng.random()), 0)]
+
+        balls = np.clip(marks(shape, metres, rng, pill, int(density * area * 2)), 0, 1) * np.clip(patch * 1.5, 0, 1)
+        colour = colour * (1 - balls[:, :, None]) + np.minimum(1, colour * (1 + paler)) * balls[:, :, None]
+        roughness = roughness * (1 - balls) + 0.97 * balls
+        height += 0.4 * balls
+
     # Studded cloth: a ring of dirt on the cloth round each head.
     if spec.get('rings') and studs is not None:
         darker, reach = spec['rings']
@@ -349,6 +466,76 @@ def worn(name, colour, normal, orm, keep=None, studs=None):
         share = np.clip(keep, 0, 1)[:, :, None]
         colour, n, orm = (worn_map * (1 - share) + clean_map * share for worn_map, clean_map in zip((colour, n, orm), clean))
     return colour, n, orm
+
+
+def cloth_metres():
+    """Each cloth family's tile side in metres (src/detailmaps.js CLOTH_FAMILIES)."""
+    import re
+    with open(os.path.join(ROOT, 'src', 'detailmaps.js')) as file:
+        return {name: float(metres) for name, metres in re.findall(r"^  (\w+): \{ cell: \d+, metres: ([\d.]+)", file.read(), re.M)}
+
+
+def worn_cloth(family, tile, metres=None):
+    """
+    A cloth family's tile worn (its kind in CLOTH_WEAR): `tile` (h, w, 4: the normal's x and y as packed 0..1, the shade, the
+    roughness), as in the atlas (tools/blender/packcloth.py). Returns the same. A family not in CLOTH_WEAR comes back as it was.
+    The shade's places darker than their neighbourhood (the weave's gaps, the stitching of a quilt, the roots of fur) stand
+    in for the occlusion the grime settles in.
+    """
+    if family not in CLOTH_WEAR:
+        return tile
+    side = metres if metres is not None else cloth_metres()[family]
+    tile = tile.astype(np.float64)
+    nx, ny = tile[:, :, 0] * 2 - 1, tile[:, :, 1] * 2 - 1
+    nz = np.sqrt(np.clip(1 - nx * nx - ny * ny, 0, 1))
+    shade, rough = tile[:, :, 2], tile[:, :, 3]
+    # (Dark against its own neighbourhood, a few threads or 3 mm across, so a print's or a pelt's dark patches are not taken for
+    # hollows.)
+    reach = max(1.5, min(shade.shape[0] / 40, 0.003 * shade.shape[0] / side))
+    occlusion = np.clip(shade / np.maximum(blur_wrap(shade, reach), 1e-3), 0, 1)
+    colour = np.repeat(shade[:, :, None], 3, axis=2)
+    normal = np.dstack([nx, ny, nz]) * 0.5 + 0.5
+    orm = np.dstack([occlusion, rough, np.zeros_like(rough)])
+    colour, normal, orm = wear_layers(family, WEAR_KINDS[CLOTH_WEAR[family]], (side, side), colour, normal, orm)
+    n = normal * 2 - 1
+    return np.dstack([n[:, :, 0] * 0.5 + 0.5, n[:, :, 1] * 0.5 + 0.5, colour.mean(axis=2), orm[:, :, 1]])
+
+
+def wear_atlas(clean_path, families, preview=None):
+    """The cloth atlas of the clean clothmaps-data.js at `clean_path`, the named families' cells worn, written over src/'s."""
+    import json
+    import packcloth
+    import pack
+    text = open(clean_path).read()
+    data = text.split("atlas: '", 1)[1].split("'", 1)[0]
+    order = json.loads(text.split('families: ', 1)[1].split(',\n', 1)[0])
+    means = json.loads(text.split('means: ', 1)[1].split(',\n', 1)[0])
+    atlas = np.asarray(Image.open(io.BytesIO(base64.b64decode(data))).convert('RGBA')).astype(np.float64) / 255
+    cell, pad, grid = packcloth.CELL, packcloth.PAD, packcloth.GRID
+    inner = cell - 2 * pad
+    sides = cloth_metres()
+    for family in families:
+        k = order.index(family)
+        top, left = (grid - 1 - k // grid) * cell, (k % grid) * cell
+        tile = worn_cloth(family, atlas[top + pad:top + pad + inner, left + pad:left + pad + inner], sides[family])
+        index = (np.arange(cell) - pad) % inner
+        atlas[top:top + cell, left:left + cell] = tile[np.ix_(index, index)]
+        means[k] = [round(float(tile[:, :, 2].mean()), 4), round(float(tile[:, :, 3].mean()), 4)]
+        print(family, CLOTH_WEAR[family], 'means', means[k])
+    image = Image.fromarray(pack.to8(atlas), 'RGBA')
+    if preview:
+        image.save(os.path.join(preview, 'cloth-atlas.png'))
+        return
+    buffer = io.BytesIO()
+    image.save(buffer, 'WEBP', quality=packcloth.QUALITY, alpha_quality=90, method=6, exact=True)
+    encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
+    import re
+    text = text.replace(f"atlas: '{data}'", f"atlas: '{encoded}'")
+    text = re.sub(r'^  means: .*,$', lambda match: f'  means: {json.dumps(means)},', text, count=1, flags=re.M)
+    target = os.path.join(ROOT, 'src', 'clothmaps-data.js')
+    with open(target, 'w') as file:
+        file.write(text)
+    print('atlas', len(buffer.getvalue()), 'bytes WebP; wrote', os.path.relpath(target, ROOT))
 
 
 def images_of(block):
@@ -375,7 +562,12 @@ def main():
         preview = arguments[at + 1]
         del arguments[at:at + 2]
         os.makedirs(preview, exist_ok=True)
-    clean_dir, names = arguments[0], arguments[1:] or list(WEAR)
+    clean_dir, names = arguments[0], arguments[1:] or list(WEAR) + list(CLOTH_WEAR)
+    families = [name for name in names if name in CLOTH_WEAR]
+    if families:
+        # (The atlas is one picture: every family not named keeps its clean cell, and the whole is packed once more.)
+        wear_atlas(os.path.join(clean_dir, 'clothmaps-data.js'), families, preview)
+    names = [name for name in names if name in WEAR]
     laced = laced_tiles()
     for file_name, table, quality in (
         ('detailmaps-data.js', pack.ARMOUR, lambda name, key: pack.ARMOUR[name]['quality']),
