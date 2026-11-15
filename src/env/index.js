@@ -34,6 +34,7 @@ import { envBuildRocks, envBuildSkyline, envBuildTrees, envPlantRocks, envPlantT
 import { envBeamsLook, envBuildBeams, envBuildParticles, envParticlesFalling, envParticlesPixel, envParticlesSet } from './particles.js';
 import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { envPressForget, envPressStep } from './press.js';
+import { envLieOf } from './lie.js';
 import { activeLook } from '../looks.js';
 import { hidePaintedSky, setRenderer } from '../looks/kit.js';
 import { probeLiteProject } from '../looks/probe-lite.js';
@@ -188,7 +189,8 @@ function envFill(group, place, view, spec, own) {
   }
   // The level ground: the scenery's own, and never less than the floor fought on (a battle's is wider than the place's).
   const keepOut = [Math.max(spec.keepOut[0], arena.halfX + 2), Math.max(spec.keepOut[1], arena.halfZ + 2)];
-  const height = envHeightField(own.terrain, keepOut);
+  // (The fought ground on the physics's own field, lie.js: the same triangles the fighters stand on.)
+  const height = envHeightField(own.terrain, keepOut, envLieOf(place, arena));
   const footprints = envFootprints(view.places[place]);
   const trees = envPlantTrees({ place: own, height, sun, keepOut, footprints });
   const rocks = envPlantRocks({ place: own, height, sun, keepOut, footprints });
@@ -208,6 +210,8 @@ function envFill(group, place, view, spec, own) {
   group.add(parts.sky, parts.terrain, parts.grass, parts.trees, parts.rocks, parts.particles, parts.beams);
   group.userData.envParts = parts;
   group.userData.envHeight = height;
+  // (The land the camera is kept above: render.js groundHeightAt reads a place's child that carries `heightAt`.)
+  group.userData.heightAt = height;
   group.userData.envMap = map.value;
   group.userData.envSkySeen = envSkySeen(trees, height);
   // Where the near crowns begin and where a point is over most of them (m over the ground): between the two the

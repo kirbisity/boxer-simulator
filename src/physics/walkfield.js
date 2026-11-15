@@ -166,7 +166,7 @@ function walkStepCost(grid, from, to) {
   // (No way at all: climbedDistance would read a slope over nothing.)
   if (Math.abs(to[0] - from[0]) + Math.abs(to[1] - from[1]) < 1e-9) return 0;
   for (const wall of grid.walls) if (walkCrosses(from, to, wall.a, wall.b)) return Infinity;
-  return grid.works.ditches.length ? climbedDistance(grid.works, from, to) : Math.hypot(to[0] - from[0], to[1] - from[1]);
+  return grid.works.relief ? climbedDistance(grid.works, from, to) : Math.hypot(to[0] - from[0], to[1] - from[1]);
 }
 
 /** The cost of step `k` out of cell `node` (Infinity off the grid or through a wall), worked out once. */
@@ -183,7 +183,7 @@ function gridStepCost(grid, node, k) {
   if (ii >= 0 && jj >= 0 && ii < grid.nx && jj < grid.nz) {
     const from = walkCentre(grid, node);
     const to = walkCentre(grid, ii * grid.nz + jj);
-    cost = grid.walled[node] || grid.walled[ii * grid.nz + jj] ? walkStepCost(grid, from, to) : grid.works.ditches.length ? climbedDistance(grid.works, from, to) : Math.hypot(to[0] - from[0], to[1] - from[1]);
+    cost = grid.walled[node] || grid.walled[ii * grid.nz + jj] ? walkStepCost(grid, from, to) : grid.works.relief ? climbedDistance(grid.works, from, to) : Math.hypot(to[0] - from[0], to[1] - from[1]);
   }
   grid.steps[at] = cost;
   return cost;
@@ -345,7 +345,7 @@ export function nearestWalk(world, corner, x, z) {
     const straight = Math.hypot(x - centre[0], z - centre[1]);
     if (!(walk + straight < best)) return;
     if (walled && grid.walls.some((wall) => walkCrosses(centre, at, wall.a, wall.b))) return;
-    offer(walk + (grid.works.ditches.length && straight > 1e-9 ? climbedDistance(grid.works, centre, at) : straight), from);
+    offer(walk + (grid.works.relief && straight > 1e-9 ? climbedDistance(grid.works, centre, at) : straight), from);
   };
   for (let i = Math.max(0, cell[0] - 1); i <= Math.min(grid.nx - 1, cell[0] + 1); i += 1) {
     for (let j = Math.max(0, cell[1] - 1); j <= Math.min(grid.nz - 1, cell[1] + 1); j += 1) {

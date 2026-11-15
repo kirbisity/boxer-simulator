@@ -18,10 +18,11 @@ import { pyongyangBattle } from '../src/story/battles/03-pyongyang.js';
 import { storyNewLife } from '../src/story/life.js';
 
 const duel = (red, blue, extra = {}) => () => createWorld([{ inputs: structuredClone(PRESETS[red]), corner: 'red' }, { inputs: structuredClone(PRESETS[blue]), corner: 'blue' }], { seed: 7, ...extra });
-const level = (key) => () => {
+// (`onGround`: in its place, as the game puts it on: an open-air place's floor then lies as its land does, env/lie.js.)
+const level = (key, onGround = false) => () => {
   const scenario = SCENARIOS[key];
   const cast = scenario.cast(seededRandom(7));
-  return createWorld([...cast.red.map((inputs) => ({ inputs, corner: 'red' })), ...cast.blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 7, arena: scenario.arena, formation: scenario.formation });
+  return createWorld([...cast.red.map((inputs) => ({ inputs, corner: 'red' })), ...cast.blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 7, arena: scenario.arena, formation: scenario.formation, ...(onGround ? { place: scenario.scene } : {}) });
 };
 
 const story = (battle) => () => {
@@ -46,6 +47,11 @@ const FIGHTS = {
   'cajamarca': [level('cajamarca'), 10],
   // A story battle on the lie of the land (physics/fieldworks.js ground): the columns' march over it under the walls' fire.
   'pyongyang 1593': [story(pyongyangBattle), 40],
+  // The open-air places as the game stages them, on the lie of their land (env/lie.js): a duel in the meadow, a
+  // mounted pair in the field, Sekigahara in its valley.
+  'meadow duel': [duel('heavy', 'light', { place: 'meadow', arena: { halfX: 9, halfZ: 7 } }), 20],
+  'field knights': [duel('knight', 'samurai', { place: 'field', arena: { halfX: 45, halfZ: 30 } }), 20],
+  'sekigahara ground': [level('sekigahara', true), 6],
 };
 
 /** A 32-bit FNV-1a hash of a world's particles (rounded to 0.1 mm) and its event count. */
