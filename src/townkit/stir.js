@@ -12,7 +12,6 @@
 // envGust), the wet and the snow the weather's (uTkWet, uTkSnow, uTkRain).
 
 import { ENV_GLSL, envUniforms } from '../env/air.js';
-import { tkBeams } from './beams.js';
 import { tkgBuilder, tkgFrame } from './geo.js';
 import { tkRandom } from './tex.js';
 import { tkWeather } from './weather.js';
@@ -372,17 +371,9 @@ export function tkStir(seed = 1) {
         carried.push(mesh);
         group.add(mesh);
       }
-      // The light in the air (beams.js: a workaround, marked there). Every sheet of it covers the screen, so not on
-      // the low tier.
-      if (tier !== 'low') {
-        const beams = tkBeams();
-        carried.push(beams);
-        group.add(beams);
-      }
       const tick = (time, wind, view, open) => {
         // What the air carries is lit and moved by the open air; without it the place is as it was built.
-        // (The sheets of beams.js put right the open air's walk of each sight line: nothing to draw where it walks none.)
-        for (const mesh of carried) mesh.visible = open && !(mesh.userData.tkWalked && (view?.env?.airWalk ?? 'none') === 'none');
+        for (const mesh of carried) mesh.visible = open;
       };
       return { group, tick };
     },
