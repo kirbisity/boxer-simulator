@@ -1492,6 +1492,18 @@ function neckUnderHead(rig, placed, { frame, morph }, height) {
     const high = Math.min(bins - 1, low + 1);
     return filled[low] + (filled[high] - filled[low]) * (at - low);
   };
+  // (The neck's open top, the base mesh's edge under the head: points on an edge only one triangle uses.)
+  const edges = new Map();
+  const tri = rig.triangles;
+  for (let corner = 0; corner < tri.length; corner += 3) {
+    const c = [0, 1, 2].map((k) => rig.render.source[tri[corner + k]]);
+    for (let k = 0; k < 3; k += 1) {
+      const [a, b] = [c[k], c[(k + 1) % 3]].sort((p, q) => p - q);
+      if (a !== b) edges.set(`${a}|${b}`, (edges.get(`${a}|${b}`) ?? 0) + 1);
+    }
+  }
+  const rim = new Set();
+  for (const [key, uses] of edges) if (uses === 1) for (const vertex of key.split('|')) rim.add(Number(vertex));
   for (const { vertex, x, y, z, angle } of local) {
     const line = jaw(angle);
     const own = ownTop(angle);
@@ -1508,7 +1520,10 @@ function neckUnderHead(rig, placed, { frame, morph }, height) {
     const rho = Math.hypot(x, z);
     // (What stands much further out than the lid, the trapezius' slope to the shoulder, is left where it is.)
     const weight = 1 - ease(reach[0], reach[1], rho / line.r);
-    const lifted = Math.min(top, y + (up - y) * weight);
+    // (The neck's open top all the way up to its top: read from its own and the neighbouring bins' highest points, a bin behind
+    // the jaw's angle whose top points stood under its neighbour's took a top from them and rose short of it, 5 mm under the
+    // line's own on a man of BMI 15, and the neck's edge dipped there in a notch under the head.)
+    const lifted = rim.has(vertex) && weight >= 1 ? top : Math.min(top, y + (up - y) * weight);
     // (Out or in to the head's wall run on below the line (its `fill` and `slope`: the jaw's angle and the nape, or the throat
     // under the jaw), less `margin`, by a curve flat at both ends: the neck leaves its own course smoothly, and meets the head's
     // wall along it, so the two are lit alike across the join. Above the line drawn in, inside the head, more as it rises.)
