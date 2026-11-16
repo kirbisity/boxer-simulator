@@ -32,7 +32,7 @@ import { createCameraRig } from './camerarig.js';
 import { BONE } from './rig.js';
 import { adaptiveSize, createAdaptiveResolution } from './adaptres.js';
 import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
-import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
+import { createTapper, createWatchCam, focusOn, frameAll, pickMan, stepAuto, stepFree, zoomBy, zoomLimits } from './watchcam.js';
 import { forgetTutorial, installTutorial, markTutorialDone, TUTORIAL, TUTORIAL_STEPS, tutorialDone, tutorialWanted } from './tutorial.js';
 import { checkButtons } from './uicheck.js';
 import { ARMIES, battleOf, crewFighter, SCENARIOS, scenarioFighters } from './scenarios.js';
@@ -1229,7 +1229,7 @@ function followCamera(fighter, dt) {
   if (state.game === 'story') story.steer(dt);
 }
 
-/** The men as the watching camera sees them: where each stands, how high his neck is, and whether he is left lying. */
+/** The men as the watching camera sees them: where each stands, how high his neck is, whether he is still in the fight (not out, fled or dormant), and whether he is left lying. */
 function watchMen(world) {
   return world.fighters.map((fighter) => ({
     id: fighter.id,
@@ -1237,29 +1237,30 @@ function watchMen(world) {
     y: fighter.x[P.neck * 3 + 1],
     z: fighter.x[P.pelvis * 3 + 2],
     up: fighter.state === 'up',
+    in: fighter.state !== 'out' && !fighter.fled && !fighter.dormant,
     gone: fighter.state === 'out' && (fighter.outFor ?? 0) > WORLD.goneSeconds,
   }));
 }
 
 /**
- * The camera when watching. Auto: the middle of everyone, a crowd drawn back to fit (a pair keeps the
- * zoom the viewer gave it). Free (the viewer zoomed or tapped a man): it stays where he put it and
- * follows the man he tapped, or the men near where it looks (watchcam.js).
+ * The camera when watching. Auto (watchcam.js stepAuto): springs on the men still fighting, their middle and the room they
+ * take (a pair held at the zoom it opened on unless it needs more, a crowd drawn back to fit, up to the level's furthest).
+ * Free (the viewer zoomed or tapped a man): it stays where he put it and follows the man he tapped, or the men near where it
+ * looks (watchcam.js).
  */
 function watchCamera(world, middle, dt) {
-  const spread = Math.max(0, ...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - middle[0], fighter.x[26] - middle[2])));
-  watchCam.spread = spread;
   const orbit = scene.orbit;
+  const men = watchMen(world);
   if (watchCam.mode === 'free') {
-    stepFree(watchCam, orbit, watchMen(world), dt);
+    const spread = Math.max(0, ...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - middle[0], fighter.x[26] - middle[2])));
+    watchCam.spread = spread;
+    stepFree(watchCam, orbit, men, dt);
     const { min, max } = zoomLimits(spread);
     orbit.distance = Math.max(min, Math.min(max, orbit.distance));
-  } else if (world.fighters.length > 2 || world.horses?.length) {
-    // A crowd needs a wider shot: back off with the spread of the fighters.
-    const furthest = levelNow()?.camera?.maxDistance ?? Infinity;
-    orbit.distance += (Math.min(furthest, frameDistance(spread)) - orbit.distance) * (1 - 0.97 ** (dt * 60));
-    watchCam.reframing = false;
-  } else stepReframe(watchCam, orbit, spread, dt);
+    return;
+  }
+  const pair = world.fighters.length <= 2 && !world.horses?.length;
+  stepAuto(watchCam, orbit, men, dt, { pair, furthest: levelNow()?.camera?.maxDistance ?? Infinity, lens: { fov: scene.camera.fov, aspect: scene.camera.aspect } });
 }
 
 // The camera's small bar: what the camera is doing, and 'Frame all' to go back to the whole field.
@@ -1311,14 +1312,15 @@ function drawWorld(dt, drawIt = true) {
   const cameraDt = state.paused ? 0 : dt;
   if (followed) followCamera(followed, cameraDt);
   else if (!sheet) watchCamera(world, pelvisMid, cameraDt);
-  // A design sheet holds its own framing; so does a viewer who has taken the camera (it follows his man or men).
+  // The orbit's look point is each camera's own (the follow camera's, the watching camera's springs, a design sheet's framing): placed as it is.
   // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall). (A stage's floors are its terrain's, which the arm below knows.)
-  placeCamera(scene, followed || sheet || watchCam.mode === 'free' ? null : pelvisMid, { ground: !sheet && !world.stage, dt: cameraDt });
+  placeCamera(scene, null, { ground: !sheet && !world.stage, dt: cameraDt });
   // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js), from the man played (a cutscene's or the ending's camera is looking at someone else: from what it looks at).
-  // The viewer's own turn of the view only shortens.
+  // The viewer's own turn of the view only shortens. (The watching camera framing by itself is nobody's hand: the arm may take it round or over
+  // what is in the way, sprung, rather than leave it a metre behind a tree trunk the line to the men runs through.)
   // (In a stage, the whole castle's walls, not only the sections awake: a section waking is no jump of the camera. Paused, the camera holds still.)
   const own = followed && !endingCam && !cutsceneDirector.active && !twistDirector.active && !story.filming;
-  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? cameraTerrain(world) : null, room: world.stage ? null : cameraWalls, subject: own ? followView.subject : null, free: !followed || followCam.state.wasManual, dt: cameraDt });
+  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? cameraTerrain(world) : null, room: world.stage ? null : cameraWalls, subject: own ? followView.subject : null, free: followed ? followCam.state.wasManual : watchCam.mode === 'free', dt: cameraDt });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);
@@ -4043,6 +4045,7 @@ function fight(red, blue, { seed = 1, distance = null, paused = false, place = s
   state.paused = paused;
   resetDrama(state.drama);
   resetChargeFeel();
+  watchCam = createWatchCam();
   $('#banner').hidden = true;
   rebuildViews();
   return state.world.fighters.map((fighter) => fighter.style);

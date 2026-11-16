@@ -81,7 +81,7 @@ export const armDirection = (yaw, pitch) => [Math.cos(pitch) * Math.cos(yaw), Ma
  * `reset()`: the next solve starts at once where the arm should be (a new place, a cut).
  */
 export function createArm(spec = ARM) {
-  const arm = { ready: false, deficit: 0, deficitV: 0, yaw: 0, pitch: 0, yawV: 0, pitchV: 0, slack: 0, key: '0:0', kept: 0, blocked: 0 };
+  const arm = { ready: false, wanted: 0, deficit: 0, deficitV: 0, yaw: 0, pitch: 0, yawV: 0, pitchV: 0, slack: 0, key: '0:0', kept: 0, blocked: 0 };
 
   function reset() {
     arm.ready = false;
@@ -149,11 +149,17 @@ export function createArm(spec = ARM) {
     const mustDeficit = Math.max(0, wanted - goal.low);
     const mayDeficit = Math.max(0, wanted - goal.high);
     if (!arm.ready) {
-      Object.assign(arm, { ready: true, deficit: mustDeficit, deficitV: 0, yaw: goal.dy, pitch: goal.dp, yawV: 0, pitchV: 0, slack: 0, key: goal.key, kept: 0, blocked: 0 });
+      Object.assign(arm, { ready: true, wanted, deficit: mustDeficit, deficitV: 0, yaw: goal.dy, pitch: goal.dp, yawV: 0, pitchV: 0, slack: 0, key: goal.key, kept: 0, blocked: 0 });
     } else {
       // (Never more short than there is arm to shorten: a wanted distance that falls (the look point arriving from far off, a zoom in) leaves no
       // deficit of metres behind it to be let out for seconds with the camera on top of him.)
       arm.deficit = Math.min(arm.deficit, Math.max(0, wanted - spec.nearest));
+      // (A wanted distance that grows (a zoom out, the watching camera drawing back from a crowd) while the arm is held short, or while its ball
+      // already touches something, does not push the camera on into the wall: the growth is taken as more deficit, and comes out only as the way
+      // clears, slowly. Passed through, the camera stepped out a frame's growth and the last check cut it back the next: a sawtooth of a few
+      // millimetres every frame, and a stop dead from full speed against a wall the zoom ran into.)
+      const growth = wanted - arm.wanted;
+      if (growth > 0 && (arm.deficit > 1e-4 || goal.low < wanted - 1e-4)) arm.deficit += growth;
       arm.kept = goal.key === arm.key ? arm.kept + dt : 0;
       arm.key = goal.key;
       // In at once (a spring, not a step); out only after the way has been clear (for the bigger ball) for `quiet` s, and slowly.
@@ -207,6 +213,7 @@ export function createArm(spec = ARM) {
         arm.deficitV = 0;
       }
     } else arm.blocked = 0;
+    arm.wanted = wanted;
     const position = at(length);
     return { position, yaw: yaw + dy, pitch: finalPitch, distance: length, pulled: wanted - length };
   }

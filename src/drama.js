@@ -4,6 +4,7 @@
 // touches the simulation: it only changes how fast it is stepped and drawn.
 
 import { P } from './body.js';
+import { spring } from './followcam.js';
 import { t } from './i18n.js';
 import { uiIconMarkup } from './uiicons.js';
 
@@ -28,6 +29,18 @@ export const DRAMA = {
   rise: { slowest: 0.75, seconds: 2.6, hold: 0.6, shake: 0.035, pushIn: 0.8, flash: 0 },
   // Real seconds to slow from full speed to the slowest: a slide, not a cut.
   easeIn: 0.18,
+  // The push-in's lens (dramaLens): the share of the moment it takes to close in, and the share at its end it takes to let go, both
+  // eased with no step in speed; what it looks at at most (a share of the way from the camera's own look point to the body part).
+  pushRise: 0.3,
+  pushFall: 0.5,
+  // The share of the moment's own push (`pushIn`) reached at its height: the depth the push-in had before it was eased, whose
+  // envelope (a quarter sine, cut by 1 − u) peaked at 0.69.
+  pushPeak: 0.69,
+  lookShare: 0.65,
+  // Springs (1/s, critically damped) on the push-in's amount and on the point it closes in on: a moment that takes over from another
+  // carries the camera on from where it is, and a head thrown back by the blow is followed, not tracked to the millimetre.
+  lensRate: 9,
+  focusRate: 7,
   shakeHz: 23,
   flashSeconds: 0.6,
   iconSeconds: 2.2,
@@ -112,31 +125,73 @@ export function momentPlaying(drama, now) {
   return Boolean(drama.active) && now < drama.active.start + DRAMA[drama.active.kind].seconds;
 }
 
+/** smoothstep: 0 at 0 and 1 at 1, with no speed at either end. */
+const smooth01 = (x) => {
+  const t = Math.max(0, Math.min(1, x));
+  return t * t * (3 - 2 * t);
+};
+
+/** How far into its push-in a moment is (0..pushPeak) at `u` of its length: in over `pushRise`, held, out over the last `pushFall`. */
+export function pushEnvelope(u) {
+  if (!(u > 0) || u >= 1) return 0;
+  return DRAMA.pushPeak * smooth01(u / DRAMA.pushRise) * smooth01((1 - u) / DRAMA.pushFall);
+}
+
 /**
- * After the camera is placed: push in towards the moment's body part and
- * shake, both dying away as the moment ends.
+ * The push-in's lens at `now` (real s): { amount (0..1 of the moment's push), focus [x, y, z] }, its state kept on `drama.lens`.
+ * `wanted` { amount, focus } is what the moment playing asks for (amount 0 when none is). The amount and the point are springs, so
+ * that a moment that begins, ends or takes over from another moves the camera with no step in place or speed.
+ */
+export function dramaLens(drama, wanted, now) {
+  const lens = (drama.lens ??= { amount: 0, speed: 0, focus: null, velocity: [0, 0, 0], at: now });
+  const dt = Math.max(0, Math.min(0.1, now - lens.at));
+  lens.at = now;
+  if (wanted.focus) {
+    if (!lens.focus || lens.amount < 1e-3) {
+      lens.focus = wanted.focus.slice();
+      lens.velocity = [0, 0, 0];
+    } else for (let axis = 0; axis < 3; axis += 1) [lens.focus[axis], lens.velocity[axis]] = spring(lens.focus[axis], lens.velocity[axis], wanted.focus[axis], DRAMA.focusRate, dt);
+  }
+  [lens.amount, lens.speed] = spring(lens.amount, lens.speed, wanted.amount, DRAMA.lensRate, dt);
+  if (!wanted.focus && lens.amount < 1e-4) {
+    lens.amount = 0;
+    lens.speed = 0;
+  }
+  return lens;
+}
+
+/**
+ * After the camera is placed: push in towards the moment's body part and shake, both dying away as the moment ends. The push and the
+ * turn of the view to the body part rise from nothing (pushEnvelope, through dramaLens's springs): before, the view turned two-thirds
+ * of the way to the body part in the moment's first frame, and a moment that took over from another threw the camera back to where it
+ * stood. The shake is the blow's own jolt and starts with it.
  */
 export function dramaCamera(view, drama, world, now) {
   const active = drama.active;
-  if (!active) return;
-  const spec = DRAMA[active.kind];
-  const u = Math.min(1, (now - active.start) / spec.seconds);
-  const fighter = world.fighters[active.fighter];
-  if (!fighter) return;
-  const base = active.particle * 3;
-  const focus = new THREE.Vector3(fighter.x[base], fighter.x[base + 1], fighter.x[base + 2]);
-  const fade = 1 - u;
+  const spec = active ? DRAMA[active.kind] : null;
+  const fighter = active ? world.fighters[active.fighter] : null;
+  const u = spec ? Math.min(1, (now - active.start) / spec.seconds) : 1;
+  const base = fighter ? active.particle * 3 : 0;
+  const wanted = fighter && u < 1
+    ? { amount: pushEnvelope(u), focus: [fighter.x[base], fighter.x[base + 1], fighter.x[base + 2]] }
+    : { amount: 0, focus: null };
+  const lens = dramaLens(drama, wanted, now);
+  if (!(lens.amount > 0) || !lens.focus) return;
+  const focus = new THREE.Vector3(...lens.focus);
   const camera = view.camera;
-  // Pull the camera along its line to the focus.
-  const push = 1 - (1 - spec.pushIn) * Math.sin(Math.min(1, u * 1.6) * Math.PI * 0.5) * fade;
-  camera.position.lerp(focus, 1 - push);
-  // Shake: two unrelated wobbles, strongest at the blow.
-  const t = (now - active.start) * DRAMA.shakeHz;
-  const amount = spec.shake * Math.exp(-u * 5);
-  camera.position.x += Math.sin(t * 1.3) * amount;
-  camera.position.y += Math.sin(t * 1.7 + 1) * amount * 0.7;
-  camera.position.z += Math.cos(t * 1.1 + 2) * amount;
-  camera.lookAt(focus.lerp(view.orbit.target, 0.35 + 0.65 * u));
+  // Pull the camera along its line to the focus: at the full amount, `1 - pushIn` of the way (the moment's own depth).
+  const depth = spec ? 1 - spec.pushIn : drama.lensDepth ?? 0;
+  if (spec) drama.lensDepth = depth;
+  camera.position.lerp(focus, depth * lens.amount);
+  if (spec && fighter && u < 1) {
+    // Shake: two unrelated wobbles, strongest at the blow.
+    const t = (now - active.start) * DRAMA.shakeHz;
+    const amount = spec.shake * Math.exp(-u * 5);
+    camera.position.x += Math.sin(t * 1.3) * amount;
+    camera.position.y += Math.sin(t * 1.7 + 1) * amount * 0.7;
+    camera.position.z += Math.cos(t * 1.1 + 2) * amount;
+  }
+  camera.lookAt(view.orbit.target.clone().lerp(focus, DRAMA.lookShare * lens.amount));
 }
 
 /** Drawn each frame from the moment's own clock, like everything else on screen. */
@@ -207,4 +262,6 @@ export function resetDrama(drama) {
   drama.icons = [];
   drama.active = null;
   drama.flash = null;
+  drama.lens = null;
+  drama.lensDepth = 0;
 }

@@ -8,6 +8,8 @@
 // height (y), and whether he has been out of the fight long enough to be
 // left lying.
 
+import { spring } from './followcam.js';
+
 export const WATCH_CAM = {
   // Nearest the camera goes to its target (m): a man's head and shoulders fill the view (a 40 degree lens).
   minDistance: 1.1,
@@ -40,6 +42,31 @@ export const WATCH_CAM = {
   clearance: 0.3,
   // The steepest it rises to stay above the ground (rad): above the target, looking down.
   steepest: 1.45,
+  // Auto-framing (stepAuto): what it frames and how it moves. Every rate is a critically damped spring's (1/s), stepped exactly
+  // for any frame time, so the camera takes the same path at 30, 60 or 144 frames a second and never overshoots.
+  auto: {
+    // The look point's height (m): a standing man's middle, as the ringside view always had it.
+    height: 1.1,
+    // The look point follows the men's middle at this rate: lagging a walking pair by under half a metre (a ramp's lag is
+    // 2/rate s), and smoothing the give and take of an exchange, where the middle jumps about by tenths of a metre.
+    follow: 4,
+    // A man out of the fight (down for good, fled, dormant) leaves the framing over about this long (s), eased: the
+    // camera neither jumps when he falls nor keeps framing the dead. A man who comes into the fight enters it as gently.
+    leaveSeconds: 3,
+    // The men's extent framed: the distance from their middle within which this share of them (by weight) stands. In a
+    // fight of a few it is the farthest man; in a crowd a runaway or an archer far back does not pull the whole view out.
+    share: 0.9,
+    // How far (a share of it) the framing's distance falls below the distance held before the camera comes in. A pair
+    // stepping in and out, a man pushed back a pace, moves the wanted distance by 5 to 10 per cent: that is not followed.
+    deadBand: 0.15,
+    // The distance's springs, on its logarithm (an equal share of the picture each second, near or far): out briskly, so no
+    // one walks out of the picture, in slowly, so the view does not breathe with the fight.
+    zoomOut: 2.2,
+    zoomIn: 0.6,
+    // A pair is held at the zoom it opened on until one of them would leave the picture: each man's middle kept this far (m) inside
+    // its edge (his shoulders and his weapon arm).
+    pairMargin: 0.8,
+  },
 };
 
 /**
@@ -72,13 +99,17 @@ export function orbitAboveGround(orbit, groundAt = () => 0, clearance = WATCH_CA
   return raised;
 }
 
+/**
+ * A fresh watching camera. `framing` is the auto-framing's own state (stepAuto): null until its first frame, which is a cut
+ * (`cut`: a new fight is shown at once where it is, not panned to from the last).
+ */
 export function createWatchCam() {
-  return { mode: 'auto', focus: null, anchor: null, anchorFocus: null, reframing: false, spread: 0 };
+  return { mode: 'auto', focus: null, anchor: null, anchorFocus: null, reframing: false, spread: 0, framing: null, cut: true, rest: null, weights: new Map() };
 }
 
-/** The distance that frames every man, `spread` m being the farthest from their middle. */
-export function frameDistance(spread) {
-  const { base, spreadBase, perSpread } = WATCH_CAM.frame;
+/** The distance that frames every man, `spread` m being the farthest from their middle; never under `base` m. */
+export function frameDistance(spread, base = WATCH_CAM.frame.base) {
+  const { spreadBase, perSpread } = WATCH_CAM.frame;
   return Math.max(base, spreadBase + spread * perSpread);
 }
 
@@ -91,6 +122,8 @@ export function zoomLimits(spread) {
 export function takeCamera(cam) {
   if (cam.mode === 'free') return;
   cam.mode = 'free';
+  // (Taken before the auto-framing's first frame: there is no opening shot left to cut to.)
+  cam.cut = false;
   cam.reframing = false;
   cam.anchor = null;
 }
@@ -101,6 +134,8 @@ export function frameAll(cam) {
   cam.focus = null;
   cam.anchor = null;
   cam.reframing = true;
+  // The auto-framing starts again from where the camera is (stepAuto): drawn back to the men by its springs, not cut.
+  cam.framing = null;
 }
 
 /** Follow one man (null: whoever is near where the camera looks). */
@@ -190,13 +225,123 @@ export function stepFree(cam, orbit, men, dt) {
   return true;
 }
 
-/** 'Frame all' drawing the distance back to the framing's (the auto mode's own easing does it in a crowd). Returns the new distance. */
-export function stepReframe(cam, orbit, spread, dt) {
-  if (!cam.reframing) return orbit.distance;
-  const to = frameDistance(spread);
-  orbit.distance += (to - orbit.distance) * (1 - Math.exp(-WATCH_CAM.reframe * dt));
-  if (Math.abs(to - orbit.distance) < to * 0.02) cam.reframing = false;
-  return orbit.distance;
+/**
+ * The share `share` (0..1) of a weighted list of values: the value under which that share of the weight lies, read between the
+ * values (each value standing at the middle of its own weight), so that it moves smoothly as the values and the weights do.
+ */
+export function weightedShare(values, weights, share) {
+  const order = values.map((value, index) => index).filter((index) => weights[index] > 0).sort((a, b) => values[a] - values[b]);
+  if (!order.length) return 0;
+  const total = order.reduce((sum, index) => sum + weights[index], 0);
+  const wanted = share * total;
+  let below = 0;
+  let last = null;
+  for (const index of order) {
+    const middle = below + weights[index] / 2;
+    if (middle >= wanted) {
+      if (!last) return values[index];
+      return last.value + ((values[index] - last.value) * (wanted - last.middle)) / Math.max(1e-9, middle - last.middle);
+    }
+    last = { value: values[index], middle };
+    below += weights[index];
+  }
+  return last.value;
+}
+
+/**
+ * Each man's weight in the auto-framing, eased (linearly, over `leaveSeconds`) towards 1 while he is in the fight and 0 once he is
+ * out of it, so that he leaves and enters the framing gradually. While fewer than two men are still fighting the weights hold:
+ * the end of a fight (a knockout, the last man of a battle) is framed with the man who fell in it, not swung onto the winner alone.
+ * A man seen the first time starts at his weight; after a cut, everyone does. Returns the weights by the order of `men`.
+ */
+function framingWeights(cam, men, dt, cut) {
+  const fighting = men.filter((man) => man.in).length;
+  const step = dt / WATCH_CAM.auto.leaveSeconds;
+  return men.map((man) => {
+    const goal = man.in ? 1 : 0;
+    let weight = cam.weights.get(man.id);
+    if (weight === undefined || cut) weight = goal;
+    else if (fighting >= 2) weight = goal > weight ? Math.min(goal, weight + step) : Math.max(goal, weight - step);
+    cam.weights.set(man.id, weight);
+    return weight;
+  });
+}
+
+/** Smoothstep of a weight, so a man's share of the framing starts and ends with no step in its rate either. */
+const framingEase = (weight) => weight * weight * (3 - 2 * weight);
+
+/**
+ * The auto-framing's goal: the men's middle (their weighted mean on the floor) and the distance that frames them, from the
+ * distance from that middle within which `share` of them stand (weightedShare). `men` [{ id, x, z, in }]: where each stands
+ * (pelvis on the floor, never a weapon's tip, a flung limb or an arrow) and whether he is still in the fight.
+ */
+export function framingGoal(cam, men, dt, cut = false) {
+  const weights = framingWeights(cam, men, dt, cut).map(framingEase);
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  // Nobody to frame (all gone from the start): the middle of everyone.
+  const use = total > 1e-6 ? weights : men.map(() => 1);
+  const sum = total > 1e-6 ? total : men.length;
+  const middle = [0, 0];
+  men.forEach((man, index) => {
+    middle[0] += (man.x * use[index]) / sum;
+    middle[1] += (man.z * use[index]) / sum;
+  });
+  const radii = men.map((man) => Math.hypot(man.x - middle[0], man.z - middle[1]));
+  const spread = weightedShare(radii, use, WATCH_CAM.auto.share);
+  return { middle, spread };
+}
+
+/**
+ * One frame of the auto-framing: the look point and the distance moved by critically damped springs towards the men's middle and
+ * the distance that frames them. The distance:
+ *  - for a pair is the zoom they opened on (`rest`) until they would not both fit across the picture; for a crowd, frameDistance of
+ *    their extent; never over `furthest`;
+ *  - is held inside a dead band: the camera draws back as soon as the men need more room, and comes in only once they need
+ *    `deadBand` less than it holds (hysteresis with no step: the goal held slides down at that margin above the wanted one);
+ *  - moves on its logarithm, out at `zoomOut` and in at `zoomIn` (1/s).
+ * The first frame of a fight is a cut: everything starts where it should be, at rest. Afterwards there is no step and no whip.
+ * `men` as framingGoal's; `pair`: a duel's framing (the distance held at its rest unless they need more); `lens` { fov (deg, vertical),
+ * aspect } of the camera; `dt` in s. Moves `orbit`.
+ */
+export function stepAuto(cam, orbit, men, dt, { pair = false, furthest = Infinity, lens = {} } = {}) {
+  const spec = WATCH_CAM.auto;
+  const cut = cam.cut || !cam.framing;
+  const { middle, spread } = framingGoal(cam, men, dt, cam.cut);
+  if (cam.cut) cam.rest = pair ? orbit.distance : null;
+  // A pair: the zoom it opened on, unless the two would not fit across the picture at it (the lens's half-width, from its
+  // vertical angle and the screen's shape). A crowd: the framing's own distance.
+  let wanted;
+  if (pair && cam.rest !== null) {
+    const halfWidth = Math.atan(Math.tan(((lens.fov ?? 40) * Math.PI) / 360) * (lens.aspect ?? 16 / 9));
+    wanted = Math.max(cam.rest, (spread + spec.pairMargin) / Math.tan(halfWidth));
+  } else wanted = frameDistance(spread);
+  wanted = Math.max(WATCH_CAM.minDistance, Math.min(furthest, wanted));
+  if (cut) {
+    // A new fight shown at once where it is (cam.cut), or the auto-framing taken back from the viewer (Frame all): from where the camera is, at rest.
+    const fresh = cam.cut;
+    cam.framing = {
+      at: fresh ? [middle[0], spec.height, middle[1]] : [orbit.target.x, orbit.target.y, orbit.target.z],
+      velocity: [0, 0, 0],
+      log: Math.log(fresh ? wanted : Math.max(WATCH_CAM.minDistance, orbit.distance)),
+      logVelocity: 0,
+      held: wanted,
+    };
+    cam.cut = false;
+  }
+  const framing = cam.framing;
+  framing.held = Math.max(wanted, Math.min(framing.held, wanted * (1 + spec.deadBand)));
+  const goal = [middle[0], spec.height, middle[1]];
+  for (let axis = 0; axis < 3; axis += 1) [framing.at[axis], framing.velocity[axis]] = spring(framing.at[axis], framing.velocity[axis], goal[axis], spec.follow, dt);
+  const goalLog = Math.log(framing.held);
+  const rate = goalLog > framing.log ? spec.zoomOut : spec.zoomIn;
+  [framing.log, framing.logVelocity] = spring(framing.log, framing.logVelocity, goalLog, rate, dt);
+  orbit.target.x = framing.at[0];
+  orbit.target.y = framing.at[1];
+  orbit.target.z = framing.at[2];
+  orbit.distance = Math.exp(framing.log);
+  cam.spread = spread;
+  cam.reframing = false;
+  return { middle, spread, wanted, held: framing.held };
 }
 
 /**
