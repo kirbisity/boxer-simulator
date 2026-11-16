@@ -2,10 +2,11 @@
 #
 # kozane  Japanese kebiki-odoshi (the o-yoroi's): four plates across and two rows up, 100 x 120 mm. Tall narrow plates with
 #         rounded heads, overlapping sideways like shingles (the left edge under the plate to its left), brushed and a little
-#         mottled; a pair of empty holes by the head, under them the small knot where the suspension braid comes through
-#         from the row above, lower the oval knot of the row's binding cord (shita-garami); from under it the suspension
-#         braid (odoshi-ito, about 20 mm wide) hangs as one fat, flat, braided loop per plate, packed close (kebiki), and
-#         goes behind the next row's heads. Each row's heads stand in front of the bottom of the row above.
+#         mottled. Kebiki odoshi: the suspension braids (odoshi-ito, flat braids about 12 mm wide) run two to a plate's
+#         pitch, packed edge to edge, each out of its hole under the row's band of heads, straight down over the
+#         plate and on behind the next row's heads, so the rows read as continuous vertical stripes of braid under a band of
+#         heads (the binding cord, shita-garami, lies under the braids and does not show). Each row's heads stand in front
+#         of the bottom of the row above.
 # steppe  Mongol, Chinese (Song, Jin, Yuan, Ming) and Tibetan iron lamellar: six plates across and two rows up, 90 x 100 mm.
 #         Narrow plates about 20 x 72 mm (Met 788894: 70 x 19 mm, 13 holes; Carpini: a finger wide, a hand long, 8
 #         holes) with rounded heads, overlapping a third sideways; flat thongs, a short vertical one through the head's
@@ -34,6 +35,9 @@ if STYLE == 'kozane':
     RH = 0.06            # row pitch up
     PW = 0.030           # plate width (5 mm under the next plate)
     PH = RH * 1.3        # plate height (its foot behind the row below's heads)
+    BRAID_HALF = 0.0059  # odoshi-ito half-width: a flat braid about 12 mm wide, two to the 25 mm pitch (kebiki: edge to edge)
+    BRAID_THICK = 0.0008 # its half-thickness
+    HOLE_AT = 0.2        # the braids' holes, under the band of heads (from the row's top, in rows)
 else:
     COLS, ROWS = 6, 2
     P = 0.015
@@ -171,8 +175,9 @@ def steel(nodes, links, geometry):
     return colour.outputs[0], rough.outputs['Result'], 1.0, 0.0, bump.outputs['Normal'], 0.0
 
 
-def braid(scale, which):
-    """A braided cord: two crossing diagonal ridges (a herringbone), shaded in the grooves; `which` its mask (1 or 2)."""
+def braid(scale, which, vary=0.0):
+    """A braided cord: two crossing diagonal ridges (a herringbone), shaded in the grooves; `which` its mask (1 or 2); each
+    object a little lighter or darker (± `vary`), as one braid was dyed and worn apart from the next."""
     def build(nodes, links, geometry):
         coord = nodes.new('ShaderNodeTexCoord')
         waves = []
@@ -197,9 +202,19 @@ def braid(scale, which):
         tone.inputs['To Min'].default_value = 0.62
         tone.inputs['To Max'].default_value = 0.95
         links.new(both.outputs[0], tone.inputs['Value'])
+        info = nodes.new('ShaderNodeObjectInfo')
+        shade = nodes.new('ShaderNodeMath')
+        shade.operation = 'MULTIPLY_ADD'
+        links.new(info.outputs['Random'], shade.inputs[0])
+        shade.inputs[1].default_value = 2 * vary
+        shade.inputs[2].default_value = 1 - vary
+        shaded = nodes.new('ShaderNodeMath')
+        shaded.operation = 'MULTIPLY'
+        links.new(tone.outputs['Result'], shaded.inputs[0])
+        links.new(shade.outputs[0], shaded.inputs[1])
         colour = nodes.new('ShaderNodeCombineXYZ')
         for k in range(3):
-            links.new(tone.outputs['Result'], colour.inputs[k])
+            links.new(shaded.outputs[0], colour.inputs[k])
         return colour.outputs[0], 0.82, 0.0, 1.0 if which == 1 else 0.0, bump.outputs['Normal'], 1.0 if which == 2 else 0.0
     return build
 
@@ -209,7 +224,7 @@ def dark(nodes, links, geometry):
 
 
 steel_mat = tb.material('steel', group, steel)
-odoshi_mat = tb.material('odoshi', group, braid(1400.0, 1))
+odoshi_mat = tb.material('odoshi', group, braid(1400.0, 1, 0.06 if STYLE == 'kozane' else 0.0))
 binding_mat = tb.material('binding', group, braid(1800.0, 2))
 dark_mat = tb.material('dark', group, dark)
 
@@ -272,47 +287,37 @@ for row in range(ROWS):
             obj.parent = plate
             tb.link(obj, tile)
             continue
-        # The two small empty holes by the head.
-        for side in (-1, 1):
-            hole = ellipsoid(f'hole_{row}_{col}_{side}', 0.0011, 0.0011, 0.0002)
+        # Kebiki odoshi: the braids run two to a plate's pitch (one through each half of the plate, the plates overlapping),
+        # edge to edge, each coming out of its hole under the plate's head, straight down over the plate and
+        # on behind the next row's heads; what shows is close vertical stripes of braid under each row's band of heads (the
+        # binding cord, shita-garami, lies under them). Each braid a little wider or narrower and lighter or darker than the
+        # next (`odoshi_mat`'s per-object tone), so no plate repeats its neighbour.
+        for k, side in enumerate((-1, 1)):
+            bx = side * P / 4 + rng.uniform(-0.0003, 0.0003)
+            hole = ellipsoid(f'hole_{row}_{col}_{side}', BRAID_HALF * 0.55, 0.0011, 0.0002)
             hole.data.materials.append(dark_mat)
             hole.parent = plate
-            hole.location = on_plate(side * 0.0052, RH * 0.1)
+            hole.location = on_plate(bx, RH * HOLE_AT)
             tb.link(hole, tile)
-        # The suspension braid's end coming through from the row above.
-        knot = ellipsoid(f'knot_{row}_{col}', 0.0031, 0.0045, 0.0016)
-        knot.data.materials.append(odoshi_mat)
-        knot.parent = plate
-        knot.location = on_plate(0.0008, RH * 0.25, 0.0004)
-        knot.rotation_euler = (0, 0, rng.uniform(-0.15, 0.15))
-        tb.link(knot, tile)
-        # The binding cord's knot.
-        bind = ellipsoid(f'bind_{row}_{col}', 0.0036, 0.0052, 0.0020)
-        bind.data.materials.append(binding_mat)
-        bind.parent = plate
-        bind.location = on_plate(0.0006, RH * 0.43, 0.0006)
-        bind.rotation_euler = (0, 0, rng.uniform(-0.12, 0.12))
-        tb.link(bind, tile)
-        # The suspension braid: from under the binding knot down over the plate, bunched, behind the next row's head.
-        start = PH - RH * 0.56
-        end = start - RH * 0.58
-        sway = rng.uniform(-0.0012, 0.0012)
-        bunch = rng.uniform(0.85, 1.15)
+            start = PH - RH * (HOLE_AT + 0.015)
+            end = PH - RH * 1.2
+            half = BRAID_HALF * rng.uniform(0.97, 1.03)
+            sway = rng.uniform(-0.0003, 0.0003)
 
-        def path(t, start=start, end=end, sway=sway):
-            y = start + (end - start) * t
-            surface = plate_z(0.0, max(0.0, y)) if y > 0 else BASE + THICK
-            bulge = 0.0036 * math.sin(math.pi * min(1.0, t * 1.15)) ** 0.8
-            tuck = -0.0034 * max(0.0, (t - 0.78) / 0.22) ** 1.5
-            return (sway * math.sin(math.pi * t) + 0.0006 * noise.noise(Vector((t * 3, seed, 0))), y, surface + 0.0012 + bulge + tuck)
+            def path(t, start=start, end=end, bx=bx, sway=sway, seed=seed + k):
+                y = start + (end - start) * t
+                surface = plate_z(bx, max(0.0, y)) if y > 0 else BASE + THICK
+                rise = min(1.0, t / 0.06) ** 0.5
+                tuck = -0.0022 * max(0.0, (t - 0.85) / 0.15) ** 1.5
+                return (bx + sway * math.sin(math.pi * t) + 0.00015 * noise.noise(Vector((t * 4, seed, 0))), y,
+                        surface + 0.0002 + BRAID_THICK * (0.4 + 0.6 * rise) + tuck)
 
-        loop = tube_mesh(f'odoshi_{row}_{col}', path,
-                         lambda t, b=bunch: 0.0095 * b * (0.82 + 0.3 * math.sin(math.pi * t)) * (1 - 0.25 * max(0.0, t - 0.8) / 0.2),
-                         lambda t: 0.0017 * (0.9 + 0.3 * math.sin(math.pi * t)))
-        loop.materials.append(odoshi_mat)
-        braid_obj = bpy.data.objects.new(f'odoshi_{row}_{col}', loop)
-        braid_obj.parent = plate
-        tb.link(braid_obj, tile)
+            strip = tube_mesh(f'odoshi_{row}_{col}_{side}', path, lambda t, h=half: h * (0.8 + 0.2 * min(1.0, t / 0.05)),
+                              lambda t: BRAID_THICK, n=60, m=16)
+            strip.materials.append(odoshi_mat)
+            braid_obj = bpy.data.objects.new(f'odoshi_{row}_{col}_{side}', strip)
+            braid_obj.parent = plate
+            tb.link(braid_obj, tile)
 
 tb.repeat_around(tile, W, H)
 size = int(2048 * SCALE)

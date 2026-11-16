@@ -376,21 +376,26 @@ def sugake(n):
     lame = (yl < top_cut)
     groove = -0.0002 * np.exp(-((wrap(t.X, notch)) / 0.0005) ** 2) * smooth(R * 0.6, R * 0.9, yl)
     t.z = np.where(lame, 0.0004 + 0.0012 * s + groove - 0.0004 * (1 - smooth(0, 0.001, top_cut - yl)), 0.0) + t.noise(40, 6, 30, 0.00001)
+    # Each strand comes out of its hole under the lame's top (a rounded end there) and runs straight down the lame to its
+    # foot, where it goes on behind the next lame's top; a flat braid, its chevrons alike on both strands of a pair, each
+    # strand a little wider or narrower than the next.
     cords = np.zeros_like(t.z)
+    hole_y = R - 0.007
     for c in range(2):
         for side in (-1, 1):
             cx = c * P + P / 2 + side * 0.0048
+            half = 0.0034 * t.rng.uniform(0.94, 1.06)
             dx = wrap(t.X - cx, W)
-            q = np.clip(1 - (dx / 0.0034) ** 2, 0, 1)
-            run = (yl > 0.002) & (yl < R - 0.006)
-            braid = 0.5 + 0.5 * np.sin(TAU * (t.Y + side * dx * 1.6) / 0.0024)
-            h = np.where(run, 0.0016 + 0.0011 * np.sqrt(q) * (0.85 + 0.15 * braid), 0.0) * (q > 0)
-            cords = np.maximum(cords, h)
+            dy = np.maximum(yl - hole_y, 0.0)
+            q = np.clip(1 - (dx / half) ** 2 - (dy / half) ** 2, 0, 1)
+            braid = 0.5 + 0.5 * np.sin(TAU * (t.Y + np.abs(dx) * 1.6) / 0.0024 + t.rng.uniform(0, TAU))
+            h = np.where(yl < hole_y + half, 0.0016 + 0.0011 * np.sqrt(q) * (0.85 + 0.15 * braid), 0.0) * (q > 0)
+            cords = np.maximum(cords, h * (0.5 + 0.5 * smooth(0, 0.003, yl)))
     holes = np.zeros_like(t.z, dtype=bool)
     for c in range(2):
         for side in (-1, 1):
             cx = c * P + P / 2 + side * 0.0048
-            holes |= (np.hypot(wrap(t.X - cx, W), (yl - (R - 0.007))) < 0.0022)
+            holes |= (np.hypot(wrap(t.X - cx, W), (yl - (hole_y + 0.003))) < 0.0018)
     t.mask1 = (cords > 0).astype(float)
     t.z = np.where(cords > 0, np.maximum(t.z, cords + 0.0012 * s), np.where(holes, t.z - 0.0006, t.z))
     t.grey(np.where(cords > 0, 0.82, np.where(lame, np.where(holes, 0.1, 0.9), 0.12)))
