@@ -99,7 +99,7 @@ function setHash(text) {
 }
 
 /** Plain people's clothes and looks: the commoner's tunic, a woman's or a child's build. */
-function setCivilian(random, { sex = 'male', age, heightCm, clothes, hair }) {
+export function setCivilian(random, { sex = 'male', age, heightCm, clothes, hair }) {
   const base = starvedRebel(random);
   return normaliseInputs({
     ...base,

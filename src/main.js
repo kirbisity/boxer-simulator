@@ -99,6 +99,7 @@ import { updateClothWind } from './clothwind.js';
 import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
 import { envDress } from './env/air.js';
 import { mergeFallen } from './fallenview.js';
+import { townfolkFrame, townfolkInfo, townfolkReset } from './townfolkview.js';
 import { disposeObject } from './toon.js';
 import { installStory } from './story/storyview.js';
 import { easeFor } from './story/scenes/stage.js';
@@ -1380,6 +1381,8 @@ function drawWorld(dt, drawIt = true) {
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
   updateClothWind(scene, world);
+  // The canal town's own people (townfolkview.js): about on an ordinary day, indoors or in their doorways once a fight starts.
+  townfolkFrame(scene, world, dt * (state.paused ? 0 : state.speed));
   envUpdate(scene, world, state.mode === 'play' ? player() : null);
   updateShots(scene, dt * (state.paused ? 0 : state.speed));
   updateSpray(scene, dt * (state.paused ? 0 : state.speed));
@@ -3190,6 +3193,8 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   $('#modes button[data-value="play"]:not([data-side])').click();
   // (The mode's button puts the one played on guard: here he walks about, at ease, until he fights. walkAbout.)
   state.world.roam = key;
+  // (Walked into before the battle: the town's people out on an ordinary day; after it, they stay where it left them.)
+  if (!after) townfolkReset(scene);
   setWalking(true);
   state.walkRunning = false;
   renderHud();
@@ -4223,6 +4228,11 @@ const boxer = window.boxer = {
     return values ? scene.weather.town : tkWeatherNow();
   },
   storyPlaces: STORY_PLACES,
+  // The canal town's people (townfolkview.js): what each is doing; `seconds` steps them alone that long first (for pictures).
+  townfolk: (seconds = 0) => {
+    for (let left = seconds; left > 1e-9; left -= 1 / 30) townfolkFrame(scene, state.world, Math.min(1 / 30, left));
+    return townfolkInfo(scene);
+  },
   storyPlaceWeather,
   // The look of the Dunnottar stage (levelmode/stagelooks.js): `stageLook()` says which (and the names); `stageLook(name)` changes it now; `stageLook(undefined, { still: true })` stops the lightning.
   // A strike now (`stageStrike(true)` holds it at its first crack, for a picture; `stageStrike(null)` lets go).

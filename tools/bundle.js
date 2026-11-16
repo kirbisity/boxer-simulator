@@ -24,6 +24,8 @@ const MODULES = ['i18n/ui-common', 'i18n/ui-menu', 'i18n/ui-fight', 'i18n/ui-bui
   'story/ground/walls', 'story/ground/wallview', 'story/ground/props', 'story/battles/korea', 'story/battles/02-wokou', 'story/battles/03-pyongyang', 'story/battles/04-byeokjegwan', 'story/battles/05-ulsan', 'story/battles/korea-battles',
   'story/battles/index',
   'story/remount', 'story/runner', 'story/scenes/sets', 'story/scenes/finale', 'story/scenes/stage', 'story/storyview', 'story/placemark',
+  // The canal town's people (their top level reads the story's sets).
+  'townfolk', 'townfolkview',
   'main'];
 const args = process.argv.slice(2);
 const minify = !args.includes('--no-minify');
