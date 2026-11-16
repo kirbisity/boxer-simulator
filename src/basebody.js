@@ -163,7 +163,8 @@ export const BASE_BODY = {
   //             superellipse of exponent 4: at 45 degrees up and out 19% further) by this share: the acromion's corner where the
   //             top line meets the arm;
   //   `edge`    the deltoid's front and back edges, grooves this deep (m) at 0.6 of muscle showing and up to twice it at all;
-  //   `chest`, `chestRows`, `chestFrom`, `chestTo`: the chest's width brought to the loft's (v7's) ring (round 13; see shoulderPlus);
+  //   `chest`, `chestRows`, `chestFrom`, `chestTo`: the chest's width brought to the loft's (v7's) ring (round 13; see shoulderPlus;
+  //             `chestRows` of t on the fighter's mesh, wider on the crowd's by its spacing);
   //   `slope`, `slopeNeck`, `floorBy` (round 16, by how wasted the body is: loftbody.js baseWasting): the top line's extra drop
   //             at the acromion (m), the share of the drop beside the neck given back, and the arm's girth floor's margin over the
   //             emaciated reference's (applied by wasting only, round 17); the corner's squaring and the flat top fade out with it;
@@ -1729,7 +1730,10 @@ function shoulderPlus(own, { rig, parts, frames, placed, shoulderKeep, height, j
       const index = Math.min(stops - 1, Math.floor(at));
       return rows[index][1] + (rows[index + 1][1] - rows[index][1]) * (at - index);
     };
-    const bin = spec.chestRows;
+    // (Rows as many of the mesh's points tall wherever it is drawn: `chestRows` is the fighter's mesh's, and the crowd's points
+    // lie `rig.spacing` times as far apart. On its thinner rows a row could hold one point beside the midline: its width read as
+    // nothing, the ratio as hundreds, and the chest flung metres out, which a crowd bake's cloth fitting then sampled to death.)
+    const bin = spec.chestRows * (rig.spacing ?? 1);
     const widest = new Map();
     for (let vertex = 0; vertex < count; vertex += 1) {
       const name = rig.names[rig.sources.part[vertex]];

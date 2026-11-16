@@ -80,6 +80,20 @@ function mountStrideRate(horse, gait) {
   return horse.spec?.robot && gait.hz > 0 ? Math.max(gait.hz, (Math.abs(horse.speed) * gait.duty) / (horse.shape.strideMost * horse.withers)) : gait.hz;
 }
 
+/**
+ * The ground a rider's mount covers (m), from its shape at its breed's withers: `length` nose to tail (its parts' furthest
+ * reach fore and aft), `width` across its barrel and legs. What a formation must leave him (formation.js placeWings).
+ */
+export function mountFootprint(inputs) {
+  const breed = breedOf(mountOf(inputs).breed);
+  const shape = breed.shape ?? HORSE_SHAPE;
+  const W = breed.withers;
+  const fore = Math.max(...shape.parts.map((part) => Math.max(part.a[0], part.b[0]) + part.radius));
+  const aft = Math.min(...shape.parts.map((part) => Math.min(part.a[0], part.b[0]) - part.radius));
+  const side = Math.max(...shape.parts.map((part) => Math.max(Math.abs(part.a[2]), Math.abs(part.b[2])) + part.radius), ...shape.legs.map((leg) => Math.abs(leg.root[2]) + shape.legRadius));
+  return { length: (fore - aft) * W, width: 2 * side * W };
+}
+
 /** A rider's horse, for createWorld: under him, facing his way. */
 export function createHorse(fighter, id, random) {
   const kit = mountOf(fighter.body.inputs);

@@ -16,7 +16,7 @@ import { normaliseInputs } from '../body.js';
 
 export const LEVEL_PRESETS = {
   // The player: fixed. Athletic and well taught (skill 0.75), quick and quiet in a gambeson.
-  // The player (user, 2026-11-15: the fighter Rodelero, as the user built her in the game's builder, in place of the man with the arming
+  // The player (since 2026-11-15): the fighter Rodelero, as built in the game's builder, in place of the man with the arming
   // sword and buckler; the key stays 'forger', the stage's and the story's operative of the Forgers).
   forger: {
     name: 'Rodelero', style: 'longsword', sex: 'female', heightCm: 169, frame: 'small', age: 28, exercise: 0.67, calories: 2630, skill: 0.5,

@@ -517,19 +517,34 @@ export function fromSlot(fighter, formation, other) {
  * ranks of `abreast`, and mark each as held (`wing`, see moveWings). `foot` is the
  * line they flank: { front, width } (m from the middle to its first rank, and across
  * its widest row); `sign` is -1 for red, 1 for blue. `place(fighter, x, z)` puts a man.
+ * `horse` is the ground one horse needs ({ length, width }, m: physics/mounted.js mountFootprint): no two riders are put
+ * closer than that, across or along. Where the floor is too narrow for `abreast` beside the foot line there are fewer
+ * abreast and more ranks; where it is too short for the ranks behind, they close up (to a horse's length) and only then
+ * does the wing stand further forward than the foot's front rank. (Squeezed onto the edge of the floor instead, two horses stood on one spot, and the men in their
+ * saddles crashed into each other before anything had moved.)
  */
-export function placeWings(riders, sign, order, foot, arena, place) {
+export function placeWings(riders, sign, order, foot, arena, place, horse = { length: 0, width: 0 }) {
   const wings = { ...WINGS, ...order.wings };
+  const spacing = Math.max(wings.spacing, horse.width);
+  const rankBack = Math.max(wings.rankBack, horse.length);
   const edge = foot.width / 2 + wings.out;
   const room = arena.halfZ - 1.2;
+  const deepest = arena.halfX - 1;
+  const abreast = Math.max(1, Math.min(wings.abreast, Math.floor((room - edge) / spacing) + 1));
   // One wing on the flank `side` names (+1 or -1 across the field), or half and half.
   const both = wings.side === undefined;
+  const sideOf = (index) => (both ? (index % 2 === 0 ? 1 : -1) : wings.side);
+  const nthOf = (index) => (both ? Math.floor(index / 2) : index);
+  const ranks = (side) => Math.ceil(riders.filter((_, index) => sideOf(index) === side).length / abreast);
+  // Ranks that do not fit behind close up first (to a horse's length nose to tail), and only then come forward of the foot's front.
+  const along = (side) => (ranks(side) > 1 ? Math.max(horse.length, Math.min(rankBack, (deepest - foot.front) / (ranks(side) - 1))) : rankBack);
+  const first = (side) => Math.min(foot.front + wings.back, deepest - (ranks(side) - 1) * along(side));
   riders.forEach((fighter, index) => {
-    const side = both ? (index % 2 === 0 ? 1 : -1) : wings.side;
-    const nth = both ? Math.floor(index / 2) : index;
-    const across = Math.min(room, edge + (nth % wings.abreast) * wings.spacing) * side;
-    const back = foot.front + wings.back + Math.floor(nth / wings.abreast) * wings.rankBack;
-    place(fighter, sign * Math.min(arena.halfX - 1, back), across);
+    const side = sideOf(index);
+    const nth = nthOf(index);
+    const across = Math.min(room, edge + (nth % abreast) * spacing) * side;
+    const back = first(side) + Math.floor(nth / abreast) * along(side);
+    place(fighter, sign * Math.min(deepest, back), across);
     fighter.wing = { held: true, side };
   });
 }
