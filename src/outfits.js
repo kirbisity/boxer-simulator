@@ -1020,8 +1020,9 @@ export const OUTFITS = {
     // The great helm: another man's head stays outside it in a clinch.
     headBulk: 1.45,
     protection: {
-      // Blunt 0.4 (was 0.3, under the Roman mail's 0.35-0.4): the hauberk over a quilted gambeson, which is what takes the blow.
-      blunt: 0.4, cut: 0.88, pierce: 0.65, bullet: { head: 0.35, torso: 0.05, limb: 0 },
+      // Blunt 0.34 (was 0.3, under the Roman mail's 0.35-0.4): the hauberk over a quilted gambeson, which is what takes the blow;
+      // still under the sultan's two layers (saladin 0.35).
+      blunt: 0.34, cut: 0.88, pierce: 0.65, bullet: { head: 0.35, torso: 0.05, limb: 0 },
       regions: {
         head: { blunt: 0.7, cut: 0.97, pierce: 0.85, deflects: true },
         Shank: { blunt: 0.45, cut: 0.95, pierce: 0.7 },
@@ -1238,11 +1239,11 @@ export const OUTFITS = {
     picked: [0, 1, 2],
     // Armour at 0.55 of its old weight (was 0.2): ~8 kg on a 70 kg man, against an okegawa-dō and jingasa's ~8–10 kg.
     extraMass: 0.11,
-    // The okegawa-dō, a solid riveted shell of munition iron: the torso cut 0.9 (was 0.8, 0.7 before: an edge cannot cut through solid iron that a point cannot, so cut is not under pierce) and pierce 0.85 (PIERCE_SCALE); its blunt kept at 0.5
+    // The okegawa-dō, a solid riveted shell of munition iron: the torso cut 0.86 (was 0.8, 0.7 before: an edge cannot cut through solid iron that a point cannot, so cut is not under pierce; under the ō-yoroi's 0.9, the lightest samurai kit) and pierce 0.85 (PIERCE_SCALE); its blunt kept at 0.5
     // (Japanese armour a little down, a solid dō a little up). The jingasa a lighter hat than a helmet: a little weaker
     // (was as the body). Cloth sleeves with light kote, shin guards: the limbs less than the trunk (were all as the body).
     protection: {
-      blunt: 0.5, cut: 0.9, pierce: 0.85, bullet: { head: 0.2, torso: 0.25, limb: 0.05 },
+      blunt: 0.5, cut: 0.86, pierce: 0.85, bullet: { head: 0.2, torso: 0.25, limb: 0.05 },
       regions: {
         head: { blunt: 0.42, cut: 0.6, pierce: 0.42 },
         // Light kote and suneate, fewer splints than a samurai's (`kote`).
