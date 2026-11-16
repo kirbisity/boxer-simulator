@@ -180,14 +180,14 @@ test('a bigger, stronger body cries louder and lets the cry ring; a slight one q
 });
 
 test('the new recordings\' screams come up half as often, and a set never plays the same take twice running', async () => {
-  const { pickWeighted, SAMPLE_SETS, SAMPLE_WEIGHTS } = await import('../src/audio/samples.js');
+  const { pickTake, SAMPLE_SETS, SAMPLE_WEIGHTS } = await import('../src/audio/samples.js');
   const names = SAMPLE_SETS['voice-male-scream'];
   const counts = Object.fromEntries(names.map((name) => [name, 0]));
   let last = null;
   let seed = 7;
   const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296);
   for (let k = 0; k < 6000; k += 1) {
-    const name = pickWeighted(names, random(), last);
+    const name = pickTake(names, random(), last);
     assert.notEqual(name, last);
     counts[name] += 1;
     last = name;

@@ -119,7 +119,7 @@ export const SAMPLE_WEIGHTS = Object.fromEntries([
 ].map((name) => [name, 0.5]));
 
 /** A take of `names` by their weights (SAMPLE_WEIGHTS), not `last` again while there is another: `random` 0..1. */
-export function pickWeighted(names, random, last = null) {
+export function pickTake(names, random, last = null) {
   const pool = names.length > 1 && last ? names.filter((name) => name !== last) : names;
   const total = pool.reduce((sum, name) => sum + (SAMPLE_WEIGHTS[name] ?? 1), 0);
   let left = random * total;
@@ -229,7 +229,7 @@ export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetch
       const names = (SAMPLE_SETS[set] ?? []).filter((name) => takes.has(name));
       if (!names.length) return null;
       // (By weight, and never the same take twice running in a set: a crowd's cries do not repeat back to back.)
-      const name = pickWeighted(names, random(), lastOf.get(set));
+      const name = pickTake(names, random(), lastOf.get(set));
       lastOf.set(set, name);
       return takes.get(name);
     },
