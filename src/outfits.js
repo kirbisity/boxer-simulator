@@ -1456,10 +1456,10 @@ export const OUTFITS = {
   mingEliteInfantry: {
     // Drilled daily, squad by squad, for years, under the Jixiao xinshu's law (its drill: the squad's men practised their
     // weapons and the array until they moved as one, and were examined on them): an elite's training (the tiers above:
-    // 0.6-0.8), below its foot (0.56, was 0.6 and 0.65 before; lowered a little each time, 2026-11-12 and 2026-11-16): picked
+    // 0.6-0.8), below its foot (0.54, was 0.56, 0.6 and 0.65 before; lowered a little each time, 2026-11-12 to 2026-11-16): picked
     // farmers and miners made soldiers, not men trained to arms from boyhood. Still over the general's household men
-    // (mingElite 0.55): the squad's drill was the better.
-    skill: 0.56,
+    // (mingElite 0.5): the squad's drill was the better.
+    skill: 0.54,
     faction: 'chinese',
     label: 'Ming — elite infantry', family: 'chinese', movement: 'good', fists: 'bare',
     // His sidearm the Qi family's long sabre (WEAPONS changdao): what the gunners draw when the raiders are on them.
@@ -1511,8 +1511,8 @@ export const OUTFITS = {
     // armoured in front only (horses.js BARDING.mingFront: the face plate, the collar, the chest apron; the flanks bare).
     horse: 'mingBorder', barding: 'mingFront',
     // Trained: a general's household men (jiading), picked and kept by him, the best the Ming fielded, but drilled to a
-    // regular's level more than an elite's: the Ming army of the 1610s was a byword for neglected drill (`skill`).
-    skill: 0.55,
+    // regular's level more than an elite's: the Ming army of the 1610s was a byword for neglected drill (`skill`; 0.5, was 0.55).
+    skill: 0.5,
     faction: 'chinese', bulletRating: 900, plated: true,
     label: 'Ming — elite brigandine', family: 'chinese', movement: 'good', fists: 'bare',
     // The officer's helmet bright or black-lacquered, plain, with the lion face and wings, or gilt with guardians.
@@ -1559,7 +1559,7 @@ export const OUTFITS = {
   // (`courage`, above the Ming regular's and as high as their elite's), the front ranks at Sarhu in two coats.
   bannerArmour: {
     // Trained: a banner man was a soldier for life, his company's hunts its drill (`skill`: OUTFITS' tiers, the
-    // Ming regular's 0.35 and their elite's 0.55): a regular's, hardened by the hunt more than drilled to a weapon.
+    // Ming regular's 0.35 and their elite's 0.5): a regular's, hardened by the hunt more than drilled to a weapon.
     skill: 0.5,
     faction: 'manchu', bulletRating: 600, plated: true,
     label: 'Eight Banners (Later Jin) — banner armour', family: 'manchu', movement: 'good', fists: 'bare',
@@ -1598,8 +1598,8 @@ export const OUTFITS = {
     // Rides (a Manchurian horse, horses.js manchu: the guard's picked steppe horses), the horse clad in brigandine as he is, in his coat's colours with its
     // gilt studs (horses.js BARDING.brigandine, mountOf `finish`).
     horse: 'manchu', barding: 'brigandine',
-    // Trained: Nurhaci's guard, picked from the banners' best, a step above the banner man (`skill`).
-    skill: 0.55,
+    // Trained: Nurhaci's guard, picked from the banners' best, a step above the banner man (`skill`; 0.53, was 0.55).
+    skill: 0.53,
     faction: 'manchu', bulletRating: 650, plated: true,
     label: 'Eight Banners (Later Jin) — Bayara guard', family: 'manchu', movement: 'good', fists: 'bare',
     sidearm: 'dao',
