@@ -7,7 +7,7 @@ import { ktShadow, ktShadowBake } from '../levelmode/kitshadow.js';
 import { placeWind } from '../wind.js';
 import { tkgBuilder } from './geo.js';
 import { TK_LAY, tkLayBake, tkLayTextures } from './lay.js';
-import { tkMaterials, tkSetAir, tkSetLay, tkSetWeather, tkWeather } from './weather.js';
+import { tkMaterials, tkSetAir, tkSetLay, tkSetLook, tkSetWeather, tkWeather } from './weather.js';
 
 /** Tuning for the assembly. */
 export const TK_PLACE = {
@@ -221,7 +221,8 @@ export function tkRain({ count = TK_PLACE.rain.count, slant = [0.12, 0.05] } = {
  * the place's own moving things (townkit/stir.js), called each frame with the one wind; `air`: how the place joins
  * the open air: { description: what env/config.js lets a place that draws itself say (sun, air, clouds, far, height,
  * openings), weathers: { the kit's weather name: the open air's }, first: the kit's name when nothing says, own:
- * { name: [the open air's weather it is laid over, what differs] } }.
+ * { name: [the open air's weather it is laid over, what differs] } }; `look`: the place's own figures where the
+ * kit's shared ones do not fit it (weather.js tkSetLook: { street, caught, most }), the kit's own where left out.
  *
  * In the open air (env/: the place is joined to it by townkit/air.js, and `view.env` says so) the sky, what falls
  * and the haze are the open air's: the kit's own dome, streaks and mist stand aside, the weather's wet, rain and
@@ -229,7 +230,7 @@ export function tkRain({ count = TK_PLACE.rain.count, slant = [0.12, 0.05] } = {
  * thrown the way its sun stands, and the mirror is taken with its sky in it, in light's own measure.
  * Sets `root.userData.bind`, `.tick` and `.leave` (render.js calls them).
  */
-export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = null, weather = () => null, mirrorAt = [0, 1.6, 0], key = 'townkit', tier = 'high', lay = null, north = [0, -1], pools = 0.8, stir = null, air = null }) {
+export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = null, weather = () => null, mirrorAt = [0, 1.6, 0], key = 'townkit', tier = 'high', lay = null, north = [0, -1], pools = 0.8, stir = null, air = null, look = null }) {
   const state = { view: null, saved: null, mirror: null, mirrored: null, checked: 0, baked: null, aired: null };
   const dir = new THREE.Vector3(...sun).normalize();
   if (air && TK_AIR.place) {
@@ -335,6 +336,7 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
     // noise sends and the things the kit moves in them keep step); alone, the page's.
     tkWeather.uTkTime.value = (open ? view.env.time ?? time : time) % 3600;
     if (lay) tkSetLay(lay.lay, lay.textures, north);
+    tkSetLook(look ?? {});
     const wind = open ? view.env.wind : placeWind(key);
     tkSetAir(open, [wind.x, wind.z, wind.speed]);
     if (open) {
@@ -385,6 +387,7 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
   };
   root.userData.leave = (view) => {
     tkSetLay(null);
+    tkSetLook();
     tkSetAir(false);
     if (!state.saved) return;
     // (The open air, joined after the kit had put its own box on, noted that box as the one to hand back: it is

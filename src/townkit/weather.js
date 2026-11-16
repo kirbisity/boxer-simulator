@@ -186,6 +186,9 @@ export const tkWeather = {
   uTkLayA: { value: null }, uTkLayB: { value: null }, uTkLay: { value: null }, uTkLayH: { value: null },
   // (1 in the open air, north's x and z, 0); the wind (the way it blows: x, z; its speed m/s; 0).
   uTkAir: { value: null }, uTkBlow: { value: null },
+  // The place's own share of three shared figures (tkSetLook): (TK_WEATHER.shade.street, TK_WEATHER.snow.caught,
+  // TK_WEATHER.shade.most).
+  uTkLook: { value: null },
 };
 
 function tkWeatherInit() {
@@ -201,6 +204,7 @@ function tkWeatherInit() {
   tkWeather.uTkLayH.value = new THREE.Vector3(0, 1, 0);
   tkWeather.uTkAir.value = new THREE.Vector4(0, 0, -1, 1);
   tkWeather.uTkBlow.value = new THREE.Vector4(1, 0, 0, 0);
+  tkWeather.uTkLook.value = new THREE.Vector3(TK_WEATHER.shade.street, TK_WEATHER.snow.caught, TK_WEATHER.shade.most);
   ktShadowInit();
 }
 
@@ -241,6 +245,17 @@ export function tkSetLay(lay, textures, north = [0, -1]) {
   tkWeather.uTkLayH.value.set(lay.base, lay.range, 1);
 }
 
+/**
+ * A place's own figures where the kit's shared ones were set against another place (tkKeep's `look`): `street`,
+ * the light reaching a shut-in place from the lit walls round it (TK_WEATHER.shade.street), `caught`, the
+ * wind-plastered snow in an upright face's joints (TK_WEATHER.snow.caught), and `most`, how much of the sky's
+ * light the lie's map may take (TK_WEATHER.shade.most). Any left out is the kit's own.
+ */
+export function tkSetLook({ street = TK_WEATHER.shade.street, caught = TK_WEATHER.snow.caught, most = TK_WEATHER.shade.most } = {}) {
+  tkWeatherInit();
+  tkWeather.uTkLook.value.set(street, caught, most);
+}
+
 /** Tell the materials whether the open air is on (its haze, sky and cloud shade are then used), and the wind: the way it blows [x, z] and its speed (m/s). */
 export function tkSetAir(on, blow = null) {
   tkWeatherInit();
@@ -273,6 +288,7 @@ uniform vec4 uTkLay;
 uniform vec3 uTkLayH;
 uniform vec4 uTkAir;
 uniform vec4 uTkBlow;
+uniform vec3 uTkLook;
 ${ENV_GLSL}
 ${ENV_GLSL_MAP}
 ${ENV_GLSL_PRESS}
@@ -513,7 +529,7 @@ const TK_COLOUR = `
   // it blows over, and a face's own stains show between.)
   float faceAlong = vTkPos.x * n.z - vTkPos.z * n.x;
   float holdsHere = mix(0.3, 1.0, smoothstep(0.3, 0.75, tkFbm(vec2(faceAlong * 0.45, vTkPos.y * 0.8) + 23.0) + 0.22 * (1.0 - smoothstep(0.0, 2.0, high)) + 0.18 * (1.0 - smoothstep(0.0, 1.2, max(fall, 0.0))) * step(-0.05, fall)));
-  float caught = uTkSnow * ${TK_WEATHER.snow.caught.toFixed(2)} * upright * smoothstep(0.1, 0.7, -dot(n.xz, uTkBlow.xy)) * smoothstep(0.66, 0.92, tkJoint + 0.8 * (blot - 0.5) + 0.3 * (fine - 0.5)) * holdsHere * (1.0 - tkUnder) * step(0.01, uTkKind.x);
+  float caught = uTkSnow * uTkLook.y * upright * smoothstep(0.1, 0.7, -dot(n.xz, uTkBlow.xy)) * smoothstep(0.66, 0.92, tkJoint + 0.8 * (blot - 0.5) + 0.3 * (fine - 0.5)) * holdsHere * (1.0 - tkUnder) * step(0.01, uTkKind.x);
   tkSnowHere = max(tkSnowHere, caught);
   vec3 snow = mix(${tkVec(TK_WEATHER.snow.colour)}, ${tkVec(TK_WEATHER.snow.colourAir)}, uTkAir.x) * (1.0 - ${TK_WEATHER.snow.drift.toFixed(2)} * tkFbm(vTkPos.xz * 0.3 + 3.0));
   snow *= mix(vec3(1.0), ${tkVec(TK_WEATHER.snow.trodden)} * (0.85 + 0.3 * fine), clamp(tkWear * 1.3, 0.0, 1.0));
@@ -602,7 +618,7 @@ if (tkSnowHere > 0.0) {
 // The baked shade, on the light that comes from the sky and the ground (not the sun's own: its shadows are cast).
 const TK_SHADE = `
 {
-  float tkOpen = mix(1.0, max(tkSky, tkBounce), ${TK_WEATHER.shade.most.toFixed(2)}) * (1.0 - ${TK_WEATHER.shade.joint.toFixed(2)} * tkJoint * (1.0 - tkSnowHere) * step(0.01, uTkDirt.z));
+  float tkOpen = mix(1.0, max(tkSky, tkBounce), uTkLook.z) * (1.0 - ${TK_WEATHER.shade.joint.toFixed(2)} * tkJoint * (1.0 - tkSnowHere) * step(0.01, uTkDirt.z));
   // (The sky a body near the player leaves the surface under and beside him: the open air's contact shade,
   // env/terrain.js envBodies, the same the land and the grass take; and the sky a live print's bed sees, a trench
   // a sole wide and as deep as the print: the view factor of its floor, as the land's snow takes it.)
@@ -613,7 +629,7 @@ const TK_SHADE = `
   // this a wet wall seen along its length shows every joint that leans toward the eye as a bright line.)
   reflectedLight.indirectSpecular *= tkOpen * tkContact * (1.0 - tkJoint * (1.0 - smoothstep(0.25, 0.6, abs(normalize(vTkNrm).y))));
   // The light of the lit walls and ground round a shut-in place (TK_WEATHER.shade.street).
-  if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (${TK_WEATHER.shade.street.toFixed(2)} * (1.0 - tkOpen) * tkContact) * material.diffuseColor;
+  if (uTkAir.x > 0.5) reflectedLight.indirectDiffuse += uEnvBounce * (uTkLook.x * (1.0 - tkOpen) * tkContact) * material.diffuseColor;
   // The sun's glint on wet stone, held under the glare (TK_WEATHER.glare).
   reflectedLight.directSpecular = min(reflectedLight.directSpecular, vec3(${TK_WEATHER.glare.toFixed(2)} / max(uTkAir.w, 1e-4) * mix(1.0, ${TK_WEATHER.glint.toFixed(1)}, tkPoolHere)));
 }
