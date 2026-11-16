@@ -140,9 +140,14 @@ function customPyongyang() {
     middle: wall.x - 34,
     camera: { yaw: -0.9, pitch: 0.38, distance: 22, maxDistance: 30 },
     // The place's own weathers (places/pyongyang.js PYONGYANG_WEATHER and its open air's), the story's first: snow showers
-    // under a clear cold sky; the same in the hazier sky the gate views had before; and the ground bare of snow, clear.
+    // under a clear cold sky at half past three; the same day at eight, at half past ten and at a quarter past four;
+    // a grey day of light snow; the showers in the hazier sky the gate views had before; and the ground bare of snow, clear.
     weathers: [
-      { key: 'snow', label: 'Snow showers', icon: 'snowflake' },
+      { key: 'snow', label: 'Snow showers, afternoon', icon: 'snowflake' },
+      { key: 'dawn', label: 'Clear early morning, gate in shade', icon: 'sun' },
+      { key: 'morning', label: 'Snow showers, mid-morning', icon: 'snowflake' },
+      { key: 'late', label: 'Late afternoon, low sun', icon: 'sun' },
+      { key: 'overcast', label: 'Overcast, light snow', icon: 'cloud' },
       { key: 'hazy', label: 'Snow showers, hazier sky', icon: 'haze' },
       { key: 'bare', label: 'Clear, no snow lying', icon: 'sun' },
     ],

@@ -282,6 +282,12 @@ export function pyongyangStage() {
 /** The weather the place is seen in (tkSetWeather's argument): snow lying, the air dry and clear. A view's `weather.town` replaces any part of it. */
 export const PYONGYANG_WEATHER = {
   snow: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
+  // (The same snow lying at other hours and under another sky, PY_HOURS: the open air's 'siegedawn', 'siegemorning',
+  // 'siegelate' and 'siegeovercast'.)
+  dawn: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
+  morning: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
+  late: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
+  overcast: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
   // (The same snow under the hazier sky the gate views had before: the open air's 'siegesnowhazy'.)
   hazy: { wet: 0, pool: 0, rain: 0, snow: PYONGYANG_PLACE.snow, mist: [0.0012, 3, 0.2], fog: PYONGYANG_PLACE.fog },
   // (The same ground without its snow: for looking at the stone and the earth.)
@@ -306,6 +312,12 @@ function pySunAt({ latitude, declination, hour }) {
   return { azimuth: Math.PI / 2 + bearing, elevation: (elevation * 180) / Math.PI };
 }
 const PY_SUN = pySunAt(PY_DAY);
+// The same day at other hours, by the same rule (the open air's `days`): eight in the morning, the sun 11.8 degrees
+// up in the south-east (58.5 east of south), the wall's outer face and the gate's front in their own shade and the
+// wall's shadow thrown out over the field; half past ten, 31.5 up, 25.6 east of south, the front still in shade
+// but the field and the town lit from high; a quarter past four, 9.3 up, 61.1 west of south, the face lit almost
+// square-on by a low, yellowing sun an hour before it sets (sunset by the same rule at about five past five).
+const PY_HOURS = { dawn: 8, morning: 10.5, late: 16.25 };
 
 /** The place's light (render.js PLACE_LIGHT's entry): the low winter sun of PY_SUN in a pale clear sky. */
 // What the bare ground under the snow throws back, for the open air's light from below (its `ground.albedo`):
@@ -944,6 +956,15 @@ export function buildPyongyang() {
       sun: PY_SUN, air: { visibility: 25000, hazeHeight: 900 }, clouds: { cover: 0.35 }, ground: { albedo: PY_GROUND_ALBEDO },
       height: (x, z) => { if (z > t.outside.z[1] && x >= t.river.field.x[0] && x <= t.river.field.x[1]) return tkFieldAt(plan.south, x, Math.min(z, t.river.field.to)); const zc = Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)); return x <= wall.x ? tkFieldAt(plan.outside, Math.max(t.outside.x[0], x), zc) : x < head ? pyFoot(zc) : tkFieldAt(plan.inside, Math.min(plan.east, x), zc); },
       openings: [{ at: [mouth, 0, t.gate.z - t.gate.way / 2], a: [0, t.gate.spring + t.gate.rise * 0.6, 0], b: [0, 0, t.gate.way], floor: 0, dust: 0.2 }],
+      // (The sun's strength judged on the field the battle is fought over, 34 m out from the wall, as the custom
+      // battle's middle: at the wall's foot the rampart's own fill, in the heights above, shuts out a morning sun.)
+      litAt: [wall.x - 34, 2, 0],
+      // (The day's other hours: PY_HOURS. The overcast day keeps the afternoon's sun behind its lid.)
+      days: {
+        siegedawn: { sun: pySunAt({ ...PY_DAY, hour: PY_HOURS.dawn }) },
+        siegemorning: { sun: pySunAt({ ...PY_DAY, hour: PY_HOURS.morning }) },
+        siegelate: { sun: pySunAt({ ...PY_DAY, hour: PY_HOURS.late }) },
+      },
     },
     // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun: a bright, pale
     // winter sky, washed blue with thin pearly cloud, the low sun whole on the wall, a few flakes on the wind.
@@ -969,10 +990,25 @@ export function buildPyongyang() {
     // 'siegesnowhazy': the same showers in the hazier, darker sky the gate views had before the sunward work (the
     // open air's own flurries haze: 14 km in its 900 m layer, and 4 km in the thick of a shower), kept to be compared
     // with the default, which it does not replace (the place's weather `hazy`).
-    weathers: { snow: 'siegesnow', hazy: 'siegesnowhazy', bare: 'clear' },
+    // The other hours and the overcast day (the place's `dawn`, `morning`, `late`, `overcast`), each a weather of
+    // its own over the same showers or the open air's snow, set by eye against the default's views:
+    //   siegedawn      clear after the night's snow, no shower: a still, cold morning's low haze (12 km in a 300 m
+    //                  layer, the valley's night air not yet stirred), a little thin cloud; the camera's balance
+    //                  for the shade the gate stands in, so cooler (warmth -0.02) and a third of a stop up;
+    //   siegemorning   the default's pale sky and its showers, with the higher sun;
+    //   siegelate      the default's showers thinned, the sun low and yellowing (its colour is the open air's own,
+    //                  worked from the air it comes through), the camera a little warmer and a sixth of a stop down;
+    //   siegeovercast  a grey snowy day: the open air's driving snow ('snow') eased to steady light snow (2.5 km of
+    //                  sight, against its 700 m: the gate still reads across the field; approximate for light snow),
+    //                  less wind, the lid lighter underneath.
+    weathers: { snow: 'siegesnow', dawn: 'siegedawn', morning: 'siegemorning', late: 'siegelate', overcast: 'siegeovercast', hazy: 'siegesnowhazy', bare: 'clear' },
     first: 'snow',
     own: {
       siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 0.95, saturation: 0.95, warmth: 0.02, ev: 0.1 }, cover: 0.26, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegedawn: ['flurries', { label: 'Clear morning on the wall', grade: { contrast: 1.0, saturation: 0.92, warmth: -0.02, ev: 0.3 }, cover: 0.12, deck: 0.6, sun: 1, gloom: 0, fine: 1.2, visibility: 12000, hazeHeight: 300, wind: 0.5, gust: 0.05, fall: null }],
+      siegemorning: ['flurries', { label: 'Mid-morning on the wall', grade: { contrast: 0.95, saturation: 0.95, warmth: 0, ev: 0.1 }, cover: 0.26, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegelate: ['flurries', { label: 'Late afternoon on the wall', grade: { contrast: 1.0, saturation: 0.95, warmth: 0.04, ev: -0.15 }, cover: 0.2, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.06, thick: 12000 } }],
+      siegeovercast: ['snow', { label: 'Overcast, light snow on the wall', grade: { contrast: 1.2, saturation: 0.88, warmth: -0.02, ev: 0.3 }, gloom: 0.15, visibility: 2500, hazeHeight: 800, wind: 1.1, gust: 0.1 }],
       siegesnowhazy: ['flurries', { label: 'Snow showers on the wall, hazier sky', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }],
     },
   };
