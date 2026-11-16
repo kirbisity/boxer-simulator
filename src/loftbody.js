@@ -1250,16 +1250,19 @@ export const ARMOR_KINDS = {
   // the Inca gave his soldiers and guards, `uncuChecks`); and the tocapu all
   // over (the Sapa Inca's own, `uncuRoyal`: none but he wore it).
   uncu: {
-    trunk: [-0.1, 0.95, 1.08, 'cloth'], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
+    trunk: [-0.1, 0.95, 1.08, 'cloth'], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }], upperArm: [-0.2, 0.24, 1.08, 'cloth'],
   },
   uncuTocapu: {
     trunk: [-0.1, 0.95, 1.08, { tocapu: [-0.12, 0.16], base: 'cloth' }], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
+    upperArm: [-0.2, 0.24, 1.08, 'cloth'],
   },
   uncuChecks: {
     trunk: [-0.1, 0.95, 1.08, { checks: true, yoke: [0.8, 'lace'] }], skirt: [0.88, 0.32, 1.16, { checks: true }],
+    upperArm: [-0.2, 0.24, 1.08, { checks: true }],
   },
   uncuRoyal: {
     trunk: [-0.1, 0.95, 1.08, { tocapu: true }], skirt: [0.88, 0.32, 1.16, { tocapu: true }],
+    upperArm: [-0.2, 0.24, 1.08, { tocapu: true }],
   },
   // The jaguar knight's suit: the spotted skin over everything, to the wrists and ankles.
   jaguarSuit: {
@@ -3725,7 +3728,7 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
     if (name !== 'trunk' && name !== 'neck') continue;
     if (mesh.base.armFlesh?.[vertex - start] && mesh.base.armFlesh[vertex - start] !== 'trunk') continue;
     const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
-    skinPlaces.push(place);
+    skinPlaces.push({ ...place, vertex });
     if (place.r < neckFoot) continue;
     const sector = sectorOf(place.angle);
     if (!highest[sector] || place.t > highest[sector].t) highest[sector] = place;
@@ -3808,6 +3811,26 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
     moves.push([vertex, vec.add(vec.add(trunk.part.a, vec.scale(trunk.axis, t * trunk.length)), vec.scale(dir, reach))]);
   }
   for (const [vertex, point] of moves) mesh.positions.splice(vertex * 3, 3, ...point);
+  // The skin above the coats' top edge as it now runs, by sector (the highest of their top rings' points there and beside it,
+  // plus `along`): no coat covers it, so it is not left out with the trunk's top (`mesh.collarBare`, the skin's coverage). Left
+  // out, the back of a round neck lower than the neck's foot (an uncu's) was a hole through the neck.
+  const coatTop = new Array(sectors).fill(null);
+  for (const [vertex, { ring, name }] of shares) {
+    if (name !== 'trunk' || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk || ring.t < pieceTop.get(ring.piece)) continue;
+    const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
+    const sector = sectorOf(place.angle);
+    if (coatTop[sector] === null || place.t > coatTop[sector]) coatTop[sector] = place.t;
+  }
+  if (coatTop.every((top) => top === null)) return;
+  mesh.collarBare = new Set();
+  for (const place of skinPlaces) {
+    let top = null;
+    for (let k = -spec.spread; k <= spec.spread; k += 1) {
+      const found = coatTop[(sectorOf(place.angle) + k + sectors) % sectors];
+      if (found !== null && (top === null || found > top)) top = found;
+    }
+    if (top !== null && (place.t - top) * trunk.length > spec.along) mesh.collarBare.add(place.vertex);
+  }
 }
 
 /**
@@ -5140,7 +5163,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       mesh.base.armFlesh.forEach((arm, index) => {
         const trunkTop = (mesh.cover.trunk ?? []).some(([, high]) => high >= LOFT.closedJoint.top.trunk);
         const closes = arm === 'trunk' ? trunkTop : trunkTop || (covered[arm] ?? []).some(([low]) => low <= LOFT.closedJoint.root);
-        if (arm && closes) inside[mesh.base.start + index] = 1;
+        if (arm && closes && !mesh.collarBare?.has(mesh.base.start + index)) inside[mesh.base.start + index] = 1;
       });
       // (And the trunk's own skin above the shoulder line, away from the front neckline (LOFT.collar.from), under a trunk piece
       // reaching the trunk's top: its collar is carried up the trapezius over it (raiseCollars), and the skin there, left in,
@@ -5150,7 +5173,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       if (trunkTop) {
         for (let vertex = Math.max(from, mesh.base.start); vertex < to; vertex += 1) {
           const angle = Math.atan2(Math.sin(mesh.ringA[vertex]), Math.cos(mesh.ringA[vertex]));
-          if (mesh.ringT[vertex] >= LOFT.closedJoint.top.trunk && Math.abs(angle) > LOFT.collar.from) inside[vertex] = 1;
+          if (mesh.ringT[vertex] >= LOFT.closedJoint.top.trunk && Math.abs(angle) > LOFT.collar.from && !mesh.collarBare?.has(vertex)) inside[vertex] = 1;
         }
       }
     }
