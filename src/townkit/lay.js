@@ -14,11 +14,6 @@
 //             under cover, and nothing falls or lies there;
 //      green  the ground's own height (the same measure): a wall's foot is where the wall meets it;
 //      blue   how near a wall's foot is (1 at it, 0 by `TK_LAY.wall.near` m): dirt, damp and weeds gather there;
-//      alpha  spare (1);
-//   C  (only where the place gives its sun's way: the sun's lie, for the light sunlit stone throws into the shade)
-//      red    how much of the ground round a point the sun reaches (the mean over `TK_LAY.sun.spread` m);
-//      green  how much sunlit wall face stands round it (1: one face lit over `band` m of its height runs by);
-//      blue   the height over the ground at which the air comes out of built shade (as a share of `high` m);
 //      alpha  spare (1).
 //
 // The sky's share is found by looking: from each point of the ground, rays in a few directions and at a few
@@ -51,13 +46,6 @@ export const TK_LAY = {
   // Snow in the wind: it piles within `windward` m of the windward foot of what stands at least `stands` high, and
   // is thin for `lee` m behind it.
   drift: { windward: 3.5, lee: 7, stands: 0.8 },
-  // The sun's lie (sheet C). `reach` m: how far toward the sun a point looks for what shades it (12 m of house under
-  // a sun 28 degrees up throws 23 m; past the reach it counts as lit); `every`: worked every so many texels; `eave`
-  // m: how deep a cover counts as solid under its top (the sun gets in under an eave or an arch); `band` m: the
-  // height of lit face that counts as a whole wall's worth (a storey and a half); `spread` m: the half side of the
-  // square the lit ground and faces are averaged over, twice (what is thrown from further is small beside the
-  // sky's own light); `high` m: the range the shade's height is kept in.
-  sun: { reach: 40, every: 2, eave: 0.6, band: 4, spread: 3, high: 16 },
   // Materials that are not built things: left out of the map.
   skip: ['water', 'ice', 'foliage', 'needles', 'lattice', 'bark', 'tuft', 'reed', 'scrap', 'icicle', 'cloth', 'drift'],
 };
@@ -71,11 +59,10 @@ const laySmooth = (a, b, x) => {
 /**
  * Bake the lie of a place. `batches`: every builder's batches (geo.js), level 'all' and 'far' are read; `box`:
  * { x: [from, to], z: [from, to] }; `ground(x, z)`: the ground's height; `ways`: [{ line: [[x, z], ...], half, kind:
- * 'foot' | 'cart', strength }] where feet and wheels go; `wind`: [x, z] the way the wind blows; `texel`: m; `sun`:
- * [x, y, z] the way toward the place's sun (none: no sheet C).
- * Returns { a, b, c: Uint8Array (RGBA; c null without a sun), width, height, min: [x, z], size: [w, d], base, range, texel, ms, at(x, z) }.
+ * 'foot' | 'cart', strength }] where feet and wheels go; `wind`: [x, z] the way the wind blows; `texel`: m.
+ * Returns { a, b: Uint8Array (RGBA), width, height, min: [x, z], size: [w, d], base, range, texel, ms, at(x, z) }.
  */
-export function tkLayBake({ batches, box, ground, ways = [], wind = [1, 0], texel = TK_LAY.texel.high, seed = 1, skip = TK_LAY.skip, sun = null }) {
+export function tkLayBake({ batches, box, ground, ways = [], wind = [1, 0], texel = TK_LAY.texel.high, seed = 1, skip = TK_LAY.skip }) {
   const started = typeof performance !== 'undefined' ? performance.now() : 0;
   const min = [box.x[0], box.z[0]];
   const size = [box.x[1] - box.x[0], box.z[1] - box.z[0]];
@@ -366,111 +353,19 @@ export function tkLayBake({ batches, box, ground, ways = [], wind = [1, 0], texe
     }
   }
 
-  // The sun's lie: from every few texels a walk toward the sun over the map. The ground is lit where nothing on the
-  // way stands over the sun's line (a wall under its top, a cover within `eave` of its top, the ground itself); the
-  // air over it is out of built shade above the highest thing the line would have to clear. A wall's face is lit
-  // where the point at its foot on the sun's side is: from that height to the wall's top.
-  let c = null;
-  if (sun && sun[1] > 0.02) {
-    const rule = TK_LAY.sun;
-    const [cw, ch] = [Math.ceil(width / rule.every), Math.ceil(height / rule.every)];
-    const flat = Math.hypot(sun[0], sun[2]) || 1;
-    const [sx, sz] = [sun[0] / flat / tx, sun[2] / flat / tz];
-    const climb = sun[1] / flat;
-    const pace = Math.min(tx, tz) * 0.7;
-    const litGround = new Float32Array(cw * ch);
-    const litWall = new Float32Array(cw * ch);
-    const shadeHigh = new Float32Array(cw * ch);
-    for (let j = 0; j < ch; j += 1) {
-      for (let i = 0; i < cw; i += 1) {
-        const [pi, pj] = [Math.min(width - 1, i * rule.every), Math.min(height - 1, j * rule.every)];
-        const here = pj * width + pi;
-        if (kind[here] === 2) continue;
-        const g = groundAt[here];
-        let lit = 1;
-        let clear = 0;
-        if (busy[(pj >> 4) * bw + (pi >> 4)]) {
-          for (let d = pace; d <= rule.reach; d += pace) {
-            const [qi, qj] = [Math.floor(pi + 0.5 + sx * d), Math.floor(pj + 0.5 + sz * d)];
-            if (qi < 0 || qj < 0 || qi >= width || qj >= height) break;
-            const rise = d * climb;
-            if (g + rise > most) break;
-            const at = qj * width + qi;
-            if (at === here) continue;
-            const what = kind[at];
-            const over = (what === 2 ? Math.max(wallHigh[at], top[at]) : top[at]) - rise - g;
-            if (over > clear) clear = over;
-            if (lit && over > 0.05 && (what !== 1 || over < rule.eave)) lit = 0;
-          }
-        }
-        const at = j * cw + i;
-        litGround[at] = kind[here] === 0 ? lit : 0;
-        shadeHigh[at] = clear;
-        // (The face the sun's line meets next, away from the sun, within three texels of this point.)
-        for (let d = 1; d <= 3; d += 1) {
-          const [qi, qj] = [Math.floor(pi + 0.5 - sx * d * Math.min(tx, tz)), Math.floor(pj + 0.5 - sz * d * Math.min(tx, tz))];
-          if (qi < 0 || qj < 0 || qi >= width || qj >= height) break;
-          const wall = qj * width + qi;
-          if (kind[wall] !== 2) continue;
-          litWall[at] = layClamp((wallHigh[wall] - g - clear) / rule.band);
-          break;
-        }
-      }
-    }
-    // The mean over a square, twice (a tent): what a point has round it.
-    const half = Math.max(1, Math.round(rule.spread / (rule.every * Math.min(tx, tz))));
-    const mean = (from) => {
-      const mid = new Float32Array(cw * ch);
-      const out = new Float32Array(cw * ch);
-      for (let j = 0; j < ch; j += 1) {
-        let sum = 0;
-        for (let i = -half; i < cw; i += 1) {
-          if (i + half < cw) sum += from[j * cw + i + half];
-          if (i - half - 1 >= 0) sum -= from[j * cw + i - half - 1];
-          if (i >= 0) mid[j * cw + i] = sum / (2 * half + 1);
-        }
-      }
-      for (let i = 0; i < cw; i += 1) {
-        let sum = 0;
-        for (let j = -half; j < ch; j += 1) {
-          if (j + half < ch) sum += mid[(j + half) * cw + i];
-          if (j - half - 1 >= 0) sum -= mid[(j - half - 1) * cw + i];
-          if (j >= 0) out[j * cw + i] = sum / (2 * half + 1);
-        }
-      }
-      return out;
-    };
-    const groundRound = mean(mean(litGround));
-    // (A face is a line a cell or two wide on the map: its mean over the square, times the square's side in such
-    // lines, is 1 where one whole lit face runs through.)
-    const wallRound = mean(mean(litWall));
-    const lines = (2 * half + 1) / 1.5;
-    c = new Uint8Array(count * 4);
-    const coarse = (field, i, j) => field[Math.min(ch - 1, Math.floor(j / rule.every)) * cw + Math.min(cw - 1, Math.floor(i / rule.every))];
-    for (let j = 0; j < height; j += 1) {
-      for (let i = 0; i < width; i += 1) {
-        const at = (j * width + i) * 4;
-        c[at] = Math.round(255 * layClamp(coarse(groundRound, i, j)));
-        c[at + 1] = Math.round(255 * layClamp(coarse(wallRound, i, j) * lines));
-        c[at + 2] = Math.round(255 * layClamp(coarse(shadeHigh, i, j) / rule.high));
-        c[at + 3] = 255;
-      }
-    }
-  }
-
-  const lay = { a, b, c, width, height, min, size, base, range, texel, ms: (typeof performance !== 'undefined' ? performance.now() : 0) - started };
+  const lay = { a, b, width, height, min, size, base, range, texel, ms: (typeof performance !== 'undefined' ? performance.now() : 0) - started };
   /** What the map says at (x, z): { top, ground, sky, hollow, wear, drift, wall } (the nearest texel's; outside it, open level ground). */
   lay.at = (x, z) => {
     const i = Math.floor((x - min[0]) / tx);
     const j = Math.floor((z - min[1]) / tz);
     if (i < 0 || j < 0 || i >= width || j >= height) return { top: ground(x, z), ground: ground(x, z), sky: 1, hollow: 0, wear: 0, drift: 0.5, wall: 0, kind: 0 };
     const at = j * width + i;
-    return { top: top[at], ground: groundAt[at], sky: a[at * 4] / 255, hollow: a[at * 4 + 1] / 255, wear: a[at * 4 + 2] / 255, drift: a[at * 4 + 3] / 255, wall: b[at * 4 + 2] / 255, kind: kind[at], litGround: c ? c[at * 4] / 255 : 0, litWall: c ? c[at * 4 + 1] / 255 : 0, shade: c ? (c[at * 4 + 2] / 255) * TK_LAY.sun.high : 0 };
+    return { top: top[at], ground: groundAt[at], sky: a[at * 4] / 255, hollow: a[at * 4 + 1] / 255, wear: a[at * 4 + 2] / 255, drift: a[at * 4 + 3] / 255, wall: b[at * 4 + 2] / 255, kind: kind[at] };
   };
   return lay;
 }
 
-/** The sheets as textures (drawn smooth, held at their edges); `c` null where the bake had no sun. */
+/** The two sheets as textures (drawn smooth, held at their edges). */
 export function tkLayTextures(lay) {
   const make = (data) => {
     const texture = new THREE.DataTexture(data, lay.width, lay.height, THREE.RGBAFormat);
@@ -482,5 +377,5 @@ export function tkLayTextures(lay) {
     texture.needsUpdate = true;
     return texture;
   };
-  return { a: make(lay.a), b: make(lay.b), c: lay.c ? make(lay.c) : null };
+  return { a: make(lay.a), b: make(lay.b) };
 }
