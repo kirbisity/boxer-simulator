@@ -197,8 +197,12 @@ export function pyongyangPlan() {
   }
   for (const [x, z] of [[30, -96], [52, -104], [78, -92], [102, -108], [124, -98], [20, -84], [90, -80], [40, 36], [86, 34], [110, -30], [36, -32], [96, 84], [44, 88], [128, 20]]) trees.push({ at: [x, z], y: pyFoot(z), kind: z < t.hill.z[0] ? 'pine' : 'bare', high: 7 + 3 * random(), seed: Math.round(x + z), yard: z > t.hill.z[0] });
   const gateFrame = tkgFrame(wall.x - t.gate.out, 0, t.gate.z, -Math.PI / 2);
-  const outcrops = pyOutcrops(trees, rocks);
-  pyPlanMade = { wall, outside, inside, south, runs, gaps, houses, trees, rocks, outcrops, gateFrame, head, east: head + t.inside.cells * step, edge: east + 0.8 };
+  // The foreground's crags, stele and ruin first (PY_FORE), the field's outcrops kept off them.
+  const fore = pyForePlan();
+  const crags = pyCrags(fore, trees);
+  const keep = [...crags.map((stone) => [...stone.at, stone.size * 0.6]), ...[fore.stele, fore.ruin].filter(Boolean).map((thing) => [...thing.at, 6])];
+  const outcrops = [...crags, ...pyOutcrops(trees, rocks, keep)];
+  pyPlanMade = { wall, outside, inside, south, runs, gaps, houses, trees, rocks, outcrops, fore, gateFrame, head, east: head + t.inside.cells * step, edge: east + 0.8 };
   return pyPlanMade;
 }
 
@@ -209,19 +213,32 @@ export function pyongyangPlan() {
 //             road (`road` m, `roadNear` within 45 m of the gate, where the trees keep off it too), or `berm` m of
 //             the wall's foot (its drifts and the ladders' ground); nor south of `flat` (z), the river's alluvial
 //             flat, where the stream laid silt and not stone (and the walk down to the ice stays open).
-//   outcrops  knots of boulders breaking through the snow, as the granite of that country does on its knolls and
-//             hill flanks: `count` knots, each of `rocks` [least, most] stones within `spread` [least, most] m of its
-//             middle, `size` [least, most] m across (the knot's first stone `big` [least, most], the rest smaller); a
-//             knot stands on a knoll's crown or flank `knoll` times as often as on the flat. Each stone is a faceted
-//             block (`sides` [least, most] round, `squat` [least, most] its height over its width, `stretch` the most
-//             it is longer one way) sunk `sink` of its height into the ground, its facets lit `round` of the way to
-//             a rounded stone's, `contact` darker where it meets the snow, its rock `tone` (weathered granite,
-//             darker than the dressed stone of the wall: lichen and the damp) `vary` either way. A stone wider than
-//             `solid` m is something a walker meets, as the place's other boulders are.
+//   outcrops  the granite breaking through the snow, as that country's does on its knolls and hill flanks: not
+//             stones strewn evenly but a few tors and clusters, each a heap of rounded blocks split along their
+//             joints and leaning on one another, half buried. Each of the place's old boulders (the plan's
+//             `rocks`, whose places and solids stand) is the heart of one, and `count` more are laid, a knoll's
+//             crown or flank `knoll` times as likely as the flat. A cluster holds `rocks` [least, most] stones
+//             within `spread` [least, most] m of its heart: the first `big` [least, most] m across, the rest
+//             `size` [least, most], set `huddle` of their half widths into their neighbours so they read as one
+//             mass. A stone (pyBoulder) is a lump `sides` round and `rings` high (`low`: the low tier's), its
+//             surface swelled by `lumps` (share of its radius) and cut flat where `joints` [least, most] of the
+//             rock's joint planes run through it (granite weathers along joints into rounded blocks with flat
+//             faces: corestones), `squat` [least, most] its height over its width, `stretch` the most it is longer
+//             one way, sunk `sink` of its height into the ground; its rock `tone` (weathered granite: a light
+//             grey, about 0.3 of the light back, the sheet's own colour times this), `vary` either way, the
+//             upper faces `pale` paler (weathered and lichened where the wet runs off), `contact` darker where it
+//             meets the snow (the damp and the little sky there). On its upper faces new snow lies `cap` [least,
+//             most] m deep (a cushion on the drift's material over the faces that face the sky more than
+//             `capFrom` of the way up), thinning to nothing at its edge, so a stone is white on top and its
+//             flanks dark; the stone's own face holds `hold` of the snow other stone does (the 'boulder' material:
+//             what lies on it is the cushion, a little more caught in its hollows; little moss: lichen, not moss,
+//             grows on granite in that dry cold). A stone wider than `solid` m is
+//             something a walker meets.
 //   tails     the snow the wind leaves in the lee of a stone (downwind of it: PY_LAY.wind), a mound `long` times
 //             the stone's width long and `wide` times it across, its head `high` of the stone's height up its lee
-//             face; for stones over `from` m. Snow tails behind obstacles run some three to ten times their height
-//             downwind (approximate).
+//             face, but no higher than `most` m (a winter's few decimetres of fall piles to about a pace's depth
+//             in a lee, not to a big stone's shoulder); for stones over `from` m. Snow tails behind obstacles run
+//             some three to ten times their height downwind (approximate).
 //   scours    patches the wind keeps bare on the windward brow of a knoll, where the dead grass and the frozen earth
 //             show: `count` patches `radius` [least, most] m, their edges ragged by `ragged` of it; the earth's
 //             `tone` (frozen earth with straw-coloured grass), and `tufts` dead tufts round each rim.
@@ -229,8 +246,12 @@ export function pyongyangPlan() {
 //             gate, `high` [least, most] m, lying out `run` m, `edge` m from the road's middle.
 const PY_FIELD = {
   clear: 15, way: 4, road: 6, roadNear: 16, berm: 13, flat: 92,
-  outcrops: { count: 48, rocks: [2, 7], spread: [1.5, 5], size: [0.4, 1.8], big: [1.8, 4.2], knoll: 3, sides: [8, 11], squat: [0.45, 0.85], stretch: 0.45, sink: 0.3, round: 0.6, contact: 0.55, tone: [0.4, 0.39, 0.37], vary: 0.22, solid: 1.1 },
-  tails: { from: 0.8, long: 1.8, wide: 1.05, high: 0.4 },
+  outcrops: {
+    count: 7, knoll: 5, rocks: [5, 10], spread: [2.5, 5.5], big: [2.8, 5], size: [0.8, 2.6], huddle: 0.35,
+    sides: 16, rings: 9, low: [10, 6], lumps: 0.2, joints: [2, 4], squat: [0.5, 0.78], stretch: 0.4, sink: 0.32,
+    tone: [0.64, 0.63, 0.6], vary: 0.14, pale: 0.18, contact: 0.45, cap: [0.08, 0.22], capFrom: 0.62, hold: 0.3, solid: 1.1,
+  },
+  tails: { from: 0.8, long: 1.8, wide: 1.05, high: 0.4, most: 0.6 },
   scours: { count: 30, radius: [1.2, 3.6], ragged: 0.45, tone: [0.36, 0.31, 0.24], tufts: 9 },
   banks: { high: [0.12, 0.34], run: 1.1, edge: 2.7 },
 };
@@ -245,80 +266,338 @@ function pyFieldClear(x, z, margin = 0) {
   return t.wall.ladders.some((lz, k) => x > PY_COLUMNS.from - 10 && Math.abs(z - (lz * (1 + (0.3 * (to - x)) / (to - PY_COLUMNS.from)) + pyColumnAside(x, to, k))) < f.way + margin);
 }
 
-/** The knots of boulders over the open ground (PY_FIELD.outcrops): [{ at, y, size, seed, squat, stretch, sides, turn }]. Seeded; kept off what pyFieldClear keeps and off the trees and the place's other boulders. */
-function pyOutcrops(trees, rocks) {
+/**
+ * The outcrops over the open ground (PY_FIELD.outcrops): [{ at, y, size, seed, squat, stretch, turn }], the plan's
+ * old boulders among them as they were. Seeded; kept off what pyFieldClear keeps, off the trees and off `keep`
+ * ([x, z, radius] each: the foreground's).
+ */
+function pyOutcrops(trees, rocks, keep = []) {
   const t = PYONGYANG_PLACE;
   const o = PY_FIELD.outcrops;
   const random = tkRandom(15931);
   const lerp = ([a, b], u) => a + (b - a) * u;
-  const taken = [...trees.map((tree) => [tree.at[0], tree.at[1], 1.5]), ...rocks.map((rock) => [rock.at[0], rock.at[1], rock.size])];
+  const taken = [...trees.map((tree) => [tree.at[0], tree.at[1], 1.5]), ...keep];
   const free = (x, z, r) => !taken.some(([tx, tz, tr]) => Math.hypot(x - tx, z - tz) < r + tr) && !pyFieldClear(x, z, r);
-  const stones = [];
-  for (let knot = 0, tries = 0; knot < o.count && tries < o.count * 30; tries += 1) {
-    const [x, z] = [t.outside.x[0] + 6 + random() * (t.wall.x - PY_FIELD.berm - t.outside.x[0] - 6), t.outside.z[0] + 6 + random() * (t.outside.z[1] - t.outside.z[0] - 12)];
-    // (On a knoll's crown or flank, `knoll` times as often as on the flat.)
+  const hearts = rocks.map((rock) => ({ at: rock.at, size: rock.size, seed: rock.seed, old: true }));
+  for (let tries = 0, made = 0; made < o.count && tries < o.count * 60; tries += 1) {
+    const [x, z] = [t.outside.x[0] + 8 + random() * (t.wall.x - PY_FIELD.berm - t.outside.x[0] - 8), t.outside.z[0] + 8 + random() * (t.outside.z[1] - t.outside.z[0] - 16)];
     const rise = PY_KNOLLS.reduce((most, [kx, kz, radius, high]) => Math.max(most, high > 0 ? Math.exp(-((x - kx) ** 2 + (z - kz) ** 2) / (radius * radius)) : 0), 0);
-    if (random() * o.knoll > 1 + (o.knoll - 1) * rise || !free(x, z, 3)) continue;
-    knot += 1;
-    const count = Math.round(lerp(o.rocks, random()));
-    const spread = lerp(o.spread, random());
+    if (random() * o.knoll > 1 + (o.knoll - 1) * rise || !free(x, z, 6) || hearts.some((h) => Math.hypot(h.at[0] - x, h.at[1] - z) < 25)) continue;
+    made += 1;
+    hearts.push({ at: [x, z], size: lerp(o.big, random()), seed: 500 + made });
+  }
+  const stones = [];
+  for (const [index, heart] of hearts.entries()) {
+    const dice = tkRandom(heart.seed * 977 + 3);
+    const shape = () => ({ squat: lerp(o.squat, dice()), stretch: 1 + o.stretch * dice(), turn: dice() * Math.PI });
+    // (The old boulder stays where and as big as it was: its solid is the plan's own.)
+    const first = { at: heart.at, y: pyOutside(...heart.at), size: heart.size, seed: index * 31, ...shape(), old: heart.old };
+    stones.push(first);
+    const near = [[...heart.at, first.size / 2]];
+    const count = Math.round(lerp(o.rocks, dice()) * (heart.old ? Math.min(1, 0.4 + heart.size / 3) : 1));
+    for (let k = 0, tries = 0; k < count && tries < count * 8; tries += 1) {
+      const size = lerp(o.size, dice() * dice()) * (heart.old ? Math.min(1, 0.5 + heart.size / 3) : 1);
+      // (Against a stone already laid: its edge and this one's overlapping by `huddle` of their half widths.)
+      const [bx, bz, br] = near[Math.floor(dice() * near.length)];
+      const a = dice() * Math.PI * 2;
+      const d = (br + size / 2) * (1 - o.huddle) + dice() * 0.4;
+      const [sx, sz] = [bx + Math.cos(a) * d, bz + Math.sin(a) * d];
+      if (Math.hypot(sx - heart.at[0], sz - heart.at[1]) > lerp(o.spread, dice()) + heart.size / 2 || !free(sx, sz, size * 0.5)) continue;
+      k += 1;
+      near.push([sx, sz, size / 2]);
+      stones.push({ at: [sx, sz], y: pyOutside(sx, sz), size, seed: index * 31 + k, ...shape() });
+    }
+    taken.push([...heart.at, Math.max(...near.map(([nx, nz, nr]) => Math.hypot(nx - heart.at[0], nz - heart.at[1]) + nr))]);
+  }
+  return stones;
+}
+
+/**
+ * A boulder at world (x, y, z) (PY_FIELD.outcrops): a weathered granite block, its top `y + height` over the ground,
+ * sunk `sink` of its height into it; lumpy, cut flat along a few joint planes, lit by its own smooth surface; a
+ * cushion of snow on its upper faces. `tier` 'low': fewer cuts. Returns its height (m).
+ */
+function pyBoulder(builder, x, y, z, { size, seed, squat = 0.6, stretch = 1.2, turn = 0, tone = PY_FIELD.outcrops.tone, tier = 'high', capped = true, crag = false }) {
+  const o = { ...PY_FIELD.outcrops, ...(crag ? { sink: PY_FORE.sink } : null) };
+  const random = tkRandom(seed * 7919 + 13);
+  const [sides, rings] = tier === 'low' ? o.low : [o.sides, o.rings];
+  const [r, high] = [size / 2, size * squat];
+  // (Its swell: a few long waves over the sphere of directions, seeded, so no two stones share a shape.)
+  const waves = Array.from({ length: 6 }, (_, k) => {
+    const [u, v] = [random() * 2 - 1, random() * Math.PI * 2];
+    const s = Math.sqrt(1 - u * u);
+    const f = 1.2 + 1.6 * random() * (k < 3 ? 1 : 2);
+    return [s * Math.cos(v) * f, u * f, s * Math.sin(v) * f, random() * Math.PI * 2, k < 3 ? 1 : 0.45];
+  });
+  const total = waves.reduce((sum, w) => sum + w[4], 0);
+  const swell = (d) => waves.reduce((sum, [a, b, c, p, w]) => sum + w * Math.sin(a * d[0] + b * d[1] + c * d[2] + p), 0) / total;
+  // (Its joints: planes `cut` of the way in from its surface, one often near level across its top, as granite's
+  // sheeting joints run, the others steep.)
+  const joints = Array.from({ length: o.joints[0] + Math.floor(random() * (o.joints[1] - o.joints[0] + 1)) }, (_, k) => {
+    const level = k === 0 && random() < 0.6;
+    const a = random() * Math.PI * 2;
+    const up = level ? 0.85 + 0.15 * random() : 0.15 * (random() - 0.3);
+    const flat = Math.sqrt(1 - up * up);
+    return [[flat * Math.cos(a), up, flat * Math.sin(a)], 0.72 + 0.2 * random()];
+  });
+  // (The lump on a unit sphere: each direction's reach, swelled, then cut back to any joint plane it crosses.)
+  const reach = (d) => {
+    let length = 1 + o.lumps * swell(d) * 2;
+    for (const [n, cut] of joints) {
+      const along = d[0] * n[0] + d[1] * n[1] + d[2] * n[2];
+      if (along > 1e-3) length = Math.min(length, cut / along);
+    }
+    return length;
+  };
+  const [cos, sin] = [Math.cos(turn), Math.sin(turn)];
+  // (Its middle sits so that `sink` of its height is under the ground.)
+  const middle = y + high * (0.5 - o.sink);
+  const place = (p) => [x + p[0] * r * stretch * cos - p[2] * r * sin, middle + p[1] * high / 2, z + p[0] * r * stretch * sin + p[2] * r * cos];
+  // (Rings from its foot to its crown, each `sides` round: a grid on the sphere, its last ring the crown's point.)
+  const grid = [];
+  for (let j = 0; j <= rings; j += 1) {
+    const polar = Math.PI * (1 - j / rings);
+    const row = [];
+    for (let k = 0; k < sides; k += 1) {
+      const azimuth = (k / sides) * Math.PI * 2;
+      const d = [Math.sin(polar) * Math.cos(azimuth), Math.cos(polar), Math.sin(polar) * Math.sin(azimuth)];
+      const length = reach(d);
+      row.push(place(d.map((value) => value * length)));
+    }
+    grid.push(row);
+  }
+  // (Each point lit by the mean of the faces round it: a weathered stone's surface is smooth between its edges.)
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const unit = (a) => { const l = Math.hypot(...a) || 1; return a.map((value) => value / l); };
+  const normals = grid.map((row, j) => row.map((p, k) => {
+    const [east, west] = [row[(k + 1) % sides], row[(k + sides - 1) % sides]];
+    const [up, down] = [grid[Math.min(rings, j + 1)][k], grid[Math.max(0, j - 1)][k]];
+    const n = unit(cross(sub(up, down), sub(east, west)));
+    // (At the crown and the foot the rings close to a point: the way out from the middle.)
+    return j === rings ? [0, 1, 0] : j === 0 ? [0, -1, 0] : n;
+  }));
+  const dice = tkRandom(seed * 31 + 7);
+  // (One factor for all three: a stone is lighter or darker, not another hue.)
+  const lighter = 1 + o.vary * (2 * dice() - 1);
+  const colour = tone.map((value) => value * lighter);
+  // (Paler on its upper faces, darker where it meets the snow: PY_FIELD.outcrops `pale`, `contact`.)
+  const shade = (p, n) => colour.map((value) => value * (1 + o.pale * Math.max(0, n[1])) * (1 - o.contact * (1 - pySmooth(y - high * 0.05, y + high * 0.3, p[1]))));
+  const uv = (p) => [p[0] + p[2] * 0.7, p[1] + p[2] * 0.3];
+  const tri = (material, a, b, c, na, nb, nc, colours) => builder.tri(material, a, b, c, [uv(a), uv(b), uv(c)], colours, [na, nb, nc]);
+  for (let j = 0; j < rings; j += 1) {
+    for (let k = 0; k < sides; k += 1) {
+      const k1 = (k + 1) % sides;
+      // (Below the ground's level nothing is seen: those faces are left out.)
+      if (Math.max(grid[j][k][1], grid[j][k1][1], grid[j + 1][k][1], grid[j + 1][k1][1]) < y - 0.3) continue;
+      const [a, b, c, d] = [grid[j][k], grid[j][k1], grid[j + 1][k1], grid[j + 1][k]];
+      const [na, nb, nc, nd] = [normals[j][k], normals[j][k1], normals[j + 1][k1], normals[j + 1][k]];
+      // (Seen from outside: the rings run round anticlockwise seen from above, foot to crown.)
+      tri('boulder', a, c, b, na, nc, nb, [shade(a, na), shade(c, nc), shade(b, nb)]);
+      tri('boulder', a, d, c, na, nd, nc, [shade(a, na), shade(d, nd), shade(c, nc)]);
+    }
+  }
+  // The snow on it: the upper faces again, lifted along their normals by the depth that lies there.
+  if (capped) {
+    const deep = o.cap[0] + (o.cap[1] - o.cap[0]) * Math.min(1, size / 4);
+    const lies = (n, p) => pySmooth(o.capFrom, 0.9, n[1]) * (0.75 + 0.25 * Math.sin(p[0] * 2.1 + p[2] * 1.7));
+    const lifted = grid.map((row, j) => row.map((p, k) => { const n = normals[j][k]; const h = deep * lies(n, p) + 0.012; return [p[0] + n[0] * h, p[1] + n[1] * h, p[2] + n[2] * h]; }));
+    const white = [1, 1, 1];
+    for (let j = 1; j < rings; j += 1) {
+      for (let k = 0; k < sides; k += 1) {
+        const k1 = (k + 1) % sides;
+        const quad = [[j, k], [j, k1], [j + 1, k1], [j + 1, k]];
+        if (quad.some(([jj, kk]) => normals[jj][kk][1] < o.capFrom)) continue;
+        const [a, b, c, d] = quad.map(([jj, kk]) => lifted[jj][kk]);
+        const [na, nb, nc, nd] = quad.map(([jj, kk]) => normals[jj][kk]);
+        tri('drift', a, c, b, na, nc, nb, [white, white, white]);
+        tri('drift', a, d, c, na, nd, nc, [white, white, white]);
+      }
+    }
+  }
+  return high * (1 - o.sink);
+}
+
+// What stands near the eye on the ground before the wall and gives a view of the gate its depth, laid by hand
+// (each kept off what pyFieldClear keeps: none of it on the battle's floor, the columns' ways or the road, and
+// what a walker meets is a solid, off the fight's ground). None of it is from a record of the day: what such
+// ground before a besieged town's gate would have, typical.
+//   crags   granite tors on the flanks of the approach, [x, z, size of the heart stone m, pines]: rounded
+//           blocks heaped higher than the field's outcrops (`squat` [least, most] for a tor's upright blocks,
+//           `rocks` stones round the heart and one `top` of its size on its crown, sunk only `sink` of their height: they stand out of the ground, no lee
+//           tails, the wind scouring round them), with Korean red pines rooted in the cracks at their feet, the tree
+//           of that country's rocky knolls (`pine` [least, most] m tall), their pads laden as the others' are.
+//   stele   a stone stele by the road out of the gate (a roadside monument of the kind Joseon towns set at their
+//           approaches): its base, its slab (`slab` [wide, deep, high] m) and its roofed capstone, weathered
+//           granite, `off` m from the road's middle at x, facing it.
+//   ruin    the outer watch post on the approach, burnt when the Ming guns and fire arrows took the outworks the
+//           day before the assault: its rubble platform (`base` [long, wide, high] m), the charred stumps of its
+//           posts, a slumped roof, beams fallen about it; the besiegers' picket now keeps it, a brazier at
+//           each front corner lit through the night (`fires`); at x, `off` m north of the road.
+//   stakes  the palisade that fronted the post on the west, wrecked: `count` stakes along `run` m of line, `down`
+//           of them knocked flat, the rest leaning by up to `lean` rad, `high` [least, most] m.
+// `char`: timber burnt black (charcoal throws back about a twentieth); `stone`: the weathered granite's tone.
+const PY_FORE = {
+  crags: [[-33, -31, 3.4, 1], [-58, -86, 4.6, 2], [-86, -74, 4.2, 2], [-52, 42, 4.4, 2], [-96, 66, 4, 1]],
+  squat: [0.6, 0.95], sink: 0.18, top: 0.55, rocks: [4, 7], pine: [8, 12],
+  stele: { x: -63, off: 10, slab: [0.92, 0.28, 2.1] },
+  ruin: { x: -40, off: 22, base: [6.5, 5, 1.1], fires: 2 },
+  stakes: { count: 16, run: 13, down: 0.2, lean: 0.5, high: [1.6, 2.4] },
+  char: [0.1, 0.085, 0.075], stone: [0.66, 0.65, 0.62],
+};
+
+/** Where the foreground stands (PY_FORE): its crags' hearts and pines, the stele, the ruin, the stakes' line. Those fenced off by pyFieldClear are left out. */
+function pyForePlan() {
+  const f = PY_FORE;
+  const random = tkRandom(1593208);
+  const crags = f.crags.filter(([x, z, size]) => !pyFieldClear(x, z, size * 0.6)).map(([x, z, size, pines], k) => ({ at: [x, z], size, pines, seed: 900 + k }));
+  const along = (x) => { const d = [1, pyRoad(x + 1) - pyRoad(x - 1)]; const l = Math.hypot(...d); return [d[0] / l, d[1] / l]; };
+  const stele = (() => { const x = f.stele.x; const z = pyRoad(x) - f.stele.off; return pyFieldClear(x, z, 1) ? null : { at: [x, z], yaw: Math.atan2(along(x)[1], along(x)[0]) }; })();
+  const ruin = (() => { const x = f.ruin.x; const z = pyRoad(x) - f.ruin.off; const reach = Math.hypot(f.ruin.base[0], f.ruin.base[1]) / 2 + 1; return pyFieldClear(x, z, reach) ? null : { at: [x, z], yaw: Math.atan2(along(x)[1], along(x)[0]) }; })();
+  const stakes = [];
+  if (ruin) {
+    // (West of the platform, across the way the attack came: a line north-south, a little bowed.)
+    const [x0, z0] = [ruin.at[0] - f.ruin.base[0] / 2 - 3.5, ruin.at[1] - f.stakes.run / 2];
+    for (let k = 0; k < f.stakes.count; k += 1) {
+      const s = (k + 0.5 * random()) / f.stakes.count;
+      const [x, z] = [x0 - 1.2 * Math.sin(s * Math.PI) + 0.3 * (random() - 0.5), z0 + s * f.stakes.run];
+      if (random() < 0.15 || pyFieldClear(x, z, 0.4)) continue;
+      stakes.push({ at: [x, z], high: f.stakes.high[0] + (f.stakes.high[1] - f.stakes.high[0]) * random(), down: random() < f.stakes.down, lean: f.stakes.lean * random(), way: random() * Math.PI * 2, seed: k });
+    }
+  }
+  return { crags, stele, ruin, stakes };
+}
+
+/** The crags' stones, laid as the outcrops' are (pyBoulder's arguments, `crag` marked) and their pines (plan trees). */
+function pyCrags(fore, trees) {
+  const f = PY_FORE;
+  const lerp = ([a, b], u) => a + (b - a) * u;
+  const stones = [];
+  for (const crag of fore.crags) {
+    const dice = tkRandom(crag.seed * 131 + 5);
+    const [x, z] = crag.at;
+    const heart = { at: [x, z], y: pyOutside(x, z), size: crag.size, seed: crag.seed, squat: lerp(f.squat, dice()), stretch: 1 + 0.3 * dice(), turn: dice() * Math.PI, crag: true };
+    stones.push(heart);
+    // (A tor's blocks stand one on another: a block `top` of the heart's size on its crown, a little off its middle.)
+    const crown = heart.y + heart.size * heart.squat * (1 - f.sink);
+    const aside = [(dice() - 0.5) * crag.size * 0.25, (dice() - 0.5) * crag.size * 0.25];
+    stones.push({ at: [x + aside[0], z + aside[1]], y: crown - crag.size * 0.06, size: crag.size * f.top, seed: crag.seed + 50, squat: lerp(f.squat, dice()) * 0.8, stretch: 1 + 0.4 * dice(), turn: dice() * Math.PI, crag: true, stacked: true });
+    const count = Math.round(lerp(f.rocks, dice()));
     for (let k = 0; k < count; k += 1) {
-      const size = k === 0 ? lerp(o.big, random()) : lerp(o.size, random() * random());
-      const a = random() * Math.PI * 2;
-      const d = k === 0 ? 0 : spread * (0.3 + 0.7 * random());
+      const a = (k / count) * Math.PI * 2 + dice() * 0.8;
+      const size = crag.size * (0.35 + 0.4 * dice());
+      const d = (crag.size + size) * 0.5 * (0.7 + 0.15 * dice());
       const [sx, sz] = [x + Math.cos(a) * d, z + Math.sin(a) * d];
-      if (!free(sx, sz, size * 0.5)) continue;
-      taken.push([sx, sz, size * 0.45]);
-      stones.push({ at: [sx, sz], y: pyOutside(sx, sz), size, seed: knot * 31 + k, squat: lerp(o.squat, random()), stretch: 1 + o.stretch * random(), sides: Math.round(lerp(o.sides, random())), turn: random() * Math.PI });
+      if (pyFieldClear(sx, sz, size * 0.5)) continue;
+      stones.push({ at: [sx, sz], y: pyOutside(sx, sz), size, seed: crag.seed * 10 + k, squat: lerp(f.squat, dice()) * 0.85, stretch: 1 + 0.3 * dice(), turn: dice() * Math.PI, crag: true });
+    }
+    for (let k = 0; k < crag.pines; k += 1) {
+      // (Rooted at the crag's foot, on its side away from the field's middle, leaning out from it.)
+      const a = Math.atan2(z > 0 ? 1 : -1, -0.4) + (k - 0.5) * 1.3 + (dice() - 0.5) * 0.5;
+      const d = crag.size * 0.75 + 0.8;
+      const [px, pz] = [x + Math.cos(a) * d, z + Math.sin(a) * d];
+      if (pyFieldClear(px, pz, 1)) continue;
+      trees.push({ at: [px, pz], y: pyOutside(px, pz), kind: 'pine', high: lerp(f.pine, dice()), seed: crag.seed + k * 7, crag: true });
     }
   }
   return stones;
 }
 
-/** A boulder at world (x, y, z) (PY_FIELD.outcrops): a faceted block, its rings jittered, sunk into the ground; each face lit flat, as split stone is. */
-function pyBoulder(builder, x, y, z, { size, seed, squat = 0.6, stretch = 1.2, sides = 7, turn = 0, tone = PY_FIELD.outcrops.tone }) {
-  const o = PY_FIELD.outcrops;
-  const random = tkRandom(seed * 7919 + 13);
-  const [r, high] = [size / 2, size * squat];
-  // (Rings from below the ground to the crown: [height share, radius share]; the crown's point a little off the middle.)
-  const rings = [[-o.sink, 0.9], [0.1, 1], [0.38, 0.97], [0.64, 0.82], [0.86, 0.55]];
-  const [cos, sin] = [Math.cos(turn), Math.sin(turn)];
-  const place = (px, py, pz) => [x + (px * stretch) * cos - pz * sin, y + py, z + (px * stretch) * sin + pz * cos];
-  const angles = Array.from({ length: sides }, (_, k) => ((k + 0.35 * (random() - 0.5)) / sides) * Math.PI * 2);
-  const points = rings.map(([up, out]) => angles.map((angle) => {
-    const reach = r * out * (0.78 + 0.44 * random());
-    return place(Math.cos(angle) * reach, high * (up + 0.08 * (random() - 0.5)), Math.sin(angle) * reach);
-  }));
-  const crown = place(r * 0.15 * (random() - 0.5), high, r * 0.15 * (random() - 0.5));
-  const colour = tone.map((value) => value * (1 + o.vary * (2 * random() - 1)));
-  const uv = (p) => [p[0] + p[2] * 0.7, p[1] + p[2] * 0.3];
-  // (Lit between the face's own way and the way out from the stone's middle (`round` of the latter): a granite
-  // boulder is rounded by weather, its facets soft, not cut.)
-  const middle = [x, y + high * 0.3, z];
-  const lit = (p, face) => {
-    const out = [(p[0] - middle[0]) / stretch, (p[1] - middle[1]) * 1.6, p[2] - middle[2]];
-    const length = Math.hypot(...out) || 1;
-    const n = face.map((value, k) => value * (1 - o.round) + (out[k] / length) * o.round);
-    const total = Math.hypot(...n) || 1;
-    return n.map((value) => value / total);
+/** The stele, the ruined post, its fires and the wrecked stakes (PY_FORE), drawn. */
+function pyForeDraw(blocks, stir, plan, tier) {
+  const f = PY_FORE;
+  const { fore } = plan;
+  const ground = (x, z) => tkFieldAt(plan.outside, x, z);
+  const random = tkRandom(1593209);
+  if (fore.stele) {
+    const [x, z] = fore.stele.at;
+    const builder = blocks.at(x, z);
+    const frame = tkgFrame(x, ground(x, z) - 0.15, z, -fore.stele.yaw);
+    const [wide, deep, high] = f.stele.slab;
+    const stone = f.stone;
+    // (Its base: a low block rounded over, standing for the carved tortoise such steles stand on.)
+    builder.lathe('ashlar', frame.child(0, 0, 0, Math.PI / 4), 0, 0, [[1.0, 0], [1.02, 0.3], [0.85, 0.5], [0.4, 0.6]], { sides: 4, colour: stone.map((v) => v * 0.9) });
+    builder.box('ashlar', frame, -wide / 2, wide / 2, 0.55, 0.55 + high, -deep / 2, deep / 2, { colour: stone });
+    builder.lathe('rooftile', frame.child(0, 0.55 + high, 0, Math.PI / 4), 0, 0, [[0.05, 0], [0.82, 0.04], [0.8, 0.13], [0.35, 0.36], [0.02, 0.44]], { sides: 4, colour: stone.map((v) => v * 0.85) });
+  }
+  if (!fore.ruin) return;
+  const [rx, rz] = fore.ruin.at;
+  const builder = blocks.at(rx, rz);
+  const [long, wide, high] = f.ruin.base;
+  const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  const frame0 = tkgFrame(rx, 0, rz, -fore.ruin.yaw);
+  const foot = Math.min(...corners.map(([a, b]) => { const p = frame0(a * long / 2, 0, b * wide / 2); return ground(p[0], p[2]); }));
+  const top = Math.max(...corners.map(([a, b]) => { const p = frame0(a * long / 2, 0, b * wide / 2); return ground(p[0], p[2]); })) + high;
+  const frame = tkgFrame(rx, 0, rz, -fore.ruin.yaw);
+  builder.box('rubble', frame, -long / 2, long / 2, foot - 0.6, top, -wide / 2, wide / 2, { colour: f.stone.map((v) => v * 0.85) });
+  const post = (lx, lz, h, lean = 0, way = 0) => {
+    const [bx, , bz] = frame(lx, 0, lz);
+    const tip = [bx + Math.cos(way) * Math.sin(lean) * h, top + Math.cos(lean) * h, bz + Math.sin(way) * Math.sin(lean) * h];
+    builder.tube('timber', [[bx, top - 0.05, bz], tip], 0.15, 0.12, { sides: 6, colour: f.char.map((v) => v * (0.8 + 0.4 * random())) });
+    return tip;
   };
-  // (Where the stone meets the snow it sees little of the sky and gathers the damp: darker by `contact` at the
-  // ground, none of it by a third of its height. The lie's map does not hold the stones: they are laid after it.)
-  const shut = (p) => colour.map((value) => value * (1 - o.contact * (1 - pySmooth(y - high * 0.1, y + high * 0.35, p[1]))));
-  const tri = (a, b, c) => {
-    const face = (() => { const [u, v] = [[b[0] - a[0], b[1] - a[1], b[2] - a[2]], [c[0] - a[0], c[1] - a[1], c[2] - a[2]]]; const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]; const l = Math.hypot(...n) || 1; return n.map((value) => value / l); })();
-    builder.tri('rock', a, b, c, [uv(a), uv(b), uv(c)], [a, b, c].map(shut), [lit(a, face), lit(b, face), lit(c, face)]);
-  };
-  for (let ring = 0; ring + 1 < points.length; ring += 1) {
-    for (let k = 0; k < sides; k += 1) {
-      const [a, b, c, d] = [points[ring][k], points[ring][(k + 1) % sides], points[ring + 1][(k + 1) % sides], points[ring + 1][k]];
-      // (Seen from outside, anticlockwise: the rings run round anticlockwise seen from above.)
-      tri(a, c, b);
-      tri(a, d, c);
+  // The posts' stumps, burnt down to different heights, one leaning where its tie burnt through.
+  const heights = [2.3, 0.9, 1.6, 1.9, 0.5, 1.2];
+  const tips = [];
+  for (let k = 0; k < 6; k += 1) tips.push(post(-2.6 + (k % 3) * 2.6, k < 3 ? -1.8 : 1.8, heights[k], k === 2 ? 0.45 : 0, fore.ruin.yaw + 0.6));
+  // A tie beam burnt through at one end, fallen from its post onto the platform.
+  builder.tube('timber', [tips[0], [tips[0][0] + 1.2, top + 0.12, tips[0][2] + 2.6]], 0.11, 0.1, { sides: 5, colour: f.char });
+  // The roof fallen in over the platform's back half and slumped off its edge to the ground behind, its rafters burnt out.
+  const back = (lx, h) => frame(lx, 0, wide / 2 + h);
+  const [a, b] = [frame(-long / 2 + 0.4, 0, wide / 2 - 2.4), frame(long / 2 - 1.5, 0, wide / 2 - 2.0)];
+  const [c, d] = [back(long / 2 - 1.2, 1.2), back(-long / 2 + 0.2, 1.5)];
+  const slab = [[a[0], top + 0.7, a[2]], [b[0], top + 0.4, b[2]], [c[0], ground(c[0], c[2]) + 0.2, c[2]], [d[0], ground(d[0], d[2]) + 0.2, d[2]]];
+  // (In pieces: a grid over the slumped skin of boards (its tiles slid off and broken under the snow), each piece
+  // sagged and turned a little, a third burnt through.)
+  const [nu, nv] = [4, 3];
+  const on = (u, v) => [0, 1, 2].map((k) => slab[0][k] * (1 - u) * (1 - v) + slab[1][k] * u * (1 - v) + slab[2][k] * u * v + slab[3][k] * (1 - u) * v);
+  for (let i = 0; i < nu; i += 1) {
+    for (let j = 0; j < nv; j += 1) {
+      if (random() < 0.35) continue;
+      const sag = -0.25 * random();
+      const corner = (u, v) => { const p = on((i + u) / nu, (j + v) / nv); return [p[0], p[1] + sag + 0.08 * (random() - 0.5), p[2]]; };
+      let [p, q, r, w] = [corner(0.04, 0.04), corner(0.96, 0.04), corner(0.96, 0.96), corner(0.04, 0.96)];
+      // (Wound so its upper side faces up: anticlockwise seen from above.)
+      if ((w[0] - p[0]) * (q[2] - p[2]) - (w[2] - p[2]) * (q[0] - p[0]) > 0) [q, w] = [w, q];
+      builder.quad('timber', p, w, r, q, { colour: f.char.map((v) => v * 1.6) });
+      // (Its underside a tile's thickness below, burnt black.)
+      const under = (point) => [point[0], point[1] - 0.07, point[2]];
+      builder.quad('timber', under(p), under(q), under(r), under(w), { colour: f.char });
     }
   }
-  const last = points[points.length - 1];
-  for (let k = 0; k < sides; k += 1) tri(crown, last[(k + 1) % sides], last[k]);
+  // Beams fallen on the platform and off its front, and broken rafters sticking from the slumped roof.
+  for (let k = 0; k < 7; k += 1) {
+    const [lx, lz] = [(random() - 0.5) * (long + 3), (random() - 0.5) * (wide + 3)];
+    const p = frame(lx, 0, lz);
+    const on = Math.abs(lx) < long / 2 && Math.abs(lz) < wide / 2;
+    const y = (on ? top : ground(p[0], p[2])) + 0.08;
+    const way = random() * Math.PI;
+    const half = 1 + 1.4 * random();
+    builder.tube('timber', [[p[0] - Math.cos(way) * half, y, p[2] - Math.sin(way) * half], [p[0] + Math.cos(way) * half, y + (random() - 0.3) * 0.5, p[2] + Math.sin(way) * half]], 0.09, 0.07, { sides: 5, colour: f.char.map((v) => v * (0.8 + 0.5 * random())) });
+  }
+  // (Its stones thrown down off the platform's edge.)
+  for (let k = 0; k < 5; k += 1) {
+    const p = frame((random() - 0.5) * long, 0, -wide / 2 - 0.5 - random());
+    pyBoulder(builder, p[0], ground(p[0], p[2]), p[2], { size: 0.45 + 0.4 * random(), seed: 7000 + k, squat: 0.6, stretch: 1.3, turn: random() * 3, tier, tone: f.stone.map((v) => v * 0.85) });
+  }
+  // The picket's braziers at its front corners.
+  for (const side of [-1, 1].slice(0, f.ruin.fires)) {
+    const p = frame(-long / 2 - 1.1, 0, side * (wide / 2 - 0.4));
+    stir.fire(...tkBrazier(blocks.at(p[0], p[2]), p[0], ground(p[0], p[2]), p[2]));
+  }
+  // The stakes: sharpened logs, burnt at their feet, some knocked flat.
+  for (const stake of fore.stakes) {
+    const [x, z] = stake.at;
+    const y = ground(x, z);
+    // (Knocked flat along the line, or leaning out to the west, the way the attack pushed them.)
+    const [lean, way] = stake.down ? [1.45, Math.PI / 2 + (random() - 0.5) * 0.8] : [stake.lean, Math.PI + (random() - 0.5) * 0.6];
+    const tip = [x + Math.cos(way) * Math.sin(lean) * stake.high, y + Math.cos(lean) * stake.high + (stake.down ? 0.12 : 0), z + Math.sin(way) * Math.sin(lean) * stake.high];
+    const base = [x, y + (stake.down ? 0.12 : -0.3), z];
+    const neck = base.map((v, k) => v + (tip[k] - v) * 0.85);
+    const tone = TK_THINGS.oldWood.map((v) => v * (0.55 + 0.3 * random()));
+    blocks.at(x, z).tube('timber', [base, neck], 0.09, 0.085, { sides: 6, colour: tone });
+    blocks.at(x, z).tube('timber', [neck, tip], 0.085, 0.01, { sides: 6, colour: tone });
+  }
 }
 
 /**
@@ -362,13 +641,13 @@ function pyField(blocks, plan, tier) {
   const ground = (x, z) => tkFieldAt(plan.outside, Math.max(t.outside.x[0], Math.min(t.wall.x, x)), Math.max(t.outside.z[0], Math.min(t.outside.z[1], z)));
   const wind = PY_LAY.wind;
   const random = tkRandom(15932);
-  for (const stone of [...plan.outcrops, ...plan.rocks.map((rock) => ({ ...rock, squat: 0.5, stretch: 1.2, sides: 6, turn: rock.seed }))]) {
+  for (const stone of plan.outcrops) {
     const [x, z] = stone.at;
     const builder = blocks.at(x, z);
-    pyBoulder(builder, x, stone.y, z, stone);
-    if (stone.size < f.tails.from) continue;
+    pyBoulder(builder, x, stone.y, z, { ...stone, tier });
+    if (stone.size < f.tails.from || stone.crag) continue;
     const reach = stone.size * 0.5 * 0.35;
-    pyMound(builder, x + wind[0] * reach, z + wind[1] * reach, wind, { long: stone.size * f.tails.long, wide: stone.size * f.tails.wide, high: stone.size * stone.squat * f.tails.high, heightAt: ground, cuts: tier === 'low' ? [4, 2] : [7, 4] });
+    pyMound(builder, x + wind[0] * reach, z + wind[1] * reach, wind, { long: stone.size * f.tails.long, wide: stone.size * f.tails.wide, high: Math.min(f.tails.most, stone.size * stone.squat * f.tails.high), heightAt: ground, cuts: tier === 'low' ? [4, 2] : [7, 4] });
   }
   // The windward brows of the knolls, swept bare (a ragged fan of the frozen earth, a finger over the snow's ground).
   const knolls = PY_KNOLLS.filter(([, , , high]) => high > 0);
@@ -464,7 +743,10 @@ export function pyongyangSolids() {
   for (const house of plan.houses) solids.push(tkHouseSolid(house));
   for (const tree of plan.trees) if (!tree.yard) solids.push(wallOf(tree.at, [0.6, 0.6], tree.y - 1, tree.y + 4));
   for (const rock of plan.rocks) if (rock.size > 1.1) solids.push(wallOf(rock.at, [rock.size * 0.8, rock.size * 0.8], rock.y - 1, rock.y + rock.size));
-  for (const stone of plan.outcrops) if (stone.size > PY_FIELD.outcrops.solid) solids.push(wallOf(stone.at, [stone.size * 0.8, stone.size * 0.8], stone.y - 1, stone.y + stone.size * stone.squat));
+  // (The foreground's ruined post and stele: PY_FORE.)
+  if (plan.fore.ruin) solids.push(wallOf(plan.fore.ruin.at, PY_FORE.ruin.base.slice(0, 2), pyOutside(...plan.fore.ruin.at) - 2, pyOutside(...plan.fore.ruin.at) + PY_FORE.ruin.base[2] + 2.5, { yaw: -plan.fore.ruin.yaw }));
+  if (plan.fore.stele) solids.push(wallOf(plan.fore.stele.at, [2, 2], pyOutside(...plan.fore.stele.at) - 1, pyOutside(...plan.fore.stele.at) + 3.2, { yaw: -plan.fore.stele.yaw }));
+  for (const stone of plan.outcrops) if (!stone.old && stone.size > PY_FIELD.outcrops.solid) solids.push(wallOf(stone.at, [stone.size * 0.8, stone.size * 0.8], stone.y - 1, stone.y + stone.size * stone.squat));
   // The bounds: the open ground's edges (where the hills and the camp's lines begin), the town's far streets.
   const [ox0] = t.outside.x;
   const [z0, z1] = [t.outside.z[0] + 3, t.outside.z[1] - 3];
@@ -547,10 +829,40 @@ export const PYONGYANG_LIGHT = {
 // of the sky's light that reaches what stands in the field, for 'siegedawn' and 'siegesnow'). The open air lights a
 // shaded face with the whole dome; here the low sun stands in a glare of haze on one side and the rest of the sky is
 // the cold clear blue of a winter morning, and a face in shade among the knolls, the wall and the near hills has a
-// share of its sky shut off by them: 0.7 by eye against the reference frames, whose shade is a deep blue-grey beside
-// the lit snow. (The camera's meter, which is told the same share, opens a little for it; each weather's `ev` takes
-// that back so the lit snow keeps its place on the curve.)
-const PY_SHADE = { sky: 0.7 };
+// share of its sky shut off by them: 0.55 by eye against the reference frames, whose shade is a deep blue-grey beside
+// the lit snow (a face standing on a level field sees half the dome, and of that half the low ground and the near
+// hills and walls hide some; 0.7 left the views with the sun behind flat: on the gate seen so, the darkest
+// twentieth of the frame went from 23 to 17 of 255, the middle 137 to 130). (The camera's meter, which is told the
+// same share, opens a little for it; each weather's `ev` takes that back so the lit snow keeps its place on the curve.)
+const PY_SHADE = { sky: 0.55 };
+
+// Two of the kit's shared figures that were set against the canal town and do not fit this place (tkKeep's `look`):
+//   street  the light a shut-in place (the gate's passage, under the pavilion's and the houses' eaves) has from
+//           the lit walls and ground round it, as a multiple of the open air's ground light (TK_WEATHER.shade.street,
+//           1.6, set for the canal town's pale plaster and wet flags, and raised over their own sum of about 0.9
+//           so a lane kept its timber against the flat curve there). Here the walls round the passage are the
+//           weathered granite (PY_WEATHERED: about two thirds of the kit's pale stone) and the grade lets the shade
+//           go dark as a winter photograph against the light does: the sum itself scaled by the stone, 0.9 x 0.67,
+//           0.6;
+//   caught  the share of the windward face's joints the wind plasters with snow (TK_WEATHER.snow.caught, 0.55):
+//           the wall's dressed granite is laid close with its joints flush, where the canal town's brick has
+//           raked joints and ledges; a third of the kit's share, 0.2, flecks the joints near the foot and under
+//           the parapet instead of ruling the whole face in white;
+//   most    how much of the sky's light the lie's map may take away (TK_WEATHER.shade.most, 0.85: the 0.15 it
+//           leaves stands for light that comes in sideways under an arcade a few metres deep). The gate's passage
+//           is 10.5 m deep and the lie's own walk already sees its two mouths, so that floor of 0.15 lit the vault's
+//           middle as if it stood at the mouth; 0.95 leaves a twentieth. With `street` it takes the passage's
+//           vault from mid-grey to the dark the references show (the sunlit mouth unchanged).
+// All by eye against the reference frames.
+const PY_LOOK = { street: 0.6, caught: 0.2, most: 0.95 };
+
+// The dawn mist's colour, away from the sun (the open air's `tint`, which colours the low sky its own colour). The
+// sky table lights its haze by single scattering, so at an 11.8 degree sun the low sky all round takes the
+// reddened beam's colour and the valley mist read beige. A mist of droplets and ice is thick enough that most of
+// its light has been scattered many times, by the blue sky above it and the snow under it as much as by the sun:
+// it is near white, a little cool, and only the forward peak round the sun itself (the weather's `glare`, the
+// sun's own colour) is warm. By eye against the reference frames (white mist, a warm glow close round the sun).
+const PY_MIST = '#e6ecf2';
 
 // The far country, drawn only: how far it is drawn (m, to the sky's edge in the haze), and how far it is sunk under
 // the walked ground where the two overlap.
@@ -1021,6 +1333,7 @@ const PY_WEATHERED = {
   timber: { ...TK_MATERIALS.timber, colour: [0.72, 0.68, 0.64] },
   rooftile: { ...TK_MATERIALS.rooftile, colour: [0.82, 0.82, 0.84] },
   snowpad: { ...TK_MATERIALS.needles, snow: 3 },
+  boulder: { ...TK_MATERIALS.rock, snow: PY_FIELD.outcrops.hold, dirt: [0, 0.12, 0.5, 0] },
 };
 
 /** The place built (a THREE.Group for render.js's places). */
@@ -1185,6 +1498,7 @@ export function buildPyongyang() {
   const stir = tkStir(3);
   const scattered = pyDress(blocks, stir, plan, lay, eave, tier);
   pyField(blocks, plan, tier);
+  pyForeDraw(blocks, stir, plan, tier);
   pyReeds(blocks, plan);
 
   // (The river's ice is frozen, not open water: no pool's mirror. The wind scours lying snow off smooth ice into drifts
@@ -1252,7 +1566,8 @@ export function buildPyongyang() {
     //                veil is lit as if the sun reached all of it, so toward the sun a thick one is a white wall in
     //                front of the cloud that sheds it. A workaround, asked of the open air as R10 (c);
     //   grade        the camera set for the sunlit snow and the shade let go dark, as a winter photograph against
-    //                the light is: the curve steeper (contrast 1.7) with its ceiling at 4 white cards (sunlit snow
+    //                the light is: the curve steeper (contrast 1.8: 1.7 before the foreground's crags, whose shade
+  //                beside lit snow wanted the deeper toe) with its ceiling at 4 white cards (sunlit snow
     //                and the glow round the sun reach it; at 6 they stayed grey under it), half a stop under
     //                the open air's meter (which already closes for lying snow; a third of a stop of it takes back
     //                what the cut sky fill, PY_SHADE, opens the meter by); saturation 0.95, warmth -0.02 (the cold
@@ -1277,7 +1592,8 @@ export function buildPyongyang() {
     //                  (warmth -0.14: the low sun comes through orange and the mist it lights would be brown on a
     //                  daylight balance, where the references' mist is white), the same steep curve, two fifths of
     //                  a stop down (PY_SHADE's share of it as for the default);
-    //   siegemorning   the default's pale sky and its showers, with the higher sun (unchanged by the glare work);
+    //                  The mist's own colour (`tint`, PY_MIST) and a narrower glare (2.8, 6 degrees): see PY_MIST;
+  //   siegemorning   the default's pale sky and its showers, with the higher sun (unchanged by the glare work);
     //   siegelate      the default's showers thinned, the sun low and yellowing (its colour is the open air's own,
     //                  worked from the air it comes through) behind a haze of 4 km in a 150 m layer (the day's
     //                  snow haze settling as the air cools toward evening, `fine` 0.6), the glare a little stronger
@@ -1288,15 +1604,15 @@ export function buildPyongyang() {
     weathers: { snow: 'siegesnow', dawn: 'siegedawn', morning: 'siegemorning', late: 'siegelate', overcast: 'siegeovercast', hazy: 'siegesnowhazy', bare: 'clear' },
     first: 'snow',
     own: {
-      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.7, white: 4, saturation: 0.95, warmth: -0.02, ev: -0.5 }, cover: 0.32, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.3, visibility: 1800, hazeHeight: 70, glare: [2, 8], fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
-      siegedawn: ['flurries', { label: 'Clear morning on the wall', grade: { contrast: 1.7, white: 4, saturation: 0.92, warmth: -0.14, ev: -0.4 }, cover: 0.28, deck: 0.8, sun: 1, gloom: 0, fine: 0.1, visibility: 1200, hazeHeight: 60, glare: [2.5, 8], wind: 0.5, gust: 0.05, fall: null }],
+      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.8, white: 4, saturation: 0.95, warmth: -0.02, ev: -0.5 }, cover: 0.32, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.3, visibility: 1800, hazeHeight: 70, glare: [2, 8], fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegedawn: ['flurries', { label: 'Clear morning on the wall', grade: { contrast: 1.8, white: 4, saturation: 0.92, warmth: -0.14, ev: -0.4 }, cover: 0.28, deck: 0.8, sun: 1, gloom: 0, fine: 0.1, visibility: 1200, hazeHeight: 60, glare: [2.8, 6], tint: PY_MIST, wind: 0.5, gust: 0.05, fall: null }],
       siegemorning: ['flurries', { label: 'Mid-morning on the wall', grade: { contrast: 0.95, saturation: 0.95, warmth: 0, ev: 0.1 }, cover: 0.26, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
       siegelate: ['flurries', { label: 'Late afternoon on the wall', grade: { contrast: 1.75, white: 4, saturation: 0.95, warmth: 0.05, ev: -0.4 }, cover: 0.25, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.6, visibility: 4000, hazeHeight: 150, glare: [2.5, 7], fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.06, thick: 12000 } }],
       siegeovercast: ['snow', { label: 'Overcast, light snow on the wall', grade: { contrast: 1.2, saturation: 0.88, warmth: -0.02, ev: 0.3 }, gloom: 0.15, visibility: 2500, hazeHeight: 800, wind: 1.1, gust: 0.1 }],
       siegesnowhazy: ['flurries', { label: 'Snow showers on the wall, hazier sky', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }],
     },
   };
-  tkKeep(root, meshes, { sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...(PYONGYANG_WEATHER[view.weather?.town?.name] ?? PYONGYANG_WEATHER.snow), ...(view.weather?.town ?? null) }) });
+  tkKeep(root, meshes, { look: PY_LOOK, sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...(PYONGYANG_WEATHER[view.weather?.town?.name] ?? PYONGYANG_WEATHER.snow), ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;
   root.userData.scattered = scattered;
   root.userData.dispose = () => {
