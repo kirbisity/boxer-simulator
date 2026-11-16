@@ -3891,6 +3891,11 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
   // front than their inflate, and a per-point rank would put the shorts over their own waistband there.)
   const pieceRank = new Map();
   for (const { standoff, ring } of shares.values()) pieceRank.set(ring.piece, Math.min(pieceRank.get(ring.piece) ?? Infinity, standoff));
+  // (Armour, mail or plate, is worn over the clothes, `top`: it outranks them whatever its inflate. A mail shirt's sleeves
+  // lofted at 1.15 ranked under a padded jack's at 1.16, the jack's sleeve was drawn over the mail, and the mail's corner at
+  // the shoulder stood out of it in a shard.)
+  const clothesRank = Math.max(0, ...[...shares].filter(([vertex]) => mesh.colors[vertex] === 'top').map(([, { ring }]) => pieceRank.get(ring.piece)));
+  for (const [vertex, { ring }] of shares) if (HARD_ROLES.has(mesh.colors[vertex]) && clothesRank > 0) pieceRank.set(ring.piece, Math.max(pieceRank.get(ring.piece), clothesRank + 2 * spec.rankGap));
   for (const [vertex, { name, under, ring }] of shares) {
     if (!frames[name]) continue;
     // (Cloth worn over armour outranks every piece: the plate is held inside it, and it is drawn out over the plate.)
