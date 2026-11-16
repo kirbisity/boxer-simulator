@@ -2203,7 +2203,7 @@ function breastplateOn(mesh, rings, inflate, shape, range, { lanceRest = false, 
  * sharp front (breastplateOn), under the rivets, riding the plate where it is fitted. As a ring's paint on the plate the gilt
  * bled over the faces either side, a smear up the sides and across the back. (Its neck's border lies under the gorget: drawn
  * at the breast's top it showed only its ends, two gilt slabs beside the gorget, and behind it crossed the back, where the
- * plate runs on up to the backplate's own neck.)
+ * plate runs on up to the backplate's own neck. The brass at the neck is the gorget's: gorgetBorder.)
  */
 function ropedBorders(mesh, rings, inflate, shape, range, bones) {
   const lift = LOFT.ridgedFront.lift * 1.5;
@@ -2214,6 +2214,26 @@ function ropedBorders(mesh, rings, inflate, shape, range, bones) {
     return [place, angle, inflate * shape(ringAt(rings, place), angle) + lift];
   }));
   addGrid(mesh, rings, grid, 'gold', bones);
+}
+
+/**
+ * A harness's brass border round its gorget's foot, where the gorget lies over the breast and back plates: the border seen at
+ * the neck (the breastplate's own neck border is under the gorget). A strip of its own LOFT.harnessEdge.depth deep, standing
+ * LOFT.harnessEdge.lift off the gorget, riding it where it is fitted; in front it rises over the breastplate's keel by the
+ * keel's own rule (LOFT.ridged ridge and width), as the gorget's plate lies over it. Without that rise it passed under the keel
+ * and showed only as two wings and a slab at its crossing.
+ */
+function gorgetBorder(mesh, rings) {
+  const spec = LOFT.harnessEdge;
+  const steps = LOFT.sides;
+  const lift = 1 + spec.lift / rings[0].depth;
+  const places = [0, placeAlong(measureRings(rings, 1), spec.depth)];
+  const grid = places.map((place) => Array.from({ length: steps + 1 }, (_, step) => {
+    const angle = (step / steps) * Math.PI * 2;
+    const off = Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle)));
+    return [place, angle, lift * (1 + LOFT.ridged.ridge * Math.max(0, 1 - off / LOFT.ridged.width))];
+  }));
+  addGrid(mesh, rings, grid, 'gold', () => null);
 }
 
 /**
@@ -4744,6 +4764,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     // (A kit's collar goes under a coat closed at the neck as far up as the coat's top edge: tuckCollars.)
     if (kit?.collar) for (const ring of collarRings) ring.collar = true;
     loft(mesh, collarRings, sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false, ...mailMaps });
+    if (plate && brassStrips) gorgetBorder(mesh, collarRings);
   }
   // (Stiff as its paint is: one plate, or rows where it is painted in rows of plates and lacing.)
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, stiffen(mesh, rings, typeof role === 'function' ? 'rows' : stiffnessOf(role)), sides, { color: role, inflate, capStart: false, capEnd: false });
