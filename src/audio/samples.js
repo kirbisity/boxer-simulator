@@ -85,7 +85,7 @@ export const SAMPLE_SETS = {
   // (The seventh batch: a bow drawn, its wood and string bending: the whole creak, its first part and its tighter last part.)
   bowdraw: ['bowdraw-1', 'bowdraw-2', 'bowdraw-3'],
   // Cries (sfx/voice.js CRY_KINDS; chosen by audio/cries.js): a man's and a woman's, each a set per kind (a few composed of two pieces).
-  ...voiceSets({ male: { hurt: 7, scream: 3, moan: 4, fear: 4, dying: 2 }, female: { hurt: 4, scream: 3, moan: 3, fear: 2, dying: 2 } }),
+  ...voiceSets({ male: { hurt: 11, scream: 6, moan: 5, fear: 5, dying: 4 }, female: { hurt: 8, scream: 6, moan: 6, fear: 4, dying: 3 } }),
   // An army's charge roared: one loop (engine.js plays it under a large side running at the enemy: audio/charge.js).
   charge: ['charge-1'],
   // Explosions (cut from the user's grenade and big-explosion recordings of 10-31): a frag's blast (three), a flashbang's
@@ -106,6 +106,25 @@ function voiceSets(counts) {
   const sets = {};
   for (const [sex, kinds] of Object.entries(counts)) for (const [kind, count] of Object.entries(kinds)) sets[`voice-${sex}-${kind}`] = Array.from({ length: count }, (_, index) => `voice-${sex}-${kind}-${index + 1}`);
   return sets;
+}
+
+/**
+ * How often a take comes up against the others of its set (1 if not named): the screams cut from the 11-16 recordings (a woman
+ * screaming, a man suffering, a man screaming in pain) half as often as the first two recordings' (the user's call, 2026-11-16: more
+ * voices, the new screams a little rarer).
+ */
+export const SAMPLE_WEIGHTS = Object.fromEntries([
+  'voice-female-hurt-5', 'voice-female-hurt-6', 'voice-female-scream-4', 'voice-female-scream-5', 'voice-female-scream-6', 'voice-female-fear-3', 'voice-female-dying-3',
+  'voice-male-hurt-8', 'voice-male-hurt-9', 'voice-male-hurt-10', 'voice-male-scream-4', 'voice-male-scream-5', 'voice-male-scream-6', 'voice-male-dying-3', 'voice-male-dying-4',
+].map((name) => [name, 0.5]));
+
+/** A take of `names` by their weights (SAMPLE_WEIGHTS), not `last` again while there is another: `random` 0..1. */
+export function pickWeighted(names, random, last = null) {
+  const pool = names.length > 1 && last ? names.filter((name) => name !== last) : names;
+  const total = pool.reduce((sum, name) => sum + (SAMPLE_WEIGHTS[name] ?? 1), 0);
+  let left = random * total;
+  for (const name of pool) if ((left -= SAMPLE_WEIGHTS[name] ?? 1) < 0) return name;
+  return pool[pool.length - 1];
 }
 
 /** Every file of every set. */
@@ -174,6 +193,7 @@ function sampleBytes(base64) {
  */
 export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetcher = globalThis.fetch?.bind(globalThis), random = Math.random } = {}) {
   const takes = new Map();
+  const lastOf = new Map();
   const loops = new Map();
   async function decode(name) {
     let bytes;
@@ -207,7 +227,11 @@ export function createSampleBank(ctx, { embed = SAMPLE_EMBED, base = null, fetch
     loop: (name) => loops.get(name) ?? null,
     pick(set) {
       const names = (SAMPLE_SETS[set] ?? []).filter((name) => takes.has(name));
-      return names.length ? takes.get(names[Math.floor(random() * names.length)]) : null;
+      if (!names.length) return null;
+      // (By weight, and never the same take twice running in a set: a crowd's cries do not repeat back to back.)
+      const name = pickWeighted(names, random(), lastOf.get(set));
+      lastOf.set(set, name);
+      return takes.get(name);
     },
   };
 }
