@@ -47,8 +47,14 @@ import { ktShadow, ktShadowInit, KT_SHADOW_PARS } from '../levelmode/kitshadow.j
  *  - `rays`: the cloud's sheets. `slabs` between `from` and `to` m (each 1.72 times as far as the last for 8:
  *    `to` is about as far as a sight line 10 degrees up runs under a cloud base at 1.5 km), each read at `reads`
  *    depths, a grain apart from pixel to pixel; fewer drew the rays as a speckle. `sunward`: drawn only where the
- *    sight line is within this cosine of the sun's own way round the compass (0.3: about 70 degrees either
- *    side), since across the sun a sight line crosses the columns and nothing would show for the work. `gain`:
+ *    sight line is within the first cosine of the sun's own way round the compass (0.3: about 73 degrees either
+ *    side), since across the sun a sight line crosses the columns and nothing would show for the work, and
+ *    faded in from there to whole at the second (0.7: about 46 degrees). The sheets' count is the fine cloud
+ *    less the broad one, which is nothing on the mean only where the two share an edge: a deck's veiled edge
+ *    (ENV.clouds.deckEdge) is three times a cumulus's and the broad count keeps its own, so under a deck the
+ *    sheets add a steady share of their own, and cut off at one bearing it stood as an upright seam through the
+ *    sky and the far land wherever the haze was thick enough to show it (1 km of sight in a 50 m layer at
+ *    Pyongyang's dawn). `gain`:
  *    1 is the open air's own figure for what shade takes of a slab's light, and at 1 the rays were there only in
  *    a difference of two frames (about 5 of 255). 6 is by eye, not derived: at 3 the sunward sky was a glow with
  *    no shafts in it, at 6 a band of light comes down from each gap under Pyongyang's broken snow cloud. What the true figure misses is most likely the forward scatter of the falling
@@ -56,7 +62,7 @@ import { ktShadow, ktShadowInit, KT_SHADOW_PARS } from '../levelmode/kitshadow.j
  */
 export const TK_BEAMS = {
   slabs: 12, from: 1.2, to: 400, least: 0.00002, most: 0.9, bias: 0.25,
-  rays: { slabs: 8, from: 120, to: 9000, reads: 3, sunward: 0.3, gain: 6 },
+  rays: { slabs: 8, from: 120, to: 9000, reads: 3, sunward: [0.3, 0.7], gain: 6 },
 };
 
 const TK_BEAMS_VERTEX = `
@@ -104,7 +110,8 @@ void main() {
   float change = 0.0;
   if (vSpan.z > 0.5) {
     // The rays: the cloud as the sky draws it over the point's sun ray, against the broad count the haze was lit by.
-    if (uEnvCloud.y <= 0.0 || dot(normalize(way.xz + vec2(1e-5, 0.0)), normalize(uEnvSunDir.xz)) < ${TK_BEAMS.rays.sunward.toFixed(2)}) discard;
+    float facing = dot(normalize(way.xz + vec2(1e-5, 0.0)), normalize(uEnvSunDir.xz));
+    if (uEnvCloud.y <= 0.0 || facing < ${TK_BEAMS.rays.sunward[0].toFixed(2)}) discard;
     float edge = mix(0.74, 0.26, uEnvCloud.x);
     float counted = 0.0;
     for (int i = 0; i < ${TK_BEAMS.rays.reads}; i++) {
@@ -120,7 +127,7 @@ void main() {
       change += (soft - cloud) * under;
     }
     // (No more is taken than the broad count left lit.)
-    change = max(change * uEnvCloud.y * ${(TK_BEAMS.rays.gain / TK_BEAMS.rays.reads).toFixed(3)}, -counted * ${(1 / TK_BEAMS.rays.reads).toFixed(4)});
+    change = max(change * uEnvCloud.y * ${(TK_BEAMS.rays.gain / TK_BEAMS.rays.reads).toFixed(3)}, -counted * ${(1 / TK_BEAMS.rays.reads).toFixed(4)}) * smoothstep(${TK_BEAMS.rays.sunward[0].toFixed(2)}, ${TK_BEAMS.rays.sunward[1].toFixed(2)}, facing);
   } else {
     vec3 p = cameraPosition + vRay * mix(vSpan.x, vSpan.y, grain);
     if (tkBeamOpen(p) > 0.5) discard;
