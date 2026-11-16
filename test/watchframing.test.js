@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createWatchCam, frameDistance, stepAuto, WATCH_CAM, weightedShare } from '../src/watchcam.js';
+import { createWatchCam, stepAuto, WATCH_CAM, weightedShare } from '../src/watchcam.js';
 import { DRAMA, dramaLens, pushEnvelope } from '../src/drama.js';
 import { createArm } from '../src/cameraarm.js';
 
@@ -146,14 +146,17 @@ test('a man killed leaves the framing over a few seconds, not in a frame; a pair
   assert.ok(Math.abs(pairView.target.x) < 0.01, `still between them: ${pairView.target.x}`);
 });
 
-test('a pair is held at the zoom it opened on and drawn back only when they need more room', () => {
+test('a pair is held at the zoom it opened on and drawn back only when one would leave the picture', () => {
   const dt = 1 / 60;
   const cam = createWatchCam();
   const view = orbit({ distance: 5.2 });
   for (let frame = 0; frame < 3 * 60; frame += 1) stepAuto(cam, view, [man(0, -0.7, 0), man(1, 0.7, 0)], dt, { pair: true });
   assert.ok(Math.abs(view.distance - 5.2) < 1e-6, `${view.distance}`);
-  for (let frame = 0; frame < 4 * 60; frame += 1) stepAuto(cam, view, [man(0, -3, 0), man(1, 3, 0)], dt, { pair: true });
-  assert.ok(Math.abs(view.distance - frameDistance(3)) < 0.1, `${view.distance} for ${frameDistance(3)}`);
+  // 8 m apart: at 5.2 m a 40 degree lens on a wide screen shows 3.4 m either side; the camera draws back until each man is
+  // `pairMargin` inside the edge.
+  for (let frame = 0; frame < 4 * 60; frame += 1) stepAuto(cam, view, [man(0, -4, 0), man(1, 4, 0)], dt, { pair: true, lens: { fov: 40, aspect: 16 / 9 } });
+  const fits = (4 + WATCH_CAM.auto.pairMargin) / Math.tan(Math.atan(Math.tan((20 * Math.PI) / 180) * (16 / 9)));
+  assert.ok(Math.abs(view.distance - fits) < 0.1, `${view.distance} for ${fits}`);
 });
 
 test('frame-rate independent: the same zoom and look point at 30, 60 and 144 fps', () => {
@@ -186,7 +189,7 @@ test('the push-in rises from nothing and lets go to nothing, with no speed at ei
   const slope = (u) => (pushEnvelope(u + 1e-4) - pushEnvelope(u)) / 1e-4;
   assert.ok(Math.abs(slope(1e-4)) < 0.01, `start ${slope(1e-4)}`);
   assert.ok(Math.abs(slope(1 - 2e-4)) < 0.01, `end ${slope(1 - 2e-4)}`);
-  assert.ok(pushEnvelope(0.5) > 0.95);
+  assert.ok(pushEnvelope(0.5) > 0.95 * DRAMA.pushPeak);
   assert.ok(DRAMA.pushRise + DRAMA.pushFall <= 1);
 });
 

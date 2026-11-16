@@ -63,6 +63,9 @@ export const WATCH_CAM = {
     // one walks out of the picture, in slowly, so the view does not breathe with the fight.
     zoomOut: 2.2,
     zoomIn: 0.6,
+    // A pair is held at the zoom it opened on until one of them would leave the picture: each man's middle kept this far (m) inside
+    // its edge (his shoulders and his weapon arm).
+    pairMargin: 0.8,
   },
 };
 
@@ -291,20 +294,27 @@ export function framingGoal(cam, men, dt, cut = false) {
 /**
  * One frame of the auto-framing: the look point and the distance moved by critically damped springs towards the men's middle and
  * the distance that frames them. The distance:
- *  - is wanted at least `rest` m for a pair (the zoom they were shown at: a pair is not framed tighter than that), never over `furthest`;
+ *  - for a pair is the zoom they opened on (`rest`) until they would not both fit across the picture; for a crowd, frameDistance of
+ *    their extent; never over `furthest`;
  *  - is held inside a dead band: the camera draws back as soon as the men need more room, and comes in only once they need
  *    `deadBand` less than it holds (hysteresis with no step: the goal held slides down at that margin above the wanted one);
  *  - moves on its logarithm, out at `zoomOut` and in at `zoomIn` (1/s).
  * The first frame of a fight is a cut: everything starts where it should be, at rest. Afterwards there is no step and no whip.
- * `men` as framingGoal's; `pair`: a duel's framing (the distance held at its rest unless they need more); `dt` in s. Moves `orbit`.
+ * `men` as framingGoal's; `pair`: a duel's framing (the distance held at its rest unless they need more); `lens` { fov (deg, vertical),
+ * aspect } of the camera; `dt` in s. Moves `orbit`.
  */
-export function stepAuto(cam, orbit, men, dt, { pair = false, furthest = Infinity } = {}) {
+export function stepAuto(cam, orbit, men, dt, { pair = false, furthest = Infinity, lens = {} } = {}) {
   const spec = WATCH_CAM.auto;
   const cut = cam.cut || !cam.framing;
   const { middle, spread } = framingGoal(cam, men, dt, cam.cut);
   if (cam.cut) cam.rest = pair ? orbit.distance : null;
-  // (A pair's floor is the zoom it opened on, in place of the framing's own.)
-  let wanted = frameDistance(spread, pair && cam.rest !== null ? cam.rest : WATCH_CAM.frame.base);
+  // A pair: the zoom it opened on, unless the two would not fit across the picture at it (the lens's half-width, from its
+  // vertical angle and the screen's shape). A crowd: the framing's own distance.
+  let wanted;
+  if (pair && cam.rest !== null) {
+    const halfWidth = Math.atan(Math.tan(((lens.fov ?? 40) * Math.PI) / 360) * (lens.aspect ?? 16 / 9));
+    wanted = Math.max(cam.rest, (spread + spec.pairMargin) / Math.tan(halfWidth));
+  } else wanted = frameDistance(spread);
   wanted = Math.max(WATCH_CAM.minDistance, Math.min(furthest, wanted));
   if (cut) {
     // A new fight shown at once where it is (cam.cut), or the auto-framing taken back from the viewer (Frame all): from where the camera is, at rest.

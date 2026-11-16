@@ -21,7 +21,7 @@ import { advance, createWorld, placeOnFloor, point } from '../src/physics.js';
 import { floorAt } from '../src/physics/terrain.js';
 import { createFollowCam } from '../src/followcam.js';
 import { createCameraRig } from '../src/camerarig.js';
-import { createWatchCam, frameDistance } from '../src/watchcam.js';
+import { createWatchCam, stepAuto } from '../src/watchcam.js';
 import { cameraTerrain, mechanismsOf, regionContains, setMechanism, updateStage } from '../src/levelmode/stage.js';
 import { levelPreset } from '../src/levelmode/presets.js';
 import { createLevelWorld, levelThink } from '../src/levelmode/level.js';
@@ -288,7 +288,7 @@ function turnsRun() {
   return camera.series;
 }
 
-/** The watching camera's auto framing of a crowd (main.js watchCamera, then placeCamera's ease onto their middle). */
+/** The watching camera's auto framing of a crowd (main.js watchCamera: watchcam.js stepAuto). */
 function watchRun({ seconds = 40 } = {}) {
   const names = ['samurai', 'knight', 'heavy', 'light', 'legionary', 'thraex'];
   const world = createWorld(names.map((preset, index) => ({ inputs: structuredClone(PRESETS[preset]), corner: index % 2 ? 'blue' : 'red' })), { seed: 7 });
@@ -297,24 +297,14 @@ function watchRun({ seconds = 40 } = {}) {
   const series = [];
   for (let frame = 0; frame < seconds * FPS; frame += 1) {
     advance(world, DT, (current, step) => thinkAll(current, step), DT);
-    const middle = [0, 0, 0];
-    for (const fighter of world.fighters) {
-      middle[0] += fighter.x[24] / world.fighters.length;
-      middle[2] += fighter.x[26] / world.fighters.length;
-    }
-    const spread = Math.max(0, ...world.fighters.map((fighter) => Math.hypot(fighter.x[24] - middle[0], fighter.x[26] - middle[2])));
-    autoWatchStep(watch, orbit, middle, spread, DT);
+    const men = world.fighters.map((fighter) => ({ id: fighter.id, x: fighter.x[24], y: fighter.x[P.neck * 3 + 1], z: fighter.x[26], in: fighter.state !== 'out' && !fighter.fled }));
+    stepAuto(watch, orbit, men, DT);
+    const middle = [orbit.target.x, 0, orbit.target.z];
     const { yaw, pitch, distance, target } = orbit;
     const p = [target.x + Math.cos(pitch) * Math.cos(yaw) * distance, target.y + Math.sin(pitch) * distance, target.z + Math.cos(pitch) * Math.sin(yaw) * distance];
     series.push({ t: frame * DT, p, look: [target.x, target.y, target.z], man: middle, arm: distance, wanted: distance, pitch, key: '', cut: frame === 0, swap: false, label: 'watch', section: '' });
   }
   return series;
-}
-
-/** main.js's auto watch frame for a crowd: the distance and the target eased (watchCamera, then placeCamera). */
-function autoWatchStep(watch, orbit, middle, spread, dt) {
-  orbit.distance += (frameDistance(spread) - orbit.distance) * (1 - 0.97 ** (dt * 60));
-  for (const [axis, value] of [['x', middle[0]], ['y', 1.1], ['z', middle[2]]]) orbit.target[axis] += (value - orbit.target[axis]) * (1 - 0.94 ** (dt * 60));
 }
 
 export const SCENARIOS = {

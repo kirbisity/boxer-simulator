@@ -1260,7 +1260,7 @@ function watchCamera(world, middle, dt) {
     return;
   }
   const pair = world.fighters.length <= 2 && !world.horses?.length;
-  stepAuto(watchCam, orbit, men, dt, { pair, furthest: levelNow()?.camera?.maxDistance ?? Infinity });
+  stepAuto(watchCam, orbit, men, dt, { pair, furthest: levelNow()?.camera?.maxDistance ?? Infinity, lens: { fov: scene.camera.fov, aspect: scene.camera.aspect } });
 }
 
 // The camera's small bar: what the camera is doing, and 'Frame all' to go back to the whole field.
@@ -1316,10 +1316,11 @@ function drawWorld(dt, drawIt = true) {
   // Never under the floor: the orbit rises over what it looks at instead (a drag down, a zoom out, a slope, a fall). (A stage's floors are its terrain's, which the arm below knows.)
   placeCamera(scene, null, { ground: !sheet && !world.stage, dt: cameraDt });
   // Then clear of the scenery: pulled in along its line, round a corner or up and over, never through a wall (camerarig.js), from the man played (a cutscene's or the ending's camera is looking at someone else: from what it looks at).
-  // The viewer's own turn of the view only shortens.
+  // The viewer's own turn of the view only shortens. (The watching camera framing by itself is nobody's hand: the arm may take it round or over
+  // what is in the way, sprung, rather than leave it a metre behind a tree trunk the line to the men runs through.)
   // (In a stage, the whole castle's walls, not only the sections awake: a section waking is no jump of the camera. Paused, the camera holds still.)
   const own = followed && !endingCam && !cutsceneDirector.active && !twistDirector.active && !story.filming;
-  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? cameraTerrain(world) : null, room: world.stage ? null : cameraWalls, subject: own ? followView.subject : null, free: !followed || followCam.state.wasManual, dt: cameraDt });
+  if (!sheet) cameraRig.update(scene, { terrain: world.stage ? cameraTerrain(world) : null, room: world.stage ? null : cameraWalls, subject: own ? followView.subject : null, free: followed ? followCam.state.wasManual : watchCam.mode === 'free', dt: cameraDt });
   // The push-in is for the camera that frames the fight: the viewer's own zoom is left where he put it.
   if (followed || sheet || watchCam.mode === 'auto') dramaCamera(scene, state.drama, world, realSeconds());
   cutsceneDirector.jolt(scene.camera);

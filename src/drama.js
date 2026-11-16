@@ -33,6 +33,9 @@ export const DRAMA = {
   // eased with no step in speed; what it looks at at most (a share of the way from the camera's own look point to the body part).
   pushRise: 0.3,
   pushFall: 0.5,
+  // The share of the moment's own push (`pushIn`) reached at its height: the depth the push-in had before it was eased, whose
+  // envelope (a quarter sine, cut by 1 − u) peaked at 0.69.
+  pushPeak: 0.69,
   lookShare: 0.65,
   // Springs (1/s, critically damped) on the push-in's amount and on the point it closes in on: a moment that takes over from another
   // carries the camera on from where it is, and a head thrown back by the blow is followed, not tracked to the millimetre.
@@ -128,10 +131,10 @@ const smooth01 = (x) => {
   return t * t * (3 - 2 * t);
 };
 
-/** How far into its push-in a moment is (0..1) at `u` of its length: in over `pushRise`, held, out over the last `pushFall`. */
+/** How far into its push-in a moment is (0..pushPeak) at `u` of its length: in over `pushRise`, held, out over the last `pushFall`. */
 export function pushEnvelope(u) {
   if (!(u > 0) || u >= 1) return 0;
-  return smooth01(u / DRAMA.pushRise) * smooth01((1 - u) / DRAMA.pushFall);
+  return DRAMA.pushPeak * smooth01(u / DRAMA.pushRise) * smooth01((1 - u) / DRAMA.pushFall);
 }
 
 /**
