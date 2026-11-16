@@ -341,8 +341,10 @@ export const WORLD = {
   skill: { aimError: { hand: 0.04, blunt: 0.08, blade: 0.07, point: 0.1 }, holdAngle: 0.01, fightScatter: 0.3, gunSpread: 1.6, edgeTilt: [0.9, 1.5], flatBlunt: 0.5, draw: 0.25, artScatter: 0.6 },
   rotationLead: 0.45,
   // Stamina regained per second at rest, times aerobic fitness: a fit boxer
-  // holds most of it through a round; an unfit one empties in about a minute.
-  staminaRecovery: 0.07,
+  // holds most of it through a round; an unfit one empties in about a minute. 0.06 (was 0.07): a bar back in ~17 s, not 14. Still
+  // quick: the bar is the fast-burn reserve, whose real recovery takes minutes (critical-power models' W' recovery), and the
+  // game's rounds are short; a little slower is the first step towards that, set so the fights' pace is moved only a little.
+  staminaRecovery: 0.06,
   // Body heat (physics/heat.js; fighter.heat.core, °C). Work warms him and his kit and the air decide how fast it goes:
   // - core: where a man starts and where he is held at rest (37 °C; the body sheds or keeps heat to stay there, so he never
   //   cools below it here).
@@ -455,10 +457,13 @@ export const WORLD = {
   // - perJoule: each blow taken on any block (on the arms or the shield, fended off by the blade, parried; held or not, player or
   //   AI: physics.js payForBlocks) costs this much stamina per joule the collision took up (before his aerobic): the arms and legs
   //   soak what the blow brought. Blows met on a guard take up ~15-130 J (a light jab to a heavyweight's cross or a full cut):
-  //   ~0.006-0.05 of the bar each, a dozen hard ones in a quarter of a minute about a third of it (overdraft.js drawStamina).
+  //   ~0.009-0.08 of the bar each (perJoule 0.0006, was 0.0004: taking a blow on the arms or the shield is dearer than it was),
+  //   a dozen hard ones in a quarter of a minute about half of it (overdraft.js drawStamina).
+  // - willFrom, willFull: an AI chooses to block by his wind (ai.js): under `willFrom` he does not put his guard up at all (he
+  //   dodges, gives ground or takes it), over `willFull` he is as willing as his skill makes him, between the two more so as the bar fills.
   // - spentBelow: stamina under this, he is spent: the block is no longer brought onto the blow's line, only held where it is (and
   //   the arms holding it are weaker anyway: fatigueScale). A guard kept up too long gives.
-  guardHeld: { recovery: 0.25, staminaPerSecond: 0.025, perJoule: 0.0004, spentBelow: 0 },
+  guardHeld: { recovery: 0.25, staminaPerSecond: 0.025, perJoule: 0.0006, spentBelow: 0, willFrom: 0.12, willFull: 0.45 },
   // Reading the blow (physics.js blowRead): a block made against a blow (its striker as `defence.from`: the player's held guard,
   // an AI's block) is brought onto the blow's line only as well as he is trained to read it (body.skill, 0..1: OUTFITS' tiers).
   // Nothing is multiplied: the block is where his reading puts it, and the blow meets it there or comes round it.
@@ -485,7 +490,11 @@ export const WORLD = {
   guardRead: { untrainedBelow: 0.3, delay: [0.3, 0.02], lag: [0.11, 0.015], error: [0.08, 0.01], linger: 0.5, chance: { most: 0.85, power: 1.5 },
     // A weapon art comes disguised (weaponarts.js): its wind-up hides where it is going (the blade laid back behind him, the hips
     // turned away), so it is read `delay` s later and `error` times as far off its line, and trails it `lag` times as far.
-    art: { delay: 0.1, error: 2.5, lag: 1.8 } },
+    art: { delay: 0.1, error: 2.5, lag: 1.8 },
+    // A thrust is harder to block than a cut: it comes straight in from a small point with little wind-up to read and no arc to
+    // meet, so it is read `delay` s later, `error` times as far off its line, trailing it `lag` times as far, and an AI answers it
+    // with his guard `chance` as often (a long point he gets off the line of instead: ai.js). All of it by his skill, as a cut's.
+    thrust: { delay: 0.04, error: 1.5, lag: 1.25, chance: 0.75 } },
   // The guard held up with bare arms (physics.js coverArms): the forearm nearer the blow goes onto its line this share of his
   // height out from what it is aimed at (~20 cm for a 1.8 m man: a forearm's length before the face or the ribs, where a boxer's
   // shell meets a punch).
@@ -1172,7 +1181,14 @@ export const WORLD = {
   // (formation.js): square before the chest, or up over the head; `roofTilt`,
   // how far forward a raised shield leans (of its facing).
   shield: { dropOnFall: 0.75, wrench: 60, strainLeak: 1, holdSeconds: 0.03, unbraced: 0.6, open: 0.4, glance: 0.45, turnStep: 0.5, wall: [0.36, 0.7, 0.1], roof: [0.26, 0.96, 0.03], roofTilt: 1.1 },
-  weapons: { dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45 },
+  weapons: {
+    dropOnFall: 0.35, pickupSeconds: 0.45, pickupReach: 0.4, pickupGiveUp: 2, heavyFrom: 3.2, heavyAimJitter: 0.45,
+    // What a stroke costs by the weapon (physics/effort.js swingEffort): `share` of a move's cost is the weapon's own work,
+    // in proportion to its inertia (swing) or mass (thrust) against the move's reference weapon (`ref`, the katana, unless the
+    // move names its `refWeapon`), up to `cap` times it. A light weapon costs less than the sword the move was set for, a
+    // heavy one more; past `heavyFrom` the lift above still applies if it is more.
+    effort: { share: 0.3, cap: 3, ref: 'katana' },
+  },
   // Weapons and shields wear and break from what they meet (physics/wear.js; what they are made of, weapons.js MATERIALS).
   wear: {
     // Of the work of a deep cut, the share that is the edge's own pressure parting the tissue (the rest is the wedge forcing

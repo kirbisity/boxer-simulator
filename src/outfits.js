@@ -541,8 +541,8 @@ const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
  *   surviving Ming and Qing coats; Great Ming Military, 2015-16) lapped inside many layers of quilted cotton, a long loose
  *   coat to below the knee. The quilting takes a blow (blunt as the coat's own: the cotton is what spreads it); an edge
  *   near plate's (cut -1 point); a point finds the thin plates' edges and seams (pierce -3). The long coat leaves no great
- *   opening over the trunk and thighs: its skirt closes the groin (`closed`), the armholes at a harness's (`thrust` 0.4,
- *   `swing` 0.1); between the plates a point may part the cloth (`lacing` 0.12: rivets through cloth hold the plates'
+ *   opening over the trunk and thighs: its skirt closes the groin (`closed`), the armholes a little wider than a harness's
+ *   (`thrust` 0.44, `swing` 0.11; a harness's 0.4 / 0.1); between the plates a point may part the cloth (`lacing` 0.13: rivets through cloth hold the plates'
  *   edges less close than laced rows).
  * - `european`: the 15th-century brigandine: fewer, larger plates, some of steel and hardened (Williams, *The Knight and
  *   the Blast Furnace*, 2003, finds brigandine plates of steel as well as iron), tailored close to the trunk, over a thinner
@@ -554,7 +554,7 @@ const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
  *   (`thrust` 0.46, `swing` 0.12), its plates closely lapped and riveted (`lacing` 0.1).
  */
 const BRIGANDINE_MAKES = {
-  ming: { guard: { blunt: 0, cut: -0.01, pierce: -0.03 }, gaps: { thrust: 0.4, swing: 0.1, lacing: 0.12, closed: ['groin'] } },
+  ming: { guard: { blunt: 0, cut: -0.01, pierce: -0.03 }, gaps: { thrust: 0.44, swing: 0.11, lacing: 0.13, closed: ['groin'] } },
   european: { guard: { blunt: -0.04, cut: 0, pierce: 0 }, bites: 0.71, gaps: { thrust: 0.46, swing: 0.12, lacing: 0.1 } },
 };
 /** A brigandine's figures: the coat's own (`guard`: blunt, cut, pierce), with what its `make` (BRIGANDINE_MAKES) gains or costs it. */
@@ -977,11 +977,11 @@ export const OUTFITS = {
     // under them the thick quilted jousting doublet (field plate's arming coat 0.25/0.3/0.2), and mail at the armpits (under
     // the laminated pauldrons) and the groin; the helm bolted to the breast leaves no throat between them (`closed`).
     gaps: { thrust: 0.2, under: { blunt: 0.35, cut: 0.5, pierce: 0.4 }, mail: ['armpit', 'groin'], closed: ['neck'] },
-    // Blunt 0.75 (was 0.65): the thick reinforced breast over the quilted doublet spreads a blow; pierce 0.985 (was 0.97):
+    // Blunt 0.82 (was 0.75, 0.65 before; over field plate's 0.8: the heavier harness): the thick reinforced breast over the quilted doublet spreads a blow; pierce 0.985 (was 0.97):
     // the jousting breast and helm 3-5 mm of steel against a field harness's 1.5-2 mm, a lance at the full gallop short of
     // its puncture (weapons.js PUNCTURE: ~2300 J), the blow landing as the jolt that unhorses; the helm the same.
     protection: {
-      blunt: 0.75, cut: 1, pierce: 0.985, bullet: { head: 0.75, torso: 0.85, limb: 0.35 },
+      blunt: 0.82, cut: 1, pierce: 0.985, bullet: { head: 0.75, torso: 0.85, limb: 0.35 },
       regions: { head: { blunt: 0.81, cut: 1, pierce: 0.985, deflects: true } },
     },
     cutProof: true,
@@ -1020,7 +1020,8 @@ export const OUTFITS = {
     // The great helm: another man's head stays outside it in a clinch.
     headBulk: 1.45,
     protection: {
-      blunt: 0.3, cut: 0.88, pierce: 0.65, bullet: { head: 0.35, torso: 0.05, limb: 0 },
+      // Blunt 0.4 (was 0.3, under the Roman mail's 0.35-0.4): the hauberk over a quilted gambeson, which is what takes the blow.
+      blunt: 0.4, cut: 0.88, pierce: 0.65, bullet: { head: 0.35, torso: 0.05, limb: 0 },
       regions: {
         head: { blunt: 0.7, cut: 0.97, pierce: 0.85, deflects: true },
         Shank: { blunt: 0.45, cut: 0.95, pierce: 0.7 },
@@ -1237,11 +1238,11 @@ export const OUTFITS = {
     picked: [0, 1, 2],
     // Armour at 0.55 of its old weight (was 0.2): ~8 kg on a 70 kg man, against an okegawa-dō and jingasa's ~8–10 kg.
     extraMass: 0.11,
-    // The okegawa-dō, a solid riveted shell of munition iron: the torso cut 0.8 (was 0.7) and pierce 0.85 (PIERCE_SCALE); its blunt kept at 0.5
+    // The okegawa-dō, a solid riveted shell of munition iron: the torso cut 0.9 (was 0.8, 0.7 before: an edge cannot cut through solid iron that a point cannot, so cut is not under pierce) and pierce 0.85 (PIERCE_SCALE); its blunt kept at 0.5
     // (Japanese armour a little down, a solid dō a little up). The jingasa a lighter hat than a helmet: a little weaker
     // (was as the body). Cloth sleeves with light kote, shin guards: the limbs less than the trunk (were all as the body).
     protection: {
-      blunt: 0.5, cut: 0.8, pierce: 0.85, bullet: { head: 0.2, torso: 0.25, limb: 0.05 },
+      blunt: 0.5, cut: 0.9, pierce: 0.85, bullet: { head: 0.2, torso: 0.25, limb: 0.05 },
       regions: {
         head: { blunt: 0.42, cut: 0.6, pierce: 0.42 },
         // Light kote and suneate, fewer splints than a samurai's (`kote`).
@@ -1483,10 +1484,10 @@ export const OUTFITS = {
     // the steel tube (its region) and the helmet turn it.
     deflects: false,
     // The long coat's openings (BRIGANDINE_MAKES.ming): the armholes, the seams between its plates; its skirt closes the groin.
-    // A little wider than the retainer's coat (thrust 0.43, swing 0.11, lacing 0.13, against 0.4 / 0.1 / 0.12): a soldier's coat
+    // A little wider than the retainer's coat (thrust 0.47, swing 0.12, lacing 0.14, against 0.44 / 0.11 / 0.13): a soldier's coat
     // issued by the army, its sleeves of studded cloth and its plates fewer than a general's household man's, worn loose for
     // the squad's drill (the user's call, 2026-11-11: "slightly").
-    gaps: { ...BRIGANDINE_MAKES.ming.gaps, thrust: 0.43, swing: 0.11, lacing: 0.13 },
+    gaps: { ...BRIGANDINE_MAKES.ming.gaps, thrust: 0.47, swing: 0.12, lacing: 0.14 },
     // Higher than the general's retainer's (mingElite 0.35) and every Chinese kit's: Qi's law (a squad that let its leader
     // fall, or ran, was put to death: Jixiao xinshu, the 'law of joint responsibility', 连坐法), the squad fighting as one
     // and his army's nine victories in a month in Taizhou, 1561. Steady, very disciplined, slow to scare.
@@ -1708,7 +1709,7 @@ export const OUTFITS = {
     // lacing a little more often, and a blow is felt through the small
     // plates more than through a one-piece bowl. The face is open.
     // Pierce 0.85, iron lamellar (PIERCE_SCALE); the helmet's small plates 0.8, its lacing found a little more often.
-    protection: { blunt: 0.4, cut: 0.82, pierce: 0.85, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.8 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    protection: { blunt: 0.4, cut: 0.88, pierce: 0.85, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.8 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.3,
@@ -1729,7 +1730,7 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.18): iron lamellar vest and helmet: ~8 kg on an 80 kg man (Han lamellar finds ~8–10 kg).
     extraMass: 0.1,
     // Pierce 0.85, iron lamellar (PIERCE_SCALE); the helmet's small plates 0.8, its lacing found a little more often.
-    protection: { blunt: 0.4, cut: 0.82, pierce: 0.85, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.8 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
+    protection: { blunt: 0.4, cut: 0.88, pierce: 0.85, bullet: { head: 0, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.3, cut: 0.75, pierce: 0.8 }, limb: { blunt: 0.04, cut: 0.08, pierce: 0.03 } } },
     // Laced armour (BLADES.gaps `lacing`): a point parts the lacing between the lamellae a little anywhere but the solid plates.
     gaps: { lacing: 0.1 },
     courage: 0.3,
@@ -2381,13 +2382,13 @@ export const OUTFITS = {
     spare: 'dagger',
     // Armour at 0.55 of its old weight (was 0.3): breastplate, mail sleeves and morion: ~13 kg on a 78–90 kg man (real ~10–14 kg).
     extraMass: 0.165,
-    // A breastplate over the torso: blunt 0.55, cut 0.92 (were 0.5, 0.9), pierce 0.95 and turning a blade or an arrow
+    // A breastplate over the torso: blunt 0.55, cut 1 (was 0.92: solid plate is proof against an edge, as the harness's), pierce 0.95 and turning a blade or an arrow
     // (`deflects`), plate's (PIERCE_SCALE); the morion as it was; the arms in mail sleeves (pierce 0.65, mail's), the legs in breeches and boots, less than the trunk (were all as the body).
     protection: {
-      blunt: 0.55, cut: 0.92, pierce: 0.95, bullet: { head: 0.4, torso: 0.55, limb: 0 },
+      blunt: 0.55, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.55, limb: 0 },
       regions: {
         head: { blunt: 0.5, cut: 0.9, pierce: 0.8 },
-        torso: { blunt: 0.55, cut: 0.92, pierce: 0.95, deflects: true },
+        torso: { blunt: 0.55, cut: 1, pierce: 0.95, deflects: true },
         UpperArm: { blunt: 0.25, cut: 0.8, pierce: 0.65 },
         Forearm: { blunt: 0.25, cut: 0.8, pierce: 0.65 },
         Thigh: { blunt: 0.1, cut: 0.25, pierce: 0.1 },
@@ -2654,8 +2655,9 @@ export const OUTFITS = {
     extraMass: 0.072,
     protection: {
       // Blunt 0.42 (was 0.45): a Japanese dō-maru, laced lamellae.
-      // Pierce 0.8, laced lamellae (PIERCE_SCALE).
-      blunt: 0.42, cut: 0.7, pierce: 0.8, bullet: { head: 0, torso: 0.25, limb: 0 },
+      // Pierce 0.8, laced lamellae (PIERCE_SCALE). Cut 0.82 (was 0.7, under its pierce): lacquered lamellae turn an edge at least as
+      // well as they keep out a point, a little under the ō-yoroi's 0.9 for a raider's cheaper, thinner dō-maru.
+      blunt: 0.42, cut: 0.82, pierce: 0.8, bullet: { head: 0, torso: 0.25, limb: 0 },
       regions: { head: { blunt: 0.05, cut: 0.05, pierce: 0 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 } },
     },
     courage: 0.3,

@@ -86,11 +86,12 @@ test('the Bayara is guarded as the Ming elite, no better; the banners braver tha
   const bayara = OUTFITS.bayara;
   const elite = OUTFITS.mingElite;
   for (const kind of ['cut', 'pierce']) assert.ok(bayara.protection[kind] <= elite.protection[kind], kind);
-  assert.ok(bayara.skill <= elite.skill);
+  // (Skill is a step up from the banner man to the guard; the general's household men are set by the Ming's own drill, not against them.)
+  assert.ok(bayara.skill > OUTFITS.bannerArmour.skill);
   assert.ok(bayara.horse, 'the guard rides');
   assert.ok(ARMOR_KINDS.bayaraCoat.mirrors.length === 1 && ARMOR_KINDS.bayaraCoat.skirt[3].bands, 'the mirror over the heart, steel bands on the skirt');
   assert.ok(OUTFITS.bannerArmour.courage > OUTFITS.mingBrigandine.courage && OUTFITS.bannerArmour.courage >= elite.courage);
-  assert.ok(OUTFITS.bannerArmour.skill > OUTFITS.mingBrigandine.skill && OUTFITS.bannerArmour.skill < elite.skill);
+  assert.ok(OUTFITS.bannerArmour.skill > OUTFITS.mingBrigandine.skill && OUTFITS.bannerArmour.skill <= bayara.skill);
   // At Sarhu the banner men are heavier and fitter than the Ming regulars, about as the Ming elite.
   const { red, blue } = SCENARIOS.sarhu.cast(seededRandom(2));
   const mean = (men, key) => men.reduce((sum, man) => sum + key(man), 0) / men.length;

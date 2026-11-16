@@ -3856,7 +3856,9 @@ function decide(world, fighter, dt) {
       if (style.riposte && fighter.offWeapon?.held && riposte(world, fighter, striker, style, distance)) return;
       // A trained man answers with his guard, held up through the blows that follow, as often as he is trained to read them
       // (WORLD.guardRead, keepGuard); a long point he still gets off the line of (AI.offLine).
-      const guards = !longPoint(striker, incoming) && random() < WORLD.guardRead.chance.most * (guardReading(fighter) ?? 0) ** WORLD.guardRead.chance.power * (incoming.spec.art ? AI.art.guardRead : 1);
+      // (Short of wind he does not put it up: WORLD.guardHeld willFrom; a thrust is the harder to meet: WORLD.guardRead.thrust.)
+      const will = Math.max(0, Math.min(1, (fighter.stamina - WORLD.guardHeld.willFrom) / (WORLD.guardHeld.willFull - WORLD.guardHeld.willFrom)));
+      const guards = !longPoint(striker, incoming) && random() < WORLD.guardRead.chance.most * (guardReading(fighter) ?? 0) ** WORLD.guardRead.chance.power * (incoming.spec.art ? AI.art.guardRead : 1) * will * (incoming.spec.mode === 'thrust' ? WORLD.guardRead.thrust.chance : 1);
       if (guards) name = blockFor(fighter);
       // A blade coming is got away from, not blocked with an arm.
       else if (incoming.spec.path === 'blade' && wary && name !== 'sidestep' && !longPoint(striker, incoming) && random() < AI.blade.stepBackChance) name = 'stepBack';
@@ -4016,7 +4018,8 @@ function keepGuard(world, fighter) {
   if (!fighter.guardHeld) return;
   const striker = fighter.state === 'up' ? world.fighters.find((other) => hostile(other, fighter) && other.punch?.target === fighter.id) : null;
   if (striker) fighter.guardUntil = world.time + (fighter.guardLinger ?? WORLD.guardRead.linger);
-  if (fighter.state !== 'up' || !(world.time < fighter.guardUntil)) {
+  // (Blown, he lets it down: WORLD.guardHeld willFrom.)
+  if (fighter.state !== 'up' || !(world.time < fighter.guardUntil) || fighter.stamina < WORLD.guardHeld.willFrom) {
     fighter.guardHeld = false;
     return;
   }

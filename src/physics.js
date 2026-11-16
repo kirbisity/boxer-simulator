@@ -30,6 +30,7 @@ import { bankOf, cornerPace, cornerShare, cornering, footworkQuickness, limpOf, 
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
+import { bowShotCost, swingEffort } from './physics/effort.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
@@ -927,13 +928,14 @@ function blowRead(world, fighter, punch, threat) {
   const spec = WORLD.guardRead;
   const by = ([novice, master]) => novice + (master - novice) * share;
   const art = punch.spec.art ? spec.art : null;
-  if ((punch.age ?? punch.t) < by(spec.delay) + (art?.delay ?? 0)) return null;
+  const thrust = punch.spec.mode === 'thrust' ? spec.thrust : null;
+  if ((punch.age ?? punch.t) < by(spec.delay) + (art?.delay ?? 0) + (thrust?.delay ?? 0)) return null;
   const read = fighter.blowRead;
   if (read?.punch !== punch) {
-    const error = by(spec.error) * (art?.error ?? 1) * fighter.body.heightM;
+    const error = by(spec.error) * (art?.error ?? 1) * (thrust?.error ?? 1) * fighter.body.heightM;
     fighter.blowRead = { punch, point: threat, at: world.time, off: [0, 1, 2].map(() => (world.random() * 2 - 1) * error) };
   } else {
-    read.point = vec.lerp(read.point, threat, 1 - Math.exp(-(world.time - read.at) / (by(spec.lag) * (art?.lag ?? 1))));
+    read.point = vec.lerp(read.point, threat, 1 - Math.exp(-(world.time - read.at) / (by(spec.lag) * (art?.lag ?? 1) * (thrust?.lag ?? 1))));
     read.at = world.time;
   }
   return vec.add(fighter.blowRead.point, fighter.blowRead.off);
@@ -2198,11 +2200,14 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   const target = at ? manNear(world, fighter, at, WORLD.aimedAtWithin) : opponentFor(world, fighter);
   // The blade it is struck with (two blades: the one in the striking hand).
   const blade = spec?.path === 'blade' ? bladeFor(fighter, spec) : null;
-  // Raising a weapon heavier than heavyFrom is work in proportion to its mass.
+  // The weapon's own work in the stroke (physics/effort.js: its inertia or mass against the move's reference weapon), and raising
+  // one heavier than heavyFrom is work in proportion to its mass, whichever is more.
   // (and the harder, the weaker he is for it: handling.js)
-  const lift = blade?.held ? Math.max(1, blade.spec.mass / WORLD.weapons.heavyFrom) / (blade.handling?.speed ?? 1) : 1;
+  const lift = blade?.held ? Math.max(blade.spec.mass / WORLD.weapons.heavyFrom, swingEffort(blade.spec, fighter.body.reach, spec)) / (blade.handling?.speed ?? 1) : 1;
+  // A bow's draw is what the bow stores at the draw he makes (physics/effort.js bowShotCost), not the move's one price.
+  const bow = spec?.path === 'aim' && fighter.weapon?.held && fighter.weapon.spec.drawN ? fighter.weapon : null;
   // (A weapon art draws none: the surge it spends pays for it, weaponarts.js.)
-  const cost = spec && !spec.art ? spec.cost * (heavy ? WORLD.heavy.costFactor : 1) * lift : 0;
+  const cost = spec && !spec.art ? (bow ? bowShotCost(bow.spec, bow.handling?.drawEnergy) : spec.cost * (heavy ? WORLD.heavy.costFactor : 1) * lift) : 0;
   // An empty gun is not fired: the same button starts loading it (no mark needed).
   if (spec?.path === 'aim' && fighter.weapon?.held && fighter.weapon.spec.shot && !fighter.weapon.loaded) {
     if (fighter.state === 'up' && !fighter.punch) fighter.reloading = true;

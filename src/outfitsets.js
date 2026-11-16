@@ -82,7 +82,10 @@ export const OUTFIT_SETS = {
         extraMass: 0.14, breastplate: 0.6,
         helmet: { mass: 2.2, padding: 0.45, curve: 0.75, hold: 'half' },
         // The breast a solid plate: pierce 0.95 and turns a blade or an arrow (`deflects`), as a harness's (knight).
-        protection: { blunt: 0.5, cut: 0.9, pierce: 0.95, regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 }, torso: { blunt: 0.5, cut: 0.9, pierce: 0.95, deflects: true } } },
+        // A plate breast, not laced cloth: cut 1 as the harness's (was 0.9), no lacing to part (`lacing` 0, not the brigandine's 0.1);
+        // its armpits, hips and throat open as a coat's are (no mail gussets in this kit: a little wider than a harness's 0.4 / 0.1).
+        protection: { blunt: 0.5, cut: 1, pierce: 0.95, regions: { head: { blunt: 0.58, cut: 0.93, pierce: 0.7 }, torso: { blunt: 0.5, cut: 1, pierce: 0.95, deflects: true } } },
+        gaps: { thrust: 0.44, swing: 0.11, lacing: 0 },
       },
     },
   ],
