@@ -217,7 +217,7 @@ export const TK_TREES = {
  * and boughs are swept bars of bark; the crown is sprays of the leaf sheets (tex.js: each sheet one ragged spray),
  * many and small, lit as one mass.
  */
-export function tkTree(builder, x, y, z, { kind = 'broad', high = 7, seed = 1, spread = 0.5, tint = [1, 1, 1] } = {}) {
+export function tkTree(builder, x, y, z, { kind = 'broad', high = 7, seed = 1, spread = 0.5, tint = [1, 1, 1], laden = null } = {}) {
   const random = tkRandom(seed * 31 + 7);
   const form = TK_TREES[kind];
   const frame = tkgFrame(x, y, z, random() * Math.PI * 2);
@@ -242,6 +242,15 @@ export function tkTree(builder, x, y, z, { kind = 'broad', high = 7, seed = 1, s
     const length = Math.hypot(...out) || 1;
     const normal = out.map((value) => value / length);
     builder.quad(form.sheet, at(-1, -1), at(1, -1), at(1, 1), at(-1, 1), { uvs: [[u0, 0], [u1, 0], [u1, 1], [u0, 1]], colour, normals: [normal, normal, normal, normal] });
+    // (`laden`: { share, material, size, lift }: snow lying on a level pad, as a card of its own a little over it,
+    // `size` of the pad and on `material`, which holds the snow, facing straight up: its underside stays the
+    // needles'. Only on pads that lie near level and on `share` of them; none is drawn, nor any die cast, without it.)
+    if (laden && form.flat > 0.5 && random() < laden.share) {
+      const lift = laden.lift * size;
+      const top = (sx, sy) => { const p = at(sx * laden.size, sy * laden.size); return [p[0], p[1] + lift, p[2]]; };
+      const up = [0, 1, 0];
+      builder.quad(laden.material, top(-1, -1), top(1, -1), top(1, 1), top(-1, 1), { uvs: [[u1, 0], [u0, 0], [u0, 1], [u1, 1]], colour, normals: [up, up, up, up] });
+    }
   };
   const leafed = (from, to, count) => {
     for (let c = 0; c < count; c += 1) {
