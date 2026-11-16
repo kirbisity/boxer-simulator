@@ -16,6 +16,8 @@ import { ARMIES, battleOf, SCENARIOS } from '../src/scenarios.js';
 import { MUSTER } from '../src/muster.js';
 import { DRILL } from '../src/formation.js';
 import { missileInHorse } from '../src/physics/ranged.js';
+import { ballInHorse } from '../src/physics/artillery.js';
+import { harmHorse, horseTimers } from '../src/physics/mounted.js';
 
 const think = (world, dt) => thinkAll(world, dt);
 const STAKES = { stakes: [{ from: [4, -8], to: [4, 8], rows: 2, every: 1.0, rowGap: 0.9, toward: -1, height: 1.05, reach: 0.95, stagger: 0.5 }] };
@@ -274,6 +276,63 @@ test('a heavy ball in a horse\'s leg shatters the bone as in a man\'s (the ball\
   missileInHorse(world, shooter, { horse, capsule: legs, point: legs.a }, [1, 0, 0], 870, { arrow: false, limbBreak: 0.75 });
   assert.ok(horse.lame && horse.state !== 'up', 'a matchlock ball: the leg broken, the horse down');
   assert.ok(world.events.some((event) => event.kind === 'horseDown' && event.effects[0] === 'goes down on a broken leg'));
+});
+
+/** A rider's horse, bare (no barding), and a shooter on foot. */
+function bareHorse(seed = 9) {
+  const random = seededRandom(seed);
+  const world = createWorld([{ inputs: mountedKnight(random), corner: 'red' }, { inputs: footSoldier(random, 'bow'), corner: 'blue' }], { seed, arena: { halfX: 25, halfZ: 12 } });
+  const horse = world.horses[0];
+  horse.barding = 'none';
+  const head = horse.capsules.find((capsule) => capsule.part === 'head');
+  return { world, horse, shooter: world.fighters[1], head };
+}
+
+/** A hit from its left flank square across the head at `at` (on the head's surface there). */
+const fromLeft = (horse, head, at) => {
+  const across = [-Math.sin(horse.yaw), 0, -Math.cos(horse.yaw)];
+  const left = [Math.sin(horse.yaw), 0, Math.cos(horse.yaw)];
+  return { hit: { horse, capsule: head, point: at.map((value, k) => value + left[k] * head.radius) }, dir: across };
+};
+
+test('a ball or an arrow through a horse\'s brain drops it dead; elsewhere in the head it is a wound', () => {
+  for (const arrow of [false, true]) {
+    const { world, horse, shooter, head } = bareHorse();
+    assert.ok(horse.brain && horse.brain.radius > 0.04 && horse.brain.radius < 0.07, `a brain of ~5 cm radius (${horse.brain?.radius.toFixed(3)} m)`);
+    // Into the muzzle end: through the jaw and the nasal passages.
+    const muzzle = fromLeft(horse, head, head.b);
+    missileInHorse(world, shooter, muzzle.hit, muzzle.dir, arrow ? 100 : 870, { arrow, bounce: 0 });
+    assert.equal(horse.state, 'up', `${arrow ? 'an arrow' : 'a ball'} in the muzzle: it runs on`);
+    assert.ok(horse.bleed > 0, 'and bleeds');
+    const brain = fromLeft(horse, head, horse.brain.at);
+    missileInHorse(world, shooter, brain.hit, brain.dir, arrow ? 100 : 870, { arrow, bounce: 0 });
+    assert.ok(horse.state !== 'up' && horse.dead, `${arrow ? 'an arrow' : 'a ball'} through the brain: down dead`);
+    assert.ok(world.events.some((event) => event.kind === 'horseDown' && event.effects[0] === 'killed through the brain'));
+  }
+  // A spent arrow (a few joules) does not get through the skull to it.
+  const { world, horse, shooter, head } = bareHorse();
+  const brain = fromLeft(horse, head, horse.brain.at);
+  missileInHorse(world, shooter, brain.hit, brain.dir, 15, { arrow: true, bounce: 0 });
+  assert.equal(horse.state, 'up', 'a spent arrow stops in the skull');
+});
+
+test('a cannon ball through a horse\'s leg breaks it; through its body it drops it', () => {
+  // A folangji's ball, ~0.72 kg of iron at ~300 m/s.
+  const kg = 0.72;
+  const area = Math.PI * Math.cbrt((3 * kg) / (4 * Math.PI * 7870)) ** 2;
+  const shot = (world, part) => {
+    const horse = world.horses[0];
+    const capsule = horse.capsules.find((each) => each.part === part);
+    world.random = () => 0.999;
+    ballInHorse(world, { x: [0, 1, 0], v: [-300, 0, 0], kg, area, gunner: 1, passed: new Set() }, { horse, capsule, point: [...capsule.a] });
+    return horse;
+  };
+  const legged = shot(bareHorse().world, 'legs');
+  assert.ok(legged.lame && legged.state !== 'up', 'the leg broken (whatever the roll), down it goes');
+  const { world } = bareHorse();
+  const horse = shot(world, 'body');
+  for (let step = 0; step < 240 && horse.state === 'up'; step += 1) horseTimers(world, horse, 1 / 120);
+  assert.ok(horse.state !== 'up', 'through the barrel: down within two seconds');
 });
 
 test('the battles with works (Agincourt, Cerignola, Qi Jiguang): the works where the lines are, the sides within the muster cap, each army one the setup screen has', () => {

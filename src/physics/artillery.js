@@ -28,7 +28,8 @@ import { soundEvent } from '../audio/log.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
 import { vec } from '../pose.js';
 import { ARROW, bulletRegion, GUN, MATCHLOCK } from '../weapons.js';
-import { bulletHit, horseOnPath, missileInHorse } from './ranged.js';
+import { bulletHit, bulletReference, horseOnPath, missileInHorse } from './ranged.js';
+import { bringDown } from './mounted.js';
 import { screenOnPath } from './cover.js';
 import { reliefAt, worksOf } from './fieldworks.js';
 import { BALLISTICS, flightStep, holdover } from './ballistics.js';
@@ -517,11 +518,23 @@ function ballInBody(world, ball, body, at) {
 }
 
 /** The ball through a horse (half a metre of its body: its chest or barrel): what it leaves in it, its harm; on through. */
-function ballInHorse(world, ball, hit) {
+export function ballInHorse(world, ball, hit) {
   ball.passed.add(`h${hit.horse.id}`);
   const joules = 0.5 * ball.kg * vec.dot(ball.v, ball.v);
   const loss = tissueLoss(ball.kg, ball.area, joules, 0.5);
   ball.v = vec.scale(ball.v, Math.sqrt(Math.max(0, joules - loss.left) / Math.max(1e-9, joules)));
   // (missileInHorse's ball leaves its `horseShare` of what it is given: it is given what this one left, over that share.)
-  missileInHorse(world, world.fighters[ball.gunner], hit, vec.normalize(ball.v), loss.left / ARROW.horseShare, { arrow: false });
+  // Its wound as ballInBody's: the matchlock ball's, as many times over as it left more energy than that ball along the
+  // same path. Through a leg it breaks the bone with that ball's `limbBreak` chance so many times over (a round shot, always).
+  const share = loss.left / Math.max(1, ballReferenceLoss(0.5));
+  const horse = hit.horse;
+  const wasUp = horse.state === 'up';
+  missileInHorse(world, world.fighters[ball.gunner], hit, vec.normalize(ball.v), loss.left / ARROW.horseShare, { arrow: false, limbBreak: Math.min(1, MATCHLOCK.limbBreak * share) });
+  // And the man's lethal share there (MATCHLOCK.lethal), as much less as the horse's part outweighs the man's (bulletHit's
+  // `scale`): one wound past what drops a man (1) drops the horse at once, its barrel or chest torn open, its head smashed.
+  // (Not summed over wounds: a matchlock ball leaves ~0.3 of it in the barrel, and a horse runs on with several.)
+  const part = hit.capsule.part;
+  const [region, manPart] = part === 'legs' ? ['limb', 'lShank'] : part === 'head' ? ['head', 'head'] : ['torso', 'trunk'];
+  const lethal = MATCHLOCK.lethal[region] * share * (bulletReference()[manPart].mass / (horse.mass * hit.capsule.mass));
+  if (wasUp && lethal >= 1 && !horse.spec?.machine) bringDown(world, horse, ball.kind === 'canister' ? 'cut down by canister' : 'struck by a cannon ball');
 }

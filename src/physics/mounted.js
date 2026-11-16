@@ -46,6 +46,13 @@ export const HORSE_SHAPE = {
     { key: 'rHind', fore: false, root: [-0.36, 0.7, -0.1], mass: 0.0475 },
   ],
   legRadius: 0.035,
+  // The brain, in the head (`at`, and its `radius`, of the withers): an adult horse's is ~600-650 g (Sisson and Grossman,
+  // The Anatomy of the Domestic Animals, Getty ed. 1975; Konig and Liebich, Veterinary Anatomy of Domestic Mammals), ~600 cm3,
+  // a ball of ~5.3 cm radius at a horse 1.55 m at the withers. It lies at the back of the skull, its hind edge at the poll and
+  // its front ~11 cm short of the eyes' line, in the upper half of the head: deep under the forehead's frontal bone and sinus
+  // (the slaughterman's and the vet's mark is where lines from each eye to the other ear cross, aimed down the neck: AVMA
+  // Guidelines for the Euthanasia of Animals, 2020). The rest of the head is jaw, teeth, nasal passages and sinus.
+  brain: { at: [0.663, 1.108, 0], radius: 0.035 },
   // Upper and lower leg (forearm and cannon; gaskin and cannon), of the withers.
   upperLeg: 0.33, lowerLeg: 0.37,
   seat: [-0.08, 0.99, 0],
@@ -280,6 +287,8 @@ export function poseHorse(horse) {
   const capsules = horse.capsules;
   capsules.length = 0;
   for (const part of shape.parts) capsules.push({ key: part.key, part: part.part, a: horsePoint(horse, scale(part.a)), b: horsePoint(horse, scale(part.b)), radius: part.radius * W, mass: part.mass });
+  // (Its brain where the head is now: harmHorse.)
+  horse.brain = shape.brain ? { at: horsePoint(horse, scale(shape.brain.at)), radius: shape.brain.radius * W } : null;
   const flying = horse.air?.phase === 'flight';
   for (const leg of shape.legs) {
     const root = scale(leg.root);
@@ -1432,12 +1441,29 @@ export function harmHorse(world, horse, capsule, { blunt, cut, pierce }, event, 
     event.effects.push('its leg broken');
     bringDown(world, horse, 'goes down on a broken leg');
   }
+  // A point or a missile through the brain (its line from where it went in, `event.point`, along `-event.normal`, through
+  // `horse.brain`), deep enough to reach it through the skull (`brainDepth`): down dead at once, as a man stabbed or shot
+  // through the brain. Elsewhere in the head it is a wound.
+  if (capsule.part === 'head' && pierce > BLADES.lethalPierce * BODY.toughness * spec.brainDepth && throughBrain(horse, event, capsule.radius)) {
+    event.effects.push('through the brain');
+    bringDown(world, horse, 'killed through the brain');
+  }
   if (capsule.part === 'head' && blunt > spec.headStun) {
     event.effects.push('stunned');
     bringDown(world, horse, 'drops from a blow to the head');
   }
   horse.trauma += blunt;
   if (horse.trauma > spec.trunkFatal * BODY.toughness) bringDown(world, horse, 'killed by the blows');
+}
+
+/** Whether a wound's line, in at `event.point` along `-event.normal` as deep as the head is across (2 `reach`), meets the brain. */
+function throughBrain(horse, event, reach) {
+  const brain = horse.brain;
+  if (!brain || horse.spec?.machine || !event?.point || !event.normal) return false;
+  const along = vec.normalize(vec.scale(event.normal, -1));
+  const toBrain = vec.sub(brain.at, event.point);
+  const depth = Math.max(0, Math.min(2 * reach, vec.dot(toBrain, along)));
+  return vec.length(vec.sub(toBrain, vec.scale(along, depth))) < brain.radius;
 }
 
 /**
