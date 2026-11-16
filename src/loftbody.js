@@ -135,9 +135,8 @@ export const LOFT = {
   // but to no less than this share of its ring: a waistband hugs the hips.)
   // A collar up the trapezius (raiseCollars): away from the front by `from` (rad), in `sectors` round the trunk (and `spread`
   // either side, with no dip between two higher sectors `bridge` or fewer apart), to skin out at `neckShare` of the neck's
-  // radius or more, stood `standoff` (m, times the piece's own standoff share) off it;
-  // the ring below the top carried `follow` of the way up to it, onto the skin there (the furthest out within `along`, m).
-  collar: { from: 0.7, sectors: 48, spread: 1, bridge: 10, neckShare: 1.1, standoff: 0.006, follow: 0.5, along: 0.012 },
+  // radius or more, stood `standoff` (m, times the piece's own standoff share) off it.
+  collar: { from: 0.7, sectors: 48, spread: 1, bridge: 10, neckShare: 1.1, standoff: 0.006 },
   // The shoulder's turn into the arm on the base mesh (blendShoulders): the arm's share eases from `from` to `to` (t of the
   // upper arm from its joint: from 10 cm above it on a man's 0.33 m upper arm, over the cap, to a quarter of the way down the
   // shaft), and the blend fades out between `radial` (shares of the arm's ring radius: the cap and the armpit's fold, not the
@@ -345,10 +344,9 @@ export const LOFT = {
   // fullest over the deltoid and drawn in to its turned lower edge.
   pauldron: { from: -0.2, to: 0.42, flare: [[-0.2, 1.08], [-0.12, 1.24], [0, 1.32], [0.2, 1.3], [0.42, 1.22]] },
   // A plate harness's limb pieces stand off the limb by these (times the limb): a rerebrace, a vambrace or a greave (`limb`) and
-  // a cuisse (`thigh`) by the plate and the arming clothes' thickness, a centimetre or so; a couter or a poleyn (`cop`) lies on
-  // the vambrace or greave at the joint, a plate and its clearance over it (0.06 of the limb, about 4 mm on a base body; at 1.36
-  // it stood 13 mm off the greave, a thick barrel round the knee); the sleeve worn under them stands no further off the arm than `under`.
-  harness: { limb: 1.16, thigh: 1.13, cop: 1.22, under: 1.07 },
+  // a cuisse (`thigh`) by the plate and the arming clothes' thickness, a centimetre or so; a couter or a poleyn (`cop`) by its
+  // own bulge over the joint; the sleeve worn under them stands no further off the arm than `under`.
+  harness: { limb: 1.16, thigh: 1.13, cop: 1.36, under: 1.07 },
   joust: { tassetTo: 0.68, tassetLames: 5, pauldron: 1.8, pauldronLames: 4, mail: [0.1, 0.4, 1.3] },
   ridged: { ridge: 0.18, width: 0.6, fade: 0.12, flare: 0.05, flareOver: 0.06, rope: 0.035 },
   // The Gothic form of it (a harness whose flutes are `sprays`, the German of c. 1480): the keel sharp (a narrow `width`), the
@@ -1250,19 +1248,16 @@ export const ARMOR_KINDS = {
   // the Inca gave his soldiers and guards, `uncuChecks`); and the tocapu all
   // over (the Sapa Inca's own, `uncuRoyal`: none but he wore it).
   uncu: {
-    trunk: [-0.1, 0.95, 1.08, 'cloth'], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }], upperArm: [-0.2, 0.24, 1.08, 'cloth'],
+    trunk: [-0.1, 0.95, 1.08, 'cloth'], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
   },
   uncuTocapu: {
     trunk: [-0.1, 0.95, 1.08, { tocapu: [-0.12, 0.16], base: 'cloth' }], skirt: [0.88, 0.32, 1.16, { edge: 'cloth2', base: 'cloth' }],
-    upperArm: [-0.2, 0.24, 1.08, 'cloth'],
   },
   uncuChecks: {
     trunk: [-0.1, 0.95, 1.08, { checks: true, yoke: [0.8, 'lace'] }], skirt: [0.88, 0.32, 1.16, { checks: true }],
-    upperArm: [-0.2, 0.24, 1.08, { checks: true }],
   },
   uncuRoyal: {
     trunk: [-0.1, 0.95, 1.08, { tocapu: true }], skirt: [0.88, 0.32, 1.16, { tocapu: true }],
-    upperArm: [-0.2, 0.24, 1.08, { tocapu: true }],
   },
   // The jaguar knight's suit: the spotted skin over everything, to the wrists and ankles.
   jaguarSuit: {
@@ -2208,7 +2203,7 @@ function breastplateOn(mesh, rings, inflate, shape, range, { lanceRest = false, 
  * sharp front (breastplateOn), under the rivets, riding the plate where it is fitted. As a ring's paint on the plate the gilt
  * bled over the faces either side, a smear up the sides and across the back. (Its neck's border lies under the gorget: drawn
  * at the breast's top it showed only its ends, two gilt slabs beside the gorget, and behind it crossed the back, where the
- * plate runs on up to the backplate's own neck. The brass at the neck is the gorget's: gorgetBorder.)
+ * plate runs on up to the backplate's own neck.)
  */
 function ropedBorders(mesh, rings, inflate, shape, range, bones) {
   const lift = LOFT.ridgedFront.lift * 1.5;
@@ -2219,26 +2214,6 @@ function ropedBorders(mesh, rings, inflate, shape, range, bones) {
     return [place, angle, inflate * shape(ringAt(rings, place), angle) + lift];
   }));
   addGrid(mesh, rings, grid, 'gold', bones);
-}
-
-/**
- * A harness's brass border round its gorget's foot, where the gorget lies over the breast and back plates: the border seen at
- * the neck (the breastplate's own neck border is under the gorget). A strip of its own LOFT.harnessEdge.depth deep, standing
- * LOFT.harnessEdge.lift off the gorget, riding it where it is fitted; in front it rises over the breastplate's keel by the
- * keel's own rule (LOFT.ridged ridge and width), as the gorget's plate lies over it. Without that rise it passed under the keel
- * and showed only as two wings and a slab at its crossing.
- */
-function gorgetBorder(mesh, rings) {
-  const spec = LOFT.harnessEdge;
-  const steps = LOFT.sides;
-  const lift = 1 + spec.lift / rings[0].depth;
-  const places = [0, placeAlong(measureRings(rings, 1), spec.depth)];
-  const grid = places.map((place) => Array.from({ length: steps + 1 }, (_, step) => {
-    const angle = (step / steps) * Math.PI * 2;
-    const off = Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle)));
-    return [place, angle, lift * (1 + LOFT.ridged.ridge * Math.max(0, 1 - off / LOFT.ridged.width))];
-  }));
-  addGrid(mesh, rings, grid, 'gold', () => null);
 }
 
 /**
@@ -3216,16 +3191,13 @@ function fitClothToBase(mesh, parts, armoured) {
     if (!name) continue;
     const point = mesh.positions.slice(vertex * 3, vertex * 3 + 3);
     if (!/Upper|Fore/.test(name)) mesh.base.armFlesh[vertex - start] = armOf(point, name);
-    // (Neck flesh beyond the neck's own reach, the slope of the shoulders, is the trunk's: covered with the trunk's top. Not in
-    // front, within the front neckline (LOFT.collar.from), where a coat closed at the neck is not raised: there the neck's foot
-    // spreading into the chest was left out above the coat's neckline, a hole in the throat.)
+    // (Neck flesh beyond the neck's own reach, the slope of the shoulders, is the trunk's: covered with the trunk's top.)
     if (name === 'neck' && frames.neck && !mesh.base.armFlesh[vertex - start]) {
       const frame = frames.neck;
       const rel = vec.sub(point, frame.part.a);
       const t = vec.dot(rel, frame.axis) / frame.length;
-      const out = vec.sub(rel, vec.scale(frame.axis, t * frame.length));
-      const front = Math.abs(Math.atan2(vec.dot(out, frame.widthAxis), vec.dot(out, frame.depthAxis))) < LOFT.collar.from;
-      if (!front && vec.length(out) > spec.armReach * Math.max(frame.part.depth(t), frame.part.width(t))) mesh.base.armFlesh[vertex - start] = 'trunk';
+      const off = vec.length(vec.sub(rel, vec.scale(frame.axis, t * frame.length)));
+      if (off > spec.armReach * Math.max(frame.part.depth(t), frame.part.width(t))) mesh.base.armFlesh[vertex - start] = 'trunk';
     }
     // (Or an arm's own point, or one blending into it (armSkin): a wasted arm hangs from the emaciated reference's shoulder,
     // basebody.js baseHer, up to 5 cm off the bone at its root and out of the reach round it.)
@@ -3721,14 +3693,12 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
   // The skin of the trunk and neck (not the arms', nor the shoulder's cap) by sector round the trunk: its highest point out at the neck's foot.
   const sectors = spec.sectors;
   const highest = new Array(sectors).fill(null);
-  const skinPlaces = [];
   const sectorOf = (angle) => ((Math.floor(((angle / (Math.PI * 2)) % 1 + 1) % 1 * sectors) % sectors) + sectors) % sectors;
   for (let vertex = start; vertex < start + count; vertex += 1) {
     const name = nameOf.get(vertex);
     if (name !== 'trunk' && name !== 'neck') continue;
     if (mesh.base.armFlesh?.[vertex - start] && mesh.base.armFlesh[vertex - start] !== 'trunk') continue;
     const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
-    skinPlaces.push({ ...place, vertex });
     if (place.r < neckFoot) continue;
     const sector = sectorOf(place.angle);
     if (!highest[sector] || place.t > highest[sector].t) highest[sector] = place;
@@ -3757,26 +3727,8 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
     return best;
   });
   const topOf = (sector) => bridged[((sector % sectors) + sectors) % sectors];
-  // The skin's own surface up the trapezius (for the ring below the top: `follow`): the skin points by sector, and the furthest
-  // out of them within `along` (m) of a height, in the sector and those `spread` either side.
-  const skinBy = Array.from({ length: sectors }, () => []);
-  for (const place of skinPlaces) skinBy[sectorOf(place.angle)].push(place);
-  const skinOut = (angle, t) => {
-    let most = null;
-    for (let k = -spec.spread; k <= spec.spread; k += 1) {
-      for (const place of skinBy[(sectorOf(angle) + k + sectors) % sectors]) if (Math.abs(place.t - t) * trunk.length < spec.along && (most === null || place.r > most)) most = place.r;
-    }
-    return most;
-  };
-  // Each closed coat's top ring and the ring below it.
-  const ringsOf = new Map();
-  for (const [, { ring, name }] of shares) if (name === 'trunk') (ringsOf.get(ring.piece) ?? ringsOf.set(ring.piece, new Set()).get(ring.piece)).add(ring.t);
-  const nextBelow = new Map([...ringsOf].map(([piece, ts]) => [piece, [...ts].filter((t) => t < pieceTop.get(piece)).reduce((a, b) => Math.max(a, b), -Infinity)]));
-  const moves = [];
   for (const [vertex, { ring, name, standoff }] of shares) {
-    if (name !== 'trunk' || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk) continue;
-    const top = ring.t >= pieceTop.get(ring.piece);
-    if (!top && ring.t !== nextBelow.get(ring.piece)) continue;
+    if (name !== 'trunk' || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk || ring.t < pieceTop.get(ring.piece)) continue;
     // (Not cloth under a cuirass that reaches as high, `ribPieces`: it is worn inside the plate's collar, and carried up the
     // trapezius past it a thin man's arming coat showed round his neck between the cuirass and the gorget.)
     if (!ribPieces.has(ring.piece) && [...ribPieces].some((piece) => pieceTop.get(piece) >= pieceTop.get(ring.piece))) continue;
@@ -3789,41 +3741,12 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
     const share = at - Math.floor(at);
     const [low, high] = [topOf(Math.floor(at)), topOf(Math.floor(at) + 1)];
     if (!low && !high) continue;
-    const highest = (low ?? high).t * (1 - share) + (high ?? low).t * share;
-    if (highest <= place.t) continue;
+    const t = (low ?? high).t * (1 - share) + (high ?? low).t * share;
+    if (t <= place.t) continue;
+    const reach = (low ?? high).r * (1 - share) + (high ?? low).r * share + spec.standoff * standoff;
     const dir = vec.scale(place.out, 1 / (place.r || 1));
-    let [t, reach] = [highest, (low ?? high).r * (1 - share) + (high ?? low).r * share + spec.standoff * standoff];
-    if (!top) {
-      // The ring below the top goes `follow` of the way up to it, out to the skin there: left where it was, the band between
-      // them was a straight chord cutting inside the trapezius's curve, and what is worn under the coat showed through it in
-      // streaks down the shoulder's slope.
-      t = place.t + (highest - place.t) * spec.follow;
-      const skin = skinOut(place.angle, t);
-      if (skin === null) continue;
-      reach = Math.max(skin + spec.standoff * standoff, place.r);
-    }
-    moves.push([vertex, vec.add(vec.add(trunk.part.a, vec.scale(trunk.axis, t * trunk.length)), vec.scale(dir, reach))]);
-  }
-  for (const [vertex, point] of moves) mesh.positions.splice(vertex * 3, 3, ...point);
-  // The skin above the coats' top edge as it now runs, by sector (the highest of their top rings' points there and beside it,
-  // plus `along`): no coat covers it, so it is not left out with the trunk's top (`mesh.collarBare`, the skin's coverage). Left
-  // out, the back of a round neck lower than the neck's foot (an uncu's) was a hole through the neck.
-  const coatTop = new Array(sectors).fill(null);
-  for (const [vertex, { ring, name }] of shares) {
-    if (name !== 'trunk' || pieceTop.get(ring.piece) < LOFT.closedJoint.top.trunk || ring.t < pieceTop.get(ring.piece)) continue;
-    const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
-    const sector = sectorOf(place.angle);
-    if (coatTop[sector] === null || place.t > coatTop[sector]) coatTop[sector] = place.t;
-  }
-  if (coatTop.every((top) => top === null)) return;
-  mesh.collarBare = new Set();
-  for (const place of skinPlaces) {
-    let top = null;
-    for (let k = -spec.spread; k <= spec.spread; k += 1) {
-      const found = coatTop[(sectorOf(place.angle) + k + sectors) % sectors];
-      if (found !== null && (top === null || found > top)) top = found;
-    }
-    if (top !== null && (place.t - top) * trunk.length > spec.along) mesh.collarBare.add(place.vertex);
+    const point = vec.add(vec.add(trunk.part.a, vec.scale(trunk.axis, t * trunk.length)), vec.scale(dir, reach));
+    mesh.positions.splice(vertex * 3, 3, ...point);
   }
 }
 
@@ -4829,7 +4752,6 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     // (A kit's collar goes under a coat closed at the neck as far up as the coat's top edge: tuckCollars.)
     if (kit?.collar) for (const ring of collarRings) ring.collar = true;
     loft(mesh, collarRings, sides, { color: kit?.collar ? paintFor(kit.collar, armor) : plate ? 'steel' : 'armor', capStart: false, capEnd: false, ...mailMaps });
-    if (plate && brassStrips) gorgetBorder(mesh, collarRings);
   }
   // (Stiff as its paint is: one plate, or rows where it is painted in rows of plates and lacing.)
   const armorPiece = (rings, inflate, role = plate ? 'steel' : 'armor') => loft(mesh, stiffen(mesh, rings, typeof role === 'function' ? 'rows' : stiffnessOf(role)), sides, { color: role, inflate, capStart: false, capEnd: false });
@@ -5165,7 +5087,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       mesh.base.armFlesh.forEach((arm, index) => {
         const trunkTop = (mesh.cover.trunk ?? []).some(([, high]) => high >= LOFT.closedJoint.top.trunk);
         const closes = arm === 'trunk' ? trunkTop : trunkTop || (covered[arm] ?? []).some(([low]) => low <= LOFT.closedJoint.root);
-        if (arm && closes && !mesh.collarBare?.has(mesh.base.start + index)) inside[mesh.base.start + index] = 1;
+        if (arm && closes) inside[mesh.base.start + index] = 1;
       });
       // (And the trunk's own skin above the shoulder line, away from the front neckline (LOFT.collar.from), under a trunk piece
       // reaching the trunk's top: its collar is carried up the trapezius over it (raiseCollars), and the skin there, left in,
@@ -5175,7 +5097,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
       if (trunkTop) {
         for (let vertex = Math.max(from, mesh.base.start); vertex < to; vertex += 1) {
           const angle = Math.atan2(Math.sin(mesh.ringA[vertex]), Math.cos(mesh.ringA[vertex]));
-          if (mesh.ringT[vertex] >= LOFT.closedJoint.top.trunk && Math.abs(angle) > LOFT.collar.from && !mesh.collarBare?.has(vertex)) inside[vertex] = 1;
+          if (mesh.ringT[vertex] >= LOFT.closedJoint.top.trunk && Math.abs(angle) > LOFT.collar.from) inside[vertex] = 1;
         }
       }
     }

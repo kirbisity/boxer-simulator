@@ -7,7 +7,7 @@
 /* global THREE */
 
 import { ENV, ENV_WEATHER } from './config.js';
-import { envNoiseTexture } from './noise.js';
+import { ENV_NOISE_CELLS, envNoiseTexture } from './noise.js';
 import { ENV_GLSL_FILM, envToneOf } from './post.js';
 
 const ENV_DEG = Math.PI / 180;
@@ -600,25 +600,37 @@ float envGust(vec2 xz) {
  * open-air place is shown (uEnvOn) it is hazed as the land is (envHaze, in place of the renderer's fog, which
  * knows one colour and no height); with `wet` or `snow` above 0 it also darkens and shines in the rain and
  * whitens on its upward faces, by those shares of what the weather lays (uEnvWet; not a basic material, which
- * has no normal; a Lambert one by its corners' normals, the others by each pixel's). With the open air off the
- * material is as it was made.
+ * has no normal; a Lambert one by its corners' normals, the others by each pixel's). `snow` may instead be a
+ * { value }: the cm of new snow settled on a thing lying out in it (the fallen after a battle), which the caller
+ * changes as it goes and is read each frame; it lies by ENV_SETTLED, and not where the geometry's `envBare`
+ * attribute (0..1) says the surface is bare warm skin. With the open air off the material is as it was made.
  * What the material's own onBeforeCompile does is kept and runs first: dress a material once, after any such
  * patch. A material marked userData.envOwn does all of this itself and is left alone, as is one the renderer's
  * fog is off for (a sky, a glow) and any other kind (a shader of the place's own, a sprite). Returns the material.
  */
+// New snow settled on a thing lying out in it, by its depth (cm): only on what faces up (the face's normal over
+// `faces`: shoulders, a back, the top of a limb, a helmet's crown, the flat of a blade; not a side or an underside),
+// in grains and patches at first (a noise `speck` m across, two octaves), the thing's own colour showing through,
+// and white and whole only at `white` cm (approximate, by eye against photographs of a dusting on dark cloth: a few
+// millimetres speckle it, a centimetre or two hides it).
+const ENV_SETTLED = { faces: [0.4, 0.85], speck: 0.09, white: 2 };
+
 export function envDress(material, { wet = 0, snow = 0 } = {}) {
   if (material.userData.envOwn || material.userData.envDressed || !material.fog) return material;
   if (!(material.isMeshBasicMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial || material.isMeshStandardMaterial)) return material;
   material.userData.envDressed = true;
   const inner = material.onBeforeCompile;
   const key = material.customProgramCacheKey();
-  const lays = (wet > 0 || snow > 0) && !material.isMeshBasicMaterial;
+  const live = typeof snow === 'object' && snow !== null;
+  const lays = (wet > 0 || live || snow > 0) && !material.isMeshBasicMaterial;
   const corners = material.isMeshLambertMaterial;
-  material.customProgramCacheKey = () => `${key}|env|${lays ? [wet, snow] : ''}`;
+  material.customProgramCacheKey = () => `${key}|env|${lays ? [wet, live ? 'live' : snow] : ''}`;
   material.onBeforeCompile = (shader, renderer) => {
     inner.call(material, shader, renderer);
     Object.assign(shader.uniforms, envUniforms());
-    shader.vertexShader = `varying vec3 vEnvWorld;\nvarying float vEnvUp;\n${shader.vertexShader}`.replace('#include <fog_vertex>', `#include <fog_vertex>
+    if (live) shader.uniforms.uEnvLaid = snow;
+    shader.vertexShader = `varying vec3 vEnvWorld;\nvarying float vEnvUp;\n${live ? 'attribute float envBare;\nvarying float vEnvBare;\n' : ''}${shader.vertexShader}`.replace('#include <fog_vertex>', `#include <fog_vertex>
+      ${live ? 'vEnvBare = envBare;' : ''}
       ${lays && corners ? 'vEnvUp = normalize( ( vec4( transformedNormal, 0.0 ) * viewMatrix ).xyz ).y;' : ''}
       vec4 envAt = vec4( transformed, 1.0 );
       #ifdef USE_INSTANCING
@@ -626,7 +638,7 @@ export function envDress(material, { wet = 0, snow = 0 } = {}) {
       #endif
       vEnvWorld = ( modelMatrix * envAt ).xyz;`);
     // (The renderer hazes after its tone curve; the open air's haze is light like the rest and goes before it.)
-    let fragment = `varying vec3 vEnvWorld;\nvarying float vEnvUp;\n${ENV_GLSL}\n${shader.fragmentShader}`
+    let fragment = `varying vec3 vEnvWorld;\nvarying float vEnvUp;\n${live ? 'uniform float uEnvLaid;\nvarying float vEnvBare;\n' : ''}${ENV_GLSL}\n${shader.fragmentShader}`
       .replace('#include <tonemapping_fragment>', 'if ( uEnvOn > 0.5 ) gl_FragColor.rgb = envHazeGrain( gl_FragColor.rgb, cameraPosition, vEnvWorld, envGrain( gl_FragCoord.xy ) );\n#include <tonemapping_fragment>')
       .replace('#include <fog_fragment>', 'if ( uEnvOn < 0.5 ) {\n#include <fog_fragment>\n}');
     // Snow lies on what faces up, first in the lee of the grain (as on the land: terrain.js); under it nothing is wet.
@@ -635,7 +647,11 @@ export function envDress(material, { wet = 0, snow = 0 } = {}) {
       if ( uEnvOn > 0.5 ) {
         float envUp = ${corners ? 'vEnvUp' : 'normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz ).y'};
         float envGrain = texture2D( uEnvNoise, vEnvWorld.xz / 2.9 ).a;
-        float envSnow = uEnvWet.y * ${snow.toFixed(2)} * smoothstep( 0.25, 0.6, envUp - 0.45 + ( envGrain - 0.5 ) * 0.4 + 0.5 * uEnvWet.y );
+        ${live ? `vec2 envSpeckAt = ( vEnvWorld.xz + vEnvWorld.y * vec2( 0.71, -0.43 ) ) / ${(ENV_NOISE_CELLS * ENV_SETTLED.speck).toFixed(3)};
+        float envSpeck = 0.65 * texture2D( uEnvNoise, envSpeckAt ).a + 0.35 * texture2D( uEnvNoise, envSpeckAt * 3.7 + 0.31 ).a;
+        float envLaid = sqrt( clamp( uEnvLaid / ${ENV_SETTLED.white.toFixed(2)}, 0.0, 1.0 ) );
+        float envSnow = smoothstep( ${ENV_SETTLED.faces[0].toFixed(2)}, ${ENV_SETTLED.faces[1].toFixed(2)}, envUp ) * smoothstep( envSpeck, envSpeck + 0.12, envLaid * 1.12 ) * mix( 0.55, 1.0, envLaid ) * ( 1.0 - smoothstep( 0.3, 0.7, vEnvBare ) );`
+    : `float envSnow = uEnvWet.y * ${snow.toFixed(2)} * smoothstep( 0.25, 0.6, envUp - 0.45 + ( envGrain - 0.5 ) * 0.4 + 0.5 * uEnvWet.y );`}
         float envWetBy = uEnvWet.x * ${wet.toFixed(2)} * ( 1.0 - envSnow );
         diffuseColor.rgb = mix( diffuseColor.rgb * ( 1.0 - envWetBy * ${(1 - ENV.terrain.wetDarken).toFixed(2)} ), vec3( ${ENV.terrain.snowColour.join(', ')} ), envSnow );
         #ifdef STANDARD
