@@ -344,9 +344,10 @@ export const LOFT = {
   // fullest over the deltoid and drawn in to its turned lower edge.
   pauldron: { from: -0.2, to: 0.42, flare: [[-0.2, 1.08], [-0.12, 1.24], [0, 1.32], [0.2, 1.3], [0.42, 1.22]] },
   // A plate harness's limb pieces stand off the limb by these (times the limb): a rerebrace, a vambrace or a greave (`limb`) and
-  // a cuisse (`thigh`) by the plate and the arming clothes' thickness, a centimetre or so; a couter or a poleyn (`cop`) by its
-  // own bulge over the joint; the sleeve worn under them stands no further off the arm than `under`.
-  harness: { limb: 1.16, thigh: 1.13, cop: 1.36, under: 1.07 },
+  // a cuisse (`thigh`) by the plate and the arming clothes' thickness, a centimetre or so; a couter or a poleyn (`cop`) lies on
+  // the vambrace or greave at the joint, a plate and its clearance over it (0.06 of the limb, about 4 mm on a base body; at 1.36
+  // it stood 13 mm off the greave, a thick barrel round the knee); the sleeve worn under them stands no further off the arm than `under`.
+  harness: { limb: 1.16, thigh: 1.13, cop: 1.22, under: 1.07 },
   joust: { tassetTo: 0.68, tassetLames: 5, pauldron: 1.8, pauldronLames: 4, mail: [0.1, 0.4, 1.3] },
   ridged: { ridge: 0.18, width: 0.6, fade: 0.12, flare: 0.05, flareOver: 0.06, rope: 0.035 },
   // The Gothic form of it (a harness whose flutes are `sprays`, the German of c. 1480): the keel sharp (a narrow `width`), the
