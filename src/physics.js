@@ -39,7 +39,7 @@ import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
 import { envLieOf } from './env/lie.js';
 import { collideWorks, faceBetween, faceOutside, FIELDWORKS, floorFor, keepRootOff, looseFloor, mireStep, reliefAt, stepOnWorks, worksOf } from './physics/fieldworks.js';
-import { chooseHorseDetail, collideHorses, createHorse, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, SEATED_PARTICLES, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
+import { chooseHorseDetail, collideHorses, createHorse, mountFootprint, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, SEATED_PARTICLES, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
 export { pinnedBy } from './physics/grappling.js';
@@ -1841,9 +1841,14 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
       placeRows(rest, shooters.length ? Math.ceil(shooters.length / perRow) * rowSpacing + order.shootersFront : 0);
     } else placeRows(team, 0);
     if (riders.length) {
+      // The foot line's width: its widest row, or, drawn up by a `layout`, as wide as its men's places reach across.
       const widest = Math.min(perRow, team.length);
+      const width = order.layout ? 2 * Math.max(0, ...team.map((_, index) => Math.abs(order.layout[index]?.[1] ?? 0))) : (widest - 1) * spacing;
+      // The most ground any one of the wing's horses needs (physics/mounted.js mountFootprint), and a knee's room beside it.
+      const feet = riders.map((fighter) => mountFootprint(fighter.body.inputs));
+      const horse = { length: Math.max(...feet.map((foot) => foot.length)), width: Math.max(WORLD.mount.avoid.clear, ...feet.map((foot) => foot.width)) };
       if (order.placed) for (const fighter of riders) fighter.wing = { held: true, side: Math.sign(fighter.x[P.pelvis * 3 + 2]) || 1 };
-      else placeWings(riders, sign, order, { front, width: (widest - 1) * spacing }, arena, (fighter, x, z) => placeFighter(fighter, x, z));
+      else placeWings(riders, sign, order, { front, width }, arena, (fighter, x, z) => placeFighter(fighter, x, z), horse);
       wingOrder ??= order.wings;
     }
   }
@@ -1944,11 +1949,18 @@ function lineUpMounted(team, sign, apart, arena, rides) {
   wings.forEach((fighter, index) => at(fighter, 0, flanks[index]));
   const behind = riders.slice(wings.length);
   const perRank = Math.max(1, Math.floor((2 * across) / spacing) + 1);
-  const firstRank = foot.length ? Math.max(0, rows - 1) * WORLD.teamRowSpacing + rankBack : 0;
+  const wanted = foot.length ? Math.max(0, rows - 1) * WORLD.teamRowSpacing + rankBack : 0;
+  // Ranks that do not fit on the floor behind close up (to a horse's length nose to tail: physics/mounted.js mountFootprint),
+  // and only then does the first come forward; never two horses on one spot against the floor's end.
+  const ranks = Math.ceil(behind.length / perRank);
+  const deepest = arena.halfX - 0.4 - apart;
+  const length = Math.max(0, ...behind.map((fighter) => mountFootprint(fighter.body.inputs).length));
+  const along = ranks > 1 ? Math.max(length, Math.min(rankBack, (deepest - wanted) / (ranks - 1))) : rankBack;
+  const firstRank = Math.min(wanted, deepest - (ranks - 1) * along);
   behind.forEach((fighter, index) => {
     const rank = Math.floor(index / perRank);
     const inRank = Math.min(perRank, behind.length - rank * perRank);
-    at(fighter, firstRank + rank * rankBack, ((index % perRank) - (inRank - 1) / 2) * spacing);
+    at(fighter, firstRank + rank * along, ((index % perRank) - (inRank - 1) / 2) * spacing);
   });
 }
 
