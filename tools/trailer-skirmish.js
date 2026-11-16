@@ -17,8 +17,10 @@ export function skirmish(castSeed = 1, { mounted = 0 } = {}) {
   const blue = [...pick('blue', (i) => /samurai/.test(i.outfit.kind), 6), ...pick('blue', (i) => i.outfit.kind === 'ashigaru' && i.style !== 'matchlock', 6)];
   // `mounted`: that many of the West's lamellar-armoured samurai on horseback, charging the guns.
   // (Lacquered lamellar, `samurai`, not the tōsei harness: that one is proof against a teppō ball, OUTFITS.samuraiTosei bulletRating.)
-  let left = mounted;
-  return { red: red.map(masked), blue: blue.map(masked).map((i) => (left > 0 && i.outfit.kind === 'samurai' ? (left -= 1, { ...i, mounted: true }) : i)) };
+  // `mounted: 'all'`: every samurai of the West on horseback (the tōsei harness too: a ball only dents it).
+  let left = mounted === 'all' ? Infinity : mounted;
+  const rides = (i) => (mounted === 'all' ? /samurai/.test(i.outfit.kind) : i.outfit.kind === 'samurai');
+  return { red: red.map(masked), blue: blue.map(masked).map((i) => (left > 0 && rides(i) ? (left -= 1, { ...i, mounted: true }) : i)) };
 }
 export const SKIRMISH_ARENA = { halfX: 22, halfZ: 12 };
 
@@ -35,13 +37,13 @@ if (typeof process !== 'undefined' && import.meta.url === `file://${process.argv
   const [seed0 = '1', seeds = '6', seconds = '25', mounted = '0'] = process.argv.slice(2);
   const scenario = battleOf('sekigahara');
   for (let seed = Number(seed0); seed < Number(seed0) + Number(seeds); seed += 1) {
-    const sides = skirmish(1, { mounted: Number(mounted) });
+    const sides = skirmish(1, { mounted: mounted === 'all' ? 'all' : Number(mounted) });
     const fighters = Object.entries(sides).flatMap(([corner, side]) => side.map((inputs) => ({ inputs: structuredClone(inputs), corner })));
     const world = createWorld(fighters, { seed, arena: SKIRMISH_ARENA, rules: scenario.rules, formation: scenario.formation, place: 'sengoku' });
     placeRiders(world);
     for (let t = 0; t < Number(seconds); t += 0.1) advance(world, 0.1, (c, dt) => thinkAll(c, dt));
     const hits = world.events.filter((e) => e.kind === 'shot' && e.defender != null && world.fighters[e.attacker]?.corner === 'red' && world.fighters[e.defender].corner === 'blue' && /samurai/.test(fighters[e.defender].inputs.outfit.kind))
-      .map((e) => ({ t: +e.time.toFixed(2), gunner: e.attacker, victim: e.defender, rider: Boolean(fighters[e.defender].inputs.mounted), target: e.target, fx: (e.effects ?? []).join('; ') }));
+      .map((e) => ({ t: +e.time.toFixed(2), gunner: e.attacker, victim: e.defender, rider: Boolean(fighters[e.defender].inputs.mounted), kit: fighters[e.defender].inputs.outfit.kind, target: e.target, fx: (e.effects ?? []).join('; ') }));
     const fallen = world.events.filter((e) => ['unhorsed', 'horseDown'].includes(e.kind)).map((e) => `${e.kind}@${e.time.toFixed(1)}:${e.fighter ?? ''}`);
     const shots = world.events.filter((e) => e.kind === 'shot').length;
     console.log(JSON.stringify({ seed, shots, hits: hits.filter((h) => h.rider), fallen }));

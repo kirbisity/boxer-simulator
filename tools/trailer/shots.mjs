@@ -125,21 +125,22 @@ export const SHOTS = {
       await TC.warm(60);`,
     segments: [slow(0.42, 6)],
   },
-  // Sekigahara (tools/trailer-skirmish.js, seed 28, one West samurai mounted: user, 2026-11-15): the East's teppō rank fires at a samurai on
-  // horseback before the West's line; a ball goes through his lamellar (24%) and kills him, he falls from the saddle (0.55 s) and the horse
-  // bolts past the guns. (A rider in the tōsei harness is proof against the ball: OUTFITS.samuraiTosei bulletRating.) No HUD.
+  // Sekigahara (tools/trailer-skirmish.js, seed 20, every West samurai on horseback: user, 2026-11-15): the West's samurai ride at the East's
+  // teppō rank; the volley; one rider (#16, in lamellar) is shot dead through his armour and falls from the saddle (0.48 s), the riders in the
+  // tōsei harness ride on through it (a ball only dents that plate: OUTFITS.samuraiTosei bulletRating). No HUD.
   sekigahara: {
     view: 'frame',
     hud: false,
     setup: `
-      await TC.skirmish(28, { mounted: 1 });
-      const a = { pos: [-12.2, 2.3, 5.2], look: [2.8, 1.7, 0], fov: 34 };
-      const b = { pos: [-11.6, 2.25, 4.6], look: [2.8, 1.5, 0], fov: 24 };
-      const c = { pos: [-4.5, 1.8, 3.6], look: [2.2, 0.5, 0.2], fov: 30 };
-      TC.path([{ t: 0, ...a }, { t: 0.5, ...a }, { t: 0.9, ...b }, { t: 1.4, ...b }, { t: 2.6, ...c }, { t: 6, ...c }]);
+      const r = await TC.skirmish(20, { mounted: 'all' });
+      const at = boxer.state.world.fighters[16].mount.at;
+      const a = { pos: [-12.5, 2.4, -1.5], look: [at[0], 1.8, at[1] - 2], fov: 44 };
+      const b = { pos: [-12.0, 2.3, -1.0], look: [at[0], 1.6, at[1]], fov: 28 };
+      const c = { pos: [-4.0, 1.8, at[1] + 3.5], look: [at[0] - 0.4, 0.5, at[1] + 0.3], fov: 34 };
+      TC.path([{ t: 0, ...a }, { t: 0.42, ...a }, { t: 0.8, ...b }, { t: 1.4, ...b }, { t: 2.6, ...c }, { t: 6, ...c }]);
       boxer.playFrames(1, 0);
       await TC.warm(150);
-      boxer.playFrames(21, 1 / 60);`,
+      boxer.playFrames(18, 1 / 60);`,
     segments: [slow(0.54, 4), real(3.6)],
   },
   // The ending's duel on the open field (seed 5, either side of a tilt): a lance glances off plate (a quarter speed), one knight unhorsed,
