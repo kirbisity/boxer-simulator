@@ -29,6 +29,7 @@ import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
 import { cameraRoom, createFollowCam } from './followcam.js';
 import { createCameraRig } from './camerarig.js';
+import { BONE } from './rig.js';
 import { adaptiveSize, createAdaptiveResolution } from './adaptres.js';
 import { sceneryLodOn, sceneryLodStats, setSceneryLod } from './scenerylod.js';
 import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, pickMan, stepFree, stepReframe, zoomBy, zoomLimits } from './watchcam.js';
@@ -822,6 +823,7 @@ function frame(now) {
     // (A hit-stop of the player's blow is the frame's pace too, hitfeel.js: the physics step is never changed, and the
     // test hooks, boxer.advance and boxer.playFrames, never have one.)
     if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * fightPace());
+    settleStoryFallen();
     draw(dt);
     // A fighter drawn in the plain loft while his V7 skin is built: a few ms of it a frame (render.js pumpSkinBuilds).
     pumpSkinBuilds(scene);
@@ -2994,13 +2996,20 @@ const STORY_FALLEN = {
   fell: ['knockout', 'floored', 'fell', 'died', 'bled', 'stopped', 'drowned'],
   // What the battle left on the ground and is carried into the walk (physics.js world.debris): dropped weapons, shields, the pieces of broken ones.
   debris: ['weapon', 'shield', 'splinter'],
-  // Snow on the fallen where it is falling (a place whose weather lays snow, through env/air.js envDress): only what has
-  // fallen since each went down. Snow showers lay about 1.5 cm an hour while they fall (approximate: light to moderate
-  // snow, 1 to 2.5 cm an hour) and fall a little under half the time (env/config.js ENV_WEATHER flurries: `under`
-  // [0.04, 0.16], 0.45 here); about 1 cm of new snow whitens what faces up (approximate, by eye: a dusting under a
-  // centimetre leaves dark cloth showing through). Minutes after a battle that is a few hundredths: barely a dusting.
-  // `step`: shares are rounded to this, so bodies alike draw together.
-  snow: { cmPerHour: 1.5, falling: 0.45, coverCm: 1, step: 0.02 },
+  // Snow on the fallen and on what they dropped, where snow is falling (through env/air.js envDress, which lays it
+  // by depth on what faces up: ENV_SETTLED): the depth of new snow that has come down since each went down or was
+  // dropped, the battle's time and then the walk's, and it goes on settling through the walk. Snowfall rates are
+  // conventionally light under about 1 cm an hour of new snow, moderate 1 to 2.5, heavy 2.5 to 5 and more (the
+  // US National Weather Service's intensity classes, by rate; approximate in cm). `cmPerHour` is the rate of a full
+  // fall of the open air's weather (its 'snow', visibility 700 m: moderate by the same service's visibility classes,
+  // 400 m to 1 km), scaled by how much of that fall is coming down now (the showers' share, env/index.js `falling`)
+  // and by the weather's own snow (its `snow`, 0.85 for a whitening fall). Snow showers between their thick parts
+  // (flurries' `least` 0.12) lay about a quarter of a centimetre an hour: light snow. `step`: cm the depths at the
+  // walk's start are rounded to, so bodies alike draw together and settle together. `bare`: the bones whose skin takes
+  // none: a dead man's face and neck are bare and stay above freezing for hours (a body cools about 1 degree C an hour
+  // at first: Henssge's cooling nomogram, approximate for a clothed body in the cold), so the first snow on them
+  // melts, where his clothes, his armour and his helmet are cold at once and hold it.
+  snow: { cmPerHour: 2.5, step: 0.02, bare: ['head', 'neck'] },
 };
 let storyFallenViews = [];
 let storyFallenStill = null;
@@ -3011,11 +3020,56 @@ function disposeStoryFallen() {
   storyFallenStill = null;
 }
 
-/** The share of snow (0..1, STORY_FALLEN.snow) on a man who fell `seconds` ago. */
-function storyFallenSnow(seconds) {
-  const { cmPerHour, falling, coverCm, step } = STORY_FALLEN.snow;
-  const share = Math.min(1, (falling * cmPerHour * Math.max(0, seconds) / 3600) / coverCm);
-  return Math.round(share / step) * step;
+/** New snow coming down where the open air is now, cm a second (STORY_FALLEN.snow); 0 where none falls. */
+function storySnowRate() {
+  const weather = scene.env?.on ? scene.env.weather : null;
+  if (weather?.fall?.kind !== 'snow') return 0;
+  return (STORY_FALLEN.snow.cmPerHour * (scene.env.falling ?? 0) * (weather.snow ?? 0)) / 3600;
+}
+
+// The depth of new snow come down (cm) since a world began, by its clock: [[time, cm], ...], so that a man who
+// fell at any time in a battle has had what came down after.
+const storySnowLog = { world: null, marks: [] };
+function storySnowSince(time) {
+  const marks = storySnowLog.marks;
+  if (!marks.length) return 0;
+  const last = marks[marks.length - 1][1];
+  let at = marks[0][1];
+  for (let i = 1; i < marks.length; i += 1) {
+    const [t0, d0] = marks[i - 1];
+    const [t1, d1] = marks[i];
+    if (time <= t0) break;
+    at = time >= t1 ? d1 : d0 + ((d1 - d0) * (time - t0)) / Math.max(1e-6, t1 - t0);
+  }
+  return Math.max(0, last - at);
+}
+
+/** Each frame: the log of new snow on the world now, and the snow on the fallen of the walk goes on settling. */
+function settleStoryFallen() {
+  const world = state.world;
+  if (!world) return;
+  if (storySnowLog.world !== world) Object.assign(storySnowLog, { world, marks: [[world.time, 0]] });
+  const marks = storySnowLog.marks;
+  const [lastTime, lastDepth] = marks[marks.length - 1];
+  const passed = world.time - lastTime;
+  if (passed <= 0) return;
+  const added = storySnowRate() * passed;
+  if (passed >= 1 || marks.length < 2) marks.push([world.time, lastDepth + added]);
+  else marks[marks.length - 1] = [world.time, lastDepth + added];
+  for (const depth of storyFallenStill?.laid ?? []) depth.value += added;
+}
+
+/** The new snow (cm, rounded to STORY_FALLEN.snow.step) on what went down at `time` on the battle's clock. */
+const storyFallenSnow = (time) => Math.round(storySnowSince(time) / STORY_FALLEN.snow.step) * STORY_FALLEN.snow.step;
+
+/** When what each of `debris` was dropped (s, the battle's clock): its owner's first loss of a weapon or shield, else his fall, else the start. */
+function storyDroppedAt(world, debris) {
+  const owners = new Set(debris.map((each) => each.owner));
+  const at = new Map();
+  for (const event of world.events ?? []) {
+    if (owners.has(event.fighter) && !at.has(event.fighter) && (event.kind === 'disarmed' || STORY_FALLEN.fell.includes(event.kind))) at.set(event.fighter, event.time);
+  }
+  return at;
 }
 
 /** When each of `fighters` went down in `world` (s, the battle's clock): his first falling event, else the start. */
@@ -3054,6 +3108,7 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   const fallenAt = state.world?.time ?? 0;
   const fellAt = after ? storyFellAt(state.world, fallen) : new Map();
   const carried = after ? storyDebrisOf(state.world) : [];
+  const droppedAt = after ? storyDroppedAt(state.world, carried) : new Map();
   if (state.game !== 'story') setGame('story');
   leaveStage();
   state.scenario = null;
@@ -3090,18 +3145,36 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
     updateFighterView(view, 0, fallenAt);
     return view;
   });
-  // What they dropped, drawn once each (weaponview.js updateDebris, into a scene of its own, none of it batched) and merged with them.
-  const dropped = { scene: new THREE.Scene(), steelEnv: scene.steelEnv };
-  updateDebris(dropped, { debris: carried.map((debris) => ({ ...debris, resting: false })) });
+  // What they dropped, drawn once each (weaponview.js updateDebris, into a scene of its own, none of it batched) and merged
+  // with them; where snow lies, a scene for each share of it already settled, so that each settles on its own.
   const snowing = (tkWeatherNow().snow ?? 0) > 0;
-  const bodies = posed.map((view) => ({ view, share: snowing ? storyFallenSnow(fallenAt - (fellAt.get(view.fighter.id) ?? 0)) : null }));
-  if (carried.length) bodies.push({ view: { group: dropped.scene }, share: null });
+  const droppedShare = (debris) => (snowing ? storyFallenSnow(droppedAt.get(debris.owner) ?? 0) : null);
+  const droppedScenes = new Map();
+  for (const debris of carried) {
+    const share = droppedShare(debris);
+    if (!droppedScenes.has(share)) droppedScenes.set(share, []);
+    droppedScenes.get(share).push({ ...debris, resting: false });
+  }
+  const dropped = [...droppedScenes].map(([share, debris]) => {
+    const each = { scene: new THREE.Scene(), steelEnv: scene.steelEnv };
+    updateDebris(each, { debris });
+    return { view: { group: each.scene }, share };
+  });
+  // (His head's skin is bare and still warm: STORY_FALLEN.snow `bare`.)
+  const bareOf = (view) => ({ skins: [view.skinMesh, view.near?.mesh, view.far?.mesh].filter(Boolean), bones: STORY_FALLEN.snow.bare.map((name) => BONE[name]) });
+  const bodies = posed.map((view) => ({ view, share: snowing ? storyFallenSnow(fellAt.get(view.fighter.id) ?? 0) : null, bare: bareOf(view) }));
+  bodies.push(...dropped);
+  // (Each depth a live one, { value } cm, that the walk's clock adds to: settleStoryFallen. Bodies alike share one.)
+  const laid = new Map();
   storyFallenStill = bodies.length ? mergeFallen(scene.scene, bodies, {
-    dress: snowing ? (material, snow) => (snow > 0 ? envDress(material, { snow }) : material) : null,
+    dress: snowing ? (material, snow) => {
+      if (!laid.has(snow)) laid.set(snow, { value: snow });
+      return envDress(material, { snow: laid.get(snow) });
+    } : null,
   }) : null;
-  if (storyFallenStill) Object.assign(storyFallenStill, { bodies: posed.length, debris: carried.length });
+  if (storyFallenStill) Object.assign(storyFallenStill, { bodies: posed.length, debris: carried.length, laid: [...laid.values()], time: state.world.time });
   for (const view of posed) disposeFighterView(scene, view);
-  disposeObject(dropped.scene);
+  for (const { view } of dropped) disposeObject(view.group);
   state.eventCursor = 0;
   state.finishedAt = null;
   resetDrama(state.drama);
@@ -4279,7 +4352,7 @@ const boxer = window.boxer = {
   // The fallen kept in the walk after a battle (enterStoryRoam): how many; `show` false hides them (to measure what they cost).
   storyFallen: (show) => {
     if (show !== undefined && storyFallenStill) storyFallenStill.group.visible = Boolean(show);
-    return { bodies: storyFallenStill?.bodies ?? 0, draws: storyFallenStill?.draws ?? 0, triangles: storyFallenStill?.triangles ?? 0, debris: storyFallenStill?.debris ?? 0 };
+    return { bodies: storyFallenStill?.bodies ?? 0, draws: storyFallenStill?.draws ?? 0, triangles: storyFallenStill?.triangles ?? 0, debris: storyFallenStill?.debris ?? 0, snow: storyFallenStill?.laid?.map((share) => +share.value.toFixed(3)) ?? [] };
   },
   advance: (seconds) => {
     tick(seconds, { budget: Infinity });

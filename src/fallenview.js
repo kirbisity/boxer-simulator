@@ -52,8 +52,12 @@ function skinnedCorners(mesh) {
   return out;
 }
 
-/** A mesh as drawn now, in world space: its used corners only, with the attributes kept (KEPT) and its own index. */
-function bakedPiece(mesh, skinnedOf) {
+/**
+ * A mesh as drawn now, in world space: its used corners only, with the attributes kept (KEPT) and its own index, and
+ * `envBare` for each corner: the share of it carried by the `bare` bones where `mesh` is one of the body's `skins` (its bare
+ * skin there), else 0.
+ */
+function bakedPiece(mesh, skinnedOf, bare = null) {
   const geometry = mesh.geometry;
   const material = mesh.material;
   const source = geometry.index ? geometry.index.array : Array.from({ length: geometry.attributes.position.count }, (_, i) => i);
@@ -102,6 +106,15 @@ function bakedPiece(mesh, skinnedOf) {
     });
     attributes[name] = { array, size };
   }
+  const bareShare = new Float32Array(used.length);
+  if (bare?.skins.includes(mesh) && mesh.isSkinnedMesh) {
+    const bones = new Set(bare.bones);
+    const { skinIndex, skinWeight } = geometry.attributes;
+    used.forEach((corner, i) => {
+      for (let k = 0; k < 4; k += 1) if (bones.has(component(skinIndex, corner, k))) bareShare[i] += component(skinWeight, corner, k);
+    });
+  }
+  attributes.envBare = { array: bareShare, size: 1 };
   return { attributes, index, count: used.length };
 }
 
@@ -131,13 +144,13 @@ function stillMaterial(mesh) {
 
 /**
  * Merge `bodies` ([{ view: a fighter view posed where he lies, share: anything that must keep his materials apart, as the
- * `dress` options for them }]) into one group of still meshes added to `scene`. `dress(material, share)` may change a merged
+ * `dress` options for them, bare: { skins: his skin meshes, bones: bone indices } where his skin is bare (envBare) }]) into one group of still meshes added to `scene`. `dress(material, share)` may change a merged
  * material (the open air's envDress). The fighter views are left as they are (the caller disposes them).
  * Returns { group, draws, triangles, dispose }.
  */
 export function mergeFallen(scene, bodies, { dress = null } = {}) {
   const groups = new Map();
-  for (const { view, share = null } of bodies) {
+  for (const { view, share = null, bare = null } of bodies) {
     view.group.updateMatrixWorld(true);
     const skinnedMemo = new Map();
     const skinnedOf = (mesh) => {
@@ -149,13 +162,13 @@ export function mergeFallen(scene, bodies, { dress = null } = {}) {
       if (!mesh.isMesh || mesh.isInstancedMesh || Array.isArray(mesh.material) || mesh.material.visible === false) return;
       const key = signature(mesh, share === null ? '' : JSON.stringify(share));
       if (!groups.has(key)) groups.set(key, { mesh, share, pieces: [] });
-      groups.get(key).pieces.push(bakedPiece(mesh, skinnedOf));
+      groups.get(key).pieces.push(bakedPiece(mesh, skinnedOf, bare));
     });
   }
   const group = new THREE.Group();
   let triangles = 0;
   for (const { mesh, share, pieces } of groups.values()) {
-    const names = KEPT.filter((name) => pieces.every((piece) => piece.attributes[name]));
+    const names = [...KEPT, 'envBare'].filter((name) => pieces.every((piece) => piece.attributes[name]));
     const corners = pieces.reduce((sum, piece) => sum + piece.count, 0);
     const indices = pieces.reduce((sum, piece) => sum + piece.index.length, 0);
     const geometry = new THREE.BufferGeometry();
