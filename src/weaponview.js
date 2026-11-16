@@ -1405,6 +1405,95 @@ function paintedFace(width, height, paint) {
   return new THREE.CanvasTexture(canvas);
 }
 
+/**
+ * The Ming rattan shield (藤牌, tengpai: the user's photographs of surviving ones, 2026-11-15): rattan coiled round and round
+ * from the middle and sewn, made up as a shallow cone, the coils bound across by six spokes of cane stitched over them; the
+ * face painted with a tiger's mask (the eyes, the 王 on its brow, the red nose, the bared teeth: the Jixiao xinshu's shield
+ * men painted theirs to frighten horses and men), a small iron boss at the point. Faces +z, the point out.
+ */
+const TENGPAI = { rise: 0.11, coils: 34, spokes: 6, boss: 0.045 };
+function tengpaiShield(spec, envMap) {
+  const look = TENGPAI;
+  const R = spec.radius;
+  const texture = paintedFace(512, 512, (g, w, h) => {
+    const c = w / 2;
+    // The rattan: the coils, each a band light on its crown and dark in the seam between it and the next.
+    g.fillStyle = '#7a5a36';
+    g.fillRect(0, 0, w, h);
+    for (let k = look.coils; k > 0; k -= 1) {
+      const r = (k / look.coils) * c;
+      const band = g.createRadialGradient(c, c, Math.max(0, r - c / look.coils), c, c, r);
+      band.addColorStop(0, '#9a7646');
+      band.addColorStop(0.55, '#b08a56');
+      band.addColorStop(1, '#4a3420');
+      g.fillStyle = band;
+      g.beginPath();
+      g.arc(c, c, r, 0, Math.PI * 2);
+      g.fill();
+    }
+    // The tiger's mask, in faded earth colours: the 王 on the brow, the two eyes, the red nose, a mouth of teeth.
+    g.globalAlpha = 0.78;
+    g.strokeStyle = '#2a1a12';
+    g.lineWidth = w * 0.018;
+    g.beginPath();
+    for (const y of [0.13, 0.19, 0.25]) { g.moveTo(w * 0.43, h * y); g.lineTo(w * 0.57, h * y); }
+    g.moveTo(c, h * 0.13); g.lineTo(c, h * 0.25);
+    g.stroke();
+    for (const x of [0.33, 0.67]) {
+      g.fillStyle = '#e8dcc0';
+      g.beginPath(); g.arc(w * x, h * 0.36, w * 0.075, 0, Math.PI * 2); g.fill();
+      g.lineWidth = w * 0.012; g.stroke();
+      g.fillStyle = '#1e140e';
+      g.beginPath(); g.arc(w * x, h * 0.36, w * 0.032, 0, Math.PI * 2); g.fill();
+    }
+    g.fillStyle = '#a8352a';
+    g.beginPath(); g.ellipse(c, h * 0.53, w * 0.13, h * 0.08, 0, 0, Math.PI * 2); g.fill();
+    g.beginPath(); g.ellipse(c, h * 0.69, w * 0.24, h * 0.1, 0, 0, Math.PI * 2); g.fill();
+    // Its whiskers, red, out to either side.
+    g.strokeStyle = '#a8352a';
+    g.lineWidth = w * 0.03;
+    for (const side of [-1, 1]) { g.beginPath(); g.moveTo(c + side * w * 0.2, h * 0.5); g.lineTo(c + side * w * 0.42, h * 0.44); g.stroke(); }
+    // The teeth: two rows of pale blocks round the mouth.
+    g.fillStyle = '#e8dcc0';
+    for (let k = 0; k < 7; k += 1) {
+      const x = c + (k - 3) * w * 0.062;
+      g.fillRect(x - w * 0.022, h * 0.625, w * 0.044, h * 0.045);
+      if (k > 0 && k < 6) g.fillRect(x - w * 0.022, h * 0.72, w * 0.044, h * 0.04);
+    }
+    g.globalAlpha = 1;
+    // The spokes of cane across the coils, cross-stitched.
+    g.strokeStyle = '#5a3e22';
+    g.lineWidth = w * 0.012;
+    for (let k = 0; k < look.spokes; k += 1) {
+      const a = Math.PI / 2 + (k / look.spokes) * Math.PI * 2;
+      g.beginPath(); g.moveTo(c + Math.cos(a) * w * 0.06, c + Math.sin(a) * w * 0.06); g.lineTo(c + Math.cos(a) * c * 0.98, c + Math.sin(a) * c * 0.98); g.stroke();
+      for (let r = 0.12; r < 0.98; r += 0.07) {
+        const [x, y] = [c + Math.cos(a) * c * r, c + Math.sin(a) * c * r];
+        const [ax, ay] = [-Math.sin(a) * w * 0.012, Math.cos(a) * w * 0.012];
+        g.beginPath(); g.moveTo(x - ax, y - ay); g.lineTo(x + ax, y + ay); g.stroke();
+      }
+    }
+  });
+  // The cone: a disc of rings (planar UVs, the paint laid flat over it) lifted toward the middle.
+  const geometry = new THREE.RingGeometry(0.0001, R, 48, 10);
+  const position = geometry.attributes.position;
+  for (let i = 0; i < position.count; i += 1) position.setZ(i, look.rise * (1 - Math.hypot(position.getX(i), position.getY(i)) / R));
+  geometry.computeVertexNormals();
+  const face = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ map: texture, roughness: 0.85, side: THREE.DoubleSide }));
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.014, 6, 48), surface(0x5a3e22, { roughness: 0.8 }));
+  const boss = new THREE.Mesh(new THREE.SphereGeometry(look.boss, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), steelMaterial(envMap, { vertexColors: false, color: 0x4a4c50, roughness: 0.5 }));
+  boss.rotation.x = Math.PI / 2;
+  boss.scale.y = 0.5;
+  boss.position.z = look.rise - 0.004;
+  const group = new THREE.Group();
+  group.add(face, rim, boss);
+  for (const mesh of [face, rim]) {
+    mesh.castShadow = true;
+    mesh.add(outlineFor(mesh, 0.003));
+  }
+  return group;
+}
+
 /** The late Roman oval shield: the dished board cut to its oval from the painted face, rimmed, its boss. Faces +z. */
 function ovalShield(spec, envMap, paint) {
   const look = LATE_SHIELDS.oval;
@@ -1529,6 +1618,7 @@ export function buildShieldMesh(spec, envMap, paint = null) {
 function shieldMesh(spec, envMap, paint) {
   if (spec.look === 'oval') return ovalShield(spec, envMap, paint);
   if (spec.look === 'germanic') return germanicShield(spec, envMap, paint);
+  if (spec.look === 'tengpai') return tengpaiShield(spec, envMap);
   // The arena's shaped shields and the scissor's crescent, in detail.
   if (spec.shape || spec.look === 'scissores') return buildArenaShield(spec, envMap, steelMaterial);
   const group = new THREE.Group();

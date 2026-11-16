@@ -70,6 +70,8 @@ export const PYONGYANG_1593 = {
   // retainers too, and its second rank (the spears) wears the brigandine under the bell helmet (OUTFITS mingBrigandine 0, the yong bell; 2,
   // the cloud bell). Their builds and weapons are their own; only the kit changes.
   kits: { retainer: ['dao'], brigandine: { rank: 1, designs: [0, 2] } },
+  // The samurai's unmasked designs and the masked one each is worn as (OUTFITS samurai).
+  masked: { 0: 3, 2: 4 },
   // The guns (physics/artillery.js). Li Rusong brought 200+ guns (Hawley, The Imjin War, 2005, p. 54); on the 8th they
   // pounded the gates (a gate broken by them, Turnbull 2008 p. 60) and drove back Konishi's sortie (p. 61). His southern
   // troops were Qi Jiguang's, whose cart camps carried the folangji and the great general (练兵实纪 杂集). At the army's
@@ -156,6 +158,9 @@ export const pyongyangBattle = {
       blue.men.push(sengokuWarrior(random, spec.japanese, style, 'samurai'));
       blue.places.push([walk[0] + spec.defenders.backAt, z]);
     }
+    // The samurai on the wall in the masked kabuto (the user's call, 2026-11-15: some units masked): the crescent and the sun disc
+    // given the masked designs of the same harness (OUTFITS samurai: 0 to 3, 2 to 4; the tōsei are all masked already).
+    for (const man of blue.men) if (man.outfit?.kind === 'samurai' && spec.masked[man.outfit.design] != null) man.outfit = { ...man.outfit, design: spec.masked[man.outfit.design] };
     // The retainers, from a stream of their own (the rest of the cast is as it was at every seed).
     const household = seededRandom(seed + 7919);
     for (const z of spec.wall.ladders) {
