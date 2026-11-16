@@ -8,7 +8,7 @@
     "test": "node --test test/*.test.js",
     "bout": "node tools/bout.js",
     "bundle": "node tools/bundle.js",
-    "bundle:custom": "node tools/bundle.js --custom",
+    "bundle:custom": "node tools/bundle.js --custom && node tools/bundle.js --custom=places",
     "bundle:music": "node tools/musicboard.js",
     "serve": "python3 tools/serve.py 8934"
   },
