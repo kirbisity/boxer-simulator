@@ -23,7 +23,7 @@ import { armourDecorMaterial, armourDetailMaterial, clothAtlasTexture, clothDeta
 import { lookSkinHex } from './skintones.js';
 import { buildSkeleton } from './bones.js';
 import { Dangle } from './dangle.js';
-import { FACTIONS, factionOf, glovedFists, headgearOptions, outfitOf } from './outfits.js';
+import { FACTIONS, HEADGEAR, factionOf, glovedFists, headgearOptions, outfitOf } from './outfits.js';
 import { WEAPONS } from './weapons.js';
 import { applyScenery } from './scenery.js';
 import { orbitAboveGround } from './watchcam.js';
@@ -2197,7 +2197,9 @@ function detailedView(view, fighter, simple) {
     const worn = make();
     if (!worn) return null;
     headView.group.add(worn);
-    return { kind, worn, loose: make() };
+    // (A prop that encloses the hair, HEADGEAR `hidesHair`, hides it as a helmet does, till it comes off: updateProps.)
+    const hid = HEADGEAR[kind]?.hidesHair && !headgear?.hidesHair && !simple ? headView.hideHair({ beard: true }) : null;
+    return { kind, worn, loose: make(), hid };
   }).filter(Boolean);
   const collar = new THREE.Group();
   collar.matrixAutoUpdate = false;
@@ -3514,6 +3516,10 @@ export function updateProps(view, fighterViews, world) {
     if (!worn) continue;
     worn.worn.visible = prop.attached && owner.layers.skin.visible && !owner.headDetached;
     if (prop.attached) continue;
+    if (worn.hid) {
+      owner.head.showHair?.();
+      worn.hid = null;
+    }
     if (!worn.loose.parent) {
       worn.loose.scale.setScalar(HEAD_SCALE);
       view.scene.add(worn.loose);
