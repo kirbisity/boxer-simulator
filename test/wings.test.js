@@ -184,3 +184,29 @@ test('every map still builds and steps on its own floor, with its horse, headles
     }
   }
 });
+
+test('riders drawn up by any formation stand a horse\'s room apart and none is unhorsed in the first second', () => {
+  const tight = { halfX: 22, halfZ: 12 };
+  const seki = battleOf('sekigahara');
+  // Sekigahara's own cast in a narrow floor with three of the West's samurai on horses (one flank, no room for three abreast).
+  const cramped = () => {
+    const cast = seki.cast(seededRandom(1));
+    let horse = 0;
+    const blue = cast.blue.map((inputs) => (/samurai/.test(inputs.outfit.kind) && !inputs.mounted && horse++ < 3 ? { ...inputs, mounted: true } : inputs));
+    return createWorld([...cast.red.map((inputs) => ({ inputs, corner: 'red' })), ...blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 2, arena: tight, rules: seki.rules, formation: seki.formation, place: 'sengoku' });
+  };
+  const worlds = [...Object.keys(SCENARIOS).filter((key) => SCENARIOS[key].cast).map((key) => [key, () => scenarioWorld(key, 1)]), ['sekigahara, narrow', cramped]];
+  for (const [key, make] of worlds) {
+    const world = make();
+    const mounted = world.fighters.filter((fighter) => fighter.mount);
+    for (let i = 0; i < mounted.length; i += 1) {
+      for (let j = i + 1; j < mounted.length; j += 1) {
+        const [a, b] = [mounted[i].mount.at, mounted[j].mount.at];
+        assert.ok(Math.hypot(a[0] - b[0], a[1] - b[1]) >= 1.8, `${key}: riders ${mounted[i].id} and ${mounted[j].id} stand ${Math.hypot(a[0] - b[0], a[1] - b[1]).toFixed(2)} m apart`);
+      }
+    }
+    for (let t = 0; t < 1; t += 0.1) advance(world, 0.1, (current, dt) => thinkAll(current, dt));
+    const fell = world.events.filter((event) => event.kind === 'unhorsed');
+    assert.deepEqual(fell.map((event) => `${event.fighter}: ${event.effects[0]}`), [], `${key}: unhorsed in the first second`);
+  }
+});
