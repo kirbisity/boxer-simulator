@@ -96,7 +96,7 @@ export function sculptTraits(body) {
   const fatOf = (key) => Math.max(0, seg[key].skinRadius - seg[key].muscleRadius);
   const bonyOf = (fat) => sculptClamp((SCULPT.boneFatBelow - fat) / SCULPT.boneFatSpan);
   const leanOf = (fat) => sculptClamp(1 - (fat - SCULPT.leanFatFrom) / SCULPT.leanFatSpan);
-  const smi = body.muscleKg / body.heightM ** 2;
+  const smi = body.muscleKg / body.statureM ** 2;
   const developed = sculptClamp(SCULPT.bulkFromMuscle * ((smi - SCULPT.smiThin) / SCULPT.smiHuge) + SCULPT.bulkFromTraining * body.inputs.exercise, 0, 1.1) * (female ? SCULPT.womanBulk : 1);
   const trunkFat = fatOf('trunk');
   const armFat = (fatOf('lUpperArm') + fatOf('rUpperArm')) / 2;

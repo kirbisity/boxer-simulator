@@ -143,7 +143,7 @@ test('the family of builds: a body is a mix of them summing to one, the emaciate
     // (The ends of the game's range: under the emaciated build's own BMI a body wastes on past it, with none of the muscular
     // build's gain taken off; the fattest body is the fattest build, and a body between F3 and it a share of both.)
     const builds = BASE_BODY.family.builds;
-    const at = (bmi) => baseFamilyWeights(buildBody({ ...average.inputs, calories: caloriesForWeight(average.inputs, bmi * average.heightM ** 2) }), height);
+    const at = (bmi) => baseFamilyWeights(buildBody({ ...average.inputs, calories: caloriesForWeight(average.inputs, bmi * average.statureM ** 2) }), height);
     const [wasted, fat, fattest] = [10, 60, 100].map(at);
     assert.ok(wasted[builds.indexOf('E')] > 1.15 && Math.abs(wasted[builds.indexOf('M')]) < 1e-9, `${sex}: a BMI of 10 past the emaciated build (${wasted.map((weight) => weight.toFixed(2))})`);
     assert.ok(fat[builds.indexOf('F4')] > 0.2 && fat[builds.indexOf('F4')] < 0.8 && fat[builds.indexOf('F3')] > 0.2, `${sex}: a BMI of 60 between the fat builds (${fat.map((weight) => weight.toFixed(2))})`);
@@ -154,7 +154,7 @@ test('the family of builds: a body is a mix of them summing to one, the emaciate
     // (A starved body of the cast, a BMI of 14, is drawn 5% narrower than the skeleton the relief's build was sculpted on,
     // LOFT.frame: a millimetre and a half more over its ribs. Under a BMI of 13 the relief is whole.)
     assert.ok(shows[0] > 0.7 && shows[1] > 0.1 && shows[1] < 0.5 && shows[2] < 0.1 && shows[3] < 0.01, `${sex}: bones through a starved body's skin, faintly a thin one's, not an average one's (${shows.map((show) => show.toFixed(2))})`);
-    const wasting = buildBody({ ...average.inputs, calories: caloriesForWeight(average.inputs, 12.5 * average.heightM ** 2) });
+    const wasting = buildBody({ ...average.inputs, calories: caloriesForWeight(average.inputs, 12.5 * average.statureM ** 2) });
     assert.ok(baseBoneRelief(wasting, height) > 0.95, `${sex}: all of it through a body of BMI 12.5`);
     const detail = baseStarvedDetail(starved, shows[0]);
     assert.equal(detail.heights.length, detail.width * detail.height, `${sex}: a height a texel of the relief's tile`);

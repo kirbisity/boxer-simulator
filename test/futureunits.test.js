@@ -30,7 +30,9 @@ test('the mini humanoid is the G1: 1.32 m and 35 kg, rigid, quicker per kilogram
 test('the exoskeleton is a soldier in the armoured frame: his own body, the frame\'s mass and motors on top', () => {
   const man = buildBody({ ...PRESETS.exoArmoured, outfit: { kind: 'casual', design: 1 } });
   const exo = buildBody(PRESETS.exoArmoured);
-  assert.equal(exo.heightM, 1.8);
+  // (Given 1.8 m; his rig 1% under it, body.js RIG_STATURE: the frame round him, not a build, so his own stature.)
+  assert.equal(exo.statureM, 1.8);
+  assert.ok(Math.abs(exo.heightM - 1.8 * 0.99) < 1e-9);
   assert.ok(Math.abs(exo.bodyMassKg - man.bodyMassKg) < 1e-9, 'the man inside is unchanged');
   assert.ok(Math.abs(exo.bodyMassKg - 83) < 2, `operator ${exo.bodyMassKg.toFixed(1)} kg`);
   assert.ok(Math.abs(exo.gearKg - (100 + 35 * 0.55) * exo.bodyMassKg / 83) < 1e-6, `frame ${exo.gearKg.toFixed(1)} kg`);

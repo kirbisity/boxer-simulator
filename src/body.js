@@ -48,6 +48,15 @@ const LENGTH = {
 // (10 mm on a man of 1.75 m): a longer neck. A build with a neck of its own (the apes) keeps it. The head's segment is as
 // heavy as it was and as thick as on the table's length (its radii: the neck's capsule).
 const NECK_RISE = 0.0057;
+// The rig's stature over the stature given, for the men and women drawn on the base body (no fixed `build`). The remodel stood
+// the drawn crown about 18 mm (1%) higher than before on a man of 1.82 m: the drawn head's lift over its seat (basebody.js
+// BASE_BODY.head.lift, 8 mm) and the head joint's rise (NECK_RISE, 10 mm), so a man stood taller than the height he is given.
+// The whole rig is his own figure 1% smaller, so his crown stands where it stood before the remodel. His mass, bone and
+// composition are still those of his given height (the height is his, the overshoot was the drawing's), and so is his shape:
+// what goes by mass over his size (the segments' sections, a limb's muscle a metre, the drawing's BMI, fat and lean indices:
+// loftbody.js baseFamilyWeights, facemorph.js, sculpt.js) is read at `statureM` and scaled down with the rig, so he is drawn
+// and moves as he was, 1% smaller. A fixed build (a robot, an animal) is drawn on its own model and keeps its stature.
+const RIG_STATURE = 0.99;
 // The arms and shoulders, fractions of standing height, one table per sex.
 // - `upperArm`, the shoulder joint to the elbow: the man's is the base model's own (src/basebody-data.js joints, 0.1775).
 //   ANSUR II (US Army, 2012; public tables, Penn State OpenLab) measures the arm between surface marks, acromion to radiale:
@@ -974,15 +983,19 @@ export function normaliseInputs(rawInputs) {
 /** Build the full body model from a character's inputs. */
 export function buildBody(rawInputs) {
   const inputs = normaliseInputs(rawInputs);
-  const heightM = inputs.heightCm / 100;
   const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
   const yearsAging = Math.max(0, inputs.age - BODY.agingFrom);
 
   // A fixed build (`inputs.build`: a robot, an animal) is what it is: its
   // mass and fat given, no diet or bone density settling into them.
   const build = inputs.build ?? null;
+  // `statureM`: the height he is given, which his mass, bone and shape are of; `heightM`: the rig's, every length's measure
+  // (RIG_STATURE).
+  const statureM = inputs.heightCm / 100;
+  const rigScale = build ? 1 : RIG_STATURE;
+  const heightM = statureM * rigScale;
   // What eating and exercise settle into: lean and fat are outcomes.
-  const composition = build ? fixedComposition(build, heightM) : settleComposition(inputs, frame.lean);
+  const composition = build ? fixedComposition(build, statureM) : settleComposition(inputs, frame.lean);
   const leanKg = composition.lean;
   const fatKg = composition.fat;
   const massKg = leanKg + fatKg;
@@ -995,10 +1008,10 @@ export function buildBody(rawInputs) {
   // A T-score is in standard deviations of mineral density, about 10% each;
   // mineral is half the skeleton's mass, so its weight moves half as much.
   const boneDensity = Math.max(0.35, 1 + 0.1 * tScore) * frame.bone;
-  const boneKg = BODY.referenceBoneKg[inputs.sex] * (heightM / BODY.referenceHeightM) ** 3 * Math.max(0.6, 1 + 0.05 * tScore) * frame.bone;
+  const boneKg = BODY.referenceBoneKg[inputs.sex] * (statureM / BODY.referenceHeightM) ** 3 * Math.max(0.6, 1 + 0.05 * tScore) * frame.bone;
   const otherKg = BODY.organShareOfLean * leanKg + BODY.organPerFatKg * fatKg;
   const muscleKg = Math.max(0.05 * leanKg, leanKg - boneKg - otherKg);
-  const ffmi = leanKg / (heightM * heightM);
+  const ffmi = leanKg / (statureM * statureM);
   // What the years (and the feeding) have left (aging.js): strength falls
   // faster than muscle, so each kilo left is weaker too.
   const starving = build ? 0 : starvation(inputs, composition.bodyFat);
@@ -1038,7 +1051,8 @@ export function buildBody(rawInputs) {
     };
     const length = kind === 'head' ? lengths.neckToHead : kind === 'trunk' ? lengths.trunk : lengths[kind === 'forearm' ? 'forearmToFist' : kind];
     const volume = (tissueKey) => tissue[tissueKey] / DENSITY[tissueKey];
-    const radiusFor = (litres) => Math.sqrt(litres / (Math.PI * (kind === 'head' ? length - neckRise : length)));
+    // (His own segment's section, at his given stature, drawn RIG_STATURE smaller with the rest of the rig: `rigScale`.)
+    const radiusFor = (litres) => rigScale * Math.sqrt(litres / (Math.PI * (kind === 'head' ? length - neckRise : length) / rigScale));
     segments[key] = {
       kind, length, tissue,
       mass: tissue.muscle + tissue.bone + tissue.fat + tissue.other,
@@ -1089,9 +1103,10 @@ export function buildBody(rawInputs) {
     strikeForce[P[`${side}Foot`]] = kickForce;
     strikeForce[P[`${side}Knee`]] = kickForce * 0.9;
     const armLength = lengths.upperArm + lengths.forearmToFist;
-    // A build's `bulk`: how much more muscle a metre of its limb carries before its fibres steepen.
-    const armBulk = arm(side) / armLength / (BODY.referenceBulk.arm * (build?.bulk ?? 1));
-    const legBulk = leg(side) / legLength / (BODY.referenceBulk.leg * (build?.bulk ?? 1));
+    // A build's `bulk`: how much more muscle a metre of its limb carries before its fibres steepen. (A metre of his own limb,
+    // at his given stature: the rig's is `rigScale` shorter, his muscle no bulkier for it.)
+    const armBulk = arm(side) / (armLength / rigScale) / (BODY.referenceBulk.arm * (build?.bulk ?? 1));
+    const legBulk = leg(side) / (legLength / rigScale) / (BODY.referenceBulk.leg * (build?.bulk ?? 1));
     const pennation = (bulk) => 1 / (1 + BODY.pennationCost * Math.max(0, bulk - 1) ** 2);
     topSpeed[P[`${side}Hand`]] = BODY.topSpeedPerMetre.arm * armLength * fastFibres * pennation(armBulk);
     topSpeed[P[`${side}Elbow`]] = topSpeed[P[`${side}Hand`]] * 0.85;
@@ -1134,7 +1149,7 @@ export function buildBody(rawInputs) {
   const aerobic = (build?.aerobic ?? inputs.aerobic ?? clamp((0.45 + 0.6 * inputs.training - 1.2 * Math.max(0, inputs.bodyFat - 0.15)) * aged.aerobic, 0.1, 1.1)) * packed;
 
   return {
-    inputs, heightM, massKg: massKg + gearKg, bodyMassKg: massKg, gearKg, gear, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
+    inputs, heightM, statureM, massKg: massKg + gearKg, bodyMassKg: massKg, gearKg, gear, leanKg, muscleKg, boneKg, fatKg, ffmi, boneDensity, muscleQuality, neckIndex, composition, tScore,
     // The years: shares of a young body's (aging.js); joints 1 young; stoop, the back's forward lean (rad).
     aged, joints: aged.joints, stoop: aged.stoop,
     lengths, segments, masses, motorForce, muscleForce, strikeForce, topSpeed, aerobic,

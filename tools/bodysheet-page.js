@@ -528,7 +528,7 @@ async function main() {
   subjects.forEach((subject, index) => {
     const { column, body } = subject;
     const x = index * width + width / 2;
-    const bmi = body.bodyMassKg / body.heightM ** 2;
+    const bmi = body.bodyMassKg / body.statureM ** 2;
     text(column.label, x, (SHEET.header + 16) * SCALE, 17, '#ffffff');
     text(`BMI ${bmi.toFixed(1)} · fat ${(body.inputs.bodyFat * 100).toFixed(0)}% · muscle ${body.muscleKg.toFixed(1)} kg`, x, (SHEET.header + 38) * SCALE, 13, '#cfcfcf');
     text(`${body.bodyMassKg.toFixed(0)} kg · ex ${body.inputs.exercise} · ${body.inputs.frame} · ${subject.triangles.toLocaleString()} tris · ${subject.ms.toFixed(0)}${subject.texMs ? `+${subject.texMs.toFixed(0)}` : ''} ms`, x, (SHEET.header + 56) * SCALE, 11, '#9a9a9a');

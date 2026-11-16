@@ -42,10 +42,10 @@ const fHump = (x, centre, width) => Math.exp(-(((x - centre) / width) ** 2));
 export function faceMorphWeights(body) {
   const female = body.inputs.sex === 'female';
   const fat = body.inputs.bodyFat;
-  const bmi = body.bodyMassKg / body.heightM ** 2;
+  const bmi = body.bodyMassKg / body.statureM ** 2;
   const exercise = body.inputs.exercise ?? 0;
   const frame = { small: -1, medium: 0, large: 1 }[body.inputs.frame] ?? 0;
-  const smi = body.muscleKg / body.heightM ** 2;
+  const smi = body.muscleKg / body.statureM ** 2;
   const offset = female ? 0.08 : 0;
   const gaunt = fSmooth(18.5, 14, bmi) * fSmooth(0.16 + offset, 0.06 + offset, fat);
   const full = fSmooth(0.2 + offset, 0.44 + offset, fat) * fSmooth(24, 34, bmi);
