@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, orbitAboveGround, pickMan, stepFree, stepReframe, WATCH_CAM, zoomBy, zoomLimits } from '../src/watchcam.js';
+import { createTapper, createWatchCam, focusOn, frameAll, frameDistance, orbitAboveGround, pickMan, stepAuto, stepFree, WATCH_CAM, zoomBy, zoomLimits } from '../src/watchcam.js';
 
 const orbit = (extra = {}) => ({ yaw: 0, pitch: 0.2, distance: 5.2, target: { x: 0, y: 1.1, z: 0 }, ...extra });
 const man = (id, x, z, extra = {}) => ({ id, x, y: 1.5, z, up: true, gone: false, ...extra });
@@ -107,7 +107,8 @@ test('Frame all gives the auto framing back and draws a pair\'s zoomed-in distan
   frameAll(cam);
   assert.equal(cam.mode, 'auto');
   assert.equal(cam.focus, null);
-  for (let frame = 0; frame < 600; frame += 1) stepReframe(cam, view, 1, 1 / 60);
+  const pair = [man(0, -1, 0, { in: true }), man(1, 1, 0, { in: true })];
+  for (let frame = 0; frame < 600; frame += 1) stepAuto(cam, view, pair, 1 / 60, { pair: true });
   assert.ok(Math.abs(view.distance - frameDistance(1)) < frameDistance(1) * 0.03, `${view.distance}`);
   assert.equal(cam.reframing, false);
 });

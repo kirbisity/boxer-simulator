@@ -201,6 +201,10 @@ export function voxelsOfPlace(place, spec = OCCLUDERS) {
     for (let above = mesh.parent; above && above !== place; above = above.parent) if (above.visible === false || above.userData.seeThrough === false) return;
     if ([].concat(mesh.material).some((material) => material.transparent || !material.depthWrite)) return;
     const geometry = mesh.geometry;
+    // A batch drawn from one shape by per-copy attributes in its shader (the open air's plants and stones, env/*): its geometry is the one
+    // shape at the batch's origin, where nothing stands. Taken as triangles it put a phantom block of a metre at the place's middle, where the
+    // fight is, and the arm pulled the camera in to half a metre behind it for seconds. Where its copies stand is the shader's; not taken.
+    if (geometry.isInstancedBufferGeometry) return;
     if (!geometry.boundingBox) geometry.computeBoundingBox();
     if (mesh.isInstancedMesh) {
       if (geometry.boundingBox.max.y - geometry.boundingBox.min.y >= spec.instanceHigh) queue.push(mesh);
