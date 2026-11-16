@@ -584,9 +584,10 @@ export const PRESETS = {
   },
   // Makara Naotaka of the Asakura, who at Anegawa (1570) fought with a
   // five-shaku ōdachi (the Tarōtachi, ~1.75 m) against the Tokugawa: a big
-  // man, as the sword wanted.
+  // man, as the sword wanted, but not a giant: 172 cm (was 177), still ~14 cm over a Sengoku samurai's mean (~158 cm); calories
+  // eased with it (4150, was 4375) to keep the same build (BMI) rather than a heavier short man.
   odachi: {
-    name: 'Makara Naotaka', style: 'odachi', sex: 'male', heightCm: 177, frame: 'large', age: 34, exercise: 0.68, calories: 4375,
+    name: 'Makara Naotaka', style: 'odachi', sex: 'male', heightCm: 172, frame: 'large', age: 34, exercise: 0.68, calories: 4150,
     outfit: { kind: 'samuraiTosei', design: 1 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'topknot', hairColor: '#120d0a', facialHair: 'beard', eyeColor: 'brown' },
   },
