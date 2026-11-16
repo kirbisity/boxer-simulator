@@ -1873,7 +1873,7 @@ export const GUN = {
   // what it is proof against (the outfit's `bulletRating`, J): a SWAT vest (rated against a
   // .44 Magnum) stops a matchlock ball as well; proofed plate stops about
   // two thirds as much; the bullet-tested tōsei dō, nine tenths; anything
-  // else, only what it would of a pistol round's worth.
+  // else, only what it would of a pistol round's worth. Over the head and trunk only (bulletRatingAt): limbs were not proved.
   energy: muzzleEnergy(NINE_MM),
   // A heavy ball is seen to strike the armour (and not to enter) only where it stopped this much.
   platedHolds: 0.45,
@@ -1881,6 +1881,21 @@ export const GUN = {
   // each for a ball of GUN.energy and in proportion to its own.
   plateKnock: { stun: 2, stagger: 0.5 },
 };
+
+/**
+ * What an outfit is proof against at `region` (head, torso, limb; J; unrated, a pistol round: GUN.energy), or null where it is
+ * proof against nothing (its share, `protection.bullet`, held only as of a pistol round's worth: bulletProof). Its
+ * `bulletRating` is the proof of its breastplate and helmet, the parts that were proved: a cuirass or a kabuto shot at and
+ * kept with the dent as its mark (the tameshi-dō; Europe's "pistol proof" and "musket proof" breasts). The arms and legs
+ * were never proved and were thinner: a harness's vambraces and cuisses ~1-1.5 mm against a 2-3 mm breast, a tōsei
+ * gusoku's kote, haidate and suneate cloth over small splints and mail (Bottomley and Hopson, *Arms and Armour of the
+ * Samurai*, 1988), and mail is no proof against shot (Williams, *The Knight and the Blast Furnace*, 2003). So over a limb
+ * the kit stops only its share of a pistol round's worth, and a ball is never turned there by proof. A machine's shell
+ * (`machine`) is one build all over, its limbs as its trunk; so is a kit whose limb plates are its chest's (`limbsProved`).
+ */
+export function bulletRatingAt(spec, region) {
+  return region === 'limb' && !spec?.machine && !spec?.limbsProved ? null : spec?.bulletRating ?? GUN.energy;
+}
 
 /** The share of an outfit's bullet protection that holds against a shot of `energy` J. */
 export function bulletProof(bulletRating, energy = GUN.energy) {

@@ -10,7 +10,7 @@ import { OUTFITS, outfitOf } from '../outfits.js';
 import { aimPoint, BLOCKING, floorUnder, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
-import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRegion, GUN, pointThrough, slerpDir, SUPPLY } from '../weapons.js';
+import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRatingAt, bulletRegion, GUN, pointThrough, slerpDir, SUPPLY } from '../weapons.js';
 import { WORLD } from './config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './gaps.js';
 import { bardingAt } from '../horses.js';
@@ -1196,10 +1196,13 @@ export function bulletHit(world, shooter, hit, dir, event, shot = null, share = 
   // Armour stops its share of a pistol round; of a heavier ball, only as much
   // as it is proof against. The throat is covered only by full armour's gorget, as the body.
   const covered = hit.throat ? (gapsOf(victim.body.gear).closed?.includes('neck') ? victim.body.gear.protection.bullet?.torso ?? 0 : 0) : victim.body.gear.protection.bullet?.[region] ?? 0;
-  const armour = covered * (shot ? bulletProof(OUTFITS[kind].bulletRating, shot.energy) : 1);
-  // Plate proof against the ball (a plated kit rated at or past its energy: a short-barrelled three-eyed gun's on a harness) is not
-  // gone through: the ball dents it, staggers him, and on the helmet stuns him (GUN.plateKnock), and wounds nothing.
-  if (shot && covered > 0 && OUTFITS[kind].plated && (OUTFITS[kind].bulletRating ?? GUN.energy) >= shot.energy) {
+  // (The throat under a gorget as the trunk: proved with the breast.)
+  const rating = bulletRatingAt(OUTFITS[kind], hit.throat ? 'torso' : region);
+  const armour = covered * (shot ? bulletProof(rating, shot.energy) : 1);
+  // Plate proof against the ball (a plated kit rated at or past its energy: a short-barrelled three-eyed gun's on a harness; over
+  // the head and trunk only, the parts proved, bulletRatingAt) is not gone through: the ball dents it, staggers him, and on
+  // the helmet stuns him (GUN.plateKnock), and wounds nothing.
+  if (shot && covered > 0 && OUTFITS[kind].plated && rating !== null && rating >= shot.energy) {
     Object.assign(event, { harm: 0, armour: 1, region, plate: kind });
     event.effects.push(`${region}: the ball dents the plate`);
     shooter.stats.landed += 1;

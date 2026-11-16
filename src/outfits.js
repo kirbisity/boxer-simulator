@@ -1178,6 +1178,12 @@ export const OUTFITS = {
     skill: 0.7,
     // Rides (mounted samurai of the Sengoku).
     horse: 'japanese',
+    // Proof (`bulletRating`, its dō and kabuto: weapons.js bulletRatingAt) to 900 J: the teppō's ~13 g ball (~1 kJ at the
+    // muzzle, Krenn, Kalaus and Hall 1995) has that ~8 m out (its flight, physics/ballistics.js), so the tameshi-dō, a dō
+    // proved by a shot and sold with the dent as its mark (Bottomley and Hopson 1988), turns a ball from beyond a few
+    // paces, and one fired closer, or a heavier ball (a 6-monme gun's 23 g, near twice the energy), goes through, its
+    // share of it held as the plate's ~2 mm against the ball's energy (bulletProof). The kote, haidate and suneate
+    // (`bullet.limb` 0.15: cloth, small splints and mail) were never proved and turn no ball.
     faction: 'japanese', bulletRating: 900, plated: true,
     label: 'Samurai — tōsei gusoku', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
@@ -2895,7 +2901,8 @@ export const OUTFITS = {
     carriedShare: 100 / 83,
     // ~19 kg of composite panels (0.55 of the 35 kg they were) over his chest, belly, shoulders and limbs' fronts (rifle plates front, as a carrier's);
     // a helmet with a visor. His sides, the backs of his arms and his neck are still the man's.
-    plated: true, bulletRating: 3000, breastplate: 0.5,
+    // Its limb panels are the same composite plates as its chest (rated as one): proof over the limbs too (bulletRatingAt).
+    plated: true, bulletRating: 3000, breastplate: 0.5, limbsProved: true,
     protection: {
       blunt: 0.45, cut: 0.75, pierce: 0.55, bullet: { head: 0.6, torso: 0.85, limb: 0.4 },
       regions: { head: { blunt: 0.65, cut: 0.8, pierce: 0.65 }, limb: { blunt: 0.35, cut: 0.55, pierce: 0.35 } },
