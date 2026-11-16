@@ -1239,11 +1239,12 @@ export function buildPyongyang() {
     //   gloom        0.1: the cloud's underside nearly as light as the open air draws it (a thin cloud lit through
     //                by a low sun); at 0.45 it was mid-grey, at 0.85 near black against the blue behind the gate;
     //   sun          the sun whole between the clouds: it draws the wall and lays the long shadows;
-    //   visibility,  4 km in a 200 m layer, `fine` 0.5: the fine snow and ice a shower leaves in the air (a few km
-    //   hazeHeight,  of sight between snow showers: approximate), large grains that pale every colour nearly alike,
-    //   fine         with the air's own blue over them. The far hills, 300 to 600 m off, are hazed by a quarter to
-    //                a half and the gate at 40 m by under a twentieth (at 35 km, as before, the hills stood as
-    //                sharp as the gate and the view had no depth);
+    //   visibility,  1.8 km in a 70 m layer, `fine` 0.3: the fine snow and ice a shower leaves in the air, settled
+    //   hazeHeight,  into the valley's floor as a low mist (a few km of sight between snow showers, less down in
+    //   fine         the hollows: approximate), grains that pale every colour nearly alike with the air's own blue
+    //                over them. The hills behind the field go soft and white into it, rank by rank, while the
+    //                gate at 40 m stands clear and the sky over the mist is the clear one (at 4 km in a 200 m layer
+    //                the far hills were hazed evenly and the valley read as no deeper than the field);
     //   glare        the forward glow of those grains round the sun (ENV_WEATHER `glare`): twice the sun's light
     //                on the ground at the sun's place, half that 8 degrees off, by eye against the reference
     //                frames of low winter sun through snow haze (a white bloom some 15 to 20 degrees across);
@@ -1252,9 +1253,10 @@ export function buildPyongyang() {
     //                front of the cloud that sheds it. A workaround, asked of the open air as R10 (c);
     //   grade        the camera set for the sunlit snow and the shade let go dark, as a winter photograph against
     //                the light is: the curve steeper (contrast 1.7) with its ceiling at 4 white cards (sunlit snow
-    //                and the glow round the sun reach it; at 6 they stayed grey under it), a third of a stop under
-    //                the open air's meter (which already closes for lying snow); saturation 0.95, warmth +0.02 for
-    //                the low sun. On the gate seen with the sun behind the camera the darkest twentieth of the frame
+    //                and the glow round the sun reach it; at 6 they stayed grey under it), half a stop under
+    //                the open air's meter (which already closes for lying snow; a third of a stop of it takes back
+    //                what the cut sky fill, PY_SHADE, opens the meter by); saturation 0.95, warmth -0.02 (the cold
+    //                shade's blue kept against the low sun's warmth). On the gate seen with the sun behind the camera the darkest twentieth of the frame
     //                went from 53 to 26 (of 255) and the brightest twentieth from 189 to 205, the middle kept (152 to
     //                145): the shade under eaves and in the masonry's joints dark beside lit snow.
     // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall and the
@@ -1266,12 +1268,15 @@ export function buildPyongyang() {
     // its own over the same showers or the open air's snow, set by eye against the default's views:
     //   siegedawn      clear after the night's snow, no shower: a still, cold morning after a clear night, when
     //                  the air chilled on the snow lies in the valley with the night's ice haze in it (a radiation
-    //                  inversion: 2.5 km of sight in a 120 m layer, `fine` 0.3 for ice crystals, approximate), so
-    //                  the near hills step back into it while the sky over it is clear; a little thin cloud
-    //                  (0.12, soft: with 0.2 of slabs the sky beside the hills stood in a straight upright seam,
-    //                  cause not found); the same glare as the default, a shade tighter (7 degrees), the camera's
-    //                  balance for the shade the gate stands in (warmth -0.08: the low sun comes through
-    //                  orange and the haze it lights would be brown on a daylight balance), the same steep curve;
+    //                  inversion, the valley mist of a still dawn: 1.2 km of sight in a 60 m layer, `fine` 0.1
+    //                  for its droplets and ice crystals, which whiten every colour alike: approximate), so the
+    //                  near hills step back into it while the sky over it is clear; a broken deck of thin cloud
+    //                  (0.28, slabs: deck 0.8) whose gaps let the low sun down in shafts through the mist (the
+    //                  cloud's rays, townkit/beams.js); a glare a little stronger and wider than the default's
+    //                  for the denser mist (2.5, 8 degrees), the camera's balance for the shade the gate stands in
+    //                  (warmth -0.14: the low sun comes through orange and the mist it lights would be brown on a
+    //                  daylight balance, where the references' mist is white), the same steep curve, two fifths of
+    //                  a stop down (PY_SHADE's share of it as for the default);
     //   siegemorning   the default's pale sky and its showers, with the higher sun (unchanged by the glare work);
     //   siegelate      the default's showers thinned, the sun low and yellowing (its colour is the open air's own,
     //                  worked from the air it comes through) behind a haze of 4 km in a 150 m layer (the day's
