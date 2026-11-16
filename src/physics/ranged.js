@@ -14,7 +14,7 @@ import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulle
 import { WORLD } from './config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './gaps.js';
 import { bardingAt } from '../horses.js';
-import { bringDown, gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
+import { gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
 import { flamePulse } from './flame.js';
 import { missileOf, screenOnPath } from './cover.js';
 import { atRange, BALLISTICS, dragRate, flatFall, flightStep, holdover, judgedShare, traceFlight } from './ballistics.js';
@@ -313,7 +313,7 @@ export function horseOnPath(world, shooter, from, to) {
  * energy in it (it passes on through: the rest goes with it). The harm is mounted.js harmHorse's, as a lance's point
  * would be: it bleeds, and in the chest or neck deep enough it opens the heart.
  */
-export function missileInHorse(world, shooter, hit, dir, joules, { arrow = true, bounce = ARROW.bounce, limbBreak = 0 } = {}) {
+export function missileInHorse(world, shooter, hit, dir, joules, { arrow = true, bounce = ARROW.bounce } = {}) {
   const horse = hit.horse;
   // (Where it lands: below a piece's reach or on a side it does not cover, the bare horse; the surface met faces back along the shot.)
   const barding = bardingAt(horse.barding, hit.capsule.part, hit.point[1] + (horse.sunk ?? 0), horse.withers, { normal: vec.scale(dir, -1), yaw: horse.yaw });
@@ -326,13 +326,6 @@ export function missileInHorse(world, shooter, hit, dir, joules, { arrow = true,
   const pierce = arrow ? joules * pointThrough(joules, barding.pierce, world.random()) : joules * ARROW.horseShare;
   if (shooter) shooter.stats.landed += 1;
   harmHorse(world, horse, hit.capsule, { blunt: 0, cut: 0, pierce }, event, shooter);
-  // A heavy ball in a leg shatters the bone as it does a man's (bulletHit: the ball's own `limbBreak`; no barding a horse
-  // carries stops it): the horse goes down on the broken leg.
-  if (!arrow && hit.capsule.part === 'legs' && !horse.lame && horse.state === 'up' && world.random() < limbBreak) {
-    horse.lame = true;
-    event.effects.push('its leg broken');
-    bringDown(world, horse, 'goes down on a broken leg');
-  }
 }
 
 /** Whether the barrel has come onto the line from the muzzle to the mark: then he fires. */
@@ -1160,7 +1153,7 @@ function gunRound(world, fighter, weapon, shot, projectile, muzzle, flight, aime
     }
     if (horseHit && (!manHit || horseHit.s < manHit.s)) {
       shotEvent({ to: horseHit.point, target: 'horse', point: horseHit.point, effects: ['into a horse'] });
-      missileInHorse(world, fighter, horseHit, flight, energy * kept(horseHit.s), { arrow: false, limbBreak: shot?.limbBreak ?? 0 });
+      missileInHorse(world, fighter, horseHit, flight, energy * kept(horseHit.s), { arrow: false });
       return;
     }
     if (!manHit) continue;
