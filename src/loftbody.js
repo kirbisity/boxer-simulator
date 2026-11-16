@@ -2700,7 +2700,7 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
   // (PROOF OF CONCEPT, BASE_BODY.shoulder 'E': the share of the model's shoulder bulk this body keeps, its arm's muscle showing
   // as baseArmForms reads it: development × leanness × definition through the fat.)
   const shoulderKeep = rules ? Math.min(1, rules.dev * rules.traits.arm.lean * Math.min(1, Math.max(0, (0.016 - rules.traits.arm.fat) / 0.011))) : 0;
-  const { positions, herShare } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null, shoulderKeep, waste, neckGirth, family, across);
+  const { positions, herShare, neckNormals } = placeBaseBody(rig, parts, relief, height, starve, skin, reach, rules ? baseArmForms(rules, rig.refRules, LOFT.armForms.carried[rig.sex]) : null, shoulderKeep, waste, neckGirth, family, across);
   const uvs = uv ? baseBodyUvs(rig) : null;
   const start = mesh.positions.length / 3;
   const { render } = rig;
@@ -2742,7 +2742,7 @@ function addBaseSkin(mesh, rig, parts, traits, uv, height, starve, { skin, reach
   // (`armSkin`: points that are an arm's or blend into one, across the armpit: keepLayersInside.)
   const armPart = (index) => /Upper$|Fore$/.test(rig.names[index]);
   const armSkin = Uint8Array.from(render.source, (source) => (armPart(rig.sources.part[source]) || (rig.sources.blend[source] > 0 && armPart(rig.sources.part2[source])) ? 1 : 0));
-  mesh.base = { start, count: render.count, source: render.source, sources: rig.sources.count, own, swell, family: Boolean(family), armSkin, herShare, triangles: [firstIndex, mesh.indices.length] };
+  mesh.base = { start, count: render.count, source: render.source, sources: rig.sources.count, own, swell, family: Boolean(family), armSkin, herShare, neckNormals, triangles: [firstIndex, mesh.indices.length] };
 }
 
 /**
@@ -5029,6 +5029,19 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     return result;
   };
   let normals = smoothNormals();
+  // (The neck's top lit as the head's wall it meets: basebody.js neckUnderHead's normals there, blended in by their share. Its
+  // own were bent up by the neck's top drawn in inside the head, and it took the sky where the head took the sun: a bluer band
+  // along the nape under the head.)
+  if (mesh.base?.neckNormals?.size) {
+    for (let index = 0; index < mesh.base.count; index += 1) {
+      const wall = mesh.base.neckNormals.get(mesh.base.source[index]);
+      if (!wall) continue;
+      const at = (mesh.base.start + index) * 3;
+      const mixed = [0, 1, 2].map((axis) => normals[at + axis] * (1 - wall.share) + wall.normal[axis] * wall.share);
+      const length = Math.hypot(...mixed) || 1;
+      for (let axis = 0; axis < 3; axis += 1) normals[at + axis] = mixed[axis] / length;
+    }
+  }
   yield 'normals';
   if (wrapping && !armoured) {
     // The legs' joins (trunk to thigh, the knee) by the fillet; the upper body by the field.

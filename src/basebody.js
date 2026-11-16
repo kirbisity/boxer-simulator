@@ -143,8 +143,9 @@ export const BASE_BODY = {
   // line's lowest point read; its top `rise` above the line all round, its points from `band` under the line up spread over
   // that height; out or in to the head's wall run on below the line (to the scan's neck's ring at row `throat` where the skin
   // between them is a floor, under the jaw) less `margin`, and above the line drawn in, `inward` times `rise` at its top; what
-  // stands past `reach` of the line's outline (the trapezius' slope) left where it is.
-  neckUnder: { throat: 0.914, from: 0.8, rise: 0.12, margin: 0.005, band: 0.4, inward: 1, reach: [1.4, 2] },
+  // stands past `reach` of the line's outline (the trapezius' slope) left where it is. Its normals from `shade` head radii under the
+  // line up blended into the head's wall's (loftbody.js): lit as the head is where it meets it.
+  neckUnder: { throat: 0.914, from: 0.8, rise: 0.12, margin: 0.005, band: 0.4, inward: 1, reach: [1.4, 2], shade: 0.3 },
   // The head as it is drawn on its joint (render.js HEAD_SCALE, HEAD_SEAT), in head radii (body.js headRadius, 0.055 of
   // stature: 96 mm on a man of 1.75 m). `size` and `seat`: 1.12 of the radius and 0.18 of a radius under the joint, as the
   // helmets and the neck's top were fitted. `lift`: how far above that seat it is drawn, and `smaller`: the share taken off
@@ -1132,7 +1133,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
   }
   if (family && sources.builds) baseFamily(rig, frames, placed, height, family, alongOf, joints.gameHead ?? joints.head, across);
   if (joints.boundHead && frames.neck) neckToHead(rig, placed, joints.boundHead, joints.boundNeck, frames.neck, height, BASE_BODY.neckUnder ? joints.gameHead : joints.boundHead);
-  if (joints.drawnHead && BASE_BODY.neckUnder && NECK_JOIN.photoHead) neckUnderHead(rig, placed, joints.drawnHead, height);
+  const neckNormals = joints.drawnHead && BASE_BODY.neckUnder && NECK_JOIN.photoHead ? neckUnderHead(rig, placed, joints.drawnHead, height) : null;
   // (PROOF OF CONCEPT: the widths ANSUR II measures, when asked for (globalThis.BASE_WIDTHS, a list): biacromial (across the
   // shoulders' tops, from 1 cm above the shoulder joints up), chest breadth (the trunk's own skin across at the nipples, 0.72 of
   // height) and bideltoid (everything across, arms included, from 12 cm under the joints to them), in the bind pose.)
@@ -1217,7 +1218,7 @@ export function placeBaseBody(rig, parts, relief, height, starve = 0, joints = r
   }
   const positions = new Float32Array(render.count * 3);
   for (let index = 0; index < render.count; index += 1) positions.set(placed.subarray(render.source[index] * 3, render.source[index] * 3 + 3), index * 3);
-  return { positions, sources: placed, herShare };
+  return { positions, sources: placed, herShare, neckNormals };
 }
 
 /**
@@ -1453,7 +1454,8 @@ export function headJawLine(female, morph) {
  * bone's frame at rest ({ origin, x, y, z }, x forward) and the body's morph (facemorph.js faceMorphWeights).
  */
 function neckUnderHead(rig, placed, { frame, morph }, height) {
-  const { from: below, rise, margin, band, inward, reach } = BASE_BODY.neckUnder;
+  const { from: below, rise, margin, band, inward, reach, shade } = BASE_BODY.neckUnder;
+  const normals = new Map();
   const { size, seat, lift, smaller } = BASE_BODY.head;
   const radius = 0.055 * height;
   const unit = radius * size * (1 - smaller);
@@ -1532,7 +1534,14 @@ function neckUnderHead(rig, placed, { frame, morph }, height) {
     const toward = ease(base, line.y, lifted) * (edge / Math.max(1e-6, rho) - 1);
     const scale = 1 + (rho > edge ? Math.max(weight, ease(line.y - band / 2, line.y, lifted)) : weight) * toward;
     placed.set(vec.add(origin, vec.add(vec.scale(frame.y, lifted * unit), vec.add(vec.scale(frame.x, x * scale * unit), vec.scale(frame.z, z * scale * unit)))), vertex * 3);
+    // (Its normal, near the line, the head's wall's there: `shade` head radii under the line none of it, at the line all.)
+    const share = ease(line.y - shade, line.y, lifted) * weight;
+    if (share > 0 && rho > 1e-6) {
+      const wall = vec.normalize(vec.sub(vec.add(vec.scale(frame.x, x / rho), vec.scale(frame.z, z / rho)), vec.scale(frame.y, line.slope)));
+      normals.set(vertex, { normal: wall, share });
+    }
   }
+  return normals;
 }
 
 function headHold(point, head, height, t, x, y, [from, to] = [0.3, 0.7]) {
