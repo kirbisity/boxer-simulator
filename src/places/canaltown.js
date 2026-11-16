@@ -14,7 +14,7 @@ import { slabOf, wallLine, wallOf } from '../physics/terrain.js';
 import { tkgBay, tkgFrame } from '../townkit/geo.js';
 import { tkRandom } from '../townkit/tex.js';
 import {
-  TK_BRIDGE, TK_HOUSE, TK_JAR, tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
+  TK_BRIDGE, TK_HOUSE, TK_JAR, tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseDoors, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
   tkSlabBridgeSolids, tkTree, tkWaterSteps, tkWaterStepsSolids, tkYardWall, tkYardWallSolid,
 } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
@@ -186,6 +186,12 @@ export function canalTownPlan() {
   ];
   ctPlanMade = { houses, walls, bridges, steps, quays, trees, boats, lions, gate, carts };
   return ctPlanMade;
+}
+
+/** The doors that open on the square and the quay lanes beside it (tkHouseDoors), for the town's people to go in by (townfolk.js). */
+export function canalTownDoors() {
+  const rows = ['squareNorthWest', 'squareNorthEast', 'squareWest', 'squareEast', 'quayWestInner', 'quayEastInner'];
+  return canalTownPlan().houses.filter((house) => rows.includes(house.row)).flatMap((house) => tkHouseDoors(house).map((door) => ({ ...door, row: house.row })));
 }
 
 /**

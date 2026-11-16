@@ -2599,7 +2599,7 @@ const BASE_TRAIT = { trunk: 'trunk', neck: 'trunk', Upper: 'arm', Fore: 'fore', 
  */
 export function baseWasting(body) {
   const { from, to } = LOFT.wasting;
-  const bmi = body.massKg / (body.heightM * body.heightM);
+  const bmi = body.massKg / (body.statureM * body.statureM);
   return Math.max(baseStarvation(body), Math.min(1, Math.max(0, (from - bmi) / (from - to))));
 }
 
@@ -2611,7 +2611,7 @@ export function baseWasting(body) {
  */
 export function baseNeckGirth(body) {
   const spec = LOFT.neck[body.inputs.sex === 'female' ? 'female' : 'male'];
-  const bmi = body.massKg / (body.heightM * body.heightM);
+  const bmi = body.massKg / (body.statureM * body.statureM);
   return LOFT.neck.slim * (spec.at22 + (bmi < 22 ? spec.lean : spec.perBmi) * (bmi - 22) + spec.trained * (body.inputs.exercise ?? 0)) * (body.heightM / spec.height);
 }
 
@@ -2627,7 +2627,7 @@ export function baseNeckGirth(body) {
 export function baseFrame(body, modelHeight) {
   const { frame, family } = LOFT;
   const ordinary = family[body.inputs.sex === 'female' ? 'female' : 'male'].N;
-  const bmi = (body.massKg / (body.heightM * body.heightM)) * (modelHeight / body.heightM);
+  const bmi = (body.massKg / (body.statureM * body.statureM)) * (modelHeight / body.statureM);
   const across = (frame.widths[body.inputs.frame] ?? 1) * Math.min(1, bmi / (ordinary[0] + ordinary[1])) ** frame.weight;
   return { across, apart: across / (FRAMES[body.inputs.frame] ?? FRAMES.medium).width, section: across ** frame.section };
 }
@@ -2647,9 +2647,9 @@ export function baseFrame(body, modelHeight) {
 export function baseFamilyWeights(body, modelHeight) {
   const spec = LOFT.family;
   const at = spec[body.inputs.sex === 'female' ? 'female' : 'male'];
-  const scale = modelHeight / body.heightM / baseFrame(body, modelHeight).section;
+  const scale = modelHeight / body.statureM / baseFrame(body, modelHeight).section;
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1]];
-  const point = [(body.fatKg / (body.heightM * body.heightM)) * scale, body.ffmi * scale];
+  const point = [(body.fatKg / (body.statureM * body.statureM)) * scale, body.ffmi * scale];
   const muscular = sub(at.M, at.N);
   const line = ['E', 'N', 'F1', 'F2', 'F3'];
   // (Each step of the line: the point as `along` of the step and `muscle` of the muscular gain; the step it falls within, the
@@ -2710,8 +2710,8 @@ export function baseFamilyWeights(body, modelHeight) {
 export function baseBoneRelief(body, modelHeight) {
   const cover = LOFT.boneCover;
   const emaciated = cover.sculpt[body.inputs.sex === 'female' ? 'female' : 'male'];
-  const scale = modelHeight / body.heightM / baseFrame(body, modelHeight).section;
-  const fat = (body.fatKg / (body.heightM * body.heightM)) * scale - emaciated[0];
+  const scale = modelHeight / body.statureM / baseFrame(body, modelHeight).section;
+  const fat = (body.fatKg / (body.statureM * body.statureM)) * scale - emaciated[0];
   const lean = body.ffmi * scale - emaciated[1];
   const over = Math.max(0, cover.fat * fat + cover.lean * lean);
   return Math.exp((-2 * Math.PI * over) / cover.spacing);

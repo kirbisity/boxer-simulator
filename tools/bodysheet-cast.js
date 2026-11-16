@@ -33,7 +33,7 @@ const TARGETS = {
   ],
 };
 
-const bmiOf = (body) => body.massKg / body.heightM ** 2;
+const bmiOf = (body) => body.massKg / body.statureM ** 2;
 
 /** The exercise level (0..1) at which a body of this fat share reaches the target BMI. */
 function exerciseFor(base, bmi, bodyFat) {

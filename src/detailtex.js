@@ -78,6 +78,21 @@ export function preloadDetailMaps(names = ['mail', 'lamellae', 'kozane', 'plate'
 // pixel, repeated round a dō in a motif that read as a printed pattern.
 export const ARMOUR_PLATE_TONES = { plate: 0.12, lace: 0.16 };
 
+// A machine's panels as they look after service (the tile itself is clean, tools/blender/hardtiles.py), drawn over the tile in
+// its own units (a panel tile is 0.16 m): grime settles where the surface turns (the normal map's seams, screw heads and vents:
+// `edge`) and in a broad noise over the panels, a warm brown of road dust and old oil (darker by up to 0.6, tinted 0.85, 0.74,
+// 0.58); dark oil runs down from above in streaks ten times longer than wide (darker by up to 0.75); the grime dulls the paint
+// (less metal, rougher), the oil's wet runs are glossier. Only the panels tile (detailmaps.js MACHINE_TILES) wears it.
+const PANEL_WEAR = {
+  head: `uniform sampler2D uPanelN;
+float pH(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float pN(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(pH(i),pH(i+vec2(1,0)),f.x),mix(pH(i+vec2(0,1)),pH(i+vec2(1)),f.x),f.y);}
+float pF(vec2 p){return .5*pN(p)+.25*pN(p*2.03+7.1)+.125*pN(p*4.01+3.3)+.0625*pN(p*8.07+1.7);}`,
+  body: `float pE=smoothstep(.12,.45,length(texture2D(uPanelN,vUv).xy*2.-1.));
+float pG=smoothstep(.25,.7,pF(vUv*1.5)*.75+.5*pE),pU=smoothstep(.55,.7,pF(vec2(vUv.x*10.,vUv.y*.8)))*smoothstep(.3,.6,pF(vUv*2.+9.));
+diffuseColor.rgb*=(1.-.6*pG)*(1.-.75*pU)*mix(vec3(1),vec3(.85,.74,.58),pG);float pwRough=mix(1.15,.55,pU),pwMetal=-.3*pG;`,
+};
+
 export function armourDetailMaterial(material, name, { cords = null, matte = false, metalness = 1, repeat = null, plates = null } = {}) {
   const entry = bakedTileTextures(name);
   if (!entry) return material;
@@ -95,8 +110,16 @@ export function armourDetailMaterial(material, name, { cords = null, matte = fal
   vec2 detailPlate = floor(vUv * vec2(${plates[0].toFixed(1)}, ${plates[1].toFixed(1)}));
   float detailTone = fract(sin(dot(detailPlate, vec2(12.9898, 78.233))) * 43758.5453) * 2.0 - 1.0;
   float detailLaceTone = fract(sin(dot(detailPlate, vec2(39.3468, 11.135))) * 24634.6345) * 2.0 - 1.0;` : '';
+  const worn = name === 'panels';
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
+    if (worn) {
+      shader.uniforms.uPanelN = { value: entry.normalMap };
+      shader.fragmentShader = `${PANEL_WEAR.head}\n${shader.fragmentShader}`
+        .replace('#include <color_fragment>', `#include <color_fragment>\n#ifdef USE_UV\n${PANEL_WEAR.body}\n#else\nfloat pwRough=1.,pwMetal=0.;\n#endif`)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = clamp(roughnessFactor * pwRough, 0.04, 1.0);')
+        .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n  metalnessFactor = clamp(metalnessFactor + pwMetal, 0.0, 1.0);');
+    }
     if (repeat) shader.vertexShader = `uniform vec2 uDetailRepeat;\n${shader.vertexShader}`.replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_UV\n  vUv *= uDetailRepeat;\n#endif');
     if (cords) {
       shader.fragmentShader = `uniform vec3 uDetailCordA;\nuniform vec3 uDetailCordB;\n${shader.fragmentShader}`.replace(
@@ -114,7 +137,7 @@ export function armourDetailMaterial(material, name, { cords = null, matte = fal
       );
     }
   };
-  material.customProgramCacheKey = () => `detail-${cords ? 'cords' : ''}-${repeat ? 'repeat' : ''}-${plates ? plates.join('x') : ''}`;
+  material.customProgramCacheKey = () => `detail-${cords ? 'cords' : ''}-${repeat ? 'repeat' : ''}-${plates ? plates.join('x') : ''}${worn ? '-worn' : ''}`;
   return material;
 }
 

@@ -300,7 +300,7 @@ export function deriveStats(body) {
   const bench = lift(STATS.bench, true) - STATS.bench.carried;
   const grip = lift(STATS.grip, true);
   const legLength = body.lengths.thigh + body.lengths.shank;
-  const referenceMass = 75 * (body.heightM / 1.75) ** 2;
+  const referenceMass = 75 * (body.statureM / 1.75) ** 2;
   const topSpeed = STATS.sprintTopSpeedPerMetre * legLength * (0.75 + STATS.sprintTrained * exercise) * Math.min(1.1, (referenceMass / massKg) ** STATS.sprintMassPenalty);
   const sprint = sprintTime(STATS.sprintForcePerMuscle * legs ** (2 / 3) * recruitment * weakness * (inputs.sex === 'female' ? STATS.femaleSprint : 1), topSpeed, massKg);
   const armour = trunk + 0.9 * fatKg * Math.min(1, segments.trunk.tissue.fat / Math.max(1, fatKg) * 1.7) + 0.4 * arms;

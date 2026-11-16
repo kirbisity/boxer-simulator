@@ -106,7 +106,9 @@ export const CUSTOM_PAGES = {
       // (Story mode's ground, its walls and ladders, is kept: worksview.js draws ladders on any battle's works.)
       || /^story\/(?!ground\/)/.test(name)
       // (The story's places and the kit they are built with: walked through level mode's stage and lit by its baked shadow, neither of them here.)
-      || /^(townkit|places)\//.test(name),
+      || /^(townkit|places)\//.test(name)
+      // (And the canal town's people.)
+      || ['townfolk', 'townfolkview'].includes(name),
     data: dataCuts(CUSTOM_GROUND_TILES),
     transforms: { 'audio/music/manifest': noMusic, menu: menuWithout({ story: false }) },
     // The sandbox's ways into level mode hidden (they lead to what is not here).
@@ -225,6 +227,14 @@ export const tkTier = () => 'low';
 `,
   'townkit/weather': `
 export const tkWeatherNow = () => ({});
+`,
+  // The canal town's people: no canal town here, so none.
+  townfolkview: `
+export function townfolkFrame() {}
+export function townfolkReset() {}
+export function townfolkInfo() {
+  return null;
+}
 `,
   // Story mode (src/story/): not here; the page's hooks into it inert.
   'story/storyview': `

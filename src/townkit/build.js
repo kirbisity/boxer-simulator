@@ -118,6 +118,28 @@ export function tkHouse(builder, spec) {
   return eave;
 }
 
+/**
+ * A house's doors on its ground floor, as tkHouse lays its bays: each { at: [x, z] the middle of the doorway on the front's
+ * line, out: [x, z] the way out of it (a unit), wide (m between the posts), sill (the threshold's height), head (the top of
+ * the opening), leaf (how far in the leaves stand, m) }.
+ */
+export function tkHouseDoors(spec) {
+  const { width: w, depth: d, ground = ['lattice'], base = 0, seed = 1 } = spec;
+  const front = tkgFrame(spec.at[0], base, spec.at[1], spec.yaw ?? 0).child(0, 0, d / 2);
+  const bays = Math.max(1, Math.round(w / (spec.bay ?? TK_HOUSE.bay)));
+  const each = w / bays;
+  const [ox, , oz] = front(0, 0, 0);
+  const [px, , pz] = front(0, 0, 1);
+  const doors = [];
+  for (let k = 0; k < bays; k += 1) {
+    if (ground[(k + seed) % ground.length] !== 'door') continue;
+    const [x, , z] = front(-w / 2 + (k + 0.5) * each, 0, 0);
+    // (tkgBay's door: its leaves 5 cm in from the front, on a stone sill 7 cm over the plinth's top.)
+    doors.push({ at: [x, z], out: [px - ox, pz - oz], wide: each - 2 * TK_HOUSE.post, sill: base + TK_HOUSE.plinth + 0.07, head: base + (spec.heights?.[0] ?? TK_HOUSE.storeys[0]) - 0.24, leaf: 0.05 });
+  }
+  return doors;
+}
+
 /** A house's solid: its plan, as one block no one walks through (`grow`: a margin, m). */
 export const tkHouseSolid = (spec, grow = 0) => wallOf(spec.at, [spec.width + 2 * grow, spec.depth + 2 * grow], (spec.base ?? 0) - 1, (spec.base ?? 0) + 6, { yaw: spec.yaw ?? 0 });
 
