@@ -966,48 +966,60 @@ export function buildPyongyang() {
         siegelate: { sun: pySunAt({ ...PY_DAY, hour: PY_HOURS.late }) },
       },
     },
-    // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun: a bright, pale
-    // winter sky, washed blue with thin pearly cloud, the low sun whole on the wall, a few flakes on the wind.
-    //   cover, deck  a quarter of the sky in thin cloud (0.26), its forms soft slabs with wide veiled edges
-    //                (deck 0.6) rather than lumps with outlines: at 0.42 and lumps the gate views showed blotches;
-    //   gloom        0: the cloud's underside as light as the open air draws it (a thin cloud lit through by a low
-    //                sun). At 0.45 it was mid-grey, at 0.85 near black against saturated blue behind the gate;
+    // 'siegesnow', over the open air's snow showers ('flurries'), set for this ground and this sun: a pale winter sky
+    // with a third of it in thin cloud, the low sun whole on the wall, a few flakes on the wind, and the air between
+    // the showers full of fine snow, so the land steps back paler and bluer rank by rank and the sun stands in a glow.
+    //   cover, deck  a third of the sky in thin cloud (0.32), soft slabs with veiled edges (deck 0.7);
+    //   gloom        0.1: the cloud's underside nearly as light as the open air draws it (a thin cloud lit through
+    //                by a low sun); at 0.45 it was mid-grey, at 0.85 near black against the blue behind the gate;
     //   sun          the sun whole between the clouds: it draws the wall and lays the long shadows;
-    //   visibility,  35 km in an 800 m layer, `fine` 1.6 (small-particle haze, scattering blue more than red):
-    //   hazeHeight,  enough haze to pale the blue to a washed one without greying it. Turned against the sky
-    //   fine         behind the gate (median and colour of its top corners): 9 km with fine 0.6 made it an even
-    //                grey lid (median 122, neutral); 16 to 20 km with fine 1.2 to 1.5 a pale grey (129 to 138, nearly
-    //                neutral); 35 km with 1.6 a pale blue (144, rgb about 126 146 159);
-    //   fall.thick   12 km of sight in the thick of a shower, against the open air's 900 m: a showery snow, not a
-    //                blizzard. The falling snow's veil is lit as if the sun reached all of it, so toward the sun a
-    //                thick one is a white wall in front of the cloud that sheds it (at 4000 m 1.8 percent of the
-    //                sunward frame clipped in a shower). A workaround, asked of the open air as R10 (c);
-    //   grade        ev +0.1 of a stop over the open air's meter and contrast 0.95 (a bright, soft morning look:
-    //                the gate's median 151, the sky behind it 144); saturation 0.95, warmth +0.02 for the low sun.
-    //                Sunward frames clip 0.01 percent (the strip at T 420): the haze and the thin cloud spread
-    //                the sun's glow instead of standing it against dark cloud.
-    // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall.
+    //   visibility,  4 km in a 200 m layer, `fine` 0.5: the fine snow and ice a shower leaves in the air (a few km
+    //   hazeHeight,  of sight between snow showers: approximate), large grains that pale every colour nearly alike,
+    //   fine         with the air's own blue over them. The far hills, 300 to 600 m off, are hazed by a quarter to
+    //                a half and the gate at 40 m by under a twentieth (at 35 km, as before, the hills stood as
+    //                sharp as the gate and the view had no depth);
+    //   glare        the forward glow of those grains round the sun (ENV_WEATHER `glare`): twice the sun's light
+    //                on the ground at the sun's place, half that 8 degrees off, by eye against the reference
+    //                frames of low winter sun through snow haze (a white bloom some 15 to 20 degrees across);
+    //   fall.thick   12 km of sight in the thick of a shower: a showery snow, not a blizzard. The falling snow's
+    //                veil is lit as if the sun reached all of it, so toward the sun a thick one is a white wall in
+    //                front of the cloud that sheds it. A workaround, asked of the open air as R10 (c);
+    //   grade        the camera set for the sunlit snow and the shade let go dark, as a winter photograph against
+    //                the light is: the curve steeper (contrast 1.7) with its ceiling at 4 white cards (sunlit snow
+    //                and the glow round the sun reach it; at 6 they stayed grey under it), a third of a stop under
+    //                the open air's meter (which already closes for lying snow); saturation 0.95, warmth +0.02 for
+    //                the low sun. Shaded masonry and the sides of men turned from the sun go to a third of the way up
+    //                the scale, sunlit snow to the top, where at contrast 0.95 both sat in the upper half.
+    // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall and the
+    // reference frames (a low sun behind thin cloud, the land stepping back into mist, deep shade beside lit snow).
     // 'siegesnowhazy': the same showers in the hazier, darker sky the gate views had before the sunward work (the
     // open air's own flurries haze: 14 km in its 900 m layer, and 4 km in the thick of a shower), kept to be compared
     // with the default, which it does not replace (the place's weather `hazy`).
     // The other hours and the overcast day (the place's `dawn`, `morning`, `late`, `overcast`), each a weather of
     // its own over the same showers or the open air's snow, set by eye against the default's views:
-    //   siegedawn      clear after the night's snow, no shower: a still, cold morning's low haze (12 km in a 300 m
-    //                  layer, the valley's night air not yet stirred), a little thin cloud; the camera's balance
-    //                  for the shade the gate stands in, so cooler (warmth -0.02) and a third of a stop up;
-    //   siegemorning   the default's pale sky and its showers, with the higher sun;
+    //   siegedawn      clear after the night's snow, no shower: a still, cold morning after a clear night, when
+    //                  the air chilled on the snow lies in the valley with the night's ice haze in it (a radiation
+    //                  inversion: 2.5 km of sight in a 120 m layer, `fine` 0.3 for ice crystals, approximate), so
+    //                  the near hills step back into it while the sky over it is clear; a little thin cloud
+    //                  (0.12, soft: with 0.2 of slabs the sky beside the hills stood in a straight upright seam,
+    //                  cause not found); the same glare as the default, a shade tighter (7 degrees), the camera's
+    //                  balance for the shade the gate stands in (warmth -0.08: the low sun comes through
+    //                  orange and the haze it lights would be brown on a daylight balance), the same steep curve;
+    //   siegemorning   the default's pale sky and its showers, with the higher sun (unchanged by the glare work);
     //   siegelate      the default's showers thinned, the sun low and yellowing (its colour is the open air's own,
-    //                  worked from the air it comes through), the camera a little warmer and a sixth of a stop down;
+    //                  worked from the air it comes through) behind a haze of 4 km in a 150 m layer (the day's
+    //                  snow haze settling as the air cools toward evening, `fine` 0.6), the glare a little stronger
+    //                  for the longer path (2.5, 7 degrees), the camera a little warmer and two fifths of a stop down;
     //   siegeovercast  a grey snowy day: the open air's driving snow ('snow') eased to steady light snow (2.5 km of
     //                  sight, against its 700 m: the gate still reads across the field; approximate for light snow),
     //                  less wind, the lid lighter underneath.
     weathers: { snow: 'siegesnow', dawn: 'siegedawn', morning: 'siegemorning', late: 'siegelate', overcast: 'siegeovercast', hazy: 'siegesnowhazy', bare: 'clear' },
     first: 'snow',
     own: {
-      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 0.95, saturation: 0.95, warmth: 0.02, ev: 0.1 }, cover: 0.26, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
-      siegedawn: ['flurries', { label: 'Clear morning on the wall', grade: { contrast: 1.0, saturation: 0.92, warmth: -0.02, ev: 0.3 }, cover: 0.12, deck: 0.6, sun: 1, gloom: 0, fine: 1.2, visibility: 12000, hazeHeight: 300, wind: 0.5, gust: 0.05, fall: null }],
+      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.7, white: 4, saturation: 0.95, warmth: 0.02, ev: -0.35 }, cover: 0.32, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.5, visibility: 4000, hazeHeight: 200, glare: [2, 8], fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegedawn: ['flurries', { label: 'Clear morning on the wall', grade: { contrast: 1.7, white: 4, saturation: 0.92, warmth: -0.08, ev: -0.25 }, cover: 0.12, deck: 0.6, sun: 1, gloom: 0, fine: 0.3, visibility: 2500, hazeHeight: 120, glare: [2.2, 7], wind: 0.5, gust: 0.05, fall: null }],
       siegemorning: ['flurries', { label: 'Mid-morning on the wall', grade: { contrast: 0.95, saturation: 0.95, warmth: 0, ev: 0.1 }, cover: 0.26, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
-      siegelate: ['flurries', { label: 'Late afternoon on the wall', grade: { contrast: 1.0, saturation: 0.95, warmth: 0.04, ev: -0.15 }, cover: 0.2, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.06, thick: 12000 } }],
+      siegelate: ['flurries', { label: 'Late afternoon on the wall', grade: { contrast: 1.75, white: 4, saturation: 0.95, warmth: 0.05, ev: -0.4 }, cover: 0.25, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.6, visibility: 4000, hazeHeight: 150, glare: [2.5, 7], fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.06, thick: 12000 } }],
       siegeovercast: ['snow', { label: 'Overcast, light snow on the wall', grade: { contrast: 1.2, saturation: 0.88, warmth: -0.02, ev: 0.3 }, gloom: 0.15, visibility: 2500, hazeHeight: 800, wind: 1.1, gust: 0.1 }],
       siegesnowhazy: ['flurries', { label: 'Snow showers on the wall, hazier sky', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }],
     },

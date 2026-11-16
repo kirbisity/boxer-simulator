@@ -75,7 +75,7 @@ void main() {
 
   // The sun: its disc and the glare round it, behind the cloud.
   float disc = smoothstep(cos(${(ENV.sky.discRadius * 1.25).toFixed(5)}), cos(${ENV.sky.discRadius.toFixed(5)}), toSun);
-  float glare = ${ENV.sky.glowGain.toFixed(3)} * pow(max(toSun, 0.0), 900.0) + 0.12 * pow(max(toSun, 0.0), 90.0);
+  float glare = ${ENV.sky.glowGain.toFixed(3)} * pow(max(toSun, 0.0), 900.0) + 0.12 * pow(max(toSun, 0.0), 90.0) + uEnvGlare.x * pow(max(toSun, 0.0), uEnvGlare.y);
   vec3 sun = sunTint * sunPower * (disc * ${ENV.sky.discGain.toFixed(1)} + glare);
   colour += sun * (1.0 - density) * step(0.0, dir.y + 0.01);
 

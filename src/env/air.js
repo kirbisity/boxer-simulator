@@ -230,6 +230,9 @@ export const ENV_UNIFORMS = {
   uEnvCloudDark: { value: null },
   // x: wet 0..1; y: snow lying 0..1.
   uEnvWet: { value: null },
+  // The glow round the sun that the sky table cannot hold (a weather's `glare`, config.js): x its strength at the
+  // sun's own place, as a share of the sun's light; y the power of the cosine it falls off by. (0, 1): none.
+  uEnvGlare: { value: null },
   // The share of the place's grass gone to straw, 0..1.
   uEnvDry: { value: 0 },
   // The way the camera looks, level (x, z; unit, or zero looking straight down): what follows the camera is laid out ahead of it.
@@ -287,6 +290,7 @@ export function envUniforms() {
   u.uEnvCloudForm.value = new THREE.Vector4(ENV.clouds.ragged, ENV.clouds.baseAt, 1, 0);
   u.uEnvCloudDark.value = new THREE.Vector3(0.5, 0.5, 0.5);
   u.uEnvWet.value = new THREE.Vector2(0, 0);
+  u.uEnvGlare.value = new THREE.Vector2(0, 1);
   u.uEnvShade.value = new THREE.Vector4(0, 0, 1, 1);
   u.uEnvShadeSway.value = new THREE.Vector2(0, 0);
   u.uEnvPlaceSunBy.value = new THREE.Matrix4();
@@ -312,6 +316,9 @@ export function envAirToUniforms(air, weather, quality, place) {
   u.uEnvCloudLit.value.fromArray(air.cloudLit);
   u.uEnvCloudDark.value.fromArray(air.cloudDark);
   u.uEnvWet.value.set(weather.wet, weather.snow);
+  // (`glare`: [strength, the angle in degrees at which it is half that]; the power of the cosine that halves there.)
+  const [glare, half] = weather.glare ?? [0, 90];
+  u.uEnvGlare.value.set(glare, half < 90 ? Math.log(0.5) / Math.log(Math.cos((half * Math.PI) / 180)) : 1);
   u.uEnvDry.value = place.grass.dry;
 }
 
@@ -345,6 +352,7 @@ uniform vec4 uEnvCloudForm;
 uniform vec3 uEnvCloudLit;
 uniform vec3 uEnvCloudDark;
 uniform vec2 uEnvWet;
+uniform vec2 uEnvGlare;
 uniform float uEnvDry;
 uniform vec2 uEnvLook;
 uniform float uEnvOn;
@@ -373,7 +381,10 @@ vec3 envAirlightIn(vec3 dir, float share) {
   float lobe = pow((${(1 + ENV.air.hazeForward * ENV.air.hazeForward).toFixed(4)} - ${(2 * ENV.air.hazeForward).toFixed(4)} * level) / (${(1 + ENV.air.hazeForward * ENV.air.hazeForward).toFixed(4)} - ${(2 * ENV.air.hazeForward).toFixed(4)} * dot(normalize(dir), sun)), 1.5);
   float fore = ${ENV.air.aureole.toFixed(2)} * max(lobe - 1.0, 0.0);
   float once = (uEnvShade.x + fore) / (1.0 + fore);
-  return envSky(vec3(dir.x, 0.0, dir.z)) * (1.0 + ${ENV.air.aureole.toFixed(2)} * (lobe - 1.0)) * (1.0 - once * (1.0 - share));
+  // (The weather's glare, the forward peak of its large particles past what the table holds, is the sun's beam
+  // scattered once, and shade takes all of it.)
+  vec3 glare = uEnvSunColour * uEnvGlare.x * pow(max(dot(normalize(dir), sun), 0.0), uEnvGlare.y);
+  return envSky(vec3(dir.x, 0.0, dir.z)) * (1.0 + ${ENV.air.aureole.toFixed(2)} * (lobe - 1.0)) * (1.0 - once * (1.0 - share)) + glare * share;
 }
 
 vec3 envAirlight(vec3 dir) {

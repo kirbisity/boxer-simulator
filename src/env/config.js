@@ -758,6 +758,13 @@ export const ENV_TREES = {
 // `grade` what the weather's picture differs by from ENV.tone.grade (all by eye:
 // a clear day a little warm and full; a lid flat light, so the curve is steepened to keep a picture, and cooler
 // and greyer; mist bright and pale, held up half a stop as a camera's meter is fooled by fog, its darks left in).
+// `glare` [strength, half-width in degrees], left out on most: the glow round the sun that the sky table cannot
+// hold. The table keeps display values, so the haze's forward lobe toward the sun stops at the sky's own white,
+// where the light scattered a few degrees forward by ice crystals, snow grains and fog droplets is many times the
+// sky's (the aureole: the larger the particles, the brighter and tighter). `strength` is that light at the sun's
+// own place as a share of the sun on the ground, falling to half at `half` degrees; it is drawn in the sky and in
+// the haze before the land (air.js envAirlightIn), where shade takes it as it takes the rest of the beam, so what
+// stands between the eye and the sun cuts shafts in it.
 export const ENV_WEATHER = {
   clear: { label: 'Clear', grade: { warmth: 0.015 }, fine: 1.3, cover: null, gloom: 0, sun: 1, visibility: null, hazeHeight: null, wind: 1, gust: 0, wet: 0, fall: null, snow: 0 },
   // Broken cloud racing over: the light comes and goes.
