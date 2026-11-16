@@ -1,5 +1,5 @@
 // Inline the modules and stylesheet into one page for the hosted review copy.
-// Usage: node tools/bundle.js [out.html] [--no-minify] [--lite | --custom]
+// Usage: node tools/bundle.js [out.html] [--no-minify] [--lite | --custom[=fights|places]]
 // The code is minified with esbuild (comments and whitespace gone, names mangled) unless --no-minify is given, which keeps the source as it is for debugging.
 // A minified build also writes <out>.map, a source map to the unminified bundle; the page names it in a sourceMappingURL comment but does not carry it.
 
@@ -8,7 +8,7 @@ import { basename } from 'node:path';
 import vm from 'node:vm';
 import { transformSync } from 'esbuild';
 import { PHOTO_HEAD } from '../src/photohead.js';
-import { CUSTOM_BUDGET, CUSTOM_CSS, CUSTOM_DATA, CUSTOM_EXCLUDED, CUSTOM_STUBS, CUSTOM_TRANSFORMS } from './custom.js';
+import { CUSTOM_BUDGET, CUSTOM_PAGES, CUSTOM_STUBS, packCode, packedScripts } from './custom.js';
 
 // In load order: a module's top-level code may use only what comes before it. The looks (the kit, one file per look, then the registry) come before toon.js, which asks the registry which look is in force.
 const MODULES = ['i18n/ui-common', 'i18n/ui-menu', 'i18n/ui-fight', 'i18n/ui-builder', 'i18n/ui-level', 'i18n/ui-squad', 'i18n/ui-cards', 'i18n/ui', 'i18n/names-people', 'i18n/names-kit', 'i18n/names-world', 'i18n/names-battles', 'i18n/names-events', 'i18n/names-level', 'i18n/names', 'i18n/names-parts', 'i18n', 'i18n/names-log', 'uiicons', 'aging', 'outfitsets', 'outfits', 'robotdogs', 'horses', 'physiology', 'maiming', 'peoples', 'body', 'physics/config', 'physics/overdraft', 'physics/heat', 'physics/terrain', 'physics/jump', 'joints', 'pose', 'physics/ballistics', 'weapons', 'moves', 'life', 'formation', 'handling', 'physics/fieldworks', 'audio/surface', 'audio/log', 'physics/arts', 'physics/gaps', 'physics/footing', 'physics/press', 'physics/wear', 'physics', 'physics/cover', 'physics/walkfield', 'physics/ladders', 'physics/ranged', 'physics/artillery', 'physics/grappling', 'physics/net', 'physics/throwable', 'physics/brush', 'physics/whip', 'physics/flame', 'physics/rising', 'physics/gait', 'physics/mounted', 'cast', 'riding', 'command', 'ai', 'battletally', 'battleend', 'lastgate', 'gesture', 'finisher', 'lowstrike', 'runsteer', 'weaponarts', 'control', 'followcam', 'camtuner', 'watchcam', 'cameraarm', 'occluders', 'camerarig', 'scenerylod', 'levelmode/quality', 'adaptres', 'rig', 'bodymesh', 'skintones', 'sculpt', 'skinrules', 'skindetail', 'skintex', 'detailmaps', 'basebody-data', 'headrings-data', 'basebody', 'fatslosh', 'loftbody', 'fleshbody', 'bodystyles', 'skinworker', 'dqskin', 'looks/kit', 'looks/toon', 'looks/probe-lite', 'looks', 'blooddye', 'clothwear', 'detailmaps-data', 'clothmaps-data', 'detailtex', 'helmstyle', 'helmforms', 'helmmaps-data', 'helmmaps', 'knighthelms-data', 'knighthelms', 'menpo', 'ground/painted', 'ground/living', 'scenery/skyball-photo-data', 'scenery/skyball', 'scenery/generated', 'scenery/trees', 'env/config', 'env/noise', 'env/lie', 'env/press', 'env/post', 'env/air', 'env/sky', 'env/terrain', 'env/grass', 'env/trees', 'env/particles', 'env/index', 'scenery', 'toon', 'chinahelms', 'chinahelmview', 'stechzeug', 'netcloth', 'arenaview', 'soft', 'dangle', 'bones', 'faceregions', 'photohair', 'hairswing', 'hairmass', 'photoface', 'photohead', 'headgrid-data', 'headlattice', 'facemorph', 'face', 'wardrobe', 'robotview', 'exoview', 'oyoroi', 'crowdview', 'crowdlod', 'fallenview', 'props/town', 'props/rural', 'props/arena', 'props/harbour', 'props/coast', 'props/subway', 'props/jiangnan', 'props/cajamarca', 'props/plains', 'fightui/logic', 'fightui/icons', 'fightui/kit', 'fightui/command', 'fightui/buttons', 'fightui/target', 'fightui/index', 'fightui/toggle', 'fightui/marker', 'generalmark', 'depthrange', 'levelmode/kitpaint', 'levelmode/kitshadow', 'levelmode/kitwear', 'levelmode/kittex', 'levelmode/kitgeo', 'levelmode/kitchapel', 'levelmode/kitfilth', 'levelmode/kitprops', 'levelmode/stagelooks', 'levelmode/stormsky-data', 'levelmode/stagesky', 'levelmode/storm', 'levelmode/water', 'levelmode/kitmirror', 'levelmode/kitwater',
@@ -30,14 +30,16 @@ const minify = !args.includes('--no-minify');
 // `--lite`: a smaller page (a test build, under 15 MB with nothing beside it): the heaviest baked pictures left out, each where the
 // game already draws without them (the `#maps=off` look), least seen first; the sounds, music and photo faces kept. No source map.
 const lite = args.includes('--lite');
-// `--custom`: only the sandbox (custom mode), opened at once, as a test bed in one file under CUSTOM_BUDGET bytes (tools/custom.js):
-// the modules it never reaches left out (stubbed where kept code imports them), the music gone, the ground tiles of its places kept.
-const custom = args.includes('--custom');
+// `--custom[=fights|places]`: one of the custom pages (tools/custom.js CUSTOM_PAGES; the fights page if none is named), a test bed in
+// one packed file under CUSTOM_BUDGET bytes: the modules it never reaches left out (stubbed where kept code imports them), the music gone.
+const customArg = args.find((arg) => arg === '--custom' || arg.startsWith('--custom='));
+const custom = customArg ? CUSTOM_PAGES[customArg.split('=')[1] ?? 'fights'] : null;
+if (customArg && !custom) throw new Error(`${customArg}: no such custom page (${Object.keys(CUSTOM_PAGES).join(', ')})`);
 if (lite && custom) throw new Error('--lite and --custom are two different builds: pick one');
-const out = args.find((arg) => !arg.startsWith('--')) ?? (lite ? 'dist/historically-accurate-combat-simulator-lite.html' : custom ? 'dist/historically-accurate-combat-simulator-custom.html' : 'dist/historically-accurate-combat-simulator.html');
+const out = args.find((arg) => !arg.startsWith('--')) ?? (lite ? 'dist/historically-accurate-combat-simulator-lite.html' : custom ? custom.out : 'dist/historically-accurate-combat-simulator.html');
 // The modules in this page, in order: a custom page's excluded modules gone, or in their place their stubs (CUSTOM_STUBS).
-const listed = custom ? MODULES.filter((name) => !CUSTOM_EXCLUDED(name) || CUSTOM_STUBS[name]) : MODULES;
-const stubbed = (name) => custom && CUSTOM_EXCLUDED(name);
+const listed = custom ? MODULES.filter((name) => !custom.excluded(name) || CUSTOM_STUBS[name]) : MODULES;
+const stubbed = (name) => Boolean(custom?.excluded(name));
 // A module imported whole (`import * as name from './x.js'`: story mode's chapters and battles, each exporting the same
 // `chapter` or `battle`) is "scoped": its code wrapped in a function of its own, its exports returned as one object under a
 // name of its own (SCOPED_PREFIX + its path), so its names never meet another module's in the one scope; the importer's line
@@ -87,17 +89,17 @@ async function cutSource(name, cuts, build) {
 }
 const liteSources = new Map();
 if (lite) for (const name of Object.keys(LITE)) liteSources.set(name, await cutSource(name, LITE, 'Lite'));
-if (custom) for (const name of Object.keys(CUSTOM_DATA)) liteSources.set(name, await cutSource(name, CUSTOM_DATA, 'Custom'));
+if (custom) for (const name of Object.keys(custom.data)) liteSources.set(name, await cutSource(name, custom.data, 'Custom'));
 /** A module's source as this page has it: a custom page's stub or rewrite, a cut-down data module, or the file. */
 function sourceOf(name) {
   if (stubbed(name)) return `// (Custom build: ${name}.js left out; its stand-in from tools/custom.js.)\n${CUSTOM_STUBS[name].trimStart()}`;
   const source = liteSources.get(name) ?? readFileSync(`src/${name}.js`, 'utf8');
-  return custom && CUSTOM_TRANSFORMS[name] ? CUSTOM_TRANSFORMS[name](source) : source;
+  return custom?.transforms[name] ? custom.transforms[name](source) : source;
 }
 const declared = (source) => [...source.matchAll(/^(?:export )?(?:const|let|(?:async )?function\*?|class) +([A-Za-z_$][\w$]*)/gm)].map(([, identifier]) => identifier);
 
 const html = readFileSync('index.html', 'utf8');
-const css = readFileSync('boxer.css', 'utf8') + readFileSync('fightui.css', 'utf8') + (custom ? CUSTOM_CSS : '');
+const css = readFileSync('boxer.css', 'utf8') + readFileSync('fightui.css', 'utf8') + (custom?.css ?? '');
 // The recorded sound effects (src/audio/samples/*.mp3), their bytes put into samples.js, which fetches the files from the source.
 const SAMPLE_EMBED_LINE = 'const SAMPLE_EMBED = null;';
 function sampleEmbed() {
@@ -242,9 +244,10 @@ if (minify) {
   }
 }
 if (/<\/script/i.test(pageCode + pageWorker)) throw new Error('a closing script tag inside the code would end the page\'s script early');
-// A custom page is opened as a file of its own (not inside the review copy's wrapper): it says its encoding itself.
-const page = `<meta charset="utf-8">\n${title}\n${fonts}\n<style>\n${css}</style>\n${markup}\n${three}\n<script type="text/plain" id="skin-worker-source">\n${pageWorker}</script>\n<script type="module">\n${pageCode}</script>\n`;
+// A custom page is opened as a file of its own (not inside the review copy's wrapper): it says its encoding itself. Its code packed (tools/custom.js packCode).
+const scripts = custom && minify ? packedScripts(packCode(pageCode, pageWorker)) : `<script type="text/plain" id="skin-worker-source">\n${pageWorker}</script>\n<script type="module">\n${pageCode}</script>\n`;
+const page = `<meta charset="utf-8">\n${title}\n${fonts}\n<style>\n${css}</style>\n${markup}\n${three}\n${scripts}`;
 const bytes = Buffer.byteLength(page);
-if (custom && bytes >= CUSTOM_BUDGET) throw new Error(`the custom page is ${bytes} bytes, over its budget of ${CUSTOM_BUDGET} (tools/custom.js CUSTOM_BUDGET): leave out more (CUSTOM_GROUND_TILES first); ${out} not written`);
+if (custom && bytes >= CUSTOM_BUDGET) throw new Error(`the custom page is ${bytes} bytes, over its budget of ${CUSTOM_BUDGET} (tools/custom.js CUSTOM_BUDGET): leave out more (tools/custom.js CUSTOM_PAGES); ${out} not written`);
 writeFileSync(out, page);
 console.log(`${out}: ${(bytes / 1024).toFixed(0)} KB${custom ? ` (${bytes} bytes of the custom budget's ${CUSTOM_BUDGET})` : ''}`);
