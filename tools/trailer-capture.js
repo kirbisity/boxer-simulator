@@ -248,13 +248,13 @@ export const TC = {
   },
   // Sekigahara's skirmish (tools/trailer-skirmish.js: the East's teppō rank and spears against the West's masked samurai and ashigaru), in
   // the Sengoku camps and the battle's morning, at `seed` (the scout's seeds are the same fight).
-  async skirmish(seed = 11, { mounted = 0 } = {}) { // mounted: a number of lamellar samurai, or 'all'
+  async skirmish(seed = 11, { mounted = 0, ahead = 6, speed = 0 } = {}) { // mounted: a number of lamellar samurai, or 'all'
     const s = battleOf('sekigahara');
     const sides = skirmish(1, { mounted });
     const fighters = Object.entries(sides).flatMap(([corner, side]) => side.map((inputs) => ({ inputs: structuredClone(inputs), corner })));
     window.boxer.storyBattle({ fighters, options: { seed, arena: SKIRMISH_ARENA, rules: s.rules, formation: s.formation, place: 'sengoku' }, view: { scene: 'sengoku', camera: s.camera ?? {}, weather: s.weather } });
     // The riders clear of the formation, as the scout stood them (tools/trailer-skirmish.js placeRiders).
-    const riders = placeRiders(window.boxer.state.world);
+    const riders = placeRiders(window.boxer.state.world, { ahead, speed });
     await this.settle();
     return { men: window.boxer.state.world.fighters.length, riders, at: riders.map((id) => window.boxer.state.world.fighters[id].mount.at) };
   },

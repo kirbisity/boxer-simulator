@@ -68,7 +68,7 @@
     {
       "shot": "canal",
       "in": 0.8,
-      "out": 5.6,
+      "out": 5.75,
       "ambience": [
         "loop-rain",
         "loop-din"
@@ -136,59 +136,50 @@
       ]
     },
     {
-      "shot": "dnCliff",
-      "in": 2.6,
-      "out": 4.4,
+      "shot": "dnCistern",
+      "in": 2.4,
+      "out": 4.0,
       "ambience": [
-        "loop-rain",
-        "loop-wind"
+        "loop-roof"
       ],
       "cards": [
         {
           "card": 4,
           "from": 0.1,
-          "to": 1.8
+          "to": 1.6
         }
       ]
     },
     {
-      "shot": "dnBridge",
-      "in": 3.2,
-      "out": 5.4,
+      "shot": "dnDrain",
+      "in": 5.0,
+      "out": 7.8,
       "ambience": [
-        "loop-rain",
-        "loop-wind"
+        "loop-roof"
       ],
       "cards": [
         {
           "card": 4,
           "from": 0,
-          "to": 1.4
+          "to": 1.2
         }
       ]
     },
     {
-      "shot": "dnLedge",
-      "in": 0.6,
-      "out": 2.2,
-      "ambience": [
-        "loop-rain"
-      ]
-    },
-    {
-      "shot": "dnCellar",
-      "in": 0.6,
+      "shot": "dnKeep",
+      "in": 0.8,
       "out": 2.8,
       "ambience": [
         "loop-roof"
       ]
     },
     {
-      "shot": "dnCrypt",
+      "shot": "dnWall",
       "in": 1.0,
-      "out": 1.9,
+      "out": 3.3,
       "ambience": [
-        "loop-roof"
+        "loop-rain",
+        "loop-wind"
       ]
     },
     {
@@ -212,23 +203,23 @@
     },
     {
       "shot": "sekigahara",
-      "in": 0,
-      "out": 4.6,
+      "in": 0.3,
+      "out": 3.45,
       "ambience": [
         "loop-wind"
       ],
       "cards": [
         {
           "card": 6,
-          "from": 2.0,
-          "to": 4.6
+          "from": 1.6,
+          "to": 3.25
         }
       ]
     },
     {
       "shot": "joust",
       "in": 3.6,
-      "out": 11.3,
+      "out": 12.6,
       "ambience": [
         "loop-wind"
       ],
@@ -241,7 +232,7 @@
         {
           "card": 8,
           "from": 3.6,
-          "to": 7.7,
+          "to": 9.0,
           "fade": 0.6
         }
       ]

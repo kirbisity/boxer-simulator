@@ -10,7 +10,7 @@ const slow = (seconds, factor) => ({ frames: Math.round(seconds * factor * 60), 
 
 export const SHOTS = {
   // Story ch. 2, seed 2, its first seconds: Qi's squads advancing across the canal town, seen from four places round it in turn (above the
-  // square, behind the column, beside its ranks by the houses, low before the shields), each with a little drift; no HUD.
+  // square, beside the column, behind its ranks: never a face close in, user 2026-11-15, low and wide before the shields), each with a little drift; no HUD.
   canalOpen: {
     view: 'frame',
     hud: false,
@@ -22,7 +22,7 @@ export const SHOTS = {
       const cuts = [
         [1.2, { pos: [mx + 6, 9, mz - 7], look: [mx - 3, 0.5, mz + 1], fov: 50 }, [-2, -0.5, 0]],
         [2.4, { pos: [mx + 9, 1.7, mz - 1.5], look: [mx - 2, 1.3, mz], fov: 50 }, [-1.5, 0, 0]],
-        [3.6, { pos: [mx - 1, 2.4, mz + 9], look: [mx, 1.2, mz], fov: 46 }, [-1.2, 0, -0.6]],
+        [3.6, { pos: [mx - 1, 4.2, mz - 9], look: [mx, 1.0, mz + 3], fov: 46 }, [-1.2, 0, 0.6]],
         [9.9, { pos: [mx - 12, 1.2, mz - 5], look: [mx - 2, 1.4, mz], fov: 44 }, [0.8, 0, 0]],
       ];
       // Hard cuts between the four, each drifting by its offset over its time.
@@ -60,7 +60,7 @@ export const SHOTS = {
     segments: [real(5.5)],
   },
   // Story ch. 3, seed 1: the moment a Ming man comes over the top: run on until a climber is near the head of his ladder (3.4 m), then
-  // played as him (the camera low behind him on the ladder): over the parapet into the defenders.
+  // played as him (the camera outside the wall, above the parapet): over the parapet into the defenders.
   pyongyangClimb: {
     view: 'phone',
     setup: `
@@ -69,12 +69,19 @@ export const SHOTS = {
       TC.play(s.player); TC.skip(88);
       const w = boxer.state.world;
       let me = null;
-      while (w.time < 150 && !me) {
+      while (w.time < 220 && !me) {
         boxer.playFrames(6, 1 / 60);
         me = w.fighters.filter((f) => f.corner === 'red' && f.state === 'up' && f.climbing && f.x[1] > 3.4).sort((a, b) => b.x[1] - a.x[1])[0] ?? null;
       }
       boxer.fullModels(true); TC.play(me.id);
-      TC.chase(me.id, { back: 3.6, pitch: 0.35, lookUp: 5.2, fov: 58 });
+      // A camera outside the wall and above its parapet (the wall's outer face at x 1, its walk at 4.5 m: story/battles/03-pyongyang.js),
+      // a little to his side, following him along it: no camera behind him inside the masonry (user, 2026-11-15).
+      let ez = null;
+      TC.camera = (t, world) => {
+        const z = world.fighters[me.id].root[1];
+        ez = ez == null ? z : ez + (z - ez) * 0.04;
+        return { pos: [-4.6, 7.6, ez + 4.4], look: [2.6, 4.6, ez - 0.4], fov: 54 };
+      };
       await TC.warm(150);`,
     segments: [real(10)],
   },
@@ -125,26 +132,26 @@ export const SHOTS = {
       await TC.warm(60);`,
     segments: [slow(0.42, 6)],
   },
-  // Sekigahara (tools/trailer-skirmish.js, seed 20, every West samurai on horseback: user, 2026-11-15): the West's samurai ride at the East's
-  // teppō rank; the volley; one rider (#16, in lamellar) is shot dead through his armour and falls from the saddle (0.48 s), the riders in the
-  // tōsei harness ride on through it (a ball only dents that plate: OUTFITS.samuraiTosei bulletRating). No HUD.
+  // Sekigahara (tools/trailer-skirmish.js, seed 17, every West samurai on horseback and already at the charge, 7 m/s: user, 2026-11-15): the
+  // West's riders gallop at the East's teppō rank, seen over the gunners' shoulders; the volley; one rider (#14, in lamellar) is shot dead
+  // through his armour at the gallop and falls from the saddle (0.47 s), the riders in the tōsei harness ride on through it (a ball only
+  // dents that plate: OUTFITS.samuraiTosei bulletRating). Never a face close in. No HUD.
   sekigahara: {
     view: 'frame',
     hud: false,
     setup: `
-      const r = await TC.skirmish(20, { mounted: 'all' });
-      const at = boxer.state.world.fighters[16].mount.at;
-      const a = { pos: [-12.5, 2.4, -1.5], look: [at[0], 1.8, at[1] - 2], fov: 44 };
-      const b = { pos: [-12.0, 2.3, -1.0], look: [at[0], 1.6, at[1]], fov: 28 };
-      const c = { pos: [-4.0, 1.8, at[1] + 3.5], look: [at[0] - 0.4, 0.5, at[1] + 0.3], fov: 34 };
-      TC.path([{ t: 0, ...a }, { t: 0.42, ...a }, { t: 0.8, ...b }, { t: 1.4, ...b }, { t: 2.6, ...c }, { t: 6, ...c }]);
+      await TC.skirmish(17, { mounted: 'all', ahead: 0, speed: 7 });
+      const at = boxer.state.world.fighters[14].mount.at;
+      const a = { pos: [-13, 2.5, at[1] - 2.5], look: [at[0] - 2, 1.7, at[1]], fov: 46 };
+      const b = { pos: [-12.5, 2.4, at[1] - 2], look: [at[0] - 3, 1.5, at[1]], fov: 36 };
+      const c = { pos: [-1.0, 2.6, at[1] + 7], look: [at[0] - 4, 0.6, at[1]], fov: 44 };
+      TC.path([{ t: 0, ...a }, { t: 0.3, ...b }, { t: 0.62, ...b }, { t: 1.6, ...c }, { t: 6, ...c }]);
       boxer.playFrames(1, 0);
-      await TC.warm(150);
-      boxer.playFrames(18, 1 / 60);`,
-    segments: [slow(0.54, 4), real(3.6)],
+      await TC.warm(150);`,
+    segments: [slow(0.75, 4), real(3.4)],
   },
   // The ending's duel on the open field (seed 5, either side of a tilt): a lance glances off plate (a quarter speed), one knight unhorsed,
-  // then the camera rises over the field for the title. No HUD.
+  // then the camera rises over the field and turns into the low sun for the title. No HUD.
   joust: {
     view: 'frame',
     hud: false,
@@ -153,11 +160,15 @@ export const SHOTS = {
       const a = { pos: [-2, 2.0, 6], look: [0, 1.4, -6], fov: 62 };
       const b = { pos: [-1.2, 1.7, 1.5], look: [0.8, 1.5, -8.6], fov: 38 };
       const c = { pos: [0, 9, 10], look: [0, 3, -40], fov: 55 };
-      TC.path([{ t: 0, ...a }, { t: 3.4, ...a }, { t: 5.7, ...b }, { t: 6.8, ...b }, { t: 9.8, ...c }, { t: 20, ...c }]);
+      // ...and turns into the evening sun for the title (the field's: env/config.js, azimuth -2.3, 7 degrees up; user, 2026-11-15), looking
+      // up a little so its glow stands under the title (the disc itself is in the evening haze), the trees and field against it.
+      const sun = [Math.cos(-2.3), Math.sin(-2.3)];
+      const d = { pos: [0, 4.5, 10], look: [sun[0] * 60, 4.5 + 60 * Math.tan(0.2), 10 + sun[1] * 60], fov: 55 };
+      TC.path([{ t: 0, ...a }, { t: 3.4, ...a }, { t: 5.7, ...b }, { t: 6.8, ...b }, { t: 9.4, ...c }, { t: 11.6, ...d }, { t: 20, ...d }]);
       boxer.playFrames(1, 0);
       await TC.warm(150);
       for (let i = 0; i < 34; i += 1) boxer.playFrames(1, 0.1);`,
-    segments: [real(2.3), slow(1, 4), real(5)],
+    segments: [real(2.3), slow(1, 4), real(6.4)],
   },
 
   // ---- Dunnottar (Level Mode, played: the Forger walks the stage's own route, DUNNOTTAR_ROUTE, and the fight AI fights for him when a foe
@@ -168,8 +179,17 @@ export const SHOTS = {
   dnLedge: dunnottar([-7.8, null, 49.5], Math.PI / 2, [[-7.8, 50.4], [-8.2, 54], [-3, 54.2], [2.2, 54]], 6),
   dnGate: dunnottar([5, 2, 46.2], 0, [[10, 46.2], [13, 46.2], [16.5, 46.2], [17.7, 42], [17.7, 37]], 5),
   dnQuad: dunnottar([17, 12.18, 6.5], 0, [[17, 4.4], [24, 3.6], [32, 3.6], [39, 3.4]], 5, 'boxer.stage.gather?.();'),
-  // Underground: the long cellar under the quadrangle (the vault, the turnkey's desk) and the crypt to its flooded passage. (Not the sewer:
-  // the twist's way.)
+  // Underground: the long cellar under the quadrangle (the vault, the turnkey's desk) and the crypt to its flooded passage.
+  // The way in under the castle: the old drain's flooded cistern (user, 2026-11-15: the underground sewer), along its causeway between the
+  // pillars, the sewage either side; then the long drain into the cesspool, where Noname rises out of the filth and the sluices come down.
+  dnCistern: dunnottar([-48.5, -5, 28], -Math.PI / 2, [[-48.5, 22], [-48.5, 14], [-48.5, 8], [-48.5, 2], [-48.5, -4]], 7),
+  dnDrain: dunnottar([-48.5, -1.6, -24], -Math.PI / 2, [[-48.5, -32], [-48.5, -36.4], [-46, -37.9], [-40, -37.9], [-30, -37.9]], 11),
+  // Inside the castle: the keep's hall (Sergeant Hay at its hearth), toward the round tower's stair. (Started in the hall, clear of the
+  // barred door and the wall's thickness, x 44.5..45.6.)
+  dnKeep: dunnottar([48.5, 12.18, -23], 0, [[48, -22.5], [52, -23.8], [56, -23.8], [59, -23.8]], 7),
+  // The high wall walk along the north cliff (24.9 m), at a run from the round tower west over the sea toward the stair down.
+  // (The game's own camera behind her: one out over the sea kept her small behind the parapet.)
+  dnWall: dunnottar([61.5, 24.93, -36], Math.PI, [[56, -36], [50, -36], [44, -36], [37, -36], [30, -36], [24, -36]], 7),
   dnCellar: dunnottar([6, 6, -22.5], 0, [[14, -22.5], [22, -22.5], [28, -22.5], [32, -24.4]], 6),
   dnCrypt: dunnottar([20, 1.4, -24.4], Math.PI, [[16, -24.4], [12, -25.5], [8, -27.5], [6.2, -29], [6.2, -33]], 6),
   // The chapel, the boss (Rodelero, 2026-11-15): Lord Vaelen's intro (skipped once it starts), then the fight under his bar: she takes two

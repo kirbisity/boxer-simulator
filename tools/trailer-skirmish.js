@@ -25,11 +25,15 @@ export function skirmish(castSeed = 1, { mounted = 0 } = {}) {
 export const SKIRMISH_ARENA = { halfX: 22, halfZ: 12 };
 
 /** The West's riders stood clear of the formation (one in formation is unhorsed at the first step: reported to the games session,
- *  branch rider-start), `ahead` m before the West's line, spread across it, facing the guns. */
-export function placeRiders(world, { ahead = 6 } = {}) {
+ *  branch rider-start), `ahead` m before the West's line, spread across it, facing the guns; `speed` (m/s) a running start: already
+ *  charging at that pace (the charge seen, not its first strides). */
+export function placeRiders(world, { ahead = 6, speed = 0 } = {}) {
   const riders = world.fighters.filter((f) => f.corner === 'blue' && f.mount);
   const line = Math.min(...world.fighters.filter((f) => f.corner === 'blue' && !f.mount).map((f) => f.root[0]));
-  riders.forEach((f, k) => placeMounted(f, line - ahead, (k - (riders.length - 1) / 2) * 4, Math.PI));
+  riders.forEach((f, k) => {
+    placeMounted(f, line - ahead, (k - (riders.length - 1) / 2) * 4, Math.PI);
+    if (speed) Object.assign(f.mount, { speed, goal: { heading: Math.PI, speed } });
+  });
   return riders.map((f) => f.id);
 }
 
