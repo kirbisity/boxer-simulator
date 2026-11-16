@@ -19,7 +19,7 @@ W, H, COLS = 270, 480, 6
 
 
 def font(size):
-    for path in ['/System/Library/Fonts/PingFang.ttc', '/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial Unicode.ttf']:
+    for path in ['/System/Library/Fonts/Hiragino Sans GB.ttc', '/System/Library/Fonts/STHeiti Medium.ttc', '/System/Library/Fonts/Helvetica.ttc', '/Library/Fonts/Arial Unicode.ttf']:
         if os.path.exists(path):
             return ImageFont.truetype(path, size)
     return ImageFont.load_default()

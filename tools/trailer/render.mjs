@@ -83,6 +83,8 @@ async function renderCards() {
     await page.goto(`http://localhost:${CONFIG.port}/tools/trailer/titles.html`, { waitFor: 'window.cardReady === true' });
     for (const [index, card] of edit.cards.entries()) {
       await page.eval(`window.showCard(${JSON.stringify(card)})`);
+      // The Chinese faces load their glyphs as a page first uses them: wait for them, and a frame drawn with them.
+      await page.eval(`document.fonts.ready.then(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => done(true)))))`);
       await page.shot(join(dir, `${index}.png`), { png: true, transparent: true });
     }
     console.log(`cards: ${edit.cards.length}`);
