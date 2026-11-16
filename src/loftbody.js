@@ -3859,11 +3859,18 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
   // front than their inflate, and a per-point rank would put the shorts over their own waistband there.)
   const pieceRank = new Map();
   for (const { standoff, ring } of shares.values()) pieceRank.set(ring.piece, Math.min(pieceRank.get(ring.piece) ?? Infinity, standoff));
+  // (The cloths with a piece on the trunk: a leg of one of them, the shorts' leg, is that garment going on down from its waist.)
+  const waisted = new Set([...shares].filter(([, { name }]) => name === 'trunk').map(([vertex]) => mesh.colors[vertex]));
+  // (A garment's leg under its waist, out of armour: a band on the trunk holds it whatever its rank, as it holds the garment's
+  // own waist. The legs of a very fat woman's shorts, fitted out round her hips, stood their own standoff past the band's and
+  // ranked level with it, so nothing held them and they stood out over it at the side in steps.)
+  const legOf = (layer) => !armoured && !layer.skin && /Thigh$/.test(layer.name) && waisted.has(mesh.colors[layer.vertex]);
   for (const [vertex, { name, under, ring }] of shares) {
     if (!frames[name]) continue;
     // (Cloth worn over armour outranks every piece: the plate is held inside it, and it is drawn out over the plate.)
-    // (`hem`: on its piece's top ring, a top's upper hem below the part's top.)
-    const hem = ring.t >= (pieceTop.get(ring.piece) ?? Infinity) - 1e-6 && ring.t < (name === 'trunk' ? LOFT.closedJoint.top.trunk : LOFT.closedJoint.top.limb);
+    // (`hem`: on its piece's top ring, a top's upper hem below the part's top. Not a garment's leg under its waist: its top
+    // ring goes on into the waist, and stood out past the skin there as a hem it stood out over the waistband.)
+    const hem = ring.t >= (pieceTop.get(ring.piece) ?? Infinity) - 1e-6 && ring.t < (name === 'trunk' ? LOFT.closedJoint.top.trunk : LOFT.closedJoint.top.limb) && !legOf({ vertex, name });
     layers.push({ vertex, name, rank: ring.over ? Infinity : pieceRank.get(ring.piece), under, piece: ring.piece, over: Boolean(ring.over), torn: Boolean(ring.torn), hem });
   }
   // (The skin by its source point: the copies of one point drawn in two tiles, or either side of a seam, move as one, or the
@@ -3904,7 +3911,7 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     for (let dr = -spec.reach; dr <= spec.reach; dr += 1) {
       for (let dc = -spec.spread; dc <= spec.spread; dc += 1) {
         for (const outer of cells.get(keyOf(name, row + dr, column + dc)) ?? []) {
-          if (outer.rank <= layer.rank + spec.rankGap || (layer.dome && outer.under)) continue;
+          if ((outer.rank <= layer.rank + spec.rankGap && !(BAND_ROLES.has(mesh.colors[outer.vertex]) && legOf(layer))) || (layer.dome && outer.under)) continue;
           const side = outer.t <= place.t ? below : above;
           const held = side.get(outer.piece);
           if (!held || Math.abs(outer.t - place.t) < Math.abs(held.t - place.t) || (Math.abs(outer.t - held.t) < 1e-6 && outer.r < held.r)) side.set(outer.piece, outer);
@@ -4089,10 +4096,11 @@ function keepLayersInside(mesh, frames, shares, nameOf, start, count, armoured =
     }
     // (High on a thigh, under a trunk piece hanging over it, a coat's skirt or a fauld: held inside it from the trunk's own axis,
     // and left out where it lies close within it, as a trunk piece is under a thigh's above. Trousers' hips came through a thin
-    // man's coat.)
+    // man's coat. Out of armour at any height: a waist worn under a hanging belly is tilted and its band lies above the trunk's
+    // foot at the sides, where the shorts' legs stood out over it.)
     if (!/Thigh$/.test(layer.name) || !frames.trunk) continue;
     const onTrunk = placeOf('trunk', layer.vertex);
-    if (onTrunk.t >= spec.trunkFoot || onTrunk.r < 1e-6) continue;
+    if ((armoured && onTrunk.t >= spec.trunkFoot) || onTrunk.r < 1e-6) continue;
     const held = { ...layer, ...onTrunk };
     const hang = surface('trunk', held, held);
     if (!within) continue;
