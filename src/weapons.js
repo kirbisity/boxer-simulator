@@ -1891,10 +1891,10 @@ export const GUN = {
  * gusoku's kote, haidate and suneate cloth over small splints and mail (Bottomley and Hopson, *Arms and Armour of the
  * Samurai*, 1988), and mail is no proof against shot (Williams, *The Knight and the Blast Furnace*, 2003). So over a limb
  * the kit stops only its share of a pistol round's worth, and a ball is never turned there by proof. A machine's shell
- * (`machine`) is one build all over, its limbs as its trunk.
+ * (`machine`) is one build all over, its limbs as its trunk; so is a kit whose limb plates are its chest's (`limbsProved`).
  */
 export function bulletRatingAt(spec, region) {
-  return region === 'limb' && !spec?.machine ? null : spec?.bulletRating ?? GUN.energy;
+  return region === 'limb' && !spec?.machine && !spec?.limbsProved ? null : spec?.bulletRating ?? GUN.energy;
 }
 
 /** The share of an outfit's bullet protection that holds against a shot of `energy` J. */

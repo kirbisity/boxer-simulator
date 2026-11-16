@@ -2901,7 +2901,8 @@ export const OUTFITS = {
     carriedShare: 100 / 83,
     // ~19 kg of composite panels (0.55 of the 35 kg they were) over his chest, belly, shoulders and limbs' fronts (rifle plates front, as a carrier's);
     // a helmet with a visor. His sides, the backs of his arms and his neck are still the man's.
-    plated: true, bulletRating: 3000, breastplate: 0.5,
+    // Its limb panels are the same composite plates as its chest (rated as one): proof over the limbs too (bulletRatingAt).
+    plated: true, bulletRating: 3000, breastplate: 0.5, limbsProved: true,
     protection: {
       blunt: 0.45, cut: 0.75, pierce: 0.55, bullet: { head: 0.6, torso: 0.85, limb: 0.4 },
       regions: { head: { blunt: 0.65, cut: 0.8, pierce: 0.65 }, limb: { blunt: 0.35, cut: 0.55, pierce: 0.35 } },

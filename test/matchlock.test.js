@@ -56,7 +56,7 @@ test('the tōsei dō turns a teppō ball from a few paces out and not at the muz
 test('only the breast and helmet carry the proof: a limb is proof against nothing, save a machine\'s shell', () => {
   for (const kind of OUTFIT_KEYS) {
     assert.equal(bulletRatingAt(OUTFITS[kind], 'torso'), OUTFITS[kind].bulletRating ?? GUN.energy, kind);
-    assert.equal(bulletRatingAt(OUTFITS[kind], 'limb'), OUTFITS[kind].machine ? OUTFITS[kind].bulletRating ?? GUN.energy : null, kind);
+    assert.equal(bulletRatingAt(OUTFITS[kind], 'limb'), OUTFITS[kind].machine || OUTFITS[kind].limbsProved ? OUTFITS[kind].bulletRating ?? GUN.energy : null, kind);
   }
   assert.ok(!ballAt('knight', 'rForearm', 30).effects.some((effect) => effect.includes('dents')), 'a vambrace was never proved');
 });
