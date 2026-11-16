@@ -2928,7 +2928,8 @@ export const HEADGEAR = {
   cap: { label: "Runner's cap", knock: 0.3, falls: true, icon: 'cap' },
   boonie: { label: 'Boonie hat', knock: 0.25, falls: true, icon: 'hat' },
   hat: { label: 'Hat', knock: 0.25, falls: true, icon: 'hat' },
-  headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: 'hat' },
+  // (`hidesHair`: it encloses the hair, wound round it; what hangs below it at the back still shows.)
+  headWrap: { label: 'Head wrap', knock: 0.4, falls: true, icon: 'hat', hidesHair: true },
   plume: { label: 'Plume', knock: 0.45, falls: true, icon: 'plume' },
   // A knight's parade crests (wardrobe.js HELM_CRESTS): the gilt winged harpy of the Negroli burgonets, and a spray of
   // ostrich plumes from a small crown. Cast or wired on a bracket: a hard blow takes them off as it does a plume.
