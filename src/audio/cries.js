@@ -24,7 +24,7 @@
 // voices replaced by the cries let through (each a voice event carrying its `cry`). Node tests run it on a battle.
 
 import { P } from '../body.js';
-import { CRY_KINDS, CRY_VOICE, cryRate, crySex } from './sfx/voice.js';
+import { CRY_KINDS, CRY_VOICE, cryRate, crySex, cryBody } from './sfx/voice.js';
 
 /** The director's numbers. */
 export const CRIES = {
@@ -109,7 +109,7 @@ export const CRY_VOICES = { grief: { wailFrom: 0.7 }, roar: { roarFrom: 0.7, pit
 export function voiceOfFighter(fighter) {
   const body = fighter.body ?? {};
   const inputs = body.inputs ?? {};
-  return { sex: crySex(inputs.sex), height: body.heightM ?? (inputs.heightCm ?? 178) / 100, mass: body.bodyMassKg ?? body.massKg ?? 80, age: inputs.age ?? 30, id: fighter.id, machine: Boolean(body.gear?.machine) };
+  return { sex: crySex(inputs.sex), height: body.heightM ?? (inputs.heightCm ?? 178) / 100, mass: body.bodyMassKg ?? body.massKg ?? 80, age: inputs.age ?? 30, strength: inputs.exercise ?? 0.5, id: fighter.id, machine: Boolean(body.gear?.machine) };
 }
 
 /** How much a man takes (J at the flesh for pain 'reference'), from his body. */
@@ -277,7 +277,7 @@ export function createCryDirector({ random = Math.random } = {}) {
       seen.quietUntil = now + delay + CRIES.cooldown[cry.kind];
       lastStart = now + delay;
       sounding.push({ who: cry.fighter.id, ends: now + delay + CRY_KINDS[cry.kind].seconds / rate });
-      cries.push({ type: 'voice', t: now, x: cry.at[0], y: cry.at[1], z: cry.at[2], kind: cry.kind, who: cry.fighter.id, cry: { kind: cry.kind, sex: crySex(voice.sex), intensity, rate, delay } });
+      cries.push({ type: 'voice', t: now, x: cry.at[0], y: cry.at[1], z: cry.at[2], kind: cry.kind, who: cry.fighter.id, cry: { kind: cry.kind, sex: crySex(voice.sex), intensity, rate, delay, ...cryBody(voice) } });
     }
     return cries.length ? [...others, ...cries] : others;
   }

@@ -167,3 +167,34 @@ test('the charge: only a large side running at the enemy, louder the more, gone 
   const robots = chargeOf([...line(30, 'red', -10, -4).map((f) => ({ ...f, body: { ...f.body, gear: { machine: true } } })), ...line(30, 'blue', -60, 0)], listener);
   assert.equal(robots.red.charging, false, 'machines do not roar');
 });
+
+test('a bigger, stronger body cries louder and lets the cry ring; a slight one quieter and shorter', async () => {
+  const { cryBody } = await import('../src/audio/sfx/voice.js');
+  const big = cryBody({ sex: 'male', height: 1.92, mass: 115, age: 30, strength: 0.8 });
+  const mid = cryBody({ sex: 'male', height: 1.78, mass: 80, age: 30, strength: 0.5 });
+  const slight = cryBody({ sex: 'male', height: 1.65, mass: 55, age: 30, strength: 0.3 });
+  assert.ok(big.db > mid.db + 2 && mid.db > slight.db + 2, `${big.db} ${mid.db} ${slight.db}`);
+  assert.ok(Math.abs(mid.db) < 0.01 && Math.abs(mid.hold - 1) < 0.01);
+  assert.ok(big.hold > 1.2 && slight.hold < 0.85, `${big.hold} ${slight.hold}`);
+  assert.ok(cryBody({ sex: 'female', height: 1.65, mass: 62 }).db === 0);
+});
+
+test('the new recordings\' screams come up half as often, and a set never plays the same take twice running', async () => {
+  const { pickWeighted, SAMPLE_SETS, SAMPLE_WEIGHTS } = await import('../src/audio/samples.js');
+  const names = SAMPLE_SETS['voice-male-scream'];
+  const counts = Object.fromEntries(names.map((name) => [name, 0]));
+  let last = null;
+  let seed = 7;
+  const random = () => ((seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296);
+  for (let k = 0; k < 6000; k += 1) {
+    const name = pickWeighted(names, random(), last);
+    assert.notEqual(name, last);
+    counts[name] += 1;
+    last = name;
+  }
+  const rare = names.filter((name) => SAMPLE_WEIGHTS[name]);
+  const common = names.filter((name) => !SAMPLE_WEIGHTS[name]);
+  const mean = (list) => list.reduce((sum, name) => sum + counts[name], 0) / list.length;
+  assert.ok(rare.length === 3 && common.length === 3);
+  assert.ok(mean(rare) < mean(common) * 0.75, JSON.stringify(counts));
+});

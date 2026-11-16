@@ -188,8 +188,26 @@ export function cryRate({ sex, height, mass, age, id }, jitter = 0) {
   return sfxClamp(rate, spec.range[0], spec.range[1]);
 }
 
-/** A cry's level at 1 m (dB SPL) by its kind and intensity (0..1). */
-export const cryLevel = (cry) => CRY_KINDS[cry.kind].level - CRY_KINDS[cry.kind].low * (1 - sfxClamp(cry.intensity ?? 0.5, 0, 1));
+/**
+ * How a body carries its cry beyond the pitch (the user's call, 2026-11-16: a big man's cry louder, deeper and drawn out, a slight one's
+ * thinner and shorter). `size` the body against the voice's reference, (height ratio) x (mass ratio)^0.5; `db` the cry's level, `perDoubling`
+ * dB for each doubling of that size, `strength` dB across a fitness (exercise) from 0 to 1 about the middle, less `old` dB a year past
+ * `oldFrom` (the breath behind it failing), within `dbRange`; `hold` how long it is let ring (the take's tail and its fade: size^`holdPower`,
+ * within `holdRange`): a big man's cry dies away slowly, a slight one's is cut off sooner.
+ */
+export const CRY_BODY = { perDoubling: 9, strength: 3, oldFrom: 50, old: 0.06, dbRange: [-4, 4], holdPower: 1.5, holdRange: [0.75, 1.4] };
+
+/** A voice's body: { db, hold } from { sex, height, mass, age, strength (exercise 0..1) }. */
+export function cryBody({ sex, height, mass, age, strength }) {
+  const spec = CRY_BODY;
+  const ref = CRY_VOICE.ref[crySex(sex)];
+  const size = (sfxClamp(height ?? ref.height, 0.9, 2.4) / ref.height) * Math.sqrt(sfxClamp(mass ?? ref.mass, 25, 220) / ref.mass);
+  const db = spec.perDoubling * Math.log2(size) + spec.strength * ((strength ?? 0.5) - 0.5) - spec.old * Math.max(0, (age ?? 30) - spec.oldFrom);
+  return { db: sfxClamp(db, spec.dbRange[0], spec.dbRange[1]), hold: sfxClamp(size ** spec.holdPower, spec.holdRange[0], spec.holdRange[1]) };
+}
+
+/** A cry's level at 1 m (dB SPL) by its kind and intensity (0..1), and the body's (`db`: cryBody). */
+export const cryLevel = (cry) => CRY_KINDS[cry.kind].level - CRY_KINDS[cry.kind].low * (1 - sfxClamp(cry.intensity ?? 0.5, 0, 1)) + (cry.db ?? 0);
 
 /**
  * The cry a voice event stands for when nothing chose one (the bench's, the board's): a blow taken a hurt cry, a wound a scream, a death
@@ -199,5 +217,6 @@ export function cryOfEvent(event) {
   if (event.cry) return event.cry;
   const kind = { struck: 'hurt', wound: 'scream', death: 'dying', moan: 'moan', fear: 'fear', hurt: 'hurt', scream: 'scream', dying: 'dying' }[event.kind];
   if (!kind) return null;
-  return { kind, sex: crySex(event.sex), intensity: sfxClamp(event.strength ?? 0.6, 0, 1), rate: cryRate({ sex: event.sex, height: event.size, mass: event.mass, age: event.age, id: event.who }) };
+  const voice = { sex: event.sex, height: event.size, mass: event.mass, age: event.age, id: event.who, strength: event.fitness };
+  return { kind, sex: crySex(event.sex), intensity: sfxClamp(event.strength ?? 0.6, 0, 1), rate: cryRate(voice), ...cryBody(voice) };
 }

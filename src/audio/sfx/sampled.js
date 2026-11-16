@@ -372,8 +372,10 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       if (!cry) return null;
       const i = sfxClamp(cry.intensity ?? 0.5, 0, 1);
       // A light hurt is a catch of the breath (the take's head, faded), a hard one the whole cry; a moan and a dying cry let die away.
-      const share = cry.kind === 'hurt' ? sampleLerp(CRY_PLAY.hurtShare, 1, i) : 1;
-      return { set: `voice-${cry.sex}-${cry.kind}`, trim: sampleLerp(CRY_PLAY.trim[0], CRY_PLAY.trim[1], i), rate: cry.rate ?? 1, seconds: null, share, fade: CRY_PLAY.fade[cry.kind] ?? 0.08, skip: 0, synth: null, synthGain: 0 };
+      // The body's hold (voice.js cryBody): a big man's cry let ring and die slowly, a slight one's cut off sooner.
+      const hold = cry.hold ?? 1;
+      const share = (cry.kind === 'hurt' ? sampleLerp(CRY_PLAY.hurtShare, 1, i) : 1) * Math.min(1, hold);
+      return { set: `voice-${cry.sex}-${cry.kind}`, trim: sampleLerp(CRY_PLAY.trim[0], CRY_PLAY.trim[1], i), rate: cry.rate ?? 1, seconds: null, share, fade: (CRY_PLAY.fade[cry.kind] ?? 0.08) * hold, skip: 0, synth: null, synthGain: 0 };
     }
     case 'draw':
       // A bow bent as it is drawn: the creak fitted to the draw (BOW_DRAW_PLAY), ending as the string is loosed.
