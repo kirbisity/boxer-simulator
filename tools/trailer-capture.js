@@ -13,7 +13,7 @@ import { battleOf } from '/src/scenarios.js';
 import { seededRandom } from '/src/physics.js';
 import { STORY_BATTLES } from '/src/story/battles/index.js';
 import { storyNorthLife } from '/tools/storynorth.js';
-import { skirmish, SKIRMISH_ARENA } from '/tools/trailer-skirmish.js';
+import { placeRiders, skirmish, SKIRMISH_ARENA } from '/tools/trailer-skirmish.js';
 import { floorAt } from '/src/physics/terrain.js';
 
 const HIDE = 'header,footer,#fight-ui,#hud,.hud,#clock,#ghost-bar,.ghost-bar,#log,#banner,.level-hud,#speeds,.fu-pick,#pause,#restart,#menu,.menu,#modes,.arena::after,.toast,#toast,#sound-toggle,.audio-mixer,#icons,.event-icon,#camera-bar{display:none!important}';
@@ -248,13 +248,15 @@ export const TC = {
   },
   // Sekigahara's skirmish (tools/trailer-skirmish.js: the East's teppō rank and spears against the West's masked samurai and ashigaru), in
   // the Sengoku camps and the battle's morning, at `seed` (the scout's seeds are the same fight).
-  async skirmish(seed = 11) {
+  async skirmish(seed = 11, { mounted = 0 } = {}) {
     const s = battleOf('sekigahara');
-    const sides = skirmish(1);
+    const sides = skirmish(1, { mounted });
     const fighters = Object.entries(sides).flatMap(([corner, side]) => side.map((inputs) => ({ inputs: structuredClone(inputs), corner })));
     window.boxer.storyBattle({ fighters, options: { seed, arena: SKIRMISH_ARENA, rules: s.rules, formation: s.formation, place: 'sengoku' }, view: { scene: 'sengoku', camera: s.camera ?? {}, weather: s.weather } });
+    // The riders clear of the formation, as the scout stood them (tools/trailer-skirmish.js placeRiders).
+    const riders = placeRiders(window.boxer.state.world);
     await this.settle();
-    return window.boxer.state.world.fighters.length;
+    return { men: window.boxer.state.world.fighters.length, riders, at: riders.map((id) => window.boxer.state.world.fighters[id].mount.at) };
   },
   // The ending's duel: two knights at the gallop with couched lances on the open field, `distance` m apart. [red, blue] presets.
   async joust(seed = 1, distance = 60, { lane = 0, red = { preset: 'maximilian', mounted: true }, blue = { preset: 'knight', style: 'lance', mounted: true }, place = 'field' } = {}) {

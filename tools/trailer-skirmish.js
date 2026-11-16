@@ -15,8 +15,10 @@ export function skirmish(castSeed = 1, { mounted = 0 } = {}) {
   const pick = (side, test, n) => cast[side].filter(test).slice(0, n);
   const red = [...pick('red', (i) => i.style === 'matchlock', 5), ...pick('red', (i) => i.outfit.kind === 'ashigaru' && i.style !== 'matchlock', 5), ...pick('red', (i) => /samurai/.test(i.outfit.kind), 2)];
   const blue = [...pick('blue', (i) => /samurai/.test(i.outfit.kind), 6), ...pick('blue', (i) => i.outfit.kind === 'ashigaru' && i.style !== 'matchlock', 6)];
-  // `mounted`: that many of the West's samurai on horseback (the first of them), charging the guns.
-  return { red: red.map(masked), blue: blue.map(masked).map((i, k) => (k < mounted ? { ...i, mounted: true } : i)) };
+  // `mounted`: that many of the West's lamellar-armoured samurai on horseback, charging the guns.
+  // (Lacquered lamellar, `samurai`, not the tōsei harness: that one is proof against a teppō ball, OUTFITS.samuraiTosei bulletRating.)
+  let left = mounted;
+  return { red: red.map(masked), blue: blue.map(masked).map((i) => (left > 0 && i.outfit.kind === 'samurai' ? (left -= 1, { ...i, mounted: true }) : i)) };
 }
 export const SKIRMISH_ARENA = { halfX: 22, halfZ: 12 };
 

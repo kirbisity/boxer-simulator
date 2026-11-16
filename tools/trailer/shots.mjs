@@ -125,17 +125,18 @@ export const SHOTS = {
       await TC.warm(60);`,
     segments: [slow(0.42, 6)],
   },
-  // Sekigahara (tools/trailer-skirmish.js, seed 11): the East's teppō rank fires; a masked West samurai is shot dead through his armour;
-  // his side charges on past him. No HUD.
+  // Sekigahara (tools/trailer-skirmish.js, seed 28, one West samurai mounted: user, 2026-11-15): the East's teppō rank fires at a samurai on
+  // horseback before the West's line; a ball goes through his lamellar (24%) and kills him, he falls from the saddle (0.55 s) and the horse
+  // bolts past the guns. (A rider in the tōsei harness is proof against the ball: OUTFITS.samuraiTosei bulletRating.) No HUD.
   sekigahara: {
     view: 'frame',
     hud: false,
     setup: `
-      await TC.skirmish(11);
-      const a = { pos: [-12.2, 2.3, 5.2], look: [4, 1.1, -2.4], fov: 46 };
-      const b = { pos: [-11.6, 2.25, 4.6], look: [7, 1.0, -2.2], fov: 34 };
-      const c = { pos: [-5.5, 2.2, 2.2], look: [8.0, 0.6, -2.0], fov: 22 };
-      TC.path([{ t: 0, ...a }, { t: 0.9, ...b }, { t: 1.2, ...b }, { t: 2.8, ...c }, { t: 6, ...c }]);
+      await TC.skirmish(28, { mounted: 1 });
+      const a = { pos: [-12.2, 2.3, 5.2], look: [2.8, 1.7, 0], fov: 34 };
+      const b = { pos: [-11.6, 2.25, 4.6], look: [2.8, 1.5, 0], fov: 24 };
+      const c = { pos: [-4.5, 1.8, 3.6], look: [2.2, 0.5, 0.2], fov: 30 };
+      TC.path([{ t: 0, ...a }, { t: 0.5, ...a }, { t: 0.9, ...b }, { t: 1.4, ...b }, { t: 2.6, ...c }, { t: 6, ...c }]);
       boxer.playFrames(1, 0);
       await TC.warm(150);
       boxer.playFrames(21, 1 / 60);`,
@@ -170,22 +171,23 @@ export const SHOTS = {
   // the twist's way.)
   dnCellar: dunnottar([6, 6, -22.5], 0, [[14, -22.5], [22, -22.5], [28, -22.5], [32, -24.4]], 6),
   dnCrypt: dunnottar([20, 1.4, -24.4], Math.PI, [[16, -24.4], [12, -25.5], [8, -27.5], [6.2, -29], [6.2, -33]], 6),
-  // The chapel, the boss: Lord Vaelen's intro (skipped once it starts), then the fight under his bar: the Forger's blows glance off the
-  // jousting plate (1.97 s, slowed; 2.73, 4.97), and Vaelen knocks him out (5.05 s: the ghost bar). Started inside the chapel gate, clear of
-  // its portcullis.
+  // The chapel, the boss (Rodelero, 2026-11-15): Lord Vaelen's intro (skipped once it starts), then the fight under his bar: she takes two
+  // of his blows on her guard (2.03, 3.10 s), her cut glances off his jousting plate (5.03 s, slowed), and he knocks her out (6.2 s: the
+  // ghost bar). Started inside the chapel gate, clear of its portcullis.
   dnChapel: {
     view: 'phone',
     level: true,
     setup: `
-      await TC.level([-9, 17.18, -36], Math.PI);
-      TC.pilot([[-14, -36], [-18, -36]]);
+      await TC.level([-7, 17.18, -36], Math.PI);
+      TC.pilot([[-15, -36], [-18, -36]]);
       const run = boxer.levelRun();
       const w = boxer.state.world;
       for (let i = 0; i < 300 && !run.cutscene(); i += 1) { TC.onFrame(w); boxer.playFrames(1, 1 / 60); }
       run.skipCutscene?.();
       await TC.warm(60);`,
-    segments: [real(1.8), slow(0.5, 4), real(4.2)],
+    segments: [real(4.6), slow(0.6, 4), real(1.8)],
   },
+
 };
 
 /** A Dunnottar shot: the Forger stood at `at` facing `yaw`, piloted along `points` for `seconds`; `extra` runs before the take. */

@@ -193,16 +193,16 @@
     },
     {
       "shot": "dnChapel",
-      "in": 0.4,
-      "out": 7.4,
+      "in": 1.6,
+      "out": 8.6,
       "ambience": [
         "loop-roof"
       ],
       "cards": [
         {
           "card": 9,
-          "from": 0.8,
-          "to": 4.2
+          "from": 2.2,
+          "to": 5.8
         }
       ]
     },
