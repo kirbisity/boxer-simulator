@@ -124,8 +124,11 @@ export const HUNRIVER = {
   seconds: 300 + HUNRIVER_MARCH,
   view: {
     scene: 'sarhu',
-    // A dry spring day on the Liaodong plain, the smoke of Shenyang's fall and the Sichuan camp's in the air.
-    weather: { fog: [20, 110], sky: 0.65, pale: 0.7, sun: 0.8 },
+    // The open field's own evening (env/config.js PLACE_ENV.sarhu, the field's): clear, the sun 7 degrees up in a few bars
+    // of cloud, the day's dust gold toward it, so the battle's last stand is fought in long level light. No weather of the
+    // battle's own: a mist drawn for the smoke took the place's evening away (the open air keeps a place's own day only
+    // under its own weather) and stood the sun at mid-afternoon height.
+    weather: null,
     camera: { yaw: -0.5, pitch: 0.55, distance: 30, maxDistance: 40 },
   },
 };

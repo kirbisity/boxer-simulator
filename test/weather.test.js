@@ -39,3 +39,14 @@ test('the wokou levels are fought in the water town, the floor clear of the hous
     assert.ok(canal.near - 1.9 > halfZ, 'short of the bridge');
   }
 });
+
+test('the Hun River (story chapter 8) is fought in the open field\'s own evening: no weather of its own, the place\'s clear day with the sun 7 degrees up', async () => {
+  const { BATTLE_HUNRIVER } = await import('../src/story/battles/08-hunriver.js');
+  const { storyNorthLife } = await import('../tools/storynorth.js');
+  const { PLACE_ENV } = await import('../src/env/config.js');
+  const setup = BATTLE_HUNRIVER.setup(storyNorthLife(BATTLE_HUNRIVER, { rank: 'officer' }), 1);
+  assert.equal(setup.view.scene, 'sarhu');
+  assert.equal(setup.view.weather, null, 'no mist for the smoke: the open air shows the place\'s own day');
+  assert.equal(PLACE_ENV.sarhu.weather, 'clear');
+  assert.equal(PLACE_ENV.sarhu.sun.elevation, 7);
+});
