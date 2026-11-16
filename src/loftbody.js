@@ -1169,8 +1169,9 @@ export const ARMOR_KINDS = {
   mingEliteInfantry: {
     trunk: [[-0.06, 0.96, 1.2, { studded: 22, base: 'cloth', edge: 'cloth2', opening: 0.012 }], [0.14, 0.24, 1.3, { buckle: 'gold', base: 'leather' }]],
     skirt: [0.95, 0.55, 1.32, { studded: 24, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
-    // The sleeve from the armhole down past the elbow to meet the forearm's (no shirt between), and over it the shoulder guard.
-    upperArm: [[-0.3, 1.04, 1.22, { studded: 10, base: 'cloth' }], [-0.05, 0.6, 1.3, { ...SHOULDER_FLAP }]],
+    // The sleeve from the armhole down past the elbow to meet the forearm's (no shirt between). (No shoulder guard over it:
+    // the user's call, 2026-11-15, the square flap struck out on a screenshot of Qi's men.)
+    upperArm: [-0.3, 1.04, 1.22, { studded: 10, base: 'cloth' }],
     forearm: {
       l: [[-0.04, -0.03, 1.22, { studded: 10, base: 'cloth', edge: 'cloth2' }], [0.12, -0.07, 1.36, 'steel']],
       r: [-0.04, -0.03, 1.22, { studded: 10, base: 'cloth', edge: 'cloth2' }],

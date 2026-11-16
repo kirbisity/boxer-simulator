@@ -47,6 +47,10 @@ export const WOKOU_1588 = {
   // The squads' kit and colours (scenarios.js QI: Qi's elite infantry in the olive coat (design 0, as QI.design since 2026-11-15), the household's crimson).
   kit: 'mingEliteInfantry',
   design: { mingEliteInfantry: 0, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  // Not all one kit (the user's call, 2026-11-15): in each squad (its slots, koreaSquad's order) some men in the vermilion 勇
+  // kettle hat over the olive coat (OUTFITS mingBrigandine 0's helmet, `outfit.helm`), and some in the regular's plain
+  // brigandine (mingBrigandine: 0 red under that hat, 1 blue under the riveted one).
+  mix: { redHat: [3, 5, 9], brigandine: { 6: 0, 7: 0, 10: 1 } },
 };
 
 /** Qi's squad of twelve: each man's [style, back, across] about his squad's middle (from qiJiguangLevel's layout). */
@@ -82,7 +86,11 @@ export const wokouBattle = {
     for (let s = 0; s < spec.squads; s += 1) {
       const middle = (s - (spec.squads - 1) / 2) * 4.9;
       for (const [style, back, across] of squad) {
-        men.push(koreaStandIn(random, style, spec.kit, { people: 'qi', design: spec.design }));
+        const man = koreaStandIn(random, style, spec.kit, { people: 'qi', design: spec.design });
+        const slot = men.length % 12;
+        if (spec.mix.brigandine[slot] != null) man.outfit = { kind: 'mingBrigandine', design: spec.mix.brigandine[slot] };
+        else if (spec.mix.redHat.includes(slot)) man.outfit = { ...man.outfit, helm: { kind: 'mingBrigandine', design: 0 } };
+        men.push(man);
         places.push([spec.front + back, middle + across]);
       }
     }
