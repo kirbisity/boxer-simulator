@@ -713,7 +713,7 @@ export function buildCanalTown() {
 
   // The town's lie (townkit/lay.js): what is under a roof or a bridge, the shade of the lanes, the low places, and
   // where feet go (the ways below: the lanes' middles, the quay, the bridges, the square's crossings).
-  const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2, sun: CT_LIGHT.sun });
+  const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2 });
 
   // What grows and gathers, by the lie: weeds at the walls' feet and in the unworn margins of the paving, thick on
   // open earth; fallen leaves and straw in the corners.
