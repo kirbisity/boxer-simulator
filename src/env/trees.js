@@ -437,7 +437,7 @@ void envHazeSplit(vec3 world, out vec3 through_, out vec3 air_) {
   float distance_ = length(ray);
   vec3 depth_ = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(world.y, 0.0))) * distance_;
   through_ = exp(-depth_);
-  air_ = envAirlightIn(ray / max(distance_, 1e-3), envAirShare(cameraPosition, ray, depth_.g, 0.5, ${ENV.air.shadeSteps[1]})) * (1.0 - through_);
+  air_ = envAirlightRising(ray / max(distance_, 1e-3), envAirShare(cameraPosition, ray, depth_.g, 0.5, ${ENV.air.shadeSteps[1]}), envAirRise(distance_, depth_)) * (1.0 - through_);
 }`;
 
 const ENV_CROWN_VERTEX = /* glsl */ `

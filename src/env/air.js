@@ -326,6 +326,8 @@ export function envAirToUniforms(air, weather, quality, place) {
  * GLSL every env shader starts with (vertex and fragment): the shared uniforms and
  *   envSky(dir)            the sky's colour toward a unit direction (the table)
  *   envAirlight(dir)       the light the air scatters into a long level sight line that way (its horizon row)
+ *   envAirlightRising(dir, share, rise)   the same for a line whose depth is `rise` the clear air's own: that share
+ *                          takes the sky's colour at the line's own height (envAirRise(distance, depth) gives it)
  *   envHaze(colour, from, to)   `colour` at world point `to` seen from `from` through the haze
  *   envCloud(xz)           the cloud sheet's cover 0..1 over sheet point xz (sheet units); envCloudDepth(xz) how thick
  *   envSunShare(world)     how much of the sun reaches a point on the land under the clouds, 0..1
@@ -374,7 +376,12 @@ vec3 envSky(vec3 dir) {
 
 // The air's light into a sight line, share of the sun on the air along it (envAirShare). What shade takes is the
 // light scattered once: ENV.air.shadeBeam of the level light, and all that the forward lobe adds toward the sun.
-vec3 envAirlightIn(vec3 dir, float share) {
+// rise (per colour, 0..1): the share of the line's depth that is the clear air's own (Rayleigh) and not the
+// haze's. The haze's light is the horizon row's (a long level line through it is all haze), but the clear air's is
+// the sky's own colour that way, so a line that climbs out of a shallow haze to high ground takes the colour of the
+// sky over that ground and not the horizon's (in a dawn's valley mist the far hilltops beige while the sky just
+// over them was blue). A level or falling line reads the horizon row either way: unchanged.
+vec3 envAirlightRising(vec3 dir, float share, vec3 rise) {
   // The horizon row that way, brighter toward the sun itself as the haze throws its light forward (config.js aureole).
   vec3 sun = uEnvSunDir;
   float level = dot(normalize(dir.xz + vec2(1e-5, 0.0)), sun.xz);
@@ -384,7 +391,17 @@ vec3 envAirlightIn(vec3 dir, float share) {
   // (The weather's glare, the forward peak of its large particles past what the table holds, is the sun's beam
   // scattered once, and shade takes all of it.)
   vec3 glare = uEnvSunColour * uEnvGlare.x * pow(max(dot(normalize(dir), sun), 0.0), uEnvGlare.y);
-  return envSky(vec3(dir.x, 0.0, dir.z)) * (1.0 + ${ENV.air.aureole.toFixed(2)} * (lobe - 1.0)) * (1.0 - once * (1.0 - share)) + glare * share;
+  vec3 sky = mix(envSky(vec3(dir.x, 0.0, dir.z)), envSky(dir), rise);
+  return sky * (1.0 + ${ENV.air.aureole.toFixed(2)} * (lobe - 1.0)) * (1.0 - once * (1.0 - share)) + glare * share;
+}
+
+vec3 envAirlightIn(vec3 dir, float share) {
+  return envAirlightRising(dir, share, vec3(0.0));
+}
+
+// The clear air's share of a line's depth (envAirlightRising's rise), from the line's length (m) and its depth.
+vec3 envAirRise(float distance, vec3 depth) {
+  return clamp(uEnvRayleigh.rgb * distance / max(depth, vec3(1e-6)), 0.0, 1.0);
 }
 
 vec3 envAirlight(vec3 dir) {
@@ -581,7 +598,7 @@ vec3 envHazeWalk(vec3 colour, vec3 from, vec3 to, float grain, int steps) {
   vec3 depth = (uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(from.y, 0.0), max(to.y, 0.0))) * distance;
   vec3 through = exp(-depth);
   float share = envAirShare(from, ray, depth.g, grain, steps);
-  return colour * through + envAirlightIn(ray / max(distance, 1e-3), share) * (1.0 - through);
+  return colour * through + envAirlightRising(ray / max(distance, 1e-3), share, envAirRise(distance, depth)) * (1.0 - through);
 }
 
 vec3 envHazeGrain(vec3 colour, vec3 from, vec3 to, float grain) {

@@ -197,8 +197,10 @@ void main() {
     float column = uEnvRayleigh.a / uEnvHaze.w * exp(-max(uEye.y, 0.0) * uEnvHaze.w) / max(dir.y, 0.004);
     depth = vec3(dir.y > 0.0 ? column : 40.0);
   }
+  // (The sky's line is the haze's column alone: its clear air is the sky itself.)
+  vec3 rise = z >= 0.999999 ? vec3(0.0) : envAirRise(distance_, depth);
   float share = envAirWalk(uEye, ray, depth.g, envGrain(gl_FragCoord.xy), ${ENV.air.frameSteps});
-  gl_FragColor = vec4((envAirlightIn(dir, 1.0) - envAirlightIn(dir, share)) * (1.0 - exp(-depth)), uRange.x * uRange.y / (uRange.y - z * (uRange.y - uRange.x)));
+  gl_FragColor = vec4((envAirlightRising(dir, 1.0, rise) - envAirlightRising(dir, share, rise)) * (1.0 - exp(-depth)), uRange.x * uRange.y / (uRange.y - z * (uRange.y - uRange.x)));
 }`;
 
 // The scene less that light. The pass above is half the size, so each point takes the four of its points round
