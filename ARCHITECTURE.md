@@ -152,6 +152,13 @@ kozane too. The castle kit (kittex.js `stoneDetailMaps`) and the painted grounds
 `PAINTED_GROUND_BAKED`: a baked tile instead of a painted layer) share the ground tiles. `#maps=off` in the address draws
 everything as before (`boxer.detailMaps()`).
 
+**Garment wear.** `src/clothwear.js` paints whole-garment wear into a body's vertex colours when it is built (render.js
+`paintBody`, so a crowd's baked body has it too, at no cost a frame): mud thrown up from the ground and at the knees, hems
+and cuffs grimed and frayed, sweat at the armpits, collar and upper back, dye faded by the sun, a little grime over all.
+One rule; how much shows is the outfit's wear amount, set by its wearer's station (`OUTFIT_STATION`, `STATION_WEAR`: rags
+1, a peasant 0.85, a common soldier 0.7 ... court and parade 0.05). A hung mantle (wardrobe.js `softDrape`) takes the same
+marks by row (`drapeWear`). The weave's own wear is in the cloth atlas.
+
 ## Looks (browser only)
 
 A **look** is a whole way of drawing the game, switchable at runtime: the

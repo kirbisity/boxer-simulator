@@ -2,6 +2,7 @@
 // on the body, tattoos, steel, and the pieces that are not part of the body
 // mesh — fists, footwear, headgear and the things that swing.
 
+import { clothWearOf, drapeWear } from './clothwear.js';
 import { Dangle } from './dangle.js';
 import { WORLD } from './physics/config.js';
 import { FACTIONS, factionOf, HEADGEAR, heelLift, OUTFITS, outfitOf, RAGS, ragStrips, ragTear, resolveColor } from './outfits.js';
@@ -3743,7 +3744,7 @@ function buildGladiatorHelm(group, head, r, steel, color) {
  * Dangles a level at a time, each level then held to its neighbours, and last
  * the sheet itself. (Each has `update` and a `group`.)
  */
-export function softDrape(anchor, { columns, links, top, hem, y, length, centre, arc, sag = 0.2, damping = 0.7, collides = ['trunk', 'leg'], paint, stretch = 1.12 }) {
+export function softDrape(anchor, { columns, links, top, hem, y, length, centre, arc, sag = 0.2, damping = 0.7, collides = ['trunk', 'leg'], paint, stretch = 1.12, wear = null }) {
   const closed = arc >= Math.PI * 2 - 1e-6;
   const link = length / links;
   const share = arc / columns;
@@ -3799,7 +3800,7 @@ export function softDrape(anchor, { columns, links, top, hem, y, length, centre,
       },
     });
   }
-  steps.push(clothSheet(anchor, chains, { closed, link, paint, folds: hem * 0.06 }));
+  steps.push(clothSheet(anchor, chains, { closed, link, paint, folds: hem * 0.06, wear: wear && { ...wear, length } }));
   return steps;
 }
 
@@ -3819,7 +3820,7 @@ function catmullRom(p0, p1, p2, p3, t, out) {
  * redrawn each frame, falling in a fold to each column (`folds` deep at the
  * hem). An open sheet runs half a column past its outer chains.
  */
-function clothSheet(anchor, chains, { closed, link, paint, folds }) {
+function clothSheet(anchor, chains, { closed, link, paint, folds, wear }) {
   const columns = chains.length;
   const links = chains[0].length;
   const across = 6;
@@ -3862,6 +3863,13 @@ function clothSheet(anchor, chains, { closed, link, paint, folds }) {
     indices.push(...bucket);
   });
   geometry.setIndex(indices);
+  // Worn as its wearer's station wears it (clothwear.js drapeWear: its hem muddied and frayed, faded): colours its
+  // material's are multiplied by.
+  const worn = wear && drapeWear({ rows: height, width, length: wear.length, hemAbove: wear.hemAbove, amount: wear.amount, base: (u) => paint(cell(Math.min(u, spans * across - 1))).color });
+  if (worn) {
+    geometry.setAttribute('color', new THREE.BufferAttribute(worn, 3));
+    for (const material of materials) material.vertexColors = true;
+  }
   const sheet = new THREE.Mesh(geometry, materials.length > 1 ? materials : materials[0]);
   // Its bounds move with the cloth every frame.
   sheet.frustumCulled = false;
@@ -4021,7 +4029,9 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
       const shoulders = body.lengths.shoulderSpan ?? 0.4 * scale;
       const cloth = surface(new THREE.Color(color).getHex(), { roughness: 0.85 });
       cloth.side = THREE.DoubleSide;
-      const drape = softDrape(collar, { columns: 9, links: 3, top: shoulders * 0.62, hem: shoulders * 1.2, y: 0.02 * scale, length, centre: Math.PI * 1.5, arc: Math.PI * 1.3, sag: 0.18, damping: 0.75, paint: () => cloth });
+      // (Its hem over the ground: hung from the shoulders, about 0.82 of his height up.)
+      const wear = { amount: clothWearOf(body.inputs.outfit), hemAbove: Math.max(0, body.heightM * 0.82 - length) };
+      const drape = softDrape(collar, { columns: 9, links: 3, top: shoulders * 0.62, hem: shoulders * 1.2, y: 0.02 * scale, length, centre: Math.PI * 1.5, arc: Math.PI * 1.3, sag: 0.18, damping: 0.75, paint: () => cloth, wear });
       if (extra.cross) {
         // On the cloth at the left front of the shoulders (riding on the last chain's top link).
         const red = surface(new THREE.Color(extra.cross).getHex(), { roughness: 0.8 });
