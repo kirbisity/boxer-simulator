@@ -503,15 +503,24 @@ const TK_COLOUR = `
   // across. The wind's work (the lie's map) piles it or thins it, feet tread it away, and nothing lies under cover.
   float holds = uTkHold * (1.0 - ${TK_WEATHER.snow.packed.toFixed(2)} * tkWear);
   // (Under a roof's edge, what the wind blows in: the cover read again up the wind, a ragged reach from the edge;
-  // the deeper under, the less: TK_WEATHER.snow.under.)
+  // the deeper under, the less: TK_WEATHER.snow.under. And the drip line itself, on either side of the roof, read
+  // jitter m aside, so the edge between lying snow and the dry ground under the eave wanders as the drips and the
+  // gusts leave it: on the lee side the line is that edge alone, where it had been the lie's straight one.)
   float tkSnowUnder = tkUnder;
-  if (uTkSnow > 0.0 && tkUnder > 0.0 && uTkLayH.z > 0.5) {
-    float reach = ${TK_WEATHER.snow.under.reach.toFixed(2)} * (1.0 - ${TK_WEATHER.snow.under.ragged.toFixed(2)} * (tkNoise(vTkPos.xz * 2.3 + 11.0) * 0.7 + fine * 0.3));
-    vec2 aside = vec2(tkNoise(vTkPos.xz * 3.1 + 2.0), tkNoise(vTkPos.xz * 3.1 + 9.0)) * 2.0 - 1.0;
-    vec2 qw = (vTkPos.xz - uTkBlow.xy * reach + aside * ${TK_WEATHER.snow.under.jitter.toFixed(2)} - uTkLay.xy) * uTkLay.zw;
-    if (qw.x > 0.0 && qw.x < 1.0 && qw.y > 0.0 && qw.y < 1.0) {
-      float topUp = texture2D(uTkLayB, qw).r * uTkLayH.y + uTkLayH.x;
-      tkSnowUnder = smoothstep(0.35, 0.9, topUp - vTkPos.y);
+  if (uTkSnow > 0.0 && uTkLayH.z > 0.5) {
+    // (Gust-wide wanders and a finer, drip-sized break on them.)
+    vec2 aside = (vec2(tkNoise(vTkPos.xz * 3.1 + 2.0), tkNoise(vTkPos.xz * 3.1 + 9.0)) * 0.7 + vec2(tkNoise(vTkPos.xz * 11.0 + 5.0), tkNoise(vTkPos.xz * 11.0 + 13.0)) * 0.3) * 2.0 - 1.0;
+    vec2 qj = (vTkPos.xz + aside * ${TK_WEATHER.snow.under.jitter.toFixed(2)} - uTkLay.xy) * uTkLay.zw;
+    float drip = tkUnder;
+    if (qj.x > 0.0 && qj.x < 1.0 && qj.y > 0.0 && qj.y < 1.0) drip = smoothstep(0.35, 0.9, texture2D(uTkLayB, qj).r * uTkLayH.y + uTkLayH.x - vTkPos.y);
+    tkSnowUnder = drip;
+    if (drip > 0.0) {
+      float reach = ${TK_WEATHER.snow.under.reach.toFixed(2)} * (1.0 - ${TK_WEATHER.snow.under.ragged.toFixed(2)} * (tkNoise(vTkPos.xz * 2.3 + 11.0) * 0.7 + fine * 0.3));
+      vec2 qw = (vTkPos.xz - uTkBlow.xy * reach + aside * ${TK_WEATHER.snow.under.jitter.toFixed(2)} - uTkLay.xy) * uTkLay.zw;
+      if (qw.x > 0.0 && qw.x < 1.0 && qw.y > 0.0 && qw.y < 1.0) {
+        float topUp = texture2D(uTkLayB, qw).r * uTkLayH.y + uTkLayH.x;
+        tkSnowUnder = min(drip, smoothstep(0.35, 0.9, topUp - vTkPos.y));
+      }
     }
   }
   float lying = blot * 0.42 + fine * 0.28 + tkFbm(vTkPos.xz * 0.045 + 7.0) * 0.3 + uTkSnow * holds * 0.45 + (lies - 0.5) * 0.8;
