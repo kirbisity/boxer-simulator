@@ -3590,7 +3590,10 @@ export function buildHeadProp(kind, body, dress, colors, steel, cornerHex) {
     }
     case 'headWrap': {
       const linen = cloth(0xd8cfb8);
-      const cap = new THREE.Mesh(new THREE.SphereGeometry(1.1 * r, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.46), linen);
+      // (1.1 head radii at its facets' middles, not only at its corners: a facet lies the chord's sag inside the sphere through
+      // its corners, and the back of the skull, out to 1.09 radii, came through two of them in dark dashes.)
+      const [around, down, reach] = [16, 10, Math.PI * 0.46];
+      const cap = new THREE.Mesh(new THREE.SphereGeometry((1.1 * r) / (Math.cos(Math.PI / around) * Math.cos(reach / (2 * down))), around, down, 0, Math.PI * 2, 0, reach), linen);
       cap.position.y = 0.06 * r;
       const roll = new THREE.Mesh(new THREE.TorusGeometry(1.06 * r, 0.16 * r, 8, 22), linen);
       roll.rotation.x = Math.PI / 2;
