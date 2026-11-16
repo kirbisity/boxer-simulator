@@ -52,7 +52,7 @@ import { blastEvent, createBlastScreen, fragmentEvent, updateThrown } from './bl
 import { artilleryFired, artilleryHit, updateArtillery } from './artilleryview.js';
 import { DETAIL_MAPS } from './detailmaps.js';
 import { setHelmStyle } from './helmstyle.js';
-import { bareCrowdHead, BODY_STYLE, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray, warmSevered } from './render.js';
+import { bareCrowdHead, BODY_STYLE, FULL_MODELS, BODY_STYLES, buildFighterView, clearCrowdTemplates, prefetchSkins, pumpSkinBuilds, setBodyStyle, setSkinQuality, SKIN_BUILD, skinBuildStats, PLACE_ARENAS, createScene, disposeFighterView, forgetPlaces, placeCamera, reapplyPlace, render, resize, selectCrowdDraw, setLayer, setPlace, showImpact, updateFighterView, updateProps, updateSpray, warmSevered } from './render.js';
 import { buildHorseView, disposeHorseView, updateHorseView } from './horseview.js';
 import { releaseSkinTextures } from './skintex.js';
 import { placeMounted } from './physics/mounted.js';
@@ -657,7 +657,8 @@ function thinkForBout(world, dt) {
   // The man played has the stamina overdraft (physics/overdraft.js); an AI fighter never does.
   for (const fighter of world.fighters) if (Boolean(fighter.player) !== players.has(fighter.id)) fighter.player = players.has(fighter.id);
   // Standing still: no thinking at all; he stays where he is, guard down, and takes what comes.
-  const still = new Set(players);
+  // (Trailer capture: boxer.autopilot(true) lets the fight AI play the player's man, the HUD and camera as in play.)
+  const still = new Set(state.autopilot ? [] : players);
   // A story scene's figures (src/story/scenes/stage.js): held where the scene puts them, posed by it.
   if (state.game === 'story') for (const id of story.held()) still.add(id);
   // Crawling (the sandbox's look at it): that side down on its knees, still in the fight; the player's man as he chooses.
@@ -807,6 +808,8 @@ resolution.onTier = (tier) => {
 function frame(now) {
   // The next frame is asked for first: an error in this one must never stop the game.
   requestAnimationFrame(frame);
+  // (Trailer capture: boxer.capture(true) hands the clock to boxer.playFrames, one frame per grab.)
+  if (state.captureHeld) { last = now; return; }
   const started = performance.now();
   const interval = now - last;
   const dt = Math.min(0.1, interval / 1000);
@@ -4140,6 +4143,34 @@ const boxer = window.boxer = {
     if (BODY_STYLES.includes(style)) setBodyStyle(style);
     return BODY_STYLE;
   },
+  // Trailer capture: a rider and his horse put at (x, z) facing `yaw` (physics/mounted.js placeMounted): the joust's two lanes.
+  placeRider: (id, x, z, yaw) => placeMounted(state.world.fighters[id], x, z, yaw),
+  // Trailer capture: the menus shut over a fight started by a hook (fight() leaves them open).
+  closeMenus: () => menus.close(),
+  // Trailer capture: the page's own loop stops (true) and boxer.playFrames is the only clock; false gives it back.
+  capture: (on) => {
+    if (on !== undefined) state.captureHeld = Boolean(on);
+    return Boolean(state.captureHeld);
+  },
+  // Trailer capture's extra-high mode: every man drawn as his own full model (no crowd bodies, far bodies, distance cuts of ink, shadow or
+  // skin), the views rebuilt now; false: as the game draws. No argument: whether it is on.
+  fullModels: (on) => {
+    if (on !== undefined) {
+      FULL_MODELS.on = Boolean(on);
+      crowdLod.enabled = !on;
+      CROWD_VIEW.inkDistance = on ? 1e4 : 16;
+      STAGE_CROWD_VIEW.inkDistance = on ? 1e4 : 10;
+      SKIN_BUILD.farDistance = on ? 1e4 : 30;
+      if (state.world) rebuildViews();
+      pumpSkinBuilds(scene, Infinity);
+    }
+    return FULL_MODELS.on;
+  },
+  // Trailer capture: the fight AI plays the player's man (true) or the player does (false).
+  autopilot: (on) => {
+    if (on !== undefined) state.autopilot = Boolean(on);
+    return Boolean(state.autopilot);
+  },
   // Adaptive resolution (adaptres.js): on or off (off: the full pixel ratio, kept), and what it is doing now; no argument: just that.
   adaptiveResolution: (on) => {
     if (on !== undefined) resolution.set(on, scene);
@@ -4311,7 +4342,7 @@ const boxer = window.boxer = {
   playFrames: (count, dt = 1 / 60) => {
     for (let index = 0; index < count; index += 1) {
       buildQueuedViews();
-      if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * paceNow());
+      if (!state.paused && !state.viewQueue?.length) tick(dt * state.speed * paceNow(), state.captureHeld ? { budget: Infinity } : undefined);
       draw(dt);
       pumpSkinBuilds(scene);
     }

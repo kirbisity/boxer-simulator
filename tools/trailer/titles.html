@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- The launch video's text cards (captions, the closing line, the title), drawn in the game's own type and colours (boxer.css: Cormorant
+     Garamond, IBM Plex Sans Condensed, Noto Serif SC; ink and gilt) on a clear page; tools/trailer/render.mjs shoots each one as a clear
+     1080x1920 PNG for assemble.py to lay over the footage. window.showCard(card) draws one: { kind, text, sub, lang }. Not part of the game. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=Noto+Serif+SC:wght@700&display=block">
+<style>
+  :root { --ink: 236, 229, 211; --gilt: 216, 178, 94; --pit: 12, 11, 9; --gold: #d8b25e;
+    --title: 'Cormorant Garamond', Georgia, 'Noto Serif SC', serif; --display: 'IBM Plex Sans Condensed', 'Arial Narrow', sans-serif; }
+  html, body { margin: 0; width: 540px; height: 960px; background: transparent; overflow: hidden; }
+  .card { position: absolute; inset: 0; display: none; }
+  .card.on { display: block; }
+  /* Captions: one line or two, centred, inside the platform-safe width (the middle 80%), clear of the phone HUD (its stick and buttons
+     fill the lowest quarter) and of the orders at the top left. */
+  .caption { position: absolute; left: 10%; right: 10%; top: 54%; text-align: center; font: 600 30px/1.18 var(--title); color: rgb(var(--ink));
+    text-shadow: 0 2px 6px rgba(var(--pit), 0.95), 0 0 18px rgba(var(--pit), 0.8); letter-spacing: 0.005em; }
+  .caption[lang=zh] { font: 700 26px/1.4 'Noto Serif SC', serif; }
+  .closing { position: absolute; left: 8%; right: 8%; top: 32%; text-align: center; font: 600 38px/1.2 var(--title); color: rgb(var(--ink));
+    text-shadow: 0 2px 10px rgba(var(--pit), 0.95), 0 0 30px rgba(var(--pit), 0.9); }
+  .closing[lang=zh] { font: 700 30px/1.5 'Noto Serif SC', serif; }
+  .title { position: absolute; left: 6%; right: 6%; top: 15%; text-align: center; }
+  /* A soft shade behind the block: the ending turns into the low sun, and the pale lines would go into its glare. */
+  .title::before { content: ''; position: absolute; inset: -140px -120px -150px; z-index: -1;
+    background: radial-gradient(closest-side at 50% 55%, rgba(var(--pit), 0.34) 0%, rgba(var(--pit), 0.26) 40%, rgba(var(--pit), 0.12) 70%, transparent 100%); }
+  .title .mark { font: 600 15px var(--display); letter-spacing: 0.55em; color: var(--gold); padding-left: 0.55em; text-shadow: 0 1px 6px rgba(var(--pit), 0.9); }
+  .title .rule { height: 1px; margin: 12px 16% 14px; background: linear-gradient(90deg, transparent, rgba(var(--gilt), 0.9), transparent); }
+  .title h1 { margin: 0; font: 700 50px/1.0 var(--title); text-transform: uppercase; letter-spacing: 0.03em;
+    color: #e4c172; text-shadow: 0 1px 0 #8a6a2a, 0 3px 10px rgba(var(--pit), 0.95), 0 0 28px rgba(var(--pit), 0.75); }
+  .title .sub { margin-top: 16px; font: italic 500 24px/1.25 var(--title); color: rgb(var(--ink)); text-shadow: 0 2px 8px rgba(var(--pit), 0.95); }
+  .title .link { margin-top: 14px; font: 600 14px var(--display); letter-spacing: 0.12em; color: rgba(var(--ink), 0.85); text-shadow: 0 1px 6px rgba(var(--pit), 0.95); }
+  /* A full card (the end page's stand-in, a gap in the cut): the game's dark plate, opaque. */
+  .plate { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 40%, #1d1913 0%, #0c0b09 75%); }
+  .plate .box { position: absolute; left: 9%; right: 9%; top: 34%; padding: 28px 22px; border: 1px solid rgba(var(--gilt), 0.55); text-align: center; }
+  .plate .kicker { font: 600 13px var(--display); letter-spacing: 0.22em; color: var(--gold); text-transform: uppercase; }
+  .plate .big { margin-top: 14px; font: 600 34px/1.2 var(--title); color: rgb(var(--ink)); }
+  .plate .small { margin-top: 12px; font: italic 500 18px/1.35 var(--title); color: rgba(var(--ink), 0.75); }
+  .plate [lang=zh].kicker { letter-spacing: 0.3em; }
+  .plate [lang=zh].big { font: 700 28px/1.5 'Noto Serif SC', serif; }
+  .plate [lang=zh].small { font: 500 15px/1.5 'Noto Serif SC', serif; }
+</style>
+</head>
+<body>
+<div class="card" id="caption"><div class="caption"></div></div>
+<div class="card" id="closing"><div class="closing"></div></div>
+<div class="card" id="title"><div class="title"><div class="mark">H · A · C · S</div><div class="rule"></div><h1></h1><div class="sub"></div><div class="link"></div></div></div>
+<div class="card" id="plate"><div class="plate"><div class="box"><div class="kicker"></div><div class="big"></div><div class="small"></div></div></div></div>
+<script>
+  const $ = (s) => document.querySelector(s);
+  window.showCard = (card) => {
+    for (const el of document.querySelectorAll('.card')) el.classList.remove('on');
+    const lang = card.lang ?? 'en';
+    if (card.kind === 'caption' || card.kind === 'closing') {
+      const el = $(`#${card.kind} .${card.kind}`);
+      el.lang = lang;
+      el.innerHTML = card.text;
+      $(`#${card.kind}`).classList.add('on');
+    } else if (card.kind === 'title') {
+      $('#title h1').innerHTML = card.text;
+      $('#title .sub').textContent = card.sub ?? '';
+      $('#title .link').textContent = card.link ?? '';
+      $('#title').classList.add('on');
+    } else if (card.kind === 'plate') {
+      for (const el of document.querySelectorAll('#plate .kicker, #plate .big, #plate .small')) el.lang = lang;
+      $('#plate .kicker').textContent = card.kicker ?? '';
+      $('#plate .big').innerHTML = card.text;
+      $('#plate .small').textContent = card.sub ?? '';
+      $('#plate').classList.add('on');
+    }
+    return true;
+  };
+  document.fonts.ready.then(() => { window.cardReady = true; });
+</script>
+</body>
+</html>
