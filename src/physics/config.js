@@ -1502,7 +1502,9 @@ export const WORLD = {
     // wounds), and a heart or great vessel opened drops it in `heartSeconds`.
     // `vital`: of a point deep enough to reach them, the share that lands over the heart and great vessels (their part of the
     // chest's and the neck's flank, seen as the point meets it): the rest goes into muscle and bleeds as any wound.
-    horse: { manBlood: 75, bleedShare: 0.3, heartSeconds: 45, heartDepth: 4, vital: { chest: 0.15, neck: 0.1 }, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
+    // `brainDepth`: a horse's brain lies under the frontal bone (~1.5 cm, a man's skull ~0.7) and the frontal sinus, or the
+    // temporal muscle from the side: a point must go about twice as deep as through a man's skull (physics/mounted.js harmHorse).
+    horse: { manBlood: 75, bleedShare: 0.3, heartSeconds: 45, heartDepth: 4, brainDepth: 2, vital: { chest: 0.15, neck: 0.1 }, legBreak: 160, headStun: 450, trunkFatal: 2500, boltSeconds: 4 },
     trample: { legs: 0.6, link: 0.9, most: 12, behind: 0.5, fell: 4, poiseGain: 0.15 },
     // `shaft`: what a set point can drive into a horse before its shaft gives (J): an ash shaft bends or snaps past a few kN
     // (~4 kN) over the ~0.25 m the point goes in: past that the energy goes into the shaft breaking and the man thrown back,
