@@ -15,7 +15,7 @@ import { ENV_GLSL, envUniforms } from '../env/air.js';
 import { tkBeams } from './beams.js';
 import { tkgBuilder, tkgFrame } from './geo.js';
 import { tkRandom } from './tex.js';
-import { tkWeather } from './weather.js';
+import { TK_STIR_RULE, tkWeather } from './weather.js';
 
 /** Tuning for what the wind moves. */
 export const TK_STIR = {
@@ -54,9 +54,15 @@ export const TK_STIR = {
   // (`long` 0.018: the eye's own blur of a falling drop, a hand's length near the ground; longer and each reads as a
   // blue rod standing in a dark lane.)
   drip: { perMetre: 2.2, every: [0.5, 3.5], wetFrom: 0.12, wide: 0.012, long: 0.018, alpha: 0.4 },
+  // A lit lantern's light: one camera-facing sheet on the lantern's middle (it swings with the lantern, TK_STIR_RULE),
+  // no light thrown on what is round it. The paper drawn lit over the lantern's own body, a soft halo `halo` lantern
+  // radii out; `light`: the paper's brightness, a multiple of the display's white. A candle behind paper is a few
+  // candelas per square metre, far under a lane's shaded wall by day (about a hundred and more): drawn as a lamp is
+  // seen at dusk, by eye, so it reads in the shade. `colours`: red paper and pale oiled paper with a flame behind.
+  glow: { halo: 3.2, light: 1.25, colours: [[1, 0.34, 0.12], [1, 0.7, 0.38]] },
 };
 
-const TK_STIR_KINDS = ['smoke', 'fire', 'spindrift', 'drip'];
+const TK_STIR_KINDS = ['smoke', 'fire', 'spindrift', 'drip', 'glow'];
 
 const TK_STIR_AIR_VERTEX = /* glsl */ `
 attribute vec2 aCorner;
@@ -116,7 +122,7 @@ void main() {
   up = cross(normalize(cross(right, up)), newRight);
   right = newRight;
   alpha *= strength * smoothstep(0.0, 0.12, age) * (1.0 - age);
-#else
+#elif KIND == 3
   // A drop from an eave: let go, falling freely the height aSeed.w, then nothing until the next.
   float wet = smoothstep(uHow.z, 1.0, uTkWet) * (1.0 - uTkSnow);
   float every = mix(uHow.x, uHow.y, r2) / max(wet, 0.05);
@@ -131,6 +137,22 @@ void main() {
   right = normalize(cross(up, cameraPosition - middle));
   // (A drip only where the roof is wet enough for this one's share, and while it is in the air.)
   alpha *= step(t, fall) * step(r3, wet * 1.2) * min(1.0, uSize.x / least);
+#else
+  // A lit lantern: its middle hangs under the hook as the hung things swing (weather.js TK_STIR_NORMAL: the lean from
+  // the gust at the hook, swinging at the lantern's own rate and phase), drawn a lantern's radius toward the eye so it
+  // lies over the paper; dimmed by the air between (as envHazeWalk's own through), adding no haze of its own.
+  float hookUp = aSeed.w * 1.15 + uHow.y;
+  vec3 hook = aAt + vec3(0.0, hookUp, 0.0);
+  float wind = envGust(hook.xz);
+  float lean = atan(uHow.x * wind * wind) * (1.0 + ${TK_STIR_RULE.swing.toFixed(2)} * sin(uTkTime * aSeed.y + aSeed.x));
+  vec3 axis = vec3(-uTkBlow.y, 0.0, uTkBlow.x);
+  vec3 arm = vec3(0.0, -hookUp, 0.0);
+  middle = hook + arm * cos(lean) + cross(axis, arm) * sin(lean);
+  middle += normalize(cameraPosition - middle) * aSeed.w * 1.1;
+  size = vec2(2.0 * uSize.x * aSeed.w);
+  float away = distance(cameraPosition, middle);
+  colour = mix(uColour, uColourEnd, aSeed.z) * uSize.w * exp(-(uEnvRayleigh.rgb + uEnvHaze.rgb * envHazeColumn(max(cameraPosition.y, 0.0), max(middle.y, 0.0))) * away);
+  lit = 0.0;
 #endif
   vec3 world = middle + (right * aCorner.x * size.x + up * aCorner.y * size.y) * 0.5;
   // (Lit as the land is, env/terrain.js: the sun by how a face meets it, here a puff's half, and the whole sky.)
@@ -156,6 +178,10 @@ varying vec4 vColour;
 void main() {
 #if KIND == 3
   float cover = 1.0 - abs(vUv.x);
+#elif KIND == 4
+  // (The paper, lit brightest at its middle, out to the lantern's radius; past it a soft halo.)
+  float d = length(vUv) * ${TK_STIR.glow.halo.toFixed(2)};
+  float cover = (1.0 - smoothstep(0.7, 1.0, d)) * (0.8 + 0.2 * (1.0 - d)) + 0.28 * exp(-d * d * 0.9);
 #else
   float cover = 1.0 - smoothstep(0.1, 1.0, length(vUv));
 #endif
@@ -172,7 +198,7 @@ export function tkStir(seed = 1) {
   const builder = tkgBuilder();
   const pivots = [];
   const stirs = [];
-  const sources = { smoke: [], fire: [], spindrift: [], drip: [] };
+  const sources = { smoke: [], fire: [], spindrift: [], drip: [], glow: [] };
   const world = tkgFrame();
   const laid = () => builder.batches().reduce((sum, batch) => sum + batch.position.length / 3, 0);
   // Everything laid since the last call hangs from `pivotOf(point)` with these figures (TK_STIR_RULE's attributes).
@@ -196,7 +222,7 @@ export function tkStir(seed = 1) {
   };
   const stir = {
     /** A paper lantern whose middle hangs at world (x, y, z), `size` m in radius, on its cord. */
-    lantern(x, y, z, { size = 0.2, colour = [0.82, 0.16, 0.12], cord = TK_STIR.lantern.cord } = {}) {
+    lantern(x, y, z, { size = 0.2, colour = [0.82, 0.16, 0.12], cord = TK_STIR.lantern.cord, phase = null } = {}) {
       const frame = tkgFrame(x, y, z);
       // (A round paper globe on bamboo hoops: seven rings from foot to head, twelve sides, so its outline holds at arm's length.)
       const globe = Array.from({ length: 7 }, (_, k) => [size * Math.max(0.35, Math.cos(((k - 3) / 3) * 1.21)), (size * (k - 3)) / 3]);
@@ -206,7 +232,16 @@ export function tkStir(seed = 1) {
       builder.round('cloth', frame, 0, 0, size * 1.15, size * 1.15 + cord, 0.006, 0.006, { colour: [0.12, 0.1, 0.08], sides: 3, caps: '' });
       const hook = [x, y + size * 1.15 + cord, z];
       // (Its swing's own rate: a pendulum as long as from the hook to its middle.)
-      hang(() => hook, [TK_STIR.lantern.catch, 0, random() * 6.28, Math.sqrt(9.81 / (size * 1.15 + cord))]);
+      const swing = [phase ?? random() * 6.28, Math.sqrt(9.81 / (size * 1.15 + cord))];
+      hang(() => hook, [TK_STIR.lantern.catch, 0, ...swing]);
+      return { at: [x, y, z], size, cord, swing };
+    },
+    /**
+     * A lantern (as `lantern` returns it) lit: its light, TK_STIR.glow. `pale` 0 for red paper, 1 for pale. Only the
+     * kit's own cord: the light reads its hook from it.
+     */
+    glow(lantern, pale = 0) {
+      sources.glow.push({ at: lantern.at, count: 1, seed: [lantern.swing[0], lantern.swing[1], pale, lantern.size] });
     },
     /**
      * A line from world point `a` to `b` ([x, y, z]) with washing on it. `dry` 0..1: how dry the cloth is; `share`:
@@ -331,7 +366,7 @@ export function tkStir(seed = 1) {
             const s = source.a ? (k + random()) / count : 0;
             const p = source.a ? [0, 1, 2].map((axis) => source.a[axis] + (source.b[axis] - source.a[axis]) * s) : source.at;
             at.push(p[0], p[1], p[2]);
-            seeds.push(random(), random(), random(), source.w(p[1]));
+            seeds.push(...(source.seed ?? [random(), random(), random(), source.w(p[1])]));
           }
         }
         if (!at.length) continue;
@@ -342,8 +377,8 @@ export function tkStir(seed = 1) {
         geometry.setAttribute('aAt', new THREE.InstancedBufferAttribute(new Float32Array(at), 3));
         geometry.setAttribute('aSeed', new THREE.InstancedBufferAttribute(new Float32Array(seeds), 4));
         geometry.instanceCount = at.length / 3;
-        const how = { smoke: [spec.life, spec.rise, spec.drag, 0], fire: [spec.life, spec.rise, 0, 0], spindrift: [spec.life, spec.ride, spec.from, spec.full], drip: [spec.every?.[0], spec.every?.[1], spec.wetFrom, 0] }[kind];
-        const size = { smoke: [spec.size?.[0], spec.size?.[1], spec.alpha, 0], fire: [spec.size, 0, 1, spec.light], spindrift: [spec.size?.[0], spec.size?.[1], spec.alpha, spec.fall], drip: [spec.wide, spec.long, spec.alpha, 0] }[kind];
+        const how = { smoke: [spec.life, spec.rise, spec.drag, 0], fire: [spec.life, spec.rise, 0, 0], spindrift: [spec.life, spec.ride, spec.from, spec.full], drip: [spec.every?.[0], spec.every?.[1], spec.wetFrom, 0], glow: [TK_STIR.lantern.catch, TK_STIR.lantern.cord, 0, 0] }[kind];
+        const size = { smoke: [spec.size?.[0], spec.size?.[1], spec.alpha, 0], fire: [spec.size, 0, 1, spec.light], spindrift: [spec.size?.[0], spec.size?.[1], spec.alpha, spec.fall], drip: [spec.wide, spec.long, spec.alpha, 0], glow: [spec.halo, 0, 1, spec.light] }[kind];
         const material = new THREE.ShaderMaterial({
           vertexShader: TK_STIR_AIR_VERTEX,
           fragmentShader: TK_STIR_AIR_FRAGMENT,
@@ -357,7 +392,7 @@ export function tkStir(seed = 1) {
             uColourEnd: { value: new THREE.Vector3(...(spec.colours?.[1] ?? [1, 1, 1])) },
           },
           side: THREE.DoubleSide, transparent: true, depthWrite: false, fog: false,
-          blending: kind === 'fire' ? THREE.AdditiveBlending : THREE.NormalBlending,
+          blending: kind === 'fire' || kind === 'glow' ? THREE.AdditiveBlending : THREE.NormalBlending,
         });
         material.userData.envOwn = true;
         const mesh = new THREE.Mesh(geometry, material);

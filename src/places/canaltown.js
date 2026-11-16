@@ -14,7 +14,7 @@ import { slabOf, wallLine, wallOf } from '../physics/terrain.js';
 import { tkgBay, tkgFrame } from '../townkit/geo.js';
 import { tkRandom } from '../townkit/tex.js';
 import {
-  TK_HOUSE, TK_JAR, tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
+  TK_BRIDGE, TK_HOUSE, TK_JAR, tkArchBridge, tkArchBridgeSolids, tkBoat, tkHouse, tkHouseSolid, tkJar, tkLaneGate, tkLaneGateSolids, tkLion, tkPaving, tkQuay, tkRow, tkSign, tkSlabBridge,
   tkSlabBridgeSolids, tkTree, tkWaterSteps, tkWaterStepsSolids, tkYardWall, tkYardWallSolid,
 } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
@@ -195,6 +195,18 @@ export function canalTownPlan() {
  * the rest stand against the wall within `deep` m of it, so the way stays clear.
  */
 const CT_FRONT = { washing: { poles: 0.34, cord: 0.14, out: 2.3, rise: 0.25 }, smoke: 0.2, firewood: 0.2, poles: 0.22, baskets: 0.38, tub: 0.22, sacks: 0.3, deep: 0.8 };
+
+/**
+ * Lanterns lit in the town's darkest places. A house front's doorstep (`out` m before its middle) counts as dark where
+ * the lie's sky probe there (lay.js sheet A: how much of the sky a point sees) is under `sky`; the darkest are taken
+ * first, none within `apart` m of one already lit, so a lit lantern marks a dark stretch of lane and the town does not
+ * look decked for a feast. A house that hangs lanterns has its first one lit; one that hangs none gets one under its
+ * eave, of pale oiled paper `pale` of the time (`paper`), else red. Where a way meets the water a lamp on a post
+ * (`post`: `high` m, its arm `arm` m out) stands at every bridge's town-side head, on the quay's edge `back` m from
+ * the kerb. The share, the spacing and the threshold are by eye against the probe's spread (doorsteps in the back
+ * street and the long lane read 0.11 to 0.3, the square's 0.36 and more).
+ */
+const CT_LIT = { sky: 0.27, apart: 14, out: 1.2, pale: 0.4, paper: [0.88, 0.8, 0.62], post: { high: 2.7, arm: 0.55, back: 0.6, size: 0.22 } };
 
 /** What hangs and stands at a house's front, from its seed: lanterns under the eave, a signboard, jars by the door, the wash, firewood, baskets. Local to its front (x along it, z out). */
 function ctDressing(house) {
@@ -616,12 +628,14 @@ export function buildCanalTown() {
   const blocks = tkBlocks();
   const world = tkgFrame();
   const stir = tkStir(2);
+  const fronts = [];
   for (const house of plan.houses) {
     const builder = blocks.at(house.at[0], house.at[1], house.far);
     tkHouse(builder, house);
     const front = tkgFrame(house.at[0], 0, house.at[1], house.yaw).child(0, 0, house.depth / 2);
     const things = ctDressing(house);
-    for (const [lx, ly, lz] of things.lanterns) stir.lantern(...front(lx, ly, lz));
+    const hung = things.lanterns.map(([lx, ly, lz]) => stir.lantern(...front(lx, ly, lz)));
+    if (!house.far) fronts.push({ house, front, hung });
     for (const wash of things.washing) stir.washing(front(...wash.a), front(...wash.b), wash);
     for (const stand of things.stands) {
       const seed = house.seed + Math.round(stand.x * 100);
@@ -659,6 +673,17 @@ export function buildCanalTown() {
   for (const wall of plan.walls) tkYardWall(blocks.at(...wall.a), wall.a, wall.b, { gate: wall.gate });
   tkLaneGate(blocks.at(...plan.gate.a), plan.gate.a, plan.gate.b);
   for (const bridge of plan.bridges) (bridge.kind === 'arch' ? tkArchBridge : tkSlabBridge)(blocks.at(...bridge.at), bridge);
+  // The bridges' lamps (CT_LIT.post): on the east side of each bridge's north head, the arm out over the quay.
+  const lamps = tkRandom(43);
+  for (const bridge of plan.bridges) {
+    const post = CT_LIT.post;
+    const [px, pz] = [bridge.at[0] + TK_BRIDGE.wide / 2 + 0.35, t.canal.z[0] - post.back];
+    const builder = blocks.at(px, pz);
+    builder.round('timber', world, px, pz, 0, post.high, 0.07, 0.055, { sides: 6, colour: [0.36, 0.3, 0.24] });
+    builder.tube('timber', [[px, post.high - 0.12, pz], [px + post.arm + 0.05, post.high - 0.12, pz]], 0.03, 0.03, { sides: 4, colour: [0.36, 0.3, 0.24] });
+    const lamp = stir.lantern(px + post.arm, post.high - 0.12 - 0.24 - post.size * 1.15, pz, { size: post.size, colour: CT_LIT.paper, phase: lamps() * 6.28 });
+    stir.glow(lamp, 1);
+  }
   tkWaterSteps(blocks.at(...plan.steps.at), plan.steps);
   for (const quay of plan.quays) {
     // (In pieces no longer than a block, each in its own.)
@@ -714,6 +739,26 @@ export function buildCanalTown() {
   // The town's lie (townkit/lay.js): what is under a roof or a bridge, the shade of the lanes, the low places, and
   // where feet go (the ways below: the lanes' middles, the quay, the bridges, the square's crossings).
   const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2 });
+
+  // Lanterns lit at the darkest doorsteps (CT_LIT): hung things, so not in the lie.
+  const lit = [];
+  const darkest = fronts
+    .map((spot) => ({ ...spot, step: spot.front(0, 0, CT_LIT.out) }))
+    .map((spot) => ({ ...spot, sky: lay.lay.at(spot.step[0], spot.step[2]).sky }))
+    .filter((spot) => spot.sky < CT_LIT.sky)
+    .sort((p, q) => p.sky - q.sky);
+  for (const spot of darkest) if (!lit.some((other) => Math.hypot(other.step[0] - spot.step[0], other.step[2] - spot.step[2]) < CT_LIT.apart)) lit.push(spot);
+  const papers = tkRandom(41);
+  for (const { house, front, hung } of lit) {
+    if (hung.length) {
+      stir.glow(hung[0], 0);
+      continue;
+    }
+    const pale = papers() < CT_LIT.pale;
+    const eave = house.storeys > 1 ? house.heights[0] : house.heights[0] - 0.1;
+    const lantern = stir.lantern(...front(0, eave - 0.75, 0.55), { colour: pale ? CT_LIT.paper : undefined, phase: papers() * 6.28 });
+    stir.glow(lantern, pale ? 1 : 0);
+  }
 
   // What grows and gathers, by the lie: weeds at the walls' feet and in the unworn margins of the paving, thick on
   // open earth; fallen leaves and straw in the corners.
