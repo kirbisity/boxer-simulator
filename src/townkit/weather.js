@@ -160,6 +160,20 @@ export const TK_WEATHER = {
  *    the cloth's face is tilted by both waves' slopes, so the light shows its folds: a cloth whose face stays flat
  *    while its edge moves reads as a painted board.
  */
+/**
+ * A paper lantern lit from inside (the 'lamp' material and stir.js's glow): the paper itself gives the light, the flame's
+ * colour `flame` through the paper's own colour, `through` of it let through white (thin paper passes some of the
+ * flame unfiltered), brightest where the paper faces the eye; a faint halo `halo` lantern radii out. Its strength
+ * goes with the hour by the sun's height (sine, `hour`: the dusk look under the first, the day look over the
+ * second): `day` and `dusk` each [the paper, the halo], multiples of the display's white. By day (a candle behind
+ * paper is a few candelas per square metre against a shaded wall's hundred and more) it reads only as a warm paper in
+ * the shade, by eye; at dusk it is the lamp. `paper`: the red and the pale oiled paper.
+ */
+export const TK_GLOW = { flame: [1, 0.7, 0.38], through: 0.3, halo: 1.5, hour: [-0.03, 0.17], day: [0.4, 0.025], dusk: [1.1, 0.2], paper: { red: [0.82, 0.16, 0.12], pale: [0.88, 0.8, 0.62] } };
+const tkGlsl = (value) => (Array.isArray(value) ? `vec${value.length}(${value.map((part) => part.toFixed(3)).join(', ')})` : value.toFixed(3));
+/** The lantern's strength now ([paper, halo]), from the sun's height: GLSL, needing uEnvSunDir. */
+export const TK_GLOW_GLSL = `mix(${tkGlsl(TK_GLOW.dusk)}, ${tkGlsl(TK_GLOW.day)}, smoothstep(${tkGlsl(TK_GLOW.hour[0])}, ${tkGlsl(TK_GLOW.hour[1])}, uEnvSunDir.y))`;
+
 export const TK_STIR_RULE = { tree: { bend: 6e-5, flutter: 0.004 }, flap: { wave: 4.5, rate: 7, fullAt: 6, down: { share: 0.6, wave: 5.2, rate: 4.1 } }, swing: 0.35, swell: [0.35, 0.7] };
 
 /** The uniforms every kit material shares: the weather (tkSetWeather), the mirror's sources, the clock, the place's lie, the open air. */
@@ -768,8 +782,14 @@ export function tkPatch(material, kind = [0, 0, 0, 1], hold = 1, dirt = [0, 0, 0
       .replace('#include <aomap_fragment>', `${TK_SHADE}\n#include <aomap_fragment>`)
       .replace('#include <tonemapping_fragment>', `${TK_MIRROR}\n#include <tonemapping_fragment>`)
       .replace('#include <fog_fragment>', TK_FOG);
+    // (A lantern's paper lit from inside, TK_GLOW: in the display's measure, so the exposure is taken back out.)
+    if (stir?.glow) {
+      shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  totalEmissiveRadiance = ${tkGlsl(TK_GLOW.flame)} * mix(vColor.rgb, vec3(1.0), ${tkGlsl(TK_GLOW.through)}) * ${TK_GLOW_GLSL}.x
+    * (0.55 + 0.45 * abs(dot(normalize(vNormal), normalize(vViewPosition)))) / max(uTkAir.w, 1e-4);`);
+    }
   };
-  material.customProgramCacheKey = () => (stir ? (stir.hung ? 'townkit-hung' : 'townkit-tree') : 'townkit');
+  material.customProgramCacheKey = () => (stir ? (stir.hung ? (stir.glow ? 'townkit-hung-glow' : 'townkit-hung') : 'townkit-tree') : 'townkit');
   material.userData.tkKind = own.uTkKind.value;
   // (The open air leaves a material so marked alone: this one takes its haze, sky and cloud shade itself.)
   material.userData.envOwn = true;
@@ -824,6 +844,8 @@ export const TK_MATERIALS = {
   // Cloth and paper that hang and fly (townkit/stir.js): the plaster sheet's fine grain under each piece's own
   // colour, seen from both sides, holding no snow.
   cloth: { sheet: 'plaster', plain: true, twoSided: true, snow: 0, blotch: 1.1, hung: true },
+  // A lit lantern's paper (TK_GLOW): cloth that gives light.
+  lamp: { sheet: 'plaster', plain: true, twoSided: true, snow: 0, blotch: 1.1, hung: true, glow: true },
   // Open water: the canal. Silted green-brown water, nearly all mirror at the angles it is seen from: it shows the
   // sky pale and the houses dark, as the reference's does.
   water: { sheet: 'plaster', pools: 2, colour: [0.2, 0.25, 0.2], blotch: 0.3, plain: true },
@@ -858,7 +880,7 @@ export function tkMaterials({ size = 512, ground = 0, anisotropy = 8, extra = {}
       });
       if (spec.normalScale) material.normalScale.set(spec.normalScale, spec.normalScale);
       material.name = `townkit:${name}`;
-      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1], spec.snow ?? 1, spec.dirt ?? [0, 0, 0, 0], [spec.tiles?.[0] ?? 0, spec.tiles?.[1] ?? 0, spec.fall ?? 0, spec.scour ?? 0], spec.hung ? { hung: true } : spec.sway ? { tree: spec.sway } : null);
+      tkPatch(material, [spec.foot ?? 0, spec.pools ?? 0, spec.ground ?? ground, spec.blotch ?? 1], spec.snow ?? 1, spec.dirt ?? [0, 0, 0, 0], [spec.tiles?.[0] ?? 0, spec.tiles?.[1] ?? 0, spec.fall ?? 0, spec.scour ?? 0], spec.hung ? { hung: true, glow: !!spec.glow } : spec.sway ? { tree: spec.sway } : null);
       made.set(name, material);
       return material;
     },

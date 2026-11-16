@@ -18,8 +18,8 @@ import {
   tkSlabBridgeSolids, tkTree, tkWaterSteps, tkWaterStepsSolids, tkYardWall, tkYardWallSolid,
 } from '../townkit/build.js';
 import { tkBlocks, tkKeep, tkLayOf, tkMaterialsFor, tkMeshes, tkRain, tkSky, tkSunWay, tkTier } from '../townkit/place.js';
-import { tkStir } from '../townkit/stir.js';
-import { TK_MATERIALS } from '../townkit/weather.js';
+import { TK_STIR, tkStir } from '../townkit/stir.js';
+import { TK_GLOW, TK_MATERIALS } from '../townkit/weather.js';
 import { TK_THINGS, tkBasket, tkCart, tkFirewood, tkPoles, tkSacks, tkScatter, tkTub } from '../townkit/things.js';
 
 /** The town's plan (m). Every figure is a choice for the game's ground, set against the battle's court and a walker's reach; none is a measurement of a real town. */
@@ -197,16 +197,26 @@ export function canalTownPlan() {
 const CT_FRONT = { washing: { poles: 0.34, cord: 0.14, out: 2.3, rise: 0.25 }, smoke: 0.2, firewood: 0.2, poles: 0.22, baskets: 0.38, tub: 0.22, sacks: 0.3, deep: 0.8 };
 
 /**
- * Lanterns lit in the town's darkest places. A house front's doorstep (`out` m before its middle) counts as dark where
- * the lie's sky probe there (lay.js sheet A: how much of the sky a point sees) is under `sky`; the darkest are taken
- * first, none within `apart` m of one already lit, so a lit lantern marks a dark stretch of lane and the town does not
- * look decked for a feast. A house that hangs lanterns has its first one lit; one that hangs none gets one under its
- * eave, of pale oiled paper `pale` of the time (`paper`), else red. Where a way meets the water a lamp on a post
- * (`post`: `high` m, its arm `arm` m out) stands at every bridge's town-side head, on the quay's edge `back` m from
- * the kerb. The share, the spacing and the threshold are by eye against the probe's spread (doorsteps in the back
- * street and the long lane read 0.11 to 0.3, the square's 0.36 and more).
+ * Lanterns lit in the town's darkest places. A spot is a house's doorstep (`out` m before its front's middle) or, where
+ * a house's end wall stands on an open paved way, the foot of that wall (`out` m out from its middle: the gable ends
+ * that close the narrow lanes). A spot counts as dark where the lie's sky probe there (lay.js sheet A: how much of the
+ * sky a point sees) is under `sky`; the darkest are taken first, none within `apart` m of a lit one it can see (the
+ * line between them passing under or through nothing built over `sight` m, a wall or a gate's arch: a lane walled off from the next
+ * street keeps its own), so a lit lantern marks a dark stretch of way and the town does not look decked for a feast. At
+ * a front: the house's first lantern lit if it hangs any, else one under its eave; at an end wall one on a bracket
+ * (`bracket` m out) at the same height. Pale oiled paper `pale` of the time, else red. Where a way meets the water a
+ * lamp on a post (`post`: `high` m, its arm `arm` m out) stands at every bridge's town-side head, on the quay's edge
+ * `back` m from the kerb. A spot on a deep way (its walls, as the lie sees them, `canyon` times its width or more: Oke's
+ * 'deep' street canyon, H/W 2, Boundary Layer Climates 1987; looked for `reach` m across) is darker than its sky probe
+ * says (the probe reads the open ends of a short lane): it counts as dark and is lit first. The spacing and the threshold are by eye against the probe's spread (doorsteps in the back
+ * street and the long lane read 0.11 to 0.3, the lane north out of the square 0.3, the square's 0.36 and more).
  */
-const CT_LIT = { sky: 0.27, apart: 14, out: 1.2, pale: 0.4, paper: [0.88, 0.8, 0.62], post: { high: 2.7, arm: 0.55, back: 0.6, size: 0.22 } };
+const CT_LIT = { sky: 0.27, canyon: 2, reach: 12, apart: 14, sight: 2.2, out: 1.2, bracket: 0.6, pale: 0.4, post: { high: 2.7, arm: 0.55, back: 0.6, size: 0.22 } };
+
+/** Where each bridge's lamp post stands (CT_LIT.post): on the east side of its north head. */
+function ctLampPosts(plan) {
+  return plan.bridges.map((bridge) => [bridge.at[0] + TK_BRIDGE.wide / 2 + 0.35, CANAL_TOWN.canal.z[0] - CT_LIT.post.back]);
+}
 
 /** What hangs and stands at a house's front, from its seed: lanterns under the eave, a signboard, jars by the door, the wash, firewood, baskets. Local to its front (x along it, z out). */
 function ctDressing(house) {
@@ -342,6 +352,7 @@ export function canalTownSolids() {
   }
   for (const tree of plan.trees) if (!tree.yard) solids.push(wallOf(tree.at, tree.ring ? [2.2, 2.2] : [0.6, 0.6], -1, 4));
   for (const lion of plan.lions) solids.push(wallOf(lion.at, [0.9, 1.2], -1, 2.2));
+  for (const post of ctLampPosts(plan)) solids.push(wallOf(post, [0.2, 0.2], -1, CT_LIT.post.high));
   return solids;
 }
 
@@ -634,8 +645,9 @@ export function buildCanalTown() {
     tkHouse(builder, house);
     const front = tkgFrame(house.at[0], 0, house.at[1], house.yaw).child(0, 0, house.depth / 2);
     const things = ctDressing(house);
-    const hung = things.lanterns.map(([lx, ly, lz]) => stir.lantern(...front(lx, ly, lz)));
-    if (!house.far) fronts.push({ house, front, hung });
+    // (Laid once the lie says which are lit; each one's swing drawn here, where it always was.)
+    const hung = things.lanterns.map(([lx, ly, lz]) => ({ at: front(lx, ly, lz), phase: stir.phase() }));
+    fronts.push({ house, front, hung });
     for (const wash of things.washing) stir.washing(front(...wash.a), front(...wash.b), wash);
     for (const stand of things.stands) {
       const seed = house.seed + Math.round(stand.x * 100);
@@ -673,16 +685,14 @@ export function buildCanalTown() {
   for (const wall of plan.walls) tkYardWall(blocks.at(...wall.a), wall.a, wall.b, { gate: wall.gate });
   tkLaneGate(blocks.at(...plan.gate.a), plan.gate.a, plan.gate.b);
   for (const bridge of plan.bridges) (bridge.kind === 'arch' ? tkArchBridge : tkSlabBridge)(blocks.at(...bridge.at), bridge);
-  // The bridges' lamps (CT_LIT.post): on the east side of each bridge's north head, the arm out over the quay.
+  // The bridges' lamps (CT_LIT.post), the arm out over the quay.
   const lamps = tkRandom(43);
-  for (const bridge of plan.bridges) {
+  for (const [px, pz] of ctLampPosts(plan)) {
     const post = CT_LIT.post;
-    const [px, pz] = [bridge.at[0] + TK_BRIDGE.wide / 2 + 0.35, t.canal.z[0] - post.back];
     const builder = blocks.at(px, pz);
     builder.round('timber', world, px, pz, 0, post.high, 0.07, 0.055, { sides: 6, colour: [0.36, 0.3, 0.24] });
     builder.tube('timber', [[px, post.high - 0.12, pz], [px + post.arm + 0.05, post.high - 0.12, pz]], 0.03, 0.03, { sides: 4, colour: [0.36, 0.3, 0.24] });
-    const lamp = stir.lantern(px + post.arm, post.high - 0.12 - 0.24 - post.size * 1.15, pz, { size: post.size, colour: CT_LIT.paper, phase: lamps() * 6.28 });
-    stir.glow(lamp, 1);
+    stir.lantern(px + post.arm, post.high - 0.12 - TK_STIR.lantern.cord - post.size * 1.15, pz, { size: post.size, colour: TK_GLOW.paper.pale, phase: lamps() * 6.28, lit: 'pale' });
   }
   tkWaterSteps(blocks.at(...plan.steps.at), plan.steps);
   for (const quay of plan.quays) {
@@ -740,24 +750,69 @@ export function buildCanalTown() {
   // where feet go (the ways below: the lanes' middles, the quay, the bridges, the square's crossings).
   const lay = tkLayOf(blocks, tier, { box: CT_LAY.box, ground: (x, z) => (z > cz0 && z < cz1 ? t.canal.water : 0), ways: ctWays(), wind: CT_LAY.wind, seed: 2 });
 
-  // Lanterns lit at the darkest doorsteps (CT_LIT): hung things, so not in the lie.
-  const lit = [];
-  const darkest = fronts
-    .map((spot) => ({ ...spot, step: spot.front(0, 0, CT_LIT.out) }))
-    .map((spot) => ({ ...spot, sky: lay.lay.at(spot.step[0], spot.step[2]).sky }))
-    .filter((spot) => spot.sky < CT_LIT.sky)
-    .sort((p, q) => p.sky - q.sky);
-  for (const spot of darkest) if (!lit.some((other) => Math.hypot(other.step[0] - spot.step[0], other.step[2] - spot.step[2]) < CT_LIT.apart)) lit.push(spot);
-  const papers = tkRandom(41);
-  for (const { house, front, hung } of lit) {
-    if (hung.length) {
-      stir.glow(hung[0], 0);
-      continue;
+  // Lanterns lit at the darkest spots (CT_LIT): hung things, so not in the lie.
+  const isOpenWay = (x, z) => paved.some(([x0, x1, z0, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1) && lay.lay.at(x, z).top - lay.lay.at(x, z).ground < 0.5;
+  const spots = [];
+  for (const { house, front } of fronts) {
+    if (house.far) continue;
+    spots.push({ house, frame: front, end: false });
+    const frame = tkgFrame(house.at[0], 0, house.at[1], house.yaw);
+    for (const side of [-1, 1]) {
+      const wall = frame.child((side * house.width) / 2, 0, 0, (side * Math.PI) / 2);
+      const [x, , z] = wall(0, 0, CT_LIT.out);
+      if (isOpenWay(x, z)) spots.push({ house, frame: wall, end: true });
     }
+  }
+  // (Whether a lantern at `a` sees one at `b`: nothing built over CT_LIT.sight m on the line between their spots, a wall
+  // or a gate's arch.)
+  const sees = (a, b) => {
+    const steps = Math.ceil(Math.hypot(b[0] - a[0], b[2] - a[2]) / 0.5);
+    for (let k = 1; k < steps; k += 1) {
+      const here = lay.lay.at(a[0] + ((b[0] - a[0]) * k) / steps, a[2] + ((b[2] - a[2]) * k) / steps);
+      if (here.kind && here.top - here.ground > CT_LIT.sight) return false;
+    }
+    return true;
+  };
+  // (How deep the way before a spot is: the height of the wall behind it and of the first wall across from it, as the
+  // lie sees them, the lower of the two over the way's width.)
+  const depth = (frame) => {
+    const [ox, , oz] = frame(0, 0, -0.3);
+    const own = lay.lay.at(ox, oz);
+    for (let w = 0.5; w < CT_LIT.reach; w += 0.25) {
+      const [x, , z] = frame(0, 0, w);
+      const here = lay.lay.at(x, z);
+      const [bx, , bz] = frame(0, 0, w + 1);
+      const behind = lay.lay.at(bx, bz);
+      // (A house's wall: built on past it, not a pole or a jar standing in the way.)
+      if (here.kind === 2 && here.top - here.ground > CT_LIT.sight && behind.top - behind.ground > CT_LIT.sight) return Math.min(own.top - own.ground, here.top - here.ground) / w;
+    }
+    return 0;
+  };
+  const lit = [];
+  const darkest = spots
+    .map((spot) => ({ ...spot, step: spot.frame(0, 0, CT_LIT.out), deep: depth(spot.frame) >= CT_LIT.canyon }))
+    .map((spot) => ({ ...spot, sky: lay.lay.at(spot.step[0], spot.step[2]).sky }))
+    .filter((spot) => spot.deep || spot.sky < CT_LIT.sky)
+    .sort((p, q) => (q.deep ? 1 : 0) - (p.deep ? 1 : 0) || p.sky - q.sky);
+  for (const spot of darkest) if (!lit.some((other) => Math.hypot(other.step[0] - spot.step[0], other.step[2] - spot.step[2]) < CT_LIT.apart && sees(other.step, spot.step))) lit.push(spot);
+  const litFront = new Set(lit.filter((spot) => !spot.end && fronts.find((f) => f.house === spot.house).hung.length).map((spot) => spot.house));
+  for (const { house, hung } of fronts) hung.forEach(({ at, phase }, k) => stir.lantern(...at, { phase, lit: k === 0 && litFront.has(house) ? 'red' : null }));
+  const papers = tkRandom(41);
+  for (const { house, frame, end } of lit) {
+    if (litFront.has(house) && !end) continue;
     const pale = papers() < CT_LIT.pale;
     const eave = house.storeys > 1 ? house.heights[0] : house.heights[0] - 0.1;
-    const lantern = stir.lantern(...front(0, eave - 0.75, 0.55), { colour: pale ? CT_LIT.paper : undefined, phase: papers() * 6.28 });
-    stir.glow(lantern, pale ? 1 : 0);
+    const y = eave - 0.75;
+    const out = end ? CT_LIT.bracket : 0.55;
+    if (end) {
+      // (A bracket out from the end wall at the hook's height, and its brace.)
+      const hook = y + 0.2 * 1.15 + TK_STIR.lantern.cord;
+      const [x, , z] = frame(0, 0, 0);
+      const builder = blocks.at(x, z);
+      builder.tube('timber', [frame(0, hook, 0), frame(0, hook, out + 0.05)], 0.025, 0.025, { sides: 4, colour: [0.36, 0.3, 0.24] });
+      builder.tube('timber', [frame(0, hook - 0.45, 0), frame(0, hook, out * 0.7)], 0.02, 0.02, { sides: 4, colour: [0.36, 0.3, 0.24] });
+    }
+    stir.lantern(...frame(0, y, out), { colour: pale ? TK_GLOW.paper.pale : TK_GLOW.paper.red, phase: papers() * 6.28, lit: pale ? 'pale' : 'red' });
   }
 
   // What grows and gathers, by the lie: weeds at the walls' feet and in the unworn margins of the paving, thick on
