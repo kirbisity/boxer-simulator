@@ -988,8 +988,9 @@ export function buildPyongyang() {
     //                the light is: the curve steeper (contrast 1.7) with its ceiling at 4 white cards (sunlit snow
     //                and the glow round the sun reach it; at 6 they stayed grey under it), a third of a stop under
     //                the open air's meter (which already closes for lying snow); saturation 0.95, warmth +0.02 for
-    //                the low sun. Shaded masonry and the sides of men turned from the sun go to a third of the way up
-    //                the scale, sunlit snow to the top, where at contrast 0.95 both sat in the upper half.
+    //                the low sun. On the gate seen with the sun behind the camera the darkest twentieth of the frame
+    //                went from 53 to 26 (of 255) and the brightest twentieth from 189 to 205, the middle kept (152 to
+    //                145): the shade under eaves and in the masonry's joints dark beside lit snow.
     // All by eye, on the open air's high tier, against the sunward and the down-sun views of the wall and the
     // reference frames (a low sun behind thin cloud, the land stepping back into mist, deep shade beside lit snow).
     // 'siegesnowhazy': the same showers in the hazier, darker sky the gate views had before the sunward work (the
