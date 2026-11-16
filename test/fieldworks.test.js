@@ -260,6 +260,22 @@ test('an arrow or a ball strikes a horse: through its hide, a ball through any b
   assert.ok(horse.bleed > bleed, 'a ball goes through it');
 });
 
+test('a heavy ball in a horse\'s leg shatters the bone as in a man\'s (the ball\'s own limbBreak): down it goes; an arrow does not', () => {
+  const random = seededRandom(9);
+  const world = createWorld([{ inputs: mountedKnight(random), corner: 'red' }, { inputs: footSoldier(random, 'bow'), corner: 'blue' }], { seed: 9, arena: { halfX: 25, halfZ: 12 } });
+  const horse = world.horses[0];
+  const shooter = world.fighters[1];
+  const legs = horse.capsules.find((capsule) => capsule.part === 'legs');
+  world.random = () => 0;
+  missileInHorse(world, shooter, { horse, capsule: legs, point: legs.a }, [1, 0, 0], 100, { arrow: true });
+  assert.equal(horse.state, 'up', 'an arrow in the leg: it runs on');
+  missileInHorse(world, shooter, { horse, capsule: legs, point: legs.a }, [1, 0, 0], 870, { arrow: false, limbBreak: 0 });
+  assert.equal(horse.state, 'up', 'a ball with no limbBreak of its own breaks nothing');
+  missileInHorse(world, shooter, { horse, capsule: legs, point: legs.a }, [1, 0, 0], 870, { arrow: false, limbBreak: 0.75 });
+  assert.ok(horse.lame && horse.state !== 'up', 'a matchlock ball: the leg broken, the horse down');
+  assert.ok(world.events.some((event) => event.kind === 'horseDown' && event.effects[0] === 'goes down on a broken leg'));
+});
+
 test('the battles with works (Agincourt, Cerignola, Qi Jiguang): the works where the lines are, the sides within the muster cap, each army one the setup screen has', () => {
   for (const [key, defenders] of [['agincourt', 35], ['cerignola', 35], ['qiJiguang', 24]]) {
     const level = battleOf(key);
