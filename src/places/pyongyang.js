@@ -747,7 +747,7 @@ const PY_SIEGE = {
   //              under the eave, `size` m in radius); `torch`, a pitch torch in an iron bracket on the gate's face
   //              each side of the arch (`aside` m beyond the passage's side, `high` m up, `out` m off the face,
   //              its flame `flame` of a brazier's). Typical, not from a record of the gate.
-  lights: { lantern: { aside: 2.4, high: 2.05, out: 0.55, size: 0.3 }, torch: { aside: 1.1, high: 2.7, out: 0.45, flame: 0.45 } },
+  lights: { lantern: { aside: 2.4, high: 2.05, out: 0.55, size: 0.32 }, torch: { aside: 1.1, high: 2.9, out: 0.45, flame: 0.75 } },
   fronts: { jars: 0.32, jarCount: [2, 6], jarHigh: [0.48, 0.95], onggi: [0.24, 0.15, 0.1], wood: 0.26, tubs: 0.22, spears: 0.12 },
   dropped: { poles: 14, campThings: 4 },
 };
