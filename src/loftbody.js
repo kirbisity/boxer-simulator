@@ -135,9 +135,9 @@ export const LOFT = {
   // but to no less than this share of its ring: a waistband hugs the hips.)
   // A collar up the trapezius (raiseCollars): away from the front by `from` (rad), in `sectors` round the trunk (and `spread`
   // either side, with no dip between two higher sectors `bridge` or fewer apart), to skin out at `neckShare` of the neck's
-  // radius or more, stood `standoff` (m, times the piece's own standoff share) off it; eased in over `ramp` (rad) past `from`;
+  // radius or more, stood `standoff` (m, times the piece's own standoff share) off it;
   // the ring below the top carried `follow` of the way up to it, onto the skin there (the furthest out within `along`, m).
-  collar: { from: 0.7, ramp: 1e-6, sectors: 48, spread: 1, bridge: 10, neckShare: 1.1, standoff: 0.006, follow: 0.5, along: 0.012 },
+  collar: { from: 0.7, sectors: 48, spread: 1, bridge: 10, neckShare: 1.1, standoff: 0.006, follow: 0.5, along: 0.012 },
   // The shoulder's turn into the arm on the base mesh (blendShoulders): the arm's share eases from `from` to `to` (t of the
   // upper arm from its joint: from 10 cm above it on a man's 0.33 m upper arm, over the cap, to a quarter of the way down the
   // shaft), and the blend fades out between `radial` (shares of the arm's ring radius: the cap and the armpit's fold, not the
@@ -3781,11 +3781,7 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
     // trapezius past it a thin man's arming coat showed round his neck between the cuirass and the gorget.)
     if (!ribPieces.has(ring.piece) && [...ribPieces].some((piece) => pieceTop.get(piece) >= pieceTop.get(ring.piece))) continue;
     const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
-    // (Raised from `from` round the trunk, eased in over `ramp`: raised all at once from there the collar rose in a step beside
-    // the front's opening, a point standing up each side of the neck.)
-    const ease = Math.max(0, Math.min(1, (Math.abs(place.angle) - spec.from) / spec.ramp));
-    if (ease <= 0) continue;
-    const raised = ease * ease * (3 - 2 * ease);
+    if (Math.abs(place.angle) < spec.from) continue;
     // (The highest skin of a sector and those beside it, and between two sectors' middles the line from one to the other: the
     // collar is a smooth line, and each point keeps its own place round the trunk. Carried to the skin point's own place, the
     // points of three sectors met on one and the ring between them folded into teeth.)
@@ -3806,8 +3802,6 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
       if (skin === null) continue;
       reach = Math.max(skin + spec.standoff * standoff, place.r);
     }
-    t = place.t + (t - place.t) * raised;
-    reach = place.r + (reach - place.r) * raised;
     moves.push([vertex, vec.add(vec.add(trunk.part.a, vec.scale(trunk.axis, t * trunk.length)), vec.scale(dir, reach))]);
   }
   for (const [vertex, point] of moves) mesh.positions.splice(vertex * 3, 3, ...point);
