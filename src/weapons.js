@@ -1279,8 +1279,9 @@ export function freeShaft(spec, build) {
 export const SHIELDS = {
   // The parma: small, round, convex bronze — far smaller than a hoplon.
   parma: { label: 'Parma', radius: 0.28, mass: 2.4, offset: 0.07, armHarm: 0.15, hold: 1.0, material: 'bronzePlate' },
-  // A Ming soldier's small round shield: lacquered wood with an iron rim and a boss.
-  roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, hold: 1.1, look: 'ming', material: 'planks' },
+  // A Ming soldier's small round shield. Drawn as the rattan shield (tengpai, the user's call, 2026-11-15: the surviving ones in
+  // the photographs); met as it was, a board (material, size and mass unchanged: a look only).
+  roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, hold: 1.1, look: 'tengpai', material: 'planks' },
   // The Spanish rodela: a round steel shield, heavy and proof against cuts and thrusts.
   rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, hold: 1.4, look: 'steel', material: 'steelPlate' },
   // The Mexica chimalli: a round shield of wicker or wood faced with feathers and hide.

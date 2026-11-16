@@ -56,7 +56,7 @@ export const BYEOKJEGWAN_1593 = {
   rows: { front: [-12, -0.65], second: [-13.6, -0.65], rear: [-15.2, -0.65], squadLeader: [-15.2, 1.95], officer: [-17, 0] },
   // Kobayakawa's and Tachibana's colours: a red army (scenarios.js SEKIGAHARA_EAST's).
   colours: { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' },
-  design: { mingEliteInfantry: 3, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  design: { mingEliteInfantry: 0, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
 /** The paddy between the two hills (the hills themselves not raised: below). */

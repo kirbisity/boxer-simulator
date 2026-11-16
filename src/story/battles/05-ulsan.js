@@ -58,7 +58,7 @@ export const ULSAN_1598 = {
   rows: { front: [-6, -0.65], second: [-7.6, -0.65], rear: [-12.4, -0.65], squadLeader: [-7.6, 1.95], officer: [-15, 2] },
   // Katō's men under his colours: black lacquer, white (scenarios.js's sides carry no Katō: a plain dark tint).
   colours: { tint: { armor: '#18181c', lace: '#d8d4c8' }, banner: '#e8e4dc' },
-  design: { mingEliteInfantry: 3, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
+  design: { mingEliteInfantry: 0, mingBrigandine: 3, mingElite: 5, mingGarrison: 0 },
 };
 
 export const ulsanBattle = {
