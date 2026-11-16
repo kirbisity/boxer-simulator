@@ -3,6 +3,7 @@ the text cards laid over them, and its sound: music (assets/music), ambience loo
 the game's own sample for it (src/audio/samples), louder the nearer the camera and the played man's own. Levelled to the mix's loudness.
 
     python3 tools/trailer/assemble.py [edit.json]        ->  trailer-out/<output>
+    python3 tools/trailer/assemble.py tools/trailer/edit-zh.json   the Chinese cut (its cards, its played shots from trailer-out/shots-zh)
 
 Needs ffmpeg and numpy. Not part of the game."""
 
@@ -49,11 +50,28 @@ def add(track, sound, at):
     track[start:end] += sound[: end - start]
 
 
+def load_edit(path):
+    """An edit, or a language's cut of one: `base` (an edit beside it) with this one's keys over it (its cards, output, lang, cardsDir)."""
+    edit = json.load(open(path))
+    if 'base' in edit:
+        base = load_edit(os.path.join(os.path.dirname(path), edit['base']))
+        edit = {**base, **{k: v for k, v in edit.items() if k != 'base'}}
+    return edit
+
+
 def main():
-    edit_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'edit.json')
-    edit = json.load(open(edit_path))
+    edit = load_edit(sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'edit.json'))
     fps = edit.get('fps', 60)
-    shots_dir, cards_dir = os.path.join(OUT, 'shots'), os.path.join(OUT, 'cards')
+    cards_dir = os.path.join(OUT, edit.get('cardsDir', 'cards'))
+    # A language's own recordings (its HUD in that language: trailer-out/shots-<lang>) before the shared ones (no HUD).
+    shot_dirs = ([os.path.join(OUT, f"shots-{edit['lang']}")] if edit.get('lang', 'en') != 'en' else []) + [os.path.join(OUT, 'shots')]
+
+    def shot_file(shot, ext):
+        for folder in shot_dirs:
+            path = os.path.join(folder, f'{shot}.{ext}')
+            if os.path.exists(path):
+                return path
+        raise FileNotFoundError(f'{shot}.{ext} in {shot_dirs}')
 
     # The timeline: each entry's start and length.
     timeline, t = [], 0.0
@@ -70,7 +88,7 @@ def main():
             inputs += ['-loop', '1', '-framerate', str(fps), '-t', f'{length:.4f}', '-i', os.path.join(cards_dir, f"{entry['plate']}.png")]
             chains.append(f'[{index}:v]scale=1080:1920,format=yuv420p,setsar=1,fps={fps},setpts=PTS-STARTPTS[v{index}]')
         else:
-            inputs += ['-ss', f"{entry['in']:.4f}", '-t', f'{length:.4f}', '-i', os.path.join(shots_dir, f"{entry['shot']}.mp4")]
+            inputs += ['-ss', f"{entry['in']:.4f}", '-t', f'{length:.4f}', '-i', shot_file(entry['shot'], 'mp4')]
             chains.append(f'[{index}:v]scale=1080:1920,setsar=1,fps={fps},format=yuv420p,setpts=PTS-STARTPTS[v{index}]')
         labels.append(f'[v{index}]')
     chains.append(f"{''.join(labels)}concat=n={len(labels)}:v=1:a=0[base0]")
@@ -121,7 +139,7 @@ def main():
             if bed is not None and len(bed):
                 bed = np.tile(bed, int(np.ceil(length * SR / len(bed))) + 1)[: int(length * SR)]
                 add(ambience, faded(bed * mix.get('ambienceGain', 0.2), 0.15, 0.15), start)
-        log = json.load(open(os.path.join(shots_dir, f"{entry['shot']}.events.json")))
+        log = json.load(open(shot_file(entry['shot'], 'events.json')))
         for k, event in enumerate(log['events']):
             family = edit['sfx'].get(event['kind'])
             if not family or not (entry['in'] <= event['t'] < entry['out']):

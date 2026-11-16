@@ -68,7 +68,7 @@
     {
       "shot": "canal",
       "in": 0.8,
-      "out": 5.75,
+      "out": 5.35,
       "ambience": [
         "loop-rain",
         "loop-din"
@@ -91,8 +91,8 @@
     },
     {
       "shot": "pyongyangClimb",
-      "in": 5.8,
-      "out": 9.6,
+      "in": 5.0,
+      "out": 8.8,
       "ambience": [
         "loop-wind",
         "loop-din"
@@ -115,9 +115,9 @@
       ]
     },
     {
-      "shot": "agincourt",
-      "in": 4.0,
-      "out": 11.0,
+      "shot": "agincourtFrench",
+      "in": 1.0,
+      "out": 4.0,
       "ambience": [
         "loop-wind",
         "loop-din"
@@ -125,13 +125,24 @@
       "cards": [
         {
           "card": 2,
-          "from": 0.3,
-          "to": 3.6
-        },
+          "from": 0.2,
+          "to": 2.9
+        }
+      ]
+    },
+    {
+      "shot": "agincourt",
+      "in": 1.0,
+      "out": 6.0,
+      "ambience": [
+        "loop-wind",
+        "loop-din"
+      ],
+      "cards": [
         {
           "card": 3,
-          "from": 3.9,
-          "to": 6.8
+          "from": 0.4,
+          "to": 4.7
         }
       ]
     },
@@ -185,7 +196,7 @@
     {
       "shot": "dnChapel",
       "in": 1.6,
-      "out": 8.6,
+      "out": 8.0,
       "ambience": [
         "loop-roof"
       ],

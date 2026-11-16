@@ -1,0 +1,62 @@
+{
+  "about": "The launch video's Chinese cut (sample, 中文): the English edit's timeline (base), with its own cards (the spec's 中文 copy; the title stays in English, the spec's call) and its played shots recorded with the game in 中文 (trailer-out/shots-zh). Read by tools/trailer/assemble.py and render.mjs --cards --edit=.",
+  "base": "edit.json",
+  "lang": "zh",
+  "output": "trailer-sample-zh.mp4",
+  "cardsDir": "cards-zh",
+  "cards": [
+    {
+      "kind": "caption",
+      "lang": "zh",
+      "text": "倭寇撞上了戚家军。"
+    },
+    {
+      "kind": "caption",
+      "lang": "zh",
+      "text": "一五九三年，平壤。<br>日军守城，明军顶着铳弹冲向城墙。"
+    },
+    {
+      "kind": "caption",
+      "lang": "zh",
+      "text": "一四一五年，阿金库尔。"
+    },
+    {
+      "kind": "caption",
+      "lang": "zh",
+      "text": "骑士没倒在箭下，<br>倒在了烂泥里。"
+    },
+    {
+      "kind": "caption",
+      "lang": "zh",
+      "text": "风暴里的海崖古堡，<br>一个人杀上去。"
+    },
+    {
+      "kind": "plate",
+      "lang": "zh",
+      "kicker": "故事 · 一生，1587–1621",
+      "text": "死一次，重来一次，<br>运气就薄一分。",
+      "sub": "（游戏结束页的占位）"
+    },
+    {
+      "kind": "closing",
+      "lang": "zh",
+      "text": "四百年前，一杆铁炮<br>让足轻打倒了武士。<br>于是，武士就成了历史。"
+    },
+    {
+      "kind": "closing",
+      "lang": "zh",
+      "text": "今天，Fable 5.2 让一个人，<br>做完了一整个游戏工作室的活。<br>每个时代，<br>都有自己的那杆火枪。"
+    },
+    {
+      "kind": "title",
+      "text": "Historically<br>Accurate<br>Combat<br>Simulator",
+      "sub": "Every blow is physics, not scripted.",
+      "link": "kirbisity.github.io/historically-accurate-combat-simulator"
+    },
+    {
+      "kind": "caption",
+      "lang": "zh",
+      "text": "板甲砍不进去，<br>只能找甲缝。"
+    }
+  ]
+}

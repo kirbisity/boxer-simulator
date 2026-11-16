@@ -36,6 +36,9 @@
   .plate .kicker { font: 600 13px var(--display); letter-spacing: 0.22em; color: var(--gold); text-transform: uppercase; }
   .plate .big { margin-top: 14px; font: 600 34px/1.2 var(--title); color: rgb(var(--ink)); }
   .plate .small { margin-top: 12px; font: italic 500 18px/1.35 var(--title); color: rgba(var(--ink), 0.75); }
+  .plate [lang=zh].kicker { letter-spacing: 0.3em; }
+  .plate [lang=zh].big { font: 700 28px/1.5 'Noto Serif SC', serif; }
+  .plate [lang=zh].small { font: 500 15px/1.5 'Noto Serif SC', serif; }
 </style>
 </head>
 <body>
@@ -59,6 +62,7 @@
       $('#title .link').textContent = card.link ?? '';
       $('#title').classList.add('on');
     } else if (card.kind === 'plate') {
+      for (const el of document.querySelectorAll('#plate .kicker, #plate .big, #plate .small')) el.lang = lang;
       $('#plate .kicker').textContent = card.kicker ?? '';
       $('#plate .big').innerHTML = card.text;
       $('#plate .small').textContent = card.sub ?? '';

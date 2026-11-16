@@ -104,8 +104,24 @@ export const SHOTS = {
       await TC.warm(150);`,
     segments: [real(10)],
   },
-  // Battle Mode Agincourt, seed 1, played as an English longbowman of the front rank (Richard): one continuous take from 34 s, the last
-  // volleys into the men-at-arms coming through the mud, then their arrival at the stakes and the melee (from 42 s).
+  // Battle Mode Agincourt, seed 1, from the French side (user, 2026-11-15): played as a man-at-arms of the front rank, from the first
+  // seconds, as the line begins its march across the mud toward the archers 50 m off, the first volleys coming down.
+  agincourtFrench: {
+    view: 'phone',
+    setup: `
+      boxer.fullModels(false);
+      await TC.battle('agincourt', 1);
+      const w = boxer.state.world;
+      const men = w.fighters.filter((f) => f.corner === 'red').sort((a, b) => Math.abs(a.root[1]) - Math.abs(b.root[1]));
+      const front = Math.max(...men.map((f) => f.root[0]));
+      const me = men.filter((f) => f.root[0] > front - 1)[0] ?? men[0];
+      boxer.fullModels(true); TC.play(me.id);
+      TC.chase(me.id, { back: 5.2, pitch: 0.3, lookUp: 1.6, fov: 54 });
+      await TC.warm(150);`,
+    segments: [real(7)],
+  },
+  // Battle Mode Agincourt, seed 1, played as an English longbowman of the front rank (Richard): from 12 s (user, 2026-11-15: before the
+  // knights come near), the volleys going out over the mud into the men-at-arms still 40 m off and coming on.
   agincourt: {
     view: 'phone',
     setup: `
@@ -115,7 +131,7 @@ export const SHOTS = {
       const bows = w.fighters.filter((f) => f.corner === 'blue' && f.weapon?.kind === 'longbow').sort((a, b) => Math.abs(a.root[1]) - Math.abs(b.root[1]));
       const front = Math.min(...bows.map((f) => f.root[0]));
       const me = bows.filter((f) => f.root[0] < front + 1)[0] ?? bows[0];
-      TC.play(me.id); TC.skip(34);
+      TC.play(me.id); TC.skip(12);
       boxer.fullModels(true); TC.play(me.id);
       TC.chase(me.id, { back: 4.6, pitch: 0.32, lookUp: 1.4, fov: 52 });
       await TC.warm(150);`,
@@ -172,7 +188,7 @@ export const SHOTS = {
   },
 
   // ---- Dunnottar (Level Mode, played: the Forger walks the stage's own route, DUNNOTTAR_ROUTE, and the fight AI fights for him when a foe
-  // closes; the game's own camera, its zoom held out; the HUD as on a phone). A section is entered where the route enters it. `at` [x, y, z]: y the floor
+  // closes; the game's own camera as a player has it, at its own zoom (user, 2026-11-15: the gameplay perspective); the HUD as on a phone). A section is entered where the route enters it. `at` [x, y, z]: y the floor
   // height near there (the stage's views, tools/camshots.js), null for the highest floor (open ground only).
   dnCliff: dunnottar([-100, 10.6, -4], 0, [[-80, -4], [-64, -4], [-60.5, -2], [-60.5, 8], [-70, 8]], 5),
   dnBridge: dunnottar([-50, null, 44], 0, [[-44, 44], [-34, 45], [-28, 46.2], [-22, 46.2], [-16, 46.2], [-10.4, 46.2]], 6),
@@ -200,7 +216,7 @@ export const SHOTS = {
     level: true,
     setup: `
       await TC.level([-7, 17.18, -36], Math.PI);
-      TC.pilot([[-15, -36], [-18, -36]]);
+      TC.pilot([[-15, -36], [-18, -36]], { zoom: null });
       const run = boxer.levelRun();
       const w = boxer.state.world;
       for (let i = 0; i < 300 && !run.cutscene(); i += 1) { TC.onFrame(w); boxer.playFrames(1, 1 / 60); }
@@ -218,7 +234,7 @@ function dunnottar(at, yaw, points, seconds, extra = '') {
     level: true,
     setup: `
       await TC.level(${JSON.stringify(at)}, ${yaw});
-      TC.pilot(${JSON.stringify(points)});
+      TC.pilot(${JSON.stringify(points)}, { zoom: null });
       ${extra}
       await TC.warm(90);
       // The game's camera comes to him at real speed (it does not move in a held frame).
