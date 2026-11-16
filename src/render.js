@@ -18,6 +18,7 @@ import { bodyCheck } from './skinworker.js';
 import { applySkinTextures, skinTextureCache, storeSkinTextures } from './skintex.js';
 import { detailMaterial } from './skindetail.js';
 import { DETAIL_ARMOUR, DETAIL_MAPS, clothCellOf, detailKindOf, metalClothCell, tileSize } from './detailmaps.js';
+import { clothWearOf, wearCloth } from './clothwear.js';
 import { armourDecorMaterial, armourDetailMaterial, clothAtlasTexture, clothDetailMaterial, preloadDetailMaps } from './detailtex.js';
 import { lookSkinHex } from './skintones.js';
 import { buildSkeleton } from './bones.js';
@@ -1941,6 +1942,8 @@ function paintBody(mesh, body, look, corner) {
       // A style that paints its skin per vertex (flesh-lite, flesh hero) darkens and tints each skin vertex.
       if (region === 'skin' && mesh.tint) for (let axis = 0; axis < 3; axis += 1) colors[vertex * 3 + axis] *= mesh.tint[vertex * 3 + axis];
     });
+    // The garment worn as its wearer's station wears it (clothwear.js): mud, frayed hems, sweat, sun.
+    wearCloth(colors, mesh, clothWearOf(body.inputs.outfit), P);
     mesh.skinMask = mesh.regions.map((region) => region === 'skin');
     // Armour of leather or horn (`armor.matte`) is drawn as the body is, not as metal; its gilt still shines.
     const matte = Boolean(dress.armor?.matte);
