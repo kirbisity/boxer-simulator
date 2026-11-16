@@ -3703,7 +3703,7 @@ function skinInTheOpen(mesh, name, frames, shares, nameOf, start, count) {
  * Every trunk piece reaching the trunk's top (a shirt, a coat, a backplate, a gorget's foot) follows the base skin up to the
  * neckline all round (LOFT.collar): the modelled trapezius rises above the loft's top rings, and a garment's collar lies on it,
  * not under it. Each point of the piece's top ring, away from the front (`from` rad), is carried to the highest skin point of
- * the trunk and the neck in its sector round the trunk (`sector`) that still lies out at the neck's foot or beyond (`neckShare`
+ * the trunk in its sector round the trunk (`sector`) that still lies out at the neck's foot or beyond (`neckShare`
  * of the neck's radius); in front, to the trunk's own highest skin there (the throat); stood off it by `standoff` (m: the
  * cloth's own thickness and the layer margin) along the point's own line out from the axis. A piece already higher there stays.
  */
@@ -3718,7 +3718,7 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
     const out = vec.sub(rel, vec.scale(trunk.axis, t * trunk.length));
     return { t, out, r: vec.length(out), angle: Math.atan2(vec.dot(out, trunk.widthAxis), vec.dot(out, trunk.depthAxis)) };
   };
-  // The skin of the trunk and neck (not the arms', nor the shoulder's cap) by sector round the trunk: its highest point out at the neck's foot.
+  // The skin of the trunk and neck (not the arms', nor the shoulder's cap) by sector round the trunk, and the trunk's own highest point out at the neck's foot.
   const sectors = spec.sectors;
   const highest = new Array(sectors).fill(null);
   const skinPlaces = [];
@@ -3729,7 +3729,9 @@ function raiseCollars(mesh, frames, shares, pieceTop, nameOf, start, count, ribP
     if (mesh.base.armFlesh?.[vertex - start] && mesh.base.armFlesh[vertex - start] !== 'trunk') continue;
     const place = placeOf(mesh.positions.slice(vertex * 3, vertex * 3 + 3));
     skinPlaces.push({ ...place, vertex });
-    if (place.r < neckFoot) continue;
+    // (The trunk's own skin: the neck leans forward out of the trunk, and its sides beside the front lie out past the neck's
+    // foot up to the jaw; counted, a coat's collar climbed to them in two points beside its front opening.)
+    if (place.r < neckFoot || name !== 'trunk') continue;
     const sector = sectorOf(place.angle);
     if (!highest[sector] || place.t > highest[sector].t) highest[sector] = place;
   }
