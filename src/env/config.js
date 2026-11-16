@@ -809,6 +809,9 @@ export const ENV_WEATHER = {
 //   { than: its own weather's name, and any of sun, air, clouds, meter }. A weather picked by name, or brought
 //   by a battle, then looks like itself there (snow under a snow sky, not an evening with snow in it); under
 //   `than` the place is its own day. Left out: the place has one sun for every weather.
+// days: a place's own day for a named weather, { [ENV_WEATHER name]: any of sun, air, clouds, meter }, laid over its
+//   description while that weather is on it (before `other`): one place seen at several hours, each hour a weather
+//   of its own (the walls of Pyongyang's morning and evening).
 // sun: `azimuth` rad round from +x toward +z (scenery.js's convention: -pi/2 is the far side of the floor),
 //   `elevation` degrees above the horizon.
 // air: `visibility` m on this place's clear day, `hazeHeight` m.
@@ -860,6 +863,8 @@ export const ENV_WEATHER = {
 //     The air's walk and what falls through the air then take the place's walls and roofs for shade as they
 //     take crowns (air.js envPlaceSun). A map packed as three.js packs depth (not VSM).
 //   meter: { sky: the share of the sky its ground sees, frame: the share of a level frame that is sky }.
+//   litAt: [x, y, z], where the sun's strength past the land is judged (left out: [0, 1, 0], the floor's middle),
+//     clear of what the place has built into its own heights.
 // Its own materials take the haze, the wet and the snow through air.js envDress.
 export const ENV_PLACE_PLAIN = {
   weather: 'clear',

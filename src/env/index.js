@@ -74,8 +74,17 @@ function envWeatherOf(view, place) {
  * so that the land is made again only when the day changes (envApply).
  */
 const envPlacesOther = new WeakMap();
+const envPlacesDay = new WeakMap();
 function envPlaceIn(place, weather) {
   const own = PLACE_ENV[place];
+  // (A place with a day of its own for this weather, config.js `days`: that day's sun, air and cloud.)
+  const day = weather && own?.days?.[weather.name];
+  if (day) {
+    if (!envPlacesDay.has(own)) envPlacesDay.set(own, new Map());
+    const days = envPlacesDay.get(own);
+    if (!days.has(weather.name)) days.set(weather.name, { ...own, ...day });
+    return days.get(weather.name);
+  }
   if (!own?.other || !weather || weather.name === own.other.than) return own;
   if (!envPlacesOther.has(own)) envPlacesOther.set(own, { ...own, ...own.other });
   return envPlacesOther.get(own);
@@ -279,11 +288,13 @@ export function envApply({ place, view, spec, group }) {
   envSteelSwap(view, air, own.meter?.sky ?? 1, view.envSteelShare ?? 1);
 
   // The sun on the fighters and what stands on the floor: the colour the land is lit with, cut by what the hills
-  // take of it at the floor's middle (and, each frame, by the cloud over it: envUpdate).
+  // take of it at the floor's middle (and, each frame, by the cloud over it: envUpdate). A place that draws itself
+  // may name the point instead (config.js `litAt`): its ground's heights hold what it has built (a rampart's body),
+  // whose shadow its own shadows already lay, and at a wall's foot those would put the whole place in shade.
   const peak = Math.max(air.sunColour[0], air.sunColour[1], air.sunColour[2], 1e-3);
   lights.sun.visible = true;
   lights.sun.color.setRGB(air.sunColour[0] / peak, air.sunColour[1] / peak, air.sunColour[2] / peak);
-  const sunPower = peak * envSunPast(group.userData.envHeight, air.sun, 0, 1, 0);
+  const sunPower = peak * envSunPast(group.userData.envHeight, air.sun, ...(own.litAt ?? [0, 1, 0]));
   lights.sun.intensity = sunPower;
   if (own.own) {
     // A place that draws itself keeps the shadow box where it put it (or has it carried: envUpdate); the sun
