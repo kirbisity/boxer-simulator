@@ -27,7 +27,8 @@ import wear  # noqa: E402
 
 ARMOUR = {
     'mail': {'size': 1024, 'quality': 90},
-    'kozane': {'size': 1024, 'quality': 90, 'masks': True},
+    # (Kozane at 72: its close-packed braids' fine herringbone costs more than the old one-loop-per-plate tile did at 90.)
+    'kozane': {'size': 1024, 'quality': 72, 'masks': True},
     'lamellae': {'size': 1024, 'quality': 90, 'masks': True},
     'plate': {'size': 512, 'quality': 92},
     # The hard armour tiles (hardtiles.py), at 512² (their detail is millimetres over a tile a hand across or less).
