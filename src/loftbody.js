@@ -3213,13 +3213,16 @@ function fitClothToBase(mesh, parts, armoured) {
     if (!name) continue;
     const point = mesh.positions.slice(vertex * 3, vertex * 3 + 3);
     if (!/Upper|Fore/.test(name)) mesh.base.armFlesh[vertex - start] = armOf(point, name);
-    // (Neck flesh beyond the neck's own reach, the slope of the shoulders, is the trunk's: covered with the trunk's top.)
+    // (Neck flesh beyond the neck's own reach, the slope of the shoulders, is the trunk's: covered with the trunk's top. Not in
+    // front, within the front neckline (LOFT.collar.from), where a coat closed at the neck is not raised: there the neck's foot
+    // spreading into the chest was left out above the coat's neckline, a hole in the throat.)
     if (name === 'neck' && frames.neck && !mesh.base.armFlesh[vertex - start]) {
       const frame = frames.neck;
       const rel = vec.sub(point, frame.part.a);
       const t = vec.dot(rel, frame.axis) / frame.length;
-      const off = vec.length(vec.sub(rel, vec.scale(frame.axis, t * frame.length)));
-      if (off > spec.armReach * Math.max(frame.part.depth(t), frame.part.width(t))) mesh.base.armFlesh[vertex - start] = 'trunk';
+      const out = vec.sub(rel, vec.scale(frame.axis, t * frame.length));
+      const front = Math.abs(Math.atan2(vec.dot(out, frame.widthAxis), vec.dot(out, frame.depthAxis))) < LOFT.collar.from;
+      if (!front && vec.length(out) > spec.armReach * Math.max(frame.part.depth(t), frame.part.width(t))) mesh.base.armFlesh[vertex - start] = 'trunk';
     }
     // (Or an arm's own point, or one blending into it (armSkin): a wasted arm hangs from the emaciated reference's shoulder,
     // basebody.js baseHer, up to 5 cm off the bone at its root and out of the reach round it.)
