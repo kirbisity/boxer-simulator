@@ -1178,6 +1178,12 @@ export const OUTFITS = {
     skill: 0.7,
     // Rides (mounted samurai of the Sengoku).
     horse: 'japanese',
+    // Proof (`bulletRating`, its dō and kabuto: weapons.js bulletRatingAt) to 900 J: the teppō's ~13 g ball (~1 kJ at the
+    // muzzle, Krenn, Kalaus and Hall 1995) has that ~8 m out (its flight, physics/ballistics.js), so the tameshi-dō, a dō
+    // proved by a shot and sold with the dent as its mark (Bottomley and Hopson 1988), turns a ball from beyond a few
+    // paces, and one fired closer, or a heavier ball (a 6-monme gun's 23 g, near twice the energy), goes through, its
+    // share of it held as the plate's ~2 mm against the ball's energy (bulletProof). The kote, haidate and suneate
+    // (`bullet.limb` 0.15: cloth, small splints and mail) were never proved and turn no ball.
     faction: 'japanese', bulletRating: 900, plated: true,
     label: 'Samurai — tōsei gusoku', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.

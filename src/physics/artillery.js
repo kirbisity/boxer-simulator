@@ -27,7 +27,7 @@ import { capsules, closestBetween, point } from '../physics.js';
 import { soundEvent } from '../audio/log.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
 import { vec } from '../pose.js';
-import { ARROW, bulletRegion, GUN, MATCHLOCK } from '../weapons.js';
+import { ARROW, bulletRatingAt, bulletRegion, GUN, MATCHLOCK } from '../weapons.js';
 import { bulletHit, horseOnPath, missileInHorse } from './ranged.js';
 import { screenOnPath } from './cover.js';
 import { reliefAt, worksOf } from './fieldworks.js';
@@ -494,7 +494,8 @@ function ballInBody(world, ball, body, at) {
   const key = body.part.key;
   const region = bulletRegion(key);
   // His armour over that part takes what it is proof against (its rated round's energy, as bulletProof reads it) first.
-  const rating = Math.max(OUTFITS[outfitOf(victim.body.inputs).kind]?.bulletRating ?? GUN.energy, GUN.energy);
+  // (Over a limb, never proved, a pistol round's worth: bulletRatingAt.)
+  const rating = Math.max(bulletRatingAt(OUTFITS[outfitOf(victim.body.inputs).kind], region) ?? GUN.energy, GUN.energy);
   const armour = Math.min(joules, (victim.body.gear.protection.bullet?.[region] ?? 0) * rating);
   const loss = tissueLoss(ball.kg, ball.area, joules - armour, body.path);
   const left = Math.max(0, joules - armour - loss.left);

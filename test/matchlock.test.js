@@ -4,7 +4,9 @@ import { normaliseInputs, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { advance, createWorld, placeFighter, throwPunch } from '../src/physics.js';
 import { FACTION_KEYS, factionOf, OUTFIT_KEYS, OUTFITS } from '../src/outfits.js';
-import { ADAMS, bulletProof, CROSSBOW, GUN, MATCHLOCK, NU } from '../src/weapons.js';
+import { ADAMS, bulletProof, bulletRatingAt, CROSSBOW, GUN, MATCHLOCK, NU } from '../src/weapons.js';
+import { bulletHit } from '../src/physics/ranged.js';
+import { atRange } from '../src/physics/ballistics.js';
 
 const ARQUEBUSIER = { ...PRESETS.contender, name: 'Hans Brenner', sex: 'male', style: 'matchlock', outfit: { kind: 'footman', design: 1 }, accessories: [] };
 const target = (outfit = null) => normaliseInputs({ ...structuredClone(PRESETS.contender), sex: 'male', heightCm: 176, style: 'unskilled', outfit, accessories: [] });
@@ -26,6 +28,37 @@ test('against a pistol round every armour stops what it always did; against a ma
   const proof = (kind) => bulletProof(OUTFITS[kind].bulletRating, MATCHLOCK.energy);
   assert.ok(proof('swat') >= proof('samuraiTosei') && proof('samuraiTosei') > proof('knight') && proof('knight') > proof('ashigaru'));
   assert.ok(MATCHLOCK.energy > GUN.energy && proof('ashigaru') < 1, 'a heavier ball goes through what stops a pistol round');
+});
+
+/** A teppō ball from `metres` off into `part` of a man in `outfit`: the shot event bulletHit fills (no bone breaks). */
+function ballAt(outfit, part, metres) {
+  const world = createWorld([{ inputs: structuredClone(ARQUEBUSIER), corner: 'red' }, { inputs: target({ kind: outfit, design: 0 }), corner: 'blue' }], { seed: 1 });
+  world.random = () => 1;
+  const share = (atRange(MATCHLOCK.projectile, metres).speed / MATCHLOCK.projectile.velocity) ** 2;
+  const event = { effects: [] };
+  const shot = { ...MATCHLOCK, energy: MATCHLOCK.energy * share };
+  bulletHit(world, world.fighters[0], { fighter: world.fighters[1], capsule: { key: part, a: 0, b: 1 }, throat: false, point: [0, 1, 0] }, [1, 0, 0], event, shot, 1);
+  return event;
+}
+
+test('the tōsei dō turns a teppō ball from a few paces out and not at the muzzle; its sleeves and leg guards turn none', () => {
+  const dented = (event) => event.effects.some((effect) => effect.includes('dents the plate'));
+  assert.ok(!dented(ballAt('samuraiTosei', 'trunk', 2)), 'at the muzzle the ball goes through the dō');
+  for (const metres of [15, 30, 75, 120]) {
+    assert.ok(dented(ballAt('samuraiTosei', 'trunk', metres)), `dō at ${metres} m`);
+    for (const part of ['rUpperArm', 'rForearm', 'lThigh', 'lShank']) {
+      const event = ballAt('samuraiTosei', part, metres);
+      assert.ok(!dented(event) && event.harm > 0 && event.armour < 0.2, `${part} at ${metres} m`);
+    }
+  }
+});
+
+test('only the breast and helmet carry the proof: a limb is proof against nothing, save a machine\'s shell', () => {
+  for (const kind of OUTFIT_KEYS) {
+    assert.equal(bulletRatingAt(OUTFITS[kind], 'torso'), OUTFITS[kind].bulletRating ?? GUN.energy, kind);
+    assert.equal(bulletRatingAt(OUTFITS[kind], 'limb'), OUTFITS[kind].machine ? OUTFITS[kind].bulletRating ?? GUN.energy : null, kind);
+  }
+  assert.ok(!ballAt('knight', 'rForearm', 30).effects.some((effect) => effect.includes('dents')), 'a vambrace was never proved');
 });
 
 test('a matchlock fires once, then is empty: the shoot button loads it, in its reload time, standing', () => {
