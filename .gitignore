@@ -3,3 +3,6 @@ shots/
 node_modules/
 .DS_Store
 
+
+# The launch video's renders, the user's music and cards (tools/trailer): local only
+trailer-out/
