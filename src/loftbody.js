@@ -2540,7 +2540,10 @@ export function baseRigOf(sex, crowd) {
     const mesh = baseBodyMesh(sex, crowd);
     const reference = buildBody(mesh.reference);
     const { baseParts } = buildLoftBody(reference, { ...baseLoftOptions(crowd), base: { measure: true } });
-    BASE_RIGS.set(key, { ...measureBaseBody(mesh, baseParts, reference.heightM, jointsByName(bindPoints(reference))), refTraits: sculptTraits(reference), refRules: rulesTraits(reference), sex });
+    // (`spacing`: how many times as far apart its points lie as the fighter's mesh's, by their counts over one surface: 1 for a
+    // fighter's, about 1.8 for a crowd's. What is measured row by row on it (basebody.js shoulderPlus) is measured in rows that much taller.)
+    const spacing = crowd ? Math.sqrt(baseBodyMesh(sex, false).count / mesh.count) : 1;
+    BASE_RIGS.set(key, { ...measureBaseBody(mesh, baseParts, reference.heightM, jointsByName(bindPoints(reference))), refTraits: sculptTraits(reference), refRules: rulesTraits(reference), sex, spacing });
   }
   return BASE_RIGS.get(key);
 }
@@ -3210,7 +3213,9 @@ function fitClothToBase(mesh, parts, armoured) {
     if (!name) continue;
     const points = corners.map((vertex) => mesh.positions.slice(vertex * 3, vertex * 3 + 3));
     const longest = Math.max(...[0, 1, 2].map((corner) => vec.length(vec.sub(points[corner], points[(corner + 1) % 3]))));
-    const steps = Math.ceil(longest / (spec.across * spec.sampling));
+    // (No finer than a face `farthest` long needs: past that it is no skin a piece clears, and a face flung out of the body
+    // asked for a grid of its length squared, hundreds of thousands of points, enough to take the page down.)
+    const steps = Math.min(Math.ceil(longest / (spec.across * spec.sampling)), Math.ceil(spec.farthest / (spec.across * spec.sampling)));
     if (steps < 2) continue;
     const swell = Math.min(...corners.map((vertex) => mesh.base.swell[vertex - start]));
     const armSkin = corners.every((vertex) => mesh.base.armSkin?.[vertex - start]);
