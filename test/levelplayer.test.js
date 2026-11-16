@@ -312,7 +312,8 @@ test('a ladder is kicked down from above, and only from above', () => {
 // ---- Loot --------------------------------------------------------------------------------------------------
 
 test('a dead man\'s weapon is taken with the existing pickup, and the style follows the weapon', () => {
-  const world = yard();
+  // A player with a sword and buckler (the stage's player before 2026-11-15), so the knight's longsword is a different weapon to take.
+  const world = createLevelWorld(TESTYARD, { ...levelPreset('forger'), style: 'armingBuckler' }, { seed: 3 });
   const me = world.fighters[0];
   assert.equal(me.style, 'armingBuckler');
   standAt(world, -14.4, 0, -3.1);
@@ -543,8 +544,8 @@ test('a death with no rest taken wakes him at the stage start in the gear he beg
   assert.ok(Math.hypot(me.root[0] - start[0], me.root[1] - start[2]) < 0.05);
   assert.equal(me.body.inputs.outfit.kind, kind);
   assert.equal(me.weapon?.held, true);
-  assert.equal(me.style, 'armingBuckler');
-  assert.equal(me.shield?.kind, snapshotGear(me).shield);
+  assert.equal(me.style, levelPreset('forger').style);
+  assert.equal(me.shield?.kind ?? null, snapshotGear(me).shield ?? null);
 });
 
 test('falling into the sea is a death: the level asks for YOU DIED', () => {
