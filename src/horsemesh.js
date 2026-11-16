@@ -330,19 +330,27 @@ function hmShell(fn, { t = [0, 1], a = [0, 1], nt = 8, na = 8, infl = 0.01, lip 
  */
 function hmStrap(fn, path, { width = 0.02, across = 't', infl = 0.006, color = [0.15, 0.1, 0.07], radius = 0.12 }) {
   const prim = { p: [], c: [], n: [], i: [] };
+  // Each point's normal: off the surface it lies on (the way `infl` lifts it).
+  const off = (t, a) => vec.normalize(vec.sub(fn(t, a, infl + 0.001), fn(t, a, infl)));
   path.forEach(([t, a], index) => {
     const half = width / 2;
     const [tl, al, tr, ar] = across === 't' ? [t - half, a, t + half, a] : [t, a - half / radius, t, a + half / radius];
     prim.p.push(...fn(tl, al, infl), ...fn(tr, ar, infl));
+    prim.n.push(...off(tl, al), ...off(tr, ar));
     prim.c.push(...hmColorAt(color, t, a), ...hmColorAt(color, t, a));
     if (index > 0) {
       const k = (index - 1) * 2;
       prim.i.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
     }
   });
-  // Wound either way round: which side faces out depends on the path's direction; make both faces.
-  const both = { ...prim, i: [...prim.i, ...prim.i.map((v, k, all) => all[k - (k % 3) + (2 - (k % 3))])] };
-  return hmSmoothen(both);
+  // One face, wound to face out (the material is drawn from both sides). Both windings over the same points summed their
+  // normals to nothing or to noise: lit along a zero normal, the strap showed as white slivers on the flanks.
+  for (let k = 0; k < prim.i.length; k += 3) {
+    const [a, b, c] = [prim.i[k], prim.i[k + 1], prim.i[k + 2]].map((v) => prim.p.slice(v * 3, v * 3 + 3));
+    const n = prim.n.slice(prim.i[k] * 3, prim.i[k] * 3 + 3);
+    if (vec.dot(vec.cross(vec.sub(b, a), vec.sub(c, a)), n) < 0) [prim.i[k + 1], prim.i[k + 2]] = [prim.i[k + 2], prim.i[k + 1]];
+  }
+  return prim;
 }
 
 /** A tube along a 3D polyline with radii. */
