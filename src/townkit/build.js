@@ -30,6 +30,7 @@ const tkbScale = (colour, by) => colour.map((value) => value * by);
  *   wall               'plaster' | 'brick' | 'rubble': its side and back walls
  *   ground, upper      what each bay of the front is, in turn (repeated to fill): 'open' | 'boards' | 'door' | 'lattice' | 'wall'
  *   pent               a pent roof over the shopfront (two storeys only)
+ *   transom            m: a band of lattice over each open or boarded bay of the ground floor (geo.js tkgBay)
  *   firewall           stepped gable walls standing above the roof at its ends ('both' | 'left' | 'right' | null)
  *   roof               { kind, rise, overhang, sag, lift, tint } over tkgRoof's defaults
  *   base               the ground's height under it (default 0)
@@ -95,7 +96,7 @@ export function tkHouse(builder, spec) {
       const x0 = -w / 2 + k * each + post;
       const x1 = -w / 2 + (k + 1) * each - post;
       if (kind === 'wall') tkgWall(builder, front, { material: wall, x0: x0 - post, x1: x1 + post, y0, y1, colour: paint, openings: [{ x: (x0 + x1) / 2, width: 0.9, sill: y0 + 1.0, head: y1 - 0.5 }], inside: dark, reveal: 0.14 });
-      else tkgBay(builder, front, { kind, x0, x1, y0, y1, finish: timber, sill: kind === 'open' ? 0.95 : y0 > plinth + 0.1 ? 0.8 : 0.9 });
+      else tkgBay(builder, front, { kind, x0, x1, y0, y1, finish: timber, sill: kind === 'open' ? 0.95 : y0 > plinth + 0.1 ? 0.8 : 0.9, transom: y0 < plinth + 0.1 ? spec.transom ?? 0 : 0 });
     }
   };
   storey(ground, plinth, h0 - 0.24, seed);
@@ -299,9 +300,11 @@ export function tkLantern(builder, x, y, z, { size = 0.2, colour = [0.82, 0.16, 
 /**
  * A storage jar's turning: `sides` round and `rings` up its body. At 10 and 4 a jar a pace from the eye was a
  * ten-sided lantern with a dark stripe down every side; 18 and 8 read as round at that distance (by eye, the canal
- * town's quay). A jar is then 18 x 11 x 2 = about 400 triangles, and a place stands a few dozen.
+ * town's quay), but still faintly faceted, its belly in bands and its rim a polygon, from half a pace (where a
+ * walker stands over a row of Korean storage jars); 26 and 14 read as turned ware there. A jar is then 26 x 17 x 2 =
+ * about 900 triangles, near detail only where a place stands many.
  */
-export const TK_JAR = { sides: 18, rings: 8 };
+export const TK_JAR = { sides: 26, rings: 14 };
 
 /** A glazed storage jar standing at world (x, y, z): `high` m, with a lid or open. */
 export function tkJar(builder, x, y, z, { high = 0.75, colour = [0.42, 0.3, 0.22], lid = true } = {}) {

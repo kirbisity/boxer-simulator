@@ -126,7 +126,7 @@ export function tkgBuilder() {
      * A round post or drum about the vertical through local (x, z), y0 to y1, radius r0 at its foot and r1 at its head
      * (`sides` round). u runs round it, v is the height. `caps`: 'top', 'bottom' or both.
      */
-    round(material, frame, x, z, y0, y1, r0, r1 = r0, { sides = TK_GEO.cuts.round, colour = TKG_WHITE, caps = 'top', ends = null } = {}) {
+    round(material, frame, x, z, y0, y1, r0, r1 = r0, { sides = TK_GEO.cuts.round, colour = TKG_WHITE, caps = 'top', ends = null, girth = Math.PI * (r0 + r1) } = {}) {
       const ring = (radius, y, k) => {
         const angle = (k / sides) * Math.PI * 2;
         return frame(x + Math.cos(angle) * radius, y, z - Math.sin(angle) * radius);
@@ -139,7 +139,6 @@ export function tkgBuilder() {
         const [across, up] = end ?? [1, lean];
         return tkgUnit(tkgSub(frame(Math.cos(angle) * across, up, -Math.sin(angle) * across), frame(0, 0, 0)));
       };
-      const girth = Math.PI * (r0 + r1);
       for (let k = 0; k < sides; k += 1) {
         const u0 = (k / sides) * girth;
         const u1 = ((k + 1) / sides) * girth;
@@ -164,10 +163,13 @@ export function tkgBuilder() {
         if (!a || !b || a[0] * b[0] + a[1] * b[1] < Math.cos((TK_GEO.cuts.crease * Math.PI) / 180)) return null;
         return [a[0] + b[0], a[1] + b[1]];
       };
+      // (One measure round for every ring, the girth at the widest: were each ring's sheet stretched round its own
+      // girth, the sheet's grain and tone would step at every ring and a jar would read as a stack of bands.)
+      const girth = 2 * Math.PI * Math.max(...profile.map((point) => point[0]));
       for (let k = 0; k + 1 < profile.length; k += 1) {
         const caps = (k === 0 ? 'bottom' : '') + (k + 2 === profile.length ? 'top' : '');
         const ends = [joined(faces[k - 1], faces[k]) ?? faces[k], joined(faces[k], faces[k + 1]) ?? faces[k]];
-        builder.round(material, frame, x, z, profile[k][1], profile[k + 1][1], profile[k][0], profile[k + 1][0], { ...options, caps, ends });
+        builder.round(material, frame, x, z, profile[k][1], profile[k + 1][1], profile[k][0], profile[k + 1][0], { girth, ...options, caps, ends });
       }
     },
     /**
@@ -620,9 +622,16 @@ export function tkgRoof(builder, frame, spec) {
  *   'boards'   shop boards the whole height (a shut shop);
  *   'door'     two plank leaves, a threshold;
  *   'open'     an open shopfront: a counter to `sill`, the dark of the shop behind.
- * `finish`: the timber's colour; `paint`: the lattice's colour if not the timber's.
+ * `finish`: the timber's colour; `paint`: the lattice's colour if not the timber's. `transom` (m): over an open or a
+ * boarded shopfront, a band of lattice leaves under its head that stays when the boards are taken down.
  */
-export function tkgBay(builder, frame, { kind = 'lattice', x0, x1, y0, y1, z = 0, sill = 0.9, leaf = 0.62, finish = [0.3, 0.22, 0.17], paint = null, back = 0.5, latticeMaterial = 'lattice' }) {
+export function tkgBay(builder, frame, { kind = 'lattice', x0, x1, y0, y1, z = 0, sill = 0.9, leaf = 0.62, finish = [0.3, 0.22, 0.17], paint = null, back = 0.5, latticeMaterial = 'lattice', transom = 0 }) {
+  if (transom > 0 && (kind === 'open' || kind === 'boards')) {
+    // (The band: framed lattice leaves over the dark, as the 'lattice' kind's above its sill; the opening under it.)
+    tkgBay(builder, frame, { kind: 'lattice', x0, x1, y0: y1 - transom, y1, z, sill: 0, leaf, finish, paint, back, latticeMaterial });
+    builder.box('timber', frame, x0, x1, y1 - transom - 0.06, y1 - transom, z - 0.06, z, { colour: finish.map((value) => value * 0.9), skip: 'back' });
+    y1 -= transom + 0.06;
+  }
   const wide = x1 - x0;
   const dark = [0.05, 0.045, 0.04];
   const frameSize = 0.055;

@@ -96,7 +96,11 @@ import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks,
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
 import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
+import { envDress } from './env/air.js';
+import { mergeFallen } from './fallenview.js';
+import { disposeObject } from './toon.js';
 import { installStory } from './story/storyview.js';
+import { easeFor } from './story/scenes/stage.js';
 import { STORY_MUSTER_RADIUS, STORY_PLACES, storyPlaceWeather } from './places/storyplaces.js';
 import { tkSetTier, tkTier } from './townkit/place.js';
 import { tkWeatherNow } from './townkit/weather.js';
@@ -746,8 +750,13 @@ function walkAbout(fighter) {
   }
   const pelvis = [fighter.x[P.pelvis * 3], fighter.x[P.pelvis * 3 + 2]];
   fighter.strafe = 0;
+  // Walking about a story place (enterStoryRoam: nobody there is fighting), he stands and walks at ease as the
+  // scenes' men do (story/scenes/stage.js easeFor): standing, the hands down and the feet side by side; walking, the
+  // arms to the stride. Out of the crouch of the guard, a man standing still in built shade is not read as hanging in the air.
+  const atEase = Boolean(state.world?.roam);
   if (!along && !across) {
     // Standing: keep the way he faces.
+    if (atEase) fighter.ease = easeFor(fighter, { time: state.world.time });
     fighter.move = 0;
     fighter.goTo = [pelvis[0] + Math.cos(fighter.yaw) * 3, 0, pelvis[1] - Math.sin(fighter.yaw) * 3];
     return;
@@ -759,6 +768,7 @@ function walkAbout(fighter) {
     fighter.move = 0;
     return;
   }
+  if (atEase) fighter.ease = easeFor(fighter, { walking: true });
   fighter.goTo = [pelvis[0] + (way[0] / size) * 3, 0, pelvis[1] + (way[1] / size) * 3];
   fighter.move = 1;
   fighter.running = state.walkRunning && !fighter.crawling;
@@ -771,6 +781,8 @@ function setWalking(on) {
   if (!fighter) return;
   fighter.walking = on;
   if (!on) {
+    // (Back on guard: the ease a story place's walk gave him is let go.)
+    if (state.world?.roam) fighter.ease = undefined;
     fighter.goTo = null;
     fighter.move = 0;
     fighter.running = false;
@@ -2979,11 +2991,49 @@ function enterStoryWorld(setup, { paused = false } = {}) {
  * nearest of a bigger one; 12 on the low tier (a phone) about 1.5 ms, the men round the walker. `lying`: the
  * states (physics) of a man on the ground.
  */
-const STORY_FALLEN = { high: 32, low: 12, lying: ['out', 'down', 'ground', 'falling'] };
+const STORY_FALLEN = {
+  high: 32, low: 12, lying: ['out', 'down', 'ground', 'falling'],
+  // The events that put a man on the ground (physics.js): the first of his says when he fell.
+  fell: ['knockout', 'floored', 'fell', 'died', 'bled', 'stopped', 'drowned'],
+  // What the battle left on the ground and is carried into the walk (physics.js world.debris): dropped weapons, shields, the pieces of broken ones.
+  debris: ['weapon', 'shield', 'splinter'],
+  // Snow on the fallen where it is falling (a place whose weather lays snow, through env/air.js envDress): only what has
+  // fallen since each went down. Snow showers lay about 1.5 cm an hour while they fall (approximate: light to moderate
+  // snow, 1 to 2.5 cm an hour) and fall a little under half the time (env/config.js ENV_WEATHER flurries: `under`
+  // [0.04, 0.16], 0.45 here); about 1 cm of new snow whitens what faces up (approximate, by eye: a dusting under a
+  // centimetre leaves dark cloth showing through). Minutes after a battle that is a few hundredths: barely a dusting.
+  // `step`: shares are rounded to this, so bodies alike draw together.
+  snow: { cmPerHour: 1.5, falling: 0.45, coverCm: 1, step: 0.02 },
+};
 let storyFallenViews = [];
+let storyFallenStill = null;
 function disposeStoryFallen() {
   for (const view of storyFallenViews) disposeFighterView(scene, view);
   storyFallenViews = [];
+  storyFallenStill?.dispose();
+  storyFallenStill = null;
+}
+
+/** The share of snow (0..1, STORY_FALLEN.snow) on a man who fell `seconds` ago. */
+function storyFallenSnow(seconds) {
+  const { cmPerHour, falling, coverCm, step } = STORY_FALLEN.snow;
+  const share = Math.min(1, (falling * cmPerHour * Math.max(0, seconds) / 3600) / coverCm);
+  return Math.round(share / step) * step;
+}
+
+/** When each of `fighters` went down in `world` (s, the battle's clock): his first falling event, else the start. */
+function storyFellAt(world, fighters) {
+  const ids = new Set(fighters.map((fighter) => fighter.id));
+  const at = new Map();
+  for (const event of world.events ?? []) {
+    if (ids.has(event.fighter) && !at.has(event.fighter) && STORY_FALLEN.fell.includes(event.kind)) at.set(event.fighter, event.time);
+  }
+  return at;
+}
+
+/** What the battle left on the ground, to be drawn still in the walk (copies: the battle's world goes). */
+function storyDebrisOf(world) {
+  return (world?.debris ?? []).filter((debris) => !debris.taken && STORY_FALLEN.debris.includes(debris.kind)).map((debris) => structuredClone(debris));
 }
 
 /** Those lying on the battle's field now, nearest `at` first (not the man who walks it: he gets up for the walk). */
@@ -3005,6 +3055,8 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   // (The battle is fought in the place itself, its view's scene the place walked: the fallen lie where they are.)
   const fallen = after ? storyFallenOf(state.world, at ?? entry.after?.at ?? entry.muster) : [];
   const fallenAt = state.world?.time ?? 0;
+  const fellAt = after ? storyFellAt(state.world, fallen) : new Map();
+  const carried = after ? storyDebrisOf(state.world) : [];
   if (state.game !== 'story') setGame('story');
   leaveStage();
   state.scenario = null;
@@ -3020,7 +3072,8 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   if (!weather && day !== null) weather = storyPlaceWeather(key, storyDayRoll(day));
   const start = at ? { ...stage.start, at, facing: facing ?? stage.start.facing } : stage.start;
   state.world = createStageWorld({ ...stage, start }, normaliseInputs(structuredClone(inputs)), { seed: state.seed, awareness: false });
-  clearGore(scene);
+  // (After the battle its blood stays on the ground it was shed on.)
+  clearGore(scene, { keepBlood: after });
   setPlace(scene, entry.place, PLACE_ARENAS[entry.place], weather ? { town: weather } : null);
   fightMarks.reset();
   fightMarks.warm();
@@ -3033,12 +3086,25 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   document.body.dataset.place = entry.place;
   $('#place').closest('label').hidden = true;
   rebuildViews({ progressive: true });
-  for (const fighter of fallen) {
+  // Each posed once as the battle left him, then all of them baked where they lie and merged by material (fallenview.js).
+  const posed = fallen.map((fighter) => {
     const view = buildFighterView(scene, fighter, { simple: true });
     setLayer(view, state.layer);
     updateFighterView(view, 0, fallenAt);
-    storyFallenViews.push(view);
-  }
+    return view;
+  });
+  // What they dropped, drawn once each (weaponview.js updateDebris, into a scene of its own, none of it batched) and merged with them.
+  const dropped = { scene: new THREE.Scene(), steelEnv: scene.steelEnv };
+  updateDebris(dropped, { debris: carried.map((debris) => ({ ...debris, resting: false })) });
+  const snowing = (tkWeatherNow().snow ?? 0) > 0;
+  const bodies = posed.map((view) => ({ view, share: snowing ? storyFallenSnow(fallenAt - (fellAt.get(view.fighter.id) ?? 0)) : null }));
+  if (carried.length) bodies.push({ view: { group: dropped.scene }, share: null });
+  storyFallenStill = bodies.length ? mergeFallen(scene.scene, bodies, {
+    dress: snowing ? (material, snow) => (snow > 0 ? envDress(material, { snow }) : material) : null,
+  }) : null;
+  if (storyFallenStill) Object.assign(storyFallenStill, { bodies: posed.length, debris: carried.length });
+  for (const view of posed) disposeFighterView(scene, view);
+  disposeObject(dropped.scene);
   state.eventCursor = 0;
   state.finishedAt = null;
   resetDrama(state.drama);
@@ -3050,6 +3116,9 @@ function enterStoryRoam(key, { inputs, weather = null, day = null, after = false
   state.sideAsked = true;
   $('#side-pick').hidden = true;
   $('#modes button[data-value="play"]:not([data-side])').click();
+  // (The mode's button puts the one played on guard: here he walks about, at ease, until he fights. walkAbout.)
+  state.world.roam = key;
+  setWalking(true);
   state.walkRunning = false;
   renderHud();
   boxer.finishBuilding();
@@ -4240,8 +4309,8 @@ const boxer = window.boxer = {
   },
   // The fallen kept in the walk after a battle (enterStoryRoam): how many; `show` false hides them (to measure what they cost).
   storyFallen: (show) => {
-    if (show !== undefined) for (const view of storyFallenViews) view.group.visible = Boolean(show);
-    return storyFallenViews.length;
+    if (show !== undefined && storyFallenStill) storyFallenStill.group.visible = Boolean(show);
+    return { bodies: storyFallenStill?.bodies ?? 0, draws: storyFallenStill?.draws ?? 0, triangles: storyFallenStill?.triangles ?? 0, debris: storyFallenStill?.debris ?? 0 };
   },
   advance: (seconds) => {
     tick(seconds, { budget: Infinity });

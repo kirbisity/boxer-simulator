@@ -30,6 +30,10 @@ export const TK_TEX = {
   // few millimetres off its neighbours (which is where the rain stands).
   // (`vary`, `warm`: how far one slab's tone and colour stand from the next: a pavement is one quarry's stone, worn alike.)
   flags: { size: 512, metres: 3, relief: 0.022, courses: 5, blocks: [2, 4], joint: 0.014, round: 0.012, face: [0.5, 0.5, 0.49], mortar: [0.24, 0.25, 0.23], pit: 0.2, vary: 0.11, warm: 0.016 },
+  // A water town's square and quay paved in long granite slabs: the courses not all of one width (`uneven`), the slabs
+  // 0.6 to 1.5 m long, some re-laid from another quarry (`vary`, `warm` wider than the lane's flags), over a repeat
+  // twice the flags' so the courses do not read as a grid across a square (by eye against the canal reference).
+  slabs: { size: 512, metres: 6, relief: 0.024, courses: 10, blocks: [4, 8], joint: 0.013, round: 0.014, face: [0.5, 0.5, 0.49], mortar: [0.24, 0.25, 0.23], pit: 0.22, vary: 0.17, warm: 0.03, lichen: 0 },
   // Small setts and river cobbles, a hand or two across (the edges of lanes, the road before the gate).
   cobble: { size: 512, metres: 1.5, relief: 0.03, stones: 14, face: [0.45, 0.45, 0.43], mortar: [0.29, 0.28, 0.26] },
   // Lime plaster, whitewashed and weathered: a house wall above its brick foot.
@@ -203,7 +207,7 @@ const TKX_PAINTERS = {
       const shade = 0.97 - vary / 2 + tone * vary + (grain - 0.5) * 0.2 + (mottle - 0.5) * 0.22 - pits * 0.5;
       // Granite's own slight colour: some blocks warmer, some greyer; lichen where the mottle is high on rough work.
       const warm = (tkHash(block.id, 17, seed) - 0.5) * (spec.warm ?? 0.05);
-      const lichen = uneven ? tkSmooth(0.66, 0.8, mottle) * 0.35 : 0;
+      const lichen = uneven ? tkSmooth(0.66, 0.8, mottle) * (spec.lichen ?? 0.35) : 0;
       for (let k = 0; k < 3; k += 1) {
         const stone = spec.face[k] * shade + (k === 0 ? warm : k === 2 ? -warm : 0);
         const grown = stone * (1 - lichen) + [0.62, 0.62, 0.5][k] * lichen;
@@ -450,7 +454,7 @@ const TKX_PAINTERS = {
 
 /** Which painter, seed and unevenness each sheet takes. */
 const TKX_SHEETS = {
-  brick: ['brick', 3, 0], ashlar: ['stone', 11, 0], rubble: ['stone', 23, 0.55], flags: ['stone', 37, 0.12], cobble: ['cobble', 41, 0],
+  brick: ['brick', 3, 0], ashlar: ['stone', 11, 0], rubble: ['stone', 23, 0.55], flags: ['stone', 37, 0.12], slabs: ['stone', 43, 0.32], cobble: ['cobble', 41, 0],
   plaster: ['plaster', 53, 0], timber: ['timber', 61, 0], rooftile: ['rooftile', 71, 0], earth: ['earth', 83, 0], rock: ['rock', 97, 0], lattice: ['lattice', 0, 0],
   foliage: ['leaves', 101, 0], needles: ['leaves', 103, 0], tuft: ['blades', 107, 0],
 };

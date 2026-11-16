@@ -157,7 +157,9 @@ export const ENV = {
     // bleached a pale face under overcast (its middle at 0.78 of the display). This is the fill while an open-air
     // place is shown: by eye against close-ups under clear sky and overcast, between a pale face bleaching under
     // overcast (above) and a face turned from a clear sun going grey, a man's eye sockets a brown band (below).
-    faceFill: 1.5,
+    // 1 since the body's skin is lit as the face is (photoface.js PHOTO_FACES.fill, skinScatter): at 1.5 the face stood
+    // 1.4 times as bright as the chest under it in the field.
+    faceFill: 1,
     // The exposure is metered as a camera does it (post.js envMeter), off what the view holds: the land (a grey
     // card's worth of the light falling on level ground, sun x sin elevation + sky, as luminance) and, through
     // thick air, the haze's own light the way the camera looks, by the share of a sight line `view` m long that
@@ -382,6 +384,11 @@ export const ENV = {
     // clouds narrower by `taper` of the noise (a cloud's top is smaller than its base). By eye.
     deep: 700,
     levels: 3,
+    // Up close (the sheet nearer than `nearFrom` m along the sight line, fully by half that): a finer reading of
+    // the noise, `nearDetail[0]` times the sheet's scale (lumps of some 20 m at 1500 m), adding `nearDetail[1]` of
+    // the lumps' own share to the cloud's depth and as much to its grain. By eye overhead with a long lens.
+    nearFrom: 4000,
+    nearDetail: [4.3, 0.3],
     taper: 0.09,
     // The wind aloft is stronger than at the ground and the clouds ride it: this many times the ground wind
     // (approximate: the power-law profile u ~ z^0.14 over grass gives about 2 at 1500 m from 2 m; 2.5 by eye,
@@ -582,6 +589,13 @@ export const ENV = {
     // near, where a card is seen leaf by leaf; lower far off, where the picture is shrunk to a blur of leaf and
     // gap and a crown must still close (by eye: at a half the hill woods fell to tatters).
     cut: [0.5, 0.42, 0.3, 0.2],
+    // A conifer's boughs (trees.js envCrownPoint): its sprays fan `fan` of the bough's length to either side at its
+    // tip (narrower than the gap to the next bough, so sky shows between tiers), each turned up to `vary` rad from
+    // the bough's own way, the sprays under the bough darker by `under`, and the near bands' cards `near` of the
+    // kind's size (smaller sprays, more of an edge). By eye against the second reference's airy wood: at 0.7, 0,
+    // 0 and 1 the cedars read as stacks of rounded blocks lit flat. (Sprays start at 0.05 of the bough, so a cedar
+    // seen from under it has no empty ring round its trunk.)
+    bough: { fan: 0.45, vary: 0.9, under: 0.45, near: 0.75 },
     // Shading inside a crown: the inside and the underside are darker (leaves shade leaves) by up to this share.
     inner: 0.55,
     // Light through the leaves when the sun is behind the crown.
@@ -699,7 +713,16 @@ export const ENV_TREES = {
   // (a field oak 15 m high is about 0.8 m through at the foot: approximate).
   broadleaf: { height: [9, 17], crown: { wide: 0.44, tall: 0.36, at: 0.62 }, shape: 'round', limbs: 7, fork: 0.85, card: 0.125, leaf: [0x3a5a26, 0x4f7030, 0x2a4520], bark: 0x4b3d2c, trunk: 0.027, picture: 'leaf' },
   // Japanese cedar and red pine on a valley side: 15-25 m, a narrow dark spire of boughs, bare at the foot.
-  pine: { height: [12, 22], crown: { wide: 0.21, tall: 0.37, at: 0.61 }, shape: 'boughs', limbs: 17, fork: 0, card: 0.085, leaf: [0x25402c, 0x335034, 0x1b3022], bark: 0x4a3626, trunk: 0.018, picture: 'needle' },
+  // `vary`: no two of a stand have one crown (trees.js envTreeCrown). A cedar's crown is a narrow spire, from three
+  // fifths to nearly all of its height (`tall` times 0.85 to 1.15 of the kind's), a fifth to a quarter as wide as
+  // the tree is tall (`wide` 0.8 to 1.05); a red pine among them (`other`, 0.3 of the trees) has shed its lower
+  // boughs with age and carries a broad, flat-topped crown high on a bare stem (`otherTall`, `otherWide`), its
+  // boughs nearly as long at the top as low down (`taper`: the power the bough's reach falls off with up the
+  // spire, the kind's own 0.8; [cedar least, most, red pine least, most]). The stand's crowns are as wide and as
+  // long on the whole as the kind's: the wood is as closed as before, only no two trees are alike. Proportions by
+  // eye against photographs of Japanese cedar and red pine stands remembered, not measured: approximate.
+  pine: { height: [12, 22], crown: { wide: 0.21, tall: 0.37, at: 0.61 }, shape: 'boughs', limbs: 17, fork: 0, card: 0.085, leaf: [0x25402c, 0x335034, 0x1b3022], bark: 0x4a3626, trunk: 0.018, picture: 'needle',
+    vary: { tall: [0.9, 1.2], wide: [0.8, 1.05], other: 0.3, otherTall: [0.65, 0.85], otherWide: [1.1, 1.35], taper: [0.65, 1.05, 0.25, 0.45] } },
   // What grows at a wood's edge and along a fence where nothing grazes it: hawthorn, bramble, hazel, a few
   // metres high and as broad, leafy to the ground.
   shrub: { height: [1.3, 3.4], crown: { wide: 0.6, tall: 0.46, at: 0.5 }, shape: 'round', limbs: 4, fork: 1.0, card: 0.3, leaf: [0x41602a, 0x56702e, 0x2e4a22], bark: 0x40352a, trunk: 0.02, picture: 'leaf' },

@@ -229,7 +229,7 @@ test('the default bundle is minified, keeps the long data strings whole, and wri
 });
 
 test('the one-file bundle carries the skin worker\'s code, and refuses an aliased import', () => {
-  const out = join(mkdtempSync(join(tmpdir(), 'v7-bundle-')), 'gladiator.html');
+  const out = join(mkdtempSync(join(tmpdir(), 'v7-bundle-')), 'historically-accurate-combat-simulator.html');
   execFileSync('node', ['tools/bundle.js', out, '--no-minify'], { cwd: new URL('..', import.meta.url).pathname, stdio: 'pipe' });
   const page = readFileSync(out, 'utf8');
   const worker = page.match(/<script type="text\/plain" id="skin-worker-source">([\s\S]*?)<\/script>/)?.[1];

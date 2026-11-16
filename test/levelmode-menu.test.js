@@ -43,23 +43,23 @@ const cards = (root) => root.all((node) => node.tag === 'button' && node.childre
 const titleOf = (button) => button.all((node) => node.tag === 'b')[0].textContent;
 const cardTitled = (root, title) => cards(root).find((button) => titleOf(button) === title);
 
-test('the home menu offers Battle Mode and Level Mode (no "Levels"), and Level Mode opens the stage list', async () => {
+test('Story mode holds both stories (no Level Mode card): the soldier\'s life and Dunnottar, each started its own way', async () => {
   await withPage((installMenus, byId) => {
     const started = [];
-    const menus = installMenus({ onMenu() {}, attract() {}, onStage: (key) => started.push(key), level() {}, tutorial() {} });
+    let lives = 0;
+    const menus = installMenus({ onMenu() {}, attract() {}, onStage: (key) => started.push(key), story: () => { lives += 1; }, level() {}, tutorial() {} });
     menus.home();
     const titles = cards(byId.home).map(titleOf);
-    assert.deepEqual(titles, ['Career', 'Story', 'Battle Mode', 'Level Mode', 'Last Stand Squad', 'Deadliest Warrior', 'Who Wins?', 'Sandbox']);
-    cardTitled(byId.home, 'Level Mode').onclick();
+    assert.deepEqual(titles, ['Career', 'Story', 'Battle Mode', 'Last Stand Squad', 'Deadliest Warrior', 'Who Wins?'], 'the sandbox is a link beside the tutorial, not a mode');
+    cardTitled(byId.home, 'Story').onclick();
     assert.equal(byId['stages-screen'].hidden, false);
     assert.equal(byId.home.hidden, true);
-    const stage1 = cardTitled(byId['stages-screen'], 'Stage 1 · Memories of Dunnottar');
-    const stage2 = cardTitled(byId['stages-screen'], 'Stage 2 · Coming soon');
-    assert.ok(stage1.onclick, 'Stage 1 is playable');
-    assert.equal(stage2.onclick, null, 'Stage 2 is not open');
-    assert.match(stage2.className, /soon/);
-    stage1.onclick();
+    assert.deepEqual(cards(byId['stages-screen']).map(titleOf), ['A Soldier\'s Life', 'Memories of Dunnottar'], 'stages not open yet are left off');
+    cardTitled(byId['stages-screen'], 'Memories of Dunnottar').onclick();
     assert.deepEqual(started, ['dunnottar']);
+    menus.stories();
+    cardTitled(byId['stages-screen'], 'A Soldier\'s Life').onclick();
+    assert.equal(lives, 1);
   });
 });
 
@@ -84,8 +84,8 @@ test('Battle Mode opens on the custom battle, then the tutorial and the historic
 test('an unwired stage hook breaks nothing', async () => {
   await withPage((installMenus, byId) => {
     const menus = installMenus({ onMenu() {}, attract() {} });
-    menus.stages();
-    const stage1 = cardTitled(byId['stages-screen'], 'Stage 1 · Memories of Dunnottar');
+    menus.stories();
+    const stage1 = cardTitled(byId['stages-screen'], 'Memories of Dunnottar');
     assert.doesNotThrow(() => stage1.onclick());
     assert.equal(byId['stages-screen'].hidden, false, 'the stage list stays up when nothing can start the stage');
   });

@@ -45,13 +45,14 @@ test('Vaelen: 210 cm, a body of 150 kg, the jousting harness with its helm, a tw
   assert.ok(body.bodyMassKg > 1.8 * buildBody(levelPreset('forger')).bodyMassKg);
 });
 
-test('the Forger: an athletic operative with arming sword and buckler in a gambeson, skill about 0.75', () => {
+test('the player: Rodelero (the user\'s fighter, 2026-11-15), a longswordswoman in a footman\'s dark kit, bare-headed, skill 0.5', () => {
   const inputs = levelPreset('forger');
-  assert.equal(STYLES[inputs.style].weapon, 'armingSword');
-  assert.equal(STYLES[inputs.style].shield, 'buckler');
-  assert.equal(inputs.outfit.kind, 'forger');
-  assert.ok(Math.abs(inputs.skill - 0.75) < 0.05);
-  assert.ok(inputs.exercise >= 0.7);
+  assert.equal(inputs.name, 'Rodelero');
+  assert.equal(inputs.sex, 'female');
+  assert.equal(STYLES[inputs.style].weapon, 'longsword');
+  assert.equal(inputs.outfit.kind, 'footman');
+  assert.equal(inputs.outfit.bareHead, true);
+  assert.ok(Math.abs(inputs.skill - 0.5) < 0.05);
   assert.equal(levelPreset('cabyPrince').style, 'passive');
   assert.equal(STYLES[levelPreset('turnkey').style].weapon, 'baton');
 });
@@ -112,7 +113,7 @@ test('the story: the lore is about 150 words and names who it should; nine notes
 test('Level Mode lists Stage 1 (playable) and Stage 2 (coming soon)', () => {
   assert.equal(STAGE_LIST[0].key, 'dunnottar');
   assert.equal(STAGE_LIST[0].ready, true);
-  assert.equal(STAGE_LIST[0].title, 'Stage 1 · Memories of Dunnottar');
+  assert.equal(STAGE_LIST[0].title, 'Memories of Dunnottar');
   assert.equal(STAGE_LIST[1].ready, false);
   assert.equal(STAGE_LIST[1].title, 'Stage 2 · Coming soon');
   assert.equal(LEVEL_PRESETS.vaelen.name, 'Lord Vaelen');

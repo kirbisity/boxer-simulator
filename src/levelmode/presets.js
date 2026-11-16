@@ -16,10 +16,12 @@ import { normaliseInputs } from '../body.js';
 
 export const LEVEL_PRESETS = {
   // The player: fixed. Athletic and well taught (skill 0.75), quick and quiet in a gambeson.
+  // The player (user, 2026-11-15: the fighter Rodelero, as the user built her in the game's builder, in place of the man with the arming
+  // sword and buckler; the key stays 'forger', the stage's and the story's operative of the Forgers).
   forger: {
-    name: 'The Forger', style: 'armingBuckler', sex: 'male', heightCm: 179, frame: 'medium', age: 28, exercise: 0.75, calories: 4176, skill: 0.75,
-    outfit: { kind: 'forger', design: 0 }, accessories: [],
-    look: { skinTone: 'light', hairStyle: 'midLong', hairColor: '#3a2a1c', facialHair: 'stubble', eyeColor: 'grey' },
+    name: 'Rodelero', style: 'longsword', sex: 'female', heightCm: 169, frame: 'small', age: 28, exercise: 0.67, calories: 2630, skill: 0.5,
+    outfit: { kind: 'footman', design: 4, colors: { top: '#1c1c20', bottom: '#1c1c20' }, bareHead: true }, accessories: [],
+    look: { skinTone: 'porcelain', hairStyle: 'long', hairColor: '#6b4a2a', facialHair: 'none', eyeColor: 'brown', faceShape: null, faceRegion: 'france', skinShade: 0.25, hairNatural: '#6b4a2a' },
   },
 
   // ---- The garrison, c. 1500 -----------------------------------------------------------------

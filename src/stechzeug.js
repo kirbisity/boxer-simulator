@@ -115,12 +115,25 @@ export function buildStechhelm(group, head, r, steel, { lowDetail = false } = {}
   const dark = surface(0x050506);
   group.add(new THREE.Mesh(helmShellGeometry(spec.lower, r, spec.square, spec.sides), iron));
   group.add(new THREE.Mesh(helmShellGeometry(spec.crown, r, spec.square, spec.sides), iron));
-  // The sight: dark behind the gap.
+  // The sight: dark on the crown's face just over the beak's edge, across the front only (a band lying on the
+  // crown, so its ends follow the helm's curve round instead of standing out past it).
   const [sightFrom, sightTo, sightHalf] = spec.sight;
-  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, (sightTo - sightFrom) * r, sightHalf * 2 * r), dark);
-  sight.position.set(1.5 * r, ((sightFrom + sightTo) / 2) * r, 0);
+  const crownAt = (y) => {
+    const above = spec.crown.findIndex((section) => section[0] >= y);
+    const [a, b] = above <= 0 ? [spec.crown[0], spec.crown[0]] : [spec.crown[above - 1], spec.crown[above]];
+    const share = b[0] === a[0] ? 0 : (y - a[0]) / (b[0] - a[0]);
+    return a.map((value, index) => (index === 0 ? y : (value + (b[index] - value) * share) * (index === 1 ? 1 : 1.012)));
+  };
+  const sightAngle = Math.asin(Math.min(0.95, sightHalf / spec.crown[0][3]));
+  const sight = new THREE.Mesh(helmBand([crownAt(Math.max(sightFrom, spec.crown[0][0])), crownAt(sightTo)], r, spec.square, -sightAngle, sightAngle, 12), dark);
+  sight.material.side = THREE.DoubleSide;
   sight.userData.noOutline = true;
   group.add(sight);
+  // The beak's top turned in to the crown's foot all round (the two plates are riveted together there), so the face is
+  // not seen down the gap between them; the sight is the dark band on the crown above it.
+  const lip = spec.lower.at(-1);
+  const ledge = [[lip[0], lip[1] * 0.995, lip[2] * 0.995, lip[3] * 0.995], spec.crown[0]];
+  group.add(new THREE.Mesh(helmBand(ledge, r, spec.square, 0, Math.PI * 2, 36), iron));
   // The plate down onto the breast: a curved sheet leaning forward to lie on it.
   const [chestTop, chestBottom, topHalf, bottomHalf, lean] = spec.chest;
   const frontAt = (y) => spec.lower[0][2] + ((chestTop - y) / (chestTop - chestBottom)) * lean;
@@ -212,6 +225,27 @@ function helmHalfShell(sections, r, power, facing, sides) {
   for (let ring = 0; ring < sections.length - 1; ring += 1) {
     for (let side = 0; side < half; side += 1) {
       const a = ring * row + side;
+      indices.push(a, a + row, a + 1, a + 1, a + row, a + row + 1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/** A band lofted through `sections` between the outline angles `from` and `to` (0 the front), open at its ends. */
+function helmBand(sections, r, power, from, to, steps) {
+  const positions = [];
+  const indices = [];
+  for (const section of sections) {
+    for (let step = 0; step <= steps; step += 1) positions.push(...helmSectionPoint(section, from + ((to - from) * step) / steps, power).map((value) => value * r));
+  }
+  const row = steps + 1;
+  for (let ring = 0; ring < sections.length - 1; ring += 1) {
+    for (let step = 0; step < steps; step += 1) {
+      const a = ring * row + step;
       indices.push(a, a + row, a + 1, a + 1, a + row, a + row + 1);
     }
   }

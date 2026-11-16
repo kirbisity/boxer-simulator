@@ -11,7 +11,7 @@ import { P, PARTICLES } from './body.js';
 import { buildBodyMesh } from './bodymesh.js';
 import { dualQuaternionSkinning } from './dqskin.js';
 import { ClothSwing, swayCloth } from './clothsway.js';
-import { BASE_BODY } from './basebody.js';
+import { BASE_BODY, NECK_JOIN } from './basebody.js';
 import { buildLoftBody, TOPS } from './loftbody.js';
 import { BODY_STYLE_KEYS, DEFAULT_BODY_STYLE, buildSkinMesh, buildSkinMeshSteps, cachedSkinMesh, readySkinTextures, skinTextureKey, skinTexturesNow, skinTexturesSteps, storeSkinMesh, styleSpec } from './bodystyles.js';
 import { bodyCheck } from './skinworker.js';
@@ -35,7 +35,7 @@ import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } 
 import { buildAirPack, buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
 import { HELM_HEAD_BREADTH, HELM_SPAN } from './helmforms.js';
-import { photoFaceFor } from './photoface.js';
+import { photoFaceFor, skinScatter } from './photoface.js';
 import { capsules, capsuleEnds, JOINT_SEGMENTS, point, WORLD } from './physics.js';
 import { BONE, BONES, bindPoints, boneFrames, coherentFrames, frameMatrix, fromFrame, toFrame } from './rig.js';
 import { bakePieces, CROWD_VIEW, crowdBatch, crowdKey, frameAt, HEAD_VARIANT, onlyVariant, simplifyTemplate, stretchedInverses, withoutVariant } from './crowdview.js';
@@ -2015,6 +2015,8 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
   if (!material && built.skinMaps) {
     dressedSkin.userData.fullMaps = { normalMap: dressedSkin.normalMap, roughnessMap: dressedSkin.roughnessMap, roughness: dressedSkin.roughness };
     skinForTier(dressedSkin);
+    // (Lit as the photo head is, so the neck and the face match.)
+    skinScatter(dressedSkin);
   }
   // Loose cloth swings behind his bones and in the wind (clothsway.js): one swing for the man, kept with his bones.
   if (built.sway) swayCloth(dressedSkin, (bones.swing ??= new ClothSwing(bones.length)));
@@ -2417,7 +2419,9 @@ function skinParts(view, fighter, built, bodyStyle, bones, { machine, lacquer, s
     for (const [kind, indices] of Object.entries(detailIndices)) {
       const base = matte ? new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, skinning: true, roughness: 1, metalness: 0 }) : steelMaterial(view.steelEnv, { skinning: true, ...lacquer });
       const metalness = lacquer.metalness ?? (kind === 'kozane' ? 0.5 : 1);
-      const material = doubleSided(armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness }));
+      // (A laced tile's plates each their own tone: armourDetailMaterial `plates`.)
+      const laced = DETAIL_ARMOUR[kind]?.masks === 'lace' && DETAIL_ARMOUR[kind].columns ? [DETAIL_ARMOUR[kind].columns, DETAIL_ARMOUR[kind].rows] : null;
+      const material = doubleSided(armourDetailMaterial(base, kind, { cords: cords[kind] ?? null, matte, metalness, plates: laced }));
       // The decoration over a plate harness (outfits.js ARMOUR_DECOR): its bands along the plates' field and fluting, its
       // borders gilt along the edge strips.
       if (dress.armor?.decor && DECOR_TILES.includes(kind)) armourDecorMaterial(material, dress.armor.decor, { tile: tileSize(kind)[0], edge: kind === 'harnessEdge' });
@@ -2576,7 +2580,7 @@ export function pumpSkinBuilds(view, budgetMs = SKIN_BUILD.sliceMs) {
       job.id = (skinWorkerState.next += 1);
       job.phase = 'worker';
       skinWorkerState.asked.set(job.id, { job, worker });
-      worker.thread.postMessage({ id: job.id, inputs: job.body.inputs, style: job.style, check: bodyCheck(job.body), known: [...skinTextureCache.map.keys()], detailMaps: DETAIL_MAPS.on });
+      worker.thread.postMessage({ id: job.id, inputs: job.body.inputs, style: job.style, check: bodyCheck(job.body), known: [...skinTextureCache.map.keys()], detailMaps: DETAIL_MAPS.on, photoHead: NECK_JOIN.photoHead });
     }
   }
   // What no worker takes (none could be made, or the body was refused), or everything now (`all`): built here, a slice at a time.

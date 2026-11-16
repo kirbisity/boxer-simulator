@@ -312,11 +312,11 @@ test('the wall of the corridor and its low roof hold a tall man', () => {
 
 // ---- Falls ---------------------------------------------------------------------------------
 
-/** How a fall of `height` m goes for each of some bodies: walked off a ledge, or dropped limp. */
-function falls(height, how) {
+/** How a fall of `height` m goes for each of some bodies (each build with each seed): walked off a ledge, or dropped limp. */
+function falls(height, how, seeds = [1, 2]) {
   const results = [];
   for (const name of ['heavy', 'light', 'muayThai', 'police']) {
-    for (const seed of [1, 2]) {
+    for (const seed of seeds) {
       const terrain = createTerrain([slabOf([0, 0], [80, 40], 0), slabOf([-20, 0], [40, 40], height, { bottom: 0 })], { sea: -30 });
       const { world, fighter } = lone(terrain, name, { x: how === 'walk' ? -2 : 5, floor: how === 'walk' ? height : 0, seed });
       if (how === 'drop') {
@@ -348,7 +348,9 @@ const share = (results, test) => results.filter(test).length / results.length;
 test('falls: a metre costs nothing, three hurt and can break a leg, six mostly kill, ten kill (walked off a ledge)', () => {
   const one = falls(1, 'walk');
   assert.equal(share(one, (r) => r.up && r.legs < 0.1 && r.broken.length === 0 && r.trunk < 0.1), 1, JSON.stringify(one));
-  const three = falls(3, 'walk');
+  // A broken knee at 3 m is a minority outcome (a fifth or so of walked-off falls here): eight bodies may all land without
+  // one by chance (at a twelfth, about half the time), so this height is tried with 24, enough to see "some" and "not most".
+  const three = falls(3, 'walk', [1, 2, 3, 4, 5, 6]);
   assert.ok(share(three, (r) => r.legs > 0.1 || r.trunk > 0.1) >= 0.75, `hurt: ${JSON.stringify(three)}`);
   assert.ok(share(three, (r) => r.broken.some((joint) => joint.endsWith('Knee'))) > 0, 'a leg breaks in some');
   assert.ok(share(three, (r) => r.broken.some((joint) => joint.endsWith('Knee'))) <= 0.5, 'but not in most');

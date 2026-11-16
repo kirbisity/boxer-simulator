@@ -136,9 +136,9 @@ test('the bank decodes every file and picks only among the decoded', async () =>
   assert.equal(bank.pick('nothing'), null);
 });
 
-test('the bundle carries every sample\'s bytes', { skip: !existsSync('dist/gladiator.html') && 'no dist/gladiator.html (node tools/bundle.js)' }, () => {
-  const page = readFileSync('dist/gladiator.html', 'utf8');
-  assert.ok(statSync('dist/gladiator.html').mtimeMs >= Math.max(...[...SAMPLE_FILES, ...LOOP_FILES].map((name) => statSync(`${DIR}/${name}.mp3`).mtimeMs)), 'the bundle is older than the samples: rebuild it');
+test('the bundle carries every sample\'s bytes', { skip: !existsSync('dist/historically-accurate-combat-simulator.html') && 'no dist/historically-accurate-combat-simulator.html (node tools/bundle.js)' }, () => {
+  const page = readFileSync('dist/historically-accurate-combat-simulator.html', 'utf8');
+  assert.ok(statSync('dist/historically-accurate-combat-simulator.html').mtimeMs >= Math.max(...[...SAMPLE_FILES, ...LOOP_FILES].map((name) => statSync(`${DIR}/${name}.mp3`).mtimeMs)), 'the bundle is older than the samples: rebuild it');
   for (const name of [...SAMPLE_FILES, ...LOOP_FILES]) assert.ok(page.includes(readFileSync(`${DIR}/${name}.mp3`).toString('base64')), `${name} is not in the bundle`);
 });
 

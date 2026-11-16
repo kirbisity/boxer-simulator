@@ -137,7 +137,7 @@ function reached(terrain, from, step, bounds) {
 // Each place's solids, where a man comes in, the bounds the walk must stay within (half sizes, m) and the battle's own
 // court (the old battleground: half sizes, m).
 const PLACES = {
-  canaltown: { solids: canalTownSolids, start: CANAL_TOWN.start.at, bounds: [160, 60], court: CANAL_TOWN.court, step: 0.5 },
+  canaltown: { solids: canalTownSolids, start: CANAL_TOWN.start.at, bounds: [160, 70], court: CANAL_TOWN.court, step: 0.5 },
   // (Pyongyang's walk runs over the river to its far bank: its grid is coarser, for time.)
   pyongyang: { solids: pyongyangSolids, start: PYONGYANG_PLACE.start.at, bounds: [170, PYONGYANG_PLACE.river.field.to + 20], court: PYONGYANG_1593.arena, step: 1 },
 };

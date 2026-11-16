@@ -71,12 +71,18 @@ export function outlineFor(mesh, width = STYLE.outlineWidth) {
   if (scale === 0) return hiddenOutline(mesh);
   width *= scale;
   const material = new THREE.MeshBasicMaterial({ color: STYLE.outlineColor, side: THREE.BackSide, skinning: !!mesh.isSkinnedMesh });
+  // (A mesh whose geometry carries an `ink` attribute is outlined that share of the width point by point: none where it meets
+  // another surface it runs on into, as the head's lid on the neck.)
+  const inked = Boolean(mesh.geometry.attributes?.ink);
   material.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', `vec3 transformed = vec3( position ) + normalize( normal ) * ${width.toFixed(5)};`);
+    const push = `normalize( normal ) * ${width.toFixed(5)}${inked ? ' * ink' : ''}`;
+    shader.vertexShader = `${inked ? 'attribute float ink;\n' : ''}${shader.vertexShader}`.replace('#include <begin_vertex>', `vec3 transformed = vec3( position ) + ${push};`);
   };
   // three caches programs by onBeforeCompile's source text, which is the same
   // for every width: key the program by the width, or all widths share the first.
-  material.customProgramCacheKey = () => `outline-${width.toFixed(5)}`;
+  material.customProgramCacheKey = () => `outline-${width.toFixed(5)}${inked ? '-ink' : ''}`;
+  // (Kept on the material for what bakes a still body's outline into place: fallenview.js.)
+  material.userData.outlineWidth = width;
   const outline = mesh.isSkinnedMesh ? new THREE.SkinnedMesh(mesh.geometry, material) : new THREE.Mesh(mesh.geometry, material);
   if (mesh.isSkinnedMesh) outline.bind(mesh.skeleton, mesh.bindMatrix);
   outline.userData.outline = true;
