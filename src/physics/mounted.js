@@ -1931,7 +1931,7 @@ const HORSE_UNSWERVED = { turn: 0, speed: Infinity };
 
 /**
  * The most a horse will come on at (m/s) with a hedge of the enemy's levelled points before it (WORLD.mount.hedge): a
- * canter where they stand `dense` to the metre of front or thicker in the way it goes, else no limit. Looked again every
+ * canter where they stand `dense` to the metre of front or thicker in the front `depth` m of them in the way it goes, else no limit. Looked again every
  * `every` s; a horse going back, at a walk or a trot is not checked.
  */
 function hedgeBalk(world, horse) {
@@ -1941,7 +1941,7 @@ function hedgeBalk(world, horse) {
   // (Checked from a trot: a horse held to a canter by them goes on seeing them.)
   if (horse.speed > horse.paces.trot) {
     const ahead = [Math.cos(horse.yaw), -Math.sin(horse.yaw)];
-    let points = 0;
+    const points = [];
     for (const man of world.fighters) {
       if (man.mount || man.corner === horse.corner || man.state !== 'up' || man.panicked) continue;
       const weapon = man.weapon;
@@ -1953,9 +1953,12 @@ function hedgeBalk(world, horse) {
       // Levelled at it: he faces the horse.
       const toHorse = Math.atan2(dz, -dx);
       const facing = Math.atan2(Math.sin(toHorse - man.yaw), Math.cos(toHorse - man.yaw));
-      if (Math.abs(facing) <= spec.facing) points += 1;
+      if (Math.abs(facing) <= spec.facing) points.push(along);
     }
-    if (points / (2 * spec.width) >= spec.dense) speed = horse.paces.canter;
+    // The hedge's front: the points within `depth` of the nearest.
+    const nearest = Math.min(...points);
+    const front = points.filter((along) => along <= nearest + spec.depth).length;
+    if (front / (2 * spec.width) >= spec.dense) speed = horse.paces.canter;
   }
   horse.hedge = { at: world.time, speed };
   return speed;
