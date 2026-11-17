@@ -484,8 +484,9 @@ test('sprint turn: the feet land to their own side of the line of travel, never 
     assert.ok(turn.closest > 0.005, `${degrees} degrees: the closest the feet came ${turn.closest.toFixed(3)} m apart across the line`);
   }
   // A sharp turn crossed them without the footwork.
-  const was = sprintTurn(160, { off: true });
-  assert.ok(was.crossed > 0, 'without it the feet cross in a 160 degree turn');
+  // (Over a few sharp turns: whether one particular stride lands crossed depends on the breath the sprint has left him.)
+  const was = [160, -160, 135, -135, 180].map((degrees) => sprintTurn(degrees, { off: true }).crossed);
+  assert.ok(was.some((crossed) => crossed > 0), `without it the feet cross in a sharp turn (${was.join(', ')})`);
 });
 
 test('sprint turn: AI fighters and Battle Mode men have none of it', () => {

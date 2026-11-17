@@ -32,7 +32,7 @@ export const OYOROI = {
   sode: { width: 0.3, height: 0.36, radius: 0.42, out: 0.05, tilt: 0.28, sag: 0.14, damping: 0.5 },
   // Kusazuri: four flaring panels (front, back, both sides) from the dō's lower edge, each a
   // quarter-turn round less a gap, flaring out (`flare`: the hem's radius over the top's).
-  kusazuri: { height: 0.36, span: 1.3, flare: 1.3, sag: 0.14, damping: 0.5 },
+  kusazuri: { height: 0.36, span: 1.45, flare: 1.3, sag: 0.14, damping: 0.5 },
   quiverArrows: 14,
 };
 
