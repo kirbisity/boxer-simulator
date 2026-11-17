@@ -67,7 +67,9 @@ export const AI = {
   // out ahead of him, an easing of the advance (`holdBack`, share of the
   // forward step given up). Never within `engaged` m of reach of his man:
   // the exchange decides then. Choosing whom to fight, a man near my leader
-  // counts as `focus` m nearer for each m he is nearer him. A shooter running
+  // counts as `focus` m nearer for each m he is nearer him. (`radiusPerSqrt`: the ground a body of men keeps grows as
+  // the room each man keeps, the square of his spacing: 1.2 m a man at AI.elbowRoom's ~1.8 m apart, twice the 0.6 of a
+  // knot ~1 m apart.) A shooter running
   // for room weighs each m a spot lies beyond that ground as `escape` m less
   // distance from his pursuer: the run away still wins, but bends homeward.
   // The retiarius's net: thrown from `from` to `to` m, at `rate` a second while there.
@@ -78,7 +80,7 @@ export const AI = {
   throwable: { rate: 0.8, melee: 3 },
   // A man going to take up his fallen standard runs to it from further than `runFor` m.
   // Weighted heavily: a man keeps with his leader (and picks men near him) before going off on his own fight.
-  cohesion: { radius: 1.6, radiusPerSqrt: 0.6, ramp: 2.5, strafe: 0.8, holdBack: 0.9, engaged: 0.8, focus: 0.6, escape: 0.5, runFor: 1.5 },
+  cohesion: { radius: 1.6, radiusPerSqrt: 1.2, ramp: 2.5, strafe: 0.8, holdBack: 0.9, engaged: 0.8, focus: 0.6, escape: 0.5, runFor: 1.5 },
   // A side's leader (its standard's bearer, its general), when the AI has him and he has no place in the ranks (a rider,
   // a man of a loose army), keeps with the body of his men rather than going on at the enemy ahead of them
   // (keepWithHisMen): he goes no nearer the enemy than the man of them a `body` share of the way out from the
@@ -529,8 +531,18 @@ export const AI = {
   // (Within 14 m, three after one man: the winners went after the routed, and most of a battle's dead fell in the rout.)
   pursuit: { within: 14, chasers: 3 },
   // Team-mates keep this far apart (m), and treat one within this far of
-  // the line to their man as in the line of fire.
+  // the line to their man as in the line of fire. `mateSpacing` is a man's in a formation's ranks (his place there is
+  // the drill's: DRILL, muster.js). Out of the ranks, `elbowRoom` (keepElbowRoom, after every decision): a man keeps
+  // his comrades `room` m off as he goes in and as he fights, sidestepping from each nearer than that (`push` of a full
+  // sidestep for one at his side, less the further off) and, one before him, easing his advance (`hold`, the share of
+  // the step given up for one at his back) rather than treading on his heels. Polybius (18.30): a legionary fighting
+  // with the sword needed 3 ft clear to each side and behind, 6 Roman ft (~1.8 m) a man, against the phalanx's 3 ft:
+  // room to swing and to give ground. A loose fight spreads out so; it does not pack into a knot. (`room` is what he
+  // keeps clear; the going in and the cohesion's pull close it some: at 2.2 m the median man of Sekigahara, Rhodes and
+  // Agincourt's loose men stood 1.8-2.0 m from his nearest comrade over their first 30 s, where 1.0 m had been usual.
+  // A band pressed into a corner still packs: the press, physics/press.js.)
   mateSpacing: 1.0,
+  elbowRoom: { room: 2.2, push: 2.5, hold: 0.9 },
   lineOfFire: 0.4,
   // m: in level mode a shooter holds his shot with a team-mate (the player among them) this near the line to his man: a shaft or a ball
   // does not fly true and the man moves as it comes. (Battles keep `lineOfFire`: their fingerprints.)
@@ -999,6 +1011,7 @@ function keepPlace(world, fighter) {
   if (fighter.gunCrew !== undefined && !fighter.panicked && atGun(world, fighter)) return;
   const formation = fighter.slot ? world.formations?.[fighter.formation] : null;
   if (!formation) {
+    keepElbowRoom(world, fighter);
     keepWithLeader(world, fighter);
     keepWithHisMen(world, fighter);
     return;
@@ -1142,6 +1155,45 @@ function holdRank(world, fighter, opponent, style, dt) {
  * advance if he has run out ahead of it. Each man decides alone; together a
  * side tends to hold together, its rear not drawn into the front's fight.
  */
+/**
+ * A man out of the ranks keeps his room (AI.elbowRoom): from each comrade on foot nearer than `room` he sidesteps away,
+ * and from one before him he eases his advance, whatever his decision was (it is his feet's, after it). Not a man at
+ * grips (a hold, a pin), on a horse, running in panic, going to a spot (goTo, a weapon to pick up), or leaning in on the
+ * back of the man before him (the press: he means to be at his back). A man with no one left to fight stands off from
+ * his comrades too: a band at rest does not stand in a knot.
+ */
+function keepElbowRoom(world, fighter) {
+  if (fighter.state !== 'up' || fighter.mount || fighter.clinch || fighter.pin || fighter.pickup || fighter.goTo || fighter.panicked || fighter.crawling) return;
+  if (fighter.leaning === world.time) return;
+  const spec = AI.elbowRoom;
+  const x = fighter.x[P.pelvis * 3];
+  const z = fighter.x[P.pelvis * 3 + 2];
+  // His feet's frame (physics.js footwork): the move along his facing, the strafe to its left; with a man to fight, toward him.
+  const ahead = [Math.cos(fighter.yaw), -Math.sin(fighter.yaw)];
+  const left = [Math.sin(fighter.yaw), Math.cos(fighter.yaw)];
+  let strafe = 0;
+  let hold = 0;
+  const near = menAround(world, nearGrid, x, z, spec.room) ?? world.fighters.map((_, index) => index);
+  for (const index of near) {
+    const mate = world.fighters[index];
+    if (mate === fighter || mate.corner !== fighter.corner || mate.state !== 'up' || mate.mount || mate.dormant || mate.hidden) continue;
+    const dx = mate.x[P.pelvis * 3] - x;
+    const dz = mate.x[P.pelvis * 3 + 2] - z;
+    const apart = Math.hypot(dx, dz);
+    if (apart >= spec.room) continue;
+    const share = 1 - apart / spec.room;
+    const across = dx * left[0] + dz * left[1];
+    const along = dx * ahead[0] + dz * ahead[1];
+    // Dead ahead or behind, a way chosen by who he is (the other, his id the other parity, goes the other way).
+    const away = Math.abs(across) > 0.05 ? -Math.sign(across) : fighter.id % 2 ? 1 : -1;
+    strafe += away * share;
+    if (along > Math.abs(across)) hold = Math.max(hold, share);
+  }
+  if (strafe === 0 && hold === 0) return;
+  fighter.strafe = Math.max(-1, Math.min(1, (fighter.strafe ?? 0) + spec.push * strafe));
+  if (fighter.move > 0) fighter.move *= 1 - spec.hold * hold;
+}
+
 function keepWithLeader(world, fighter) {
   const spec = AI.cohesion;
   const side = world.leaders?.[fighter.corner];
@@ -3579,6 +3631,7 @@ function decide(world, fighter, dt) {
   const opponent = avenging ?? chosen;
   if (!opponent) {
     fighter.move = 0;
+    fighter.strafe = 0;
     return;
   }
   // On horseback: the charge (riding.js).
@@ -3809,6 +3862,7 @@ function decide(world, fighter, dt) {
   // A comrade at his chest between him and his man: he leans in on his back and drives him on (AI.crowd leanWithin; the
   // force goes through the man before him: physics/press.js), not round him.
   if (spacing.leanOn && !fighter.clinch) {
+    fighter.leaning = world.time;
     fighter.move = 1;
     fighter.strafe = 0;
   }
