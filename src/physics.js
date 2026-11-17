@@ -2773,7 +2773,8 @@ function updateIntent(world, fighter, dt) {
     // (Hanging at the angle that just clears his trunk's side, thin close in, fat out: pose.js restArmAngle.)
     const hang = restArmAngle(fighter.body);
     const L = fighter.body.lengths;
-    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * (L.shoulderSpan / 2 + (L.upperArm + L.forearmToFist) * Math.sin(hang))];
+    // ('behind': clasped at the small of his back, out of the way of what comes at his front: tools/armour-durability.js's unguarded man.)
+    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = fighter.handsDown === 'behind' ? [-0.13 * H, 0.5 * H, sign * 0.05 * H] : [0.03 * H, 0.47 * H, sign * (L.shoulderSpan / 2 + (L.upperArm + L.forearmToFist) * Math.sin(hang))];
     // Two blades held at his sides: both points down and forward, clear of his legs.
     if (fighter.offWeapon?.held) {
       intent.bladeDir = [0.45, -1, -0.1];
