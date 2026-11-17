@@ -206,7 +206,9 @@ test('riders drawn up by any formation stand a horse\'s room apart and none is u
       }
     }
     for (let t = 0; t < 1; t += 0.1) advance(world, 0.1, (current, dt) => thinkAll(current, dt));
-    const fell = world.events.filter((event) => event.kind === 'unhorsed');
+    // (Crowding is what is looked for: a horse killed by a blow or a shot, an arrow in the brain in the first second, is the fight's.)
+    const struck = new Set(world.events.filter((event) => event.kind === 'horseDown' && event.attacker !== undefined).map((event) => event.rider));
+    const fell = world.events.filter((event) => event.kind === 'unhorsed' && !struck.has(event.fighter));
     assert.deepEqual(fell.map((event) => `${event.fighter}: ${event.effects[0]}`), [], `${key}: unhorsed in the first second`);
   }
 });

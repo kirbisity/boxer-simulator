@@ -84,7 +84,17 @@ import { vec, yawRotate } from './pose.js';
  *   `gap` m of him inside `look` s (at the speeds they have now) is ridden away
  *   from (`push` of the turn), and one ahead in his lane is not ridden up
  *   to (he eases to its pace); so are men of his own side on foot, standing
- *   within `footGap` m of his line ahead.
+ *   within `footGap` m of his line ahead. `gap` is two horse lengths (a horse ~2.4 m nose to tail): a rider out of a
+ *   formation keeps that from his comrades, more than a man on foot keeps (AI.elbowRoom), for a horse at the gallop
+ *   (~12 m/s) needs a second and more and some metres to swerve, and two that meet are both down (physics/mounted.js
+ *   crash). Ranks of horse knee to knee are a formation's (formation.js WINGS), not a loose rider's.
+ * - flank: his own foot between him and his man (`corridor` m either side of the line to him, `from` m off him or
+ *   further; once he is going round, `corridor` and `margin`), he does not ride into their backs: he rides round the end of them, to a point `margin` m beyond their
+ *   last man (a gap of `hole` m in them ends them: a horse goes through it), level with his man, and comes at him from
+ *   there, from the side. The nearer way round is taken, and kept for `keep` s unless the other becomes `switch` times
+ *   shorter. The horse that rode down its own foot was a disaster recorded more than once (the French knights through
+ *   their own Genoese crossbowmen at Crécy, 1346); horse behind its own infantry went round by the wings (Hannibal's
+ *   at Cannae, the Ming and Manchu horse of Sarhu).
  * - robot: a robot dog (robotdogs.js) fights from its own legs. With a turret on its back, its man within `turretStand` m
  *   (too near to ride round), it stands and turns to face him, its gun laid over its head. It jumps (physics/mounted.js
  *   mountJump): over what is in its way that it can clear (`hurdle`, fieldworks.js horseBalks); aside and away from a blow
@@ -117,7 +127,8 @@ export const RIDING = {
   noise: { aim: 0.3, pause: 0.6, pace: 0.1, wheel: 0.3 },
   wheel: { room: 0.45, from: 0.3, slowest: 0.5, clear: 4 },
   patience: { passes: 3, seconds: 25 },
-  lane: { gap: 2.6, look: 1.6, push: 1.8, footGap: 1.6 },
+  lane: { gap: 5, look: 2, push: 1.8, footGap: 2.5 },
+  flank: { corridor: 2.5, from: 2, hole: 6, margin: 4, keep: 2, switch: 2 },
   assist: { through: 8, face: 0.45, halted: 0.5, ready: 4 },
   robot: { turretStand: 3, dodge: 0.35, dodgeReach: 0.6, leap: [0.9, 1.4] },
 };
@@ -245,6 +256,61 @@ function keepLane(world, fighter, heading, speed) {
   const push = Math.max(-1, Math.min(1, across)) * lane.push;
   const turned = [wanted[0] + left[0] * push, wanted[2] + left[2] * push];
   return { heading: headingOf(turned[0], turned[1]), speed: pace };
+}
+
+/**
+ * Where to ride to get round his own foot (RIDING.flank), or null with none of them in his way to `target` ([x, 0, z]).
+ * The men of his side on foot between him and his man, near the line, are his side's body there; it ends, each way,
+ * at its last man before a gap of `hole` m. He rides for the nearer end, `margin` m beyond it and level with his man.
+ */
+function roundOwnFoot(world, fighter, me, target) {
+  const spec = RIDING.flank;
+  const ride = fighter.ride;
+  const kept = ride?.flank;
+  // Once going round, the way is wider (by `margin`) before he turns in: not cut close round their last man.
+  const corridor = spec.corridor + (kept ? spec.margin : 0);
+  const to = [target[0] - me[0], target[2] - me[2]];
+  const length = Math.hypot(to[0], to[1]);
+  if (length < spec.from) {
+    if (ride) ride.flank = null;
+    return null;
+  }
+  const along = [to[0] / length, to[1] / length];
+  const left = [-along[1], along[0]];
+  // Each of his own on foot level with the way to his man (from beside him to just past his man): how far across the line.
+  const across = [];
+  let blocked = false;
+  for (const man of world.fighters) {
+    if (man.mount || man.corner !== fighter.corner || man.state !== 'up' || man.dormant || man.hidden) continue;
+    const dx = man.x[P.pelvis * 3] - me[0];
+    const dz = man.x[P.pelvis * 3 + 2] - me[2];
+    const forward = dx * along[0] + dz * along[1];
+    if (forward < 1 || forward > length + 1) continue;
+    const side = dx * left[0] + dz * left[1];
+    across.push(side);
+    if (Math.abs(side) < corridor) blocked = true;
+  }
+  if (!blocked) {
+    if (ride) ride.flank = null;
+    return null;
+  }
+  across.sort((a, b) => a - b);
+  // From the men in the way outward, each way, to the last man before a gap a horse goes through.
+  const edge = (sign) => {
+    const inWay = across.filter((side) => Math.abs(side) < corridor);
+    let reached = sign > 0 ? Math.max(...inWay) : Math.min(...inWay);
+    for (;;) {
+      const further = across.filter((side) => sign * (side - reached) > 0 && sign * (side - reached) < spec.hole);
+      if (!further.length) return reached + sign * spec.margin;
+      reached = sign > 0 ? Math.max(...further) : Math.min(...further);
+    }
+  };
+  const ways = { 1: edge(1), [-1]: edge(-1) };
+  let sign = Math.abs(ways[1]) <= Math.abs(ways[-1]) ? 1 : -1;
+  if (kept && world.time - kept.at < spec.keep && Math.abs(ways[kept.sign]) < spec.switch * Math.abs(ways[-kept.sign])) sign = kept.sign;
+  if (ride && (!kept || kept.sign !== sign)) ride.flank = { sign, at: world.time };
+  const offset = ways[sign];
+  return [target[0] + left[0] * offset, 0, target[2] + left[1] * offset];
 }
 
 /** The pace to turn at, slowed until his turning circle fits inside the room he has to his man. */
@@ -495,7 +561,9 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   } else if (ride.phase === 'charge') {
     // Each charge on a line of its own, a little off the one he would ride, and a little less than flat out.
     const passAt = vec.add(target, vec.scale(leftOfLine, pass + ride.plan.aim * (lance ? 0.3 : 1)));
-    const aim = [passAt[0] - me[0], passAt[2] - me[2]];
+    // His own foot in the way: round the end of them first (RIDING.flank).
+    const round = roundOwnFoot(world, fighter, me, target);
+    const aim = round ? [round[0] - me[0], round[2] - me[2]] : [passAt[0] - me[0], passAt[2] - me[2]];
     // Close in, the line is held (no swerve at the last moment).
     const heading = distance > 3 ? headingOf(aim[0], aim[1]) : horse.goal.heading;
     setGoal(heading, world.time < ride.holdUntil ? 0 : horse.paces.gallop * ride.plan.pace);
@@ -519,8 +587,9 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
   } else {
     // Wheeling round (to the side he has drawn if his man is behind him): slowed to a pace his turning circle fits the room he has,
     // then the charge again once his man is ahead (and he has made up his mind).
-    const turning = Math.atan2(-along[2], along[0]) - ride.plan.side * (ahead < 0 ? RIDING.noise.wheel : 0);
-    setGoal(turning, WORLD.mount.turnSpeed, distance);
+    const round = roundOwnFoot(world, fighter, me, target);
+    const turning = round ? headingOf(round[0] - me[0], round[2] - me[2]) : Math.atan2(-along[2], along[0]) - ride.plan.side * (ahead < 0 ? RIDING.noise.wheel : 0);
+    setGoal(turning, WORLD.mount.turnSpeed, round ? Math.hypot(round[0] - me[0], round[2] - me[2]) : distance);
     if (ahead > Math.cos(0.45) && world.time >= ride.holdUntil) ride.phase = 'charge';
   }
   if (fighter.punch) steerBlow(fighter, opponent);
