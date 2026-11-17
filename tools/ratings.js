@@ -31,14 +31,15 @@ import { STYLES } from '../src/moves.js';
 export const RATING = {
   references: { maximus: PRESETS.maximus, monk: PRESETS.staff }, seconds: 120, firstSeed: 900,
   // A pairing is settled after at least `minBouts` once one side has won `share` of them (draws half), else fought to its cap.
-  settle: { minBouts: 4, share: 0.85 },
+  // (`RATING_MIN_BOUTS`, `RATING_NEAREST`, `RATING_PANEL_BOUTS` in the environment fight more of them for a steadier table; the workers read them too.)
+  settle: { minBouts: Number(process.env.RATING_MIN_BOUTS ?? 4), share: 0.85 },
   // The panel besides the references: the men nearest these quantiles of the last table's scores. Five spread over the
   // range (a 100-fold one, a macaque to a bayara) put a near match within about ×2-3 of every man, where a pairing says most.
   panelQuantiles: [0.1, 0.3, 0.5, 0.7, 0.9],
   // The panel's own pairings are fought to this many bouts: every rating hangs on where the panel sits.
-  panelBouts: 12,
+  panelBouts: Number(process.env.RATING_PANEL_BOUTS ?? 12),
   // Then each man against this many nearest by fitted strength (not already met).
-  nearest: 2,
+  nearest: Number(process.env.RATING_NEAREST ?? 2),
   // A bout's score (0..1, to the first man): `health` of it from how much of each was left at the end (half and half: his health
   // left less the other's, a man out having none), the rest from who won (a win 1, a draw a half). A win at full health is 1;
   // a win barely alive ~0.75; a draw the healthier ahead.
