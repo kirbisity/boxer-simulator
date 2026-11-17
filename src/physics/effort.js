@@ -13,7 +13,7 @@ import { WEAPONS, bowCast } from '../weapons.js';
 import { WORLD } from './config.js';
 
 /** A weapon's moment of inertia about the shoulder (kg m²), held at arm's length `reach`: as handling.js inertia. */
-function inertia(spec, reach) {
+function weaponInertia(spec, reach) {
   const length = spec.length + (spec.handle ?? 0);
   return spec.mass * (reach + spec.balance) ** 2 + (spec.mass * length * length) / 12;
 }
@@ -22,7 +22,7 @@ function inertia(spec, reach) {
 export function swingEffort(spec, reach, move) {
   const rule = WORLD.weapons.effort;
   const reference = WEAPONS[move?.refWeapon ?? rule.ref];
-  const ratio = move?.mode === 'thrust' ? spec.mass / reference.mass : inertia(spec, reach) / inertia(reference, reach);
+  const ratio = move?.mode === 'thrust' ? spec.mass / reference.mass : weaponInertia(spec, reach) / weaponInertia(reference, reach);
   return 1 - rule.share + rule.share * Math.min(rule.cap, ratio);
 }
 
