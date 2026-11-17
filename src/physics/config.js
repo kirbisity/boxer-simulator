@@ -1547,10 +1547,15 @@ export const WORLD = {
     // The one thing a horse will not be ridden into: a hedge of points (physics/mounted.js hedgeBalk). Looking `look` m ahead (its
     // stopping distance from the gallop to a canter and some: ~11 m at its pulling up, so it sees them in time to check)
     // across `width` m either side of its line, it counts the enemy's levelled long points (a held weapon of `long` m or more
-    // that thrusts, its bearer facing it within `facing` rad); `dense` or more points to the metre of front (a pike or spear
-    // block: two or three ranks at ~1 m a file show 2-5) and it will come on no faster than a canter however it is urged (the
-    // squares at Waterloo, the Swiss and Flemish pike: horses balked at the points, not at men). Looked again every `every` s.
-    hedge: { look: 20, width: 2.5, long: 1.8, facing: 1.0, dense: 1.2, every: 0.25 },
+    // that thrusts, its bearer facing it within `facing` rad) in the front of them: from the nearest point back `depth` m (the
+    // two or three ranks whose points reach out together; a man further back is not part of the hedge before it). `dense` or
+    // more points to the metre of front (a pike or spear block closed up: two or three ranks at ~1 m a file show 2-5; men out
+    // of the ranks ~2 m apart, AI.elbowRoom, show under 1) and it will come on no faster than a canter however it is urged (the
+    // squares at Waterloo, the Swiss and Flemish pike: horses balked at the points, not at men). Bows, swords, axes and maces,
+    // and spears in a loose crowd, are no hedge (`long` 1.2: every spear, the 1.3 m spear and the yari among them, not the
+    // pike and the lance alone; a closed spear block stopped horse as pike did, the Ming spear squads, the Saxon wall): a horse ridden at them goes in (the knights at Crécy rode down their own
+    // Genoese crossbowmen; Carrhae's cataphracts and the Mongol charge broke loose foot). Looked again every `every` s.
+    hedge: { look: 20, width: 2.5, depth: 2.5, long: 1.2, facing: 1.0, dense: 1.5, every: 0.25 },
     stamina: { gallopSeconds: 60, restSeconds: 90, slows: 0.3, easy: 0.5 },
     // The horse's turning (physics/mounted.js stepHorse).
     // - into (s): the time it takes to get into its sharpest turn at its pace, or out of it: its yaw rate changes no faster
