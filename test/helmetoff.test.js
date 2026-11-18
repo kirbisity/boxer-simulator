@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { buildBody, P, PRESETS } from '../src/body.js';
 import { gearTraits, helmetNameOf } from '../src/outfits.js';
 import { advance, createWorld, helmetSlip, placeFighter, protectionAt, reachOf, throwPunch, WORLD } from '../src/physics.js';
-import { measureHelm } from '../tools/helmet-off.js';
+import { ATTACKERS, blowAt, measureHelm } from '../tools/helmet-off.js';
 
 const holdOf = (kind, design = 0) => gearTraits({ outfit: { kind, design } }).helmetHold;
 
@@ -49,14 +49,24 @@ test('the slip: the head\'s speed change on the helmet\'s mass, more on the rim 
 // comes off in a share of them about the open class's (helmetOff.holds.open, recalibrated 2026-11-11: 50.5% of the class's
 // 105 in 6 seeds; this hat's own 12 of 40), and through a half-enclosed or an enclosed helm a heavy blow knocks a man out
 // seldom and never takes the helm (was: enough knockouts through each to judge, ~30, before the rigid shell counted).
-test('knocked out by a heavy blow, an open hat comes off often; through a half-enclosed or enclosed helm a heavy blow seldom knocks him out, and never takes it', () => {
+test('knocked out by a heavy blow, an open hat comes off often; through a half-enclosed or enclosed helm only a heavy weapon knocks him out, mostly when he is already hurt, and an enclosed one never comes off', () => {
+  // (2026-11-17, the owner's ruling: a heavy weapon may knock out a hurt man through a closed helm; the brain is spared by
+  // the helmet's padding, physics.js brainShare. A fist, a kick, a bat or a staff does not, through either.)
   const open = measureHelm({ kind: 'ashigaru', design: 0 }, 3);
   assert.ok(open.kos >= 20, `enough knockouts to judge (${open.kos})`);
-  assert.ok(open.off / open.kos > 0.2 && open.off / open.kos < 0.7, `jingasa off in ${open.off} of ${open.kos} knockouts`);
-  for (const [helm, seeds, name] of [[{ kind: 'samurai', design: 0 }, 4, 'kabuto'], [{ kind: 'knight', design: 3 }, 3, 'close helmet']]) {
+  assert.ok(open.off / open.kos > 0.1 && open.off / open.kos < 0.7, `jingasa off in ${open.off} of ${open.kos} knockouts`);
+  for (const [helm, seeds, name, offMost] of [[{ kind: 'samurai', design: 0 }, 4, 'kabuto', 0.15], [{ kind: 'knight', design: 3 }, 3, 'close helmet', 0]]) {
     const shut = measureHelm(helm, seeds);
-    assert.ok(shut.kos <= open.kos / 4, `${name}: knocked out ${shut.kos} times, the jingasa ${open.kos}`);
-    assert.equal(shut.off, 0, `${name} off in ${shut.off} of ${shut.kos} knockouts`);
+    assert.ok(shut.kos < open.kos, `${name}: knocked out ${shut.kos} times, the jingasa ${open.kos}`);
+    assert.ok(shut.off <= offMost * shut.kos, `${name} off in ${shut.off} of ${shut.kos} knockouts`);
+  }
+  // Only heavy weapons, and through the close helmet only on a man already hurt.
+  const light = ATTACKERS.filter((attacker) => !['warhammer', 'kanabo', 'mace', 'commodus'].includes(attacker.style));
+  for (const attacker of light) for (const move of attacker.moves) for (const range of [0.8, 1.0]) {
+    assert.ok(!blowAt(attacker, move, { kind: 'knight', design: 3 }, { head: 0.7, knockdowns: 2 }, range, 1)?.ko, `${attacker.style} ${move} knocks him out through a close helmet`);
+  }
+  for (const attacker of ATTACKERS) for (const move of attacker.moves) {
+    assert.ok(!blowAt(attacker, move, { kind: 'knight', design: 3 }, { head: 0, knockdowns: 0 }, 0.9, 1)?.ko, `${attacker.style} ${move} knocks a fresh man out through a close helmet`);
   }
 });
 

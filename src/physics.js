@@ -6157,8 +6157,11 @@ function collideGround(world, fighter, h, arena) {
       }
     }
     if (fighter.x[base + 1] < floor) {
-      // Arriving this substep (it was clear of the floor): how fast it hit.
-      if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, (fighter.prev[base + 1] - fighter.x[base + 1]) / h);
+      // Arriving this substep (it was clear of the floor): how fast it hit. The part's speed as it fell, not only how far it
+      // moved: a joint's correction in the same substep can drag a light hand or forearm down centimetres at once, and that
+      // read as a speed is tens of m/s ("hand broken in the fall" at 11-15 m/s, where a man falling from his height brings
+      // a hand down at ~5). As on terrain (above).
+      if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, Math.min((fighter.prev[base + 1] - fighter.x[base + 1]) / h, WORLD.gravity * h - fighter.v[base + 1]));
       fighter.x[base + 1] = floor;
       // Flesh on canvas does not bounce: the push out of the floor must not
       // turn into upward speed, or a falling body springs back up.
@@ -7108,6 +7111,9 @@ function collideStriker(world, attacker, defender, striker, time) {
       [defender, capsule.b, capsule.a === capsule.b ? 0 : closest.t, -1],
     ].filter(([, , share]) => share > 0);
     const total = shares.reduce((sum, [fighter, index, share]) => sum + fighter.invMass[index] * share, 0);
+    // (Only once the stroke has landed: its blow reckoned, the weapon carried on into him by the rest of the stroke. A
+    // weapon held against him with no stroke going, or a point laid on him before its drive, parts them as bodies do.)
+    const struck = Boolean(striker.weapon && attacker.punch?.landed);
     for (const [fighter, index, share, sign] of shares) {
       const amount = (penetration * fighter.invMass[index] * share) / total;
       for (let axis = 0; axis < 3; axis += 1) {
@@ -7115,7 +7121,12 @@ function collideStriker(world, attacker, defender, striker, time) {
         // A weapon resting in a body is held off it at the hand, far from
         // where it touches: move the hand without making that a speed, or
         // the push repeated each substep winds the arm up into a fling.
-        if (striker.weapon && fighter === attacker) fighter.prev[index * 3 + axis] += sign * normal[axis] * amount;
+        // Nor, once the stroke has landed (`struck`), the man it is carried on into: the blow's momentum was his once, at the
+        // impact (registerWeaponImpact, pushBack), and the club or haft going on after it is kept out of him, not struck
+        // again each substep. (Made a speed, the push
+        // repeated 240 times a second drove a man a kanabo had dropped into the floor at 10-17 m/s, faster than the club
+        // itself was going: his shoulders and hands hit the ground at a fall's three times, "hand broken in the fall".)
+        if (striker.weapon && (fighter === attacker || struck)) fighter.prev[index * 3 + axis] += sign * normal[axis] * amount;
       }
     }
   }
