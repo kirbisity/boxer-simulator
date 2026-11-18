@@ -146,6 +146,7 @@ export const UI_FIGHT = {
   'touch.surface': { en: 'Fight: drag the stick at the bottom left to move, anywhere else to look about; tap your man where to hit him, press and hold to shove or hold a man down', zh: '战斗：拖左下角的摇杆移动，拖别处看四周；在对手身上点哪儿就打哪儿，按住不放可以推搡或把人压住' },
   'touch.art': { en: 'Art', zh: '绝技' },
   'touch.guard': { en: 'Guard', zh: '防御' },
+  'touch.deflect': { en: 'Deflect', zh: '弹反' },
   'touch.sidearm': { en: 'Sidearm', zh: '副武器' },
   'touch.bow': { en: 'Bow', zh: '弓' },
   'touch.dismount': { en: 'Dismount', zh: '下马' },

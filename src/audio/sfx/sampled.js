@@ -54,6 +54,9 @@ export function blowTail(plan, s) {
   return { ...plan, seconds: plan.seconds === null ? null : plan.seconds * sampleLerp(BLOW_TAIL.light, BLOW_TAIL.heavy, k), fade: plan.fade * sampleLerp(BLOW_TAIL.fadeLight, BLOW_TAIL.fadeHeavy, k) };
 }
 
+// A deflect's clash: the weapons' own clash at `rate` of its pitch (about four semitones down), `trim` louder, rung `seconds` longer.
+const DEFLECT_SOUND = { rate: 0.8, trim: 1.6, seconds: 1.3 };
+
 /** A strength 0..1 of `value` on a log scale from `low` to `high`. */
 export const sampleStrength = (value, low, high) => sfxClamp(Math.log(Math.max(low, value) / low) / Math.log(high / low), 0, 1);
 const sampleLerp = (a, b, share) => a + (b - a) * share;
@@ -231,8 +234,11 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
         return blowTail({ set: 'shieldclang', trim: sampleLerp(0.75, 1.15, s), rate: sampleMassRate(event.mass) * (blunt ? 0.88 : 1) * jitter(), seconds: sampleLerp(0.2, 0.7, s), fade: sampleLerp(0.05, 0.25, s), skip: 0, synth: params.scrape > 0 ? { ...params, modes: [] } : null, synthGain: 0.7 }, s);
       }
       const blunt = !params.modes.length || params.modes[0].f < 500;
+      // A deflect (WORLD.deflect): the same meeting of these weapons, deeper and louder (DEFLECT_SOUND: the blade met square and
+      // set, ringing the whole of both, not a glancing tick).
+      const deflect = event.deflect ? DEFLECT_SOUND : { rate: 1, trim: 1, seconds: 1 };
       return blowTail({
-        set: 'clash', trim: 1, rate: sampleMassRate(event.mass) * (blunt ? 0.85 : 1) * jitter(), seconds: sampleLerp(0.15, 0.8, s), fade: sampleLerp(0.04, 0.25, s), skip: 0,
+        set: 'clash', trim: deflect.trim, rate: sampleMassRate(event.mass) * (blunt ? 0.85 : 1) * deflect.rate * jitter(), seconds: sampleLerp(0.15, 0.8, s) * deflect.seconds, fade: sampleLerp(0.04, 0.25, s), skip: 0,
         // Edge along edge: the synth's scrape beside it (without its own ring).
         synth: params.scrape > 0 ? { ...params, modes: [] } : null, synthGain: 0.7,
       }, s);
