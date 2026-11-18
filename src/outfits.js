@@ -1093,6 +1093,8 @@ export const OUTFITS = {
     skill: 0.75,
     // Rides (the samurai fought from the saddle, the bow first).
     horse: 'japanese',
+    // Every man in it wears the sakayaki (body.js normaliseInputs): the crown shaved under the helmet, the queue folded on it.
+    hairStyle: 'sakayaki',
     faction: 'japanese', plated: true,
     label: 'Samurai — ō-yoroi', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.
@@ -1140,6 +1142,8 @@ export const OUTFITS = {
     skill: 0.75,
     // Rides (the o-yoroi was made to be worn on horseback).
     horse: 'japanese',
+    // Every man in it wears the sakayaki (body.js normaliseInputs): the crown shaved under the helmet, the queue folded on it.
+    hairStyle: 'sakayaki',
     faction: 'japanese', plated: true,
     // No `family`: never dealt to a samurai at random (it is the flagship's own, too detailed for a crowd).
     label: 'Ō-yoroi (great armour)', movement: 'good', fists: 'bare',
@@ -1196,6 +1200,8 @@ export const OUTFITS = {
     // paces, and one fired closer, or a heavier ball (a 6-monme gun's 23 g, near twice the energy), goes through, its
     // share of it held as the plate's ~2 mm against the ball's energy (bulletProof). The kote, haidate and suneate
     // (`bullet.limb` 0.15: cloth, small splints and mail) were never proved and turn no ball.
+    // Every man in it wears the sakayaki (body.js normaliseInputs): the crown shaved under the helmet, the queue folded on it.
+    hairStyle: 'sakayaki',
     faction: 'japanese', bulletRating: 900, plated: true,
     label: 'Samurai — tōsei gusoku', family: 'samurai', movement: 'good', fists: 'bare',
     // Arrows glance off it.

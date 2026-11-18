@@ -45,7 +45,7 @@ const STYLE_LENGTH = {
   cleanShort: 'short', spiky: 'short',
   midLong: 'medium', dreads: 'medium',
   long: 'long', hime: 'long', ringlets: 'long',
-  bun: 'tied', ponytail: 'tied', topknot: 'tied', ringletUpdo: 'tied', ringletPigtails: 'tied',
+  bun: 'tied', ponytail: 'tied', topknot: 'tied', sakayaki: 'tied', ringletUpdo: 'tied', ringletPigtails: 'tied',
 };
 const hairSmooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -61,6 +61,8 @@ export function hairLength(style) {
 export function photoScalp(style, female, age, random) {
   const length = hairLength(style);
   if (length === 'bald') return { hairline: 0.2, temple: 0, sideburn: 0.5, nape: 0.64, density: 0, crown: 0, seed: random() * 50 };
+  // Sakayaki: the front shaved back over the crown (no front hairline, the crown bare), the sides and back grown.
+  if (style === 'sakayaki') return { hairline: 0, temple: 0, sideburn: PHOTO_HAIR.sideburn + 0.03 * random(), nape: PHOTO_HAIR.nape + 0.02, density: 1, crown: 1, seed: random() * 50 };
   const balding = female ? 0 : Math.min(1, Math.max(0, (age - 38) / 32)) * (0.4 + 0.6 * random());
   return {
     hairline: PHOTO_HAIR.hairline[length] + 0.05 * balding + (random() - 0.5) * 0.01,

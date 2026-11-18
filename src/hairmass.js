@@ -94,6 +94,10 @@ export const HAIR_SHAPES = {
   },
   // Locs: ropes over the scalp, hanging free to the shoulders, heavy.
   dreads: { cap: { crown: 0.035, edge: 0.02 }, parts: [{ kind: 'ropes', count: 20, length: 1.9, radius: 0.065 }] },
+  // Sakayaki, the samurai's: the front and crown shaved bare (`shaved`: where the hair begins, the polar angle at the sides and
+  // at the back; none in front), the rest grown and drawn up to a tie at the back of the crown, its queue (the chonmage) folded
+  // forward over the shaved pate.
+  sakayaki: { cap: { crown: 0.035, edge: 0.02, shaved: { side: 1.0, back: 0.72 } }, parts: [{ kind: 'chonmage' }] },
   // A small knot on the very top of the head, the sides cut short (the cap only over the top).
   topknot: { cap: { crown: 0.04, edge: 0.02, top: 1.25 }, parts: [{ kind: 'topknot' }] },
   // Two bunches of ringlets tied high at the sides, a blunt fringe.
@@ -121,6 +125,13 @@ const hairSmoothstep = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
 };
+
+/** Where a shaved crown's hair begins (polar angle), by azimuth from the face: `back` behind, `side` over the ears, past the hairline in front (none). */
+function hairShavedFrom(shaved, azimuth) {
+  const f = Math.abs(azimuth) / Math.PI;
+  if (f >= 0.5) return shaved.side + (shaved.back - shaved.side) * hairSmoothstep(0.5, 1, f);
+  return shaved.side + (2.6 - shaved.side) * (1 - hairSmoothstep(0.28, 0.5, f));
+}
 
 /** Where the hair leaves the scalp (polar angle from the crown), by azimuth from the face: the hairline, lifted over the ears. */
 function hairLeavePolar(azimuth) {
@@ -162,14 +173,18 @@ export function hairProfile({ style, surface, r, columns = HAIR_MASS.columns, ra
   for (let column = 0; column < columns; column += 1) {
     const azimuth = -Math.PI + ((column + 0.5) / columns) * Math.PI * 2;
     const leave = Math.min(hairLeavePolar(azimuth), cap.top ?? Infinity);
+    // (A shaved crown, `shaved`: the hair begins lower, and in front not at all: a bare column lies on the skin, sunk under it.)
+    const start = cap.shaved ? hairShavedFrom(cap.shaved, azimuth) : 0.03;
+    const bare = start >= leave - 0.04;
     const side = new THREE.Vector3(Math.cos(azimuth), 0, Math.sin(azimuth));
     const points = [];
     for (let row = 0; row <= HAIR_MASS.scalpRows; row += 1) {
-      const polar = 0.03 + ((leave - 0.03) * row) / HAIR_MASS.scalpRows;
+      const polar = bare ? leave : start + ((leave - start) * row) / HAIR_MASS.scalpRows;
       const skin = surface(new THREE.Vector3(Math.sin(polar) * Math.cos(azimuth), Math.cos(polar), Math.sin(polar) * Math.sin(azimuth)));
       const radial = skin.clone().sub(centre);
       // Thick over the crown, thinning to the edge (a fade's cap down to nothing, so it meets the painted stubble).
-      const thickness = (cap.edge + (cap.crown - cap.edge) * (1 - hairSmoothstep(0, 1, polar / leave))) * r;
+      const share = (polar - start) / Math.max(1e-6, leave - start);
+      const thickness = bare ? -0.02 * r : (cap.edge + (cap.crown - cap.edge) * (1 - hairSmoothstep(0, 1, share))) * r;
       points.push(centre.clone().add(radial.setLength(radial.length() + thickness)));
     }
     const scalpLength = hairLengthsOf(points).at(-1);
@@ -580,6 +595,23 @@ function buildHairParts(shape, sheet, chains, { surface, centre, r, random }) {
           v: length / r,
         });
       }
+    } else if (part.kind === 'chonmage') {
+      // The chonmage: tied at the back of the crown where the grown hair ends, the queue laid forward over the shaved pate, over
+      // the top to just short of the front, thick and oiled, its end cut square.
+      const tie = at(0.6, Math.PI, 0.03);
+      addHairKnot(sheet, tie.point.clone().addScaledVector(tie.normal, 0.05 * r), [0.06 * r, 0.11 * r, 0.11 * r], { segments: 10, rings: 5, facing: tie.normal });
+      const path = [];
+      for (let k = 0; k <= 10; k += 1) {
+        const s = -0.58 + (0.92 * k) / 10;
+        path.push(at(Math.abs(s), s < 0 ? Math.PI : 0, 0.05 + 0.012 * Math.sin((k / 10) * Math.PI)).point);
+      }
+      addHairTube(sheet, path, {
+        radius: (t) => r * (0.085 + 0.02 * Math.sin(t * Math.PI) - 0.015 * t),
+        sides: 8,
+        flat: 0.55,
+        up: new THREE.Vector3(0, 1, 0),
+        v: 1,
+      });
     } else if (part.kind === 'bun' || part.kind === 'topknot') {
       // A bun: high on the back of the crown or low at the nape (seeded), 0.3 r; a topknot: small, upright on the crown.
       const top = part.kind === 'topknot';

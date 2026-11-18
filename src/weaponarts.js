@@ -47,6 +47,9 @@ export const ARTS = {
   // - hurt: a blow landing on him, `hurtJoules` more per joule, up to `hurtMost`: being hit is the surest spur there is;
   // - kill: a man of the other side dying of his hand.
   surge: { landed: 0.04, landedJoules: 0.0003, landedMost: 0.1, hurt: 0.06, hurtJoules: 0.0005, hurtMost: 0.16, kill: 0.3 },
+  // A deflect of his (physics/deflect.js) charges his art at once, whatever his blood was: the man reeling before him is the
+  // opening it is made for (and the moment is slowed for him to take it: drama.js DRAMA.deflect).
+  deflectCharges: true,
   // Danger near: each enemy on his feet within `within` m holds him up to `perFoe` (to `most` in all), risen to at `rate` a
   // second (a man about to fight is already keyed up; facing three he is more so, but danger alone never makes an art).
   danger: { within: 3, perFoe: 0.12, most: 0.36, rate: 0.08 },
@@ -320,6 +323,10 @@ export function feelAdrenaline(world, fighter, dt) {
       else if (event.defender === fighter.id) level += Math.min(spec.hurtMost, spec.hurt + spec.hurtJoules * joules) * gain;
     }
     if (event.kind === 'killed' && event.attacker === fighter.id && event.fighter !== fighter.id) level += spec.kill * gain;
+    if (event.kind === 'deflect' && event.fighter === fighter.id && ARTS.deflectCharges && artOf(fighter)) {
+      level = Math.max(level, ARTS.ready);
+      fighter.artCharged = true;
+    }
   }
   fighter.artEventCursor = events.length;
   // Danger near: enemies on their feet close by hold him keyed up.

@@ -966,6 +966,9 @@ export function normaliseInputs(rawInputs) {
   // His own skill; else a hero's, the best there is (`hero`: the legends, not the men varied from them);
   // else what his kit's men are trained to (OUTFITS[kind].skill), else an ordinary man's.
   if (rawInputs?.skill === undefined) inputs.skill = rawInputs?.hero ? 1 : OUTFITS[inputs.outfit?.kind]?.skill ?? DEFAULT_INPUTS.skill;
+  // A kit that dresses its men's hair one way (OUTFITS[kind].hairStyle: the samurai's sakayaki), for every man in it.
+  const kitHair = OUTFITS[inputs.outfit?.kind]?.hairStyle;
+  if (kitHair && inputs.sex !== 'female') inputs.look = { ...inputs.look, hairStyle: kitHair };
   if (rawInputs?.calories === undefined) {
     const frame = FRAMES[inputs.frame] ?? FRAMES.medium;
     inputs.calories = Math.round(caloriesForBodyFat(inputs, rawInputs?.bodyFat ?? 0.16, frame.lean));

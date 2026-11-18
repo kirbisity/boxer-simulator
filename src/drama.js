@@ -27,6 +27,8 @@ export const DRAMA = {
   pinned: { slowest: 0.5, seconds: 1.6, hold: 0.4, shake: 0, pushIn: 0.75, flash: 0 },
   // A thing rising out of the filth to fight (levelmode/awareness.js `lurk`): the camera drawn in on him and a tremor as he comes up, a little slowed.
   rise: { slowest: 0.75, seconds: 2.6, hold: 0.6, shake: 0.035, pushIn: 0.8, flash: 0 },
+  // The player's deflect: the fight slowed to a fifth for a moment, his man reeling, his art charged (weaponarts.js): time to press it.
+  deflect: { slowest: 0.2, seconds: 1.4, hold: 0.6, shake: 0.02, pushIn: 0.9, flash: 0 },
   // Real seconds to slow from full speed to the slowest: a slide, not a cut.
   easeIn: 0.18,
   // The push-in's lens (dramaLens): the share of the moment it takes to close in, and the share at its end it takes to let go, both
@@ -83,6 +85,8 @@ export function momentFor(event) {
   // Ridden down and put over by a horse: as a knockdown.
   if (event.kind === 'trampled' && event.fell) return { kind: 'knockdown', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'staggered') return { kind: 'staggered', fighter: event.fighter, particle: P.head };
+  // The player's deflect, in any fight (`always`): on his blade's hand.
+  if (event.kind === 'deflect' && event.byPlayer) return { kind: 'deflect', fighter: event.fighter, particle: P.rHand, always: true };
   if (event.kind === 'killed') return { kind: 'killed', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'bledOut') return { kind: 'bledOut', fighter: event.fighter, particle: P.neck };
   if (event.kind === 'disarmed' && event.effects[0]?.includes('knocked away')) return { kind: 'disarmed', fighter: event.fighter, particle: P.rHand };

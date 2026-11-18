@@ -8576,7 +8576,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // travel is the animation's). Not the AI's: its blade must meet the blow (the clash, bladeClash).
   if (assistedDeflect(world, attacker, punch, defender)) {
     punch.stopped = true;
-    const event = { time: world.time, kind: 'deflect', fighter: defender.id, attacker: attacker.id, punch: punch.type, weapon: defender.weapon.kind, point: closest.onFirst, normal, impulse, energy, assisted: true, effects: [`deflected with the ${defender.weapon.spec.label.toLowerCase()}`] };
+    const event = { time: world.time, kind: 'deflect', fighter: defender.id, byPlayer: Boolean(defender.player), attacker: attacker.id, punch: punch.type, weapon: defender.weapon.kind, point: closest.onFirst, normal, impulse, energy, assisted: true, effects: [`deflected with the ${defender.weapon.spec.label.toLowerCase()}`] };
     world.pendingImpulses.push({ fighter: attacker, shares: [[main, 1], [P[`${weapon.main}Elbow`], 0.5]], direction: normal, impulse });
     reel(world, attacker, energy, event);
     world.events.push(event);
@@ -9218,7 +9218,7 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
     const energy = 0.5 * ((massA * massB) / (massA + massB)) * Math.max(0, closing) ** 2;
     // (As a parry's: which of his blades, and whether his other was cutting as it did.)
     const answering = parrier.punch && strokeOf(parrier, blade) === null && parrier.punch.t <= parrier.punch.spec.extendUntil;
-    const event = { time: world.time, kind: 'deflect', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, normal, impulse, energy, effects: [`deflected with the ${blade.spec.label.toLowerCase()}`] };
+    const event = { time: world.time, kind: 'deflect', fighter: parrier.id, byPlayer: Boolean(parrier.player), attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, normal, impulse, energy, effects: [`deflected with the ${blade.spec.label.toLowerCase()}`] };
     reel(world, striker, energy, event);
     world.events.push(event);
   } else if (parried) {

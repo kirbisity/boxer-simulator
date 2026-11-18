@@ -28,7 +28,7 @@ import { buildHairMass, buildHairRim, headEllipsoid } from './hairmass.js';
 import { buildHairSwing, HAIR_SWING } from './hairswing.js';
 
 export const LOOK_OPTIONS = {
-  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
+  hairStyle: ['spiky', 'cleanShort', 'fade', 'buzz', 'cornrows', 'bun', 'ponytail', 'midLong', 'long', 'dreads', 'topknot', 'sakayaki', 'ringletPigtails', 'ringlets', 'ringletUpdo', 'hime', 'bald'],
   facialHair: ['none', 'stubble', 'mustache', 'handlebar', 'beard', 'longBeard'],
   eyeColor: ['brown', 'hazel', 'blue', 'green', 'grey', 'amber'],
 };
@@ -961,7 +961,7 @@ function buildHair(group, look, r, shape, material, female, curtains = []) {
       const out = [Math.cos(azimuth) * 0.25, -1, Math.sin(azimuth) * 0.25];
       hangingLock(group, material, dangles, root, out, (0.72 + 0.38 * Math.max(0, back)) * r, 0.42 * r, 0.12 * r, { sag: 0.45, damping: 0.3 });
     }
-  } else if (style === 'topknot') {
+  } else if (style === 'topknot' || style === 'sakayaki') {
     // A sumo's oiled hair, drawn up into a knot folded on the crown.
     cap(1.04, 1.04, 2.0);
     const knot = new THREE.Mesh(new THREE.SphereGeometry(0.22 * r, 12, 10), material);
