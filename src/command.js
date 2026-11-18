@@ -15,7 +15,7 @@
 //     spot where the order found him; each fights only a man within reach.
 //   As you were (`free`): the order taken back, the side's own way again
 //     (its formation, its standard). Every battle begins so.
-//   Line, Wedge, Square (`line`, `wedge`, `square`: SHAPES): his men drawn up in that shape where he stands, faced the
+//   Line, Wedge, Square (`line`, `wedge`, `square`: ORDER_SHAPES): his men drawn up in that shape where he stands, faced the
 //     way he looks (or at the man he is locked on): a line two or three deep with him in the middle of its front rank,
 //     its shooters in front; a wedge with its point a step before him; a hollow square round him, every side facing out.
 //     Each man goes to his place and keeps it shoulder to shoulder (the room a man keeps out of the ranks, ai.js
@@ -63,14 +63,14 @@ export const COMMAND = {
   charge: { behind: 1, width: 3, spread: 0.58, retargetEvery: 0.5, runFrom: 2.5 },
   // Hold: a man this near (m) his place in the ranks keeps it; anyone further holds where he stands.
   ranksWithin: 2,
-  // The drawn-up shapes (SHAPES): a man's room in the file (m, shoulder to shoulder with a weapon: close order) and a rank's
+  // The drawn-up shapes (ORDER_SHAPES): a man's room in the file (m, shoulder to shoulder with a weapon: close order) and a rank's
   // depth behind the one before; a line is `deep` ranks (`deepFrom` men or more, one rank more); a wedge's point `ahead` m
   // before him; a square's side long enough for its men round it.
   shape: { file: 0.95, rank: 1.15, deep: 2, deepFrom: 14, ahead: 1.2 },
 };
 
 // The shapes a side may be drawn up in, each its places ([x, z] in the frame of the way it faces: x ahead, z to the left).
-export const SHAPES = ['line', 'wedge', 'square'];
+export const ORDER_SHAPES = ['line', 'wedge', 'square'];
 
 // The arms, in the order the player steps through them ([ and ]): `orders`, where given, the only ones an arm takes.
 export const COMMAND_GROUPS = [
@@ -88,7 +88,7 @@ export const COMMAND_ORDERS = [
   { kind: 'free', label: 'Free', key: '0' },
   // Back to the places set before the fight: only where the side has them (formPlaces).
   { kind: 'form', label: 'Formation', key: '-', places: true },
-  // Drawn up in a shape where he stands (SHAPES).
+  // Drawn up in a shape where he stands (ORDER_SHAPES).
   { kind: 'line', label: 'Line', key: 'z' },
   { kind: 'wedge', label: 'Wedge', key: 'x' },
   { kind: 'square', label: 'Square', key: 'b' },
@@ -195,7 +195,7 @@ export function giveOrder(world, by, kind, { dir = null, group = 'all' } = {}) {
   // Formation: each man's own place, fixed in the world ([x, z] by his id).
   if (kind === 'form') command.places = structuredClone(world.formPlaces[by.corner]);
   // A shape: each man's place in it, fixed in the world where it was drawn up.
-  if (SHAPES.includes(kind)) command.places = shapePlaces(world, by, kind, way, group);
+  if (ORDER_SHAPES.includes(kind)) command.places = shapePlaces(world, by, kind, way, group);
   if (group === 'all') {
     world.commands[by.corner] = command;
     for (const arm of Object.keys(arms)) delete arms[arm];
@@ -225,7 +225,7 @@ function orderHorse(world, corner, kind) {
 
 
 /**
- * The places of a shape (SHAPES) for every man of his side who hears him (in `group`), [x, z] in the world: the shape's
+ * The places of a shape (ORDER_SHAPES) for every man of his side who hears him (in `group`), [x, z] in the world: the shape's
  * places laid out in the frame of the way it faces (`way`, from where he stands), then each taken by the nearest man still
  * without one, the front places first (so no man walks through the ranks to the back of them). A line's front rank to its
  * shooters first.
@@ -512,7 +512,7 @@ export function orderKeepsPlace(world, fighter) {
 
 /** His place under the order ([x, z]): his ring's place round the giver, his place in the formation, or his own ground. */
 function placeFor(world, command, fighter) {
-  if (command.kind === 'form' || SHAPES.includes(command.kind)) return command.places[fighter.id] ?? null;
+  if (command.kind === 'form' || ORDER_SHAPES.includes(command.kind)) return command.places[fighter.id] ?? null;
   if (command.kind === 'rally') {
     const offset = command.places[fighter.id];
     if (!offset) return null;

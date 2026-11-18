@@ -9,7 +9,7 @@
 // than one arm, a row of tabs: All, Foot, Shot, Horse (keys [ and ]); the orders go
 // to the arm lit, and the pills show that arm's order and the orders it takes.
 
-import { canCommand, chosenGroup, COMMAND_GROUPS, COMMAND_ORDERS, FIRE_ORDER_KEY, groupsFor, hasShot, holdingFire, orderOver, ordersFor, SHAPES, standingOrder } from '../command.js';
+import { canCommand, chosenGroup, COMMAND_GROUPS, COMMAND_ORDERS, FIRE_ORDER_KEY, groupsFor, hasShot, holdingFire, orderOver, ordersFor, ORDER_SHAPES, standingOrder } from '../command.js';
 import { fightUiElement } from './kit.js';
 import { onLangChange, t } from '../i18n.js';
 
@@ -85,7 +85,7 @@ export function fightUiCommandBar(root, hooks) {
   });
   // The shapes in one row of their own under the orders (a column of nine would run down the screen).
   const shapes = fightUiElement('div', 'fu-shapes');
-  for (const button of buttons) (SHAPES.includes(button.dataset.order) ? shapes : bar).append(button);
+  for (const button of buttons) (ORDER_SHAPES.includes(button.dataset.order) ? shapes : bar).append(button);
   bar.append(shapes);
   // Hold fire / Fire at will: one pill, its word what it is now; only where he has bows or guns to tell.
   const fire = fightUiElement('button', 'fu-order fu-fire', '<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true"></svg><span></span><kbd>H</kbd>');
@@ -136,7 +136,7 @@ export function fightUiCommandBar(root, hooks) {
     // Formation only where the side has places of its own; the horse only what a rider can be told.
     const offered = new Set(ordersFor(world, me.corner, group).map((entry) => entry.kind));
     for (const button of buttons) button.hidden = !offered.has(button.dataset.order);
-    shapes.hidden = !buttons.some((button) => SHAPES.includes(button.dataset.order) && !button.hidden);
+    shapes.hidden = !buttons.some((button) => ORDER_SHAPES.includes(button.dataset.order) && !button.hidden);
     // The fire order: lit (gold) while the shot holds; its word the order standing.
     fire.hidden = !hasShot(world, me);
     const holding = holdingFire(world, me.corner);

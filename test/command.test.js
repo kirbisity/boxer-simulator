@@ -186,8 +186,8 @@ test('the general played stands in the middle of his arm, however many his side'
 });
 
 test('Line, Wedge, Square: his men drawn up in the shape where he stands, each in his place, shoulder to shoulder', async () => {
-  const { COMMAND: spec, SHAPES } = await import('../src/command.js');
-  for (const shape of SHAPES) {
+  const { COMMAND: spec, ORDER_SHAPES } = await import('../src/command.js');
+  for (const shape of ORDER_SHAPES) {
     const { world, player, men } = orderBattle('wokou', 2);
     const command = giveOrder(world, player, shape, { dir: towardEnemy(world, player) });
     assert.equal(standingOrder(world, 'red'), shape);
