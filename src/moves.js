@@ -2393,3 +2393,13 @@ for (const [key, style] of Object.entries(STYLES)) {
 
 /** Every blow the player can tap with a style: its own attacks and the ones from the other side made for him. */
 export const tapAttacks = (styleKey) => [...Object.keys(STYLES[styleKey]?.attacks ?? {}), ...(TAP_MOVES[styleKey] ?? [])];
+
+// A thrust with a weapon laid at the body (zones body then head) may be laid lower, at the thigh: the point under the
+// skirts of a breastplate, a dō's kusazuri or a coat's hem, where the armour stops (the thigh and the groin under the tassets
+// and the haidate; Talhoffer's and the Japanese spear's low thrusts at an armoured man). Where it goes is the AI's (aimZone:
+// a small base share, more against a kit the point does not go through above), or the player's tap. (Not an art, laid at
+// its own place; not a tap of another side's, nor a thrust laid first at the head: the high thrust, the finisher.)
+for (const spec of Object.values(MOVES)) {
+  const atBody = spec.mode === 'thrust' && spec.reach === 'weapon' && !spec.art && !spec.tapName && spec.zones?.length === 2 && spec.zones[0] === 'body' && spec.zones[1] === 'head';
+  if (atBody) spec.zones = [...spec.zones, 'legs'];
+}

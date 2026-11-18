@@ -17,7 +17,7 @@ import { BODY, P } from '../body.js';
 import { BARDING, bardingAt, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
 import { DOG_JUMP } from '../robotdogs.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
-import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, pointThrough, pointWidthOf, shieldContact, sliceGain } from '../weapons.js';
+import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, pointThrough, pointWidthOf, cuttingWidth, shieldContact, sliceGain } from '../weapons.js';
 import { armourHardness, bluntEdge, driveShaft, dullEdge, stopIn } from './wear.js';
 import { knockOut, bladeFor, bladeStrike, breakWeapon, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
@@ -1371,7 +1371,7 @@ function hitHorse(world, attacker, weapon, punch, horse, capsule, closest) {
   const cut = energy * mix.cut * (1 - (protection.cut ?? 0)) * sharp * (mix.cut > 0 ? sliceGain(wspec, relative, weapon.dir, distance, protection) : 1);
   // A point through the barding only past its puncture (weapons.js pointThrough), as through a man's armour; stopped, it lands
   // only as its blow.
-  const through = mix.pierce > 0 ? pointThrough(energy, protection.pierce, world.random(), pointWidthOf(wspec)) : 0;
+  const through = mix.pierce > 0 ? pointThrough(energy, protection.pierce, world.random(), mix.cut > 0 ? cuttingWidth(pointWidthOf(wspec), protection.cut) : pointWidthOf(wspec)) : 0;
   const pierce = energy * mix.pierce * sharp * through;
   const blunt = energy * mix.blunt * (1 - (protection.blunt ?? 0) * (1 - (wspec.crush ?? 0)));
   // (An edge always glances off plate; a point that bites square does not.)

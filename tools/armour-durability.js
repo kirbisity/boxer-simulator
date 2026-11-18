@@ -4,7 +4,8 @@
 // as he would in a bout) against the same man (a contender's body in the armour, style passive, his hands behind his back and
 // nothing thinking for him: no guard, no parry, no step away). Every blow that lands counts, on the trunk, the head or an arm,
 // whether it went in or the armour turned it (`glanced`: nothing of the edge or the point went in, or it glanced off plate or
-// the helmet). Down but not out, he gets up as a man does and the fight goes on; the blood keeps running. Past `limit` hits
+// the helmet). Down but not out, he gets up as a man does and the fight goes on; the blood keeps running. No pins (a
+// bout's rule: held down is not hurt). Past `limit` hits
 // (or `seconds` s) he is reported as `limit` (survived). Each armour against each weapon over `seeds` seeds; the median.
 // Usage: node tools/armour-durability.js [out.json] [seeds=3] [workers=10]
 //        node tools/armour-durability.js --one <kind> <design> <weapon> [seed]   (one run, printed)
@@ -34,7 +35,7 @@ export function hitsToOut(kind, design, weapon, seed) {
   const world = createWorld([
     { inputs: { ...structuredClone(PRESETS.contender), style: arms.style }, corner: 'red' },
     { inputs: { ...structuredClone(PRESETS.contender), style: 'passive', outfit: { kind, design }, accessories: [] }, corner: 'blue' },
-  ], { seed, arena: { halfX: 20, halfZ: 20 } });
+  ], { seed, arena: { halfX: 20, halfZ: 20 }, rules: { noPins: true } });
   const [striker, man] = world.fighters;
   // No guard: his hands clasped behind his back (physics.js handsDown 'behind'), and nothing thinks for him (no parry, no step
   // away: he is left out of the thinking, as a man played is). A blow at his body still finds the upper arm hanging beside it

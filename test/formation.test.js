@@ -45,8 +45,9 @@ test('the legion walks up in its ranks and the Han hold theirs; nobody runs on d
         const fighter = world.fighters[id];
         if (fighter.state !== 'up') continue;
         // A shooter just relieved walks back to his new place, a man disarmed goes to pick up a weapon, a man broken runs
-        // where he can (a maimed man fleeing back through the line breaks others: maiming.js): not out of place.
-        if (world.time - (fighter.swappedAt ?? -Infinity) > 4 && !fighter.goTo && !fighter.panicked) deepest = Math.max(deepest, aheadOfSlot(fighter, formation));
+        // where he can (a maimed man fleeing back through the line breaks others: maiming.js), a man down on his hands and
+        // knees crawls where he can (a hip broken, a leg off): not out of place.
+        if (world.time - (fighter.swappedAt ?? -Infinity) > 4 && !fighter.goTo && !fighter.panicked && !fighter.crawling) deepest = Math.max(deepest, aheadOfSlot(fighter, formation));
         if (!fighter.inFront && !fighter.punch) {
           behind += 1;
           if (fighter.detail === 'proxy') posedBehind += 1;
