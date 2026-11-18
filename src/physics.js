@@ -31,6 +31,7 @@ import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js
 import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
 import { bowShotCost, swingEffort } from './physics/effort.js';
+import { deflecting, deflectsWith, deflectWindow, guardHold, noteGuard } from './physics/deflect.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
@@ -923,20 +924,23 @@ export function guardReading(fighter) {
  * move; then where it was, trailing it by `lag`, off its line by his `error` (a new miss each blow). Null if not read.
  */
 function blowRead(world, fighter, punch, threat) {
-  const share = guardReading(fighter);
-  if (share === null) return null;
+  // (A weapon's guard held past its deflect window gives as it is held, to nothing: WORLD.deflect holdFor.)
+  const hold = guardHold(fighter, world.time);
+  const read = guardReading(fighter);
+  if (read === null || hold <= 0) return null;
+  const share = read * hold;
   const spec = WORLD.guardRead;
   const by = ([novice, master]) => novice + (master - novice) * share;
   const art = punch.spec.art ? spec.art : null;
   const thrust = punch.spec.mode === 'thrust' ? spec.thrust : null;
   if ((punch.age ?? punch.t) < by(spec.delay) + (art?.delay ?? 0) + (thrust?.delay ?? 0)) return null;
-  const read = fighter.blowRead;
-  if (read?.punch !== punch) {
+  const reading = fighter.blowRead;
+  if (reading?.punch !== punch) {
     const error = by(spec.error) * (art?.error ?? 1) * (thrust?.error ?? 1) * fighter.body.heightM;
     fighter.blowRead = { punch, point: threat, at: world.time, off: [0, 1, 2].map(() => (world.random() * 2 - 1) * error) };
   } else {
-    read.point = vec.lerp(read.point, threat, 1 - Math.exp(-(world.time - read.at) / (by(spec.lag) * (art?.lag ?? 1) * (thrust?.lag ?? 1))));
-    read.at = world.time;
+    reading.point = vec.lerp(reading.point, threat, 1 - Math.exp(-(world.time - reading.at) / (by(spec.lag) * (art?.lag ?? 1) * (thrust?.lag ?? 1))));
+    reading.at = world.time;
   }
   return vec.add(fighter.blowRead.point, fighter.blowRead.off);
 }
@@ -2378,6 +2382,11 @@ export function blockFor(fighter) {
  * he has the breath (`spentBelow`), else held where it is.
  */
 export function holdGuard(world, fighter, striker) {
+  // A weapon held up in the line past WORLD.deflect holdFor: his arms come down, however he means to keep it there.
+  if (guardHold(fighter, world.time) <= 0) {
+    if (BLOCKS.has(fighter.defence?.name) || fighter.defence?.name === 'parry') fighter.defence = null;
+    return;
+  }
   const from = striker && fighter.stamina >= WORLD.guardHeld.spentBelow ? striker.id : null;
   if (!fighter.punch && !fighter.defence) perform(world, fighter, blockFor(fighter), { from, held: true });
   // (A blow begun while the block was already up: the block goes to meet it.)
@@ -2385,6 +2394,30 @@ export function holdGuard(world, fighter, striker) {
     fighter.defence.from = from;
     fighter.defence.cover = undefined;
   }
+}
+
+/**
+ * Whether the stroke `attacker` is making at `defender` cannot be deflected (WORLD.deflect; the red mark over him, perilmark.js):
+ * a weapon's blow too heavy for the defender's blade to stop where they would meet (beatenThrough: its effective mass out
+ * near its head, at `strikeAt` of its length, against his blade's at its middle, braced), or a lance couched on a horse
+ * (the horse's weight behind it). Only against a man whose guard is a deflect; a shot or an arrow is never one at all.
+ */
+export function undeflectable(attacker, defender) {
+  const punch = attacker.punch;
+  if (!punch || punch.landed || punch.target !== defender.id) return false;
+  return tooHeavyToDeflect(attacker, punch, defender);
+}
+
+/** The rule of undeflectable for a stroke (whatever its state): also what a clash asks before it calls a meeting a deflect. */
+function tooHeavyToDeflect(attacker, punch, defender) {
+  if (punch.spec.path !== 'blade' || !deflectsWith(defender)) return false;
+  const blade = bladeFor(attacker, punch.spec);
+  if (!blade?.held) return false;
+  if (punch.spec.couched && attacker.mount) return true;
+  const arm = (fighter) => fighter.body.lengths.upperArm + fighter.body.lengths.forearmToFist;
+  const theirs = effectiveMassAt(blade.spec, attacker.body.limbKg[`${blade.main}Arm`] * 0.6, blade.spec.length * WORLD.deflect.strikeAt, arm(attacker));
+  const mine = effectiveMassAt(defender.weapon.spec, defender.body.limbKg[`${defender.weapon.main}Arm`] * 0.6, defender.weapon.spec.length * 0.5, arm(defender));
+  return beatenThrough(theirs, mine) > 0;
 }
 
 /**
@@ -2404,6 +2437,8 @@ function blockerOf(event) {
   if (event.kind === 'blocked') return event.defender;
   if (event.kind === 'bladeBlock') return event.attacker;
   if (event.kind === 'parry' || event.kind === 'beatenThrough') return event.fighter;
+  // A deflect's meeting is paid by the man deflected, not the man who deflected it (WORLD.deflect).
+  if (event.kind === 'deflect') return event.attacker;
   return undefined;
 }
 
@@ -5106,6 +5141,8 @@ function updateTimers(world, fighter, dt) {
   }
   heatMark(fighter);
   fighter.hurt = Math.max(0, (fighter.hurt ?? 0) - dt);
+  // When his guard went up, and whether fresh (the deflect's window: physics/deflect.js).
+  noteGuard(world, fighter);
   if (fighter.state === 'out') {
     fighter.motorScale = 0;
   } else if (fighter.state === 'down') {
@@ -9009,14 +9046,25 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
     stroke.stopped = true;
   }
   const met = vec.lerp(closest.onFirst, closest.onSecond, 0.5);
-  world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: met, normal, impulse, effects: ['blades meet'] });
+  // Met on time by a blade put up fresh (WORLD.deflect): a deflect.
+  // (Not a stroke too heavy to deflect, its red mark: undeflectable. Met near his hilt, his blade may still stop it: a parry.)
+  const deflected = parried && !beaten && deflecting(parried[0], world.time) && !tooHeavyToDeflect(parried[2], parried[3], parried[0]);
+  world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: met, normal, impulse, deflect: deflected || undefined, effects: ['blades meet'] });
   // Heard: how fast they met, what of each (an edge, a haft, a head), and whether a point was turned along the blade (a scrape).
-  if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed, mass: Math.max(a.spec.mass ?? 1, b.spec.mass ?? 1) });
+  if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed, mass: Math.max(a.spec.mass ?? 1, b.spec.mass ?? 1), deflect: deflected || undefined });
   if (beaten) {
     const [parrier, blade, striker, stroke] = parried;
     if (BLOCKS.has(parrier.defence?.name) || parrier.defence?.name === 'parry') parrier.defence = null;
     const energy = 0.5 * ((massA * massB) / (massA + massB)) * Math.max(0, closing) ** 2;
     world.events.push({ time: world.time, kind: 'beatenThrough', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, point: met, impulse, energy, kept: beaten, effects: [`beats through the ${blade.spec.label.toLowerCase()}`] });
+  } else if (deflected) {
+    const [parrier, blade, striker, stroke] = parried;
+    const energy = 0.5 * ((massA * massB) / (massA + massB)) * Math.max(0, closing) ** 2;
+    // (As a parry's: which of his blades, and whether his other was cutting as it did.)
+    const answering = parrier.punch && strokeOf(parrier, blade) === null && parrier.punch.t <= parrier.punch.spec.extendUntil;
+    const event = { time: world.time, kind: 'deflect', fighter: parrier.id, attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, normal, impulse, energy, effects: [`deflected with the ${blade.spec.label.toLowerCase()}`] };
+    reel(world, striker, energy, event);
+    world.events.push(event);
   } else if (parried) {
     const [parrier, blade, striker, stroke] = parried;
     // Parried while his other blade is on its way in: the parry and the cut together.
@@ -9236,6 +9284,23 @@ export function stagger(world, fighter, severity, event, anyone = false) {
   }
   event?.effects.push(`staggered (${seconds.toFixed(0)} s)`);
   return true;
+}
+
+/**
+ * A deflected man's arm jarred back (WORLD.deflect reel): he reels for a beat, longer the harder his blow met the blade
+ * (its energy over `reelJoules`), his stroke gone; not a stagger's seconds, and no stumble.
+ */
+function reel(world, fighter, energy, event) {
+  const spec = WORLD.deflect;
+  if (fighter.state !== 'up') return;
+  const seconds = spec.reel[0] + (spec.reel[1] - spec.reel[0]) * Math.min(1, energy / spec.reelJoules);
+  fighter.punch = null;
+  fighter.rush = null;
+  if (seconds > (fighter.stagger ?? 0)) {
+    fighter.stagger = seconds;
+    fighter.staggerFor = seconds;
+  }
+  event.effects.push(`reels (${seconds.toFixed(1)} s)`);
 }
 
 /** A blow that would drop an armoured man staggers him instead, unless it is overwhelming or he already reels. */

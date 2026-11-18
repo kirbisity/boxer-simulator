@@ -25,6 +25,7 @@ import { fightUiCommandBar } from './fightui/command.js';
 import { paintStamina } from './overdraftview.js';
 import { ARTS, artBlocked, artLabel, artPrimed } from './weaponarts.js';
 import { throwableOf } from './physics/throwable.js';
+import { deflectWindow, deflectsWith, guardHold } from './physics/deflect.js';
 import { bleedingFast } from './maiming.js';
 import { horseHealth } from './physics/mounted.js';
 import { getLang, t, tname } from './i18n.js';
@@ -318,18 +319,20 @@ export function installFightControls(root, hooks) {
     for (const target of [surface, guard, action, art, swap, horseButton, lock, jump, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
   }
 
-  // Guard: held, the block; tapped, an evasion.
+  // Guard: held, the block; tapped, an evasion. With a weapon in hand it is the deflect (physics/deflect.js): up from the
+  // moment it is pressed (the window starts there), and a tap is a deflect, not an evasion.
   guard.addEventListener('pointerdown', (press) => {
     if (!active) return;
     press.preventDefault();
     capture(guard, press.pointerId);
     guardDown = { id: press.pointerId, at: hooks.now() };
+    if (deflectsWith(hooks.player())) hooks.orders().guard = true;
     guard.classList.add('on');
   });
   const guardUp = (up, cancelled) => {
     if (!guardDown || guardDown.id !== up.pointerId) return;
     const orders = hooks.orders();
-    if (!cancelled && hooks.now() - guardDown.at < TOUCH.guardTap) {
+    if (!cancelled && hooks.now() - guardDown.at < TOUCH.guardTap && !deflectsWith(hooks.player())) {
       (orders.evasions ??= []).push(1);
       signal('evade');
     }
@@ -492,6 +495,18 @@ export function installFightControls(root, hooks) {
     if (guardDown && now - guardDown.at >= TOUCH.guardTap) orders.guard = true;
     // A man running does not guard (control.js): the button is greyed.
     guard.classList.toggle('blocked', Boolean(me.runMode));
+    // Deflect with a weapon in hand, Guard with a shield or the fists; held, how much of the guard is left (guardHold): bright
+    // in its window, fading as it is held, dark when his arms come down.
+    const deflect = deflectsWith(me);
+    if (guard.dataset.mode !== (deflect ? 'deflect' : 'guard')) {
+      guard.dataset.mode = deflect ? 'deflect' : 'guard';
+      const word = guard.querySelector('span');
+      word.dataset.i18n = deflect ? 'touch.deflect' : 'touch.guard';
+      word.textContent = t(word.dataset.i18n);
+    }
+    const holding = deflect && me.guardUp;
+    guard.style.setProperty('--hold', holding ? guardHold(me, world.time).toFixed(2) : '1');
+    guard.classList.toggle('deflect-window', Boolean(holding && me.guardFresh && world.time - me.guardSince <= deflectWindow(me)));
     // The special button: one place, its label what it would do now.
     // A switch of language (src/i18n.js): the words that are set only on a change are set again.
     if (labelledIn !== getLang()) {

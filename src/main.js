@@ -39,6 +39,7 @@ import { ARMIES, battleOf, crewFighter, SCENARIOS, scenarioFighters } from './sc
 import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battletally.js';
 import { judgeBattle } from './battleend.js';
 import { createGeneralMarks } from './generalmark.js';
+import { createPerilMarks } from './perilmark.js';
 import { leadOf, musterLevel } from './muster.js';
 import { CUSTOM_BATTLE, customLevel } from './custombattle.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, finishOptions, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, helmChoices, helmSlotOf, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setHelmSlot, withFinish, wornCard } from './outfits.js';
@@ -93,6 +94,8 @@ import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceRegions, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { hasOrigin, originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
+import { battleFxRing, battleFxSpark } from './battlefx.js';
+import { deflectsWith } from './physics/deflect.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
@@ -237,6 +240,7 @@ const cameraRig = createCameraRig();
 const fightMarks = createFightUiMarks(scene);
 // The crown over each side's general in a battle (generalmark.js; ai.js AI.general).
 const generalMarks = createGeneralMarks(scene);
+const perilMarks = createPerilMarks(scene);
 // His place in the line in a story battle (story/placemark.js): a ring at his slot, an arrow to it while he is out of it.
 const storyPlaceMark = createStoryPlaceMark(scene);
 let fightMarksClock = 0;
@@ -1396,6 +1400,8 @@ function drawWorld(dt, drawIt = true) {
   fightMarks.update(state.mode === 'play' ? world : null, fightMarksClock);
   // (Not over a story scene's figures: nobody there leads a side.)
   generalMarks.update(story.filming ? null : world);
+  // The red "!" over a man whose blow at the man played cannot be deflected (perilmark.js).
+  perilMarks.update(story.filming || state.mode !== 'play' ? null : world, player(), realSeconds());
   storyPlaceMark.update(world, state.game === 'story' ? story.placeMark() : null);
   // A cut-off piece's program (its man's material, unskinned) built while he is new, not on the frame of the cut (render.js warmSevered).
   warmSevered(scene, state.views);
@@ -1434,7 +1440,12 @@ function consumeEvents() {
     if (event.weapon && event.kind === 'landed' && state.world.fighters[event.defender]?.body.gear.assist) spawnSparks(scene, event.point, 6);
     // (A robot dog struck, robotdogs.js `machine`: sparks off its shell, not blood.)
     if (event.kind === 'horseHit' && event.cut + event.pierce > 1) (state.world.horses?.[event.horse]?.spec?.machine ? spawnSparks(scene, event.point, 10) : woundBlood(scene, event));
-    if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
+    // A deflect (physics/deflect.js): a bigger burst of sparks, a bigger flash, and a ring of light spreading from the meeting.
+    if (event.kind === 'clash' && event.deflect) {
+      spawnSparks(scene, event.point, 64);
+      battleFxSpark(scene, event.point, 0.36);
+      battleFxRing(scene, event.point, event.normal ?? [0, 0, 1]);
+    } else if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
     // (A gun's ball, physics/artillery.js: its own blood or grit, its flash at the muzzle with the 'cannon' event: artilleryview.js.)
     if (event.kind === 'shot') (event.gun ? artilleryHit(scene, event) : spawnShot(scene, machine ? { ...event, harm: 0 } : event));
     if (event.kind === 'cannon') artilleryFired(scene, event);
@@ -1559,6 +1570,7 @@ function logEvent(event) {
   else if (event.kind === 'drowned') text = `${logIcon('wave')} ${who(event.fighter)}${tail()}`;
   else if (event.kind === 'disarmed' || event.kind === 'drew') text = `${logIcon('blade')} ${who(event.fighter)}${tail()}`;
   else if (event.kind === 'clash' || event.kind === 'glance' || event.kind === 'out' || event.kind === 'surge') return;
+  else if (event.kind === 'deflect') text = `${logIcon('swords')} ${L(`${who(event.fighter)} deflects ${who(event.attacker)}'s ${event.punch}`, `${who(event.fighter)} 弹反 ${who(event.attacker)} 的${blow(event.punch)}`)} · <em>${fx()}</em>`;
   else if (event.kind === 'parry') text = `${logIcon('swords')} ${L(`${who(event.fighter)} parries ${who(event.attacker)}'s ${event.punch}`, `${who(event.fighter)} 架开 ${who(event.attacker)} 的${blow(event.punch)}`)} · <em>${fx()}${event.answering ? L(', cutting as he does', '，顺势反斩') : ''}</em>`;
   else if (event.kind === 'bladeBlock') text = `${L(`${who(event.attacker)} meets ${who(event.defender)}'s ${event.punch ?? 'strike'} with the blade`, `${who(event.attacker)} 以刃接住 ${who(event.defender)} 的${event.punch ? blow(event.punch) : what('strike')}`)} · <em>${fx() || what('fended off')}</em>`;
   else if (event.kind === 'pickup') text = `${logIcon('blade')} ${who(event.fighter)}${tail()}`;
@@ -2161,7 +2173,8 @@ window.addEventListener('keyup', (press) => {
   if (key === 'shift') state.walkRunning = false;
   if (key === GUARD_KEY) {
     state.orders.guard = false;
-    if (guardKeyDown !== null && realSeconds() - guardKeyDown < TOUCH.guardTap) {
+    // (With a weapon in hand the guard is the deflect, physics/deflect.js: a tap is a deflect, not a dodge.)
+    if (guardKeyDown !== null && realSeconds() - guardKeyDown < TOUCH.guardTap && !deflectsWith(player())) {
       (state.orders.evasions ??= []).push(1);
       tutorial.signal('evade');
     }

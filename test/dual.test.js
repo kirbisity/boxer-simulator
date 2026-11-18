@@ -86,7 +86,8 @@ test('one blade meets his while the other cuts: a parry with the wakizashi, the 
     perform(world, him, 'weaponBlock', { from: samurai.id });
     assert.ok(throwPunch(world, him, 'kataKesa', 'body', { riposte: true }));
     advance(world, 0.5);
-    parried = world.events.find((event) => event.kind === 'parry' && event.fighter === him.id && event.off);
+    // (Met in his block's first moment it is a deflect, physics/deflect.js: a parry made on time.)
+    parried = world.events.find((event) => (event.kind === 'parry' || event.kind === 'deflect') && event.fighter === him.id && event.off);
     if (parried) break;
   }
   assert.ok(parried, 'the wakizashi parries');

@@ -44,6 +44,8 @@ export const BATTLE_FX = {
   flashColour: [1, 0.62, 0.22],
   // Sparks off steel: the share of their life they glow white-hot, and how long a streak each draws (s of travel).
   sparkStreakSeconds: 0.022,
+  // A deflect's ring (battleFxRing): `count` beads `bead` m across, spreading from `from` to `to` m in `seconds`, hot white-gold.
+  ring: { count: 28, bead: 0.035, from: 0.05, to: 0.45, seconds: 0.22, colour: [2.2, 1.8, 1.1] },
   // A sun glint: how tight the mirror line must be (the half-vector's share along the blade: ~6 degrees, the
   // spread of the sun's image in steel polished to roughness ~0.2), and its size per metre away (glare is a size in the eye).
   glintSharpness: 0.1,
@@ -524,6 +526,25 @@ export function battleFxSpark(view, at, size = 0.14) {
   fx.flashes.push({ at: [...at], size, colour: [1.6, 1.3, 0.8], tail: [0, 0, 0], age: 0, seconds: 0.05 });
 }
 
+const ringBead = [0, 0, 0];
+
+/**
+ * A ring of light spreading from `at` (arrays, copied) in the plane square to `normal` (a deflect's: the blades' meeting,
+ * BATTLE_FX.ring): `count` beads of glow from `from` m out to `to` m over `seconds`, fading as it goes.
+ */
+export function battleFxRing(view, at, normal) {
+  const fx = battleFxOf(view);
+  const spec = BATTLE_FX.ring;
+  const n = Math.hypot(normal[0], normal[1], normal[2]) > 1e-6 ? normal.map((value) => value / Math.hypot(normal[0], normal[1], normal[2])) : [0, 0, 1];
+  // Two directions square to the normal and each other.
+  const seed = Math.abs(n[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0];
+  const u = [n[1] * seed[2] - n[2] * seed[1], n[2] * seed[0] - n[0] * seed[2], n[0] * seed[1] - n[1] * seed[0]];
+  const length = Math.hypot(u[0], u[1], u[2]);
+  for (let axis = 0; axis < 3; axis += 1) u[axis] /= length;
+  const v = [n[1] * u[2] - n[2] * u[1], n[2] * u[0] - n[0] * u[2], n[0] * u[1] - n[1] * u[0]];
+  fx.flashes.push({ at: [...at], size: spec.bead, colour: spec.colour, tail: [0, 0, 0], age: 0, seconds: spec.seconds, ring: { u, v, from: spec.from, to: spec.to, count: spec.count } });
+}
+
 /**
  * An electric arc from `from` to `to` (arrays, copied), `strength` 0..1: a
  * jagged blue-white line that flickers for a moment, with a small flash at
@@ -781,6 +802,21 @@ export function battleFxUpdate(view, dt, sparks = []) {
     if (flash.age > flash.seconds) return false;
     const fade = 1 - flash.age / flash.seconds;
     const swell = 1 + (flash.age / flash.seconds) * 0.6;
+    if (flash.ring) {
+      // A ring (battleFxRing): its beads round the meeting, spreading out from it as it fades.
+      const ring = flash.ring;
+      const radius = ring.from + (ring.to - ring.from) * Math.sqrt(flash.age / flash.seconds);
+      for (let bead = 0; bead < ring.count; bead += 1) {
+        const angle = (bead / ring.count) * Math.PI * 2;
+        const c = Math.cos(angle) * radius;
+        const sn = Math.sin(angle) * radius;
+        ringBead[0] = flash.at[0] + ring.u[0] * c + ring.v[0] * sn;
+        ringBead[1] = flash.at[1] + ring.u[1] * c + ring.v[1] * sn;
+        ringBead[2] = flash.at[2] + ring.u[2] * c + ring.v[2] * sn;
+        put(ringBead, flash.size, flash.colour.map((value) => value * fade), 0, null);
+      }
+      return true;
+    }
     put(flash.at, flash.size * swell, flash.colour.map((c) => c * fade), 0, flash.tail);
     return true;
   });
