@@ -12,9 +12,12 @@ export function deflectsWith(fighter) {
   return Boolean(fighter?.weapon?.held && !fighter.shield && !fighter.weapon.spec.ranged);
 }
 
-/** Whether a man is guarding now: the guard held (the player's button, an AI's kept guard) or a block or parry under way. */
+/**
+ * Whether a man is guarding now: the guard held (the player's button, an AI's kept guard) or a block or parry under way, and no
+ * stroke of his own going (a cut made from the guard takes the blade out of it; brought back after, it is raised again).
+ */
 export function guarding(fighter) {
-  return Boolean(fighter.guardHeld) || GUARDING_DEFENCES.has(fighter.defence?.name);
+  return (Boolean(fighter.guardHeld) || GUARDING_DEFENCES.has(fighter.defence?.name)) && !fighter.punch;
 }
 
 /**
@@ -40,7 +43,9 @@ export function deflectWindow(fighter) {
   if (!weapon) return 0;
   const reach = fighter.body.reach;
   const ratio = weaponInertia(weapon, reach) / weaponInertia(WEAPONS[spec.ref], reach);
-  return Math.min(spec.most, Math.max(spec.least, spec.window / Math.sqrt(ratio)));
+  const own = Math.min(spec.most, Math.max(spec.least, spec.window / Math.sqrt(ratio)));
+  // (A man the AI plays: `aiShare` of it, WORLD.deflect.)
+  return fighter.player ? own : own * spec.aiShare;
 }
 
 /** Whether a meeting of his blade with a blow now is a deflect: his guard fresh, up with a weapon, and within its window. */

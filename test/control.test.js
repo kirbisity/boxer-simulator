@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { P, PRESETS } from '../src/body.js';
 import { thinkAll } from '../src/ai.js';
 import { MOVES, STYLES, TAP_MOVES } from '../src/moves.js';
-import { advance, createWorld, dropWeapon, point } from '../src/physics.js';
+import { advance, createWorld, dropWeapon, point, WORLD } from '../src/physics.js';
 import { attackAt, attackLayout, chooseAttack, contextAction, CONTROL, directFighter, doAction, holdDistance, newOrders, stickPace } from '../src/control.js';
 import { createRecognizer, GESTURE } from '../src/gesture.js';
 
@@ -145,8 +145,11 @@ test('press and hold: a shove at a man standing; a man on the floor is held down
 test('the guard held stays up; a tap of it gets out of the way', () => {
   const { orders, me, step } = played(PRESETS.samurai, PRESETS.light, { distance: 3, still: true });
   orders.guard = true;
-  step(1.5);
+  step(0.6);
   assert.equal(me.defence?.name, 'weaponBlock', 'a swordsman blocks with his sword');
+  // (Held on past WORLD.deflect holdFor, a weapon's guard gives: physics/deflect.js.)
+  step(WORLD.deflect.holdFor);
+  assert.notEqual(me.defence?.name, 'weaponBlock', 'held past its time, his arms come down');
   orders.guard = false;
   step(1);
   orders.evasions = [1];

@@ -926,6 +926,12 @@ export function guardReading(fighter) {
 function blowRead(world, fighter, punch, threat) {
   // (A weapon's guard held past its deflect window gives as it is held, to nothing: WORLD.deflect holdFor.)
   const hold = guardHold(fighter, world.time);
+  // The man played, his deflect fresh and in its window (physics/deflect.js): the reading is his own (the press is it), and
+  // his blade goes straight onto the blow: no delay, no miss, no trailing. His character's skill reads for him after.
+  if (fighter.player && deflecting(fighter, world.time)) {
+    fighter.blowRead = { punch, point: threat, at: world.time, off: [0, 0, 0] };
+    return threat;
+  }
   const read = guardReading(fighter);
   if (read === null || hold <= 0) return null;
   const share = read * hold;
@@ -2408,6 +2414,18 @@ export function undeflectable(attacker, defender) {
   const punch = attacker.punch;
   if (!punch || punch.landed || punch.target !== defender.id) return false;
   return tooHeavyToDeflect(attacker, punch, defender);
+}
+
+/**
+ * Whether a weapon's blow landing on the man played is deflected all the same (registerWeaponImpact): his deflect fresh and in
+ * its window, the striker within WORLD.deflect `arc` of where he faces, and the stroke not too heavy for his blade.
+ */
+function assistedDeflect(world, attacker, punch, defender) {
+  if (!defender.player || !deflecting(defender, world.time) || tooHeavyToDeflect(attacker, punch, defender)) return false;
+  const dx = attacker.x[P.pelvis * 3] - defender.x[P.pelvis * 3];
+  const dz = attacker.x[P.pelvis * 3 + 2] - defender.x[P.pelvis * 3 + 2];
+  const off = Math.atan2(-dz, dx) - defender.yaw;
+  return Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) <= WORLD.deflect.arc;
 }
 
 /** The rule of undeflectable for a stroke (whatever its state): also what a clash asks before it calls a meeting a deflect. */
@@ -8454,6 +8472,18 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const impulse = reducedMass * goingIn * (1 + WORLD.restitution);
   // The energy the collision takes up: what an edge or a point spends going in.
   const energy = 0.5 * reducedMass * goingIn * goingIn;
+  // The man played, his deflect fresh and in its window (physics/deflect.js), the blow coming at his front and light enough for
+  // his blade: it is deflected, though his blade had not yet come all the way onto it (the press is the parry; the arm's
+  // travel is the animation's). Not the AI's: its blade must meet the blow (the clash, bladeClash).
+  if (assistedDeflect(world, attacker, punch, defender)) {
+    punch.stopped = true;
+    const event = { time: world.time, kind: 'deflect', fighter: defender.id, attacker: attacker.id, punch: punch.type, weapon: defender.weapon.kind, point: closest.onFirst, normal, impulse, energy, assisted: true, effects: [`deflected with the ${defender.weapon.spec.label.toLowerCase()}`] };
+    world.pendingImpulses.push({ fighter: attacker, shares: [[main, 1], [P[`${weapon.main}Elbow`], 0.5]], direction: normal, impulse });
+    reel(world, attacker, energy, event);
+    world.events.push(event);
+    if (world.ear) soundEvent(world, 'clash', { at: closest.onFirst, speed: goingIn, a: 'blade', b: weaponPart(weapon, distance), mass: Math.max(wspec.mass ?? 1, defender.weapon.spec.mass ?? 1), deflect: true });
+    return false;
+  }
   // The haft: round wood, no edge and no point; the pommel: all blunt.
   // (A war hammer swung beak first, `beak`: its spike behind the head leads, the weapon's `beak` mix, physics/arts.js beakMix.)
   const beak = !haft && spec.beak && wspec.beak ? beakMix(wspec) : null;

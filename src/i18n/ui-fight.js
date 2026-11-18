@@ -32,6 +32,7 @@ export const UI_FIGHT = {
   'page.bodyGame': { en: 'Game', zh: '游戏' },
   'page.bodyV7': { en: 'Before (V7)', zh: '旧版（V7）' },
   'page.cameraFeel': { en: 'Camera feel', zh: '镜头手感' },
+  'page.deflectFeel': { en: 'Deflect feel', zh: '弹反手感' },
   'page.retry': { en: '↻ Retry', zh: '↻ 重试' },
   'page.chooseSide': { en: 'Choose your side', zh: '选边站' },
   'page.justWatch': { en: 'Just watch', zh: '只看不打' },
