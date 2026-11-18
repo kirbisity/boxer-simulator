@@ -111,6 +111,7 @@ import { tkSetTier, tkTier } from './townkit/place.js';
 import { tkWeatherNow } from './townkit/weather.js';
 import { createStoryPlaceMark } from './story/placemark.js';
 import { mountCameraTuner } from './camtuner.js';
+import { mountDeflectTuner } from './deflecttuner.js';
 
 const STEP = 1 / 60;
 const $ = (selector) => document.querySelector(selector);
@@ -1836,6 +1837,13 @@ $('#ghost-walk').addEventListener('click', () => enterSandboxLevel('ghost'));
 mountCameraTuner($('#camera-tuner'));
 $('#camera-feel').addEventListener('click', (event) => {
   const tuner = $('#camera-tuner');
+  tuner.hidden = !tuner.hidden;
+  event.currentTarget.setAttribute('aria-expanded', String(!tuner.hidden));
+});
+// The deflect feel panel (deflecttuner.js), the same way.
+mountDeflectTuner($('#deflect-tuner'));
+$('#deflect-feel').addEventListener('click', (event) => {
+  const tuner = $('#deflect-tuner');
   tuner.hidden = !tuner.hidden;
   event.currentTarget.setAttribute('aria-expanded', String(!tuner.hidden));
 });
