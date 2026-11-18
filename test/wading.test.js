@@ -210,7 +210,7 @@ test('wade: getting up takes longer in the sump (the staged rise divides by his 
   assert.ok(wet > dry * 1.3, `${dry.toFixed(1)} s on the rim, ${wet.toFixed(1)} s in the pit`);
 });
 
-test('wade: wading tires a man a little while he moves, and not while he stands; the stamina never goes below empty for it', () => {
+test('wade: the cesspool\'s sludge is the battlefield\'s mud: it tires a man as he moves by his weight (fieldworks.js slogCost), not while he stands, takes his footing, and gives it back on the rim', () => {
   const w = pit();
   const me = w.fighters[0];
   intoPit(me);
@@ -218,14 +218,24 @@ test('wade: wading tires a man a little while he moves, and not while he stands;
   me.rootVelocity = [0, 0];
   wadeGear(w, 1);
   assert.equal(me.stamina, 0.8, 'standing');
+  assert.ok(me.mired?.footing < 0.85, `footing in the sludge ${me.mired?.footing}`);
   me.rootVelocity = [1.2, 0];
   wadeGear(w, 1);
   const lost = 0.8 - me.stamina;
-  assert.ok(lost > 0.005 && lost < 0.03, `a second of wading in the pit costs ${lost}`);
+  assert.ok(lost > 0.01, `a second of wading in the pit costs ${lost}`);
+  // Heavier (plate on him), the same steps cost him more.
+  me.stamina = 0.8;
+  const kg = me.body.massKg;
+  me.body.massKg = kg + 25;
+  wadeGear(w, 1);
+  assert.ok(0.8 - me.stamina > lost * 1.1, `in plate ${0.8 - me.stamina} against ${lost}`);
+  me.body.massKg = kg;
   me.stamina = 0.001;
   wadeGear(w, 1);
   assert.equal(me.stamina, 0);
-  assert.ok(LEVEL_CONFIG.wade.tire.cost <= 0.05, 'a little');
+  onRim(me);
+  wadeGear(w, 1);
+  assert.equal(me.mired, null, 'footing back on the rim');
 });
 
 test('wade: it is deterministic (two runs of the same wade are the same)', () => {

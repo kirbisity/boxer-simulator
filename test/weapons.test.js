@@ -503,7 +503,7 @@ test('the whip: its thong a rope whose tip outruns the hand; a lash bleeds bare 
   assert.ok(onPlate.length > 0 && onPlate.every((event) => event.effects.some((effect) => effect.includes('turned'))), `plate turns every lash (${onPlate.length})`);
 });
 
-test('plate is cut-proof: no edge finds a gap in a full harness; a point still can', () => {
+test('plate is cut-proof: no edge finds a gap in a full harness (only one his own raised arm opened, onto its mail); a point still can', () => {
   const gapsBy = { swing: 0, thrust: 0 };
   // A point finds a gap in a few landed thrusts in a hundred: sixteen bouts, since the knight's plate ending them sooner
   // (wear dulling the samurai's edge, heat) leaves eight with too few thrusts to count on one.
@@ -512,6 +512,11 @@ test('plate is cut-proof: no edge finds a gap in a full harness; a point still c
     for (let second = 0; second < 60 && !boutWinner(world); second += 1) advance(world, 1, (current, dt) => thinkAll(current, dt));
     for (const event of world.events) {
       if (event.defender !== 1 || !event.effects?.includes('into a gap in the armour')) continue;
+      // (An edge into the armpit or the elbow his own arm, raised to strike, has opened: it meets the voider's mail, BLADES.gaps.exposure.)
+      if (event.mode !== 'thrust' && event.opened) {
+        assert.ok(['armpit', 'elbow'].includes(event.gap), event.gap);
+        continue;
+      }
       gapsBy[event.mode === 'thrust' ? 'thrust' : 'swing'] += 1;
     }
   }

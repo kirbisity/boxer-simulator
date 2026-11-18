@@ -2,12 +2,13 @@
 // starting, its own stamina) and issues the same commands a player would,
 // choosing from its style's moves those that reach from where it stands.
 
+import { finishTarget, startFinisher, updateFinisher } from './finisher.js';
 import { aheadOfSlot, DRILL, fallIn, fromSlot, moveFormations, moveWings, volleyDue, walkToSlot, WINGS } from './formation.js';
 import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.js';
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { MAIMING, maimFear } from './maiming.js';
-import { aimPoint, armGone, inRiderArc, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD, undeflectable } from './physics.js';
+import { aimPoint, armGone, inRiderArc, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, goToGrips, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD, undeflectable } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { BLADES, GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
@@ -171,6 +172,12 @@ export const AI = {
   // lean back, step back; weighted up to `move` times, and open to anyone)
   // rather than by blocking (weighted down to `block` of itself).
   evadeHeavy: { heavyMass: 4, loaded: 0.6, defend: 0.6, move: 3, block: 0.4 },
+  // Driving himself on past his breath (decide: physics/overdraft.js `overdraw`): while his side has been shot into within
+  // `underFire` s and his man is more than `short` m beyond both their reaches.
+  overdraw: { underFire: 5, short: 1 },
+  // Going to grips (goesToGrips): his man within both their reaches and `within` m, his best blow getting less than `through` of its
+  // harm through the man's kit, at `rate` a second.
+  grips: { within: 1, through: 0.2, spent: 0.25, footing: 0.85, rate: 0.5 },
   // A game plan lasts this long (s, plus up to `strategyRange`) before a rethink.
   strategySeconds: 20,
   strategyRange: 20,
@@ -1788,7 +1795,9 @@ function goForWeapon(world, fighter, opponent, dt) {
   // A man of a shield style who has lost his wants it back, whatever is in his hand.
   const wantsShield = Boolean(STYLES[fighter.style]?.shield) && !fighter.shield && !armGone(fighter, 'l');
   // A beast (`unarmed` kit) takes up no weapon; nor a man with no hand to hold it in (maiming.js).
-  const wantsWeapon = !fighter.weapon?.held && !fighter.body.gear.unarmed && !(armGone(fighter, 'l') && armGone(fighter, 'r'));
+  // (Nor a man who let his own fall to wrestle (physics.js goToGrips) while his man is still on his feet before him.)
+  const wrestling = fighter.style === 'ringen' && opponent?.state === 'up';
+  const wantsWeapon = !fighter.weapon?.held && !wrestling && !fighter.body.gear.unarmed && !(armGone(fighter, 'l') && armGone(fighter, 'r'));
   // Nothing loose on the floor he wants (the usual case): no thought, and no draw on the bout's randomness.
   const loose = world.debris?.some((debris) => !debris.taken && debris.resting && ((debris.kind === 'weapon' && wantsWeapon) || (debris.kind === 'shield' && wantsShield)));
   if (!loose || fighter.clinch || fighter.pin || fighter.punch || !AI.pickup.enabled) {
@@ -3636,16 +3645,38 @@ function decide(world, fighter, dt) {
     fighter.move = 0;
     return;
   }
+  // An enemy helpless on the floor within his reach, and no enemy on his feet on him: he kneels over him and puts a blade into
+  // the gap in his armour (finisher.js, the player's finisher, the same physics: armour turns a point not put in a gap). As
+  // Agincourt's archers went among the fallen men-at-arms with daggers and mallets. Not in a bout of rules (`noPins`: held
+  // down is not hurt there), and not a man broken by fear.
+  if (fighter.finisher) {
+    if (updateFinisher(world, fighter, dt)) return;
+  } else if (!world.rules?.noPins && !fighter.panicked) {
+    const prey = finishTarget(world, fighter, { watched: true });
+    if (prey && startFinisher(world, fighter, prey) && updateFinisher(world, fighter, dt)) return;
+  }
   // His own choice, or the man the player's order sends him at (command.js); in a rage, the man who cut his comrade down (AI.rage).
   const chosen = orderedFocus(world, fighter, chooseFocus(world, fighter));
   const avenging = rageTarget(world, fighter);
   if (avenging) fighter.focus = avenging.id;
   const opponent = avenging ?? chosen;
+  fighter.overdraw = false;
   if (!opponent) {
     fighter.move = 0;
     fighter.strafe = 0;
     return;
   }
+  // Under fire (an arrow or a ball into his side lately: physics/ranged.js) and still short of his man: he drives himself on
+  // past his breath (physics/overdraft.js) rather than stand and be shot, as the men-at-arms did across Agincourt's field; at
+  // the floor of it he faints where he is. Not a man broken by fear, nor a shooter (he has nothing to close for), nor a rider.
+  const shotAt = world.time - (world.underFire?.[fighter.corner] ?? -Infinity) < AI.overdraw.underFire;
+  if (shotAt && !fighter.panicked && !fighter.mount && !STYLES[fighter.style]?.ranged) {
+    const apart = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+    fighter.overdraw = apart > reachOf(fighter) + reachOf(opponent) + AI.overdraw.short;
+  }
+  // His weapon cannot hurt this man (his blows turned by the plate: harmThrough): he lets it fall and goes to grips with him
+  // (physics.js goToGrips, STYLES.ringen), to put him down and finish him on the floor (finisher.js), as the archers did.
+  if (goesToGrips(world, fighter, opponent, dt)) goToGrips(world, fighter);
   // On horseback: the charge (riding.js).
   if (fighter.mount) {
     // His horse failing: reined in and got down from, before it falls with him (AI.dismount).
@@ -4160,6 +4191,35 @@ export function harmThrough(attacker, defender, spec, zone = 'body') {
   const edge = (on) => cut * (1 - (on.cut ?? 0)) + pierce * (1 - (on.pierce ?? 0));
   const felt = blunt * (1 - (covered.blunt ?? 0) * (1 - (wspec?.crush ?? 0)));
   return (felt + (1 - found) * edge(covered) + found * edge(gap.under)) / total;
+}
+
+/**
+ * Whether he lets his weapon fall to wrestle his man (AI.grips): a weapon in hand (not a gun or a bow he is shooting), his man on his
+ * feet and near, the best of his blows getting less than `through` of its harm through that man's kit at any place it can be put
+ * (harmThrough: plate turns a short sword's edge and point both), and the man easier put down than cut: spent (stamina under
+ * `spent`) or on ground that grips him less than `footing` (mud, sludge). Decided over a moment (`rate` a second), not at once. A
+ * fresh man in plate on firm ground is fought with the weapon (the half-sword, the hammer), as men-at-arms fought each other.
+ */
+function goesToGrips(world, fighter, opponent, dt) {
+  const spec = AI.grips;
+  const weapon = fighter.weapon;
+  if (!weapon?.held || weapon.spec.mounted || fighter.mount || fighter.panicked || fighter.clinch || fighter.finisher || opponent.state !== 'up' || opponent.mount) return false;
+  if (weapon.spec.shot || (weapon.spec.ranged && !weapon.spent && STYLES[fighter.style]?.ranged)) return false;
+  const apart = Math.hypot(opponent.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], opponent.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]);
+  if (apart > reachOf(fighter) + reachOf(opponent) + spec.within) return false;
+  const unsteady = opponent.stamina < spec.spent || (opponent.mired?.footing ?? 1) < spec.footing;
+  return unsteady && bestHarmThrough(fighter, opponent) < spec.through && world.random() < spec.rate * dt;
+}
+
+/** The most of its harm any blow of his style (not a shot) gets through his man's kit at any place it can be put (harmThrough). */
+export function bestHarmThrough(fighter, opponent) {
+  let best = 0;
+  for (const name of Object.keys(STYLES[fighter.style]?.attacks ?? {})) {
+    const move = MOVES[name];
+    if (move?.kind !== 'strike' || move.path === 'aim') continue;
+    for (const zone of move.zones ?? ['body']) best = Math.max(best, harmThrough(fighter, opponent, move, zone));
+  }
+  return best;
 }
 
 /**

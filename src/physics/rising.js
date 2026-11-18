@@ -75,7 +75,9 @@ export function riseForces(fighter, strength = 1) {
  */
 export function riseMargins(fighter, strength = 1, lead = strongerLeg(fighter)) {
   const spec = WORLD.rise;
-  const { arm, leg, weight } = riseForces(fighter, strength);
+  // On ground that grips less (wet clay, sludge: `fighter.mired.footing`, physics/fieldworks.js and levelmode/level.js), a hand or a foot pushing
+  // on it slides before the limb is at its limit: only that share of the push lifts him (as a shove that puts a standing man down the sooner there).
+  const { arm, leg, weight } = riseForces(fighter, strength * (fighter.mired?.footing ?? 1));
   const arms = arm.l + arm.r;
   const legs = leg.l + leg.r;
   const rear = OTHER[lead];

@@ -747,6 +747,9 @@ function arrowBleed(victim, hit, key, through, scale) {
  */
 export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bounce, momentum = ARROW_MOMENTUM) {
   const victim = hit.fighter;
+  // (Shot at: his side is under the arrows, ai.js reads it, the will to close under them.)
+  victim.underFireAt = world.time;
+  (world.underFire ??= {})[victim.corner] = world.time;
   const event = { time: world.time, kind: 'arrow', attacker: shooter.id, defender: victim.id, point: hit.point, normal: vec.scale(dir, -1), target: hit.target, harm: 0, effects: [] };
   world.events.push(event);
   if (hit.target === 'shield') {
@@ -1194,6 +1197,9 @@ function spentShot(shot, share, wound) {
  */
 export function bulletHit(world, shooter, hit, dir, event, shot = null, share = 1) {
   const victim = hit.fighter;
+  // (Shot at: his side is under fire, ai.js.)
+  victim.underFireAt = world.time;
+  (world.underFire ??= {})[victim.corner] = world.time;
   const key = hit.capsule.key;
   const region = hit.throat ? 'head' : bulletRegion(key);
   const kind = outfitOf(victim.body.inputs).kind;

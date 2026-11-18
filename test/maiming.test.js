@@ -110,6 +110,8 @@ test('a leg off drops him; on his knees he fights on from the ground (in the fig
   man.vessels = [];
   // Steady (no fear: as a relentless man is), he kneels and fights on.
   man.body.inputs.relentless = true;
+  // (His man does not kneel over him and finish him while he lies there, ai.js: the rule of a bout, `noPins`, so the getting up is seen.)
+  world.rules = { ...world.rules, noPins: true };
   for (let t = 0; t < 8 && !man.crawling; t += 0.25) advance(world, 0.25, (current, dt) => thinkAll(current, dt));
   assert.ok(man.crawling && man.groundFight && man.crawlChosen, 'on his knees, fighting');
   assert.ok(inFight(man));

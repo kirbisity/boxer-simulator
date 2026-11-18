@@ -30,7 +30,8 @@ function bout(a, b, seed, seconds, aRed) {
   const wounding = { [attacker.id]: 0, [defender.id]: 0 };
   let end = null;
   for (const event of world.events) {
-    if (event.kind === 'landed' && event.target && !event.haft) {
+    // (The blows of the fight on his feet: not a finisher's point put into a man on the floor, finisher.js, which is placed.)
+    if (event.kind === 'landed' && event.target && !event.haft && event.punch !== 'execute') {
       const by = world.fighters[event.attacker];
       const on = world.fighters[event.defender];
       if (by === attacker && on === defender) {

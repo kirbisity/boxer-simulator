@@ -186,6 +186,7 @@ export const UI_FIGHT = {
   'action.drawSidearm': { en: 'Draw sidearm', zh: '拔副武器' },
   'action.pickUp': { en: 'Pick up', zh: '捡起' },
   'action.clinch': { en: 'Clinch', zh: '缠抱' },
+  'action.wrestle': { en: 'Wrestle', zh: '弃械角力' },
   'action.finish': { en: 'Finish him', zh: '补刀' },
   'action.art': { en: 'Weapon art', zh: '绝技' },
   'action.swapWeapon': { en: 'Sidearm', zh: '副武器' },

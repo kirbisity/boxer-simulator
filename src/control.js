@@ -5,9 +5,9 @@
 // main.js and touch.js fill the orders, tests drive them directly.
 
 import { P } from './body.js';
-import { AI, chooseDefence } from './ai.js';
+import { AI, bestHarmThrough, chooseDefence } from './ai.js';
 import { blowSide, DEFENCES, MOVES, pointRoomOf, STYLES, moveRange, tapAttacks } from './moves.js';
-import { aimPoint, BLOCKS, inRiderArc, dropWeapon, protectionAt, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD, startEvade } from './physics.js';
+import { aimPoint, BLOCKS, inRiderArc, dropWeapon, protectionAt, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD, startEvade, goToGrips } from './physics.js';
 import { dismount, dismountReady, horseToMount, mountHorse } from './physics/mounted.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
@@ -109,6 +109,10 @@ export const CONTROL = {
   // rigid armour parts (BLADES.gaps.aimFor: the armpit, the throat), it is laid there. The AI's blows have their own
   // scatter and their own reading of armour (ai.js aimsForGap); the player's tap is his own aim.
   tapWide: 0.35,
+  // The special button offers Wrestle (contextAction) with his man this near (m beyond both reaches) and his best blow getting less
+  // than this share of its harm through the man's armour (ai.js bestHarmThrough).
+  wrestleWithin: 1.2,
+  wrestleBelow: 0.2,
   tapOver: 0.15,
   gapSnap: 0.12,
   // A press held on a man down within this (m) of where it points: he goes to hold him down.
@@ -1125,6 +1129,8 @@ export const ACTIONS = {
   drawSidearm: { label: 'Draw sidearm', icon: 'blade' },
   pickUp: { label: 'Pick up', icon: 'hand' },
   clinch: { label: 'Clinch', icon: 'hold' },
+  // His weapon let fall to wrestle a man it cannot hurt (physics.js goToGrips, STYLES.ringen).
+  wrestle: { label: 'Wrestle', icon: 'hold' },
   finish: { label: 'Finish him', icon: 'knife' },
   // His weapon's art (weaponarts.js): not the special button's (it has its own, shown while the art is charged), but asked
   // for the same way, in `orders.actions`; its button names it (weaponarts.js artLabel).
@@ -1194,6 +1200,8 @@ export function contextAction(world, fighter) {
     return 'fire';
   }
   if (looseNearby(world, fighter)) return 'pickUp';
+  // His weapon in hand doing little against the armour of the man before him (ai.js bestHarmThrough): let it fall and wrestle him.
+  if (weapon && !weapon.spec.mounted && opponent?.state === 'up' && distance < reachOf(fighter) + reachOf(opponent) + CONTROL.wrestleWithin && bestHarmThrough(fighter, opponent) < CONTROL.wrestleBelow) return 'wrestle';
   // Within striking range: pressed, he steps in to take hold (goClinch).
   if (clinchMove(style) && opponent?.state === 'up' && distance < holdDistance(fighter, opponent) + CONTROL.clinchFrom) return 'clinch';
   return null;
@@ -1295,6 +1303,7 @@ export function doAction(world, fighter, name) {
     const move = style?.ranged?.move ?? Object.keys(style?.attacks ?? {}).find((attackName) => MOVES[attackName]?.path === 'aim');
     return Boolean(move) && throwPunch(world, fighter, move, 'body');
   }
+  if (name === 'wrestle') return goToGrips(world, fighter);
   if (name === 'drawSidearm') {
     // The bow slung, not let fall (swapSidearm); one he cannot sling (a stake, a spent weapon) is let fall.
     if (swapSidearm(world, fighter)) return true;

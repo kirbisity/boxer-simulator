@@ -967,6 +967,9 @@ const AGINCOURT = {
   // The woods' edges: the field ~23 m across where the French formed, narrowing to ~17 where the English stood (some
   // 1,200 yards across at the French end, 900 at the English: the French were squeezed together as they came on).
   woods: [[-50, 11.6], [-20, 11.2], [-8, 10.2], [3, 8.5], [50, 8.5]],
+  // The French men-at-arms' walk to the English line: ~250 m of the field (the lower of the estimates: 250-300), of which the floor holds the last
+  // 36 m (`front`); the rest walked before it begins (physics.js marchBefore), at the pace of men in plate wading the plough (~0.8 m/s, a slow walk).
+  marched: { metres: 215, pace: 0.8 },
   // The archers' stakes before each wing: two staggered rows, the points leaning out at a horse's chest.
   stakes: { first: 1.6, rows: 2, every: 0.95, rowGap: 0.9, height: 1.05, reach: 0.95 },
 };
@@ -1081,7 +1084,8 @@ const AGINCOURT_LEVEL = {
   roster: { en: 'Thirty-two French on foot and three on horse · thirty English archers and five men-at-arms', zh: '法军步行三十二人、骑马三人 · 英格兰弓手三十人、重甲兵五人' },
   formation: {
     // The vanguard packed close, shoulder to shoulder and rank on rank (so tight, the chroniclers say, they could hardly raise their arms).
-    red: { front: AGINCOURT.front.french, spacing: 0.85, rowSpacing: 1.0, perRow: 12, loose: 0.15, wings: HORSE_FIRST },
+    // (The ~250 m of the field they had crossed before the floor's last 36: physics.js marchBefore, at a laden walk through the plough.)
+    red: { front: AGINCOURT.front.french, spacing: 0.85, rowSpacing: 1.0, perRow: 12, loose: 0.15, wings: HORSE_FIRST, marched: AGINCOURT.marched },
     blue: { front: AGINCOURT.front.english, layout: agincourtLayout(), loose: 0.08, drill: HOLD_GROUND },
   },
   cast: (random) => ({

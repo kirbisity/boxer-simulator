@@ -87,7 +87,9 @@ export const LEVEL_CONFIG = {
   //   act:    his punches, dodges and turning go at the thick share to this power (a man stuck in sludge is slower everywhere, but only slightly); rising is slowed by his
   //           footwork share itself (physics/rising.js already divides its stages by gear.foot).
   //   tire:   the stamina he loses a second for each 1 of footwork share lost, while he moves (a little).
-  wade: { height: 1.75, sole: 0.073, table: [[0.15, 1], [0.3, 0.9], [0.5, 0.75], [0.8, 0.55], [1.0, 0.4], [1.3, 0.3]], accel: 1.2, thick: { exp: 0.75, from: 0.15, full: 0.35 }, act: 0.35, tire: { cost: 0.03, speed: 0.4 } },
+  //   mire:   water thick as mud (viscosity from `from`, all of it at `full`: the cesspool's sludge) is the battlefield's mud (physics/fieldworks.js): the
+  //           slog of drawing his legs out of it by his weight and armour (slogCost) in place of `tire`, and his footing down to `footing` (wet clay's).
+  wade: { height: 1.75, sole: 0.073, table: [[0.15, 1], [0.3, 0.9], [0.5, 0.75], [0.8, 0.55], [1.0, 0.4], [1.3, 0.3]], accel: 1.2, thick: { exp: 0.75, from: 0.15, full: 0.35 }, act: 0.35, tire: { cost: 0.03, speed: 0.4 }, mire: { from: 1.3, full: 2, footing: 0.7 } },
 
   // ---- Stand-ins until the awareness AI lands (levelmode/adapter.js) ---------------------------------------
   // An awake enemy counts as aware of the player within this many m.

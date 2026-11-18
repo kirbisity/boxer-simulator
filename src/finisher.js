@@ -290,7 +290,8 @@ export function canFinish(fighter) {
 export function helplessOnFloor(man) {
   if (man.state === 'out' || man.dormant || man.fled || man.mount || man.netted) return false;
   // (On his knees by his own choice, the player's crawl, he is not helpless: he can strike and stand.)
-  return man.state === 'down' || Boolean(man.crawling && !man.crawlChosen && man.state === 'up');
+  // (Nor on his knees fighting on from the ground, a leg gone and his nerve held: physics.js groundFight.)
+  return man.state === 'down' || Boolean(man.crawling && !man.crawlChosen && !man.groundFight && man.state === 'up');
 }
 
 /** Whether a man on the floor is within reach of this one: the hips apart on the floor, and on the same level. */
@@ -300,11 +301,15 @@ function within(fighter, man, range) {
   return Math.hypot(dx, dz) <= range && Math.abs(man.x[P.pelvis * 3 + 1] - fighter.x[P.pelvis * 3 + 1]) < 1.3;
 }
 
-/** An enemy on his feet and awake, near enough that the attack is for him, not for a man on the floor. */
-function engaged(world, fighter) {
+/**
+ * An enemy on his feet and awake, near enough that the attack is for him, not for a man on the floor. `watched`: only one who has
+ * him for his man (`focus`): in a melee there is always an enemy within a few steps, and the men who went among the fallen did so
+ * while the enemies about them had others to fight (an AI man's own judgement: ai.js); the player's button stays off near any.
+ */
+function engaged(world, fighter, watched = false) {
   return world.fighters.some((other) => other !== fighter && hostile(other, fighter) && other.state === 'up' && !other.crawling && !other.dormant && !other.fled
     && !(other.driven && !(world.stage?.aware?.minds?.[other.id]?.state === 'aggro'))
-    && within(fighter, other, FINISHER.threat));
+    && (!watched || other.focus === fighter.id) && within(fighter, other, FINISHER.threat));
 }
 
 /**
@@ -312,9 +317,9 @@ function engaged(world, fighter) {
  * nearest), in a fight with weapons, while he can kneel and no enemy on his feet is on him. `anyone`: a man of any side (a team-mate, a civilian) is
  * also a target, if no enemy is (the player's own choice: an explicit call, not the button).
  */
-export function finishTarget(world, fighter, { anyone = false, locked = null, range = FINISHER.reach } = {}) {
+export function finishTarget(world, fighter, { anyone = false, locked = null, range = FINISHER.reach, watched = false } = {}) {
   // Only where it is a fight with weapons (world.armed): in a bout of fists a man down is stood up or counted out, not stabbed.
-  if (world.armed === false || !canFinish(fighter) || engaged(world, fighter)) return null;
+  if (world.armed === false || !canFinish(fighter) || engaged(world, fighter, watched)) return null;
   const pick = (allowed) => {
     let best = null;
     let bestApart = Infinity;

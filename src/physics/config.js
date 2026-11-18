@@ -540,6 +540,9 @@ export const WORLD = {
   // strike again or to defend till it is over (WORLD.heavy's `committed`), and the braking costs `breath` of the stroke's own
   // stamina again.
   miss: { seconds: 0.15, cap: 16, thrust: 0.5, breath: 0.4 },
+  // Spent in thick water with no mud sinkage of its own (the castle's sludge: levelmode/level.js), the depth he draws his legs out of (m) for his pace's
+  // limit (physics.js moveRoot, fieldworks.js spentPace).
+  spent: { wadeSunk: 0.3 },
   // Step out (physics.js startEvade, the player's button): the whole body out of the blow's way, by where it comes (evadeKind),
   // costing `costJumps` of what his own jump costs (the legs' work of throwing his body and gear: physics/jump.js). Each kind
   // lasts `seconds`; its legs' burst (× footwork speed, falling off over it) is `step` aside (twice a defence's sidestep) with

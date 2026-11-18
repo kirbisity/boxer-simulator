@@ -55,6 +55,7 @@ import { WORLD } from './config.js';
 import { fieldHeight } from './terrain.js';
 import { pointThrough } from '../weapons.js';
 import { knockOut } from '../physics.js';
+import { drawStamina } from './overdraft.js';
 
 export const FIELDWORKS = {
   stake: {
@@ -595,7 +596,7 @@ function mireHoldLegs(fighter, soft, sunk, dt) {
     wading.set = { foot: gear.foot, accel: gear.accel };
     wading.drag = held;
     wading.act = held.act;
-    if (dt > 0 && fighter.state === 'up') fighter.stamina = Math.max(0, fighter.stamina - slogCost(fighter, sunk) * dt);
+    if (dt > 0 && fighter.state === 'up') drawStamina(fighter, slogCost(fighter, sunk) * dt);
   } else if (wading?.mud) {
     if (gear.foot === wading.set.foot && gear.accel === wading.set.accel) {
       gear.foot = wading.base.foot;
@@ -612,8 +613,7 @@ function mireHoldLegs(fighter, soft, sunk, dt) {
  * only a run's share of his recovery while he is at it (WORLD.runMode.recovery: the rest of it is taken back here).
  * An 80 kg archer calf-deep at a walk nearly holds his own; a man in plate knee-deep is spent in a minute or two.
  */
-export function slogCost(fighter, sunk) {
-  const speed = Math.hypot(fighter.rootVelocity?.[0] ?? 0, fighter.rootVelocity?.[1] ?? 0);
+export function slogCost(fighter, sunk, speed = Math.hypot(fighter.rootVelocity?.[0] ?? 0, fighter.rootVelocity?.[1] ?? 0)) {
   if (speed < 0.05 || sunk <= 0) return 0;
   const aerobic = fighter.body.aerobic || 1;
   const steps = speed / FIELDWORKS.mud.step;
@@ -621,6 +621,24 @@ export function slogCost(fighter, sunk) {
   const labour = Math.min(1, speed / FIELDWORKS.mud.labour);
   const forgone = (1 - WORLD.runMode.recovery) * WORLD.staminaRecovery * aerobic * labour;
   return work + forgone;
+}
+
+/**
+ * The fastest a man spent (his stamina gone) can go through the mud he is sunk `sunk` m in: the pace whose slog (slogCost) his
+ * breathing pays for as he goes (`recovery`, stamina a second). With nothing left in the bar, the work of each step must come
+ * out of what he draws in: in knee-deep plough a man in plate is down to a trudge. (Bisected: slogCost rises with the pace.)
+ */
+export function spentPace(fighter, sunk, recovery) {
+  if (sunk <= 0) return Infinity;
+  let low = 0;
+  let high = 3;
+  if (slogCost(fighter, sunk, high) <= recovery) return high;
+  for (let k = 0; k < 20; k += 1) {
+    const mid = (low + high) / 2;
+    if (slogCost(fighter, sunk, mid) <= recovery) low = mid;
+    else high = mid;
+  }
+  return low;
 }
 
 /**

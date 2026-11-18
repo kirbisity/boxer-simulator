@@ -524,6 +524,30 @@ export const STYLES = {
     clinchDriveShare: 1.35,
     throws: { after: 0.12, rate: 3 },
   },
+  // Ringen: the wrestling a man in harness or out of it was taught (Ott the Jew, Liechtenauer's school, the fight books of the 1400s),
+  // taken up when the weapon in his hands cannot hurt the man before him (ai.js goesToGrips) or let fall by the man played: hands
+  // forward and low, both hands driven into his chest to push him over (`oshi`), a grab for the neck and arm (`clinch`), driven
+  // in the hold and thrown from it (`clinchDrive`, `throws`: physics/grappling.js). A spent man in deep mud, his legs half held by
+  // it and his footing gone (physics.js checkBalance), goes over to it: as the men-at-arms at Agincourt went over under the
+  // archers, who were lightly armed and fresh. No weapon of its own (`hidden`: no character fights so from the start).
+  ringen: {
+    label: 'Wrestling', hidden: true,
+    cadence: { work: 1.2, move: 0.9, burst: 0.7, mobility: 0.6 },
+    stance: { blade: 0.15, crouch: 0.08, width: 1.3, lean: 0.18, guardHeight: -0.05 },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.4 },
+    attacks: { oshi: 0.3, clinch: 0.45, cross: 0.1, rush: 0.15 },
+    combos: { 'oshi clinch': 0.6, 'cross clinch': 0.4 },
+    comboChance: 0.5,
+    tempo: 1,
+    defences: { guard: 0.4, stepBack: 0.4, parry: 0.2 },
+    defendChance: 0.45,
+    headMovement: 0.1,
+    plans: { pressure: 2, brawler: 1.2, outboxer: 0.2, counter: 0.3 },
+    pressure: 0.5,
+    clinchDrive: true,
+    clinchDriveShare: 1.1,
+    throws: { after: 0.4, rate: 1.5 },
+  },
   // Clinch brawling (Frye–Takayama): square and forward, guard low; grabs
   // the back of the neck with one hand (`collarTie`) and hammers hooks and
   // uppercuts with the other (`clinchStrikes`), face to face, trading.

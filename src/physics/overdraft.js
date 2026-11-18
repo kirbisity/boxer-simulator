@@ -1,11 +1,17 @@
-// The player's stamina overdraft: past empty he keeps swinging, weaker, until he faints. Only the man flagged
-// `fighter.player` (control.js directFighter, main.js) has it: for every other fighter these functions give what
-// the old rules did (stamina stops at empty, the fatigue scale is 0.55 + 0.45 × stamina), to the last bit, so
-// a battle without a player is the same battle. The numbers are WORLD.overdraft's.
+// The stamina overdraft: past empty a man keeps going, weaker, until he faints. The man played has it always (`fighter.player`:
+// control.js directFighter, main.js); any other man only while he chooses to drive himself past his breath (`fighter.overdraw`:
+// ai.js, under fire and short of his enemy, Agincourt's men-at-arms pushing on under the arrows). For a man not overdrawing, his
+// stamina stops where it is (at empty, or where the overdraft he ran into left it) and his recovery brings it back up. The numbers
+// are WORLD.overdraft's.
 //
 // Stamina is 0..1 above empty; below it, down to `floor`, is the overdraft. `depth` is 0 at empty to 1 at the floor.
 
 import { WORLD } from './config.js';
+
+/** Whether this man may draw past empty now: the man played, or one driving himself on (`overdraw`). */
+export function overdraws(fighter) {
+  return Boolean(fighter.player || fighter.overdraw);
+}
 
 /** How deep in the overdraft a stamina is: 0 at empty or above, 1 at the floor. */
 export function overdraftDepth(stamina) {
@@ -27,8 +33,8 @@ export function fatigueScale(stamina) {
  * (`faintGrace`).
  */
 export function drawStamina(fighter, amount) {
-  if (!fighter.player) {
-    fighter.stamina = Math.max(0, fighter.stamina - amount);
+  if (!overdraws(fighter)) {
+    fighter.stamina = Math.max(Math.min(0, fighter.stamina), fighter.stamina - amount);
     return;
   }
   const next = fighter.stamina - amount;

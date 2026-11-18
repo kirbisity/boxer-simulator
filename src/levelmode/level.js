@@ -47,7 +47,9 @@ import { watchTeam } from './team.js';
 import { beginAttempt } from './attempts.js';
 import { outfitOf } from '../outfits.js';
 import { floorAt } from '../physics/terrain.js';
-import { stageWaters, wadeDrag, waterAt } from './water.js';
+import { stageWaters, wadeDrag, waterAt, waterViscosity } from './water.js';
+import { slogCost } from '../physics/fieldworks.js';
+import { drawStamina } from '../physics/overdraft.js';
 
 /** Give a stage world its run. Returns the level. */
 export function startLevel(world, { settle = true } = {}) {
@@ -171,11 +173,21 @@ export function wadeGear(world, dt = 0) {
       wading.set = { foot: gear.foot, accel: gear.accel };
       wading.drag = held;
       wading.act = held.act;
+      // Thick (sludge, LEVEL_CONFIG.wade.mire): it is the battlefield's mud (physics/fieldworks.js): each step draws his legs out of it as deep as it
+      // is over his feet, at the work his weight and his armour make of it (slogCost), and it takes his footing (`fighter.mired`, checkBalance's: a
+      // shove or a press puts him down the sooner). Thin water only tires him a little as he moves.
+      const mire = LEVEL_CONFIG.wade.mire;
+      const thick = Math.max(0, Math.min(1, (waterViscosity(water) - mire.from) / (mire.full - mire.from)));
+      if (thick > 0 && (!fighter.mired || fighter.mired.byWater)) fighter.mired = { sunk: 0, footing: 1 - (1 - mire.footing) * thick, byWater: true };
       if (dt > 0 && fighter.state !== 'out') {
-        const moving = Math.min(1, Math.hypot(fighter.rootVelocity?.[0] ?? 0, fighter.rootVelocity?.[1] ?? 0) / LEVEL_CONFIG.wade.tire.speed);
-        fighter.stamina = Math.max(0, fighter.stamina - LEVEL_CONFIG.wade.tire.cost * (1 - held.foot) * moving * dt);
+        if (thick > 0) drawStamina(fighter, slogCost(fighter, depth * thick) * dt);
+        else {
+          const moving = Math.min(1, Math.hypot(fighter.rootVelocity?.[0] ?? 0, fighter.rootVelocity?.[1] ?? 0) / LEVEL_CONFIG.wade.tire.speed);
+          fighter.stamina = Math.max(0, fighter.stamina - LEVEL_CONFIG.wade.tire.cost * (1 - held.foot) * moving * dt);
+        }
       }
     } else if (wading) {
+      if (fighter.mired?.byWater) fighter.mired = null;
       if (gear.foot === wading.set.foot && gear.accel === wading.set.accel) {
         gear.foot = wading.base.foot;
         gear.accel = wading.base.accel;

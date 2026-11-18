@@ -28,7 +28,7 @@ import { blockStep, carried, recordContact, setDrive, slopeFall, slopeHold, solv
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, footworkQuickness, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
-import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
+import { overdraftDepth, drawStamina, overdraws, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
 import { bowShotCost, strokeHeft, swingEffort } from './physics/effort.js';
 import { deflecting, deflectsWith, deflectWindow, guardHold, noteGuard } from './physics/deflect.js';
@@ -40,7 +40,7 @@ import { painShare, stepWhips, whipDrive } from './physics/whip.js';
 import { isMounted } from './horses.js';
 import { stepFlame } from './physics/flame.js';
 import { envLieOf } from './env/lie.js';
-import { collideWorks, faceBetween, faceOutside, FIELDWORKS, floorFor, keepRootOff, looseFloor, mireStep, reliefAt, stepOnWorks, worksOf } from './physics/fieldworks.js';
+import { collideWorks, faceBetween, faceOutside, FIELDWORKS, floorFor, footSink, keepRootOff, looseFloor, mireStep, reliefAt, slogCost, spentPace, stepOnWorks, worksOf } from './physics/fieldworks.js';
 import { chooseHorseDetail, collideHorses, createHorse, mountFootprint, goalFromFootwork, horseTimers, keepSeat, loseHorse, mountedBehind, riderFacing, ridingLean, saddleReach, mountJump, mountJumpBlocked, mountJumpOf, seatMass, seatRider, SEATED_PARTICLES, stepHorse, stepTurret, strikeHorses, turnCarried } from './physics/mounted.js';
 import { cutSeverity, limbStriker, particleAt, shieldCovering, soundDown, soundEvent, soundHit, soundStep, soundVoice, soundWound, trackPunchSwing, trackSwing, weaponPart, weaponStriker } from './audio/log.js';
 export { WORLD } from './physics/config.js';
@@ -204,7 +204,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // Level mode (levelmode/level.js): hands at a wound while a bandage goes on ({ t, seconds }).
     tending: undefined,
     // The player's stamina overdraft (physics/overdraft.js): player (the man played), faintDue (a cost would pass the floor), fainted (down in a faint), blackout (the screen's black, 0..1), faintGrace (s after waking).
-    player: undefined, faintDue: undefined, fainted: undefined, blackout: undefined, faintGrace: undefined,
+    player: undefined, overdraw: undefined, underFireAt: undefined, faintDue: undefined, fainted: undefined, blackout: undefined, faintGrace: undefined,
     // Getting up (physics/rising.js): riseTries (failed tries since he was last up), floored (given up trying for now: out of the
     // fight until he rises), crawlWeak (crawling because he could not stand; he tries again at crawlRetryAt), wobble (unsteady
     // for a moment once up: { t, seconds, size }).
@@ -399,6 +399,26 @@ export function strokeOf(fighter, weapon) {
  * on the floor, and the fighter fights on in the style that follows (a
  * hoplomachus draws his gladius; anyone else boxes).
  */
+/**
+ * He lets his weapon fall (and the second blade, if he has one) and goes to grips with his hands (STYLES.ringen: the shove, the
+ * hold, the throw): the man played by his choice, an AI man when his weapon cannot hurt his man (ai.js goesToGrips). His shield
+ * stays on his arm. False if he has nothing held to let go (or it is part of his arm).
+ */
+export function goToGrips(world, fighter) {
+  const weapon = fighter.weapon;
+  if (!weapon?.held || weapon.spec.mounted || fighter.state !== 'up' || fighter.mount) return false;
+  releaseWeapon(world, fighter, 'lets his weapon fall to wrestle', [0, 0, 0]);
+  if (fighter.offWeapon?.held) {
+    releaseWeapon(world, fighter, 'lets it fall', [0, 0, 0], fighter.offWeapon);
+    fighter.offWeapon = null;
+  }
+  fighter.weapon = null;
+  fighter.punch = null;
+  armFighter(fighter, 'ringen', { random: world.random, shield: false });
+  world.events.push({ time: world.time, kind: 'grips', fighter: fighter.id, effects: ['lets his weapon fall and goes to grips'] });
+  return true;
+}
+
 export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
   const weapon = fighter.weapon;
   // A forearm weapon is the arm: it cannot be let go or knocked away.
@@ -1912,6 +1932,17 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
     world.ambush = { corner, signal: ambush.signal ?? 0, sprung: false, cursor: 0 };
     for (const fighter of fighters) if (fighter.corner === corner) fighter.hidden = true;
   }
+  // A side that has already come a long way over the same ground before the floor begins (`formation[corner].marched`:
+  // { metres, pace } m/s): Agincourt's French had crossed ~250 m of soaked plough before they reached the English, of which
+  // the floor holds the last few dozen. Each man on foot arrives as that walk left him: its slog through the mud where he
+  // stands (fieldworks.js slogCost: the work of drawing his legs out at every step, his armour's weight in it), his armour's
+  // cost to move in and the heat it keeps in (physics/heat.js stepHeat: a closed visor, a breastplate on his breathing), and
+  // what he got back as he went (his recovery, hampered as it is in that kit). The same physics as the walk on the floor,
+  // run for the ground that is off it; nothing set by hand.
+  for (const fighter of fighters) {
+    const march = formation[fighter.corner]?.marched;
+    if (march && !fighter.mount) marchBefore(world, fighter, march);
+  }
   // The guns standing on the field, each with its crew (`artillery`: physics/artillery.js), and a wall's scaling ladders as
   // things that stand, are pushed off and are raised (physics/ladders.js), from the arena's works.
   world.artillery = createArtillery(world, artillery);
@@ -1920,6 +1951,23 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   // one fought after a long approach across the field has that walk and the fight's own time.
   world.timeLimit = timeLimit;
   return world;
+}
+
+/** A walk of `metres` at `pace` m/s over the ground where he stands, before the fight: what it costs him (formation `marched`). */
+function marchBefore(world, fighter, { metres, pace }) {
+  const works = worksOf(world.arena);
+  const sunk = works ? footSink(works, fighter, fighter.root[0], fighter.root[1]) : 0;
+  const kept = [...fighter.rootVelocity];
+  fighter.rootVelocity = [pace, 0];
+  const step = 0.5;
+  heatMark(fighter);
+  for (let time = 0; time < metres / pace; time += step) {
+    if (sunk > 0) fighter.stamina = Math.max(0, fighter.stamina - slogCost(fighter, sunk) * step);
+    stepHeat(world, fighter, step);
+    fighter.stamina = Math.min(1, fighter.stamina + WORLD.staminaRecovery * fighter.body.aerobic * heatRecovery(fighter) * recoveryShare(fighter.stamina) * step);
+    heatMark(fighter);
+  }
+  fighter.rootVelocity = kept;
 }
 
 /**
@@ -2233,7 +2281,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   if (fighter.climbing && !fighter.climbing.top) return false;
   // (Told to hold his fire, command.js giveFireOrder: no arrow, bolt or ball loosed; the man played is his own master.)
   if (spec?.path === 'aim' && fighter.holdFire && !fighter.player) return false;
-  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.committed > 0 || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
+  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.committed > 0 || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !overdraws(fighter)) || (spec.bash && !fighter.shield)) return false;
   // From the saddle only what is before him (WORLD.mount.arc: inRiderArc): nothing behind, nor square beside him.
   if (fighter.mount && !inRiderArc(fighter, at ?? point(target.x, P.pelvis))) return false;
   // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
@@ -4313,7 +4361,9 @@ function checkBalance(world, fighter) {
   // Heels make it easy to go over; riot gear's wide stance and weight, hard.
   // (Wet clay under him, fieldworks.js `mired`: a shove puts him down sooner.)
   // (On a ladder his hands are on its rails as well as his feet on a rung: LADDERS.climb.hold.)
-  const footing = legs * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1) * (fighter.mired?.footing ?? 1) * (fighter.climbing ? LADDERS.climb.hold : 1);
+  // (Spent, his legs hold him up less, as they lift him less off the floor: limbShares' leg fatigue, WORLD.rise.legFatigue.)
+  const tired = 1 - WORLD.rise.legFatigue * (1 - fatigueScale(fighter.stamina) * heatStrength(fighter));
+  const footing = legs * tired * fighter.body.gear.balance * (fighter.netted ? NET.footing : 1) * (fighter.mired?.footing ?? 1) * (fighter.climbing ? LADDERS.climb.hold : 1);
   // Knocked about in armour: reeling, not falling, unless it is too much.
   const pushed = knock / (WORLD.balance.speed * footing);
   const overreached = outside / (WORLD.balance.reach * legLength * footing);
@@ -4518,6 +4568,17 @@ function moveRoot(world, fighter, dt) {
   const wanted = runPace === null
     ? [(forward[0] * drive + left[0] * side) * WORLD.footSpeed * legs * gear.foot, (forward[2] * drive + left[2] * side) * WORLD.footSpeed * legs * gear.foot]
     : [forward[0] * runPace + left[0] * side * footwork, forward[2] * runPace + left[2] * side * footwork];
+  // Spent (nothing left in his bar) in mud (or sludge), he goes no faster than his breathing pays for (fieldworks.js spentPace): the
+  // slog of every step must come out of what he draws in as he goes. (Firm ground asks little of a walk: there he is not held.)
+  if (fighter.stamina <= 0 && !overdraws(fighter) && (fighter.mired?.sunk > 0 || fighter.wading?.mud || fighter.mired?.byWater) && !fighter.rush) {
+    const sunk = fighter.mired?.sunk > 0 ? fighter.mired.sunk : fighter.wading?.drag ? WORLD.spent.wadeSunk : 0;
+    const most = spentPace(fighter, sunk, WORLD.staminaRecovery * fighter.body.aerobic * heatRecovery(fighter));
+    const asked = Math.hypot(wanted[0], wanted[1]);
+    if (asked > most) {
+      wanted[0] *= most / asked;
+      wanted[1] *= most / asked;
+    }
+  }
   // Flat out (a charge, a run), the slope's pull adds to his legs' drive down it and takes from it up it (downhillPull).
   // (Its accelerations: the charge's, as below; the run's at a standstill, gait.js runChange.) Up it, that and the climb's
   // own limit (climbShare: the rate his legs lift him) are one limit, the work of lifting him: the lesser holds, not both;
@@ -5263,7 +5324,8 @@ function updateTimers(world, fighter, dt) {
   countPin(world, fighter, dt);
   updatePickup(world, fighter, dt);
   const winded = 1 - WORLD.hurt.staminaPerTrunkDamage * (fighter.damage.trunk ?? 0);
-  if (fighter.player) overdraftStep(world, fighter, dt);
+  // (Anyone in the overdraft or fainted from it: the man played, or a man who drove himself past his breath, ai.js.)
+  if (fighter.player || fighter.stamina < 0 || fighter.faintDue || fighter.fainted) overdraftStep(world, fighter, dt);
   // His heat: what he has drawn warms him, his armour costs breath to move in (physics/heat.js).
   stepHeat(world, fighter, dt);
   // A machine (gear.machine: a robot) does not tire: what an attack or a run costs a man costs it nothing.
