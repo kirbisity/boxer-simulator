@@ -45,7 +45,7 @@ export const BATTLE_FX = {
   // Sparks off steel: the share of their life they glow white-hot, and how long a streak each draws (s of travel).
   sparkStreakSeconds: 0.022,
   // A deflect's ring (battleFxRing): `count` beads `bead` m across, spreading from `from` to `to` m in `seconds`, hot white-gold.
-  ring: { count: 28, bead: 0.035, from: 0.05, to: 0.45, seconds: 0.22, colour: [2.2, 1.8, 1.1] },
+  ring: { count: 32, bead: 0.08, from: 0.08, to: 0.6, seconds: 0.3, colour: [2.4, 1.9, 1.1] },
   // A sun glint: how tight the mirror line must be (the half-vector's share along the blade: ~6 degrees, the
   // spread of the sun's image in steel polished to roughness ~0.2), and its size per metre away (glare is a size in the eye).
   glintSharpness: 0.1,

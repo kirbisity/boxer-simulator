@@ -4463,6 +4463,17 @@ const boxer = window.boxer = {
     $('#modes button[data-value="watch"]')?.click();
     return state.world.fighters.map((fighter) => fighter.style);
   },
+  // The red marks of strokes that cannot be deflected (perilmark.js): each sprite's state, for tests and shots.
+  perilMarks: () => perilMarks.sprites.map((sprite) => ({ visible: sprite.visible, at: sprite.position.toArray() })),
+  // One against one, played (the man played red): `hero` and `foe` presets, at `place` (tests, shots: the deflect, its button and marks).
+  duelDemo: (hero = 'samurai', foe = 'kanabo', place = 'meadow', seed = 1, distance = 2.4) => {
+    skipIntro();
+    menus.close();
+    setGame('sandbox');
+    fight([{ preset: hero }], [{ preset: foe }], { place, seed, distance });
+    $('#modes button[data-value="play"]')?.click();
+    return state.world.fighters.map((fighter) => fighter.style);
+  },
   // A story battle's setup (src/story/battles: { fighters, options, view }) shown and watched as it is, for its shots
   // (the story's own screens are the engine's: src/story/storyview.js). `await import('./src/story/battles/08-hunriver.js')`
   // in the page, then boxer.storyBattle(battle.setup(life, seed)).
@@ -4489,6 +4500,12 @@ const boxer = window.boxer = {
   fx: {
     shot: (event) => spawnShot(scene, { attacker: 0, time: state.world.time, point: event.to, normal: [0, 0, 1], harm: 0, ...event }),
     sparks: (at, count) => spawnSparks(scene, at, count),
+    // A deflect's look at a point (as a clash with `deflect`: the burst, the flash and the ring square to `normal`).
+    deflect: (at, normal = [0, 0, 1]) => {
+      spawnSparks(scene, at, 64);
+      battleFxSpark(scene, at, 0.36);
+      battleFxRing(scene, at, normal);
+    },
     step: (seconds, dt = 1 / 60) => {
       for (let left = seconds; left > 1e-9; left -= dt) {
         updateShots(scene, Math.min(dt, left));

@@ -506,6 +506,7 @@ export function installFightControls(root, hooks) {
     }
     const holding = deflect && me.guardUp;
     guard.style.setProperty('--hold', holding ? guardHold(me, world.time).toFixed(2) : '1');
+    guard.classList.toggle('holding', Boolean(holding));
     guard.classList.toggle('deflect-window', Boolean(holding && me.guardFresh && world.time - me.guardSince <= deflectWindow(me)));
     // The special button: one place, its label what it would do now.
     // A switch of language (src/i18n.js): the words that are set only on a change are set again.

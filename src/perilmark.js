@@ -11,8 +11,8 @@ import { undeflectable } from './physics.js';
 
 export const PERIL_MARK = {
   // m over the top of his head, the sprite's size on the screen (a share of its height), how many at once, and the pulse (Hz).
-  lift: 0.42,
-  size: 0.05,
+  lift: 0.65,
+  size: 0.075,
   most: 4,
   pulseHz: 5,
   colour: '#ff2a1a',
@@ -43,15 +43,18 @@ function markTexture() {
 export function createPerilMarks(view) {
   const texture = markTexture();
   const sprites = Array.from({ length: PERIL_MARK.most }, (_, index) => {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false, fog: false, sizeAttenuation: false }));
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false, fog: false, sizeAttenuation: false, toneMapped: false }));
     sprite.scale.setScalar(PERIL_MARK.size);
-    sprite.renderOrder = 7;
+    // (Over everything, as the fight's own marks are: fightui/marker.js; and never culled, its size being the screen's.)
+    sprite.renderOrder = 995;
+    sprite.frustumCulled = false;
     sprite.visible = false;
     sprite.name = `peril-${index}`;
     view.scene.add(sprite);
     return sprite;
   });
   return {
+    sprites,
     update(world, player, time) {
       let shown = 0;
       if (world && player && player.state === 'up') {
