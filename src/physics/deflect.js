@@ -12,9 +12,12 @@ export function deflectsWith(fighter) {
   return Boolean(fighter?.weapon?.held && !fighter.shield && !fighter.weapon.spec.ranged);
 }
 
-/** Whether a man is guarding now: the guard held (the player's button, an AI's kept guard) or a block or parry under way. */
+/**
+ * Whether a man is guarding now: the guard held (the player's button, an AI's kept guard) or a block or parry under way, and no
+ * stroke of his own going (a cut made from the guard takes the blade out of it; brought back after, it is raised again).
+ */
 export function guarding(fighter) {
-  return Boolean(fighter.guardHeld) || GUARDING_DEFENCES.has(fighter.defence?.name);
+  return (Boolean(fighter.guardHeld) || GUARDING_DEFENCES.has(fighter.defence?.name)) && !fighter.punch;
 }
 
 /**

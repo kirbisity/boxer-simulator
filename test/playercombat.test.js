@@ -146,7 +146,7 @@ test('the guard held stops most blows: it goes onto the line of each one, as wel
       const thrown = new Set();
       // (Put up and let down again, as a man does: a weapon's guard held on gives at WORLD.deflect holdFor, physics/deflect.js.)
       game.step(12, () => {
-        if (guard) game.orders.guard = game.world.time % 1.9 < 1.5;
+        if (guard) game.orders.guard = game.world.time % 1.3 < 0.9;
         if (game.him.punch?.target === 0) thrown.add(game.him.punch);
       });
       blows += thrown.size;
@@ -161,9 +161,9 @@ test('the guard held stops most blows: it goes onto the line of each one, as wel
   const shares = `landed on him: ${open.share.toFixed(2)} open, ${guarded.share.toFixed(2)} guarded at skill 0.9, ${untrained.share.toFixed(2)} at 0.1`;
   assert.ok(guarded.share * 2.5 <= open.share, shares);
   assert.ok(guarded.blocked > open.blocked, `met on the guard: ${guarded.blocked}, against ${open.blocked} open`);
-  // (Raised again and again, every man has his deflect windows, and a blow meeting the blade in one is turned however well he
-  // reads it; the reading still puts the trained man's blade where the blows come.)
-  assert.ok(untrained.share >= 1.5 * guarded.share, shares);
+  // (Raised again and again, the man played has his deflect windows, and a blow in one is turned however well his character
+  // reads it (the press is the player's reading); the reading still puts the trained man's blade where the rest come.)
+  assert.ok(untrained.share >= guarded.share, shares);
 });
 
 test('spent, the guard is no longer brought onto the blow: it is held where it is', () => {

@@ -58,13 +58,14 @@ test('a cut met in the window is deflected: no harm to him, the striker pays the
   assert.ok(deflect.effects.some((effect) => /reels \((0\.[3-8])/.test(effect)), `a short reel, not a stagger: ${deflect.effects.join(', ')}`);
 });
 
-test('a guard held past three seconds is down: the blow lands', () => {
+test('a guard held past its time is down: the blow lands', () => {
   const held = meet('katana', 'kesagiri', 'katana', { lead: 0, hold: WORLD.deflect.holdFor + 0.2 });
   assert.ok(!held.kinds.includes('deflect') && !held.kinds.includes('parry'), `held too long: ${held.kinds.join(', ')}`);
   assert.ok(held.harm > 0.05, `the blow lands (${held.harm.toFixed(3)})`);
   const { world, man } = pair('boxing', 'katana');
   man.guardUp = true;
-  man.guardSince = world.time - 1.6;
+  // (Half way from the end of his window to WORLD.deflect holdFor.)
+  man.guardSince = world.time - (deflectWindow(man) + WORLD.deflect.holdFor) / 2;
   assert.ok(guardHold(man, world.time) > 0.3 && guardHold(man, world.time) < 0.7, `half way: ${guardHold(man, world.time).toFixed(2)}`);
 });
 
