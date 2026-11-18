@@ -472,7 +472,7 @@ export const WORLD = {
   // window is the base over that: a war hammer's or a guandao's about half, a knife's longer, between `least` and `most`.
   // A guard put up again within `spam` s of the last let down has no window: a blade waved up and down is not set.
   // After its window the guard is a block as before, but kept up it gives: its reading of the blow falls off to nothing at
-  // `holdFor` s, when his arms come down whatever he means (a deflect is a beat, not a stance held; the owner's choice, 1 s).
+  // `holdFor` s, when his arms come down whatever he means (a deflect is a beat, not a stance held: 1 s).
   // The deflected man pays the meeting's energy in stamina (WORLD.guardHeld.perJoule, his and not the deflecter's) and his
   // arm is jarred back: he reels for `reel` s (fewer to more, by the meeting's energy over `reelJoules`), not a stagger's
   // seconds: his blade rebounds and must be gathered, a beat in which he can neither strike nor guard well.
