@@ -102,6 +102,10 @@ export const AI = {
   // and not running past him (weighted); a fresh choice every `rethink` s.
   gunKite: { stride: 2.5, directions: 16, wallMargin: 0.7, roomWeight: 0.8, pastWeight: 2.5, rethink: 0.4 },
   bodyShotShare: 0.2,
+  // The share of a weapon's thrusts at the body laid at the thigh instead (moves.js, aimZone), before he reads the kit: at
+  // an unarmoured man a few (the body is the bigger mark and the surer kill); at one whose breast and head turn the point
+  // and whose thighs do not, the armour sense weights it up (an elite's thrusts at a dō over bare thighs go mostly low).
+  thighShare: 0.1,
   // Armour sense: a trained man fights the kit in front of him, not his drill. Each move he might make (and the zone he aims
   // it at) is weighted by the share of its harm that gets through that man's kit there (harmThrough: its cut/pierce/blunt
   // against the protection, a point's chance of a gap in rigid armour) raised to `power` × his sense: none below `from`
@@ -4168,17 +4172,23 @@ export function senseArmour(fighter, opponent, choices) {
 }
 
 /**
- * The zone a move is aimed at: its first, or its last `AI.bodyShotShare` of
- * the time, each weighted by how much of it gets
- * through his kit there, as far as the striker reads it (AI.armourSense).
+ * The zone a move is aimed at: its first, or its second `AI.bodyShotShare` of the time (a move's two places), and a
+ * weapon thrust's third, the thigh (moves.js: a thrust laid at the body laid lower), `AI.thighShare` of the time; each
+ * weighted by how much of it gets through his kit there, as far as the striker reads it (AI.armourSense).
  */
 function aimZone(fighter, opponent, spec, random) {
-  const [first, last] = [spec.zones[0], spec.zones.at(-1)];
+  const zones = spec.zones;
   const power = AI.armourSense.power * armourSense(fighter);
   const sensed = (zone) => (power > 0 && opponent ? harmThrough(fighter, opponent, spec, zone) ** power : 1);
-  const low = AI.bodyShotShare * sensed(last);
-  const high = (1 - AI.bodyShotShare) * sensed(first);
-  return random() < low / Math.max(1e-9, low + high) ? last : first;
+  const thigh = zones.length > 2 && zones[2] === 'legs' ? AI.thighShare : 0;
+  const base = [(1 - thigh) * (1 - AI.bodyShotShare), (1 - thigh) * AI.bodyShotShare, thigh];
+  const weights = zones.length === 1 ? [1] : zones.slice(0, 3).map((zone, index) => (base[index] ?? 0) * sensed(zone));
+  let pick = random() * weights.reduce((sum, weight) => sum + weight, 0);
+  for (let index = 0; index < weights.length; index += 1) {
+    pick -= weights[index];
+    if (pick < 0) return zones[index];
+  }
+  return zones[0];
 }
 
 /** Whether a thrust at `zone` is laid for where his armour parts there (AI.gapAim): only at rigid armour, as he reads it. */

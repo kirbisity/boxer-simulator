@@ -2225,6 +2225,20 @@ export function punctureOf(pierce, width = PUNCTURE.width) {
 export const pointWidthOf = (spec) => spec.pointWidth ?? 2 * (spec.radius ?? PUNCTURE.width / 2);
 
 /**
+ * The width (m) a point must open in this armour to go in: a point with edges (a leaf-bladed spear's head, a sword's)
+ * cuts its own way through what does not turn an edge, so of its width past a bodkin's (PUNCTURE.width: the point that only
+ * parts and must be pushed through) only the share the armour's `cut` proof holds against the edges counts. Through
+ * cloth (a quilted jack's cut ~0.2) a spear's 40 mm head goes as a narrow point does, the edges slicing the quilting
+ * open behind its tip; through mail or plate (cut ~0.9-1, rings to be broken, steel the edge cannot cut) its whole width
+ * must be opened, as before. (It was the whole width everywhere: a quilted jack (pierce 0.1) stopped a long spear's
+ * thrust under ~93 J, and a padded coat (0.3) under ~180 J, more than most thrusts bring, as if cloth were thin plate.)
+ */
+export function cuttingWidth(width, cutProof) {
+  if (!(width > PUNCTURE.width)) return width;
+  return PUNCTURE.width + (width - PUNCTURE.width) * Math.min(1, Math.max(0, cutProof ?? 0));
+}
+
+/**
  * The share of a point bringing `joules` (physical, at the point), `width` m across, that gets through armour of this
  * `pierce` (PUNCTURE), the strike's draw `roll` (0..1).
  */

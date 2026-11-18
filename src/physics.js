@@ -9,7 +9,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
-import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
+import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, cuttingWidth, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restArmAngle, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
 import { gapChance, gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
@@ -2773,7 +2773,8 @@ function updateIntent(world, fighter, dt) {
     // (Hanging at the angle that just clears his trunk's side, thin close in, fat out: pose.js restArmAngle.)
     const hang = restArmAngle(fighter.body);
     const L = fighter.body.lengths;
-    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = [0.03 * H, 0.47 * H, sign * (L.shoulderSpan / 2 + (L.upperArm + L.forearmToFist) * Math.sin(hang))];
+    // ('behind': clasped at the small of his back, out of the way of what comes at his front: tools/armour-durability.js's unguarded man.)
+    for (const [side, sign] of [['l', 1], ['r', -1]]) intent[`${side}Hand`] = fighter.handsDown === 'behind' ? [-0.13 * H, 0.5 * H, sign * 0.05 * H] : [0.03 * H, 0.47 * H, sign * (L.shoulderSpan / 2 + (L.upperArm + L.forearmToFist) * Math.sin(hang))];
     // Two blades held at his sides: both points down and forward, clear of his legs.
     if (fighter.offWeapon?.held) {
       intent.bladeDir = [0.45, -1, -0.1];
@@ -6156,8 +6157,11 @@ function collideGround(world, fighter, h, arena) {
       }
     }
     if (fighter.x[base + 1] < floor) {
-      // Arriving this substep (it was clear of the floor): how fast it hit.
-      if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, (fighter.prev[base + 1] - fighter.x[base + 1]) / h);
+      // Arriving this substep (it was clear of the floor): how fast it hit. The part's speed as it fell, not only how far it
+      // moved: a joint's correction in the same substep can drag a light hand or forearm down centimetres at once, and that
+      // read as a speed is tens of m/s ("hand broken in the fall" at 11-15 m/s, where a man falling from his height brings
+      // a hand down at ~5). As on terrain (above).
+      if (fighter.prev[base + 1] >= floor - 1e-4) groundImpact(world, fighter, index, Math.min((fighter.prev[base + 1] - fighter.x[base + 1]) / h, WORLD.gravity * h - fighter.v[base + 1]));
       fighter.x[base + 1] = floor;
       // Flesh on canvas does not bounce: the push out of the floor must not
       // turn into upward speed, or a falling body springs back up.
@@ -7107,6 +7111,9 @@ function collideStriker(world, attacker, defender, striker, time) {
       [defender, capsule.b, capsule.a === capsule.b ? 0 : closest.t, -1],
     ].filter(([, , share]) => share > 0);
     const total = shares.reduce((sum, [fighter, index, share]) => sum + fighter.invMass[index] * share, 0);
+    // (Only once the stroke has landed: its blow reckoned, the weapon carried on into him by the rest of the stroke. A
+    // weapon held against him with no stroke going, or a point laid on him before its drive, parts them as bodies do.)
+    const struck = Boolean(striker.weapon && attacker.punch?.landed);
     for (const [fighter, index, share, sign] of shares) {
       const amount = (penetration * fighter.invMass[index] * share) / total;
       for (let axis = 0; axis < 3; axis += 1) {
@@ -7114,7 +7121,12 @@ function collideStriker(world, attacker, defender, striker, time) {
         // A weapon resting in a body is held off it at the hand, far from
         // where it touches: move the hand without making that a speed, or
         // the push repeated each substep winds the arm up into a fling.
-        if (striker.weapon && fighter === attacker) fighter.prev[index * 3 + axis] += sign * normal[axis] * amount;
+        // Nor, once the stroke has landed (`struck`), the man it is carried on into: the blow's momentum was his once, at the
+        // impact (registerWeaponImpact, pushBack), and the club or haft going on after it is kept out of him, not struck
+        // again each substep. (Made a speed, the push
+        // repeated 240 times a second drove a man a kanabo had dropped into the floor at 10-17 m/s, faster than the club
+        // itself was going: his shoulders and hands hit the ground at a fall's three times, "hand broken in the fall".)
+        if (striker.weapon && (fighter === attacker || struck)) fighter.prev[index * 3 + axis] += sign * normal[axis] * amount;
       }
     }
   }
@@ -7910,16 +7922,22 @@ function bluntConsequences(world, attacker, defender, capsule, event, { impulse,
  * the brain feels: the head's speed change (headDeltaV) is the blow's whole momentum on head and helmet, and the brain
  * strains by how fast that comes (event.harmDeltaV: the contact's `concentration`, the padding's stretch); the harm
  * table's blunt over 1 (a mace's 1.5, a hammer's 1.6: how its hard head crushes the tissue under it, BLADES.crushTrauma)
- * is no more speed change, so here it is 1 at most. Through what is on the head, the share it does not spread
- * (1 − its `blunt`). A heavy narrow head's `crush` (a flange, a hammer's face) drives a blow through soft headgear (a
- * coif, a quilted cap, a turban's cloth), whose padding it presses flat under that narrow face, so its spreading is lost;
- * a rigid shell (`rigid`: rigidHelmet) it only dents, and a dent is local (the bone under it: the crush's tissue harm)
- * and takes up energy as it forms: the shell still moves as one onto its padding and the whole head with it, which is
- * what strains the brain. (It was the blow's crush share for the brain too, so a flanged mace's or a hammer's blow
- * knocked out a man in a bascinet as it did a bare head, 2026-11-11.)
+ * is no more speed change, so here it is 1 at most. What is on the head spreads the blow over the skull (its `blunt`:
+ * the skull's and the scalp's harm, the bone broken under it), but spreading the same push over more of the head does
+ * not move the head less: the brain is spared only by the push coming slower, the padding's stretch (bluntConsequences),
+ * which is counted there. So a rigid shell (`rigid`: rigidHelmet) passes the brain the blow's whole speed change, drawn
+ * out by its padding; it dents locally and takes up a little, and still moves as one onto its padding with the whole head
+ * under it. Soft headgear (a coif, a quilted cap, a turban's cloth) is itself the padding, and a heavy narrow head's
+ * `crush` (a flange, a hammer's face) presses it flat under that face: of the padding's stretch (`padding`, HELMETS) only
+ * (1 − crush) is left, so this returns the share of the stretch that blow loses back (√ of the stretch kept over the
+ * stretch counted). (It was 1 − the helmet's blunt, on top of the padding: a padded helmet counted twice, and under a
+ * knight's bascinet a flanged mace's 80 J overhead (1.6 m/s to the head) reached the brain at 0.6, under the 1.2 m/s from
+ * which strain builds: no number of mace blows dazed, stunned or knocked down a helmeted man, 2026-11-17.)
  */
-export function brainShare(blunt, protection, rigid, crush) {
-  return Math.min(1, blunt) * (1 - (protection.blunt ?? 0) * (rigid ? 1 : 1 - crush));
+export function brainShare(blunt, rigid, crush, padding = 0) {
+  if (rigid || !(padding > 0)) return Math.min(1, blunt);
+  const stretch = WORLD.helmet.paddingStretch;
+  return Math.min(1, blunt) * Math.sqrt((1 + stretch * padding) / (1 + stretch * padding * (1 - Math.min(1, crush))));
 }
 
 /**
@@ -8459,7 +8477,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // as the armour spreads any blow, and its impulse): the shove of a thrust on plate, the jolt of a lance that unhorses.
   const press = punch.finisher && mix.pierce > 0 ? finisherPress(attacker, weapon, punch.finisher) : 0;
   const pointJoules = mix.pierce > 0 ? goes + press : 0;
-  const pointGoes = pointThrough(pointJoules, protection.pierce, world.random(), pointWidthOf(wspec));
+  const pointGoes = pointThrough(pointJoules, protection.pierce, world.random(), mix.cut > 0 ? cuttingWidth(pointWidthOf(wspec), protection.cut) : pointWidthOf(wspec));
   // (The press is a push, not a blow: what bursts the rings or the plate is the blow and the push together, but once the
   // point is through he is still leaning on it, and drives it on with all of the push, only the armour's hold on it taken.)
   const pressGoes = pointGoes > 0 ? 1 - PUNCTURE.after * Math.min(PUNCTURE.most, protection.pierce ?? 0) : 0;
@@ -8517,7 +8535,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // What its head crushes under it (BLADES.crushTrauma), by how its face presses in against the pendulum's (BLADES.crushFace):
   // a blunt weapon's head (bluntHeaded: a mace, a club, a hammer, a bat); a blade's flat or a spear's shaft crushes as before.
   const crushing = blowJoules * bluntShare * BLADES.crushTrauma * (bluntHeaded(wspec) ? contactStress(face, BLADES.crushFace) : 1);
-  const brainHarm = capsule.key === 'head' ? brainShare(mix.blunt + pointStopped + edgeStopped, protection, shelled, haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0) : bluntShare;
+  const brainHarm = capsule.key === 'head' ? brainShare(mix.blunt + pointStopped + edgeStopped, shelled, haft ? 0 : spec.hilt === 'cross' ? hiltCrush() : wspec.crush ?? 0, body.gear.helmet?.padding ?? 0) : bluntShare;
   bluntConsequences(world, attacker, defender, capsule, event, { impulse: blowImpulse, joules: blowJoules * bluntShare, struckMass: partMass, peakForce, harm: bluntShare, brainHarm, blocked, rotation: wspec.rotation * glance.twist, side: weapon.main, concentration, crushing, face });
   if (glanced) {
     // Off the plate: the blade is turned along it.
