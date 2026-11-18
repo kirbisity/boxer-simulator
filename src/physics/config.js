@@ -529,6 +529,14 @@ export const WORLD = {
   // the body's weight behind the limb, at a higher stamina cost, and leaving
   // the thrower committed (unable to defend) for a moment after.
   heavy: { loadSeconds: 0.2, loadTwist: 0.6, loadDip: 0.045, massFactor: 1.4, costFactor: 2.2, committedSeconds: 0.35 },
+  // A weapon stroke that meets nothing (no man, no blade, no shield) is not stopped by what it struck: the arms and the body
+  // must brake the weapon themselves, and the heavier it swings the longer it carries him round. Committed for `seconds` ×
+  // the square root of the weapon's heft (physics/effort.js strokeHeft: its inertia about the shoulder against a katana's,
+  // a thrust's mass against the reference's, at most `cap`): a katana's miss ~0.15 s, an ōdachi's ~0.3, a war hammer's or a
+  // kanabō's ~0.5; a thrust's `thrust` of that (a point drawn back along its own line, not braked across it). Unable to
+  // strike again or to defend till it is over (WORLD.heavy's `committed`), and the braking costs `breath` of the stroke's own
+  // stamina again.
+  miss: { seconds: 0.15, cap: 16, thrust: 0.5, breath: 0.4 },
   // A thrust on foot is driven by the body as well as the arms: the step (the rear leg pushing off and bracing),
   // the hips and shoulders turning in behind the shaft. Along the weapon's line that share of the body's mass
   // pushes with the point (physics.js bladeStrike), as a move's own `mass.body` does: the larger of the two.

@@ -18,11 +18,16 @@ export function weaponInertia(spec, reach) {
   return spec.mass * (reach + spec.balance) ** 2 + (spec.mass * length * length) / 12;
 }
 
+/** A stroke's heft against the move's reference weapon: a swing's inertia about the shoulder, a thrust's mass (1 for the reference). */
+export function strokeHeft(spec, reach, move) {
+  const reference = WEAPONS[move?.refWeapon ?? WORLD.weapons.effort.ref];
+  return move?.mode === 'thrust' ? spec.mass / reference.mass : weaponInertia(spec, reach) / weaponInertia(reference, reach);
+}
+
 /** The stroke's cost as a multiple of its move's own, by the weapon (1 for the move's reference weapon). */
 export function swingEffort(spec, reach, move) {
   const rule = WORLD.weapons.effort;
-  const reference = WEAPONS[move?.refWeapon ?? rule.ref];
-  const ratio = move?.mode === 'thrust' ? spec.mass / reference.mass : weaponInertia(spec, reach) / weaponInertia(reference, reach);
+  const ratio = strokeHeft(spec, reach, move);
   return 1 - rule.share + rule.share * Math.min(rule.cap, ratio);
 }
 

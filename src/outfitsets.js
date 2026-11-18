@@ -73,7 +73,7 @@ export const OUTFIT_SETS = {
     {
       key: 'mail', designs: [2], name: 'Mail shirt and kettle hat',
       blurb: { en: 'Shirt of iron rings over a padded jacket, every ring riveted by hand. Romans, Vikings and crusaders wore it. A thousand years of armour, handed down at last to those who could not afford plate.\nBy the 1400s new arrowheads went through rings like a needle through lace, and the lords had moved on to plate.\nThe poor got the old shirts, patched with rings from a dozen dead men.\nThe shirt will pass to one more man yet.', zh: '锁子衫与棉甲。铁环一枚枚手工铆合。罗马人穿过，维京人穿过，十字军也穿过。千年的甲，最后传给了买不起板甲的人。\n到十五世纪，新式箭头穿过铁环，如针穿花边。领主们早已换上板甲。\n旧衫落到穷人手中，破处用十几个死人身上拆下的铁环补缀。\n这件衫子，还会再传给下一个人。' },
-      patch: { extraMass: 0.105, protection: { blunt: 0.35, cut: 0.88, pierce: 0.65 }, gaps: null },
+      patch: { extraMass: 0.105, protection: { blunt: 0.35, cut: 0.88, pierce: 0.65 }, gaps: { opens: false } },
     },
     {
       key: 'breastplate', designs: [3], name: 'Breastplate and sallet',

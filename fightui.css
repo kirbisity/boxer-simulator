@@ -248,3 +248,18 @@ html:lang(zh) :is(.fu-legend, .fu-toast-name, .fu-toast-outcome, .fu-btn-name) {
 .deflect-cue span { position: absolute; top: 74px; left: 0; right: 0; text-align: center; font: 600 22px/1 "Cormorant Garamond", Georgia, serif; letter-spacing: 0.18em; color: #ffe2a8; text-shadow: 0 0 12px rgba(255, 170, 60, 0.95); }
 .deflect-cue.play { animation: dc-fade 0.55s ease-out forwards; }
 @keyframes dc-fade { 0% { opacity: 1; } 35% { opacity: 0.9; } 100% { opacity: 0; } }
+/* Step out: beside the stick, to its right and level with its middle, under the left thumb (the stick's own size and place in
+   each layout, boxer.css and above). */
+.step-button { left: calc(172px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 107px); width: 58px; height: 58px; }
+.step-button b { display: block; width: 28px; height: 28px; }
+.step-button .fu-icon { width: 100%; height: 100%; display: block; }
+.step-button span { font-size: 9px; }
+.step-button.blocked { opacity: 0.45; }
+@media (max-width: 520px) {
+  .step-button { left: calc(144px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 92px); width: 52px; height: 52px; }
+  .step-button b { width: 24px; height: 24px; }
+  .fight-ui[data-fightui="buttons"] .step-button { left: calc(124px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 72px); }
+}
+@media (max-width: 380px) { .fight-ui[data-fightui="buttons"] .step-button { left: calc(114px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 62px); width: 48px; height: 48px; } }
+/* A phone on its side: the art has the place right of the stick, so Step out goes one further. */
+@media (max-height: 480px) { .step-button, .fight-ui[data-fightui="buttons"] .step-button { left: calc(214px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 76px); } }

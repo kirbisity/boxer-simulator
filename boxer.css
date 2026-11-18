@@ -579,8 +579,8 @@ body[data-game="home"] .fight-ui, body[data-overlay="wizard"] .fight-ui, body.sh
 .jump-button b, .crawl-button b { display: block; width: 30px; height: 30px; }
 .jump-button .fu-icon, .crawl-button .fu-icon { width: 100%; height: 100%; display: block; }
 .jump-button span, .crawl-button span { font-size: 10px; }
-.jump-button kbd, .crawl-button kbd { display: none; position: absolute; left: -4px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: var(--r); background: rgba(var(--pit), 0.85); border: 1px solid rgba(var(--ink), 0.3); font: 600 9px var(--mono); color: var(--muted); }
-.fight-ui[data-device="mouse"] .jump-button kbd, .fight-ui[data-device="mouse"] .crawl-button kbd { display: block; }
+.jump-button kbd, .crawl-button kbd, .step-button kbd { display: none; position: absolute; left: -4px; top: -4px; min-width: 16px; padding: 1px 3px; border-radius: var(--r); background: rgba(var(--pit), 0.85); border: 1px solid rgba(var(--ink), 0.3); font: 600 9px var(--mono); color: var(--muted); }
+.fight-ui[data-device="mouse"] .jump-button kbd, .fight-ui[data-device="mouse"] .crawl-button kbd, .fight-ui[data-device="mouse"] .step-button kbd { display: block; }
 .jump-button.on { background: rgba(120, 190, 255, 0.4); border-color: #9cd0ff; }
 .crawl-button.on { background: rgba(127, 224, 192, 0.42); border-color: #7fe0c0; color: #0d1f19; }
 .jump-button.blocked, .crawl-button.blocked { opacity: 0.4; }

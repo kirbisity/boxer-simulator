@@ -155,6 +155,7 @@ export const UI_FIGHT = {
   'touch.lockOn': { en: 'Lock on', zh: '锁定目标' },
   'touch.lockedOn': { en: 'Locked on {who}: press to let go', zh: '已锁定 {who}：再按一下松开' },
   'touch.jump': { en: 'Jump', zh: '跳跃' },
+  'touch.stepOut': { en: 'Step out', zh: '闪身' },
   'touch.crawl': { en: 'Crawl', zh: '爬行' },
   'touch.stand': { en: 'Stand', zh: '起身' },
   'touch.action': { en: 'Action', zh: '动作' },

@@ -1655,6 +1655,18 @@ export const BLADES = {
     layers: { mail: { blunt: 0.3, cut: 0.85, pierce: 0.65 }, butted: { blunt: 0.15, cut: 0.7, pierce: 0.3 }, bare: { blunt: 0, cut: 0, pierce: 0 } },
     // A zone counts as one when the normal of the struck surface faces this far (cosine) towards where it opens (`faces`).
     facing: 0.3,
+    // A man opens his own gaps as he strikes (physics/gaps.js gapExposure): an arm raised to swing lifts the pauldron or the
+    // sode off the armpit and turns the bend of the elbow out, so a blow landing there meets the opening, not finds it. By
+    // how far his upper arm is raised from hanging at his side: nothing up to `from` rad (60°: a guard, a thrust's arms),
+    // all of it at `to` (150°: the arm up over the head for a blow from above); a blow from the side, the arm out level
+    // (~90°), a third of it. Of a zone, `zones` of it is opened so: the armpit most, the elbow's crease a little. What is under
+    // the gap is still what the kit has there (gapUnder: a harness's voiders, a coat's mail): raising the arm opens no gap a
+    // kit has not got (mail and cloth have none: only rigid armour, `rigidFrom`).
+    // A kit's `hung` (by part, or one side's part): armour hung beside a limb rather than strapped round it, the sode on their
+    // cords, which the raised arm leaves; struck then, the arm meets what is under it (`hung[part]`), as often as it is raised.
+    // A kit of mail alone (`opens` false: a mail shirt, a hauberk) moves with the arm and opens nothing as it rises.
+    exposure: { from: 1.05, to: 2.6, zones: { armpit: 0.9, elbow: 0.3 } },
+    opens: true,
     // Each zone on the parts it lies on, measured on the man's own body: on the trunk, `height` the share of the way from
     // his hips to his neck and `round` the degrees round from the front of his chest (to either side; 180 his back), `cap`
     // how far up its top end the surface faces (the collar); on the head, `rise` how far up the face of the helmet faces

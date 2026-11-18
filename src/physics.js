@@ -12,7 +12,7 @@ import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions
 import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, cuttingWidth, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restArmAngle, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
-import { gapChance, gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
+import { gapChance, gapExposure, gapsOf, gapUnder, gapZoneAt, hungOff } from './physics/gaps.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, loadStop, LONG_GUN, MAGAZINE_CHANGE, raisedAim, reload, reloadKind, sightsOn, SUPPORT_GRIP, TUBE_LOAD } from './physics/ranged.js';
 import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
@@ -30,7 +30,7 @@ import { bankOf, cornerPace, cornerShare, cornering, footworkQuickness, limpOf, 
 import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
-import { bowShotCost, swingEffort } from './physics/effort.js';
+import { bowShotCost, strokeHeft, swingEffort } from './physics/effort.js';
 import { deflecting, deflectsWith, deflectWindow, guardHold, noteGuard } from './physics/deflect.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
@@ -2225,7 +2225,7 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   if (spec?.kind === 'strike' && limbGone(fighter, spec.limb)) return false;
   // On a ladder his hands are on its rungs: he strikes only from its head, over the walk's edge (physics/ladders.js).
   if (fighter.climbing && !fighter.climbing.top) return false;
-  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
+  if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.committed > 0 || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
   // From the saddle only what is before him (WORLD.mount.arc: inRiderArc): nothing behind, nor square beside him.
   if (fighter.mount && !inRiderArc(fighter, at ?? point(target.x, P.pelvis))) return false;
   // A blade caught in a wolf-brush's branches strikes nothing until it is free (physics/brush.js).
@@ -2275,6 +2275,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
     beaten: undefined,
     // The share of its turn the trunk is wound back first (`coil`: a weapon art's, or the player's blow from a side, control.js).
     coil: coil || spec.coil || undefined,
+    // What the stroke cost him (a miss costs a share of it again to brake: WORLD.miss).
+    drain,
   };
   // A riposte: struck as the other blade (or the guard) takes his.
   if (riposte) fighter.punch.riposte = true;
@@ -2418,6 +2420,23 @@ function tooHeavyToDeflect(attacker, punch, defender) {
   const theirs = effectiveMassAt(blade.spec, attacker.body.limbKg[`${blade.main}Arm`] * 0.6, blade.spec.length * WORLD.deflect.strikeAt, arm(attacker));
   const mine = effectiveMassAt(defender.weapon.spec, defender.body.limbKg[`${defender.weapon.main}Arm`] * 0.6, defender.weapon.spec.length * 0.5, arm(defender));
   return beatenThrough(theirs, mine) > 0;
+}
+
+/**
+ * A weapon stroke that met nothing (WORLD.miss): the weapon carries on and he must brake it himself, committed the longer
+ * the heavier it swings, and out of breath by a share of the stroke's cost again.
+ */
+function overswing(fighter, punch) {
+  const spec = punch.spec;
+  if (spec.path !== 'blade' || punch.landed || punch.stopped || punch.beaten || spec.couched) return;
+  const blade = bladeFor(fighter, spec);
+  if (!blade?.held) return;
+  const rule = WORLD.miss;
+  // (Against the katana whatever the move's own reference: a hammer's move is measured against a hammer for its cost.)
+  const heft = Math.min(rule.cap, strokeHeft(blade.spec, fighter.body.reach, { mode: spec.mode }));
+  const seconds = rule.seconds * Math.sqrt(Math.max(0, heft)) * (spec.mode === 'thrust' ? rule.thrust : 1);
+  fighter.committed = Math.max(fighter.committed ?? 0, seconds);
+  drawStamina(fighter, (punch.drain ?? 0) * rule.breath);
 }
 
 /**
@@ -2724,6 +2743,7 @@ function updateIntent(world, fighter, dt) {
       throwPunch(world, fighter, spec.then, next.zones[0], man?.state === 'up' ? {} : { at: punch.at ?? toWorld(fighter, punch.aim) });
     } else if (punch.t >= spec.duration) {
       if (punch.heavy) fighter.committed = WORLD.heavy.committedSeconds;
+      overswing(fighter, punch);
       fighter.punch = null;
     }
   }
@@ -8455,7 +8475,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   }
   // A dull edge is a wider one: it parts less of what it meets, the rest lands as the flat (physics/wear.js bluntEdge).
   if (!haft) bluntEdge(weapon, mix);
-  const covered = protectionAt(body.gear, capsule.key);
+  // (Armour hung beside a raised arm, the sode, has swung off it: physics/gaps.js hungOff.)
+  const hung = hungOff(defender, capsule.key);
+  const covered = hung && world.random() < hung.share ? hung.under : protectionAt(body.gear, capsule.key);
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   // Into a gap in rigid armour (BLADES.gaps): only where there is one (physics/gaps.js gapZoneAt: the armpit, the groin, the
   // throat, the sights, the bend of a joint; never the middle of the breast, the back or the crown), then only what is under it, and no glance.
@@ -8470,7 +8492,10 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // (An open face is not found but met: as often as it is bare, whoever strikes it: BLADES.gaps.zones `open`.)
   const bareFace = Boolean(gapZone && BLADES.gaps.zones[gapZone]?.open);
   const gapFound = !gapZone ? 0 : bareFace ? gapChance(body.gear, gapZone, spec.mode) : (punch.finisher ? punch.finisher.gap : spec.placed ?? gapChance(body.gear, gapZone, spec.mode)) * placed;
-  const intoGap = gapFound > 0 && world.random() < (bareFace ? gapFound : gapFound * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5)));
+  // (A gap his own raised arm has opened is met, not found: physics/gaps.js gapExposure. An edge only where an edge goes.)
+  const opened = gapZone && !bareFace && (spec.mode === 'thrust' || BLADES.gaps.zones[gapZone]?.edge) ? gapExposure(defender, capsule.key, gapZone, contactPoint) : 0;
+  const found = gapFound > 0 ? (bareFace ? gapFound : gapFound * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5))) : 0;
+  const intoGap = (found > 0 || opened > 0) && world.random() < opened + (1 - opened) * found;
   const protection = intoGap ? { ...gapUnder(body.gear, gapZone, covered), deflects: false } : covered;
   // (A shaft that shatters on armour it cannot go into, below.)
   const shattered = !haft && !intoGap && shattersOn(weapon, spec.mode, protection, energy);

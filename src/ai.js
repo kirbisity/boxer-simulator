@@ -7,7 +7,7 @@ import { keepOrders, obeyOrder, orderedFocus, orderKeepsPlace } from './command.
 import { P } from './body.js';
 import { MOVES, pointRoomOf, STRATEGIES, STYLES, moveRange } from './moves.js';
 import { MAIMING, maimFear } from './maiming.js';
-import { aimPoint, armGone, inRiderArc, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD } from './physics.js';
+import { aimPoint, armGone, inRiderArc, bladeFor, blockFor, bodyHarm, chinNow, couchedGap, crawlingAway, dazedShare, dropShield, dropWeapon, fightTier, guardReading, holdGuard, hostile, fillGrid, floorGrid, gridAround, inFight, legGone, legShare, limbGone, longPoint, nearestOpponent, perform, point, protectionAt, reachOf, shedStandard, sightAngle, staggerShare, startCrawl, startPickup, strikeThreat, throwPunch, toLocal, useMounted, WORLD, undeflectable } from './physics.js';
 import { vec, yawRotate } from './pose.js';
 import { BLADES, GUN, WEAPONS } from './weapons.js';
 import { FACTIONS, factionOf } from './outfits.js';
@@ -1299,21 +1299,29 @@ export function chooseDefence(fighter, attacker, style, incoming, random) {
   const root = spec.limb.replace(/Hand|Elbow/, 'Shoulder').replace(/Foot|Knee/, 'Hip');
   const lateral = toLocal(fighter, point(attacker.x, P[root]))[2] - head[2];
   const away = Math.abs(lateral) > 0.02 ? -Math.sign(lateral) : random() < 0.5 ? 1 : -1;
-  const name = pickDefence(style, incoming, random, heaviness(attacker, incoming), longPoint(attacker, incoming));
+  // A blow that would beat through his blade (the red mark over him: physics.js undeflectable) is not met with it: he takes
+  // his body out of its way, as from any heavy blow, and puts nothing of his weapon in it.
+  const beats = undeflectable(attacker, fighter);
+  const name = pickDefence(style, incoming, random, heaviness(attacker, incoming, fighter), longPoint(attacker, incoming), beats);
   // A roll starts on the side the hook comes from and ducks across with it.
   return { name, side: name === 'roll' ? -away : away };
 }
 
-/** How heavy an incoming blow is, 0 (a jab) to 1 (a great club, or a strike loaded up). */
-function heaviness(striker, incoming) {
+/** How heavy an incoming blow is, 0 (a jab) to 1 (a great club, or a strike loaded up; or one that beats through his blade). */
+function heaviness(striker, incoming, defender = null) {
   const spec = AI.evadeHeavy;
+  if (defender && undeflectable(striker, defender)) return 1;
   const blade = incoming.spec.path === 'blade' ? bladeFor(striker, incoming.spec) : null;
   const weapon = blade?.held ? blade.spec.mass / spec.heavyMass : 0;
   return Math.min(1, Math.max(weapon, incoming.heavy ? spec.loaded : 0));
 }
 
-function pickDefence(style, incoming, random, heavy = 0, long = false) {
+function pickDefence(style, incoming, random, heavy = 0, long = false, beats = false) {
   const answers = { ...style.defences };
+  if (beats) {
+    for (const block of ['guard', 'weaponBlock', 'parry']) delete answers[block];
+    answers.stepBack ??= 0.25;
+  }
   const spec = incoming.spec;
   if (long) {
     // A long point: stepping straight back only keeps him on its line (it comes on faster than he
@@ -3899,13 +3907,14 @@ function decide(world, fighter, dt) {
     seenFor = incoming.watchedFrom === undefined ? 0 : incoming.age - incoming.watchedFrom;
   }
   // His guard held up (keepGuard) is his answer: it goes to meet the blow as well as he reads it.
-  if (incoming && fighter.guardHeld) fighter.reacted = true;
+  // (Not against a blow that would beat through it: he lets it go and steps out of the way, below.)
+  if (incoming && fighter.guardHeld && !undeflectable(striker, fighter)) fighter.reacted = true;
   if (incoming && !fighter.reacted && !fighter.punch && !(fighter.committed > 0) && seenFor >= fighter.reactAt) {
     fighter.reacted = true;
     // Reeling from a blow, he is slow to cover up.
     const reeling = staggerShare(fighter, WORLD.stagger.defend);
     // A heavy blow is watched for, and got out of the way of, more than a light one.
-    const heavy = 1 + AI.evadeHeavy.defend * heaviness(striker, incoming);
+    const heavy = 1 + AI.evadeHeavy.defend * heaviness(striker, incoming, fighter);
     // An enemy's wolf-brush between his eyes and the striker: he sees the blow late (physics/brush.js BRUSH.screen).
     const screen = (world.brushBorne ??= world.fighters.some((man) => man.weapon?.spec.brush)) && brushScreens(world, fighter, striker) ? BRUSH.screen : 1;
     if (random() < Math.min(0.97, style.defendChance * plan.defend * (0.6 + 0.6 * fighter.body.inputs.exercise) * reeling * heavy * screen)) {

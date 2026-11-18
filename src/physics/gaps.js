@@ -155,3 +155,41 @@ export function expectedGap(gear, key, mode, covered) {
   return { found: share * gapChance(gear, zone, mode), under: gapUnder(gear, zone, covered), met: Boolean(BLADES.gaps.zones[zone].open) };
 }
 
+/** How far (0..1, BLADES.gaps.exposure) his arm on `side` ('l' or 'r') is raised from hanging at his side, as his own pose has it. */
+export function armRaised(fighter, side) {
+  const rule = BLADES.gaps.exposure;
+  const frame = gapTrunkFrame(fighter);
+  const arm = vec.sub(gapPoint(fighter, `${side}Elbow`), gapPoint(fighter, `${side}Shoulder`));
+  const length = vec.length(arm);
+  if (length < 1e-6) return 0;
+  const raised = Math.acos(Math.max(-1, Math.min(1, -vec.dot(arm, frame.up) / length)));
+  return Math.max(0, Math.min(1, (raised - rule.from) / (rule.to - rule.from)));
+}
+
+/** The side of him ('l' or 'r') a blow at `point` on part `key` is on: a limb's own, else which side of his spine. */
+function sideOf(fighter, key, point) {
+  if (key !== 'trunk' && key !== 'head') return key[0];
+  const frame = gapTrunkFrame(fighter);
+  return vec.dot(vec.sub(point, frame.pelvis), frame.left) >= 0 ? 'l' : 'r';
+}
+
+/**
+ * The share of blows landing in gap `zone` (at `point` on part `key`) that meet it opened by his own raised arm, whatever the
+ * striker's art (BLADES.gaps.exposure): the armpit under an arm lifted to strike from above, a little the elbow's bend.
+ */
+export function gapExposure(fighter, key, zone, point) {
+  const share = BLADES.gaps.exposure.zones[zone];
+  if (!share || !gapsOf(fighter.body.gear).opens) return 0;
+  return share * armRaised(fighter, sideOf(fighter, key, point));
+}
+
+/**
+ * Armour hung beside the limb (the kit's `gaps.hung`, BLADES.gaps.exposure) at part `key`: what is under it, and the share of
+ * blows that meet that instead (as far as the arm is raised off it); null where the kit hangs nothing there.
+ */
+export function hungOff(fighter, key) {
+  const hung = gapsOf(fighter.body.gear).hung;
+  if (!hung || key === 'trunk' || key === 'head') return null;
+  const under = hung[key] ?? hung[key.slice(1)];
+  return under ? { under, share: armRaised(fighter, key[0]) } : null;
+}

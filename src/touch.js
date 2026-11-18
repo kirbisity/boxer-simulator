@@ -124,6 +124,12 @@ export function installFightControls(root, hooks) {
   jump.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.jump}</b><span data-i18n="touch.jump">${t('touch.jump')}</span><kbd>Space</kbd>`;
   jump.setAttribute('aria-label', t('touch.jump'));
   jump.dataset.i18nAria = 'touch.jump';
+  // Step out (beside the stick, under the left thumb): the body taken out of the blow's way, off its line or back out of its
+  // arc (control.js evasionFor), for a blow too heavy to stop; a deflect is the Guard's.
+  const stepOut = root.appendChild(uiElement('button', 'fight-button step-button'));
+  stepOut.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.stepOut}</b><span data-i18n="touch.stepOut">${t('touch.stepOut')}</span><kbd>E</kbd>`;
+  stepOut.setAttribute('aria-label', t('touch.stepOut'));
+  stepOut.dataset.i18nAria = 'touch.stepOut';
   const crawl = root.appendChild(uiElement('button', 'fight-button crawl-button'));
   crawl.innerHTML = `<b>${FIGHT_UI_CONTROL_ICONS.crawl}</b><span class="label">Crawl</span><kbd>C</kbd>`;
   crawl.setAttribute('aria-label', t('touch.crawl'));
@@ -316,7 +322,7 @@ export function installFightControls(root, hooks) {
   surface.addEventListener('lostpointercapture', drop);
   // No callout, selection, context menu or page zoom from the fight.
   for (const kind of ['contextmenu', 'selectstart', 'dragstart', 'gesturestart', 'dblclick']) {
-    for (const target of [surface, guard, action, art, swap, horseButton, lock, jump, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
+    for (const target of [surface, guard, action, art, swap, horseButton, lock, jump, stepOut, crawl]) target.addEventListener(kind, (event) => event.preventDefault());
   }
 
   // Guard: held, the block; tapped, an evasion. With a weapon in hand it is the deflect (physics/deflect.js): up from the
@@ -372,6 +378,13 @@ export function installFightControls(root, hooks) {
     askJump();
     navigator.vibrate?.(12);
   });
+  // Step out: a press is an evasion (as E), the same as a tap of the Guard without a weapon in hand.
+  stepOut.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    if (!active) return;
+    askStepOut();
+    navigator.vibrate?.(12);
+  });
   // Crawl: down on his knees, or up again (as C); not while locked on.
   crawl.addEventListener('pointerdown', (press) => {
     press.preventDefault();
@@ -407,6 +420,12 @@ export function installFightControls(root, hooks) {
     (hooks.orders().actions ??= []).push('art');
     signal('action', 'art');
     return true;
+  }
+
+  /** A step out of the blow's way asked for (the button or E): carried out with the orders (control.js defend). */
+  function askStepOut() {
+    (hooks.orders().evasions ??= []).push(1);
+    signal('evade');
   }
 
   /** A jump asked for (the button or Space): carried out with the orders (control.js directFighter). */
@@ -566,6 +585,8 @@ export function installFightControls(root, hooks) {
     const canJump = !jumpNow(world, me).blocked;
     jump.classList.toggle('blocked', !canJump);
     jump.classList.toggle('on', Boolean(me.jump || me.mount?.air));
+    // Step out dimmed while he cannot (down, on a horse, carried on by a stroke that met nothing: physics.js overswing).
+    stepOut.classList.toggle('blocked', me.state !== 'up' || Boolean(me.mount) || me.committed > 0);
     // The player's own status, compact, low down.
     status.querySelector('.name').textContent = firstNameOf(me);
     // (A great vessel open, a limb lost: maiming.js. The bar drains and pulses; BLEEDING when nothing else is to say.)
@@ -630,6 +651,7 @@ export function installFightControls(root, hooks) {
     mark.hidden = true;
     guard.classList.remove('on');
     jump.classList.remove('on', 'blocked');
+    stepOut.classList.remove('blocked');
     art.hidden = true;
     art.classList.remove('winded');
     crawl.classList.remove('on', 'blocked');
@@ -640,7 +662,7 @@ export function installFightControls(root, hooks) {
     commandBar.reset();
   }
 
-  return { update, setActive, reset, toggleLock, jump: askJump, toggleCrawl: pressCrawl, art: askArt, swapWeapon: () => (sidearmSwapReady(hooks.player()) ? askKit('swapWeapon') : false), horse: () => askKit(horseAction(hooks.world(), hooks.player())), setDevice, get device() { return device; }, fightUi: fightUi.choose };
+  return { update, setActive, reset, toggleLock, jump: askJump, stepOut: askStepOut, toggleCrawl: pressCrawl, art: askArt, swapWeapon: () => (sidearmSwapReady(hooks.player()) ? askKit('swapWeapon') : false), horse: () => askKit(horseAction(hooks.world(), hooks.player())), setDevice, get device() { return device; }, fightUi: fightUi.choose };
 }
 
 /** Keep a pointer's events coming here even off the element (a pointer the browser no longer knows is let be). */

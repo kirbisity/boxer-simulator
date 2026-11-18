@@ -2103,6 +2103,8 @@ window.addEventListener('keydown', (press) => {
   if (key === 'v') return setWalking(!player().walking);
   // C: down on his knees to crawl, or up again (not while locked on: control.js toggleCrawl). Space: a jump.
   if (key === 'c') return void fightControls.toggleCrawl();
+  // E: step out of the blow's way (the Step out button).
+  if (key === 'e') return void fightControls.stepOut();
   if (press.key === ' ') {
     press.preventDefault();
     fightControls.jump();

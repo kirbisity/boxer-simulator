@@ -1100,6 +1100,8 @@ function defend(world, fighter, orders) {
   fighter.guardHeld = Boolean(orders.guard);
   if (orders.guard) holdGuard(world, fighter, world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id));
   for (const request of orders.evasions ?? []) {
+    // (Carried on by a stroke that met nothing, he cannot: physics.js overswing.)
+    if (fighter.committed > 0) break;
     const evasion = evasionFor(world, fighter);
     if (!fighter.punch) perform(world, fighter, evasion.name, { side: evasion.side, from: evasion.from });
     else if (evasion.name === 'stepBack') fighter.punch = null;

@@ -1165,7 +1165,13 @@ export const OUTFITS = {
     // saddle, the armpits under hanging plates (the sendan and kyūbi no ita) not closed, the right side a separate plate
     // tied on (the waidate), the thighs open under four broad skirt panels; and the laced box parts at its lacing and the
     // waidate's seam more than most laced armour (`lacing` 0.2, was 0.15).
-    gaps: { thrust: 0.6, swing: 0.18, lacing: 0.2 },
+    gaps: {
+      thrust: 0.6, swing: 0.18, lacing: 0.2,
+      // The sode hang on cords from the shoulder straps, beside the arm, not round it (BLADES.gaps.exposure `hung`): an arm
+      // raised to strike leaves them, and under them is the bow arm's mailed sleeve (the left forearm's kote) and the
+      // sword arm's robe (the right forearm's figures).
+      hung: { lUpperArm: kote({ blunt: 0.19, cut: 0.6, pierce: 0.3 }), rUpperArm: { blunt: 0.05, cut: 0.08, pierce: 0.04 } },
+    },
     // Courage 0.85 (was 0.45): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
@@ -1818,6 +1824,8 @@ export const OUTFITS = {
     // Pierce 0.65, mail over its padding (PIERCE_SCALE).
     protection: { blunt: 0.35, cut: 0.9, pierce: 0.65, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.95, pierce: 0.75, deflects: true }, limb: { blunt: 0.03, cut: 0.1, pierce: 0.03 } } },
     courage: 0.45,
+    // Mail alone: it rises with the arm and opens no gap (BLADES.gaps `opens`).
+    gaps: { opens: false },
     designs: [
       { label: 'Mail, red tunic, bracae', top: { kind: 'tunic', color: '#7a2a22' }, bottom: { kind: 'pants', color: '#5a4c36' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'galea', color: '#b8bec6', gold: '#9a7a3a' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
       { label: 'Mail, blue tunic, bracae', top: { kind: 'tunic', color: '#2f4468' }, bottom: { kind: 'pants', color: '#4a4030' }, armor: { kind: 'hauberk', color: '#8d9097' }, head: { kind: 'galea', color: '#b8bec6', gold: '#9a7a3a' }, feet: { kind: 'compactBoot', color: '#3a2416' } },
@@ -2121,6 +2129,8 @@ export const OUTFITS = {
     // Pierce 0.65, mail over its padding (PIERCE_SCALE).
     protection: { blunt: 0.35, cut: 0.9, pierce: 0.65, bullet: { head: 0.25, torso: 0.15, limb: 0 }, regions: { head: { blunt: 0.55, cut: 0.92, pierce: 0.72, deflects: true }, limb: { blunt: 0, cut: 0, pierce: 0 }, UpperArm: { blunt: 0.3, cut: 0.85, pierce: 0.45 } } },
     courage: 0.4,
+    // Mail alone: it rises with the arm and opens no gap (BLADES.gaps `opens`).
+    gaps: { opens: false },
     designs: [
       { label: 'Mail, red tunic, bronze helmet', top: { kind: 'tunic', color: '#8a2a22' }, bottom: { kind: 'loincloth', color: '#8a2a22' }, armor: { kind: 'hamata', color: '#8d9097', gold: '#b98a3e', lace: '#3a2416' }, head: { kind: 'montefortino', color: '#b98a3e', plume: '#1a1a1d' }, feet: { kind: 'sandal', color: '#3a2416' } },
     ],
