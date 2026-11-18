@@ -133,8 +133,13 @@ test('mail under the gaps where history puts it: a harness\'s voiders, standard 
   for (const zone of ['armpit', 'elbow', 'groin', 'neck']) {
     assert.deepEqual(under('knight', zone), { blunt: mail.blunt, cut: mail.cut, pierce: mail.pierce }, `knight: ${zone}`);
     assert.deepEqual(under('joan', zone), { blunt: mail.blunt, cut: mail.cut, pierce: mail.pierce }, `Joan: ${zone}`);
-    assert.equal(under('samuraiTosei', zone).pierce, mail.pierce, `tosei: ${zone}`);
   }
+  // The tosei's kusari only in the kote's sleeve at the elbow, and butted: a point opens it. The armpit, the groin and the
+  // throat (wakibiki, a mailed haidate, the nodowa: extras few wore) the clothes under the dō.
+  const butted = BLADES.gaps.layers.butted;
+  assert.equal(under('samuraiTosei', 'elbow', 'lForearm').pierce, butted.pierce, 'tosei: the kote at the elbow');
+  assert.ok(butted.pierce < mail.pierce && butted.cut < mail.cut, 'butted rings below riveted mail');
+  for (const zone of ['armpit', 'groin', 'neck']) assert.equal(under('samuraiTosei', zone).pierce, BLADES.gaps.under.pierce, `tosei: ${zone}`);
   assert.equal(under('knight', 'knee').pierce, BLADES.gaps.under.pierce, 'the back of the knee: the arming hose');
   assert.equal(under('knight', 'visor', 'head').pierce, 0, 'behind the sights, the face');
   assert.equal(under('conquistadorPlate', 'armpit').cut, mail.cut, 'the mail sleeves');

@@ -131,7 +131,7 @@ export function gapUnder(gear, zone, covered) {
   const mailed = gaps.mail === 'all' ? !spec?.under : gaps.mail?.includes(zone);
   // (A layer worn under the whole kit, outfits.js UNDER_ARMOUR, lies under the gaps it reaches: a mail shirt under the coat.)
   const layered = !spec?.under && gear.under?.zones?.includes(zone);
-  const under = mailed ? BLADES.gaps.layers.mail : spec?.under ? BLADES.gaps.layers[spec.under] : layered ? gear.under.guard : gaps.under;
+  const under = mailed ? BLADES.gaps.layers[gaps.mailMake ?? 'mail'] : spec?.under ? BLADES.gaps.layers[spec.under] : layered ? gear.under.guard : gaps.under;
   return {
     blunt: Math.min(under.blunt ?? 0, covered.blunt ?? 0),
     cut: Math.min(under.cut ?? 0, covered.cut ?? 0),

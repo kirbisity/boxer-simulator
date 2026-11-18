@@ -1647,8 +1647,12 @@ export const BLADES = {
     under: { blunt: 0.25, cut: 0.3, pierce: 0.2 },
     // What else may be under a gap (a kit's `mail`: the zones, or 'all', where it has mail under them; a zone's `under`):
     // riveted mail over the arming doublet (voiders, gussets, a standard, a mail skirt), which turns an edge and a point
-    // less (as the kits' own mail over its padding: cut ~0.88, pierce 0.65); bare skin.
-    layers: { mail: { blunt: 0.3, cut: 0.85, pierce: 0.65 }, bare: { blunt: 0, cut: 0, pierce: 0 } },
+    // less (as the kits' own mail over its padding: cut ~0.88, pierce 0.65); bare skin. A kit's `mailMake` names another
+    // layer for its mail: `butted`, the Japanese kusari, fine rings butted shut and sewn to cloth with no padding behind
+    // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988): it turns a drawn edge, but a point spreads the butted
+    // ends and goes through as if through the cloth beneath (pierce 0.3, near the arming coat's 0.2), and a blow meets
+    // nothing to spread it (blunt 0.15).
+    layers: { mail: { blunt: 0.3, cut: 0.85, pierce: 0.65 }, butted: { blunt: 0.15, cut: 0.7, pierce: 0.3 }, bare: { blunt: 0, cut: 0, pierce: 0 } },
     // A zone counts as one when the normal of the struck surface faces this far (cosine) towards where it opens (`faces`).
     facing: 0.3,
     // Each zone on the parts it lies on, measured on the man's own body: on the trunk, `height` the share of the way from

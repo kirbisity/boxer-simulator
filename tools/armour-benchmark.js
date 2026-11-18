@@ -27,7 +27,7 @@ const average = (values) => values.reduce((sum, value) => sum + value, 0) / valu
 /** What is under a gap in this kit: mail where it says (`mail`), else the arming coat (`under`). */
 function underGap(gaps, kind) {
   const layers = BLADES.gaps.layers;
-  const layer = gaps.mail ? layers.mail : gaps.under ?? BLADES.gaps.under;
+  const layer = gaps.mail ? layers[gaps.mailMake ?? 'mail'] : gaps.under ?? BLADES.gaps.under;
   return layer[kind];
 }
 

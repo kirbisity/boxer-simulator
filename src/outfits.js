@@ -553,9 +553,13 @@ const MING_ARM_GUARD = { blunt: 0.55, cut: 0.98, pierce: 0.93, deflects: true };
  *   gussets or plate to close them (a kit's `gaps.mail`); a kit without them is opened a little more there than a harness
  *   (`thrust` 0.46, `swing` 0.12), its plates closely lapped and riveted (`lacing` 0.1).
  */
+// Both makes a little less against a point than they were (pierce a further -0.05) and a blow (blunt -0.02), the edge as
+// it was: small plates leave seams and thin iron, so a strong war arrow (110-140 J) now and then goes through a coat close
+// to (the Ming coat's puncture for a bodkin ~150 J at pierce 0.82, now ~125 J ± 30%: weapons.js PUNCTURE) and does a
+// little harm, and a couched lance goes through more of the time; an edge is still turned.
 const BRIGANDINE_MAKES = {
-  ming: { guard: { blunt: 0, cut: -0.01, pierce: -0.03 }, gaps: { thrust: 0.44, swing: 0.11, lacing: 0.13, closed: ['groin'] } },
-  european: { guard: { blunt: -0.04, cut: 0, pierce: 0 }, bites: 0.71, gaps: { thrust: 0.46, swing: 0.12, lacing: 0.1 } },
+  ming: { guard: { blunt: -0.02, cut: -0.01, pierce: -0.08 }, gaps: { thrust: 0.44, swing: 0.11, lacing: 0.13, closed: ['groin'] } },
+  european: { guard: { blunt: -0.06, cut: 0, pierce: -0.05 }, bites: 0.71, gaps: { thrust: 0.46, swing: 0.12, lacing: 0.1 } },
 };
 /** A brigandine's figures: the coat's own (`guard`: blunt, cut, pierce), with what its `make` (BRIGANDINE_MAKES) gains or costs it. */
 const brigandineOf = (guard, make) => {
@@ -573,14 +577,14 @@ const brigandineOf = (guard, make) => {
  * (pierce 0.85, PIERCE_SCALE). What sets the kits apart is what else they wear: steel arm guards (MING_ARM_GUARD), mail under it
  * (UNDER_ARMOUR.mail), a mask. (Each kit had its own figures for the coat: the Ming elite's 0.7 / 0.95 / 0.87, the coat itself
  * credited with what its arm guards and lapping give; the user's call, 2026-11-10.)
- * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.72, cut 0.92 (was 0.93), pierce 0.82 (was 0.85).
+ * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.70, cut 0.92 (was 0.93), pierce 0.77 (was 0.85, then 0.82).
  */
 const PLATE_COAT = brigandineOf({ blunt: 0.72, cut: 0.93, pierce: 0.85 }, 'ming');
 
 /**
  * The Ming soldier's brigandine (a vest of plates, no sleeves): the same plates inside a thinner padded coat, one plate deep
  * where the coat of plates laps: a blow spread a little less, an edge a little less turned; a point as any brigandine's.
- * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.66, cut 0.89 (was 0.9), pierce 0.82 (was 0.85).
+ * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.64, cut 0.89 (was 0.9), pierce 0.77 (was 0.85, then 0.82).
  */
 const PLATE_VEST = brigandineOf({ blunt: 0.66, cut: 0.9, pierce: 0.85 }, 'ming');
 
@@ -1051,7 +1055,7 @@ export const OUTFITS = {
     // Armour at 0.55 of its old weight (was 0.22): ~9 kg on a 75 kg man, against a brigandine's 8–15 kg or a mail shirt's ~10 kg.
     extraMass: 0.12,
     // The torso in a brigandine: cut 0.85 (was 0.75), blunt 0.45 (was 0.4); pierce 0.85, a brigandine's (PIERCE_SCALE; the breastplate set's 0.95);
-    // its make the European's (BRIGANDINE_MAKES.european: 0.92 / 0.41 / 0.85, a slanting point turned; its gaps). Cut 0.92 as the
+    // its make the European's (BRIGANDINE_MAKES.european: 0.92 / 0.39 / 0.80, was 0.41 / 0.85, a slanting point turned; its gaps). Cut 0.92 as the
     // Ming coat's (was 0.85): either brigandine is near proof against an edge, rivets and plates behind every inch of cloth (the
     // user's call, 2026-11-11).
     // The kettle hat, steel over an arming cap: better against an edge and a blow (was as the body: 0.4/0.75/0.6).
@@ -1199,12 +1203,14 @@ export const OUTFITS = {
     // Pierce 0.9, solid lames (PIERCE_SCALE).
     // The limbs in kote, haidate and suneate (`kote`: were the dō's own figures): against a cut, not a blow or a point.
     protection: { blunt: 0.7, cut: 0.95, pierce: 0.9, bullet: { head: 0.4, torso: 0.55, limb: 0.15 }, regions: { limb: kote({ blunt: 0.7, cut: 0.95, pierce: 0.9 }) } },
-    // Under its gaps, kusari (mail) where the later armour has it: the wakibiki under the arms, the kote's mail sleeves at
-    // the bend of the elbow, the haidate's mail over the groin and thighs, the yodarekake and nodowa at the throat
-    // (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). The cuirass is solid lames,
-    // but no plate closes the armpit (mail only), the dō opens on its hinged side seam, and the skirt (kusazuri), sode and
-    // the kabuto's neck guard are laced lames that part (`thrust` 0.5, was the default 0.4; `lacing` 0.1, was none).
-    gaps: { mail: ['armpit', 'elbow', 'groin', 'neck'], thrust: 0.5, lacing: 0.1 },
+    // Under its gaps, kusari only where it is part of the harness itself: the kote's mail sleeve over the bend of the elbow.
+    // The pieces that would close the other gaps were extras, worn by few: the wakibiki under the arms, a mail-lined haidate
+    // over the groin (most hung as an apron over the front of the thighs), the nodowa at the throat (Bottomley and Hopson,
+    // Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989); so the armpit, the groin and the throat are cloth
+    // (was mail at all four, riveted mail's figures). And the kusari is butted (`mailMake`, BLADES.gaps.layers.butted):
+    // a point opens it. The cuirass is solid lames, but the dō opens on its hinged side seam, and the skirt (kusazuri),
+    // sode and the kabuto's neck guard are laced lames that part (`thrust` 0.5, was the default 0.4; `lacing` 0.1).
+    gaps: { mail: ['elbow'], mailMake: 'butted', thrust: 0.5, lacing: 0.1 },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
@@ -2604,7 +2610,8 @@ export const OUTFITS = {
       // mail on linen, no padding (`kote`); the upper arms, the legs (hakama, kyahan) cloth.
       regions: { head: { blunt: 0.12, cut: 0.25, pierce: 0.1 }, limb: { blunt: 0.05, cut: 0.05, pierce: 0 }, Forearm: kote({ blunt: 0.12, cut: 0.6, pierce: 0.3 }) },
     },
-    gaps: { mail: ['neck'] },
+    // (The manchira's mail at the throat butted, as all kusari: BLADES.gaps.layers.butted.)
+    gaps: { mail: ['neck'], mailMake: 'butted' },
     // Courage 0.85 (was 0.4): a samurai seldom turned from the man who answered his challenge
     // (nanori), whoever he was, and to run was the shame the war tales punish (Heike monogatari; Kōyō gunkan; Friday,
     // Samurai, Warfare and the State, 2004): less afraid everywhere (ai.js: fear × 1 − courage; nerve + courage). The user's call, 2026-11-08.
