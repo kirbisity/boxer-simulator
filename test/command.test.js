@@ -184,3 +184,60 @@ test('the general played stands in the middle of his arm, however many his side'
     assert.ok(apart(at(me), middle) <= nearest + 1e-6, `${count} a side: ${apart(at(me), middle).toFixed(2)} m from the middle (nearest man ${nearest.toFixed(2)})`);
   }
 });
+
+test('Line, Wedge, Square: his men drawn up in the shape where he stands, each in his place, shoulder to shoulder', async () => {
+  const { COMMAND: spec, SHAPES } = await import('../src/command.js');
+  for (const shape of SHAPES) {
+    const { world, player, men } = orderBattle('wokou', 2);
+    const command = giveOrder(world, player, shape, { dir: towardEnemy(world, player) });
+    assert.equal(standingOrder(world, 'red'), shape);
+    runOrders(world, player, 8);
+    const placed = hearing(men).filter((fighter) => command.places[fighter.id]);
+    assert.ok(placed.length >= men.length - 3, `${shape}: ${placed.length} placed of ${men.length}`);
+    const off = placed.map((fighter) => apart(at(fighter), command.places[fighter.id]));
+    assert.ok(mean(off) < 0.5, `${shape}: ${mean(off).toFixed(2)} m off their places`);
+    // Close order: the room a man keeps out of the ranks is not kept (each a file's room from the next, not ~2 m).
+    const nearest = placed.map((fighter) => Math.min(...placed.filter((other) => other !== fighter).map((other) => apart(at(fighter), at(other)))));
+    assert.ok(mean(nearest) < spec.shape.file * 1.25, `${shape}: nearest comrade ${mean(nearest).toFixed(2)} m`);
+    assert.ok(placed.every((fighter) => orderKeepsPlace(world, fighter)));
+  }
+});
+
+test('the shapes: a line with him in its front rank, a wedge with its point before him, a square round him', async () => {
+  const { world, player } = orderBattle('wokou', 2);
+  const toward = towardEnemy(world, player);
+  const way = [toward[0] / Math.hypot(...toward), toward[1] / Math.hypot(...toward)];
+  const ahead = (place) => (place[0] - at(player)[0]) * way[0] + (place[1] - at(player)[1]) * way[1];
+  const placesOf = (shape) => Object.values(giveOrder(world, player, shape, { dir: way }).places);
+  const line = placesOf('line');
+  assert.ok(line.every((place) => ahead(place) < 0.05) && line.filter((place) => Math.abs(ahead(place)) < 0.05).length >= line.length / 4);
+  const wedge = placesOf('wedge');
+  assert.ok(Math.max(...wedge.map(ahead)) > 1);
+  const square = placesOf('square');
+  const middle = [mean(square.map((place) => place[0])), mean(square.map((place) => place[1]))];
+  assert.ok(apart(middle, at(player)) < 1, `the square round him (${apart(middle, at(player)).toFixed(2)} m off)`);
+});
+
+test('Hold fire: his bows loose nothing till Fire at will', async () => {
+  const { giveFireOrder, holdingFire } = await import('../src/command.js');
+  const { PRESETS } = await import('../src/body.js');
+  const { advance } = await import('../src/physics.js');
+  const { thinkAll } = await import('../src/ai.js');
+  const shots = (hold) => {
+    const red = [structuredClone(PRESETS.samurai), ...Array.from({ length: 5 }, () => structuredClone(PRESETS.archerYumi))];
+    const blue = Array.from({ length: 5 }, () => structuredClone(PRESETS.samurai));
+    const world = createWorld([...red.map((inputs) => ({ inputs, corner: 'red' })), ...blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 4, arena: { halfX: 40, halfZ: 40 } });
+    const player = world.fighters[0];
+    player.player = true;
+    world.fighters.forEach((fighter, index) => {
+      fighter.root[0] = fighter.corner === 'red' ? -14 : 14;
+      fighter.root[1] = (index % 6) * 1.5 - 4;
+    });
+    giveFireOrder(world, player, hold);
+    assert.equal(holdingFire(world, 'red'), hold);
+    advance(world, 8, (current, dt) => thinkAll(current, dt, new Set([player.id])));
+    return world.fighters.filter((fighter) => fighter.corner === 'red' && fighter !== player).reduce((sum, fighter) => sum + fighter.stats.thrown, 0);
+  };
+  assert.equal(shots(true), 0);
+  assert.ok(shots(false) > 5);
+});

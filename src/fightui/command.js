@@ -9,7 +9,7 @@
 // than one arm, a row of tabs: All, Foot, Shot, Horse (keys [ and ]); the orders go
 // to the arm lit, and the pills show that arm's order and the orders it takes.
 
-import { canCommand, chosenGroup, COMMAND_GROUPS, COMMAND_ORDERS, groupsFor, orderOver, ordersFor, standingOrder } from '../command.js';
+import { canCommand, chosenGroup, COMMAND_GROUPS, COMMAND_ORDERS, FIRE_ORDER_KEY, groupsFor, hasShot, holdingFire, orderOver, ordersFor, SHAPES, standingOrder } from '../command.js';
 import { fightUiElement } from './kit.js';
 import { onLangChange, t } from '../i18n.js';
 
@@ -17,7 +17,7 @@ export const FIGHT_UI_COMMAND = {
   // The call of a new order stays this long (s).
   callSeconds: 1.6,
   // What each order calls out.
-  calls: { rally: 'To me!', charge: 'Charge!', hold: 'Hold!', free: 'As you were', form: 'Back to formation!' },
+  calls: { rally: 'To me!', charge: 'Charge!', hold: 'Hold!', free: 'As you were', form: 'Back to formation!', line: 'Form line!', wedge: 'Form wedge!', square: 'Form square!' },
 };
 
 // Each order's icon: plain strokes in the pill's colour (16 px).
@@ -31,6 +31,13 @@ const FIGHT_UI_COMMAND_ICONS = {
   // Out, each his own way.
   free: '<path d="M7 7L3 3m0 3V3h3M9 7l4-4m0 3V3h-3M8 9.5V14m-2-2l2 2 2-2"/>',
   // Men in their places: two ranks of dots, an arrow back to them.
+  // The shapes, as dots: two ranks; a point and its widening ranks; a hollow square.
+  line: '<g fill="currentColor" stroke="none"><circle cx="2.5" cy="6" r="1.2"/><circle cx="6.2" cy="6" r="1.2"/><circle cx="9.8" cy="6" r="1.2"/><circle cx="13.5" cy="6" r="1.2"/><circle cx="2.5" cy="10.5" r="1.2"/><circle cx="6.2" cy="10.5" r="1.2"/><circle cx="9.8" cy="10.5" r="1.2"/><circle cx="13.5" cy="10.5" r="1.2"/></g>',
+  wedge: '<g fill="currentColor" stroke="none"><circle cx="8" cy="3" r="1.2"/><circle cx="5.8" cy="7" r="1.2"/><circle cx="10.2" cy="7" r="1.2"/><circle cx="3.6" cy="11" r="1.2"/><circle cx="8" cy="11" r="1.2"/><circle cx="12.4" cy="11" r="1.2"/></g>',
+  square: '<g fill="currentColor" stroke="none"><circle cx="3" cy="3" r="1.2"/><circle cx="8" cy="3" r="1.2"/><circle cx="13" cy="3" r="1.2"/><circle cx="3" cy="8" r="1.2"/><circle cx="13" cy="8" r="1.2"/><circle cx="3" cy="13" r="1.2"/><circle cx="8" cy="13" r="1.2"/><circle cx="13" cy="13" r="1.2"/></g>',
+  // A bow drawn (Fire at will) and the same with a bar through it (Hold fire).
+  fire: '<path d="M4 2c5 2 5 10 0 12M4 2v12M4 8h9m-2-2l2 2-2 2"/>',
+  holdFire: '<path d="M4 2c5 2 5 10 0 12M4 2v12M4 8h9"/><path d="M2 14L14 2"/>',
   form: '<circle cx="4" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="6" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="10" cy="8" r="1.2" fill="currentColor" stroke="none"/><path d="M8 15v-4m-2 2l2-2 2 2"/>',
 };
 
@@ -76,7 +83,22 @@ export function fightUiCommandBar(root, hooks) {
     for (const kind of ['contextmenu', 'dblclick']) button.addEventListener(kind, (event) => event.preventDefault());
     return button;
   });
-  bar.append(...buttons);
+  // The shapes in one row of their own under the orders (a column of nine would run down the screen).
+  const shapes = fightUiElement('div', 'fu-shapes');
+  for (const button of buttons) (SHAPES.includes(button.dataset.order) ? shapes : bar).append(button);
+  bar.append(shapes);
+  // Hold fire / Fire at will: one pill, its word what it is now; only where he has bows or guns to tell.
+  const fire = fightUiElement('button', 'fu-order fu-fire', '<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true"></svg><span></span><kbd>H</kbd>');
+  fire.type = 'button';
+  fire.addEventListener('pointerdown', (press) => {
+    press.preventDefault();
+    press.stopPropagation();
+    hooks.fire?.();
+    navigator.vibrate?.(10);
+  });
+  for (const kind of ['contextmenu', 'dblclick']) fire.addEventListener(kind, (event) => event.preventDefault());
+  bar.append(fire);
+  let fireShown = null;
   // The call sits in the column, under the last pill shown, however many there are.
   // A switch of language (src/i18n.js) relabels the pills and the bar.
   onLangChange(() => {
@@ -114,6 +136,17 @@ export function fightUiCommandBar(root, hooks) {
     // Formation only where the side has places of its own; the horse only what a rider can be told.
     const offered = new Set(ordersFor(world, me.corner, group).map((entry) => entry.kind));
     for (const button of buttons) button.hidden = !offered.has(button.dataset.order);
+    shapes.hidden = !buttons.some((button) => SHAPES.includes(button.dataset.order) && !button.hidden);
+    // The fire order: lit (gold) while the shot holds; its word the order standing.
+    fire.hidden = !hasShot(world, me);
+    const holding = holdingFire(world, me.corner);
+    if (fireShown !== holding) {
+      fireShown = holding;
+      fire.classList.toggle('on', holding);
+      fire.querySelector('svg').innerHTML = FIGHT_UI_COMMAND_ICONS[holding ? 'holdFire' : 'fire'];
+      fire.querySelector('span').textContent = t(holding ? 'order.holdFire' : 'order.fireAtWill');
+      fire.title = `${t(holding ? 'order.call.fireAtWill' : 'order.call.holdFire')} (H)`;
+    }
     const kind = standingOrder(world, me.corner, group);
     if (`${group}:${kind}` !== shown) {
       shown = `${group}:${kind}`;
@@ -136,6 +169,7 @@ export function fightUiCommandBar(root, hooks) {
 
   function reset() {
     shown = null;
+    fireShown = null;
     heard = null;
     said.hidden = true;
   }

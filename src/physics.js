@@ -161,7 +161,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     // and the engine reading them all (a hundred men, a hundred shapes) slows to a crawl.
     shield: undefined, weapon: undefined, offWeapon: undefined, arena: undefined, slot: undefined, formation: undefined, inFront: undefined, wing: undefined,
     shieldPose: undefined, shieldOpen: undefined, strafe: undefined, running: undefined, aimAt: undefined, focus: undefined, goTo: undefined,
-    nearestFoe: undefined, committed: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
+    nearestFoe: undefined, committed: undefined, holdFire: undefined, heldAnnounced: undefined, pinClock: undefined, hurt: undefined, hurtFor: undefined,
     weave: undefined, carry: undefined, detail: undefined, unposedAt: undefined, capsuleCache: undefined, limitStep: undefined, reachBound: undefined, crashDv: undefined,
     underStyle: undefined, runsUnder: undefined,
     stillFor: undefined, outFor: undefined, atLimits: undefined, strain: undefined, trauma: undefined, traumaDue: undefined, lastHitBy: undefined, lastWoundedBy: undefined,
@@ -2231,6 +2231,8 @@ export function throwPunch(world, fighter, type, zone = null, { heavy = false, a
   if (spec?.kind === 'strike' && limbGone(fighter, spec.limb)) return false;
   // On a ladder his hands are on its rungs: he strikes only from its head, over the walk's edge (physics/ladders.js).
   if (fighter.climbing && !fighter.climbing.top) return false;
+  // (Told to hold his fire, command.js giveFireOrder: no arrow, bolt or ball loosed; the man played is his own master.)
+  if (spec?.path === 'aim' && fighter.holdFire && !fighter.player) return false;
   if (!spec || spec.kind !== 'strike' || (!target && !at) || fighter.punch || fighter.committed > 0 || fighter.throwing || fighter.state !== 'up' || (fighter.crawling && !fromKnees) || fighter.netted || fighter.pain || (fighter.stamina < drain && !fighter.player) || (spec.bash && !fighter.shield)) return false;
   // From the saddle only what is before him (WORLD.mount.arc: inRiderArc): nothing behind, nor square beside him.
   if (fighter.mount && !inRiderArc(fighter, at ?? point(target.x, P.pelvis))) return false;

@@ -263,3 +263,7 @@ html:lang(zh) :is(.fu-legend, .fu-toast-name, .fu-toast-outcome, .fu-btn-name) {
 @media (max-width: 380px) { .fight-ui[data-fightui="buttons"] .step-button { left: calc(114px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 62px); width: 48px; height: 48px; } }
 /* A phone on its side: the art has the place right of the stick, so Step out goes one further. */
 @media (max-height: 480px) { .step-button, .fight-ui[data-fightui="buttons"] .step-button { left: calc(214px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 76px); } }
+/* The shapes' row (Line, Wedge, Square): smaller pills side by side under the orders. */
+.fu-shapes { display: flex; gap: 4px; }
+.fu-shapes .fu-order { min-width: 0; height: 32px; padding: 0 8px; font-size: 10px; }
+.fu-shapes[hidden] { display: none; }

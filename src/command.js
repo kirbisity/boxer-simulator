@@ -15,6 +15,14 @@
 //     spot where the order found him; each fights only a man within reach.
 //   As you were (`free`): the order taken back, the side's own way again
 //     (its formation, its standard). Every battle begins so.
+//   Line, Wedge, Square (`line`, `wedge`, `square`: SHAPES): his men drawn up in that shape where he stands, faced the
+//     way he looks (or at the man he is locked on): a line two or three deep with him in the middle of its front rank,
+//     its shooters in front; a wedge with its point a step before him; a hollow square round him, every side facing out.
+//     Each man goes to his place and keeps it shoulder to shoulder (the room a man keeps out of the ranks, ai.js
+//     AI.elbowRoom, is not kept in them), fighting only a man who comes within reach. It stays where it was drawn up
+//     till another order.
+//   Hold fire, Fire at will (giveFireOrder): his bows, crossbows and guns do not loose till he gives the word, or do;
+//     a side apart from its other orders. Every battle begins at will.
 //   Formation (`form`), where the side has places of its own to keep
 //     (`world.formPlaces[corner]`: Last Stand Squad's, placed before the
 //     run): every man back to his place, at a run from afar, and held
@@ -55,7 +63,14 @@ export const COMMAND = {
   charge: { behind: 1, width: 3, spread: 0.58, retargetEvery: 0.5, runFrom: 2.5 },
   // Hold: a man this near (m) his place in the ranks keeps it; anyone further holds where he stands.
   ranksWithin: 2,
+  // The drawn-up shapes (SHAPES): a man's room in the file (m, shoulder to shoulder with a weapon: close order) and a rank's
+  // depth behind the one before; a line is `deep` ranks (`deepFrom` men or more, one rank more); a wedge's point `ahead` m
+  // before him; a square's side long enough for its men round it.
+  shape: { file: 0.95, rank: 1.15, deep: 2, deepFrom: 14, ahead: 1.2 },
 };
+
+// The shapes a side may be drawn up in, each its places ([x, z] in the frame of the way it faces: x ahead, z to the left).
+export const SHAPES = ['line', 'wedge', 'square'];
 
 // The arms, in the order the player steps through them ([ and ]): `orders`, where given, the only ones an arm takes.
 export const COMMAND_GROUPS = [
@@ -73,7 +88,14 @@ export const COMMAND_ORDERS = [
   { kind: 'free', label: 'Free', key: '0' },
   // Back to the places set before the fight: only where the side has them (formPlaces).
   { kind: 'form', label: 'Formation', key: '-', places: true },
+  // Drawn up in a shape where he stands (SHAPES).
+  { kind: 'line', label: 'Line', key: 'z' },
+  { kind: 'wedge', label: 'Wedge', key: 'x' },
+  { kind: 'square', label: 'Square', key: 'b' },
 ];
+
+// Hold fire / Fire at will: its own button (one press each way), key H.
+export const FIRE_ORDER_KEY = 'h';
 
 /** The orders this side (or one arm of it, `group`) may be given: all but Formation where it has no places of its own, and the horse's own few. */
 export function ordersFor(world, corner, group = 'all') {
@@ -172,6 +194,8 @@ export function giveOrder(world, by, kind, { dir = null, group = 'all' } = {}) {
   if (kind === 'rally') command.places = rallyPlaces(world, by, group);
   // Formation: each man's own place, fixed in the world ([x, z] by his id).
   if (kind === 'form') command.places = structuredClone(world.formPlaces[by.corner]);
+  // A shape: each man's place in it, fixed in the world where it was drawn up.
+  if (SHAPES.includes(kind)) command.places = shapePlaces(world, by, kind, way, group);
   if (group === 'all') {
     world.commands[by.corner] = command;
     for (const arm of Object.keys(arms)) delete arms[arm];
@@ -200,12 +224,113 @@ function orderHorse(world, corner, kind) {
 }
 
 
+/**
+ * The places of a shape (SHAPES) for every man of his side who hears him (in `group`), [x, z] in the world: the shape's
+ * places laid out in the frame of the way it faces (`way`, from where he stands), then each taken by the nearest man still
+ * without one, the front places first (so no man walks through the ranks to the back of them). A line's front rank to its
+ * shooters first.
+ */
+function shapePlaces(world, by, kind, way, group = 'all') {
+  const spec = COMMAND.shape;
+  const men = world.fighters.filter((fighter) => fighter.corner === by.corner && fighter !== by && fighter.state !== 'out' && !fighter.mount && hearsOrders(world, fighter) && (group === 'all' || groupOf(fighter) === group));
+  const count = men.length;
+  const local = [];
+  if (kind === 'line') {
+    // Ranks of equal length, he in the middle of the front one (a gap left for him).
+    const deep = spec.deep + (count >= spec.deepFrom ? 1 : 0);
+    const across = Math.ceil((count + 1) / deep);
+    for (let rank = 0; local.length < count; rank += 1) {
+      for (let file = 0; file < across && local.length < count; file += 1) {
+        const z = (file - (across - 1) / 2) * spec.file;
+        if (rank === 0 && Math.abs(z) < spec.file / 2) continue;
+        local.push([-rank * spec.rank, z]);
+      }
+      if (rank === 0 && across === 1) local.push([0, spec.file]);
+    }
+  } else if (kind === 'wedge') {
+    // Its point a step before him, each rank one man wider (he in the second rank's middle gap).
+    for (let rank = 0; local.length < count; rank += 1) {
+      for (let file = 0; file <= rank && local.length < count; file += 1) {
+        const z = (file - rank / 2) * spec.file;
+        const x = spec.ahead - rank * spec.rank;
+        if (Math.abs(x) < 0.3 && Math.abs(z) < 0.3) continue;
+        local.push([x, z]);
+      }
+    }
+  } else {
+    // A hollow square round him: its sides long enough to hold every man at a file's room, its corners filled.
+    const perSide = Math.max(2, Math.ceil(count / 4) + 1);
+    const half = ((perSide - 1) * spec.file) / 2;
+    const ring = [];
+    for (let k = 0; k < perSide - 1; k += 1) {
+      const t = -half + k * spec.file;
+      ring.push([half, t], [t + spec.file, half], [-half, -t], [-t - spec.file, -half]);
+    }
+    // The front side first, then the flanks, the rear last.
+    ring.sort((a, b) => b[0] - a[0]);
+    local.push(...ring.slice(0, count));
+  }
+  const at = commandAt(by);
+  const left = [-way[1], way[0]];
+  const places = local.map(([x, z]) => [at[0] + way[0] * x + left[0] * z, at[1] + way[1] * x + left[1] * z]);
+  // The front places first; a line's shooters to its front rank.
+  const order = places.map((place, index) => ({ place, ahead: local[index][0] })).sort((a, b) => b.ahead - a.ahead);
+  const shot = (fighter) => (kind === 'line' && groupOf(fighter) === 'shot' ? 0 : 1);
+  const waiting = [...men].sort((a, b) => shot(a) - shot(b));
+  const result = {};
+  for (const { place } of order) {
+    // The nearest man of the first kind still waiting (the shot, for a line's front).
+    const kindNow = shot(waiting[0]);
+    let best = -1;
+    let bestApart = Infinity;
+    waiting.forEach((fighter, index) => {
+      if (shot(fighter) !== kindNow) return;
+      const apart = commandApart(commandAt(fighter), place);
+      if (apart < bestApart) {
+        best = index;
+        bestApart = apart;
+      }
+    });
+    if (best < 0) break;
+    result[waiting[best].id] = place;
+    waiting.splice(best, 1);
+  }
+  return result;
+}
+
+/**
+ * Hold fire (`hold` true) or Fire at will, to every man of his side who hears him: a man told to hold looses nothing (no
+ * arrow, no bolt, no ball: physics.js throwPunch) till told he may; the man played looses as he likes. Kept on the side
+ * (`world.holdFire[corner]`) for the button and for men who come into the fight after it.
+ */
+export function giveFireOrder(world, by, hold) {
+  world.holdFire ??= {};
+  world.holdFire[by.corner] = Boolean(hold);
+  for (const fighter of world.fighters) if (fighter.corner === by.corner && fighter !== by && hearsOrders(world, fighter)) fighter.holdFire = Boolean(hold);
+  world.orderCount = (world.orderCount ?? 0) + 1;
+  world.fireSerial ??= {};
+  world.fireSerial[by.corner] = world.orderCount;
+  return world.holdFire[by.corner];
+}
+
+/** Whether his side's shot is told to hold its fire. */
+export function holdingFire(world, corner) {
+  return Boolean(world?.holdFire?.[corner]);
+}
+
+/** Whether any man of his side who hears him is of the shot (went out with a bow, a crossbow or a gun, groupOf: a sidearm drawn since he still is): the fire order's button shows only then. */
+export function hasShot(world, by) {
+  return Boolean(world && by) && world.fighters.some((fighter) => fighter.corner === by.corner && fighter !== by && fighter.state !== 'out' && hearsOrders(world, fighter) && groupOf(fighter) === 'shot');
+}
+
 /** Every order taken back (leaving play: the side goes its own way). */
 export function clearOrders(world) {
   if (!world) return;
   world.commands = {};
   world.groupCommands = {};
   world.orderGroups = {};
+  world.holdFire = {};
+  for (const fighter of world.fighters) fighter.holdFire = false;
 }
 
 /**
@@ -387,7 +512,7 @@ export function orderKeepsPlace(world, fighter) {
 
 /** His place under the order ([x, z]): his ring's place round the giver, his place in the formation, or his own ground. */
 function placeFor(world, command, fighter) {
-  if (command.kind === 'form') return command.places[fighter.id] ?? null;
+  if (command.kind === 'form' || SHAPES.includes(command.kind)) return command.places[fighter.id] ?? null;
   if (command.kind === 'rally') {
     const offset = command.places[fighter.id];
     if (!offset) return null;

@@ -23,7 +23,7 @@ import { LEVEL_PRESETS, levelPreset } from './levelmode/presets.js';
 import { introPlaying, playIntro, skipIntro, stepIntro } from './intro.js';
 import { breakRun, contextAction, directFighter, keyStick, MOVE_KEYS, moveName, newOrders, playerCrawl, swingAt } from './control.js';
 import { installFightControls, TOUCH } from './touch.js';
-import { canCommand, chooseGroup, chosenGroup, clearOrders, COMMAND_ORDERS, giveOrder } from './command.js';
+import { canCommand, chooseGroup, chosenGroup, clearOrders, COMMAND_ORDERS, FIRE_ORDER_KEY, giveFireOrder, giveOrder, hasShot, holdingFire } from './command.js';
 import { createFightUiMarks } from './fightui/marker.js';
 import { fightUiChoose } from './fightui/index.js';
 import { fightUiWireToggle } from './fightui/toggle.js';
@@ -276,6 +276,7 @@ const fightControls = installFightControls($('#fight-ui'), {
   clock: () => fightMarksClock,
   order: (kind) => orderSide(kind),
   group: (step) => chooseOrderGroup(step),
+  fire: () => toggleFire(),
   // In a stage the man he is on is one near or aware of him, not the nearest of the garrison.
   opponent: (world, me) => (world.stage?.level ? levelOpponent(world, me) : opponentFor(world, me)),
 });
@@ -344,6 +345,13 @@ function orderSide(kind) {
   chargeArrow.position.set(command.at[0] + command.dir[0] * CHARGE_ARROW.ahead, 0.03, command.at[1] + command.dir[1] * CHARGE_ARROW.ahead);
   chargeArrow.rotation.y = Math.atan2(-command.dir[1], command.dir[0]);
   chargeArrowAt = realSeconds();
+}
+
+/** Hold fire, or Fire at will: the other of the two, to his whole side (command.js giveFireOrder; its button, or H). */
+function toggleFire() {
+  const me = player();
+  if (state.mode !== 'play' || !canCommand(state.world, me) || !hasShot(state.world, me)) return;
+  giveFireOrder(state.world, me, !holdingFire(state.world, me.corner));
 }
 
 /** The charge's arrow, fading out. */
@@ -2157,6 +2165,9 @@ window.addEventListener('keydown', (press) => {
     // His weapon's art, whenever it is charged (its own button; F stays the special action's).
     press.preventDefault();
     fightControls.art();
+  } else if (key === FIRE_ORDER_KEY) {
+    press.preventDefault();
+    toggleFire();
   } else if (ORDER_KEYS[key]) {
     press.preventDefault();
     orderSide(ORDER_KEYS[key]);
