@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { AI, chooseDefence } from './ai.js';
 import { blowSide, DEFENCES, MOVES, pointRoomOf, STYLES, moveRange, tapAttacks } from './moves.js';
-import { aimPoint, BLOCKS, inRiderArc, dropWeapon, protectionAt, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD } from './physics.js';
+import { aimPoint, BLOCKS, inRiderArc, dropWeapon, protectionAt, holdGuard, hostile, inFight, legBroken, manNear, nearestAnyone, opponentFor, perform, point, reachOf, retryFromKnees, startCrawl, startJump, startPickup, swapSidearm, throwPunch, WORLD, startEvade } from './physics.js';
 import { dismount, dismountReady, horseToMount, mountHorse } from './physics/mounted.js';
 import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
@@ -259,7 +259,7 @@ export function breakRun(orders) {
  * (a running strike: the body's speed is in the weapon's, physics.js handVelocityOf), as a rider's charge does (chargeOrder).
  */
 function runStep(fighter, orders, stick) {
-  const breaks = orders.guard || (orders.evasions?.length ?? 0) > 0 || (orders.actions?.length ?? 0) > 0;
+  const breaks = orders.guard || orders.stepOut || (orders.evasions?.length ?? 0) > 0 || (orders.actions?.length ?? 0) > 0;
   const atRun = Boolean(stick) && stick.amount >= CONTROL.stick.runFrom;
   orders.runBroken = atRun && (breaks || orders.runBroken);
   if (fighter.stamina < CONTROL.run.windedBelow) orders.winded = true;
@@ -1107,6 +1107,11 @@ function defend(world, fighter, orders) {
     else if (evasion.name === 'stepBack') fighter.punch = null;
   }
   orders.evasions = [];
+  // Step out (its button, E): the whole-body evasion (physics.js startEvade).
+  if (orders.stepOut) {
+    orders.stepOut = false;
+    startEvade(world, fighter);
+  }
 }
 
 // ---- Special actions ---------------------------------------------------------

@@ -540,6 +540,27 @@ export const WORLD = {
   // strike again or to defend till it is over (WORLD.heavy's `committed`), and the braking costs `breath` of the stroke's own
   // stamina again.
   miss: { seconds: 0.15, cap: 16, thrust: 0.5, breath: 0.4 },
+  // Step out (physics.js startEvade, the player's button): the whole body out of the blow's way, by where it comes (evadeKind),
+  // costing `costJumps` of what his own jump costs (the legs' work of throwing his body and gear: physics/jump.js). Each kind
+  // lasts `seconds`; its legs' burst (× footwork speed, falling off over it) is `step` aside (twice a defence's sidestep) with
+  // `back` of a step back, or `step` back with a little aside; a duck drops the hips `dip`, the head `head` of his height
+  // and leans in `lean`, under a cut at the head, half a step back; a hop (a low cut) is his jump gathered in `crouch` s, at `up`
+  // of its speed, pushed `back` m/s back and `aside` m/s away; `step` the body's lowering and lean into a step aside or back.
+  evade: {
+    costJumps: 2.5,
+    // The legs' acceleration in it, × his footwork's (a charge's 1.6): one leg driving the body off the line.
+    accel: 1.9,
+    // A blow launched turns after its man at this share of the body's turn (physics.js moveRoot): any blow, any evasion.
+    strikeTurn: 0.3,
+    // The body's own throw off the line is full this far through it (the feet follow: moveRoot).
+    snap: 0.25,
+    seconds: { aside: 0.5, back: 0.5, duck: 0.55, hop: 0.5 },
+    aside: { step: 3.4, back: 0.6 },
+    back: { step: 2.6, aside: 0.5 },
+    duck: { dip: 0.16, head: 0.24, lean: 0.35, across: 0.05, back: 0.8 },
+    hop: { crouch: 0.07, up: 0.7, back: 3.2, aside: 1.2 },
+    step: { dip: 0.1, lower: 0.07, lean: 0.2 },
+  },
   // A thrust on foot is driven by the body as well as the arms: the step (the rear leg pushing off and bracing),
   // the hips and shoulders turning in behind the shaft. Along the weapon's line that share of the body's mass
   // pushes with the point (physics.js bladeStrike), as a move's own `mass.body` does: the larger of the two.

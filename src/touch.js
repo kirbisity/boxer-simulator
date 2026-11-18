@@ -424,7 +424,7 @@ export function installFightControls(root, hooks) {
 
   /** A step out of the blow's way asked for (the button or E): carried out with the orders (control.js defend). */
   function askStepOut() {
-    (hooks.orders().evasions ??= []).push(1);
+    hooks.orders().stepOut = true;
     signal('evade');
   }
 

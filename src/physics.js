@@ -7,7 +7,7 @@
 
 import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
-import { DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
+import { blowSide, DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
 import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, cuttingWidth, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restArmAngle, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
@@ -3250,9 +3250,26 @@ function applyDefence(fighter, intent, dt) {
     // Off the line, not along it (moveRoot drives the step).
     fighter.move = 0;
     fighter.strafe = 0;
+  } else if (defence.name === 'evade') {
+    // Step out (startEvade): the feet are moveRoot's; the body goes low and away with them.
+    const rule = WORLD.evade;
+    fighter.move = 0;
+    fighter.strafe = 0;
+    // The body goes first, thrown off the line at once (full by `snap` of the way through), the feet after it; eased back at the end.
+    const thrown = Math.min(1, u / rule.snap);
+    const arc = Math.sin((Math.PI / 2) * thrown) * (u > 0.7 ? Math.max(0, (1 - u) / 0.3) : 1);
+    if (defence.kind === 'duck') {
+      intent.dip += rule.duck.dip * arc;
+      intent.lean += rule.duck.lean * arc;
+      intent.headOffset = vec.add(intent.headOffset, [0, -rule.duck.head * H * arc, defence.side * rule.duck.across * H * arc]);
+    } else {
+      // Aside and back: the knees bent into the step, the trunk leaning out of the line.
+      intent.dip += rule.step.dip * arc;
+      intent.headOffset = vec.add(intent.headOffset, [defence.kind === 'back' ? -rule.step.lean * H * arc : 0, -rule.step.lower * H * arc, defence.kind === 'aside' ? defence.side * rule.step.lean * H * arc : 0]);
+    }
   }
   if (defence.t >= defence.seconds) {
-    if (defence.name === 'stepBack' || defence.name === 'sidestep') fighter.move = 0;
+    if (defence.name === 'stepBack' || defence.name === 'sidestep' || defence.name === 'evade') fighter.move = 0;
     fighter.defence = null;
   }
 }
@@ -3749,7 +3766,7 @@ export function jumpNow(world, fighter) {
  * way he was going (and `forward` of the takeoff along it); the flight is the body's own; he lands on his legs (landJump). It
  * costs stamina by the work. False if he cannot jump now.
  */
-export function startJump(world, fighter) {
+export function startJump(world, fighter, { hop = null } = {}) {
   // On a robot dog's back (robotdogs.js `legs`), the robot jumps (physics/mounted.js mountJump): on the move, a leap the way it
   // is going; standing, straight up.
   const robot = fighter?.mount?.spec?.legs ? fighter.mount : null;
@@ -3761,16 +3778,68 @@ export function startJump(world, fighter) {
   const model = jumpNow(world, fighter);
   if (model.blocked) return false;
   const running = Math.max(WORLD.jump.crouch.running, 1 - Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]) / WORLD.jump.crouch.fast);
-  drawStamina(fighter, model.cost);
+  // (A hop out of a blow, startEvade: paid for there, gathered in a flick, low, and away.)
+  if (!hop) drawStamina(fighter, model.cost);
   fighter.defence = null;
   fighter.rush = null;
   fighter.jump = {
     // (Gathered quicker and shallower on the run: a running takeoff has little dip.)
     phase: 'crouch', t: 0, model, base: fighter.lift, standing: fighter.lift ?? 0, depth: WORLD.jump.crouch.depth * model.push * running,
-    crouch: WORLD.jump.crouch.seconds * running,
+    crouch: hop ? hop.crouch : WORLD.jump.crouch.seconds * running,
     from: fighter.x[P.pelvis * 3 + 1], apex: -Infinity, takeoff: 0, ground: 0, landing: null, bumped: false,
+    // (`away`: a hop's own push off the floor, m/s on the ground, [x, z]; `up` its share of his full jump's speed.)
+    away: hop?.away ?? null, up: hop?.up ?? 1,
   };
+  if (hop) fighter.jump.depth *= hop.up;
   world.events.push({ time: world.time, kind: 'jump', fighter: fighter.id, height: model.height, effects: ['jumps'] });
+  return true;
+}
+
+/**
+ * How to get out of the blow coming at him (WORLD.evade), by where it comes: a cut swung low at the legs is hopped back out
+ * of; one swung level at the head is ducked under; one swung level at the body is stepped back out of its arc; one from
+ * above, a thrust, or nothing yet, is stepped aside from, far, off its line.
+ */
+export function evadeKind(punch) {
+  const spec = punch?.spec;
+  if (!spec || spec.kind !== 'strike') return 'aside';
+  if (punch.zone === 'legs' || punch.zone === 'shins') return 'hop';
+  if (spec.mode === 'thrust' || spec.path === 'aim') return 'aside';
+  const level = blowSide(spec) !== 0 || spec.path === 'hook';
+  if (!level) return 'aside';
+  return punch.zone === 'head' ? 'duck' : 'back';
+}
+
+/**
+ * Step out (the player's button, control.js): a whole-body evasion, larger than any defence, as the blow coming at him asks
+ * (evadeKind). It costs `costJumps` of what his own jump would (physics/jump.js: the work of his body and gear), and he cannot
+ * while carried on by a stroke of his own (overswing), on a horse, in the air or on his knees. Aside, he goes away from the
+ * side the striker's weapon is on.
+ */
+export function startEvade(world, fighter) {
+  if (fighter.state !== 'up' || fighter.netted || fighter.mount || fighter.jump || fighter.crawling || fighter.committed > 0) return false;
+  const rule = WORLD.evade;
+  const striker = world.fighters.find((other) => other.corner !== fighter.corner && other.punch?.target === fighter.id && !other.punch.landed) ?? null;
+  const kind = evadeKind(striker?.punch);
+  const model = jumpOf(fighter, { legs: limbShares(fighter).leg, strength: fighter.motorScale ?? 1 });
+  const cost = rule.costJumps * model.cost;
+  if (!fighter.player && fighter.stamina < cost) return false;
+  // Away from the weapon's side (his left +1), else either way.
+  const blade = striker?.punch?.spec.path === 'blade' ? bladeFor(striker, striker.punch.spec) : null;
+  const across = striker ? toLocal(fighter, point(striker.x, P[`${blade?.main ?? 'r'}Hand`]))[2] : 0;
+  const side = Math.abs(across) > 0.05 ? -Math.sign(across) : world.random() < 0.5 ? 1 : -1;
+  // A low cut is hopped out of if his legs can (the jump he has now: jumpNow); else stepped back from.
+  const hop = kind === 'hop' && !jumpNow(world, fighter).blocked;
+  drawStamina(fighter, cost);
+  fighter.punch = null;
+  fighter.guardHeld = false;
+  fighter.defence = { name: 'evade', kind: kind === 'hop' && !hop ? 'back' : kind, t: 0, seconds: rule.seconds[kind] ?? rule.seconds.aside, side, from: striker?.id ?? null, cover: undefined };
+  if (hop) {
+    const away = vec.add(yawRotate([-rule.hop.back, 0, 0], fighter.yaw), yawRotate([0, 0, side * rule.hop.aside], fighter.yaw));
+    fighter.defence = null;
+    startJump(world, fighter, { hop: { crouch: rule.hop.crouch, up: rule.hop.up, away: [away[0], away[2]] } });
+  }
+  world.events.push({ time: world.time, kind: 'evade', fighter: fighter.id, how: kind, from: striker?.id ?? null, effects: [`steps out (${kind})`] });
   return true;
 }
 
@@ -3922,7 +3991,22 @@ function launch(world, fighter) {
   const pelvis = P.pelvis * 3;
   const standingY = jump.standing + fighter.desired[P.pelvis][1];
   const below = Math.max(0, standingY - fighter.x[pelvis + 1]);
-  const up = Math.sqrt(jump.model.v * jump.model.v + 2 * WORLD.gravity * below);
+  const up = Math.sqrt((jump.model.v * jump.up) ** 2 + 2 * WORLD.gravity * below);
+  // A hop out of a blow (startEvade) is pushed away off the floor as much as up.
+  if (jump.away) {
+    fighter.rootVelocity[0] = jump.away[0];
+    fighter.rootVelocity[1] = jump.away[1];
+    for (let index = 0; index < fighter.v.length; index += 3) {
+      fighter.v[index] = jump.away[0];
+      fighter.v[index + 1] = up;
+      fighter.v[index + 2] = jump.away[1];
+    }
+    jump.phase = 'air';
+    jump.t = 0;
+    jump.takeoff = world.time;
+    fighter.air = true;
+    return;
+  }
   // Moving, the jump goes along his way.
   const speed = Math.hypot(fighter.rootVelocity[0], fighter.rootVelocity[1]);
   const along = speed > 0.3 ? [fighter.rootVelocity[0] / speed, fighter.rootVelocity[1] / speed] : [0, 0];
@@ -4357,6 +4441,9 @@ function moveRoot(world, fighter, dt) {
     }
     // A blow aimed by the line he runs (a couched lance: `holdHeading`) is not turned once it is going: the point would sweep sideways.
     if (fighter.punch?.spec.holdHeading && fighter.punch.t >= fighter.punch.spec.windup) change = 0;
+    // A blow launched (past its wind-up, till it is out) keeps its line: the body is thrown into it, and turns after a man
+    // stepping off that line only `strikeTurn` as fast (WORLD.evade), so a man who gets out of the way in time is missed.
+    else if (fighter.punch && fighter.punch.spec.kind === 'strike' && fighter.punch.spec.path !== 'aim' && fighter.punch.t >= fighter.punch.spec.windup && fighter.punch.t <= fighter.punch.spec.extendUntil && !artTurn(fighter.punch)) change *= WORLD.evade.strikeTurn;
     // Running, his heading turns no faster than the floor can carry his path round (gait.js turnRateMost: v × rate = what the foot
     // gives sideways): faster than that and he would face one way while the run went on another, dragged round sideways.
     if (fighter.running && !fighter.rush && !fighter.crawling && !fighter.air || fighter.gaitCarry) {
@@ -4409,6 +4496,17 @@ function moveRoot(world, fighter, dt) {
   let side = fighter.rush ? 0 : (fighter.strafe ?? 0) * WORLD.sidestepShare * (fighter.crawling ? WORLD.crawl.speed : 1) * (fighter.netted ? NET.step : 1);
   // Off the line (a sidestep defence): one quick step to the side, as fast as his legs and gear let him.
   if (fighter.defence?.name === 'sidestep' && !fighter.rush && !fighter.crawling) side = fighter.defence.side * DEFENCES.sidestep.step * (fighter.netted ? NET.step : 1);
+  // Step out (startEvade): a burst of the legs, hardest at its start, aside or back (a duck takes half a step back under it).
+  if (fighter.defence?.name === 'evade' && !fighter.rush) {
+    const evading = fighter.defence;
+    // (Full drive through most of it, eased off at the end to stand again.)
+    const share = evading.t / evading.seconds;
+    const burst = share < 0.6 ? 1 : Math.max(0, (1 - share) / 0.4);
+    const rule = WORLD.evade;
+    if (evading.kind === 'aside') { side = evading.side * rule.aside.step * burst; drive = -rule.aside.back * burst; }
+    else if (evading.kind === 'back') { drive = -rule.back.step * burst; side = evading.side * rule.back.aside * burst; }
+    else if (evading.kind === 'duck') drive = -rule.duck.back * burst;
+  }
   // Footwork in this outfit: free in trunks, stiff in a suit or in plate.
   const gear = fighter.body.gear;
   const footwork = WORLD.footSpeed * legs * gear.foot;
@@ -4467,7 +4565,8 @@ function moveRoot(world, fighter, dt) {
       if (now > most && now > 1e-6) for (const axis of [0, 1]) fighter.rootVelocity[axis] *= most / now;
     }
   } else {
-    const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : 1) * dt;
+    // (A step out, startEvade, is the legs thrown into it as a charge is, harder still: WORLD.evade `accel`.)
+    const limit = WORLD.footAcceleration * legs * gear.accel * (fighter.rush ? 1.6 : fighter.crawling ? WORLD.crawl.accel : fighter.defence?.name === 'evade' ? WORLD.evade.accel : 1) * dt;
     // (Off the ground, the legs push on nothing.)
     const scale = fighter.air ? 0 : size > limit ? limit / size : 1;
     fighter.rootVelocity[0] += change[0] * scale;
@@ -8637,6 +8736,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     world.events.push({ time: world.time, kind: 'glance', fighter: defender.id, point: contactPoint, normal });
   }
   if (intoGap) event.effects.push('into a gap in the armour');
+  // (Which gap, and whether his own raised arm opened it: physics/gaps.js gapExposure.)
+  if (intoGap) Object.assign(event, { gap: gapZone, opened: opened > 0 });
   if (glance.share < WORLD.helmet.glancedBelow) event.effects.push('glanced off the helmet');
   // An edge or a point that gets through the armour injures the part it is in (addDamage: the part's health; the head's
   // and the trunk's are his life). On a limb the flesh it cuts weakens it (BLADES.bone.flesh of it) and the bone, as far
