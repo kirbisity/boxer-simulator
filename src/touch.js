@@ -662,7 +662,7 @@ export function installFightControls(root, hooks) {
     commandBar.reset();
   }
 
-  return { update, setActive, reset, toggleLock, jump: askJump, stepOut: askStepOut, toggleCrawl: pressCrawl, art: askArt, swapWeapon: () => (sidearmSwapReady(hooks.player()) ? askKit('swapWeapon') : false), horse: () => askKit(horseAction(hooks.world(), hooks.player())), setDevice, get device() { return device; }, fightUi: fightUi.choose };
+  return { update, setActive, reset, toggleLock, jump: askJump, stepOut: askStepOut, toggleFormation: () => commandBar.toggleFormation(), toggleCrawl: pressCrawl, art: askArt, swapWeapon: () => (sidearmSwapReady(hooks.player()) ? askKit('swapWeapon') : false), horse: () => askKit(horseAction(hooks.world(), hooks.player())), setDevice, get device() { return device; }, fightUi: fightUi.choose };
 }
 
 /** Keep a pointer's events coming here even off the element (a pointer the browser no longer knows is let be). */

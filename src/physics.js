@@ -2664,6 +2664,9 @@ function updateIntent(world, fighter, dt) {
     intent.shift += Math.sin(world.time * 1.7) * sway;
     intent.guardTight = true;
   }
+  // Told to hold his fire (command.js giveFireOrder) with a shot already drawn or levelled: he lets the bow down or the gun
+  // fall from his shoulder, unfired.
+  if (fighter.punch?.spec.path === 'aim' && !fighter.punch.fired && fighter.holdFire && !fighter.player) fighter.punch = null;
   if (fighter.punch?.load > 0) {
     // Loading a heavy attack: sit down on the legs, turn away from it.
     const punch = fighter.punch;

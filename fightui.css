@@ -138,7 +138,7 @@ body:not(.playing) .fu-pick { display: none; }
 .fu-order kbd { display: none; margin-left: auto; padding-left: 6px; font: 600 10px var(--mono); color: var(--muted); }
 .fu-order.on kbd { color: rgba(25, 19, 0, 0.6); }
 .fight-ui[data-device="mouse"] .fu-order kbd { display: block; }
-.fu-order-said { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px) + 4 * 36px + 3 * 6px + 8px); padding: 3px 10px; border-radius: var(--r-pill); background: rgba(var(--pit), 0.6); font: 700 13px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); text-shadow: 0 1px 3px rgba(var(--pit), 0.9); pointer-events: none; }
+.fu-order-said { position: absolute; left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px) + 2 * 42px + 12px); padding: 3px 10px; border-radius: var(--r-pill); background: rgba(var(--pit), 0.6); font: 700 13px var(--display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--gold); text-shadow: 0 1px 3px rgba(var(--pit), 0.9); pointer-events: none; }
 .fu-orders .fu-order-said { position: static; justify-self: start; margin-top: 2px; }
 .fu-arms { display: flex; gap: 2px; padding: 2px; border-radius: var(--r-plate); pointer-events: auto; background: rgba(var(--pit), 0.55); border: 1px solid rgba(var(--ink), 0.3); }
 .fu-arm { height: 26px; padding: 0 9px; border: 0; border-radius: var(--r-plate); background: transparent; color: var(--fg); font: 600 10px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; touch-action: none; cursor: pointer; text-shadow: 0 1px 2px rgba(var(--pit), 0.8); }
@@ -216,10 +216,10 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 .lv-pip.fighting i { background: var(--gold); box-shadow: 0 0 10px rgba(var(--gilt), 0.9), 0 0 2px rgba(var(--pit), 0.8); }
 .banner:not([hidden]) ~ .fight-ui .lv-team, .banner:not([hidden]) ~ .fight-ui .lv-pips { visibility: hidden; }
 
-/* With the army orders up (the player has men to command: his comrades), the item row sits beside them, not on top of them; on a narrow screen, under them. */
-.fight-ui:has(.fu-orders:not([hidden])) .lv-items { left: calc(134px + env(safe-area-inset-left, 0px)); }
-@media (max-width: 700px) {
-  .fight-ui:has(.fu-orders:not([hidden])) .lv-items { left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(184px + env(safe-area-inset-top, 0px)); }
+/* With the army orders up (the player has men to command: his comrades), the item row sits under their bar, not on it. */
+.fight-ui:has(.fu-orders:not([hidden])) .lv-items { left: calc(12px + env(safe-area-inset-left, 0px)); top: calc(112px + env(safe-area-inset-top, 0px)); }
+@media (max-width: 520px) {
+  .fight-ui:has(.fu-orders:not([hidden])) .lv-items { left: calc(8px + env(safe-area-inset-left, 0px)); top: calc(162px + env(safe-area-inset-top, 0px)); }
 }
 .lv-item[data-item="kit"] { width: 48px; }
 .lv-item[data-item="kit"] .lv-icon { color: var(--gold); }
@@ -263,7 +263,23 @@ html:lang(zh) :is(.fu-legend, .fu-toast-name, .fu-toast-outcome, .fu-btn-name) {
 @media (max-width: 380px) { .fight-ui[data-fightui="buttons"] .step-button { left: calc(114px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 62px); width: 48px; height: 48px; } }
 /* A phone on its side: the art has the place right of the stick, so Step out goes one further. */
 @media (max-height: 480px) { .step-button, .fight-ui[data-fightui="buttons"] .step-button { left: calc(214px + env(safe-area-inset-left, 0px)); bottom: calc(var(--controls-height, 56px) + 76px); } }
-/* The shapes' row (Line, Wedge, Square): smaller pills side by side under the orders. */
+/* The order bar (fightui/command.js): two rows along the top left, every button one fixed size, an icon over its word.
+   The first row the orders, Formation and the fire order; the second the arms, or the shapes while Formation is open. */
+.fu-orders { gap: 4px; justify-items: start; }
+.fu-order-row { display: flex; gap: 4px; }
+.fu-order-row[hidden], .fu-shapes[hidden], .fu-arms[hidden] { display: none; }
+.fu-orders .fu-order { flex-direction: column; justify-content: center; gap: 2px; width: 58px; min-width: 0; height: 42px; padding: 0 2px; font-size: 8.5px; letter-spacing: 0.04em; overflow: hidden; }
+.fu-orders .fu-order span { max-width: 100%; white-space: normal; text-align: center; line-height: 1.05; overflow-wrap: anywhere; }
+.fu-orders .fu-order-icon { width: 15px; height: 15px; }
+.fu-orders .fu-order kbd { position: absolute; right: 2px; top: 1px; margin: 0; padding: 0; font-size: 8px; }
+.fu-orders .fu-fire { width: 70px; }
+.fu-formation.open { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
 .fu-shapes { display: flex; gap: 4px; }
-.fu-shapes .fu-order { min-width: 0; height: 32px; padding: 0 8px; font-size: 10px; }
-.fu-shapes[hidden] { display: none; }
+.fu-orders .fu-arms { height: 32px; align-items: center; }
+.fu-orders .fu-arm { width: 52px; padding: 0; }
+/* A phone held upright: the bar under the clock (the clock has the top's middle), a little smaller. */
+@media (max-width: 520px) {
+  .fu-orders { top: calc(66px + env(safe-area-inset-top, 0px)); left: calc(8px + env(safe-area-inset-left, 0px)); }
+  .fu-orders .fu-order { width: 52px; height: 42px; font-size: 7.5px; letter-spacing: 0.02em; }
+  .fu-orders .fu-fire { width: 62px; }
+}

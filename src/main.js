@@ -2165,6 +2165,10 @@ window.addEventListener('keydown', (press) => {
     // His weapon's art, whenever it is charged (its own button; F stays the special action's).
     press.preventDefault();
     fightControls.art();
+  } else if (key === 'g') {
+    // G: the formations opened or closed on the order bar (Line, Wedge, Square: their own keys Z, X, B).
+    press.preventDefault();
+    fightControls.toggleFormation();
   } else if (key === FIRE_ORDER_KEY) {
     press.preventDefault();
     toggleFire();

@@ -1,13 +1,11 @@
-// The player's orders to his side on screen (command.js): a small column of
-// pills at the top left, out of the fight's way (the status is low on the
-// left, the Guard, Lock and special buttons down the right), each an icon
-// and a word: To me, Charge, Hold, Free; and Formation (back to the places
-// set before the fight) where the side has them (Last Stand Squad). The order standing is lit gold, as
-// a choice is in the footer. Shown only in a fight his side is big enough
-// for orders. A new order is called for a moment under the column, however
-// it was given (a tap, or keys 7–0). Above the column, where his side has more
-// than one arm, a row of tabs: All, Foot, Shot, Horse (keys [ and ]); the orders go
-// to the arm lit, and the pills show that arm's order and the orders it takes.
+// The player's orders to his side on screen (command.js): a bar of buttons all one size along the top left, in two rows,
+// out of the fight's way (the status is low on the left, the Guard, Lock and special buttons down the right). The first
+// row: To me, Charge, Hold, Free, Formation, and Hold fire / Fire at will (where his side has shot). The second: the
+// arms, where his side has more than one (All, Foot, Shot, Horse; keys [ and ]: the orders go to the arm lit); or, while
+// Formation is open, the shapes (Line, Wedge, Square, and Places, back to the places set before the fight, where the side
+// has them), one press giving the order and closing them. The order standing is lit gold, as a choice is in the footer
+// (Formation, while a shape stands). Shown only in a fight his side is big enough for orders. A new order is called for
+// a moment under the bar, however it was given (a tap, or its key).
 
 import { canCommand, chosenGroup, COMMAND_GROUPS, COMMAND_ORDERS, FIRE_ORDER_KEY, groupsFor, hasShot, holdingFire, orderOver, ordersFor, ORDER_SHAPES, standingOrder } from '../command.js';
 import { fightUiElement } from './kit.js';
@@ -38,6 +36,8 @@ const FIGHT_UI_COMMAND_ICONS = {
   // A bow drawn (Fire at will) and the same with a bar through it (Hold fire).
   fire: '<path d="M4 2c5 2 5 10 0 12M4 2v12M4 8h9m-2-2l2 2-2 2"/>',
   holdFire: '<path d="M4 2c5 2 5 10 0 12M4 2v12M4 8h9"/><path d="M2 14L14 2"/>',
+  // The Formation button (opening the shapes): ranks under a frame.
+  formation: '<rect x="2" y="2" width="12" height="12" rx="1.5"/><g fill="currentColor" stroke="none"><circle cx="5.5" cy="6.5" r="1.1"/><circle cx="8" cy="6.5" r="1.1"/><circle cx="10.5" cy="6.5" r="1.1"/><circle cx="5.5" cy="10" r="1.1"/><circle cx="8" cy="10" r="1.1"/><circle cx="10.5" cy="10" r="1.1"/></g>',
   form: '<circle cx="4" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="8" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="4" r="1.2" fill="currentColor" stroke="none"/><circle cx="6" cy="8" r="1.2" fill="currentColor" stroke="none"/><circle cx="10" cy="8" r="1.2" fill="currentColor" stroke="none"/><path d="M8 15v-4m-2 2l2-2 2 2"/>',
 };
 
@@ -52,7 +52,9 @@ export function fightUiCommandBar(root, hooks) {
   bar.setAttribute('role', 'group');
   bar.setAttribute('aria-label', t('fightui.orders'));
   bar.hidden = true;
-  const arms = bar.appendChild(fightUiElement('div', 'fu-arms'));
+  const top = bar.appendChild(fightUiElement('div', 'fu-order-row'));
+  const second = bar.appendChild(fightUiElement('div', 'fu-order-row fu-order-second'));
+  const arms = second.appendChild(fightUiElement('div', 'fu-arms'));
   arms.setAttribute('role', 'tablist');
   const armButtons = COMMAND_GROUPS.map((entry) => {
     const button = fightUiElement('button', 'fu-arm', t(`order.group.${entry.key}`));
@@ -68,47 +70,54 @@ export function fightUiCommandBar(root, hooks) {
     return button;
   });
   arms.append(...armButtons);
-  const buttons = COMMAND_ORDERS.map((entry) => {
-    const button = fightUiElement('button', 'fu-order', `<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true">${FIGHT_UI_COMMAND_ICONS[entry.kind]}</svg><span>${t(`order.${entry.kind}`)}</span><kbd>${entry.key}</kbd>`);
+  // A button of the bar: an icon over its word, its key in a corner (with a mouse). Its own press: never the fight surface's
+  // tap or drag beneath it.
+  const barButton = (className, icon, word, key, press) => {
+    const button = fightUiElement('button', `fu-order ${className}`, `<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true">${icon}</svg><span>${word}</span><kbd>${key}</kbd>`);
     button.type = 'button';
-    button.dataset.order = entry.kind;
-    button.title = `${t(`order.call.${entry.kind}`)} (${entry.key})`;
-    // Its own press: never the fight surface's tap or drag beneath it.
-    button.addEventListener('pointerdown', (press) => {
-      press.preventDefault();
-      press.stopPropagation();
-      hooks.order(entry.kind);
+    button.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      press();
       navigator.vibrate?.(10);
     });
     for (const kind of ['contextmenu', 'dblclick']) button.addEventListener(kind, (event) => event.preventDefault());
     return button;
+  };
+  // The shapes (and Places) are shown only while Formation is open; a shape given closes them.
+  let formationOpen = false;
+  const shaped = (kind) => ORDER_SHAPES.includes(kind) || kind === 'form';
+  const buttons = COMMAND_ORDERS.map((entry) => {
+    const button = barButton('', FIGHT_UI_COMMAND_ICONS[entry.kind], entry.kind === 'form' ? t('order.places') : t(`order.${entry.kind}`), entry.key.toUpperCase(), () => {
+      hooks.order(entry.kind);
+      if (shaped(entry.kind)) formationOpen = false;
+    });
+    button.dataset.order = entry.kind;
+    button.title = `${t(`order.call.${entry.kind}`)} (${entry.key.toUpperCase()})`;
+    return button;
   });
-  // The shapes in one row of their own under the orders (a column of nine would run down the screen).
-  const shapes = fightUiElement('div', 'fu-shapes');
-  for (const button of buttons) (ORDER_SHAPES.includes(button.dataset.order) ? shapes : bar).append(button);
-  bar.append(shapes);
-  // Hold fire / Fire at will: one pill, its word what it is now; only where he has bows or guns to tell.
-  const fire = fightUiElement('button', 'fu-order fu-fire', '<svg class="fu-order-icon" viewBox="0 0 16 16" aria-hidden="true"></svg><span></span><kbd>H</kbd>');
-  fire.type = 'button';
-  fire.addEventListener('pointerdown', (press) => {
-    press.preventDefault();
-    press.stopPropagation();
-    hooks.fire?.();
-    navigator.vibrate?.(10);
+  const shapes = second.appendChild(fightUiElement('div', 'fu-shapes'));
+  shapes.hidden = true;
+  const formation = barButton('fu-formation', FIGHT_UI_COMMAND_ICONS.formation, t('order.formation'), 'G', () => {
+    formationOpen = !formationOpen;
   });
-  for (const kind of ['contextmenu', 'dblclick']) fire.addEventListener(kind, (event) => event.preventDefault());
-  bar.append(fire);
+  for (const button of buttons) (shaped(button.dataset.order) ? shapes : top).append(button);
+  top.append(formation);
+  // Hold fire / Fire at will: one button, its word what it is now; only where he has bows or guns to tell.
+  const fire = barButton('fu-fire', '', '', 'H', () => hooks.fire?.());
+  top.append(fire);
   let fireShown = null;
-  // The call sits in the column, under the last pill shown, however many there are.
-  // A switch of language (src/i18n.js) relabels the pills and the bar.
+  // A switch of language (src/i18n.js) relabels the buttons and the bar.
   onLangChange(() => {
     bar.setAttribute('aria-label', t('fightui.orders'));
     for (const button of buttons) {
       const entry = COMMAND_ORDERS.find((each) => each.kind === button.dataset.order);
-      button.querySelector('span').textContent = t(`order.${entry.kind}`);
-      button.title = `${t(`order.call.${entry.kind}`)} (${entry.key})`;
+      button.querySelector('span').textContent = entry.kind === 'form' ? t('order.places') : t(`order.${entry.kind}`);
+      button.title = `${t(`order.call.${entry.kind}`)} (${entry.key.toUpperCase()})`;
     }
+    formation.querySelector('span').textContent = t('order.formation');
     for (const button of armButtons) button.textContent = t(`order.group.${button.dataset.group}`);
+    fireShown = null;
   });
   const said = bar.appendChild(fightUiElement('div', 'fu-order-said'));
   said.hidden = true;
@@ -128,7 +137,14 @@ export function fightUiCommandBar(root, hooks) {
     // The arms he has (only All: no tabs), the one chosen lit.
     const groups = groupsFor(world, me);
     const group = chosenGroup(world, me);
-    arms.hidden = groups.length < 2;
+    // The second row: the shapes while Formation is open, else the arms (where there is more than one).
+    const offeredShapes = new Set(ordersFor(world, me.corner, group).map((entry) => entry.kind));
+    if (!ORDER_SHAPES.some((kind) => offeredShapes.has(kind))) formationOpen = false;
+    shapes.hidden = !formationOpen;
+    arms.hidden = formationOpen || groups.length < 2;
+    second.hidden = shapes.hidden && arms.hidden;
+    formation.hidden = !ORDER_SHAPES.some((kind) => offeredShapes.has(kind));
+    formation.classList.toggle('open', formationOpen);
     for (const button of armButtons) {
       button.hidden = !groups.includes(button.dataset.group);
       button.classList.toggle('on', button.dataset.group === group);
@@ -136,7 +152,6 @@ export function fightUiCommandBar(root, hooks) {
     // Formation only where the side has places of its own; the horse only what a rider can be told.
     const offered = new Set(ordersFor(world, me.corner, group).map((entry) => entry.kind));
     for (const button of buttons) button.hidden = !offered.has(button.dataset.order);
-    shapes.hidden = !buttons.some((button) => ORDER_SHAPES.includes(button.dataset.order) && !button.hidden);
     // The fire order: lit (gold) while the shot holds; its word the order standing.
     fire.hidden = !hasShot(world, me);
     const holding = holdingFire(world, me.corner);
@@ -151,6 +166,7 @@ export function fightUiCommandBar(root, hooks) {
     if (`${group}:${kind}` !== shown) {
       shown = `${group}:${kind}`;
       for (const button of buttons) button.classList.toggle('on', button.dataset.order === kind);
+      formation.classList.toggle('on', shaped(kind));
     }
     // A new order (or the order taken back): called for a moment.
     const serial = orderOver(world, me.corner, group)?.serial ?? 0;
@@ -170,9 +186,15 @@ export function fightUiCommandBar(root, hooks) {
   function reset() {
     shown = null;
     fireShown = null;
+    formationOpen = false;
     heard = null;
     said.hidden = true;
   }
 
-  return { update, reset };
+  /** Formation opened or closed (its button, or G). */
+  function toggleFormation() {
+    formationOpen = !formationOpen;
+  }
+
+  return { update, reset, toggleFormation };
 }

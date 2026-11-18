@@ -211,6 +211,8 @@ export const UI_FIGHT = {
   'order.hold': { en: 'Hold', zh: '原地坚守' },
   'order.free': { en: 'Free', zh: '自由行动' },
   'order.form': { en: 'Formation', zh: '归队列阵' },
+  'order.formation': { en: 'Formation', zh: '阵形' },
+  'order.places': { en: 'Places', zh: '归位' },
   'order.line': { en: 'Line', zh: '横阵' },
   'order.wedge': { en: 'Wedge', zh: '锥形阵' },
   'order.square': { en: 'Square', zh: '方阵' },
