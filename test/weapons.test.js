@@ -21,8 +21,8 @@ test('armour stops each kind of harm by its own share, and adds its weight', asy
   // (The head as his set's helmet guards it: design 0, the sallet and bevor: outfitsets.js.)
   // (blunt 0.8: steel over the arming doublet and its mail, as the Bayara's coat over its mail; 0.6 before 2026-11-10.)
   assert.deepEqual(wearing('knight').protection, { blunt: 0.8, cut: 1, pierce: 0.95, bullet: { head: 0.4, torso: 0.7, limb: 0.3 }, regions: { head: { blunt: 0.62, cut: 1, pierce: 0.94, deflects: true } } });
-  // The limbs in kote, haidate and suneate: the dō's blunt and pierce × 0.7, its cut kept (outfits.js KOTE; 2026-11-10).
-  assert.deepEqual(wearing('samurai').protection, { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 }, regions: { limb: { blunt: 0.45, cut: 0.9, pierce: 0.56 } } });
+  // The limbs in kote, haidate and suneate: the dō's blunt × 0.7 and pierce × 0.6, its cut kept (outfits.js KOTE).
+  assert.deepEqual(wearing('samurai').protection, { blunt: 0.65, cut: 0.9, pierce: 0.8, bullet: { head: 0.3, torso: 0.4, limb: 0 }, regions: { limb: { blunt: 0.45, cut: 0.9, pierce: 0.48 } } });
   // Japanese limb armour is made against a cut, and each kit keeps its own order: the tōsei's kote over the ashigaru's light ones.
   const { protectionAt: armOf } = await import('../src/physics.js');
   const arm = (kind) => armOf(wearing(kind), 'lForearm');

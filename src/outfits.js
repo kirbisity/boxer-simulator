@@ -595,10 +595,10 @@ const PLATE_VEST = brigandineOf({ blunt: 0.66, cut: 0.9, pierce: 0.85 }, 'ming')
  * (Bottomley and Hopson, Arms and Armour of the Samurai, 1988; Bryant, The Samurai, 1989). Made to stop an edge drawn
  * across the arm: each kit's cut kept as it was. A blow meets thin iron on a sleeve with nothing to spread it (blunt
  * × 0.7); a point slips between the splints and opens the butted rings, as it would not riveted mail over its padding
- * (pierce × 0.7; × 0.4 and × 0.5 cut too deep, the user's call the same day). Each kit keeps its own figures, scaled (`kote`). The user's call, 2026-11-10: mostly against a cut,
- * little against a point or a blow.
+ * (pierce × 0.6, was × 0.7, which left the tōsei's sleeve at 0.63, riveted mail's figure; × 0.4 and × 0.5 cut too deep).
+ * Each kit keeps its own figures, scaled (`kote`): mostly against a cut, little against a point or a blow.
  */
-const KOTE = { blunt: 0.7, pierce: 0.7 };
+const KOTE = { blunt: 0.7, pierce: 0.6 };
 const kote = ({ blunt, cut, pierce }) => ({ blunt: Math.round(blunt * KOTE.blunt * 100) / 100, cut, pierce: Math.round(pierce * KOTE.pierce * 100) / 100 });
 
 export const OUTFITS = {

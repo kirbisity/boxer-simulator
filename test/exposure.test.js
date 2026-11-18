@@ -49,7 +49,7 @@ test('the ō-yoroi\'s sode are left by the raised arm: struck from above, the ar
   const sode = protectionAt(man.body.gear, 'rUpperArm');
   const robe = gapsOf(man.body.gear).hung.rUpperArm;
   assert.ok((hungOff(man, 'rUpperArm')?.share ?? 1) < 0.1, 'standing, the sode hang over the arm');
-  assert.ok(robe.cut < sode.cut / 4 && robe.pierce < sode.pierce / 4, 'under them the robe');
+  assert.ok(robe.cut < sode.cut / 4 && robe.pierce < sode.pierce / 3, 'under them the robe');
   const above = atPeak('samurai', 'shomen', oyoroi);
   assert.ok(above.share > 0.85, `raised: ${above.share} of blows meet the robe`);
   // A kit that hangs nothing beside the arm keeps its sleeve as it rises.
