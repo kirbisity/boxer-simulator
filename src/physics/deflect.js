@@ -40,7 +40,9 @@ export function deflectWindow(fighter) {
   if (!weapon) return 0;
   const reach = fighter.body.reach;
   const ratio = weaponInertia(weapon, reach) / weaponInertia(WEAPONS[spec.ref], reach);
-  return Math.min(spec.most, Math.max(spec.least, spec.window / Math.sqrt(ratio)));
+  const own = Math.min(spec.most, Math.max(spec.least, spec.window / Math.sqrt(ratio)));
+  // (A man the AI plays: `aiShare` of it, WORLD.deflect.)
+  return fighter.player ? own : own * spec.aiShare;
 }
 
 /** Whether a meeting of his blade with a blow now is a deflect: his guard fresh, up with a weapon, and within its window. */

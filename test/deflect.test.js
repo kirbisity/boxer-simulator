@@ -11,6 +11,8 @@ function pair(attack, defend, defendExtra = {}) {
     { inputs: { ...structuredClone(PRESETS.contender), style: defend, ...defendExtra }, corner: 'blue' },
   ], { seed: 1 });
   const [striker, man] = world.fighters;
+  // (The man guarding is the man played: the deflect is the player's, the AI's window a share of it.)
+  man.player = true;
   const distance = reachOf(striker) * 0.85;
   placeFighter(striker, -distance / 2, 0);
   placeFighter(man, distance / 2, 0);
@@ -37,7 +39,7 @@ function meet(attack, move, defend, { lead, landAt = 0.26, hold = 0, down = null
   return { events, kinds: events.map((event) => event.kind), harm: bodyHarm(man) - harm, spent: stamina - striker.stamina, striker, man };
 }
 
-test('the deflect window: a katana\'s ~0.2 s, shorter for a heavier weapon, longer for a lighter; none for a shield or the fists', () => {
+test('the deflect window: a katana\'s, shorter for a heavier weapon, longer for a lighter; none for a shield or the fists', () => {
   const window = (style, extra) => deflectWindow(pair('boxing', style, extra).man);
   assert.ok(Math.abs(window('katana') - WORLD.deflect.window) < 0.01, `katana ${window('katana').toFixed(3)} s`);
   assert.ok(window('warhammer') < window('katana') * 0.75, `war hammer ${window('warhammer').toFixed(3)} s`);
@@ -56,8 +58,7 @@ test('a cut met in the window is deflected: no harm to him, the striker pays the
   assert.ok(deflect.effects.some((effect) => /reels \((0\.[3-8])/.test(effect)), `a short reel, not a stagger: ${deflect.effects.join(', ')}`);
 });
 
-test('too late is a block, and a guard held past three seconds is down: the blow lands', () => {
-  assert.ok(!meet('katana', 'kesagiri', 'katana', { lead: 0.03 }).kinds.includes('deflect'), 'too late: no deflect');
+test('a guard held past three seconds is down: the blow lands', () => {
   const held = meet('katana', 'kesagiri', 'katana', { lead: 0, hold: WORLD.deflect.holdFor + 0.2 });
   assert.ok(!held.kinds.includes('deflect') && !held.kinds.includes('parry'), `held too long: ${held.kinds.join(', ')}`);
   assert.ok(held.harm > 0.05, `the blow lands (${held.harm.toFixed(3)})`);
@@ -83,4 +84,19 @@ test('the heavy strokes cannot be deflected and are marked: a war hammer and a g
   assert.ok(!marked('katana', 'kesagiri'), 'katana');
   assert.ok(!marked('longsword', 'oberhau'), 'longsword');
   for (const lead of [0.1, 0.15]) assert.ok(!meet('kanabo', 'hammerOverhead', 'katana', { lead, landAt: 0.43 }).kinds.includes('deflect'), `kanabo never deflected (lead ${lead})`);
+});
+
+test('the AI\'s window is a share of the player\'s: a deflect is the player\'s reward', () => {
+  const { man } = pair('boxing', 'katana');
+  const played = deflectWindow(man);
+  man.player = false;
+  assert.ok(Math.abs(deflectWindow(man) - played * WORLD.deflect.aiShare) < 1e-9, `AI ${deflectWindow(man).toFixed(3)} s, played ${played.toFixed(3)} s`);
+});
+
+test('the man played deflects a blow at his front in his window before his blade has come all the way onto it', () => {
+  // Raised so late the blade cannot travel to the line, yet in the window: the press is the parry.
+  const met = meet('katana', 'kesagiri', 'katana', { lead: 0.06 });
+  const deflect = met.events.find((event) => event.kind === 'deflect');
+  assert.ok(deflect, `deflected (${met.kinds.join(', ')})`);
+  assert.equal(met.harm, 0, 'no harm to him');
 });

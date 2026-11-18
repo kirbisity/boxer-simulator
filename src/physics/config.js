@@ -464,8 +464,8 @@ export const WORLD = {
   // - spentBelow: stamina under this, he is spent: the block is no longer brought onto the blow's line, only held where it is (and
   //   the arms holding it are weaker anyway: fatigueScale). A guard kept up too long gives.
   // The deflect (physics/deflect.js; the guard button with a weapon in hand, and any man's block with one): a blade brought
-  // onto a blow within `window` s of the guard going up (0.28 s for a katana, about 17 frames: a parry timed by eye, not a
-  // reflex's tenth) meets it with the wrist set and turns it (a parry's stop, struck on
+  // onto a blow within `window` s of the guard going up (0.45 s for a katana's when the man played presses it: a parry timed
+  // by eye; the AI's `aiShare` of its own, below) meets it with the wrist set and turns it (a parry's stop, struck on
   // time: the attacker's blade rebounds, his blow spent on the meeting), and the man who deflects takes none of it. The
   // window is for a blade of the `ref` weapon's moment of inertia about the shoulder (a katana's); any other brings his
   // blade onto the line in √(I / I_ref) of the time (the time to swing a mass through an angle at the same torque), so its
@@ -476,9 +476,12 @@ export const WORLD = {
   // The deflected man pays the meeting's energy in stamina (WORLD.guardHeld.perJoule, his and not the deflecter's) and his
   // arm is jarred back: he reels for `reel` s (fewer to more, by the meeting's energy over `reelJoules`), not a stagger's
   // seconds: his blade rebounds and must be gathered, a beat in which he can neither strike nor guard well.
+  // `arc` (rad either side of where he faces): the man played deflects a blow from within it that lands on him in his window
+  // even before his blade has come all the way onto it (physics.js assistedDeflect): the press is his parry. (The AI's blade
+  // must meet the blow; its window is `aiShare` of the man played's: a deflect is the player's reward, rare from the AI.)
   // `strikeAt`: where along an attacking weapon a stroke is reckoned to meet the blade, for its mark (physics.js undeflectable):
   // out toward its head, near where a swung weapon strikes hardest.
-  deflect: { window: 0.28, ref: 'katana', least: 0.11, most: 0.42, spam: 0.3, holdFor: 3, reel: [0.3, 0.8], reelJoules: 120, strikeAt: 0.8 },
+  deflect: { window: 0.45, ref: 'katana', least: 0.18, most: 0.65, spam: 0.3, holdFor: 3, reel: [0.3, 0.8], reelJoules: 120, strikeAt: 0.8, arc: 1.5, aiShare: 0.2 },
   guardHeld: { recovery: 0.25, staminaPerSecond: 0.025, perJoule: 0.0006, spentBelow: 0, willFrom: 0.12, willFull: 0.45 },
   // Reading the blow (physics.js blowRead): a block made against a blow (its striker as `defence.from`: the player's held guard,
   // an AI's block) is brought onto the blow's line only as well as he is trained to read it (body.skill, 0..1: OUTFITS' tiers).
