@@ -2515,21 +2515,26 @@ export function updateArrows(view, world) {
 // cut, not all round); `electric`: torn off a short (machinefx.js), drawn
 // blue-white before it cools (battlefx.js). Spent sparks are kept and
 // reused (`spare`), so a stump's sputter allocates nothing once it starts.
-export function spawnSparks(view, at, count = 26, { flash = true, along = null, electric = false } = {}) {
+// `speed` [m/s least, most], `life` [s least, most] and `width` [m least, most] of each spark; `cone`: how tightly they go
+// `along` (its weight against a random direction: 0.6 a loose spray toward it, 3 a jet); `tint`: how far from white-yellow
+// toward orange they burn (0 to 1); `gravity`: the share of g that pulls them down (heavier flecks fall in arcs).
+export function spawnSparks(view, at, count = 26, { flash = true, along = null, electric = false, speed = [2, 7], life = [0.25, 0.85], width = [0.005, 0.009], cone = 0.6, tint = 0, gravity = 1 } = {}) {
   const blood = bloodOf(view);
   for (let index = 0; index < count && blood.sparks.length < GORE.maxSparks; index += 1) {
     const spark = blood.spare.pop() ?? { position: new THREE.Vector3(), velocity: new THREE.Vector3() };
     const velocity = spark.velocity.set(Math.random() - 0.5, Math.random() * 0.9 - 0.1, Math.random() - 0.5).normalize();
-    if (along) velocity.multiplyScalar(0.6).add(sparkAlong.set(along[0], along[1], along[2]).normalize()).normalize();
-    velocity.multiplyScalar(2 + Math.random() ** 2 * 5);
+    if (along) velocity.multiplyScalar(1 / Math.max(0.05, cone)).add(sparkAlong.set(along[0], along[1], along[2]).normalize()).normalize();
+    velocity.multiplyScalar(speed[0] + Math.random() ** 2 * (speed[1] - speed[0]));
     // Most die in the air in a few tenths of a second; some last to the floor.
-    const life = 0.25 + Math.random() ** 2 * 0.6;
+    const lifeOf = life[0] + Math.random() ** 2 * (life[1] - life[0]);
     spark.position.set(at[0], at[1], at[2]);
-    spark.life = life;
-    spark.lifeAtStart = life;
-    spark.width = 0.005 + Math.random() * 0.004;
+    spark.life = lifeOf;
+    spark.lifeAtStart = lifeOf;
+    spark.width = width[0] + Math.random() * (width[1] - width[0]);
     spark.bounced = false;
     spark.electric = electric;
+    spark.tint = tint;
+    spark.gravity = gravity;
     blood.sparks.push(spark);
   }
   if (flash) battleFxSpark(view, at, 0.08 + Math.min(count, 30) * 0.004);
@@ -2727,7 +2732,7 @@ export function updateBlood(view, world, dt) {
     spark.life -= dt;
     // Light flecks: the air slows them a little as gravity takes them.
     spark.velocity.multiplyScalar(Math.exp(-0.8 * dt));
-    spark.velocity.y -= 9.81 * dt;
+    spark.velocity.y -= 9.81 * (spark.gravity ?? 1) * dt;
     spark.position.addScaledVector(spark.velocity, dt);
     if (spark.position.y < floor && spark.velocity.y < 0) {
       // On the floor: one skip, low and slower; the second time it lies there and goes out.

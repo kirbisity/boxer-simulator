@@ -54,8 +54,8 @@ export function blowTail(plan, s) {
   return { ...plan, seconds: plan.seconds === null ? null : plan.seconds * sampleLerp(BLOW_TAIL.light, BLOW_TAIL.heavy, k), fade: plan.fade * sampleLerp(BLOW_TAIL.fadeLight, BLOW_TAIL.fadeHeavy, k) };
 }
 
-// A deflect's clash: the weapons' own clash at `rate` of its pitch (about four semitones down), `trim` louder, rung `seconds` longer.
-const DEFLECT_SOUND = { rate: 0.8, trim: 1.6, seconds: 1.3 };
+// A deflect's clash: the weapons' own clash at `rate` of its pitch (about four semitones down), `trim` times louder, rung `seconds` longer.
+const DEFLECT_SOUND = { rate: 0.8, trim: 2.3, seconds: 1.4 };
 
 /** A strength 0..1 of `value` on a log scale from `low` to `high`. */
 export const sampleStrength = (value, low, high) => sfxClamp(Math.log(Math.max(low, value) / low) / Math.log(high / low), 0, 1);

@@ -464,7 +464,8 @@ export const WORLD = {
   // - spentBelow: stamina under this, he is spent: the block is no longer brought onto the blow's line, only held where it is (and
   //   the arms holding it are weaker anyway: fatigueScale). A guard kept up too long gives.
   // The deflect (physics/deflect.js; the guard button with a weapon in hand, and any man's block with one): a blade brought
-  // onto a blow within `window` s of the guard going up meets it with the wrist set and turns it (a parry's stop, struck on
+  // onto a blow within `window` s of the guard going up (0.28 s for a katana, about 17 frames: a parry timed by eye, not a
+  // reflex's tenth) meets it with the wrist set and turns it (a parry's stop, struck on
   // time: the attacker's blade rebounds, his blow spent on the meeting), and the man who deflects takes none of it. The
   // window is for a blade of the `ref` weapon's moment of inertia about the shoulder (a katana's); any other brings his
   // blade onto the line in √(I / I_ref) of the time (the time to swing a mass through an angle at the same torque), so its
@@ -477,7 +478,7 @@ export const WORLD = {
   // seconds: his blade rebounds and must be gathered, a beat in which he can neither strike nor guard well.
   // `strikeAt`: where along an attacking weapon a stroke is reckoned to meet the blade, for its mark (physics.js undeflectable):
   // out toward its head, near where a swung weapon strikes hardest.
-  deflect: { window: 0.2, ref: 'katana', least: 0.08, most: 0.3, spam: 0.3, holdFor: 3, reel: [0.3, 0.8], reelJoules: 120, strikeAt: 0.8 },
+  deflect: { window: 0.28, ref: 'katana', least: 0.11, most: 0.42, spam: 0.3, holdFor: 3, reel: [0.3, 0.8], reelJoules: 120, strikeAt: 0.8 },
   guardHeld: { recovery: 0.25, staminaPerSecond: 0.025, perJoule: 0.0006, spentBelow: 0, willFrom: 0.12, willFull: 0.45 },
   // Reading the blow (physics.js blowRead): a block made against a blow (its striker as `defence.from`: the player's held guard,
   // an AI's block) is brought onto the blow's line only as well as he is trained to read it (body.skill, 0..1: OUTFITS' tiers).

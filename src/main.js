@@ -94,7 +94,7 @@ import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceRegions, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { hasOrigin, originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
-import { battleFxRing, battleFxSpark } from './battlefx.js';
+import { DEFLECT_LOOKS, deflectBurst, deflectCue, deflectLook } from './deflectlook.js';
 import { deflectsWith } from './physics/deflect.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
@@ -1440,12 +1440,14 @@ function consumeEvents() {
     if (event.weapon && event.kind === 'landed' && state.world.fighters[event.defender]?.body.gear.assist) spawnSparks(scene, event.point, 6);
     // (A robot dog struck, robotdogs.js `machine`: sparks off its shell, not blood.)
     if (event.kind === 'horseHit' && event.cut + event.pierce > 1) (state.world.horses?.[event.horse]?.spec?.machine ? spawnSparks(scene, event.point, 10) : woundBlood(scene, event));
-    // A deflect (physics/deflect.js): a bigger burst of sparks, a bigger flash, and a ring of light spreading from the meeting.
-    if (event.kind === 'clash' && event.deflect) {
-      spawnSparks(scene, event.point, 64);
-      battleFxSpark(scene, event.point, 0.36);
-      battleFxRing(scene, event.point, event.normal ?? [0, 0, 1]);
-    } else if (event.kind === 'clash' || event.kind === 'glance') spawnSparks(scene, event.point);
+    // A deflect (physics/deflect.js): its look (deflectlook.js), the sparks thrown back at the man deflected; the man played
+    // deflecting, the screen's cue. (Its clash has none of its own.)
+    if (event.kind === 'deflect') {
+      const striker = state.world.fighters[event.attacker];
+      const chest = striker ? [striker.x[P.neck * 3], striker.x[P.neck * 3 + 1] - 0.15, striker.x[P.neck * 3 + 2]] : event.point;
+      deflectBurst(scene, event.point, [chest[0] - event.point[0], chest[1] - event.point[1] + 0.2, chest[2] - event.point[2]]);
+      if (state.mode === 'play' && event.fighter === player()?.id) deflectCue($('#deflect-cue'));
+    } else if ((event.kind === 'clash' && !event.deflect) || event.kind === 'glance') spawnSparks(scene, event.point);
     // (A gun's ball, physics/artillery.js: its own blood or grit, its flash at the muzzle with the 'cannon' event: artilleryview.js.)
     if (event.kind === 'shot') (event.gun ? artilleryHit(scene, event) : spawnShot(scene, machine ? { ...event, harm: 0 } : event));
     if (event.kind === 'cannon') artilleryFired(scene, event);
@@ -4463,6 +4465,11 @@ const boxer = window.boxer = {
     $('#modes button[data-value="watch"]')?.click();
     return state.world.fighters.map((fighter) => fighter.style);
   },
+  // The deflect's look (deflectlook.js): named, it is used from now on; with none, the one in use and the others.
+  deflectLook: (name) => {
+    if (name && DEFLECT_LOOKS[name]) deflectLook.chosen = name;
+    return { chosen: deflectLook.chosen, looks: Object.keys(DEFLECT_LOOKS) };
+  },
   // The red marks of strokes that cannot be deflected (perilmark.js): each sprite's state, for tests and shots.
   perilMarks: () => perilMarks.sprites.map((sprite) => ({ visible: sprite.visible, at: sprite.position.toArray() })),
   // One against one, played (the man played red): `hero` and `foe` presets, at `place` (tests, shots: the deflect, its button and marks).
@@ -4500,11 +4507,10 @@ const boxer = window.boxer = {
   fx: {
     shot: (event) => spawnShot(scene, { attacker: 0, time: state.world.time, point: event.to, normal: [0, 0, 1], harm: 0, ...event }),
     sparks: (at, count) => spawnSparks(scene, at, count),
-    // A deflect's look at a point (as a clash with `deflect`: the burst, the flash and the ring square to `normal`).
-    deflect: (at, normal = [0, 0, 1]) => {
-      spawnSparks(scene, at, 64);
-      battleFxSpark(scene, at, 0.36);
-      battleFxRing(scene, at, normal);
+    // A deflect's look at a point, thrown `toward` (deflectlook.js), in `look` (or the one chosen); with `cue`, the screen's cue too.
+    deflect: (at, toward = [1, 0.3, 0], look = deflectLook.chosen, cue = true) => {
+      deflectBurst(scene, at, toward, look);
+      if (cue) deflectCue($('#deflect-cue'), look);
     },
     step: (seconds, dt = 1 / 60) => {
       for (let left = seconds; left > 1e-9; left -= dt) {
