@@ -94,7 +94,7 @@ import { createLastGateView } from './lastgateview.js';
 import { loadPhotoFaces, photoFaceRegions, photoFaceStats, photoFacesOn, releaseUnusedPhotoFaces, resetPhotoCasting, setPhotoFaces, setPhotoFill } from './photoface.js';
 import { hasOrigin, originOf, REGION_ORIGINS, regionName, regionTone, setShade, settleOrigin, skinShadeOf, toneSpan } from './faceregions.js';
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
-import { DEFLECT_LOOKS, deflectBurst, deflectCue, deflectLook } from './deflectlook.js';
+import { deflectBurst, deflectCue } from './deflectlook.js';
 import { deflectsWith } from './physics/deflect.js';
 import { clearGore, machineEvent, severView, spawnBlood, spawnShot, spawnSparks, updateArms, updateArrows, updateBlood, updateDebris, updateShots, updateStumps, updateWhips, woundBlood } from './weaponview.js';
 import { placeFlameTanks, updateFlames } from './flameview.js';
@@ -4465,11 +4465,6 @@ const boxer = window.boxer = {
     $('#modes button[data-value="watch"]')?.click();
     return state.world.fighters.map((fighter) => fighter.style);
   },
-  // The deflect's look (deflectlook.js): named, it is used from now on; with none, the one in use and the others.
-  deflectLook: (name) => {
-    if (name && DEFLECT_LOOKS[name]) deflectLook.chosen = name;
-    return { chosen: deflectLook.chosen, looks: Object.keys(DEFLECT_LOOKS) };
-  },
   // The red marks of strokes that cannot be deflected (perilmark.js): each sprite's state, for tests and shots.
   perilMarks: () => perilMarks.sprites.map((sprite) => ({ visible: sprite.visible, at: sprite.position.toArray() })),
   // One against one, played (the man played red): `hero` and `foe` presets, at `place` (tests, shots: the deflect, its button and marks).
@@ -4507,10 +4502,10 @@ const boxer = window.boxer = {
   fx: {
     shot: (event) => spawnShot(scene, { attacker: 0, time: state.world.time, point: event.to, normal: [0, 0, 1], harm: 0, ...event }),
     sparks: (at, count) => spawnSparks(scene, at, count),
-    // A deflect's look at a point, thrown `toward` (deflectlook.js), in `look` (or the one chosen); with `cue`, the screen's cue too.
-    deflect: (at, toward = [1, 0.3, 0], look = deflectLook.chosen, cue = true) => {
-      deflectBurst(scene, at, toward, look);
-      if (cue) deflectCue($('#deflect-cue'), look);
+    // A deflect's look at a point, thrown `toward` (deflectlook.js); with `cue`, the screen's cue too.
+    deflect: (at, toward = [1, 0.3, 0], cue = true) => {
+      deflectBurst(scene, at, toward);
+      if (cue) deflectCue($('#deflect-cue'));
     },
     step: (seconds, dt = 1 / 60) => {
       for (let left = seconds; left > 1e-9; left -= dt) {

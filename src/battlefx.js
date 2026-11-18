@@ -525,20 +525,6 @@ export function battleFxSpark(view, at, size = 0.14, colour = [1.6, 1.3, 0.8], s
 }
 
 /**
- * A star of light at `at` (a deflect's flare, deflectlook.js): a hot core and `rays` thin streaks out from it `length` m,
- * in `colour`, for `seconds`.
- */
-export function battleFxStar(view, at, { size = 0.2, length = 0.5, rays = 4, colour = [2.4, 1.5, 0.6], seconds = 0.12 } = {}) {
-  const fx = battleFxOf(view);
-  fx.flashes.push({ at: [...at], size, colour, tail: [0, 0, 0], age: 0, seconds });
-  for (let ray = 0; ray < rays; ray += 1) {
-    const angle = (ray / rays) * Math.PI + Math.PI / 4;
-    const tail = [Math.cos(angle) * length, Math.sin(angle) * length, 0];
-    fx.flashes.push({ at: [...at], size: size * 0.35, colour, tail, age: 0, seconds: seconds * 1.2 });
-  }
-}
-
-/**
  * An electric arc from `from` to `to` (arrays, copied), `strength` 0..1: a
  * jagged blue-white line that flickers for a moment, with a small flash at
  * its root and the flash's light turned blue-white on it. Full, the oldest

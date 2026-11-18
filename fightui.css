@@ -242,30 +242,9 @@ body[data-game="tutorial"] .fu-orders, body[data-game="tutorial"] .fu-order-said
 .fu-toast-outcome { border-radius: 0; font: 700 12px var(--display); letter-spacing: 0.14em; }
 html:lang(zh) :is(.fu-legend, .fu-toast-name, .fu-toast-outcome, .fu-btn-name) { letter-spacing: 0.04em; }
 
-/* The deflect's cue on the screen (deflectlook.js deflectCue): played once per deflect by the man played, in the look's `cue`. */
-.deflect-cue { position: fixed; inset: 0; pointer-events: none; z-index: 2; opacity: 0; }
-.deflect-cue span { display: none; }
+/* The deflect's cue on the screen (deflectlook.js deflectCue): when the man played deflects, a gold shine down from the top
+   edge with the word under the clock, fading in a little over half a second. */
+.deflect-cue { position: fixed; inset: 0; pointer-events: none; z-index: 2; opacity: 0; background: linear-gradient(to bottom, rgba(255, 196, 90, 0.7), rgba(255, 170, 60, 0.18) 14%, transparent 26%); }
+.deflect-cue span { position: absolute; top: 74px; left: 0; right: 0; text-align: center; font: 600 22px/1 "Cormorant Garamond", Georgia, serif; letter-spacing: 0.18em; color: #ffe2a8; text-shadow: 0 0 12px rgba(255, 170, 60, 0.95); }
 .deflect-cue.play { animation: dc-fade 0.55s ease-out forwards; }
 @keyframes dc-fade { 0% { opacity: 1; } 35% { opacity: 0.9; } 100% { opacity: 0; } }
-/* edges: the four edges glow gold. */
-.deflect-cue[data-cue="edges"] { box-shadow: inset 0 0 70px 18px rgba(255, 186, 72, 0.75), inset 0 0 0 3px rgba(255, 214, 130, 0.9); }
-/* sweep: a gold bar runs along the top. */
-.deflect-cue[data-cue="sweep"] { background: linear-gradient(90deg, transparent 0%, rgba(255, 196, 90, 0) 30%, rgba(255, 214, 130, 0.95) 50%, rgba(255, 196, 90, 0) 70%, transparent 100%) top / 220% 10px no-repeat; }
-.deflect-cue[data-cue="sweep"].play { animation: dc-fade 0.6s ease-out forwards, dc-sweep 0.6s ease-out forwards; }
-@keyframes dc-sweep { from { background-position: 100% 0; } to { background-position: 0% 0; } }
-/* corners: gold brackets in the four corners. */
-.deflect-cue[data-cue="corners"] {
-  --c: rgba(255, 205, 110, 0.95); --l: 64px; --w: 5px;
-  background:
-    linear-gradient(var(--c), var(--c)) top 18px left 18px / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) top 18px left 18px / var(--w) var(--l) no-repeat,
-    linear-gradient(var(--c), var(--c)) top 18px right 18px / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) top 18px right 18px / var(--w) var(--l) no-repeat,
-    linear-gradient(var(--c), var(--c)) bottom 18px left 18px / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) bottom 18px left 18px / var(--w) var(--l) no-repeat,
-    linear-gradient(var(--c), var(--c)) bottom 18px right 18px / var(--l) var(--w) no-repeat, linear-gradient(var(--c), var(--c)) bottom 18px right 18px / var(--w) var(--l) no-repeat;
-  filter: drop-shadow(0 0 8px rgba(255, 180, 60, 0.9));
-}
-/* top: a gold shine down from the top edge, with the word. */
-.deflect-cue[data-cue="top"] { background: linear-gradient(to bottom, rgba(255, 196, 90, 0.7), rgba(255, 170, 60, 0.18) 14%, transparent 26%); }
-.deflect-cue[data-cue="top"] span { display: block; position: absolute; top: 74px; left: 0; right: 0; text-align: center; font: 600 22px/1 "Cormorant Garamond", Georgia, serif; letter-spacing: 0.18em; color: #ffe2a8; text-shadow: 0 0 12px rgba(255, 170, 60, 0.95); }
-/* wash: the whole screen warm for an instant, edges gold. */
-.deflect-cue[data-cue="wash"] { background: rgba(255, 168, 64, 0.2); box-shadow: inset 0 0 90px 10px rgba(255, 186, 72, 0.55); }
-.deflect-cue[data-cue="wash"].play { animation: dc-fade 0.35s ease-out forwards; }
