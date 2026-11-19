@@ -27,7 +27,8 @@ export const WEAPONS = {
   hammer: { label: 'War hammer', style: 'warhammer', typical: 'war hammer: face, beak and spike' },
   club: { label: 'Great club', style: 'kanabo', typical: 'kanabo, two-handed iron-studded club' },
 };
-export const SPEC = { limit: 40, seconds: 240, look: 0.5 };
+// Capped at 120 hits (was 40: the best armours all stood past it, so the top was not told apart), in as long a fight (6 s a hit).
+export const SPEC = { limit: 120, seconds: 720, look: 0.5 };
 
 /** One run: hits landed until he is out (or `limit`), how many of them glanced, and how it ended. */
 export function hitsToOut(kind, design, weapon, seed) {
