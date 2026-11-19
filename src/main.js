@@ -40,6 +40,7 @@ import { battleTally, clock, howBeaten, notableFacts, tallyRows } from './battle
 import { judgeBattle } from './battleend.js';
 import { createGeneralMarks } from './generalmark.js';
 import { createPerilMarks } from './perilmark.js';
+import { createExecuteMarks } from './executemark.js';
 import { leadOf, musterLevel } from './muster.js';
 import { CUSTOM_BATTLE, customLevel } from './custombattle.js';
 import { CLOTH_COLORS, defaultHeadgear, FACTION_KEYS, factionOf, FACTIONS, finishOptions, firstDesignOf, HEADGEAR, headgearOptions, OUTFIT_KEYS, outfitOf, outfitSets, OUTFITS, helmChoices, helmSlotOf, pickableSets, PICKABLE_OUTFIT_KEYS, randomColors, setHelmSlot, withFinish, wornCard } from './outfits.js';
@@ -242,6 +243,7 @@ const fightMarks = createFightUiMarks(scene);
 // The crown over each side's general in a battle (generalmark.js; ai.js AI.general).
 const generalMarks = createGeneralMarks(scene);
 const perilMarks = createPerilMarks(scene);
+const executeMarks = createExecuteMarks(scene);
 // His place in the line in a story battle (story/placemark.js): a ring at his slot, an arrow to it while he is out of it.
 const storyPlaceMark = createStoryPlaceMark(scene);
 let fightMarksClock = 0;
@@ -1453,6 +1455,8 @@ function drawWorld(dt, drawIt = true) {
   generalMarks.update(story.filming ? null : world);
   // The red "!" over a man whose blow at the man played cannot be deflected (perilmark.js).
   perilMarks.update(story.filming || state.mode !== 'play' ? null : world, player(), realSeconds());
+  // The red dot on the face of a man broken open by the player's big deflect: his to execute (executemark.js).
+  executeMarks.update(story.filming || state.mode !== 'play' ? null : world, player(), realSeconds());
   storyPlaceMark.update(world, state.game === 'story' ? story.placeMark() : null);
   // A cut-off piece's program (its man's material, unskinned) built while he is new, not on the frame of the cut (render.js warmSevered).
   warmSevered(scene, state.views);
@@ -4534,6 +4538,8 @@ const boxer = window.boxer = {
   },
   // The red marks of strokes that cannot be deflected (perilmark.js): each sprite's state, for tests and shots.
   perilMarks: () => perilMarks.sprites.map((sprite) => ({ visible: sprite.visible, at: sprite.position.toArray() })),
+  // The red dots of executions to be had (executemark.js): each sprite's state, for tests and shots.
+  executeMarks: () => executeMarks.sprites.map((sprite) => ({ visible: sprite.visible, at: sprite.position.toArray(), opacity: sprite.material.opacity })),
   // One against one, played (the man played red): `hero` and `foe` presets, at `place` (tests, shots: the deflect, its button and marks).
   duelDemo: (hero = 'samurai', foe = 'kanabo', place = 'meadow', seed = 1, distance = 2.4) => {
     skipIntro();
