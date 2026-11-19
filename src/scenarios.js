@@ -2,6 +2,7 @@
 // same bodies, physics and AI as the sandbox — only the place, the people
 // and what they wear differ.
 
+import { battleThemes, themedSides } from './armythemes.js';
 import { FRAMES, normaliseInputs, PRESETS } from './body.js';
 import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
@@ -864,12 +865,15 @@ export const ARMIES = {
  * - `cast(random, sides)`: the sides as the foot cast made them, with the horse added
  *   (or the foot thinned where horse takes their place).
  */
-export function battleOf(key) {
+export function battleOf(key, { themes = true } = {}) {
   const scenario = SCENARIOS[key];
   const wings = scenario.wings;
-  if (!wings) return drawnApart(scenario);
-  const formation = Object.fromEntries(['red', 'blue'].map((corner) => [corner, { ...scenario.formation?.[corner], ...wings.formation?.[corner] }]));
-  return drawnApart({ ...scenario, arena: wings.arena, camera: wings.camera ?? scenario.camera, formation, cast: (random) => wings.cast(random, scenario.cast(random)) });
+  const level = wings ? drawnApart({ ...scenario, arena: wings.arena, camera: wings.camera ?? scenario.camera, formation: Object.fromEntries(['red', 'blue'].map((corner) => [corner, { ...scenario.formation?.[corner], ...wings.formation?.[corner] }])), cast: (random) => wings.cast(random, scenario.cast(random)) }) : drawnApart(scenario);
+  // Each side in its army's colours (armythemes.js: colour only), unless asked without (the themes' test).
+  const sides = themes && level.cast ? battleThemes(key, scenario.armies) : null;
+  if (!sides) return level;
+  const cast = level.cast;
+  return { ...level, themes: sides, cast: (random) => themedSides(cast(random), sides) };
 }
 
 /**

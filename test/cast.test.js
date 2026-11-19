@@ -97,7 +97,7 @@ test('the rebellion opens with the knights in a tight line and the rebels a loos
   assert.ok(new Set(rebels.map((fighter) => fighter.root[0].toFixed(1))).size > 6, 'not in ranks');
 });
 
-test('Sekigahara: the East in red, the West in black and blue, one more of the West, mostly ashigaru, teppō and spears and three horse a side; Agincourt\'s archers and men-at-arms; Cerignola\'s arquebusiers, Landsknechts, gendarmes and Swiss', async () => {
+test('Sekigahara: the East in black lacquer under white sashimono (Ii\'s horse in red), the West in navy and indigo under dark blue, one more of the West, mostly ashigaru, teppō and spears and three horse a side; Agincourt\'s archers and men-at-arms; Cerignola\'s arquebusiers, Landsknechts, gendarmes and Swiss', async () => {
   const { SCENARIOS, battleOf } = await import('../src/scenarios.js');
   const sekigahara = SCENARIOS.sekigahara.cast(seededRandom(7));
   const { red: east, blue: west } = battleOf('sekigahara').cast(seededRandom(7));
@@ -110,7 +110,12 @@ test('Sekigahara: the East in red, the West in black and blue, one more of the W
     assert.ok(side.filter((man) => man.outfit.kind !== 'ashigaru').length <= 7, 'samurai about one in six');
     assert.equal(side.filter((man) => man.style === 'matchlock' && man.outfit.kind === 'ashigaru').length, 7, 'seven teppō ashigaru');
     assert.ok(side.filter((man) => man.style === 'yari' && man.outfit.kind === 'ashigaru').length >= 8, 'the yari');
-    assert.ok(side.every((man) => man.outfit.tint.armor === side[0].outfit.tint.armor), 'one colour to an army');
+    // One lacquer and one sashimono to an army (armythemes.js), but Ii Naomasa's red horse with the East; a kit of bare iron or
+    // polished steel takes no lacquer.
+    const foot = side.filter((man) => !man.mounted);
+    const lacquers = new Set(foot.map((man) => man.outfit.tint?.armor).filter(Boolean));
+    assert.equal(lacquers.size, 1, 'one lacquer to an army');
+    assert.ok(foot.every((man) => man.outfit.banner === foot[0].outfit.banner), 'one sashimono to an army');
   }
   assert.notEqual(east[0].outfit.tint.armor, west[0].outfit.tint.armor, 'each army in its own colour');
   const agincourt = SCENARIOS.agincourt.cast(seededRandom(7));

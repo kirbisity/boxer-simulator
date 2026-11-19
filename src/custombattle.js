@@ -5,6 +5,7 @@
 // the browser between visits, and `customLevel(battle)` makes of it a level like any of scenarios.js's, which
 // muster.js musterLevel sets up and main.js fights.
 
+import { factionThemes, themedSides } from './armythemes.js';
 import { boltedOn, canRide, isMounted } from './horses.js';
 import { STYLES } from './moves.js';
 import { FACTIONS } from './outfits.js';
@@ -191,7 +192,9 @@ export function customLevel(battle) {
     fighters: [],
   };
   const men = Object.fromEntries(CUSTOM_CORNERS.map((corner) => [corner, battle.sides[corner].men.map((man) => units[corner].find((unit) => unit.id === man.unit)).filter(Boolean)]));
-  level.cast = () => Object.fromEntries(CUSTOM_CORNERS.map((corner) => [corner, men[corner].map((unit) => unit.make())]));
+  // Each side in its faction's colours (armythemes.js), the blue in its alternate where the two would look alike.
+  level.themes = factionThemes(battle.factions);
+  level.cast = () => themedSides(Object.fromEntries(CUSTOM_CORNERS.map((corner) => [corner, men[corner].map((unit) => unit.make())])), level.themes);
   level.places = Object.fromEntries(CUSTOM_CORNERS.map((corner) => [corner, battle.sides[corner].men.filter((man) => units[corner].some((unit) => unit.id === man.unit)).map((man) => man.at)]));
   return level;
 }

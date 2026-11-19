@@ -742,7 +742,8 @@ export function installMenus(game) {
         const colors = { ...inputs.outfit?.colors };
         if (hex === own) delete colors[part];
         else colors[part] = hex;
-        inputs.outfit = { ...inputs.outfit, colors };
+        // (Picked by hand: an army's colours never paint over it, armythemes.js.)
+        inputs.outfit = { ...inputs.outfit, colors, handColors: true };
       });
       picker.firstChild.classList.add('own');
       return picker;

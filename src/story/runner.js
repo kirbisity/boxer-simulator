@@ -18,6 +18,7 @@
 // `when` holds then; a fatal choice's `scene` (the chapter's scene of that id) plays before its page.
 // `storyRunBattle` fights a chapter's battle headless (Node): the hero thinks for himself as every man does (ai.js).
 
+import { BATTLE_THEMES, themedFighters } from '../armythemes.js';
 import { P } from '../body.js';
 import { thinkAll } from '../ai.js';
 import { judgeBattle } from '../battleend.js';
@@ -254,7 +255,7 @@ export function storyLifeLived(run) {
 
 /** The battle's setup for this life at a seed (the battle file's `setup`, with his men as drawn up: `deploy`, else the run's), kept on the run. */
 export function storyBattleSetup(run, seed = 1, deploy = run.deploy) {
-  run.setup = run.battle.setup(run.life, seed, deploy ? { deploy } : {});
+  run.setup = storyThemed(run.battle, run.battle.setup(run.life, seed, deploy ? { deploy } : {}));
   // His family the battle cast (his brother in the column): kept as the battle made them, so later scenes stage the same man.
   for (const [who, index] of Object.entries(run.setup.comrades ?? {})) {
     const member = run.life.family?.[who];
@@ -538,7 +539,7 @@ function storyDetailOf(outcome) {
  * defaults (deploy.js). Returns { world, setup, watch, outcome }.
  */
 export function storyRunBattle(battle, life, seed = 1, { step = STORY_RUN.step, seconds = battle.seconds, deploy = null } = {}) {
-  const setup = battle.setup(life, seed, deploy ? { deploy } : {});
+  const setup = storyThemed(battle, battle.setup(life, seed, deploy ? { deploy } : {}));
   const world = storyBattleWorld(setup, life);
   const watch = storyWatch(setup);
   const limit = { ...battle, seconds };
@@ -547,4 +548,10 @@ export function storyRunBattle(battle, life, seed = 1, { step = STORY_RUN.step, 
     storyWatchStep(watch, world, setup, step);
   }
   return { world, setup, watch, outcome: storyReadOutcome(world, setup, watch) };
+}
+
+/** A story battle's set-up with each side in its army's colours (armythemes.js BATTLE_THEMES `story:<id>`; colour only). */
+function storyThemed(battle, setup) {
+  const themes = BATTLE_THEMES[`story:${battle.id}`];
+  return themes && setup?.fighters ? { ...setup, fighters: themedFighters(setup.fighters, themes) } : setup;
 }

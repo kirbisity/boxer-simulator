@@ -2438,11 +2438,11 @@ const OUTFIT_FIELDS = [
   },
   {
     key: 'top', label: 'Top', options: Object.keys(PICKER_COLORS), optionKey: 'builder.c',
-    get: (inputs) => colorName(outfitField(inputs).colors?.top), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, top: PICKER_COLORS[value] ?? undefined }; },
+    get: (inputs) => colorName(outfitField(inputs).colors?.top), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, top: PICKER_COLORS[value] ?? undefined }; outfitField(inputs).handColors = true; },
   },
   {
     key: 'bottom', label: 'Legs', options: Object.keys(PICKER_COLORS), optionKey: 'builder.c',
-    get: (inputs) => colorName(outfitField(inputs).colors?.bottom), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, bottom: PICKER_COLORS[value] ?? undefined }; },
+    get: (inputs) => colorName(outfitField(inputs).colors?.bottom), set: (inputs, value) => { outfitField(inputs).colors = { ...outfitField(inputs).colors, bottom: PICKER_COLORS[value] ?? undefined }; outfitField(inputs).handColors = true; },
   },
   {
     // What the outfit offers for the head; filled in per outfit (see fillCornerForm).

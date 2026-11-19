@@ -33,7 +33,7 @@ import { SUBWAY_ARENA, subwayPuddleFilm, subwayStation } from './props/subway.js
 import { swayGrass } from './clothwind.js';
 import { coastFarPlaneGuard, coastFort, coastGabions, coastHouses, coastNetRacks, coastPalms, coastPier, coastSampans, coastShip, coastShipMaterials } from './props/coast.js';
 import { buildHarness, buildLionPelt, buildRomanKit, buildScaleShirt, netCord } from './arenaview.js';
-import { buildAirPack, buildBackBox, buildBackPrint, buildBanner, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
+import { buildAirPack, buildBackBox, buildBackPrint, buildBanner, buildSigns, signsLocal, buildFootwear, buildHand, buildHeadgear, buildSwinging, dressFor, handKind, roleColors, steelEnvironment, steelMaterial, tattooColor, buildHeadProp } from './wardrobe.js';
 import { buildHead, hairCurtain, hairCurtainSoft } from './face.js';
 import { HELM_HEAD_BREADTH, HELM_SPAN } from './helmforms.js';
 import { photoFaceFor, skinScatter } from './photoface.js';
@@ -2263,9 +2263,16 @@ function detailedView(view, fighter, simple) {
   // How far the armour on the chest stands out behind the spine: a photo head's long hair rests on it (face.js, hairswing.js).
   const armourBack = dress.armor && !simple ? armourBackReach(collar) : 0;
   if (dress.banner) {
-    const banner = buildBanner(body, dress.banner, dress.greatBanner, dress.bannerLook);
+    const banner = buildBanner(body, dress.banner, dress.greatBanner, dress.bannerLook, dress.crest);
     banner.userData.banner = true;
     collar.add(banner);
+  }
+  // An army's field signs on the chest and back (armythemes.js): cloth, set to his trunk.
+  const signs = buildSigns(dress);
+  if (signs) {
+    signs.userData.signs = true;
+    signsLocal(body).decompose(signs.position, signs.quaternion, signs.scale);
+    collar.add(signs);
   }
 
   // Bone layer: the anatomical skeleton, moved rigidly with the rig. The skin view draws none (the body carries its own bony
@@ -2748,7 +2755,7 @@ function bakeCrowdTemplate(view, fighter) {
   // What can be knocked off him is drawn alone then: its programs built now (warmWorn).
   warmWorn(view, [full.group, ...full.headProps.map((prop) => prop.loose)]);
   full.group.traverse((object) => {
-    if (object.userData.banner) object.visible = false;
+    if (object.userData.banner || object.userData.signs) object.visible = false;
   });
   const seat = fighter.body.lengths.headRadius * HEAD_SEAT;
   const headFrame = frames[BONE.head];
@@ -2922,7 +2929,8 @@ function crowdView(view, fighter, template) {
   }).filter(Boolean);
   const attachments = [];
   let banner = null;
-  if (dress.armor?.backPrint || dress.banner) {
+  let signs = null;
+  if (dress.armor?.backPrint || dress.banner || dress.badge || dress.sash) {
     const collar = new THREE.Group();
     collar.matrixAutoUpdate = false;
     layers.skin.add(collar);
@@ -2931,11 +2939,17 @@ function crowdView(view, fighter, template) {
     if (dress.banner) {
       // The side's banners are one instanced batch, made at 1.8 m and set
       // to each man's size and back (see buildBanner).
-      const batch = crowdBatch(view, `banner:${dress.banner}${dress.greatBanner ? `:great:${dress.bannerLook}` : ''}`, () => buildBanner({ heightM: 1.8, segments: { trunk: { skinRadius: 0 } } }, dress.banner, dress.greatBanner, dress.bannerLook));
+      const crest = dress.greatBanner ? null : dress.crest;
+      const batch = crowdBatch(view, `banner:${dress.banner}${dress.greatBanner ? `:great:${dress.bannerLook}` : ''}${crest ? `:${JSON.stringify(crest)}` : ''}`, () => buildBanner({ heightM: 1.8, segments: { trunk: { skinRadius: 0 } } }, dress.banner, dress.greatBanner, dress.bannerLook, crest));
       const scale = body.heightM / 1.8;
       const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
       const local = new THREE.Matrix4().makeTranslation(back + 0.05 * scale, 0, 0).multiply(new THREE.Matrix4().makeScale(scale, scale, scale));
       banner = { batch, collar, local, matrix: new THREE.Matrix4() };
+    }
+    // The side's field signs, likewise one batch (wardrobe.js buildSigns, at unit depth: signsLocal sets them to him).
+    if (dress.badge || dress.sash) {
+      const batch = crowdBatch(view, `signs:${JSON.stringify([dress.badge, dress.sash])}`, () => buildSigns(dress));
+      signs = { batch, collar, local: signsLocal(body), matrix: new THREE.Matrix4() };
     }
   }
   // The bone and physics layers of a crowd man are built when one is shown (ensureCrowdLayers): a man is 45 objects more in the scene, each drawn into nothing and each walked every frame.
@@ -2958,7 +2972,7 @@ function crowdView(view, fighter, template) {
   return {
     fighter, group, layers, bones, built: { bindFrames: template.frames }, skinMesh, skinOutline, muscle: null, skeleton: boneGroups, attachments, shells: [], near, far,
     baseColors: template.colors, vertexSegment: template.vertexSegment, damageVersion: -1, headProps, dangles: [], steelMesh,
-    head: { group: headGroup, shell: { dent() {} }, update() {}, hideHair() {} }, layer: 'skin', frames, baked: true, banner,
+    head: { group: headGroup, shell: { dent() {} }, update() {}, hideHair() {} }, layer: 'skin', frames, baked: true, banner, signs,
     // Drawn bare-headed (bareCrowdHead): his helmet knocked off.
     bareHead: false,
   };
@@ -3419,8 +3433,10 @@ function showBody(body, shown, ink, shadow, skinLayer) {
 
 /** A baked crowd fighter's banner, into its side's batch for this frame. */
 function addBanner(fighterView) {
-  const banner = fighterView.banner;
-  if (banner && banner.collar.visible && fighterView.layers.skin.visible) banner.batch.add(banner.matrix.multiplyMatrices(banner.collar.matrix, banner.local));
+  if (!fighterView.layers.skin.visible) return;
+  for (const piece of [fighterView.banner, fighterView.signs]) {
+    if (piece && piece.collar.visible) piece.batch.add(piece.matrix.multiplyMatrices(piece.collar.matrix, piece.local));
+  }
 }
 
 function updatePhysicsLayer(fighterView) {

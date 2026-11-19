@@ -3149,6 +3149,26 @@ export function familyKinds(family) {
   return OUTFIT_KEYS.filter((key) => OUTFITS[key].family === family);
 }
 
+/** A look with a theme's paint on it (`paint`: a path into the look and its colour); only fields the look has. */
+function paintedLook(look, paint) {
+  if (!paint || !look) return look;
+  const painted = { ...look };
+  for (const [path, colour] of Object.entries(paint)) {
+    const [piece, ...rest] = path.split('.');
+    if (!rest.length || !painted[piece] || typeof painted[piece] !== 'object') continue;
+    // (A piece copied once, then its field set: a design's own objects are shared by every man in it.)
+    const copy = (painted[piece] = painted[piece] === look[piece] ? { ...look[piece] } : painted[piece]);
+    let at = copy;
+    for (let index = 0; index < rest.length - 1; index += 1) {
+      if (!at[rest[index]] || typeof at[rest[index]] !== 'object') { at = null; break; }
+      at[rest[index]] = { ...at[rest[index]] };
+      at = at[rest[index]];
+    }
+    if (at && typeof at[rest[rest.length - 1]] === 'string') at[rest[rest.length - 1]] = colour;
+  }
+  return painted;
+}
+
 /** The outfit a fighter wears: kind and design, defaulting to boxing's first. */
 // ---- Factions -----------------------------------------------------------------
 
@@ -3284,7 +3304,8 @@ export function outfitOf(inputs) {
   // (And `outfit.helm` { kind, design }: another kit's helm put on over this one, a dead man's taken up: levelmode/ending.js.)
   const helm = wornHelm(inputs);
   const drawn = inputs.outfit?.bareHead ? { ...OUTFITS[kind].designs[design], head: null } : helm ? { ...OUTFITS[kind].designs[design], head: helm.head } : OUTFITS[kind].designs[design];
-  return { kind, design, set: set.key, spec: setSpec(kind, set.key), look: finishedLook(kind, inputs.outfit, drawn) };
+  // (An army's colours over it: armythemes.js, colour only.)
+  return { kind, design, set: set.key, spec: setSpec(kind, set.key), look: paintedLook(finishedLook(kind, inputs.outfit, drawn), inputs.outfit?.paint) };
 }
 
 /** The helm of another kit worn over this one (`outfit.helm`: { kind, design }: the helmet slot, or a dead man's taken up), or null. */

@@ -13,6 +13,7 @@
 // `placed` (physics.js createWorld: his riders too), the side keeping its
 // level's drill, discipline and wings. The world is built from it as from any level.
 
+import { battleThemes, themedMan } from './armythemes.js';
 import { isMounted } from './horses.js';
 import { STYLES } from './moves.js';
 import { WORLD } from './physics.js';
@@ -291,7 +292,9 @@ export function musterLevel(level, setup) {
       placed: true,
     };
   }
-  const cast = (corner) => setup.cast[corner].map((inputs) => structuredClone(inputs));
+  // Each side in its colours (armythemes.js): the level's, else its armies' (a set-up army's men are dressed as the level's are).
+  const themes = level.themes ?? battleThemes(null, level.armies);
+  const cast = (corner) => setup.cast[corner].map((inputs) => (themes ? themedMan(structuredClone(inputs), themes[corner]) : structuredClone(inputs)));
   return { ...level, formation, cast: () => ({ red: cast('red'), blue: cast('blue') }), mustered: true };
 }
 

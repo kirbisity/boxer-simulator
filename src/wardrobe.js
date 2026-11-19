@@ -76,7 +76,9 @@ export function dressFor(inputs, cornerHex) {
   const second = resolveArms(inputs).second;
   const carried = carriedAs(second);
   if ((carried === 'sword' || carried === 'dagger') && !extras.some((extra) => extra.kind === 'daisho')) extras.push({ kind: 'sheath', weapon: second, carried });
-  return { kind, design, look, top, bottom, armor, feet, head, extras, tattoo: look.tattoo, female, color, banner: inputs.outfit?.banner ?? null };
+  // An army's field signs (armythemes.js): the sashimono's crest, a cross on the chest and back, a sash: cloth, no weight.
+  const signs = { crest: inputs.outfit?.crest ?? null, badge: inputs.outfit?.badge ?? null, sash: inputs.outfit?.sash ?? null };
+  return { kind, design, look, top, bottom, armor, feet, head, extras, tattoo: look.tattoo, female, color, banner: inputs.outfit?.banner ?? null, ...signs };
 }
 
 // A scabbard's look by its sword's people: its leather or lacquer, the grip's binding and the guard's metal (`guard`: a cross,
@@ -4323,7 +4325,7 @@ export function featherDevice(colour, top, size = 1) {
  * A sashimono: the side's banner on a pole up the back, standing clear of
  * the helmet, a white disc on the field (collar coordinates: x forward, y up).
  */
-export function buildBanner(body, colorHex, great = false, look = null) {
+export function buildBanner(body, colorHex, great = false, look = null, crest = null) {
   const scale = body.heightM / 1.8;
   const back = -(body.segments.trunk.skinRadius * 0.62 * 1.32 + 0.05);
   const group = new THREE.Group();
@@ -4373,10 +4375,8 @@ export function buildBanner(body, colorHex, great = false, look = null) {
   const g = canvas.getContext('2d');
   g.fillStyle = colorHex;
   g.fillRect(0, 0, 64, 128);
-  g.fillStyle = '#f2eee4';
-  g.beginPath();
-  g.arc(32, 40, 17, 0, Math.PI * 2);
-  g.fill();
+  // Its crest (an army's: armythemes.js), else the white disc.
+  paintCrest(g, great ? null : crest);
   if (great) {
     // A gold rim round the crest.
     g.strokeStyle = '#d8a23a';
@@ -4390,6 +4390,106 @@ export function buildBanner(body, colorHex, great = false, look = null) {
   flag.position.set(back - 0.005, (size.pole - 0.25 - size.height / 2 - 0.03) * scale, (size.width / 2 + 0.005) * scale);
   group.add(pole, flag);
   return group;
+}
+
+/**
+ * A sashimono's crest on its 64 x 128 canvas (`crest`: { mark, color }): 'disc' a round mon, 'hollyhock' three leaves in a ring
+ * (the Tokugawa aoi), 'prayer' the Nichiren daimoku down the flag under a ring (Katō Kiyomasa's), 'none' a plain field; no crest,
+ * the white disc.
+ */
+function paintCrest(g, crest) {
+  const mark = crest?.mark ?? 'disc';
+  g.fillStyle = crest?.color ?? '#f2eee4';
+  g.strokeStyle = crest?.color ?? '#f2eee4';
+  if (mark === 'none') return;
+  if (mark === 'disc') {
+    g.beginPath();
+    g.arc(32, 40, 17, 0, Math.PI * 2);
+    g.fill();
+  } else if (mark === 'hollyhock') {
+    g.lineWidth = 3;
+    g.beginPath();
+    g.arc(32, 40, 19, 0, Math.PI * 2);
+    g.stroke();
+    for (let leaf = 0; leaf < 3; leaf += 1) {
+      const angle = -Math.PI / 2 + (leaf * Math.PI * 2) / 3;
+      g.beginPath();
+      g.ellipse(32 + Math.cos(angle) * 8, 40 + Math.sin(angle) * 8, 8, 5.5, angle, 0, Math.PI * 2);
+      g.fill();
+    }
+  } else if (mark === 'prayer') {
+    g.lineWidth = 4;
+    g.beginPath();
+    g.arc(32, 20, 11, 0, Math.PI * 2);
+    g.stroke();
+    g.font = 'bold 13px serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    [...'南無妙法蓮華経'].forEach((glyph, index) => g.fillText(glyph, 32, 41 + index * 12.3));
+  }
+}
+
+// An army's field signs on the trunk (armythemes.js `badge`, `sash`): flat cloth across the chest and the back, drawn at a unit
+// depth (x ±1) and set to each man's (signsLocal): the side's men share one batch (render.js). Sizes at a 1.8 m man.
+// A `tabard` badge is the whole front and back of the trunk (a surcoat's field and its cross, drawn flat).
+export const SIGN_PIECE = { badge: { width: 0.17, height: 0.21, y: -0.2 }, tabard: { width: 0.3, height: 0.46, y: -0.3 }, sash: { width: 0.055, length: 0.62, y: -0.27, slope: 0.62 }, standOff: 0.035, front: 1.12 };
+
+/** The badge's canvas: its field, the cross (or the saltire) in its colour, a border if it has one. */
+function badgeTexture(badge) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 80;
+  const g = canvas.getContext('2d');
+  g.fillStyle = badge.field;
+  g.fillRect(0, 0, 64, 80);
+  if (badge.border) {
+    g.strokeStyle = badge.border;
+    g.lineWidth = 6;
+    g.strokeRect(3, 3, 58, 74);
+  }
+  g.strokeStyle = badge.color;
+  g.lineWidth = 13;
+  g.beginPath();
+  if (badge.mark === 'saltire') {
+    g.moveTo(6, 6); g.lineTo(58, 74); g.moveTo(58, 6); g.lineTo(6, 74);
+  } else {
+    g.moveTo(32, 6); g.lineTo(32, 74); g.moveTo(6, 34); g.lineTo(58, 34);
+  }
+  g.stroke();
+  return new THREE.CanvasTexture(canvas);
+}
+
+/** A man's field signs on his trunk (dress `badge`, `sash`): a group in the collar's frame at unit depth, or null for none. */
+export function buildSigns(dress) {
+  if (!dress.badge && !dress.sash) return null;
+  const group = new THREE.Group();
+  const cloth = (options) => new THREE.MeshStandardMaterial({ roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, ...options });
+  for (const facing of [1, -1]) {
+    const depth = facing > 0 ? SIGN_PIECE.front : 1;
+    if (dress.badge) {
+      const { width, height, y } = SIGN_PIECE[dress.badge.tabard ? 'tabard' : 'badge'];
+      const badge = new THREE.Mesh(new THREE.PlaneGeometry(width, height), cloth({ map: badgeTexture(dress.badge) }));
+      badge.rotation.y = facing * Math.PI / 2;
+      badge.position.set(facing * depth, y, 0);
+      group.add(badge);
+    }
+    if (dress.sash) {
+      const { width, length, y, slope } = SIGN_PIECE.sash;
+      const sash = new THREE.Mesh(new THREE.PlaneGeometry(length, width), cloth({ color: dress.sash, side: THREE.DoubleSide }));
+      // (Turned to face out, then tilted in the plane of the chest: the same diagonal, shoulder to hip, before and behind.)
+      sash.rotation.set(slope, facing * Math.PI / 2, 0, 'XYZ');
+      sash.position.set(facing * depth * 1.01, y, 0);
+      group.add(sash);
+    }
+  }
+  return group;
+}
+
+/** The matrix setting a signs group (buildSigns) on a man: its unit depth to his trunk's, the rest to his size. */
+export function signsLocal(body) {
+  const scale = body.heightM / 1.8;
+  const depth = body.segments.trunk.skinRadius * 0.62 * 1.32 + SIGN_PIECE.standOff * scale;
+  return new THREE.Matrix4().makeScale(depth, scale, scale);
 }
 
 export function buildBackPrint(body, text, colorHex = '#e9e2c8') {
