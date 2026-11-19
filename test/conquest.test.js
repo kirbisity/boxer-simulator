@@ -80,7 +80,9 @@ test('in the set battles the bows and guns open in the front rows, the blades an
       if (!shooters.length || !rest.length) continue;
       const nearest = Math.min(...rest.map((fighter) => Math.abs(fighter.x[24])));
       const furthestShooter = Math.max(...shooters.map((fighter) => Math.abs(fighter.x[24])));
-      assert.ok(nearest > furthestShooter, `${key} ${corner}: the blades (from ${nearest.toFixed(1)} m) behind the shooters (to ${furthestShooter.toFixed(1)} m)`);
+      // (Within each man's own loose standing off his place, `loose` m either way: two men a row apart can come that near.)
+      const slack = 2 * (level.formation?.[corner]?.loose ?? 0);
+      assert.ok(nearest > furthestShooter - slack, `${key} ${corner}: the blades (from ${nearest.toFixed(1)} m) behind the shooters (to ${furthestShooter.toFixed(1)} m)`);
     }
   }
 });

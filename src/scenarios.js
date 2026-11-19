@@ -101,9 +101,11 @@ const PYONGYANG_MING = {
   brigandine: { swordShield: 5, spear: 4, matchlock: 3 },
 };
 // (Samurai fewer, the ashigaru more, as the army was: the user's call, 2026-11-18; was 12 samurai and 32 ashigaru.)
+// (Guns more, bows fewer: Konishi's men held the walls with the teppō, the Korean and Ming accounts of 1592-93 full of its
+// volleys and few of arrows; was 13 guns and 8 bows: the user's call, 2026-11-19.)
 const PYONGYANG_JAPANESE = {
   samurai: { katana: 4, naginata: 1, spear: 1 },
-  ashigaru: { spear: 17, matchlock: 13, archerYumi: 8 },
+  ashigaru: { spear: 17, matchlock: 18, archerYumi: 3 },
 };
 // The Ming horse: northern heavy cavalry, sabres and spears with a few three-eyed guns; the Japanese had none in the field.
 const PYONGYANG_HORSE = { dao: 4, spear: 5, threeEyed: 2 };
@@ -258,7 +260,9 @@ const ZEELANDIA = {
   dutch: { musketeer: 9, pikeman: 6, officer: 3 },
   // About a third of his regulars in iron lamellar with arm guards, units of their own (spears and shields); the rest in
   // the brigandine vest.
-  koxinga: { elite: { guandao: 4, swordShield: 2 }, brigandine: { swordShield: 3, spear: 1, matchlock: 3 }, lamellar: { spear: 2, swordShield: 1 }, garrison: { spear: 8, dao: 2, matchlock: 2 }, ronin: { ronin: 2 } },
+  // (The iron men fewer, the garrison troops more: a larger army, most of it of the lower tiers; was 6 iron men and 12
+  // garrison men, 30 in all: the user's call, 2026-11-19.)
+  koxinga: { elite: { guandao: 3, swordShield: 1 }, brigandine: { swordShield: 3, spear: 1, matchlock: 3 }, lamellar: { spear: 2, swordShield: 1 }, garrison: { spear: 11, dao: 4, matchlock: 3 }, ronin: { ronin: 2 } },
 };
 
 // A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders
