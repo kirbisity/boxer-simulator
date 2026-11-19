@@ -318,7 +318,7 @@ function walkingGap(world, corner, formation, front) {
 }
 
 /** A man with a bow or gun (his weapon shoots). */
-const shoots = (fighter) => Boolean(fighter.weapon?.held && (fighter.weapon.spec.shot || fighter.weapon.spec.ranged));
+const shoots = (fighter) => Boolean(fighter.weapon?.held && (fighter.weapon.spec.shot || fighter.weapon.spec.ranged) && !fighter.weapon.spec.shot?.thrown);
 
 /**
  * The ranks a formation's guns and crossbows stand in: the `ahead` of each (m), the foremost first; slots within

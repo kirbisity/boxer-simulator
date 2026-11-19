@@ -7,7 +7,7 @@ import { surfaceAt } from '../audio/surface.js';
 import { BODY, buildBody, FRAMES, normaliseInputs, P, PRESETS } from '../body.js';
 import { STYLES } from '../moves.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
-import { aimPoint, alongPart, BLOCKING, floorUnder, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
+import { aimPoint, rearm, alongPart, BLOCKING, floorUnder, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
 import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRatingAt, bulletRegion, GUN, pointThrough, slerpDir, SUPPLY } from '../weapons.js';
@@ -418,7 +418,7 @@ export function loose(world, fighter, bolt = null) {
   if (!bolt) spendMissile(world, fighter, weapon);
   // The arrow leaves the bow with the bow's own way over the ground (a horse's gallop, a man's step) as well as its cast.
   const carried = overGround(fighter);
-  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, kg: laid.projectile.kg, projectile: laid.projectile, bolt: Boolean(bolt), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
+  world.arrows.push({ id: world.arrows.length, owner: fighter.id, x: vec.add(grip, vec.scale(dir, bolt ? 0.3 : 0.08)), v: vec.add(vec.scale(dir, speed), carried), speed, energy, kg: laid.projectile.kg, projectile: laid.projectile, bolt: Boolean(bolt), thrown: Boolean(bolt?.thrown), length: bolt?.length, bounce: bolt?.bounce, age: 0, landed: false, done: false });
   world.events.push({ time: world.time, kind: 'loosed', attacker: fighter.id, effects: [] });
   // Heard: the string let go (a bow's, or a crossbow's heavier snap).
   if (world.ear) soundEvent(world, 'shot', { at: grip, kind: bolt ? 'crossbow' : 'bow', who: fighter.id });
@@ -1064,7 +1064,16 @@ export function fire(world, fighter, weapon = fighter.weapon, aimedAt = null, ai
     }
   }
   // A crossbow looses its bolt; a flamethrower opens its valve a moment longer (flame.js).
-  if (shot?.bolt) return loose(world, fighter, shot);
+  if (shot?.bolt) {
+    loose(world, fighter, shot);
+    // Thrown (a pilum): it is gone from his hand with the throw, and he draws what comes next (physics.js rearm: the gladius).
+    if (shot.thrown && own) {
+      weapon.held = false;
+      fighter.weapon = null;
+      rearm(world, fighter, weapon);
+    }
+    return;
+  }
   if (shot?.flame) return flamePulse(world, fighter, weapon);
   // Heard: the powder going off, over the whole field (a matchlock's, or any firearm's: `weapon` says which).
   if (world.ear) soundEvent(world, 'shot', { at: point(fighter.x, P[`${weapon.main}Hand`]), kind: 'matchlock', weapon: weapon.kind, who: fighter.id });

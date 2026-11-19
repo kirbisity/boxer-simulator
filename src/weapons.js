@@ -47,6 +47,13 @@ import { WORLD } from './physics/config.js';
 //   ~3.5 shi, ~1000 N, a common waist-spanned bow (an estimate within that range).
 export const CROSSBOW = { bolt: true, speed: 50, energy: 2, length: 0.38, bounce: 0.72, spread: 0.012, rounds: 1, misfire: 0, reloadSeconds: 8, ammo: 30,
   span: { by: "goat's foot", drawN: 1800, advantage: 4, lift: 1, share: 0.5 } };
+// The pilum, thrown (a missile flown as a bolt is: physics/ranged.js loose): the legionary's heavy javelin of the late
+// Republic and the Principate, ~2 m, ~2 kg, its long thin iron shank (~60 cm) behind a small pyramidal head. Thrown
+// overarm at ~20-25 m/s from 15 m or less (Connolly's reconstructions; Bishop and Coulston, Roman Military Equipment,
+// 2006): ~450 J behind a narrow head (`energy`, of the war arrow's 100 J; its momentum ~40 N·s, a dozen arrows'), enough to
+// go through a shield and the arm behind it or a mail shirt. One carried (`ammo` 1: the second, the lighter one, not here),
+// gone once thrown (`thrown`): then the gladius.
+export const PILUM = { bolt: true, thrown: true, speed: 22, energy: 4.6, length: 2.0, bounce: 0.5, spread: 0.03, rounds: 1, misfire: 0, reloadSeconds: 0, ammo: 1 };
 export const NU = { ...CROSSBOW, speed: 48, energy: 1.6, length: 0.42, bounce: 0.78, reloadSeconds: 6, ammo: 75,
   span: { by: 'waist', drawN: 1000, advantage: 1, lift: 2, share: 0.5 } };
 
@@ -148,6 +155,28 @@ export const MATCHLOCK = {
   // pouch of balls: ~20-30 shots (an ashigaru's cartridge box held about as many). In all, the loaded one counted.
   ammo: 24,
 };
+// The flintlock musket of the 18th c. (the British Land Pattern, "Brown Bess", 1722-1838; its French and Prussian
+// cousins): a ~1.07 m smoothbore barrel throwing a 0.69-inch ball of ~32 g, loaded from a paper cartridge (the powder
+// and ball in one, its charge ~1/3 the ball's weight: the rule's velocity, ~350-400 m/s, ~2 kJ, twice the matchlock's
+// ball), fired by a flint struck on the frizzen: no match to keep alight, so loaded and fired in close order the faster
+// (3 rounds a minute drilled, against the matchlock's 1-2: `reloadSeconds` two thirds of its), but the flint misses as
+// the match does (Hanger's and the Board of Ordnance's trials: about one shot in seven to ten). No rear sight (aimed at
+// the mass, `spread` the rule's at the cheek).
+const FLINTLOCK_LOAD = { barrel: 1.07, kg: 0.032, charge: 0.33, hold: 'cheek' };
+const FLINTLOCK_BALL = { kg: FLINTLOCK_LOAD.kg, velocity: ballGunVelocity(FLINTLOCK_LOAD), curve: 'sphere' };
+export const FLINTLOCK = {
+  ...MATCHLOCK,
+  projectile: FLINTLOCK_BALL,
+  energy: muzzleEnergy(FLINTLOCK_BALL),
+  impulse: 7.5,
+  recoil: 12,
+  spread: ballGunSpread(FLINTLOCK_LOAD),
+  misfire: 0.1,
+  reloadSeconds: 10,
+  // A cartridge box of 24-36 rounds (the British soldier's 60 in two boxes in the field): 30.
+  ammo: 30,
+};
+
 // (The Japanese teppō is this gun as listed: well made in the Sakai and Kunitomo workshops, its ball through layered damp
 // felt at 80 paces (Song Yingchang's trial, 1593, as quoted secondhand: why the Ming put iron inside their cotton coats).
 // Two soaked blankets through at 80 paces, three or four at 50 (经略复国要编, as given by Great Ming Military, "Random
@@ -421,6 +450,21 @@ export const WEAPONS = {
     // with the whole head behind it — it goes into plate where it meets it near square (BLADES.bite), as a thrust's point does.
     beak: { pierce: 1, blunt: 0.5 },
   },
+  // The halberd: the foot soldier's polearm of the 15th-16th c. (the Swiss and the Landsknechts, the Spanish tercios, the
+  // English bill's cousin): a ~2.1 m ash haft with langets, an axe blade on one side, a hook or fluke behind it to pull a
+  // rider down or a man off his feet, and a long square top spike to thrust and keep off horse; ~2.5-3 kg (the Met's and
+  // the Royal Armouries' of c. 1500). Swung, the axe cleaves (cut) with the head's weight behind it (blunt, a little
+  // `crush`); thrust, the spike goes in as a bodkin does; swung back, the fluke leads (`beak`).
+  halberd: {
+    label: 'Halberd', hands: 'two', length: 1.6, strikeFrom: 1.05, handle: 0.55, spacing: 0.42, leadAhead: true, edgeLeads: true, mass: 2.8, balance: 0.75, radius: 0.016, pointWidth: 0.014,
+    harm: { swing: { cut: 1.3, blunt: 1, pierce: 0.15 }, thrust: { pierce: 1.25, blunt: 0.45, cut: 0.05 } },
+    contactSeconds: 0.004, rotation: 1.05, wrist: { omega: 11, zeta: 0.82 }, threat: 4.3, art: 'artCrush', crush: 0.35,
+    build: { shaftRadius: 0.018, langets: 0.4 },
+    face: 0.03,
+    beak: { pierce: 0.9, blunt: 0.5 },
+  },
+  // The same halberd made for a lord's guard or the lord himself: its blade crescent-cut and pierced, etched and gilt over
+  // blued steel (the Met's ceremonial halberds of the 1580s). It fights as the plain one does (the same head, the same haft).
   naginata: {
     label: 'Naginata', hands: 'two', length: 1.5, strikeFrom: 1.0, handle: 0.5, spacing: 0.4, leadAhead: true, edgeLeads: true, mass: 2.35, balance: 0.55, radius: 0.014,
     // A heavy head on a long shaft (+25% weight, +25% blunt): it knocks men about as it cuts.
@@ -597,6 +641,24 @@ export const WEAPONS = {
     shot: MATCHLOCK,
     // As each people made it (physics.js madeSpec, by his kit's faction): the Ming arsenals' bird gun (NIAOCHONG).
     makes: { chinese: { shot: NIAOCHONG } },
+  },
+  // The flintlock musket (FLINTLOCK) with its socket bayonet fixed: ~4.7 kg, the bayonet's 43 cm triangular blade past the
+  // muzzle (`length` to its point), so a thrust in close goes in as a spear's does; swung, the butt and the barrel club.
+  flintlock: {
+    label: 'Flintlock musket', hands: 'two', length: 1.5, strikeFrom: 1.07, handle: 0.38, spacing: 0.44, supportAhead: true, longGun: true,
+    mass: 4.7, balance: 0.35, radius: 0.02, pointWidth: 0.018,
+    harm: { swing: { blunt: 1.1 }, thrust: { pierce: 1.1, blunt: 0.4 } },
+    contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 10, zeta: 0.9 }, threat: 5.2, grip: 0.7, ranged: true, edgeUp: true,
+    muzzle: [1.07, 0.02],
+    shot: FLINTLOCK,
+  },
+  // The pilum in the hand (PILUM): held over the shoulder to throw; in the hand at close quarters, a light spear.
+  pilum: {
+    label: 'Pilum', hands: 'one', length: 1.5, strikeFrom: 1.1, handle: 0.5, mass: 2, balance: 0.45, radius: 0.012, pointWidth: 0.01,
+    harm: { thrust: { pierce: 1.2, blunt: 0.25 }, swing: { blunt: 0.5 } },
+    contactSeconds: 0.004, rotation: 0.6, wrist: { omega: 14, zeta: 0.85 }, threat: 3.8, grip: 0.6, ranged: true,
+    muzzle: [0.2, 0],
+    shot: PILUM,
   },
   // The three-eyed gun (see THREE_EYED): fired from the hip with the shaft
   // under the arm; empty, a club with an iron head (`crush`: the barrels'
@@ -1186,6 +1248,9 @@ export const WEAPONS = {
     art: 'artSpear',
   }])),
 };
+
+// The lord's halberd: the plain one's figures, etched and gilt (weaponview.js draws it so).
+WEAPONS.halberdEtched = { ...WEAPONS.halberd, label: 'Etched halberd', etched: true };
 
 /**
  * What weapons and shields are made of, for their wear (physics/wear.js). A weapon's `build` names the material of its

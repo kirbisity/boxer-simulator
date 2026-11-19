@@ -583,7 +583,7 @@ function releaseWeapon(world, fighter, reason, push, weapon = fighter.weapon) {
 }
 
 /** After losing a weapon, the next: a backup, his kit's sidearm, or his bare hands. */
-function rearm(world, fighter, weapon) {
+export function rearm(world, fighter, weapon) {
   // A backup weapon if he carries one: the hoplomachus's gladius, or his
   // kit's sidearm (a knight's dagger, a samurai's wakizashi), drawn once;
   // else he fights mixed.
@@ -1923,12 +1923,20 @@ function arenaOnItsGround(arena, place) {
   return byPlace.get(place);
 }
 
+/**
+ * Whether a style makes a man a missile troop (a bowman, a gunner: drawn up and fought as shot), not a man of the line who
+ * throws once before the lines meet (`ranged.line`: the legionary's pilum) and is drawn up with the foot.
+ */
+export function missileTroop(style) {
+  return Boolean(style?.ranged) && !style.ranged.line;
+}
+
 export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true }, rules = {}, formation = {}, place = null, climate = null, artillery = null, timeLimit = null, general = null } = {}) {
   arena = arenaOnItsGround(arena, place);
   const random = seededRandom(seed);
   const sides = fighterInputs.map((entry, index) => ({ inputs: entry.inputs ?? entry, corner: entry.corner ?? (index % 2 === 0 ? 'red' : 'blue') }));
   // With a gun in the fight, they start further apart: room for the gun to work, and to close.
-  const gunFight = sides.some((side) => STYLES[side.inputs.style]?.ranged);
+  const gunFight = sides.some((side) => missileTroop(STYLES[side.inputs.style]));
   // A fight starts out of reach: a pair at least just beyond the longer weapon's reach (a lance's point does not start in a man's chest).
   const longest = Math.max(0, ...sides.map((side) => {
     const spec = WEAPONS[STYLES[side.inputs.style]?.weapon];
@@ -1996,7 +2004,7 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
         placeFighter(fighter, Math.max(-(arena.halfX - 0.4), Math.min(arena.halfX - 0.4, x)), Math.max(-(arena.halfZ - 0.4), Math.min(arena.halfZ - 0.4, sign * across + jitter())));
       });
     } else if (order?.shootersFront !== undefined) {
-      const shooting = (fighter) => Boolean(STYLES[fighter.style]?.ranged);
+      const shooting = (fighter) => missileTroop(STYLES[fighter.style]);
       const shooters = team.filter(shooting);
       const rest = team.filter((fighter) => !shooting(fighter));
       placeRows(shooters, 0);
@@ -2166,7 +2174,7 @@ function centreGeneral(fighters, general, order, riding) {
   const team = fighters.filter((fighter) => fighter.corner === general.corner);
   const me = team[general.index];
   if (!me || team.length < WORLD.standard.minSide || order?.layout) return;
-  const armOf = (fighter) => (riding(fighter.body.inputs) ? 'horse' : STYLES[fighter.style]?.ranged ? 'shot' : 'foot');
+  const armOf = (fighter) => (riding(fighter.body.inputs) ? 'horse' : missileTroop(STYLES[fighter.style]) ? 'shot' : 'foot');
   const arm = team.filter((fighter) => armOf(fighter) === armOf(me));
   const middle = [0, 0];
   for (const fighter of arm) {
@@ -2217,7 +2225,7 @@ function raiseStandards(fighters, random) {
     // hands, the standard worn up his back (WORLD.standard.shooters). Given it to hold, he would have no way to fight
     // but to ride or walk at them with its pole.
     const team = fighters.filter((fighter) => fighter.corner === corner && fighter !== leader);
-    const shoots = (fighter) => Boolean(STYLES[fighter.style]?.ranged);
+    const shoots = (fighter) => missileTroop(STYLES[fighter.style]);
     const shootersLed = shoots(leader) && team.filter(shoots).length > WORLD.standard.shooters * team.length;
     if (standard.worn || shootersLed) {
       leader.wornStandard = { kind: standard.weapon, colour };

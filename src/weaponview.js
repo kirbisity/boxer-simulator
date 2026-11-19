@@ -327,6 +327,44 @@ function buildStandard(spec, colour, envMap) {
   return group;
 }
 
+/** A polearm's langets: steel straps riveted down two faces of the haft from `from` to `to` (m), standing on its surface (`radius`). */
+function langets(from, to, radius, material, rivetMaterial) {
+  const parts = [];
+  for (const side of [1, -1]) {
+    const strap = new THREE.Mesh(new THREE.BoxGeometry(0.004, to - from, 0.03), material);
+    strap.position.set(side * (radius + 0.002), (from + to) / 2, 0);
+    parts.push(strap);
+    for (let at = from + 0.04; at < to - 0.03; at += 0.075) {
+      const rivet = new THREE.Mesh(new THREE.SphereGeometry(0.005, 6, 4), rivetMaterial);
+      rivet.position.set(side * (radius + 0.005), at, 0);
+      parts.push(rivet);
+    }
+  }
+  return parts;
+}
+
+/** Points along a quadratic curve from `a` through control `c` to `b` ([out, up] each), `steps` of them past `a`. */
+function curveBetween(a, c, b, steps) {
+  return Array.from({ length: steps }, (_, i) => {
+    const t = (i + 1) / steps;
+    return [0, 1].map((k) => (1 - t) ** 2 * a[k] + 2 * (1 - t) * t * c[k] + t ** 2 * b[k]);
+  });
+}
+
+/**
+ * A flat steel piece standing out from the haft (an axe blade, a fluke, a hook): `outline` [out, up] points (m; out along +z,
+ * the edge side, negative behind; up along the haft from `at`), `thick` m through.
+ */
+function flatPiece(outline, thick, at, material) {
+  const shape = new THREE.Shape(outline.map(([out, up]) => new THREE.Vector2(out, up)));
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: thick, bevelEnabled: false });
+  geometry.translate(0, 0, -thick / 2);
+  geometry.rotateY(-Math.PI / 2);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.y = at;
+  return mesh;
+}
+
 export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
   const spec = WEAPONS[kind];
   if (spec.flag) return buildStandard(spec, colour, envMap);
@@ -608,6 +646,53 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       }
       break;
     }
+    case 'pilum': {
+      // The pilum in the hand, held to throw: its butt behind the hand, its iron ahead.
+      pilumParts(group, -spec.handle, spec.length);
+      break;
+    }
+    case 'flintlock': {
+      // The flintlock musket (+z up): a round browned barrel on a full walnut stock to near the muzzle, brass butt plate,
+      // trigger guard and pipes, the lock by the trigger hand (the cock with its flint over the frizzen and pan), the steel
+      // ramrod under the barrel, the socket bayonet fixed below the muzzle, its triangular blade on past it.
+      const barrelIron = steelMaterial(envMap, { vertexColors: false, color: 0x4a4c50, roughness: 0.4 });
+      const muzzle = spec.muzzle[0];
+      const barrel = cylinder(0.01, 0.012, 0, muzzle, barrelIron, 10);
+      barrel.position.z = 0.03;
+      const walnut = surface(0x5a3a22, { roughness: 0.55 });
+      const butt = new THREE.Mesh(new THREE.BoxGeometry(0.036, spec.handle + 0.08, 0.075), walnut);
+      butt.position.set(0, -spec.handle / 2 + 0.02, -0.015);
+      butt.rotation.x = 0.1;
+      const forestock = new THREE.Mesh(new THREE.BoxGeometry(0.032, muzzle - 0.18, 0.026), walnut);
+      forestock.position.set(0, (muzzle - 0.18) / 2 + 0.04, 0.014);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.012, 0.08), brass);
+      plate.position.set(0, -spec.handle - 0.02, -0.02);
+      const ramrod = cylinder(0.003, 0.003, 0.08, muzzle - 0.02, steel, 6);
+      ramrod.position.z = -0.004;
+      const lockPlate = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.12, 0.026), barrelIron);
+      lockPlate.position.set(0.019, 0.03, 0.022);
+      const cock = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.012, 0.035), barrelIron);
+      cock.position.set(0.022, 0.0, 0.045);
+      cock.rotation.x = 0.6;
+      const frizzen = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.006, 0.024), barrelIron);
+      frizzen.position.set(0.022, 0.05, 0.048);
+      const guard = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.003, 4, 10, Math.PI), brass);
+      guard.position.set(0, -0.02, -0.03);
+      guard.rotation.y = Math.PI / 2;
+      group.add(barrel, butt, forestock, plate, ramrod, lockPlate, cock, frizzen, guard);
+      for (const at of [0.4, 0.75]) {
+        const pipe = cylinder(0.006, 0.006, at - 0.012, at + 0.012, brass, 6);
+        pipe.position.z = -0.004;
+        group.add(pipe);
+      }
+      // The bayonet: its socket round the muzzle, an elbow down, the blade on past it below the barrel.
+      const socket = cylinder(0.014, 0.014, muzzle - 0.08, muzzle, steel, 10);
+      socket.position.z = 0.03;
+      const blade = bladeMesh(bladeGeometry(muzzle + 0.02, spec.length - muzzle - 0.02, 0.022, 0.01, 0.2), polished);
+      blade.position.z = 0.0;
+      group.add(socket, blade);
+      break;
+    }
     case 'crossbow':
     case 'nu': {
       // A crossbow (+z is up, y along the tiller): the tiller from the butt
@@ -839,24 +924,69 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       break;
     }
     case 'warhammer': {
-      // An ash shaft; at the head a hammer face, a back spike and a top spike.
-      const head = spec.length - 0.12;
-      group.add(cylinder(0.017, 0.019, -spec.handle, head + 0.02, wood, 10));
-      const block = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.07), steel);
-      block.position.y = head;
-      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.04, 0.09, 10), steel);
-      face.rotation.x = Math.PI / 2;
-      face.position.set(0, head, 0.08);
-      const beak = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.16, 8), steel);
-      beak.rotation.x = -Math.PI / 2;
-      beak.position.set(0, head, -0.11);
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.022, 0.14, 8), steel);
-      spike.position.y = head + 0.12;
-      const langets = cylinder(0.021, 0.021, head - 0.2, head - 0.04, steel, 8);
+      // The war hammer of the 16th c. (the Met's, c. 1550-1600): a squared ash haft, steel langets riveted down its front a long
+      // way from the head; at the head a knop, a leaf-shaped top spike, on the face side a short block ending in a crowned face
+      // of three prongs (to bite and not glance), and behind it a curved fluke drooping to its point.
+      const head = spec.length - 0.16;
+      group.add(cylinder(0.018, 0.02, -spec.handle, head + 0.02, wood, 4));
+      const langetFrom = head - (spec.build?.langets ?? 0.35) * 2.4;
+      group.add(...langets(langetFrom, head, 0.02, steel, steel));
+      const knop = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.007, 6, 12), steel);
+      knop.rotation.x = Math.PI / 2;
+      knop.position.y = head + 0.04;
+      group.add(knop);
+      group.add(bladeMesh(bladeGeometry(head + 0.05, spec.length + 0.1 - head, 0.05, 0.012, 0.55), polished));
+      const block = new THREE.Mesh(new THREE.BoxGeometry(0.046, 0.05, 0.14), steel);
+      block.position.set(0, head, 0.04);
+      group.add(block);
+      for (const [dy, dx] of [[0.014, 0.012], [0.014, -0.012], [-0.014, 0]]) {
+        const prong = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.035, 5), steel);
+        prong.rotation.x = Math.PI / 2;
+        prong.position.set(dx, head + dy, 0.125);
+        group.add(prong);
+      }
+      group.add(flatPiece([[-0.015, 0.024], ...curveBetween([-0.05, 0.026], [-0.15, 0.03], [-0.21, -0.06], 6), ...curveBetween([-0.21, -0.06], [-0.13, -0.02], [-0.05, -0.024], 6), [-0.015, -0.024]], 0.012, head, polished));
       const butt = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.06, 8), steel);
       butt.rotation.x = Math.PI;
       butt.position.y = -spec.handle - 0.03;
-      group.add(block, face, beak, spike, langets, butt);
+      group.add(butt);
+      break;
+    }
+    case 'halberd':
+    case 'halberdEtched': {
+      // The halberd. Plain (the foot's, c. 1500): an axe blade whose concave edge runs between an upswept horn and a down-
+      // pointing one, a short fluke cut in a bat's wing behind it, a long square top spike. Etched (a lord's guard's, the
+      // Met's of the 1580s): crescent blade and crescent hook, both pierced and etched, blued and gilt, a knop under a longer spike.
+      const etched = Boolean(spec.etched);
+      const blade = etched ? steelMaterial(envMap, { vertexColors: false, color: 0x7a6a52, roughness: 0.42 }) : steel;
+      const gilt = steelMaterial(envMap, { vertexColors: false, color: 0xc9a24a, roughness: 0.35 });
+      const head = spec.length - (etched ? 0.5 : 0.4);
+      group.add(cylinder(0.017, 0.019, -spec.handle, head + 0.06, etched ? surface(0x2a1a12, { roughness: 0.5 }) : wood, 8));
+      group.add(...langets(head - 0.3, head + 0.07, 0.019, blade, etched ? gilt : blade));
+      if (etched) {
+        for (const at of [head - 0.2, head - 0.12, head - 0.04]) {
+          const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.004, 10), gilt);
+          boss.rotation.z = Math.PI / 2;
+          boss.position.set(0.024, at, 0);
+          group.add(boss);
+        }
+        const knop = new THREE.Mesh(new THREE.SphereGeometry(0.02, 10, 8), blade);
+        knop.position.y = head + 0.085;
+        group.add(cylinder(0.012, 0.016, head + 0.03, head + 0.07, blade, 8));
+        group.add(knop);
+        // Crescent blade (its two horns curving up and down) and crescent hook, pierced by the gaps between their arms.
+        group.add(flatPiece([[0.015, 0.06], [0.07, 0.07], ...curveBetween([0.1, 0.08], [0.17, 0.12], [0.2, 0.2], 5), ...curveBetween([0.2, 0.2], [0.12, 0.02], [0.2, -0.2], 10), ...curveBetween([0.2, -0.2], [0.15, -0.12], [0.08, -0.07], 5), [0.015, -0.05]], 0.006, head, blade));
+        group.add(flatPiece([[-0.015, 0.05], ...curveBetween([-0.05, 0.05], [-0.12, 0.07], [-0.19, 0.13], 5), ...curveBetween([-0.19, 0.13], [-0.1, 0.0], [-0.17, -0.12], 8), ...curveBetween([-0.17, -0.12], [-0.08, -0.05], [-0.015, -0.035], 5)], 0.006, head, blade));
+        group.add(bladeMesh(bladeGeometry(head + 0.12, spec.length + 0.12 - head - 0.12, 0.02, 0.012, 0.15), polished));
+      } else {
+        group.add(flatPiece([[0.015, 0.07], [0.1, 0.085], [0.19, 0.12], ...curveBetween([0.19, 0.12], [0.12, 0], [0.17, -0.12], 8), [0.1, -0.06], [0.05, -0.045], [0.015, -0.04]], 0.007, head, blade));
+        group.add(flatPiece([[-0.015, 0.06], [-0.11, 0.075], [-0.085, 0.04], [-0.1, 0.02], [-0.06, 0.0], [-0.015, -0.02]], 0.007, head, blade));
+        group.add(bladeMesh(bladeGeometry(head + 0.06, spec.length + 0.1 - head - 0.06, 0.022, 0.012, 0.15), polished));
+      }
+      const butt = new THREE.Mesh(new THREE.ConeGeometry(0.019, 0.05, 8), blade);
+      butt.rotation.x = Math.PI;
+      butt.position.y = -spec.handle - 0.025;
+      group.add(butt);
       break;
     }
     case 'naginata': {
@@ -2453,7 +2583,30 @@ export function updateShots(view, dt) {
 // ---- Arrows -----------------------------------------------------------------
 
 /** An arrow along +y from its nock (0) to its head: shaft, fletching, point. */
-function arrowMesh(length = ARROW.length, bolt = false) {
+/**
+ * A pilum from its butt (`from`, m along y) to its point (`to`): the ash shaft (three fifths), the squared wooden block where
+ * the iron is riveted on, the long thin iron shank, the small pyramidal head.
+ */
+function pilumParts(group, from, to) {
+  const length = to - from;
+  const shaftTo = from + length * 0.6;
+  const ash = surface(0xb08a5a, { roughness: 0.7 });
+  const iron = surface(0x4a4c50, { roughness: 0.45 });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.013, shaftTo - from, 6), ash);
+  shaft.position.y = (from + shaftTo) / 2;
+  const block = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.08, 0.03), ash);
+  block.position.y = shaftTo;
+  const shank = new THREE.Mesh(new THREE.CylinderGeometry(0.0035, 0.005, to - 0.03 - shaftTo, 5), iron);
+  shank.position.y = (shaftTo + to - 0.03) / 2;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.035, 4), iron);
+  head.position.y = to - 0.0175;
+  group.add(shaft, block, shank, head);
+  return group;
+}
+
+function arrowMesh(length = ARROW.length, bolt = false, thrown = false) {
+  // A pilum thrown: the whole javelin in flight.
+  if (thrown) return pilumParts(new THREE.Group(), 0, length);
   // A crossbow's bolt: short and thick, a square iron head, two stiff vanes of leather or wood.
   const group = new THREE.Group();
   const shaft = new THREE.Mesh(new THREE.CylinderGeometry(bolt ? 0.006 : 0.004, bolt ? 0.006 : 0.004, length, 5), surface(0xc8a878, { roughness: 0.7 }));
@@ -2503,7 +2656,7 @@ export function updateArrows(view, world) {
     live.add(arrow);
     let mesh = drawn.get(arrow);
     if (!mesh) {
-      mesh = arrowMesh(arrow.length ?? ARROW.length, arrow.bolt);
+      mesh = arrowMesh(arrow.length ?? ARROW.length, arrow.bolt, arrow.thrown);
       view.scene.add(mesh);
       drawn.set(arrow, mesh);
     }

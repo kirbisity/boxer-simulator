@@ -632,7 +632,7 @@ export const PRESETS = {
   // fallen in the Teutoburg Forest (AD 9) aged 53, his tombstone showing
   // him in his mail, phalerae and torcs. Romans of the legions ran ~1.68 m.
   legionary: {
-    name: 'Gaius Valerius Crispus', style: 'legionary', sex: 'male', heightCm: 170, frame: 'medium', age: 28, exercise: 0.75, calories: 4050,
+    name: 'Gaius Valerius Crispus', style: 'pilum', sex: 'male', heightCm: 170, frame: 'medium', age: 28, exercise: 0.75, calories: 4050,
     outfit: { kind: 'legionary', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'buzz', hairColor: '#2a1a10', facialHair: 'none', eyeColor: 'brown' },
   },

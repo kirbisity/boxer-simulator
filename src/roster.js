@@ -93,6 +93,7 @@ export const UNIT_NAMES = {
   taekwondo: 'Taekwondo Black Belt',
   judo: 'Judoka',
   mingEliteInfantry: 'Ming Elite Infantry',
+  halberdier: 'Halberdier',
   mingEliteSpear: 'Qi Long Spearman',
   mingDangpa: 'Dangpa Soldier',
   mingEliteGun: 'Ming Elite Musketeer',
@@ -173,6 +174,8 @@ export const WARRIORS = [
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', heightCm: 160, calories: 3525, outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
   warrior('nanban', 'Takayama Ukon', PRESETS.nanbanLord),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
+  // A foot soldier of the 1500s with the halberd (the Swiss and the Landsknechts, the tercios): the brigandine and kettle hat.
+  warrior('halberdier', 'Ulrich Brandt', PRESETS.spear, { name: 'Ulrich Brandt', style: 'halberd', heightCm: 172, outfit: { kind: 'footman', design: 0 }, accessories: [] }),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
   // The Japanese flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
   { ...warrior('tametomo', 'Minamoto no Tametomo', PRESETS.tametomo), flagship: true, legend: { order: 3, kicker: { en: 'Great-armour samurai', zh: '大铠武士' }, line: { en: 'The great archer of the Hōgen war, in ō-yoroi: the long yumi, then the blade.', zh: '保元之乱的大弓手，身披大铠：先放长弓，再拔刀。' } } },
