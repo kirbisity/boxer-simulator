@@ -73,3 +73,19 @@ test('drawn in turn: the first lost, the second from the belt (no shield with it
     assert.equal(rider.weapon?.kind, 'flangedMace', 'the mace from the saddle');
   }
 });
+
+test('the knight rides with the lance and fights on foot with his sword: unhorsed, he lets the lance go for it', async () => {
+  const { unhorse } = await import('../src/physics/mounted.js');
+  const { ridingInputs } = await import('../src/loadout.js');
+  const world = createWorld([{ inputs: { ...structuredClone(PRESETS.knight), mounted: true }, corner: 'red' }, structuredClone(PRESETS.contender)], { seed: 1 });
+  const [knight] = world.fighters;
+  assert.equal(knight.weapon?.kind, 'lance');
+  assert.equal(knight.footStyle, 'longsword');
+  if (knight.mount) unhorse(world, knight, 'test', false);
+  assert.equal(knight.weapon?.kind, 'longsword', 'the sword on foot');
+  // On foot from the start: his sword. A bow or a spear rides as it is; a man may ride with his own (`rideWith: 'own'`).
+  assert.equal(ridingInputs(normaliseInputs(structuredClone(PRESETS.knight))).style, 'lance');
+  assert.equal(ridingInputs({ ...normaliseInputs(structuredClone(PRESETS.knight)), rideWith: 'own' }).style, 'longsword');
+  assert.equal(ridingInputs(normaliseInputs(structuredClone(PRESETS.longbow))).style, 'longbow');
+  assert.equal(createWorld([structuredClone(PRESETS.knight), structuredClone(PRESETS.contender)], { seed: 1 }).fighters[0].weapon?.kind, 'longsword');
+});

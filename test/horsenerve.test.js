@@ -7,7 +7,8 @@ import { placeMounted } from '../src/physics/mounted.js';
 
 /** A knight ridden at three ranks of eight `kind` men `files` m apart, ranks `ranks` m apart: his slowest pace (m/s) from 12 m to 4 m off their front, and his horse's paces. */
 function chargeAt(kind, files, ranks) {
-  const world = createWorld([{ inputs: { ...structuredClone(PRESETS.knight), mounted: true }, corner: 'red' }, ...Array.from({ length: 24 }, () => ({ inputs: structuredClone(PRESETS[kind]), corner: 'blue' }))], { seed: 1, arena: { halfX: 45, halfZ: 30 } });
+  // (His own longsword in the saddle, `rideWith: 'own'`: the horse's nerve is what is tested, not the lance's weight on it.)
+  const world = createWorld([{ inputs: { ...structuredClone(PRESETS.knight), mounted: true, rideWith: 'own' }, corner: 'red' }, ...Array.from({ length: 24 }, () => ({ inputs: structuredClone(PRESETS[kind]), corner: 'blue' }))], { seed: 1, arena: { halfX: 45, halfZ: 30 } });
   placeMounted(world.fighters[0], -35, 0, 0);
   world.fighters.slice(1).forEach((man, index) => placeFighter(man, Math.floor(index / 8) * ranks, ((index % 8) - 3.5) * files + (Math.floor(index / 8) % 2) * files / 2));
   const rider = world.fighters[0];

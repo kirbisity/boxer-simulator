@@ -19,7 +19,7 @@ import { DOG_JUMP } from '../robotdogs.js';
 import { tiltToward, vec, yawRotate, twoBoneIK } from '../pose.js';
 import { BLADES, bleedRate, bleedToLose, contactShare, harmMix, pointThrough, pointWidthOf, cuttingWidth, shieldContact, sliceGain } from '../weapons.js';
 import { armourHardness, bluntEdge, driveShaft, dullEdge, stopIn } from './wear.js';
-import { knockOut, bladeFor, bladeStrike, breakWeapon, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
+import { afoot, knockOut, bladeFor, bladeStrike, breakWeapon, closestBetween, crashBetween, dropWeapon, crashHardness, crashHarm, crashOf, fall, fighterParty, placeFighter, groundBrace, handVelocityOf, heldBlades, point, poiseOf, shakenLoose, shieldDisc, shieldHarm, shieldParty, shattersOn, stagger, strainGrip, strikeLiveUntil, strokeOf, wholeVelocity } from '../physics.js';
 import { WORLD } from './config.js';
 import { footingOn, partUnder, treadOn } from './footing.js';
 import { horseBalks, horseFounders, horseMire, horseOnWorks } from './fieldworks.js';
@@ -1213,6 +1213,8 @@ export function unhorse(world, fighter, reason, thrown, lost = null, carried = 1
     fighter.downTimer = WORLD.balance.fallSeconds;
   }
   world.events.push({ time: world.time, kind: 'unhorsed', fighter: fighter.id, horse: horse.id, effects: [reason] });
+  // On his feet: a lance is let go for the weapon he fights with on foot (physics.js afoot).
+  afoot(world, fighter);
 }
 
 /** Whether he can get down from his horse now: in the saddle, up, and the horse at a walk or slower (WORLD.mount.dismount). */

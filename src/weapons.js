@@ -454,6 +454,8 @@ export const WEAPONS = {
   // hold it in the hand against a blow on the long shaft (`grip`) better than a spear.
   // (`pointWidth` 0.025: a war lance's narrow socketed head, ~2.5 cm; PUNCTURE.)
   lance: {
+    // Too long to fight with on foot: let go when he is on his feet (physics.js afoot).
+    saddleOnly: true,
     art: 'artSpear',
     pointFrom: 0.78, label: 'Lance', hands: 'two', length: 2.45, strikeFrom: 1.3, handle: 0.85, spacing: 0.45, mass: 5.2, balance: 0.18, radius: 0.026, pointWidth: 0.025, vamplate: 0.13,
     harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },
@@ -1145,6 +1147,8 @@ export const WEAPONS = {
   // behind the grip; its grip a two-handed one, firmer than a spear's.
   // (`pointWidth` 0.03: a narrow head ~3 cm; PUNCTURE.)
   kontos: {
+    // Too long to fight with on foot: let go when he is on his feet (physics.js afoot).
+    saddleOnly: true,
     art: 'artSpear',
     pointFrom: 0.78, label: 'Kontos', hands: 'two', length: 2.65, strikeFrom: 1.5, handle: 1.05, spacing: 0.55, mass: 5.6, balance: 0.2, radius: 0.025, pointWidth: 0.03,
     harm: { thrust: { pierce: 1.6, blunt: 0.35, cut: 0.02 }, swing: { blunt: 0.9 } },

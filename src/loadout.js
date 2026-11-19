@@ -178,6 +178,33 @@ export const KIT_FIRST = {
   mexicaElite: ['macuahuitl', 'tepoztopilli'],
 };
 
+// What a kit's horsemen fought with in the saddle, where it is not what they fought with on foot (a style). The knight
+// charged with the lance and, unhorsed or dismounted, fought with the sword (or the hammer, or the axe) he carried; so did the
+// men-at-arms of every army that couched the lance: the Templars, the conquistadors' hidalgos, the Ayyubids and the
+// Ottomans' sipahis; the cataphract with the kontos; the Jin's and the Ming's heavy horse with their heavy spears; the
+// samurai of the Sengoku with the yari from the saddle (the bow before them). A rider of such a kit armed with a short
+// weapon takes his kit's (ridingInputs); one with a spear, a bow or a gun rides with it.
+export const KIT_RIDE = {
+  knight: 'lance', joan: 'lance', tournament: 'lance', templar: 'lance', conquistadorPlate: 'lance',
+  saladin: 'lance', ottomanHeavy: 'lance', gaziAlp: 'lance', cumanHeavy: 'lance',
+  cataphract: 'kontos', ironPagoda: 'jinLance', mingIronLamellar: 'mingLance', samuraiTosei: 'yari',
+};
+
+/**
+ * A man as he rides: his kit's saddle weapon (KIT_RIDE) in place of a short one, his own kept for when he is on his feet
+ * (`footStyle`, physics.js afoot). A spear, a bow, a gun, a kit with no saddle weapon of its own, or a man who rides with his
+ * own (`rideWith: 'own'`: a horseman who fights with the sword from the saddle): as he is.
+ */
+export function ridingInputs(inputs) {
+  const riding = inputs?.rideWith === 'own' ? null : KIT_RIDE[inputs?.outfit?.kind];
+  const style = STYLES[inputs?.style];
+  const weapon = WEAPONS[style?.weapon];
+  if (!riding || !STYLES[riding] || !weapon || weapon.ranged || style.ranged || inputs.style === riding) return inputs;
+  // Short: what is held within arm's reach (a sword, a mace, a hammer, a club), not a polearm.
+  if (weapon.length + weapon.handle > 1.6) return inputs;
+  return { ...inputs, style: riding, footStyle: inputs.style };
+}
+
 /** The main weapons (styles) his kit may fight with, its own first; none for a kit not listed (any style stands). */
 export function firstOptions(inputs) {
   return (KIT_FIRST[inputs?.outfit?.kind] ?? []).filter((style) => STYLES[style]);

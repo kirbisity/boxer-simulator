@@ -5,7 +5,7 @@
 // A landed punch hands its momentum to the struck part, which flies until
 // the fighter's muscles, after a reflex delay, catch it.
 
-import { drawnStyle } from './loadout.js';
+import { drawnStyle, ridingInputs } from './loadout.js';
 import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { blowSide, DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
@@ -147,6 +147,8 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     stamina: 1, bank: 0, concussion: 0, knockdowns: 0, injuries: [],
     // A mixed fighter starts in one of his styles and switches as he goes.
     mixed: STYLES[inputs.style]?.mix ? inputs.style : null,
+    // The style he fights in on foot when he rides with another (loadout.js ridingInputs: the knight's longsword under his lance).
+    footStyle: inputs.footStyle ?? null,
     style: STYLES[inputs.style]?.mix ? STYLES[inputs.style].mix[Math.floor((random ?? Math.random)() * STYLES[inputs.style].mix.length)] : STYLES[inputs.style] ? inputs.style : 'boxing',
     punch: null, cooldown: 0, guardHigh: 0, slip: 0, defence: null, rush: null, clinch: null,
     legDamage: { l: 0, r: 0 },
@@ -419,6 +421,30 @@ export function goToGrips(world, fighter) {
   armFighter(fighter, 'ringen', { random: world.random, shield: false });
   world.events.push({ time: world.time, kind: 'grips', fighter: fighter.id, effects: ['lets his weapon fall and goes to grips'] });
   return true;
+}
+
+/**
+ * On his feet with a weapon made for the saddle (a lance, a kontos: `saddleOnly`): he lets it go and takes up the one he fights
+ * with on foot (`footStyle`: the knight's longsword, the hammer knight's hammer), or, with none of his own, draws as from a
+ * weapon lost (rearm).
+ */
+export function afoot(world, fighter) {
+  const weapon = fighter.weapon;
+  if (!weapon?.held || !weapon.spec.saddleOnly) return;
+  const foot = fighter.footStyle && STYLES[fighter.footStyle] ? fighter.footStyle : null;
+  if (!foot) {
+    dropWeapon(world, fighter, 'too long to fight with on foot');
+    return;
+  }
+  releaseWeapon(world, fighter, 'too long to fight with on foot', [0, 0, 0]);
+  fighter.weapon = null;
+  fighter.style = foot;
+  if (fighter.state === 'down') {
+    fighter.pendingArm = foot;
+    return;
+  }
+  armFighter(fighter, foot, { random: world.random });
+  if (fighter.weapon) world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`takes up the ${fighter.weapon.spec.label.toLowerCase()}`] });
 }
 
 export function dropWeapon(world, fighter, reason, push = [0, 0, 0]) {
@@ -1915,7 +1941,8 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   const fighters = sides.map((side, index) => {
     const onRed = side.corner === 'red';
     const x = (onRed ? -1 : 1) * apart;
-    return createFighter(side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI, random });
+    // A rider with a short weapon takes his kit's saddle weapon (loadout.js ridingInputs: the knight's lance).
+    return createFighter(riding(side.inputs) ? ridingInputs(side.inputs) : side.inputs, { id: index, corner: side.corner, x, facing: onRed ? 0 : Math.PI, random });
   });
   // Sides line up in rows facing each other: as many abreast as the floor
   // is wide, the rest in rows behind. The sides need not be the same size.
