@@ -827,7 +827,11 @@ export function protectionAt(gear, capsuleKey) {
   // (Forearm), then its region (head, torso, limb). A region may say whether
   // it is plate that turns a blade (`deflects`); else the kit says.
   const regions = gear.protection.regions;
-  const own = regions && (regions[capsuleKey] ?? regions[capsuleKey.replace(/^[lr](?=[A-Z])/, '')] ?? regions[bulletRegion(capsuleKey)]);
+  // A hand: what covers it (outfits.js HAND_COVERS), not the sleeve's or the coat's figures, unless the kit names the hand
+  // itself; a gauntlet carries the harness on over it (the limb's, below).
+  const named = regions && (regions[capsuleKey] ?? regions[capsuleKey.replace(/^[lr](?=[A-Z])/, '')]);
+  if (gear.handCover && !named && capsuleKey.endsWith('Hand')) return { ...gear.protection, deflects: false, bites: undefined, ...gear.handCover };
+  const own = named ?? (regions && regions[bulletRegion(capsuleKey)]);
   if (!own) return gear.deflects === undefined ? gear.protection : { ...gear.protection, deflects: gear.deflects };
   // (A kit's `bites`, its plates' own glancing of a point, is the plates'; a region of other stuff says its own.)
   return { ...gear.protection, deflects: gear.deflects, bites: undefined, ...own };

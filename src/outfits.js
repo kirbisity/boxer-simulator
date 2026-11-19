@@ -35,6 +35,18 @@ export const MOVEMENT = {
 // `bullet`: share of a pistol round's harm stopped, by region (see GUN).
 const NO_PROTECTION = { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } };
 
+// What covers the hands (a kit's `hands`; physics.js protectionAt for a hand): a gauntlet of plate or mail carries the harness
+// on over the hand (`gauntlet`: the kit's limb figures, as for the forearm); the samurai's kote ends in the tekkō, a small iron
+// plate over the back of the hand on a cloth glove, the fingers and palm in cloth (Bottomley and Hopson 1988): some of a cut
+// turned, little of a point or a blow; and most armies' men went bare-handed (`bare`): the Ming and Qing coats of plates and
+// their arm guards stopped at the wrist (the Wubei zhi's and the Qing armouries' pieces have no gauntlets), as did the
+// breastplate men of Europe. A kit with `fists: 'gauntlet'` wears gauntlets; any other is bare unless it says.
+export const HAND_COVERS = {
+  bare: { blunt: 0, cut: 0, pierce: 0 },
+  tekko: { blunt: 0.2, cut: 0.55, pierce: 0.2 },
+  gauntlet: null,
+};
+
 /** Cloth colours by name, for designs' palettes and the builder's pickers. */
 export const CLOTH_COLORS = {
   navy: '#24324a', maroon: '#7a2230', black: '#1c1c20', charcoal: '#26262b', grey: '#6b6e74', white: '#e4e4e6',
@@ -1098,6 +1110,8 @@ export const OUTFITS = {
   // Lamellar: small lacquered steel scales laced in rows, in red. Proof
   // against most cuts, good against points; lighter than plate.
   samurai: {
+    // The kote's tekkō over the back of each hand (HAND_COVERS).
+    hands: 'tekko',
     // Trained: a warrior born, trained in arms from childhood (`skill`: OUTFITS' tiers).
     skill: 0.75,
     // Rides (the samurai fought from the saddle, the bow first).
@@ -1147,6 +1161,8 @@ export const OUTFITS = {
   // finds the openings of the box (armpits, the waidate's seam, under the
   // skirt) more often than in later armour (`gaps`).
   oyoroi: {
+    // The kote's tekkō over the back of each hand (HAND_COVERS).
+    hands: 'tekko',
     // Trained: a warrior born, trained in arms from childhood (`skill`: OUTFITS' tiers).
     skill: 0.75,
     // Rides (the o-yoroi was made to be worn on horseback).
@@ -1199,6 +1215,8 @@ export const OUTFITS = {
   // steel lames, laced skirt and sleeves, and the menpo war mask. Better
   // than ō-yoroi against points and bullets, and heavier.
   samuraiTosei: {
+    // The kote's tekkō over the back of each hand (HAND_COVERS).
+    hands: 'tekko',
     // Trained: a warrior born, trained in arms from childhood (`skill`: OUTFITS' tiers).
     skill: 0.7,
     // Rides (mounted samurai of the Sengoku).
@@ -2631,6 +2649,8 @@ export const OUTFITS = {
   },
   // A rōnin: no lord; a cuirass and kote over the kimono and hakama, the kasa for a helmet.
   ronin: {
+    // The kote's tekkō over the back of each hand (HAND_COVERS).
+    hands: 'tekko',
     skill: 0.85,
     faction: 'japanese',
     label: 'Rōnin', movement: 'excellent', fists: 'bare',
@@ -3522,6 +3542,8 @@ export function gearTraits(inputs) {
     // The layer under his kit (UNDER_ARMOUR), or null: under its gaps (physics/gaps.js gapUnder), and its heat (physics/heat.js).
     under,
     deflects: Boolean(spec.deflects),
+    // What covers his hands (HAND_COVERS): null, a gauntlet (the harness carries on over them); else its figures.
+    handCover: HAND_COVERS[spec.hands ?? (spec.fists === 'gauntlet' ? 'gauntlet' : 'bare')] ?? null,
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
     headLocked: Boolean(spec.headLocked) && !headChanged,
     // His skill in this kit, as a share of his own (a man who cannot turn his head fights by feel).
