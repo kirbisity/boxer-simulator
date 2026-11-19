@@ -15,7 +15,7 @@ import { FACTIONS, factionOf } from './outfits.js';
 import { castNet } from './physics/net.js';
 import { startThrow, throwChoice } from './physics/throwable.js';
 import { BRUSH, brushScreens, heldOffAt } from './physics/brush.js';
-import { expectedGap, gapsOf } from './physics/gaps.js';
+import { expectedGap, gapsOf, rigidAt } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { holdWing, reinFrom, ride, standToRider } from './riding.js';
 import { walkingDistance } from './physics/fieldworks.js';
@@ -4191,7 +4191,7 @@ export function harmThrough(attacker, defender, spec, zone = 'body') {
   if (total <= 0) return 1;
   const part = ZONE_PART[zone] ?? 'trunk';
   const covered = protectionAt(gear, part);
-  const rigid = (covered.cut ?? 0) >= gapsOf(gear).rigidFrom && cut + pierce > 0.2;
+  const rigid = rigidAt(covered, gear) && cut + pierce > 0.2;
   const gap = rigid ? expectedGap(gear, part, spec.mode, covered) : { found: 0, under: covered };
   const found = Math.min(1, gap.met ? gap.found : gap.found * attacker.body.technique * (0.5 + (attacker.body.skill ?? 0.5)));
   const edge = (on) => cut * (1 - (on.cut ?? 0)) + pierce * (1 - (on.pierce ?? 0));
@@ -4270,7 +4270,7 @@ function aimZone(fighter, opponent, spec, random) {
 function aimsForGap(fighter, opponent, spec, zone, random) {
   if (spec?.mode !== 'thrust' || !opponent || !BLADES.gaps.aimFor[zone]) return false;
   const gear = opponent.body.gear;
-  const rigid = (protectionAt(gear, zone === 'head' ? 'head' : 'trunk').cut ?? 0) >= gapsOf(gear).rigidFrom;
+  const rigid = rigidAt(protectionAt(gear, zone === 'head' ? 'head' : 'trunk'), gear);
   return rigid && random() < AI.gapAim * armourSense(fighter);
 }
 

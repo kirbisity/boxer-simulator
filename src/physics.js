@@ -14,7 +14,7 @@ import { ARMOUR_COVER, coverageKnown, coverageOf, coveredShare, piecesAt } from 
 import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, cuttingWidth, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restArmAngle, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
-import { gapChance, gapExposure, gapsOf, gapUnder, gapZoneAt, hungOff } from './physics/gaps.js';
+import { gapChance, gapExposure, gapsOf, gapUnder, gapZoneAt, hungOff, rigidAt } from './physics/gaps.js';
 import { limbTwist, swivelIntoRange, trunkAxes, turnAbout, twistExcess } from './joints.js';
 import { aimTargets, CYLINDER_LOAD, drawBow, emptied, fire, flyArrows, loadStop, LONG_GUN, MAGAZINE_CHANGE, raisedAim, reload, reloadKind, sightsOn, SUPPORT_GRIP, TUBE_LOAD } from './physics/ranged.js';
 import { clinchGrip, countPin, drive, holdClinch, holdPin, neckLow, pinnedBy, pinPoints, startPin } from './physics/grappling.js';
@@ -829,6 +829,30 @@ function updatePickup(world, fighter, dt) {
  * a modern vest guards the torso alone.
  */
 export function protectionAt(gear, capsuleKey, along = null) {
+  const guard = guardAt(gear, capsuleKey, along);
+  // What it is made of there (coverage.js: the piece over the place; `stuff`), where coverage is known: rigid armour has gaps,
+  // mail and cloth none (physics/gaps.js rigidAt).
+  const stuff = stuffAt(gear, capsuleKey, along);
+  return stuff === undefined ? guard : { ...guard, stuff };
+}
+
+/** What a kit is made of at a place on him: the armour piece over it (its material), 'bare' where none, undefined where coverage is not known (or the head). */
+function stuffAt(gear, capsuleKey, along) {
+  const part = capsuleKey.replace(/^[lr](?=[A-Z])/, '');
+  if (part === 'head') return undefined;
+  const side = /^[lr](?=[A-Z])/.test(capsuleKey) ? capsuleKey[0] : 'l';
+  const cover = armourCoverOf(gear)?.[side];
+  if (!cover) return undefined;
+  if (part === 'Hand' || (part === 'Forearm' && along != null && along >= ARMOUR_COVER.handFrom)) return cover.hand ?? 'bare';
+  if (part === 'Shank' && along != null && along >= ARMOUR_COVER.footFrom) return cover.foot ?? 'bare';
+  const name = part === 'trunk' ? 'trunk' : part[0].toLowerCase() + part.slice(1);
+  if (!cover[name]) return undefined;
+  if (along == null) return coveredShare(cover, name) >= 0.5 ? cover.main : 'bare';
+  const over = piecesAt(cover, name, along).find((piece) => ARMOUR_COVER.armour.includes(piece.material) || (cover.quilted && piece.material === 'cloth'));
+  return over?.material ?? 'bare';
+}
+
+function guardAt(gear, capsuleKey, along = null) {
   const regions = gear.protection.regions;
   const part = capsuleKey.replace(/^[lr](?=[A-Z])/, '');
   // The hand: its own key (a fist), or the far end of the forearm; the foot, the far end of the shank.
@@ -8773,7 +8797,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   // Into a gap in rigid armour (BLADES.gaps): only where there is one (physics/gaps.js gapZoneAt: the armpit, the groin, the
   // throat, the sights, the bend of a joint; never the middle of the breast, the back or the crown), then only what is under it, and no glance.
-  const rigid = (covered.cut ?? 0) >= gapsOf(body.gear).rigidFrom && mix.cut + mix.pierce > 0.2;
+  const rigid = rigidAt(covered, body.gear) && mix.cut + mix.pierce > 0.2;
   // (An execution's point, placed through the sights of the helm of a man standing broken open before him: finisher.js `zone`,
   // the sights wherever on the helm it is first met, as the hand puts it there.)
   const gapZone = rigid ? (punch.finisher?.zone && capsule.key === 'head' ? punch.finisher.zone : gapZoneAt(defender, capsule.key, contactPoint, normal)) : null;

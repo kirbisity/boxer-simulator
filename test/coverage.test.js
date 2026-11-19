@@ -123,3 +123,14 @@ test('metal quality: a harder metal turns more of an edge and a point, never spr
   assert.ok(protectionAt(nanban, 'trunk', 0.5).pierce > protectionAt(tosei, 'trunk', 0.5).pierce);
   assert.equal(protectionAt(nanban, 'lForearm', 0.5).pierce, protectionAt(tosei, 'lForearm', 0.5).pierce);
 });
+
+test('mail has no gaps: its rings run on over the joints; plate and a coat of plates have theirs', async () => {
+  const { rigidAt } = await import('../src/physics/gaps.js');
+  const at = (kind, key, t, design = 0) => { const gear = gearOf(kind, design); return rigidAt(protectionAt(gear, key, t), gear); };
+  assert.equal(at('templar', 'trunk', 0.5), false, 'the hauberk');
+  assert.equal(at('templar', 'lUpperArm', 0.9), false, 'the hauberk sleeve over the elbow');
+  assert.equal(at('conquistadorPlate', 'trunk', 0.05), false, 'the mail skirt below the breastplate');
+  assert.equal(at('conquistadorPlate', 'trunk', 0.6), true, 'the breastplate');
+  assert.equal(at('knight', 'trunk', 0.5), true);
+  assert.equal(at('mingBrigandine', 'trunk', 0.5), true, 'a coat of plates');
+});

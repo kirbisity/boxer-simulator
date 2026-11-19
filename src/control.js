@@ -13,7 +13,7 @@ import { throwFromHold } from './physics/grappling.js';
 import { floorAt, pushOut } from './physics/terrain.js';
 import { vec, yawRotate } from './pose.js';
 import { BLADES, WEAPONS } from './weapons.js';
-import { gapsOf } from './physics/gaps.js';
+import { rigidAt } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { RUN_STEER, runSteer } from './runsteer.js';
 import { jogSpeed, runSpeed } from './physics/gait.js';
@@ -745,7 +745,7 @@ export function pointAt(man, aim) {
   let best = aim;
   let nearest = CONTROL.gapSnap;
   for (const [zone, gap] of Object.entries(BLADES.gaps.aimFor)) {
-    if ((protectionAt(gear, zone === 'head' ? 'head' : 'trunk').cut ?? 0) < gapsOf(gear).rigidFrom) continue;
+    if (!rigidAt(protectionAt(gear, zone === 'head' ? 'head' : 'trunk'), gear)) continue;
     const mark = aimPoint(man, gap);
     const distance = vec.length(vec.sub(mark, aim));
     if (distance < nearest) {

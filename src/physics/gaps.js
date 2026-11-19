@@ -15,6 +15,17 @@ const GAP_DEGREES = 180 / Math.PI;
 const squareTo = (v, axis) => vec.sub(v, vec.scale(axis, vec.dot(v, axis)));
 
 /** The kit's gaps: the defaults (BLADES.gaps) with what the kit says of its own (`gear.gaps`). */
+// What is not rigid however hard it is to cut: mail, its rings running on over a joint unbroken and closing round it as it
+// bends (a hauberk's sleeve over the elbow, its skirt over the groin), and cloth; neither has an opening for a point to find,
+// only what it stops itself (Edge, Paddock and Pyhrr, Arms and Armor of the Medieval Knight, 1988; Richardson, The
+// Medieval Inventories of the Tower Armouries, 2016). Rigid armour (plate, lamellae, a coat of plates) has its gaps.
+const FLEXIBLE = new Set(['mail', 'cloth']);
+
+/** Whether armour at a place has gaps: proof against an edge (BLADES.gaps.rigidFrom) and not mail or cloth there (`stuff`, protectionAt). */
+export function rigidAt(covered, gear) {
+  return (covered?.cut ?? 0) >= gapsOf(gear).rigidFrom && !FLEXIBLE.has(covered?.stuff);
+}
+
 export function gapsOf(gear) {
   return gear?.gaps ? { ...BLADES.gaps, ...gear.gaps } : BLADES.gaps;
 }

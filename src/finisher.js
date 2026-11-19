@@ -13,7 +13,7 @@ import { P } from './body.js';
 import { vec, yawRotate } from './pose.js';
 import { MOVES, STYLES } from './moves.js';
 import { WEAPONS } from './weapons.js';
-import { gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
+import { gapsOf, gapUnder, gapZoneAt, rigidAt } from './physics/gaps.js';
 import { capsuleEnds, capsules, drawForFinisher, hostile, plantFeet, point, protectionAt, restoreAfterFinisher, shieldDisc, throwPunch, WORLD } from './physics.js';
 
 export const FINISHER = {
@@ -133,7 +133,7 @@ function stopsIn(gear, key, zone) {
   const covered = protectionAt(gear, key);
   const gaps = gapsOf(gear);
   const pierce = covered.pierce ?? 0;
-  if ((covered.cut ?? 0) < gaps.rigidFrom || !zone || gaps.closed?.includes(zone)) return pierce;
+  if (!rigidAt(covered, gear) || !zone || gaps.closed?.includes(zone)) return pierce;
   return pierce * (1 - FINISHER.profile.gap) + (gapUnder(gear, zone, covered).pierce ?? 0) * FINISHER.profile.gap;
 }
 
@@ -205,7 +205,7 @@ function lineFrom(target, hand, aim, gaps) {
   if (!met || (met.key !== 'head' && met.key !== 'trunk')) return null;
   const gear = target.body.gear;
   const covered = protectionAt(gear, met.key);
-  const rigid = (covered.cut ?? 0) >= gapsOf(gear).rigidFrom;
+  const rigid = rigidAt(covered, gear);
   const zone = rigid && gaps ? gapZoneAt(target, met.key, met.point, met.normal) : null;
   return { stops: stopsIn(gear, met.key, zone), zone, key: met.key };
 }

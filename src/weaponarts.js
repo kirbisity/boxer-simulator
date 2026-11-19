@@ -32,7 +32,7 @@ import { P } from './body.js';
 import { MOVES, STYLES } from './moves.js';
 import { hostile, inFight, opponentFor, perform, point, protectionAt, reachOf, throwPunch } from './physics.js';
 import { WORLD } from './physics/config.js';
-import { gapsOf } from './physics/gaps.js';
+import { rigidAt } from './physics/gaps.js';
 import { startThrow, throwableOf, throwBlocked } from './physics/throwable.js';
 import { yawRotate } from './pose.js';
 
@@ -135,7 +135,7 @@ export const ARTS = {
 /** The armour class at a part of him ('plate', 'mail' or 'none'), as ARTS.sense reads it. */
 function armourClass(man, key) {
   const covered = protectionAt(man.body.gear, key);
-  if (covered.deflects || (covered.cut ?? 0) >= gapsOf(man.body.gear).rigidFrom) return 'plate';
+  if (covered.deflects || rigidAt(covered, man.body.gear)) return 'plate';
   return (covered.cut ?? 0) >= ARTS.sense.mail ? 'mail' : 'none';
 }
 

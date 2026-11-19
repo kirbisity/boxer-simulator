@@ -12,7 +12,7 @@ import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
 import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRatingAt, bulletRegion, GUN, pointThrough, slerpDir, SUPPLY } from '../weapons.js';
 import { WORLD } from './config.js';
-import { gapChance, gapExposure, gapsOf, gapUnder, gapZoneAt, hungOff } from './gaps.js';
+import { gapChance, gapExposure, gapsOf, gapUnder, gapZoneAt, hungOff, rigidAt } from './gaps.js';
 import { bardingAt } from '../horses.js';
 import { bringDown, gaitAt, harmHorse, turretLaid, turretRecoil } from './mounted.js';
 import { flamePulse } from './flame.js';
@@ -787,7 +787,7 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   const hung = hit.throat ? null : hungOff(victim, key);
   const covered = hung && world.random() < hung.share ? hung.under : (hit.throat ? protectionAt(gear, 'trunk') : protectionAt(gear, key, alongPart(victim, key, hit.point)));
   const gaps = gapsOf(gear);
-  const rigid = (covered.cut ?? 0) >= gaps.rigidFrom;
+  const rigid = rigidAt(covered, gear);
   const zone = !rigid ? null : hit.throat ? (gaps.closed?.includes('neck') ? null : 'neck') : gapZoneAt(victim, key, hit.point, normal);
   // (A gap opened by his own raised arm is met, not found: physics/gaps.js gapExposure.)
   const opened = zone && !hit.throat ? gapExposure(victim, key, zone, hit.point) : 0;
