@@ -57,16 +57,19 @@ export function breathParams(exertion, size = 1.78) {
  * How loud a breath is (dB at 1 m) by exertion: through a fight with breath in hand barely there (BREATH_LEVEL.quiet, a
  * hush under everything), swelling only as his stamina is all but gone (from `swellFrom`) to `spent` at empty, and past it,
  * in the overdraft, to `gasping` (the heaving of a man near fainting). It was 38 + 26 × exertion: heard from the first exchange.
- * The swell from the stamina's last fifth (0.8, was 0.85), as the recorded breath is first heard (sampled.js BREATH_TAKES): heavier and
+ * The swell from the stamina's last third (0.67, was 0.8), as the recorded breath is first heard (sampled.js BREATH_TAKES): heavier and
  * heavier from there.
  */
-const BREATH_LEVEL = { quiet: [24, 30], swellFrom: 0.8, spent: 56, gasping: 66 };
+// (From the stamina's last third, 0.67, heard from its start (`heard`, a soft breath over the fight) and swelling steadily, not
+// held back to the end (`curve` 1.4, was the square), to `spent` at empty; louder still in the overdraft (`gasping`, was 66):
+// the user's call, 2026-11-18.)
+const BREATH_LEVEL = { quiet: [24, 30], swellFrom: 0.67, heard: 38, curve: 1.4, spent: 58, gasping: 70 };
 function breathLevel(work) {
   const spec = BREATH_LEVEL;
   if (work <= spec.swellFrom) return spec.quiet[0] + (spec.quiet[1] - spec.quiet[0]) * (work / spec.swellFrom);
   if (work <= 1) {
     const share = (work - spec.swellFrom) / (1 - spec.swellFrom);
-    return spec.quiet[1] + (spec.spent - spec.quiet[1]) * share * share;
+    return spec.heard + (spec.spent - spec.heard) * share ** spec.curve;
   }
   return spec.spent + (spec.gasping - spec.spent) * Math.min(1, (work - 1) / 0.5);
 }

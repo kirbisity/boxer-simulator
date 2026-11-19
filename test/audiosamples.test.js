@@ -378,11 +378,11 @@ test('a chain: a portcullis raised and a drawbridge on the heavy chain; a chaine
   assert.equal(plan({ type: 'hit', energy: 20, striker: 'lash', covering: 'flesh', part: 'trunk' }).extra, undefined, 'a man not chained: the lash alone');
 });
 
-test('breathing is silent through a fight with breath in hand, heard (recorded, by sex, at the voice\'s pitch) only when all but spent', () => {
+test('breathing is silent through a fight with breath in hand, heard (recorded, by sex, at the voice\'s pitch) from the stamina\'s last third, louder and louder', () => {
   const at = (stamina) => exertionOf({ stamina });
-  // (From the stamina's last fifth since 2026-11-10: a warning that he is tiring.)
-  for (const stamina of [1, 0.5, 0.3, 0.25]) assert.equal(breathPlan(breathParams(at(stamina)), true, at(stamina), 'male'), null, `stamina ${stamina}: silent`);
-  for (const stamina of [0.18, 0.08, 0, -0.3]) {
+  // (From the stamina's last third since 2026-11-18, a warning that he is tiring, swelling to empty and louder in the overdraft.)
+  for (const stamina of [1, 0.6, 0.5, 0.36]) assert.equal(breathPlan(breathParams(at(stamina)), true, at(stamina), 'male'), null, `stamina ${stamina}: silent`);
+  for (const stamina of [0.3, 0.18, 0.08, 0, -0.3]) {
     const exertion = at(stamina);
     const breath = breathParams(exertion);
     const inhale = breathPlan(breath, true, exertion, 'male', 0.9);
@@ -392,7 +392,10 @@ test('breathing is silent through a fight with breath in hand, heard (recorded, 
     assert.equal(inhale.rate, 0.9, 'his voice\'s pitch');
     assert.ok(Math.abs(inhale.seconds - breath.inSeconds * BREATH_TAKES.length) < 1e-9 && Math.abs(exhale.seconds - breath.outSeconds * BREATH_TAKES.length) < 1e-9, 'in step with the breathing rate');
   }
-  assert.ok(breathHeard(at(0)) && !breathHeard(at(0.5)));
+  assert.ok(breathHeard(at(0)) && breathHeard(at(0.3)) && !breathHeard(at(0.5)));
+  // Stronger and stronger: louder at each step down, loudest in the overdraft.
+  const levels = [0.3, 0.2, 0.1, 0, -0.5].map((stamina) => breathParams(at(stamina)).level);
+  for (let index = 1; index < levels.length; index += 1) assert.ok(levels[index] > levels[index - 1], `louder: ${levels}`);
 });
 
 test('the menu\'s buttons play the recorded tap (a back lower, a confirm higher with the chime under it); victory and defeat stay the synth\'s', () => {
