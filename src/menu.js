@@ -701,6 +701,8 @@ export function installMenus(game) {
       content.append(
         wornPick,
         el('div', { className: 'field' }, el('b', { textContent: t('wizard.helmet') }), helmPicker()),
+        // How armour's protection is worked out (assets/armour.html, made by tools/armour-page.mjs), in the language in force.
+        el('a', { className: 'armour-how', href: `assets/armour.html#${getLang() === 'zh' ? 'zh' : 'en'}`, target: '_blank', rel: 'noopener', textContent: t('wizard.armourHow') }),
         ...armsFields(),
         ...(designs.length < 2 ? [] : [el('div', { className: 'field' }, el('b', { textContent: t('wizard.finish') }), buttons(designs.map(([, at]) => String(at)), () => String(outfit.design ?? 0), (at) => { gearTouched = true; inputs.outfit = { ...outfit, design: Number(at) }; }, (at) => tname(OUTFITS[outfit.kind].designs[at].label)))]),
         // The metal's steel and its decoration, where the kit offers them (outfits.js finishOptions).

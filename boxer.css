@@ -2139,3 +2139,7 @@ html:lang(zh) .story-chapter, html:lang(zh) .story-prompt, html:lang(zh) .boss-t
   .story-plate { padding: 20px 16px 16px; }
   .boss-track { height: 9px; }
 }
+
+/* The link to how armour protects (assets/armour.html), under the helmet in the gear step. */
+.wizard .armour-how { font-size: 0.85rem; color: inherit; opacity: 0.8; text-underline-offset: 3px; justify-self: start; }
+.wizard .armour-how:hover, .wizard .armour-how:focus-visible { opacity: 1; }
