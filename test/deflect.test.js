@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PRESETS } from '../src/body.js';
 import { advance, bodyHarm, createWorld, holdGuard, placeFighter, reachOf, throwPunch, undeflectable, WORLD } from '../src/physics.js';
-import { deflectsWith, deflectWindow, guardHold } from '../src/physics/deflect.js';
+import { deflectsWith, deflectWindow, guardHold, guarding } from '../src/physics/deflect.js';
 
 /** Two men at a blow's reach: `attack` style strikes, `defend` style guards. */
 function pair(attack, defend, defendExtra = {}) {
@@ -100,4 +100,21 @@ test('the man played deflects a blow at his front in his window before his blade
   const deflect = met.events.find((event) => event.kind === 'deflect');
   assert.ok(deflect, `deflected (${met.kinds.join(', ')})`);
   assert.equal(met.harm, 0, 'no harm to him');
+});
+
+test('the big deflect: the man played\'s guard up closest of all before the blow breaks the striker open, no guard for him for a couple of seconds; one raised earlier in the window is an ordinary deflect', () => {
+  const late = meet('katana', 'kesagiri', 'katana', { lead: 0.06 });
+  const big = late.events.find((event) => event.kind === 'deflect');
+  assert.ok(big?.big, `a big deflect (${late.kinds.join(', ')})`);
+  assert.equal(late.harm, 0, 'no harm to him');
+  assert.ok(late.striker.brokenOpen > 0, 'the striker broken open');
+  late.striker.guardHeld = true;
+  assert.equal(guarding(late.striker), false, 'no guard while broken open');
+  const early = meet('katana', 'kesagiri', 'katana', { lead: 0.2 });
+  const plain = early.events.find((event) => event.kind === 'deflect');
+  assert.ok(plain && !plain.big, 'earlier in the window: an ordinary deflect');
+  assert.ok(!(early.striker.brokenOpen > 0));
+  // About one deflect in five of guards raised anywhere in the katana's window.
+  const share = Math.min(WORLD.deflect.big.most, Math.max(WORLD.deflect.big.least, WORLD.deflect.window * WORLD.deflect.big.share)) / WORLD.deflect.window;
+  assert.ok(share >= 0.1 && share <= 0.25, `${share}`);
 });

@@ -481,7 +481,11 @@ export const WORLD = {
   // must meet the blow; its window is `aiShare` of the man played's: a deflect is the player's reward, rare from the AI.)
   // `strikeAt`: where along an attacking weapon a stroke is reckoned to meet the blade, for its mark (physics.js undeflectable):
   // out toward its head, near where a swung weapon strikes hardest.
-  deflect: { window: 0.45, ref: 'katana', least: 0.18, most: 0.65, spam: 0.3, holdFor: 1, reel: [0.3, 0.8], reelJoules: 120, strikeAt: 0.8, arc: 1.5, aiShare: 0.3 },
+  // `big`: the big deflect (the user's call, 2026-11-18), the man played's deflect timed closest of all: his guard up within `share`
+  // of his weapon's window before the blow (no less than `least` s, no more than `most`: ~0.09 s for the katana's 0.45; about one
+  // deflect in five of guards raised anywhere in the window) breaks the striker open: for `open` s he can neither guard, block,
+  // dodge nor strike (his blade knocked wide, his balance gone), reeling, and a blow to him meets no defence.
+  deflect: { window: 0.45, ref: 'katana', least: 0.18, most: 0.65, spam: 0.3, holdFor: 1, reel: [0.3, 0.8], reelJoules: 120, strikeAt: 0.8, arc: 1.5, aiShare: 0.3, big: { share: 0.2, least: 0.05, most: 0.12, open: 2 } },
   guardHeld: { recovery: 0.25, staminaPerSecond: 0.025, perJoule: 0.0006, spentBelow: 0, willFrom: 0.12, willFull: 0.45 },
   // Reading the blow (physics.js blowRead): a block made against a blow (its striker as `defence.from`: the player's held guard,
   // an AI's block) is brought onto the blow's line only as well as he is trained to read it (body.skill, 0..1: OUTFITS' tiers).

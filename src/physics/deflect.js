@@ -17,6 +17,8 @@ export function deflectsWith(fighter) {
  * stroke of his own going (a cut made from the guard takes the blade out of it; brought back after, it is raised again).
  */
 export function guarding(fighter) {
+  // (A man broken open by a big deflect has no guard at all: bigDeflect.)
+  if (fighter.brokenOpen > 0) return false;
   return (Boolean(fighter.guardHeld) || GUARDING_DEFENCES.has(fighter.defence?.name)) && !fighter.punch;
 }
 
@@ -65,4 +67,32 @@ export function guardHold(fighter, time) {
   const window = deflectWindow(fighter);
   if (held <= window) return 1;
   return Math.max(0, 1 - (held - window) / Math.max(1e-6, spec.holdFor - window));
+}
+
+/**
+ * Whether the man played's deflect now is a big one (WORLD.deflect.big): his guard up within its share of his window (least..most s).
+ * The AI's never are: a big deflect is the player's reward for the closest timing.
+ */
+export function bigDeflect(fighter, time) {
+  if (!fighter.player || !deflecting(fighter, time)) return false;
+  const spec = WORLD.deflect.big;
+  return time - fighter.guardSince <= Math.min(spec.most, Math.max(spec.least, deflectWindow(fighter) * spec.share));
+}
+
+/**
+ * The striker of a big deflect broken open (WORLD.deflect.big `open`): for that long no guard, no block, no stroke (`brokenOpen` s, the
+ * AI thinks nothing for him: ai.js), after the deflect's own reel (physics.js reel).
+ */
+export function breakOpen(world, fighter, event) {
+  const seconds = WORLD.deflect.big.open;
+  if (fighter.state !== 'up') return;
+  fighter.brokenOpen = seconds;
+  fighter.punch = null;
+  fighter.rush = null;
+  fighter.defence = null;
+  fighter.guardHeld = false;
+  // (Not a stagger's length: his arms keep their strength, his blade held off as it was knocked; a 2 s stagger's slack arm let
+  // it swing on into the man who deflected it. The deflect's own reel shows the blow thrown back.)
+  event.big = true;
+  event.effects.push(`broken open (${seconds.toFixed(0)} s)`);
 }

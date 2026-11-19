@@ -21,6 +21,9 @@ import { playWound, woundParams } from './sfx/wound.js';
  * but not played) and `sampledOnly` (played only from its recordings: the synth's cries and grunts sounded wrong, the user said; the
  * cries are now the recorded ones, rationed by audio/cries.js, and an effort, which has no recording, is silent).
  */
+// A weapon art's mortal blow (dB at 1 m): over the clash of steel at a hand's breadth, dramatic, his own.
+const MORTAL_LEVEL = 86;
+
 export const SOUND_FAMILIES = {
   hit: { params: impactParams, play: playImpact, bus: 'effects', boost: 6 },
   wound: { params: woundParams, play: playWound, bus: 'effects', boost: 4 },
@@ -40,6 +43,8 @@ export const SOUND_FAMILIES = {
   robotSpark: { params: sparkParams, play: playSpark, bus: 'effects' },
   // A bow bent as its string is drawn (physics.js, at the draw's start): the recorded creak only (the synth has none: silent until it loads).
   draw: { params: drawParams, play: playShot, bus: 'effects', sampledOnly: true },
+  // A weapon art begun by the man played (weaponarts.js): the recorded mortal blow over the weapon's own sound (none in the synth).
+  mortal: { params: () => ({ level: MORTAL_LEVEL }), play: playShot, bus: 'effects', sampledOnly: true },
 };
 
 /** A voice event's params: the synth's, at its cry's level where it is one (cryOfEvent), else silent (an effort: no recording). */

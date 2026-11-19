@@ -56,6 +56,9 @@ export function blowTail(plan, s) {
 
 // A deflect's clash: the weapons' own clash at `rate` of its pitch (about four semitones down), `trim` times louder, rung `seconds` longer.
 const DEFLECT_SOUND = { rate: 0.8, trim: 2.3, seconds: 1.4 };
+// The man played's deflect and big deflect (the recordings `set`, at `trim`), the meeting's energy (J) from soft to hard across
+// `joules` (louder and a little lower as it goes); the pitch by the weapons' weight (sampleMassRate).
+const PLAYER_DEFLECT = { deflect: { set: 'deflect', trim: 1.6 }, big: { set: 'bigdeflect', trim: 2 }, joules: [10, 250] };
 
 /** A strength 0..1 of `value` on a log scale from `low` to `high`. */
 export const sampleStrength = (value, low, high) => sfxClamp(Math.log(Math.max(low, value) / low) / Math.log(high / low), 0, 1);
@@ -254,6 +257,13 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
         const blunt = event.a === 'blunt' || event.b === 'blunt';
         return blowTail({ set: 'shieldclang', trim: sampleLerp(0.75, 1.15, s), rate: sampleMassRate(event.mass) * (blunt ? 0.88 : 1) * jitter(), seconds: sampleLerp(0.2, 0.7, s), fade: sampleLerp(0.05, 0.25, s), skip: 0, synth: params.scrape > 0 ? { ...params, modes: [] } : null, synthGain: 0.7 }, s);
       }
+      // The man played's deflect (and his big deflect, WORLD.deflect.big): its own recording in place of the clash, lower for heavier
+      // weapons and louder for a harder meeting (PLAYER_DEFLECT).
+      if (event.deflect && event.byPlayer) {
+        const spec = event.big ? PLAYER_DEFLECT.big : PLAYER_DEFLECT.deflect;
+        const hard = sampleStrength(event.energy ?? PLAYER_DEFLECT.joules[0], PLAYER_DEFLECT.joules[0], PLAYER_DEFLECT.joules[1]);
+        return { set: spec.set, trim: spec.trim * sampleLerp(0.75, 1.25, hard), rate: sampleMassRate(event.mass) * sampleLerp(1.04, 0.94, hard) * jitter(0.03), seconds: null, fade: 0.2, skip: 0, synth: null, synthGain: 0 };
+      }
       const blunt = !params.modes.length || params.modes[0].f < 500;
       // A deflect (WORLD.deflect): the same meeting of these weapons, deeper and louder (DEFLECT_SOUND: the blade met square and
       // set, ringing the whole of both, not a glancing tick).
@@ -411,6 +421,9 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       const share = (cry.kind === 'hurt' ? sampleLerp(CRY_PLAY.hurtShare, 1, i) : 1) * Math.min(1, hold);
       return { set: `voice-${cry.sex}-${cry.kind}`, trim: sampleLerp(CRY_PLAY.trim[0], CRY_PLAY.trim[1], i), rate: cry.rate ?? 1, seconds: null, share, fade: (CRY_PLAY.fade[cry.kind] ?? 0.08) * hold, skip: 0, synth: null, synthGain: 0 };
     }
+    case 'mortal':
+      // A weapon art's mortal blow (the man played's, weaponarts.js): its recording over the weapon's own sound, at its full length.
+      return { set: 'mortal', trim: 1, rate: jitter(0.02), seconds: null, fade: 0.25, skip: 0, synth: null, synthGain: 0 };
     case 'draw':
       // A bow bent as it is drawn: the creak fitted to the draw (BOW_DRAW_PLAY), ending as the string is loosed.
       return { set: 'bowdraw', trim: BOW_DRAW_PLAY.trim, rate: jitter(BOW_DRAW_PLAY.jitter), fit: params.seconds, fitRange: BOW_DRAW_PLAY.stretch, fromEnd: true, seconds: params.seconds, fadeIn: BOW_DRAW_PLAY.fadeIn, fade: BOW_DRAW_PLAY.fade, skip: 0, synth: null, synthGain: 0 };

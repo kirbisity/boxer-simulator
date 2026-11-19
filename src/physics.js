@@ -32,7 +32,7 @@ import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js
 import { overdraftDepth, drawStamina, overdraws, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
 import { bowShotCost, strokeHeft, swingEffort } from './physics/effort.js';
-import { deflecting, deflectsWith, deflectWindow, guardHold, noteGuard } from './physics/deflect.js';
+import { bigDeflect, breakOpen, deflecting, deflectsWith, deflectWindow, guardHold, noteGuard } from './physics/deflect.js';
 import { jumpBlocked, jumpLanding, jumpOf } from './physics/jump.js';
 import { formUp, placeWings, WINGS } from './formation.js';
 import { handling } from './handling.js';
@@ -5324,6 +5324,12 @@ function updateTimers(world, fighter, dt) {
   fighter.committed = Math.max(0, (fighter.committed ?? 0) - dt);
   fighter.stun = Math.max(0, fighter.stun - dt);
   fighter.stagger = Math.max(0, (fighter.stagger ?? 0) - dt);
+  // Broken open by a big deflect (physics/deflect.js breakOpen): no guard held, no stroke begun, while it lasts.
+  if (fighter.brokenOpen > 0) {
+    fighter.brokenOpen = Math.max(0, fighter.brokenOpen - dt);
+    fighter.guardHeld = false;
+    if (fighter.punch && !fighter.player) fighter.punch = null;
+  }
   fighter.dazed = Math.max(0, (fighter.dazed ?? 0) - dt);
   if (fighter.clinch) {
     fighter.clinch.t += dt;
@@ -8656,11 +8662,13 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // travel is the animation's). Not the AI's: its blade must meet the blow (the clash, bladeClash).
   if (assistedDeflect(world, attacker, punch, defender)) {
     punch.stopped = true;
+    const big = bigDeflect(defender, world.time);
     const event = { time: world.time, kind: 'deflect', fighter: defender.id, byPlayer: Boolean(defender.player), attacker: attacker.id, punch: punch.type, weapon: defender.weapon.kind, point: closest.onFirst, normal, impulse, energy, assisted: true, effects: [`deflected with the ${defender.weapon.spec.label.toLowerCase()}`] };
     world.pendingImpulses.push({ fighter: attacker, shares: [[main, 1], [P[`${weapon.main}Elbow`], 0.5]], direction: normal, impulse });
     reel(world, attacker, energy, event);
+    if (big) breakOpen(world, attacker, event);
     world.events.push(event);
-    if (world.ear) soundEvent(world, 'clash', { at: closest.onFirst, speed: goingIn, a: 'blade', b: weaponPart(weapon, distance), mass: Math.max(wspec.mass ?? 1, defender.weapon.spec.mass ?? 1), deflect: true });
+    if (world.ear) soundEvent(world, 'clash', { at: closest.onFirst, speed: goingIn, a: 'blade', b: weaponPart(weapon, distance), mass: Math.max(wspec.mass ?? 1, defender.weapon.spec.mass ?? 1), deflect: true, byPlayer: Boolean(defender.player), big, energy });
     return false;
   }
   // The haft: round wood, no edge and no point; the pommel: all blunt.
@@ -9287,7 +9295,10 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
   const deflected = parried && !beaten && deflecting(parried[0], world.time) && !tooHeavyToDeflect(parried[2], parried[3], parried[0]);
   world.events.push({ time: world.time, kind: 'clash', fighter: first.id, other: second.id, point: met, normal, impulse, deflect: deflected || undefined, effects: ['blades meet'] });
   // Heard: how fast they met, what of each (an edge, a haft, a head), and whether a point was turned along the blade (a scrape).
-  if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed, mass: Math.max(a.spec.mass ?? 1, b.spec.mass ?? 1), deflect: deflected || undefined });
+  // (The man played's deflect, and whether big: WORLD.deflect.big; its own sound, audio/sfx/sampled.js.)
+  const deflectedBy = deflected ? parried[0] : null;
+  const big = Boolean(deflectedBy && bigDeflect(deflectedBy, world.time));
+  if (world.ear) soundEvent(world, 'clash', { at: met, speed: Math.abs(closing), a: weaponPart(a, one.along), b: weaponPart(b, two.along), slide: Boolean(bind) && closing < BLADES.clashSpeed, mass: Math.max(a.spec.mass ?? 1, b.spec.mass ?? 1), deflect: deflected || undefined, byPlayer: Boolean(deflectedBy?.player) || undefined, big: big || undefined, energy: 0.5 * ((massA * massB) / (massA + massB)) * Math.max(0, closing) ** 2 });
   if (beaten) {
     const [parrier, blade, striker, stroke] = parried;
     if (BLOCKS.has(parrier.defence?.name) || parrier.defence?.name === 'parry') parrier.defence = null;
@@ -9300,6 +9311,7 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
     const answering = parrier.punch && strokeOf(parrier, blade) === null && parrier.punch.t <= parrier.punch.spec.extendUntil;
     const event = { time: world.time, kind: 'deflect', fighter: parrier.id, byPlayer: Boolean(parrier.player), attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, normal, impulse, energy, effects: [`deflected with the ${blade.spec.label.toLowerCase()}`] };
     reel(world, striker, energy, event);
+    if (big) breakOpen(world, striker, event);
     world.events.push(event);
   } else if (parried) {
     const [parrier, blade, striker, stroke] = parried;

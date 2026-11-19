@@ -27,6 +27,7 @@
 // it is gone the button is the art's again (shown only while the art is charged).
 
 import { AI, adrenalineGain, surge } from './ai.js';
+import { soundEvent } from './audio/log.js';
 import { P } from './body.js';
 import { MOVES, STYLES } from './moves.js';
 import { hostile, inFight, opponentFor, perform, point, protectionAt, reachOf, throwPunch } from './physics.js';
@@ -297,6 +298,8 @@ export function startArt(world, fighter) {
   fighter.artCharged = false;
   fighter.adrenaline = Math.max(0, (fighter.adrenaline ?? 0) - ARTS.spend);
   world.events.push({ time: world.time, kind: 'art', attacker: fighter.id, defender: man?.id, punch: name, effects: [ARTS.labels[name] ?? name] });
+  // The man played's: the mortal blow heard over his weapon (audio/families.js mortal).
+  if (fighter.player && world.ear) soundEvent(world, 'mortal', { at: point(fighter.x, P.head), who: fighter.id });
   return true;
 }
 

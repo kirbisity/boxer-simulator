@@ -17,8 +17,8 @@ const DIR = 'src/audio/samples';
 // (A thunder's roar is the longest single take, 2.6 s; the army's charge loop, 6 s of a dull roar at 32 kb/s, is the largest one-shot file.)
 const FILE_CAP = 25 * 1024;
 // (The one-shot takes ~300 KB, the cries and the charge ~170 KB, the three ambience beds ~230 KB.)
-// (960 KB since the lamellar and mail steps, 2026-11-18: was 900; the custom page has room, 12.98 of its 15.5 MB.)
-const TOTAL_CAP = 960 * 1024;
+// (1000 KB since the lamellar and mail steps and the deflects, 2026-11-18: was 900; the custom page has room, 12.98 of its 15.5 MB.)
+const TOTAL_CAP = 1000 * 1024;
 const half = () => 0.5;
 const plan = (event) => samplePlan(event.type, SOUND_FAMILIES[event.type].params(event), event, half);
 
@@ -518,4 +518,16 @@ test('armour heard as it moves: lamellar rattles with the step, plate clanks, ma
   assert.deepEqual(hoof({ bard: 'lamellar' }).extra.map((take) => take.set), ['lamellarstep']);
   assert.deepEqual(hoof({ bard: 'plate', rider: 'plate' }).extra.map((take) => take.set), ['armourstep', 'armourstep']);
   assert.ok(hoof({ bard: 'lamellar' }).extra[0].rate < lamellar.extra[0].rate * 1.1, 'the bard lower than a man\'s coat');
+});
+
+test('the man played\'s deflect plays its own recording in place of the clash (the big deflect its own), lower for heavier weapons and louder for a harder meeting; a weapon art its mortal blow', () => {
+  const half = () => 0.5;
+  const params = SOUND_FAMILIES.clash.params({ a: 'blade', b: 'blade', speed: 8, mass: 1.2 });
+  const deflect = (event) => samplePlan('clash', params, { deflect: true, byPlayer: true, mass: 1.2, energy: 60, ...event }, half);
+  assert.equal(deflect({}).set, 'deflect');
+  assert.equal(deflect({ big: true }).set, 'bigdeflect');
+  assert.ok(deflect({ mass: 4 }).rate < deflect({ mass: 1 }).rate, 'a heavier weapon lower');
+  assert.ok(deflect({ energy: 250 }).trim > deflect({ energy: 10 }).trim, 'a harder meeting louder');
+  assert.notEqual(samplePlan('clash', params, { deflect: true, mass: 1.2 }, half).set, 'deflect', 'the AI\'s deflect: the clash as before');
+  assert.equal(samplePlan('mortal', SOUND_FAMILIES.mortal.params({}), {}, half).set, 'mortal');
 });

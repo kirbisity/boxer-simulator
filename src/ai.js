@@ -748,6 +748,12 @@ function thinkEach(world, dt, playerIds) {
     if (fighter.dormant || fighter.corner === 'grey' || fighter.driven) continue;
     // A man lying in ambush waits where he is, unseen, for the signal (springAmbush).
     if (fighter.hidden) continue;
+    // Broken open by a big deflect (physics/deflect.js breakOpen): he decides nothing, no guard, no block, no stroke, until it passes.
+    if (fighter.brokenOpen > 0) {
+      fighter.guardHeld = false;
+      fighter.defence = null;
+      continue;
+    }
     const seen = perceivedBy(view, fighter);
     fighter.unperceived = !seen;
     // (A rider thinks every step, whatever his detail: a step his AI sets no goal for his horse, it goes by his footwork,

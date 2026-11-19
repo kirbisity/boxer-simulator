@@ -47,6 +47,9 @@ src/audio/sfx/sampled.js sets its loudness, length and pitch from the event. too
 | bones-4.mp3 | ScreenRecording_10-29-2026_20-55-14_1.mov | 3.114-3.434 | Breaking Bones | 0.034 | 1980 | wound: bone (a break), crush (lower, slower) |
 | bones-5.mp3 | ScreenRecording_10-29-2026_20-55-14_1.mov | 3.916-4.256 | Breaking Bones | 0.036 | 2160 | wound: bone (a break), crush (lower, slower) |
 | bones-6.mp3 | ScreenRecording_10-29-2026_20-55-14_1.mov | 4.767-4.987 | Breaking Bones | 0.047 | 1620 | wound: bone (a break), crush (lower, slower) |
+| deflect-1.mp3 | ScreenRecording_11-18-2026_23-19-07_1.mov | 0.000-1.432 | DEFLECT | 0.000 | 7380 | clash: the man played's deflect (in place of the clash; pitch by the weapons' weight, loudness by the meeting's energy) |
+| bigdeflect-1.mp3 | ScreenRecording_11-18-2026_23-19-54_1.mov | 0.057-2.187 | BIG DEFLECT | 0.057 | 10980 | clash: the man played's big deflect (WORLD.deflect.big: the striker broken open) |
+| mortal-1.mp3 | ScreenRecording_11-18-2026_23-22-46_1.mov | 0.065-2.432 | Mortal | 0.065 | 12060 | mortal: a weapon art begun by the man played, over the weapon's own sound |
 | mailstep-1.mp3 | ScreenRecording_11-18-2026_23-17-31_1.mov | 1.140-1.720 | Chainmail walking | 0.000 | 3240 | step: a man in mail (high-passed at 150 Hz, the tail cut 30 dB under the peak over the recording's hiss); hoof: a rider in mail |
 | mailstep-2.mp3 | ScreenRecording_11-18-2026_23-17-31_1.mov | 1.720-2.190 | Chainmail walking | 0.000 | 2700 | step: a man in mail (high-passed at 150 Hz, the tail cut 30 dB under the peak over the recording's hiss); hoof: a rider in mail |
 | mailstep-3.mp3 | ScreenRecording_11-18-2026_23-17-31_1.mov | 2.244-2.540 | Chainmail walking | 0.024 | 1800 | step: a man in mail (high-passed at 150 Hz, the tail cut 30 dB under the peak over the recording's hiss); hoof: a rider in mail |

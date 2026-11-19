@@ -28,6 +28,10 @@ export const SAMPLE_SETS = {
   lamellarstep: Array.from({ length: 5 }, (_, index) => `lamellarstep-${index + 1}`),
   // Mail's rings jingling as he walks (the user's clip of 2026-11-18).
   mailstep: Array.from({ length: 8 }, (_, index) => `mailstep-${index + 1}`),
+  // The man played's deflect, his big deflect, and a weapon art's mortal blow (the user's clips of 2026-11-18): one take each.
+  deflect: ['deflect-1'],
+  bigdeflect: ['bigdeflect-1'],
+  mortal: ['mortal-1'],
   clatter: ['clatter-1'],
   maceswing: ['maceswing-1'],
   gunshot: ['gunshot-1', 'gunshot-2'],
