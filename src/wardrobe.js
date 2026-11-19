@@ -1276,7 +1276,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'pagodaHelm':
-      buildPagodaHelm(group, head, r, steel, color, { laced: Boolean(partTiles.aventail) });
+      buildPagodaHelm(group, head, r, steel, color, { laced: Boolean(partTiles.aventail), still: lowDetail });
       worldMask(group, head, r, steel, color);
       break;
     case 'ayyubidHelm':
@@ -2154,7 +2154,7 @@ const PAGODA_HELM = {
  * or (`laced`, where the detail maps draw them) each tier one band marked as the
  * aventail (`userData.helmPart`), wearing a row of the laced lamellae's tile.
  */
-function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
+function buildPagodaHelm(group, head, r, steel, color, { laced = false, still = false } = {}) {
   const spec = PAGODA_HELM;
   const iron = metal(steel, color);
   iron.side = THREE.DoubleSide;
@@ -2230,6 +2230,8 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
   const dotMaterial = surface(head.lace ?? 0x141416);
   dotMaterial.side = THREE.DoubleSide;
   const placements = [];
+  // Each tier's plates (instances [from, to)), for its swing.
+  const tierPlates = [];
   const holder = new THREE.Object3D();
   // Behind each tier its leather backing, dark, so the gaps between plates show lacing, not the face.
   const backing = surface(head.lace ?? 0x141416);
@@ -2245,6 +2247,7 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
     const band = new THREE.Mesh(new THREE.CylinderGeometry((radius - flare - 0.07) * r, (radius + flare - 0.07) * r, spec.plate[1] * r, 28, 1, true, Math.PI / 2 + open, Math.PI * 2 - open * 2), backing);
     band.position.y = y * r;
     band.userData.noOutline = true;
+    band.userData.aventailTier = tier;
     group.add(band);
     if (laced) {
       // The tier as one band of plates, flared at its foot as the plates are, the tile's row on it.
@@ -2252,9 +2255,11 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
       tierBand.position.y = y * r;
       tierBand.userData.noOutline = true;
       tierBand.userData.helmPart = 'aventail';
+      tierBand.userData.aventailTier = tier;
       group.add(tierBand);
       return;
     }
+    const first = placements.length;
     for (let index = 0; index < spec.plates; index += 1) {
       const angle = ((index + (tier % 2) * 0.5) / spec.plates) * Math.PI * 2;
       const ahead = Math.cos(angle);
@@ -2266,8 +2271,14 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
       holder.updateMatrix();
       placements.push(holder.matrix.clone());
     }
+    tierPlates.push([first, placements.length]);
   });
-  if (laced) return;
+  // The aventail swings a little after the head (PAGODA_SWAY): not in a crowd.
+  const tierWeights = tiers.map(([y]) => Math.max(0, Math.min(1, (PAGODA_SWAY.top - y) / (PAGODA_SWAY.top - PAGODA_SWAY.hem))) ** 1.3);
+  if (laced) {
+    if (!still) group.add(pagodaSwing(group, tierWeights, null));
+    return;
+  }
   const plates = new THREE.InstancedMesh(plateGeometry, plateMaterial, placements.length);
   const dots = new THREE.InstancedMesh(dotGeometry, dotMaterial, placements.length * 2);
   const dotOffset = new THREE.Matrix4();
@@ -2282,6 +2293,105 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
   plates.userData.noOutline = true;
   dots.userData.noOutline = true;
   group.add(plates, dots);
+  if (!still) group.add(pagodaSwing(group, tierWeights, { plates, dots, placements, tierPlates, r }));
+}
+
+/**
+ * The Iron Pagoda's aventail swings a little after the head, as hair does but stiffer and shorter (iron plates on leather):
+ * a point on a damped spring behind the helmet (`hz`, `damping` under 1: past and back), hanging `trail` s of its speed behind,
+ * never more than `reach` m off; each tier moved by its share (none at `top`, the rim, all at `hem`, head radii up from the
+ * eyes), the lowest round the chin and neck the most. Drawing only.
+ */
+const PAGODA_SWAY = { hz: 2.2, damping: 0.4, trail: 0.01, reach: 0.02, jump: 0.7, top: -0.1, hem: -1.92 };
+
+const pagodaScratch = { at: new THREE.Vector3(), turn: new THREE.Quaternion(), move: new THREE.Vector3(), offset: new THREE.Matrix4() };
+
+/**
+ * The aventail's swing (render.js moves it each frame: `userData.swing.update(dt)`), on a holder in the helmet: the laced tiers'
+ * meshes (`userData.aventailTier`) moved whole, or the instanced plates' matrices (`instanced`) tier by tier.
+ */
+function pagodaSwing(group, weights, instanced) {
+  const spec = PAGODA_SWAY;
+  const holder = new THREE.Object3D();
+  holder.name = 'aventail-swing';
+  let at = null;
+  let was = null;
+  const speed = [0, 0, 0];
+  const pace = [0, 0, 0];
+  const rest = new Map();
+  const move = (offset) => {
+    if (instanced) {
+      const { plates, dots, placements, tierPlates, r } = instanced;
+      const dotOffset = new THREE.Matrix4();
+      tierPlates.forEach(([from, to], tier) => {
+        const share = weights[tier] ?? 0;
+        pagodaScratch.offset.makeTranslation(offset.x * share, offset.y * share, offset.z * share);
+        for (let index = from; index < to; index += 1) {
+          const placed = pagodaScratch.offset.clone().multiply(placements[index]);
+          plates.setMatrixAt(index, placed);
+          for (const [slot, rise] of [[0, 0.12], [1, -0.1]]) {
+            dotOffset.makeTranslation(0, rise * r, 0.004 * r);
+            dots.setMatrixAt(index * 2 + slot, placed.clone().multiply(dotOffset));
+          }
+        }
+      });
+      plates.instanceMatrix.needsUpdate = true;
+      dots.instanceMatrix.needsUpdate = true;
+      return;
+    }
+    group.traverse((object) => {
+      const tier = object.userData.aventailTier;
+      if (tier === undefined) return;
+      if (!rest.has(object)) rest.set(object, object.position.clone());
+      const share = weights[tier] ?? 0;
+      object.position.copy(rest.get(object)).addScaledVector(offset, share);
+    });
+  };
+  holder.userData.swing = {
+    angle: 0,
+    update(dt) {
+      if (!group.parent || !(dt > 0)) return;
+      group.updateWorldMatrix(true, false);
+      group.getWorldPosition(pagodaScratch.at);
+      const target = pagodaScratch.at.toArray();
+      const moved = at ? Math.hypot(target[0] - was[0], target[1] - was[1], target[2] - was[2]) : Infinity;
+      if (!at || moved > spec.jump) {
+        at = target.slice();
+        was = target.slice();
+        speed.fill(0);
+        pace.fill(0);
+        return;
+      }
+      const omega = Math.PI * 2 * spec.hz;
+      const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
+      const h = dt / steps;
+      const off = [0, 0, 0];
+      for (let axis = 0; axis < 3; axis += 1) {
+        const now = (target[axis] - was[axis]) / dt;
+        pace[axis] += (now - pace[axis]) * Math.min(1, dt / 0.08);
+        for (let step = 1; step <= steps; step += 1) {
+          const goal = was[axis] + ((target[axis] - was[axis]) * step) / steps;
+          speed[axis] += (omega * omega * (goal - at[axis]) - 2 * spec.damping * omega * (speed[axis] - now)) * h;
+          at[axis] += speed[axis] * h;
+        }
+        was[axis] = target[axis];
+        off[axis] = at[axis] - target[axis] - pace[axis] * spec.trail;
+      }
+      const far = Math.hypot(...off);
+      if (far > spec.reach) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          off[axis] *= spec.reach / far;
+          at[axis] = target[axis] + off[axis] + pace[axis] * spec.trail;
+        }
+      }
+      // Into the helmet's own axes (its turn, and its scale: a helmet drawn narrower is moved as far in the world).
+      group.getWorldQuaternion(pagodaScratch.turn).invert();
+      const scale = group.getWorldScale(new THREE.Vector3());
+      pagodaScratch.move.set(...off).applyQuaternion(pagodaScratch.turn).divide(scale);
+      move(pagodaScratch.move);
+    },
+  };
+  return holder;
 }
 
 // The Ming helmet's red tassel (hongying): a hank of horsehair dyed red, bound round the finial's spike and falling all
