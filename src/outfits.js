@@ -444,26 +444,27 @@ function incaDesign(label, weave, field, second, { cord = '#1c1c20', cord2 = '#b
 // The arena's armour, part by part: gladiators fought with the chest bare
 // and the limbs most exposed in their stance covered, each kind differently
 // (`regions` in an outfit's protection). Plate turns a blade (`deflects`).
+// (Each `worn`: drawn by arenaview.js, not the armour table: physics.js protectionAt keeps them where they are.)
 const ARENA = {
   // A bronze helmet with a grilled visor over the whole head and face.
-  helm: { blunt: 0.65, cut: 0.95, pierce: 0.85, deflects: true },
+  helm: { blunt: 0.65, cut: 0.95, pierce: 0.85, deflects: true, worn: true },
   // The secutor's and scissor's smooth egg: nothing to catch a trident's prong or an edge.
-  smoothHelm: { blunt: 0.7, cut: 0.97, pierce: 0.9, deflects: true },
+  smoothHelm: { blunt: 0.7, cut: 0.97, pierce: 0.9, deflects: true, worn: true },
   // The manica: overlapping metal or hardened leather lames over padding.
-  manica: { blunt: 0.45, cut: 0.85, pierce: 0.7, deflects: true },
+  manica: { blunt: 0.45, cut: 0.85, pierce: 0.7, deflects: true, worn: true },
   // A quilted manica or legging: thick linen, no metal.
-  quilt: { blunt: 0.35, cut: 0.55, pierce: 0.3 },
+  quilt: { blunt: 0.35, cut: 0.55, pierce: 0.3, worn: true },
   // A bronze greave (ocrea) from instep to knee.
-  greave: { blunt: 0.55, cut: 0.95, pierce: 0.85, deflects: true },
+  greave: { blunt: 0.55, cut: 0.95, pierce: 0.85, deflects: true, worn: true },
   // The thraex's greaves run up over the quilted thigh.
-  highGreave: { blunt: 0.45, cut: 0.8, pierce: 0.6, deflects: true },
+  highGreave: { blunt: 0.45, cut: 0.8, pierce: 0.6, deflects: true, worn: true },
   // The retiarius's galerus: a bronze plate standing up off the shoulder, guarding neck and arm.
-  galerus: { blunt: 0.6, cut: 0.95, pierce: 0.85, deflects: true },
+  galerus: { blunt: 0.6, cut: 0.95, pierce: 0.85, deflects: true, worn: true },
   // Wrappings (fasciae) round a shin: little.
-  wrap: { blunt: 0.15, cut: 0.25, pierce: 0.15 },
+  wrap: { blunt: 0.15, cut: 0.25, pierce: 0.15, worn: true },
   // The scissor's scale shirt over the trunk, and the steel tube over his left arm.
   scale: { blunt: 0.4, cut: 0.85, pierce: 0.85 },
-  tube: { blunt: 0.7, cut: 1, pierce: 0.95, deflects: true },
+  tube: { blunt: 0.7, cut: 1, pierce: 0.95, deflects: true, worn: true },
   bare: { blunt: 0, cut: 0, pierce: 0 },
 };
 
@@ -1162,6 +1163,8 @@ export const OUTFITS = {
   // finds the openings of the box (armpits, the waidate's seam, under the
   // skirt) more often than in later armour (`gaps`).
   oyoroi: {
+    // The box armour, its kusazuri and the great sode, drawn by oyoroi.js (coverage.js `coverAlso`).
+    coverAlso: { trunk: [[-0.06, 0.98, 'kozane']], skirt: [[0.55, 'kozane']], upperArm: [[-0.2, 0.62, 'kozane']] },
     // The kote's tekkō over the back of each hand (HAND_COVERS).
     hands: 'tekko',
     // Trained: a warrior born, trained in arms from childhood (`skill`: OUTFITS' tiers).
@@ -1485,7 +1488,8 @@ export const OUTFITS = {
     // a good guard over the trunk, only the arms bare).
     protection: {
       ...PLATE_VEST, bullet: { head: 0.3, torso: 0.5, limb: 0 },
-      regions: { UpperArm: { blunt: 0.25, cut: 0.3, pierce: 0.15 }, Forearm: { blunt: 0.25, cut: 0.3, pierce: 0.15 } },
+      // (The quilted coat's sleeves under the sleeveless vest: worn, drawn as the coat, not an armour piece.)
+      regions: { UpperArm: { blunt: 0.25, cut: 0.3, pierce: 0.15, worn: true }, Forearm: { blunt: 0.25, cut: 0.3, pierce: 0.15, worn: true } },
     },
     // The long coat's openings (BRIGANDINE_MAKES.ming): the armholes, the seams between its plates; its skirt closes the groin.
     gaps: BRIGANDINE_MAKES.ming.gaps,
@@ -1725,6 +1729,8 @@ export const OUTFITS = {
   // (zhanpao) over gilt scale armour, the scale at the shoulders and arms, a green soft cap tied at the
   // back, black boots. The scale is a general's; the head is in cloth.
   guanYu: {
+    // The gilt scale under the green robe, its skirt below the knee (drawn: the robe; coverage.js `coverAlso`).
+    coverAlso: { trunk: [[-0.08, 1, 'scales']], skirt: [[1.2, 'scales']] },
     // Trained: a legend (`skill`: OUTFITS' tiers).
     skill: 0.9,
     // Rides (Red Hare).
@@ -2464,8 +2470,9 @@ export const OUTFITS = {
         torso: { blunt: 0.55, cut: 1, pierce: 0.95, deflects: true },
         UpperArm: { blunt: 0.25, cut: 0.8, pierce: 0.65 },
         Forearm: { blunt: 0.25, cut: 0.8, pierce: 0.65 },
-        Thigh: { blunt: 0.1, cut: 0.25, pierce: 0.1 },
-        Shank: { blunt: 0.1, cut: 0.25, pierce: 0.1 },
+        // (Breeches and riding boots, worn: not armour pieces in the table.)
+        Thigh: { blunt: 0.1, cut: 0.25, pierce: 0.1, worn: true },
+        Shank: { blunt: 0.1, cut: 0.25, pierce: 0.1, worn: true },
       },
     },
     // Mail under the breastplate's gaps where the kit has it: the mail sleeves at the armpits and the elbows, the mail collar
@@ -2653,6 +2660,8 @@ export const OUTFITS = {
   },
   // A rōnin: no lord; a cuirass and kote over the kimono and hakama, the kasa for a helmet.
   ronin: {
+    // The tatami-dō sewn inside the kosode, not drawn (coverage.js `coverAlso`).
+    coverAlso: { trunk: [[-0.05, 0.95, 'armor']] },
     // The kote's tekkō over the back of each hand (HAND_COVERS).
     hands: 'tekko',
     skill: 0.85,
@@ -2977,6 +2986,8 @@ export const OUTFITS = {
   // of panels bolted on, cut with all armour to 0.55 of their weight (~19 kg):
   // 119 kg in all (was 135). The frame is a load to its poise (`carriedShare`).
   exoArmoured: exoKit('Powered exoframe — armoured', 100 + 35 * 0.55, {
+    // The exoframe's plates over every limb, drawn by exoview.js (coverage.js `coverAlso`).
+    coverAlso: 'whole',
     carriedShare: 100 / 83,
     // ~19 kg of composite panels (0.55 of the 35 kg they were) over his chest, belly, shoulders and limbs' fronts (rifle plates front, as a carrier's);
     // a helmet with a visor. His sides, the backs of his arms and his neck are still the man's.
@@ -3548,6 +3559,9 @@ export function gearTraits(inputs) {
     deflects: Boolean(spec.deflects),
     // What covers his hands (HAND_COVERS): null, a gauntlet (the harness carries on over them); else its figures.
     handCover: HAND_COVERS[spec.hands ?? (spec.fists === 'gauntlet' ? 'gauntlet' : 'bare')] ?? null,
+    // What his armour is drawn as, and what is on his hands and feet: what covers each place on him (coverage.js, read by
+    // physics.js protectionAt where a blow lands).
+    cover: { armor: look.armor?.kind ?? null, fists: spec.fists ?? null, hands: spec.hands ?? null, feet: feet?.kind ?? null, also: spec.coverAlso ?? null },
     // The helm bolted to the cuirass: the head moves only with the trunk (physics lockHead, pose, rig), and he sees only ahead.
     headLocked: Boolean(spec.headLocked) && !headChanged,
     // His skill in this kit, as a share of his own (a man who cannot turn his head fights by feel).

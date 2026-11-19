@@ -5,6 +5,7 @@
 // on whatever of him the weapon meets first (an arm, a shoulder), not the part asked about.
 // Per kind: `guarded` torso, head, arms, legs, the whole body (WORLD.heat.skinShare: the head 9%, trunk 36%, limbs 55% of the skin),
 // and `gapped` the torso's with the gaps in it, for a man of an average skill (gap chance × (0.5 + skill) = 1).
+// Each part's figure is its protection averaged along it (coverage.js: bare where no armour is drawn over a place).
 // Usage: node tools/armour-benchmark.js [out.json]
 
 import { writeFileSync } from 'node:fs';
@@ -36,7 +37,10 @@ function measure(kind, design, label, family) {
   const inputs = normaliseInputs({ ...structuredClone(PRESETS.contender), outfit: { kind, design }, accessories: [] });
   const gear = buildBody(inputs).gear;
   if (!gear.protection) return null;
-  const at = (key, figure) => protectionAt(gear, key)[figure] ?? 0;
+  // Each part as a whole: its protection averaged along it (coverage.js: what is drawn over each place, the hand at the end of
+  // the forearm, the foot at the end of the shank, bare where nothing is), the head as one.
+  const along = Array.from({ length: 20 }, (_, step) => (step + 0.5) / 20);
+  const at = (key, figure) => (key === 'head' ? protectionAt(gear, key)[figure] ?? 0 : average(along.map((t) => protectionAt(gear, key, t)[figure] ?? 0)));
   const gaps = gapsOf(gear);
   const rigid = at('trunk', 'cut') >= gaps.rigidFrom;
   const share = WORLD.heat.skinShare;

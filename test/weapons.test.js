@@ -27,7 +27,10 @@ test('armour stops each kind of harm by its own share, and adds its weight', asy
   const { protectionAt: armOf } = await import('../src/physics.js');
   const arm = (kind) => armOf(wearing(kind), 'lForearm');
   for (const kind of ['samurai', 'samuraiTosei', 'oyoroi', 'ashigaru', 'ronin', 'sohei']) assert.ok(arm(kind).blunt < wearing(kind).protection.blunt && arm(kind).pierce < wearing(kind).protection.pierce, `${kind}: ${JSON.stringify(arm(kind))}`);
-  assert.ok(arm('samuraiTosei').blunt > arm('samurai').blunt && arm('samurai').blunt > arm('ashigaru').blunt && arm('ashigaru').blunt > arm('ronin').blunt);
+  // (The ashigaru's forearms are his cloth sleeves, nothing drawn over them: bare, coverage.js. The rōnin's kusari-kote is mail
+  // with a splint.)
+  assert.ok(arm('samuraiTosei').blunt > arm('samurai').blunt && arm('samurai').blunt > arm('ronin').blunt && arm('ronin').blunt > arm('ashigaru').blunt);
+  assert.equal(arm('ashigaru').cut, 0);
   // A gladiator: the chest bare, the helmet, the arm and the legs covered, each its own way.
   const { protectionAt } = await import('../src/physics.js');
   const hoplomachus = wearing('hoplomachus');

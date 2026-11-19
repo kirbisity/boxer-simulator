@@ -157,10 +157,14 @@ test('sound log: a battle (Rhodes, 1522): on the sand, the bows and the matchloc
   const world = createWorld([...cast.red.map((inputs) => ({ inputs, corner: 'red' })), ...cast.blue.map((inputs) => ({ inputs, corner: 'blue' }))], { seed: 7, arena: scenario.arena, formation: scenario.formation });
   // (The engine says where the fight is: the view's place.)
   world.place = scenario.scene;
-  advance(world, 10, (current, dt) => {
+  // (Fought 10 s, then on in 2 s spells until a man has died, to 30 s: when the first dies is the draw of blows, and the log
+  // is what is tested, not the day's luck.)
+  const fight = (seconds) => advance(world, seconds, (current, dt) => {
     current.ear = { x: 0, y: 1.6, z: 0, radius: 40 };
     thinkAll(current, dt);
   });
+  fight(10);
+  while (world.time < 30 && !ofType(world, 'voice').some((voice) => voice.kind === 'death')) fight(2);
   const types = new Set(readSounds(world, 0).events.map((event) => event.type));
   for (const type of ['hit', 'wound', 'step', 'fall', 'voice', 'shot', 'arrowhit', 'clash', 'swing']) assert.ok(types.has(type), `${type} in ${[...types]}`);
   assert.ok(ofType(world, 'step').every((step) => step.surface === 'sand'), 'the beach before the fort');

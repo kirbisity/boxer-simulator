@@ -10,6 +10,7 @@ import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { blowSide, DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
 import { factionOf, FACTIONS, gearTraits, glovedFists, HEADGEAR, headgearOptions, helmetNameOf, outfitOf } from './outfits.js';
+import { ARMOUR_COVER, coverageKnown, coverageOf, coveredShare, piecesAt } from './coverage.js';
 import { BLADES, edgeProofOf, bleedRate, bleedToLose, bulletRegion, SHIELDS, WEAPONS, bladeTargets, createWeapon, effectiveMassAt, guardTargets, pointFirst, handShares, harmMix, pointThrough, pointWidthOf, cuttingWidth, PUNCTURE, sliceGain, LEAD_GRIP, offHandAlong, behindShield, shieldContact, shieldReach, NET } from './weapons.js';
 import { desiredPose, lockedHead, POSE, restArmAngle, restPose, twoBoneIK, unleaned, vec, yawCos, yawRotate, yawSin } from './pose.js';
 import { WORLD } from './physics/config.js';
@@ -818,23 +819,91 @@ function updatePickup(world, fighter, dt) {
 }
 
 /**
- * What a fighter's kit stops where it struck: its protection, with what it
- * says for that region (`regions`: head, torso, limb) over it. Medieval
- * armour covers the whole man alike; a modern vest guards the torso alone.
+ * What a fighter's kit stops where it struck (`along`: how far along the struck part, physics.js capsules' a to b: the trunk
+ * from the hips to the neck, a limb from its upper joint; none, for a reckoning of the part as a whole): its protection, with
+ * what it says for that region (`regions`: a part by name, Forearm; or head, torso, limb) over it, where the armour is drawn
+ * over that place (coverage.js). A part the kit names has its own figures. One it does not name takes the kit's only where a
+ * piece of armour is drawn over it, and a piece of another stuff than the kit's own (mail sleeves under a breastplate) that
+ * stuff's (COVERED_STUFF); where none is, what is under (a mail shirt, UNDER_ARMOUR) or nothing: a hand or a foot past its
+ * sleeve or greave, the arm out of a sleeveless coat, a leg below a short skirt. Medieval armour covers the whole man alike;
+ * a modern vest guards the torso alone.
  */
-export function protectionAt(gear, capsuleKey) {
-  // Most particular first: this very part (rForearm), the part on either side
-  // (Forearm), then its region (head, torso, limb). A region may say whether
-  // it is plate that turns a blade (`deflects`); else the kit says.
+export function protectionAt(gear, capsuleKey, along = null) {
   const regions = gear.protection.regions;
-  // A hand: what covers it (outfits.js HAND_COVERS), not the sleeve's or the coat's figures, unless the kit names the hand
-  // itself; a gauntlet carries the harness on over it (the limb's, below).
-  const named = regions && (regions[capsuleKey] ?? regions[capsuleKey.replace(/^[lr](?=[A-Z])/, '')]);
-  if (gear.handCover && !named && capsuleKey.endsWith('Hand')) return { ...gear.protection, deflects: false, bites: undefined, ...gear.handCover };
+  const part = capsuleKey.replace(/^[lr](?=[A-Z])/, '');
+  // The hand: its own key (a fist), or the far end of the forearm; the foot, the far end of the shank.
+  const atHand = part === 'Hand' || (part === 'Forearm' && along != null && along >= ARMOUR_COVER.handFrom);
+  const atFoot = part === 'Shank' && along != null && along >= ARMOUR_COVER.footFrom;
+  const handKey = capsuleKey.replace('Forearm', 'Hand');
+  const named = regions && (atHand ? regions[handKey] ?? regions.Hand : regions[capsuleKey] ?? regions[part]);
+  if (atHand && !named && gear.handCover) return { ...gear.protection, deflects: false, bites: undefined, ...gear.handCover };
+  const side = /^[lr](?=[A-Z])/.test(capsuleKey) ? capsuleKey[0] : 'l';
+  const cover = armourCoverOf(gear)?.[side] ?? null;
+  // A part the kit names keeps its figures where anything is drawn over it, or where the region says it is worn though the
+  // table does not draw it (`worn`: boots, a quilted sleeve, a gladiator's manica drawn by arenaview.js); else it is bare.
+  if (named && cover && part !== 'head' && part !== 'trunk' && !named.worn && !atHand) {
+    const name = part[0].toLowerCase() + part.slice(1);
+    const drawn = along == null ? coveredShare(cover, name, { any: true }) >= 0.5 : piecesAt(cover, name, along).length > 0;
+    if (cover[name] && !drawn) return uncovered(gear, part);
+  }
+  if (!named && cover && part !== 'head') {
+    if (atFoot && !cover.foot) return uncovered(gear, part);
+    const name = part === 'trunk' ? 'trunk' : part[0].toLowerCase() + part.slice(1);
+    if (!atHand && !atFoot && cover[name]) {
+      const over = along == null ? (coveredShare(cover, name) >= 0.5 ? { material: cover.main } : null) : piecesAt(cover, name, along).find((piece) => ARMOUR_COVER.armour.includes(piece.material) || (cover.quilted && piece.material === 'cloth'));
+      if (!over) return uncovered(gear, part);
+      const stuff = over.material !== cover.main && COVERED_STUFF[over.material];
+      if (stuff) return { ...gear.protection, deflects: false, bites: undefined, ...stuff };
+    }
+  }
   const own = named ?? (regions && regions[bulletRegion(capsuleKey)]);
   if (!own) return gear.deflects === undefined ? gear.protection : { ...gear.protection, deflects: gear.deflects };
   // (A kit's `bites`, its plates' own glancing of a point, is the plates'; a region of other stuff says its own.)
   return { ...gear.protection, deflects: gear.deflects, bites: undefined, ...own };
+}
+
+// A piece of another stuff than the kit's own, over a place the kit does not name: what that stuff stops (the mail sleeves
+// and skirt under a conquistador's breastplate are mail, not the breastplate). Mail: riveted mail on its padding, as the mail
+// shirt worn under a coat (outfits.js UNDER_ARMOUR.mail).
+const COVERED_STUFF = { mail: { blunt: 0.3, cut: 0.85, pierce: 0.65 } };
+
+/** Where nothing of the armour is over a place: the layer under it where it reaches (UNDER_ARMOUR `covers`), else nothing. */
+function uncovered(gear, part) {
+  const under = gear.under;
+  const zone = part === 'trunk' ? 'torso' : part;
+  const bare = { ...gear.protection, blunt: 0, cut: 0, pierce: 0, deflects: false, bites: undefined, regions: undefined };
+  return under?.covers?.includes(zone) ? { ...bare, ...under.guard } : bare;
+}
+
+/** What covers each place on him (coverage.js), read once from his kit's armour as drawn; null where it is not known (a kit drawn otherwise). */
+function armourCoverOf(gear) {
+  if (gear.coverCache !== undefined) return gear.coverCache;
+  const worn = gear.cover;
+  let cover = null;
+  if ((worn?.armor || worn?.also) && coverageKnown(worn.armor, worn.also)) {
+    cover = {};
+    for (const side of ['l', 'r']) {
+      const each = coverageOf(worn.armor, { ...worn, side });
+      // The kit's own stuff: its trunk's outermost armour (its figures are that stuff's); a kit of quilting alone (an escaupil,
+      // a gambeson: no armour stuff anywhere) counts its cloth as its armour.
+      const armour = each.trunk.filter((piece) => ARMOUR_COVER.armour.includes(piece.material));
+      each.main = armour.length ? armour[armour.length - 1].material : 'cloth';
+      each.quilted = !['trunk', 'upperArm', 'forearm', 'thigh', 'shank'].some((name) => each[name].some((piece) => ARMOUR_COVER.armour.includes(piece.material)));
+      cover[side] = each;
+    }
+  }
+  Object.defineProperty(gear, 'coverCache', { value: cover, enumerable: false, writable: true });
+  return cover;
+}
+
+/** How far along a struck part (0 at its a, 1 at its b) a point on him is: where a blow or an arrow met it. */
+export function alongPart(fighter, key, at) {
+  const capsule = capsules(fighter).find((each) => each.key === key);
+  if (!capsule || capsule.a === capsule.b) return null;
+  const a = point(fighter.x, capsule.a);
+  const run = vec.sub(point(fighter.x, capsule.b), a);
+  const length = vec.dot(run, run);
+  return length ? Math.max(0, Math.min(1, vec.dot(vec.sub(at, a), run) / length)) : null;
 }
 
 /** A brittle edge (obsidian) loses part of its cut: on armour, a shield or a steel blade. */
@@ -8700,7 +8769,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   if (!haft) bluntEdge(weapon, mix);
   // (Armour hung beside a raised arm, the sode, has swung off it: physics/gaps.js hungOff.)
   const hung = hungOff(defender, capsule.key);
-  const covered = hung && world.random() < hung.share ? hung.under : protectionAt(body.gear, capsule.key);
+  const covered = hung && world.random() < hung.share ? hung.under : protectionAt(body.gear, capsule.key, closest.t);
   const contactPoint = vec.add(closest.onSecond, vec.scale(normal, capsule.radius));
   // Into a gap in rigid armour (BLADES.gaps): only where there is one (physics/gaps.js gapZoneAt: the armpit, the groin, the
   // throat, the sights, the bend of a joint; never the middle of the breast, the back or the crown), then only what is under it, and no glance.

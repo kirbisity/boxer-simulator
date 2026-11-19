@@ -7,7 +7,7 @@ import { surfaceAt } from '../audio/surface.js';
 import { BODY, buildBody, FRAMES, normaliseInputs, P, PRESETS } from '../body.js';
 import { STYLES } from '../moves.js';
 import { OUTFITS, outfitOf } from '../outfits.js';
-import { aimPoint, BLOCKING, floorUnder, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
+import { aimPoint, alongPart, BLOCKING, floorUnder, breakJoint, capsuleEnds, capsules, closestBetween, dropWeapon, glanceShare, knockOut, point, protectionAt, shieldDisc, stagger, strainGrip, surfaceCurve, toLocal, toWorld } from '../physics.js';
 import { caloriesForWeight } from '../physiology.js';
 import { vec, yawRotate } from '../pose.js';
 import { ARROW, ARROW_MOMENTUM, BLADES, bleedToLose, bowCast, bulletProof, bulletRatingAt, bulletRegion, GUN, pointThrough, slerpDir, SUPPLY } from '../weapons.js';
@@ -785,7 +785,7 @@ export function arrowHit(world, shooter, hit, dir, energy = 1, bounce = ARROW.bo
   const region = hit.throat ? 'head' : bulletRegion(key);
   // (Armour hung beside a raised arm, the sode, has swung off it: physics/gaps.js hungOff.)
   const hung = hit.throat ? null : hungOff(victim, key);
-  const covered = hung && world.random() < hung.share ? hung.under : protectionAt(gear, hit.throat ? 'trunk' : key);
+  const covered = hung && world.random() < hung.share ? hung.under : (hit.throat ? protectionAt(gear, 'trunk') : protectionAt(gear, key, alongPart(victim, key, hit.point)));
   const gaps = gapsOf(gear);
   const rigid = (covered.cut ?? 0) >= gaps.rigidFrom;
   const zone = !rigid ? null : hit.throat ? (gaps.closed?.includes('neck') ? null : 'neck') : gapZoneAt(victim, key, hit.point, normal);
