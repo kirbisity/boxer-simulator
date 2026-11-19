@@ -54,7 +54,16 @@ const HORSE_LOOK = {
 // `twistReach` rad about the barrel's middle, `pivot` × the withers forward of the frame's origin); `curve`: how the share
 // grows down the skirt (under 2: more of it moves).
 export const BARD_SWAY = {
-  kinds: ['lamellar'], hz: 1.5, damping: 0.3, trail: 0.02, reach: 0.1, lift: 0.5, jump: 0.7, top: 0.8, hem: 0.42, curve: 1.5,
+  // `hang`: where the skirt hangs from, the point the spring follows (× the withers: over the croup, behind the saddle, at the
+  // barrel's top), so the stride's rock, pitch and bob swing it as a pendulum, not only the horse's pace and turns (followed at
+  // the frame's origin, under the barrel, it hardly moved as the body rocked: rigid from behind, the user's call, 2026-11-18).
+  kinds: ['lamellar'], hz: 1.2, damping: 0.22, trail: 0.02, reach: 0.16, lift: 0.7, jump: 0.7, top: 0.8, hem: 0.42, curve: 1.3,
+  hang: [-0.42, 1.0, 0],
+  // `flare`: the skirt flaring out from the horse as it lags his rise and fall each stride (m out per m of the vertical lag;
+  // `tuck` of it inward, the panels laid back against him), the flanks out to the sides, the rump's panel behind `rear` and the
+  // breast's before `front` (× the withers, forward of the frame's origin) out behind and before: so from behind the skirt
+  // flaps out and in with the stride.
+  flare: 1.6, tuck: 0.3, rear: -0.35, front: 0.25,
   twistHz: 1.3, twistDamping: 0.3, twistReach: 0.12, pivot: -0.05,
 };
 
@@ -200,7 +209,7 @@ const bardTurn = new THREE.Quaternion();
 function updateBardSwing(swing, frame, dt) {
   const spec = BARD_SWAY;
   frame.updateMatrixWorld(true);
-  frame.getWorldPosition(bardWorld);
+  bardWorld.set(spec.hang[0] * swing.withers, spec.hang[1] * swing.withers, spec.hang[2] * swing.withers).applyMatrix4(frame.matrixWorld);
   const target = [bardWorld.x, bardWorld.y, bardWorld.z];
   const moved = swing.at ? Math.hypot(target[0] - swing.was[0], target[1] - swing.was[1], target[2] - swing.was[2]) : Infinity;
   if (!swing.at || moved > spec.jump || !(dt > 0)) {
@@ -247,6 +256,7 @@ function swayBard(material, swing, withers) {
   const top = (BARD_SWAY.top * withers).toFixed(4);
   const span = ((BARD_SWAY.top - BARD_SWAY.hem) * withers).toFixed(4);
   const pivot = (BARD_SWAY.pivot * withers).toFixed(4);
+  const [rear, front] = [BARD_SWAY.rear, BARD_SWAY.front].map((share) => (share * withers).toFixed(4));
   material.onBeforeCompile = (shader, renderer) => {
     before?.call(material, shader, renderer);
     shader.uniforms.uBardSwing = swing.uniform;
@@ -259,6 +269,11 @@ float bardTurn = uBardTwist * bardHang;
 vec2 bardAt = transformed.xz - vec2( ${pivot}, 0.0 );
 transformed.xz = vec2( ${pivot}, 0.0 ) + vec2( bardAt.x * cos( bardTurn ) + bardAt.y * sin( bardTurn ), - bardAt.x * sin( bardTurn ) + bardAt.y * cos( bardTurn ) );
 transformed += uBardSwing * bardHang;
+vec2 bardOut = vec2( position.x > ${front} ? position.x - ${front} : ( position.x < ${rear} ? position.x - ${rear} : 0.0 ), position.z );
+bardOut /= max( length( bardOut ), 1e-4 );
+float bardFlare = uBardSwing.y * ${BARD_SWAY.flare.toFixed(2)};
+if ( bardFlare < 0.0 ) bardFlare *= ${BARD_SWAY.tuck.toFixed(2)};
+transformed.xz += bardOut * bardFlare * bardHang;
 #include <morphtarget_vertex>`,
     );
   };
@@ -349,7 +364,7 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
   const owned = [];
   const bard = (tile) => bardMaterial(view, tile, horse.finish);
   // A swaying bard (BARD_SWAY): the body's pieces in materials of this horse's own, reading its swing.
-  const swaying = !low && BARD_SWAY.kinds.includes(horse.barding) ? bardSwing() : null;
+  const swaying = !low && BARD_SWAY.kinds.includes(horse.barding) ? { ...bardSwing(), withers: W } : null;
   if (swaying) {
     const own = { ...materials, soft: swayBard(doubleSided(surface(0xffffff, { vertexColors: true })), swaying, W), metal: swayBard(doubleSided(steelMaterial(view.steelEnv, { vertexColors: true })), swaying, W) };
     const meshes = horsePart(frame, parts.body, own, { ink, bard: (tile) => swayBard(makeBardMaterial(view, tile, horse.finish), swaying, W) });
