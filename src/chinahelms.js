@@ -239,16 +239,25 @@ export const QING_HOOD = {
 
 /**
  * The Ming retainer's hood under his helmet (MING_OFFICER_HELMS retainerBowl): the banners' hood (QING_HOOD) in its shape,
- * the flaps brought further forward over the cheeks and closed over the ears (no ear hole), hanging a little lower: the
- * studded red cloth of the user's second photograph, the steel scales of the first. Of the coat's own stuff (wardrobe.js
- * mingHelm; chinahelmview.js buildQingHood `scales`: overlapping steel scales in rows, `scale` their size and pitch).
+ * the flaps brought further forward over the cheeks and closed over the ears (no ear hole), hanging a little lower, and no
+ * collar (the coat's steel neck guard in front of the throat in its place): the
+ * hood of the coat's armour (outfits.js mingEliteDesign `aventail`): the brigandine's studded cloth (the user's second
+ * photograph), lamellae laced in rows (the first), or mail (the third, a surviving helmet); chinahelmview.js buildQingHood.
  */
 export const MING_ELITE_HOOD = {
   ...QING_HOOD,
-  flaps: { from: 0.25, to: 0.64, hem: -1.36 },
-  back: { from: 0.67, hem: -1.4 },
+  // (Down past the nape onto the coat's collar behind: no steel band round the neck under it.)
+  flaps: { from: 0.25, to: 0.64, hem: -1.5 },
+  back: { from: 0.62, hem: -1.85 },
+  flare: [1.22, 1.32],
   ear: null,
-  scale: { pitch: 0.13, size: 0.085 },
+  // No collar: the throat under the coat's steel neck guard (loftbody.js ELITE_NECK_GUARD).
+  collar: null,
+  // The lamellar hood's plates (head radii): `width` round, `height` down, `thick`, in rows `down` apart (each row's foot
+  // over the head of the row below), `across` apart round; tipped out at the foot by `tip` (rad). The mail hood's rings:
+  // `ring` (head radii across one ring).
+  lamellae: { width: 0.1, height: 0.2, thick: 0.018, across: 0.115, down: 0.15, tip: 0.3 },
+  ring: 0.085,
 };
 
 /**
@@ -262,6 +271,14 @@ export function qingHoodSheets(hood = QING_HOOD) {
   const { flaps, back, collar } = hood;
   // The collar's top dips under the chin: lowest at the front, highest behind.
   const collarTop = (phi) => collar.top[1] + (collar.top[0] - collar.top[1]) * Math.max(0, Math.cos(phi)) ** 2;
+  // (A hood without its collar, `collar: null`: the Ming retainer's, his throat under the coat's steel neck guard.)
+  if (!collar) {
+    return [
+      sheet([flaps.from * Math.PI, flaps.to * Math.PI], flat(hood.top), flat(flaps.hem), hood.ellipse, hood.flare),
+      sheet([-flaps.to * Math.PI, -flaps.from * Math.PI], flat(hood.top), flat(flaps.hem), hood.ellipse, hood.flare),
+      sheet([back.from * Math.PI, (2 - back.from) * Math.PI], flat(hood.top), flat(back.hem), hood.ellipse, hood.flare, 0, 'back'),
+    ];
+  }
   return [
     sheet([flaps.from * Math.PI, flaps.to * Math.PI], flat(hood.top), flat(flaps.hem), hood.ellipse, hood.flare),
     sheet([-flaps.to * Math.PI, -flaps.from * Math.PI], flat(hood.top), flat(flaps.hem), hood.ellipse, hood.flare),
@@ -284,7 +301,8 @@ export function qingHoodPoint(sheet, phi, s, out = 0) {
  * from the last, as the coat's are), clear of the binding by `margin`, of the bowl's rim and of the ear holes.
  */
 export function qingHoodStuds(hood = QING_HOOD) {
-  const { pitch, margin } = hood.studs;
+  // (`down`: the rows' own pitch, where it differs from the pitch round; `stagger`: false lines the rows up.)
+  const { pitch, margin, down = pitch, stagger = true } = hood.studs;
   const studs = [];
   for (const sheet of qingHoodSheets(hood)) {
     const [from, to] = sheet.phi;
@@ -292,9 +310,9 @@ export function qingHoodStuds(hood = QING_HOOD) {
     const tall = Math.abs(sheet.hem(middle) - sheet.top(middle));
     // The flaps' tops are inside the bowl: their studs start below its rim (y 0).
     const start = sheet.kind === 'collar' ? margin / tall : (hood.top + 0.04) / tall;
-    const rows = Math.floor((tall * (1 - start) - margin) / pitch) + 1;
+    const rows = Math.floor((tall * (1 - start) - margin) / down) + 1;
     for (let row = 0; row < rows; row += 1) {
-      const s = start + (row * pitch) / tall;
+      const s = start + (row * down) / tall;
       const a = sheet.ellipse[0] + (sheet.flare[0] - sheet.ellipse[0]) * s;
       const b = sheet.ellipse[1] + (sheet.flare[1] - sheet.ellipse[1]) * s;
       // Radians to a stud's pitch here (by the ellipse's mean radius), so the studs are as far apart round as down.
@@ -302,7 +320,7 @@ export function qingHoodStuds(hood = QING_HOOD) {
       const inset = margin / ((a + b) / 2);
       const span = to - from - 2 * inset;
       const columns = Math.max(1, Math.floor(span / step) + 1);
-      const shift = row % 2 && columns > 1 ? step / 2 : 0;
+      const shift = stagger && row % 2 && columns > 1 ? step / 2 : 0;
       const offset = (span - (columns - 1) * step) / 2;
       for (let column = 0; column < columns - (shift ? 1 : 0); column += 1) {
         const phi = from + inset + offset + shift + column * step;

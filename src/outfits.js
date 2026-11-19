@@ -300,10 +300,12 @@ function mingEliteInfantryDesign(label, cloth, bind = shade(cloth, 0.35), extra 
 // Elite: the coat, the coif's cloth, the steel.
 // `helm`: a steel neck guard (`neck: 'steel'`) in place of the padded coif, and a steel face mask.
 // `look`: the same protection drawn as scale armour (`kind: 'mingScale'`), or as lamellar (`kind: 'mingEliteLamellar'`).
-// The helm's flaps are of the coat: the brigandine's own cloth and gilt rivets, or steel where the coat is scale (`flapSteel`).
+// The helm's hood (`aventail`) is of the coat's armour: the brigandine's own cloth and gilt rivets ('brigandine'), lamellae
+// laced in the coat's lacing where the coat is scale or lamellar ('lamellar': a scale coat under a lamellar hood, the user's
+// first photograph), or mail ('mail', `helm.aventail`: the surviving helmet of the third), in the coat's steel.
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
-  const scale = look.kind === 'mingScale';
-  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: scale ? steel : cloth, flapSteel: scale, tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
+  const aventail = helm.aventail ?? (look.kind === 'mingScale' || look.kind === 'mingEliteLamellar' ? 'lamellar' : 'brigandine');
+  return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: aventail === 'brigandine' ? cloth : steel, aventail, lace: look.lace ?? '#3a2016', tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
 }
 // The Eight Banners (the Later Jin's, 1615 on; the Qing's): the banner's coat in its colour (`cloth`), bound in its
 // border (`trim`: red, or white on the red banner; a plain banner's bound in its own colour, a shade darker), the
@@ -1562,7 +1564,7 @@ export const OUTFITS = {
     designs: [
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
       mingEliteDesign('Imperial blue', '#1f2f6a', '#e8e0cc', '#a7adb6'),
-      mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { mask: true, maskDesign: 'shoumian' }),
+      mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { mask: true, maskDesign: 'shoumian', aventail: 'mail' }),
       mingEliteDesign('Gilt scale', '#5a1a14', '#7a1418', '#b8a066', {}, { kind: 'mingScale', lace: '#3a2016' }),
       mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true, maskDesign: 'shoumian' }, { kind: 'mingScale', lace: '#1a1c24' }),
       // Qi Jiguang's and his household guards' (Qi Jiguang's level): the elite's protection drawn as

@@ -1034,10 +1034,10 @@ const LACED = { rows: ['steel', 'lace'], kozane: true };
 const SPLINTED_SHIN = { splints: 7, base: 'top', tie: 'lace' };
 const SPLINTED_SLEEVE = { splints: 5, base: 'top' };
 const MANICA = { rows: ['steel', 'lace'] };
-// The Ming elite's neck guard: steel lames lying over the shoulders and the
-// top of the chest, each stepping out over the one below, with a steel band
-// round the throat (the kit's `collar`).
-const ELITE_GORGET = [0.8, 1.0, 1.36, { lames: 3, base: 'steel2' }];
+// The Ming elite's neck guard: two steel lames in front of the throat and the top of the chest, the lower stepped out
+// over the upper, open at the back and the sides (`front`: the half width round it covers, rad; the user's first
+// photograph of a general's household man); no band round the neck (the hood's flaps cover it behind).
+const ELITE_NECK_GUARD = [[0.94, 1.0, 1.3, { base: 'steel2', front: 0.7 }], [0.9, 0.955, 1.34, { base: 'steel2', front: 0.55 }]];
 // The Ming elite's arms: a great spaulder of steel lames over the shoulder,
 // and lames down the upper arm (the forearm's to the wrist, in the kit).
 const ELITE_ARM = [[-0.24, 1.02, 1.42, { lames: 6, base: 'steel2' }], [-0.2, 0.38, 1.62, { lames: 3, base: 'steel2' }], [0.3, 0.62, 1.58, { lames: 3, base: 'steel2' }]];
@@ -1294,9 +1294,9 @@ export const ARMOR_KINDS = {
   // below the knee, hung point down, the steel mirror over the heart; the
   // arms and the neck guard as the brigandine elite's.
   mingScale: {
-    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, pointDown: true, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }], ELITE_GORGET],
+    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, pointDown: true, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }], ...ELITE_NECK_GUARD],
     skirt: [0.95, 0.6, 1.34, { lamellae: 30, pointDown: true, edge: 'gold', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], 
-    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], collar: 'steel',
+    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], 
     mirrors: [[0.62, 0, 0.3, 1.42, 'steel']],
   },
   // The elite in lamellar (Qi Jiguang's and his guards', Qi Jiguang's level):
@@ -1304,9 +1304,9 @@ export const ARMOR_KINDS = {
   // lacing showing (`lace`), the steel mirror over the heart; the arms and
   // the neck guard as the brigandine elite's. The same protection, drawn so.
   mingEliteLamellar: {
-    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }], ELITE_GORGET],
+    trunk: [[-0.06, 0.97, 1.22, { lamellae: 30, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.38, { buckle: 'gold', base: 'leather' }], ...ELITE_NECK_GUARD],
     skirt: [0.95, 0.6, 1.34, { lamellae: 30, edge: 'gold', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
-    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], collar: 'steel',
+    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], 
     mirrors: [[0.62, 0, 0.3, 1.42, 'steel']],
   },
   // Ming elite: the long brigandine coat to below the knee, its plates
@@ -1314,11 +1314,11 @@ export const ARMOR_KINDS = {
   // dark edge, split for riding; a round steel mirror (huxinjing) over the
   // heart, a buckled belt; a great spaulder of steel lames over each
   // shoulder and lames down the arm to the wrist (ELITE_ARM); the steel
-  // neck guard of lames over the shoulders (ELITE_GORGET).
+  // neck guard in front of the throat (ELITE_NECK_GUARD).
   mingElite: {
-    trunk: [[-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', opening: 0.012, mirror: [0.62, 0.15, 'steel'] }], [0.14, 0.24, 1.32, { buckle: 'gold', base: 'leather' }], ELITE_GORGET],
+    trunk: [[-0.06, 0.97, 1.22, { studded: 28, base: 'cloth', edge: 'cloth2', opening: 0.012, mirror: [0.62, 0.15, 'steel'] }], [0.14, 0.24, 1.32, { buckle: 'gold', base: 'leather' }], ...ELITE_NECK_GUARD],
     skirt: [0.95, 0.6, 1.34, { studded: 30, base: 'cloth', edge: 'cloth2', gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }], 
-    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], collar: 'steel',
+    upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], 
     mirrors: [[0.62, 0, 0.3, 1.36, 'steel']],
   },
   // Ō-yoroi: its box, skirt panels and shoulder boards are rigid pieces of
@@ -4531,9 +4531,11 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     // (A spaulder or a shoulder plate from above the shoulder's joint is closed over the shoulder, a low dome on a fitted body
     // (capsFollow): left open, its mouth showed dark inside above the shoulder once the sleeve under it was tucked under the coat.)
     const overShoulder = slot === 'upperArm' && rings[0].t < 0 && (material === 'steel' || material === 'armor');
+    // A piece over the front alone (`front`: the half width round it covers, rad, from the front): open behind.
+    const frontOnly = paint?.front ? { holes: (t, angle) => Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle))) > paint.front } : {};
     if (tile && tile !== 'plate' && (material === 'steel' || material === 'armor')) {
       const colour = paint?.rows && !paint.mon ? paint.rows[0] : paintFor(paint, armor);
-      loft(mesh, rings, sides, { color: colour, inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile) });
+      loft(mesh, rings, sides, { color: colour, inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), uv: tileUv(rings, inflate, tile), ...frontOnly });
       if (paint?.lames) lamesOn(mesh, rings, inflate, paint, boned);
       // A plate piece whose edges are turned and riveted (detailmaps.js ARMOUR_EDGES: the foot soldier's spaulders, vambraces, cops).
       if (material === 'steel' && ARMOUR_EDGES[armor?.kind]?.includes(slot)) harnessEdgesOn(mesh, rings, inflate, sides, boned);
@@ -4541,7 +4543,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
-    loft(mesh, rings, split ? split.sides : sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), ...(split ? { holes: split.holes } : {}) });
+    loft(mesh, rings, split ? split.sides : sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), ...(split ? { holes: split.holes } : frontOnly) });
     if (split) {
       const { edge, stand } = legPanelsOn(mesh, rings, inflate, paint, boned, sides, split, panel(studsDrawn));
       // The front panel's own rivet heads, in columns down it as the skirt's.

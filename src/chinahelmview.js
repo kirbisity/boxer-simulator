@@ -670,17 +670,49 @@ function qingSheetMesh(sheet, [phi0, phi1], [s0, s1], out, material, r, { column
   return new THREE.Mesh(geometry, material);
 }
 
+let chinaMailCanvas = null;
+/** A material of mail (one row of rings, drawn once) over `material`, `across` rings round and `down` rings down. */
+function chinaMailOn(material, across, down) {
+  if (!chinaMailCanvas && typeof document !== 'undefined') {
+    chinaMailCanvas = document.createElement('canvas');
+    chinaMailCanvas.width = chinaMailCanvas.height = 64;
+    const c = chinaMailCanvas.getContext('2d');
+    c.fillStyle = '#141518';
+    c.fillRect(0, 0, 64, 64);
+    c.lineWidth = 6;
+    // Each ring through four others: two rows of rings, the second shifted half a ring.
+    for (const [x, y] of [[16, 16], [48, 16], [0, 48], [32, 48], [64, 48], [16, 80], [48, 80], [16, -16], [48, -16]]) {
+      c.strokeStyle = '#e4e6ea';
+      c.beginPath();
+      c.ellipse(x, y, 13, 11, 0, 0, Math.PI * 2);
+      c.stroke();
+    }
+  }
+  if (!chinaMailCanvas) return material;
+  const map = new THREE.CanvasTexture(chinaMailCanvas);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(Math.max(1, Math.round(across / 2)), Math.max(1, Math.round(down / 2)));
+  const mail = material.clone();
+  mail.map = map;
+  mail.needsUpdate = true;
+  return mail;
+}
+
 /**
  * The banners' hood (chinahelms.js QING_HOOD) under the helmet: the flaps over the ears and the neck and the collar round
  * the throat, of the coat's own cloth (`head.coif`; its meshes marked `userData.hoodCloth`, for the cloth atlas's stuff:
  * wardrobe.js), studded in rows with gilt heads (`head.gold`) as the coat is, bound at every edge in the coat's binding
  * (`bind`), an ear hole in each flap, the collar closed at the throat with frog buttons. Returns the meshes it added.
  */
-export function buildQingHood(group, head, r, steel, bind, { lowDetail = false, hood = QING_HOOD, scales = false } = {}) {
-  // Of steel scales (`scales`: the coat's steel, `head.coif`), or of the coat's cloth.
-  const cloth = scales
-    ? chinaFinish(steel, { colour: new THREE.Color(head.coif ?? 0xa7adb6).multiplyScalar(0.7).getHex(), metalness: 0.85, roughness: 0.4 }, null)
-    : surface(new THREE.Color(head.coif ?? 0x1f2a4a).getHex(), { roughness: 0.85 });
+export function buildQingHood(group, head, r, steel, bind, { lowDetail = false, hood = QING_HOOD, stuff = 'cloth' } = {}) {
+  // Of the coat's cloth (`stuff` 'cloth'); of lamellae, the lacing (`head.lace`) showing between them ('lamellar'); or of
+  // mail in the coat's steel (`head.coif`, 'mail').
+  const metalColour = new THREE.Color(head.coif ?? 0xa7adb6).getHex();
+  const cloth = stuff === 'lamellar'
+    ? surface(new THREE.Color(head.lace ?? 0x3a2016).getHex(), { roughness: 0.85 })
+    : stuff === 'mail'
+      ? chinaFinish(steel, { colour: metalColour, metalness: 0.75, roughness: 0.5 }, null)
+      : surface(new THREE.Color(head.coif ?? 0x1f2a4a).getHex(), { roughness: 0.85 });
   const binding = surface(new THREE.Color(bind).getHex(), { roughness: 0.8 });
   const dark = surface(0x0d0d10, { roughness: 0.9 });
   const gilt = chinaFinish(steel, { colour: head.gold ?? '#d2aa4c', metalness: 0.9, roughness: 0.32 }, null);
@@ -699,8 +731,10 @@ export function buildQingHood(group, head, r, steel, bind, { lowDetail = false, 
     const radius = (sheet.ellipse[0] + sheet.ellipse[1]) / 2;
     const across = hood.binding / radius;
     const down = hood.binding / tall;
-    const body = add(qingSheetMesh(sheet, [from, to], [0, 1], 0, cloth, r, { ...grain, columns: Math.max(4, Math.round(grain.columns * (to - from))) }));
-    body.userData.hoodCloth = !scales;
+    // Mail: its rings drawn on it, as many as its size holds.
+    const own = stuff === 'mail' && !lowDetail ? chinaMailOn(cloth, ((to - from) * radius) / hood.ring, tall / hood.ring) : cloth;
+    const body = add(qingSheetMesh(sheet, [from, to], [0, 1], 0, own, r, { ...grain, columns: Math.max(4, Math.round(grain.columns * (to - from))) }));
+    body.userData.hoodCloth = stuff === 'cloth';
     body.name = `helm-hood-${sheet.kind}`;
     // The binding: the hem, both edges, and the collar's top (the flaps' tops are inside the bowl).
     const strips = [[[from, to], [1 - down, 1]], [[from, from + across], [0, 1]], [[to - across, to], [0, 1]]];
@@ -721,31 +755,34 @@ export function buildQingHood(group, head, r, steel, bind, { lowDetail = false, 
       }
     }
   }
-  // The studs: gilt heads, a little flattened against the cloth; or the scales, steel, overlapping in rows, each a little
-  // broader than tall and lying nearly flat on the one below (its top tucked under the row above).
-  const scale = scales ? hood.scale ?? { pitch: 0.13, size: 0.085 } : null;
-  const studs = qingHoodStuds(scale ? { ...hood, studs: { ...hood.studs, pitch: scale.pitch, margin: hood.binding } } : hood);
-  const plate = scale ? chinaFinish(steel, { colour: new THREE.Color(head.coif ?? 0xa7adb6).getHex(), metalness: 0.9, roughness: 0.3 }, null) : gilt;
-  const heads = new THREE.InstancedMesh(new THREE.SphereGeometry((scale ? scale.size : hood.studs.size) * r, lowDetail ? 4 : 6, lowDetail ? 3 : 4), plate, studs.length);
+  // The studs: gilt heads, a little flattened against the cloth; or the lamellae, in rows, each row's foot over the head
+  // of the row below, tipped out a little at the foot; none on mail.
+  const plates = stuff === 'lamellar' ? hood.lamellae : null;
+  const studs = stuff === 'mail' ? [] : qingHoodStuds(plates ? { ...hood, studs: { ...hood.studs, pitch: plates.across, down: plates.down, margin: hood.binding, stagger: false } } : hood);
+  const plate = plates ? chinaFinish(steel, { colour: metalColour, metalness: 0.9, roughness: 0.3 }, null) : gilt;
+  const geometry = plates
+    ? new THREE.BoxGeometry(plates.width * r, plates.height * r, plates.thick * r)
+    : new THREE.SphereGeometry(hood.studs.size * r, lowDetail ? 4 : 6, lowDetail ? 3 : 4);
+  const heads = new THREE.InstancedMesh(geometry, plate, Math.max(1, studs.length));
+  heads.count = studs.length;
   const place = new THREE.Object3D();
   studs.forEach(([x, y, z], index) => {
     place.position.set(x * r, y * r, z * r);
     place.lookAt(place.position.clone().add(new THREE.Vector3(x, 0, z)));
-    if (scale) {
-      place.translateY(-scale.size * 0.3 * r);
-      place.rotateX(-0.35);
-      place.scale.set(1.15, 1, 0.28);
+    if (plates) {
+      place.translateZ(plates.thick * r);
+      place.rotateX(-plates.tip);
     } else place.scale.set(1, 1, 0.6);
     place.updateMatrix();
     heads.setMatrixAt(index, place.matrix);
   });
   heads.userData.noOutline = true;
-  heads.name = scale ? 'helm-hood-scales' : 'helm-hood-studs';
+  heads.name = plates ? 'helm-hood-lamellae' : 'helm-hood-studs';
   add(heads);
   // The frog buttons closing the collar at the throat: a dark cord loop across the split, a gilt knot at its end.
   const collar = qingHoodSheets(hood).find((sheet) => sheet.kind === 'collar');
   const cord = surface(0x141416, { roughness: 0.85 });
-  for (const y of hood.frogs) {
+  for (const y of collar ? hood.frogs : []) {
     const s = (collar.top(0) - y) / (collar.top(0) - collar.hem(0));
     const [left, right] = [0.08, -0.08].map((phi) => new THREE.Vector3(...qingHoodPoint(collar, phi, s, lip * 2)).multiplyScalar(r));
     const loop = add(new THREE.Mesh(new THREE.CylinderGeometry(0.018 * r, 0.018 * r, left.distanceTo(right), 5), cord));

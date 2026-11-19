@@ -19,11 +19,15 @@ test('the Ming elite turns blades and arrows nearly as plate does; the brigandin
     // (The vest's plates as the coat's: a point the same; the coat's quilting deeper.)
     assert.ok(elite.protection[kind] >= brigandine[kind] && (kind === 'pierce' || elite.protection[kind] > brigandine[kind]), kind);
   }
-  // Some elites wear the steel mask; all the steel neck guard (laminated, over the shoulders) and the throat band.
+  // Some elites wear the steel mask; all the steel neck guard in front of the throat, open behind (`front`), and no band
+  // round the neck (the hood's flaps over it behind); the hood of the coat's armour.
   assert.ok(elite.designs.some((design) => design.head.mask));
   for (const design of elite.designs) {
     const kit = ARMOR_KINDS[design.armor.kind];
-    assert.ok(kit.collar === 'steel' && kit.trunk.some((piece) => piece[3]?.lames), design.label);
+    const guard = kit.trunk.filter((piece) => piece[3]?.front);
+    assert.ok(guard.length && guard.every((piece) => piece[3].front < Math.PI / 2 && piece[1] >= 0.85), design.label);
+    assert.ok(!kit.collar, design.label);
+    assert.ok(['brigandine', 'lamellar', 'mail'].includes(design.head.aventail), design.label);
   }
 });
 

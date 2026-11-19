@@ -1906,10 +1906,11 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         }
       } else {
         // The hood: the banners' (chinahelms.js MING_ELITE_HOOD), its flaps closer over the cheeks and the ears, the collar
-        // round the throat; of the coat's own stuff, its cloth studded in gilt, or its steel in scales (`flapSteel`), the
-        // edges bound in the cloth a shade darker.
-        const bind = new THREE.Color(head.coif ?? 0x1f2a4a).multiplyScalar(head.flapSteel ? 0.55 : 0.75).getHex();
-        for (const mesh of buildQingHood(group, head, r, steel, bind, { lowDetail, hood: MING_ELITE_HOOD, scales: Boolean(head.flapSteel) })) {
+        // round the throat; of the coat's armour (`aventail`: the brigandine's studded cloth, lamellae, or mail), the edges
+        // bound a shade darker.
+        const stuff = head.aventail === 'lamellar' || head.aventail === 'mail' ? head.aventail : 'cloth';
+        const bind = new THREE.Color(stuff === 'lamellar' ? head.lace ?? 0x3a2016 : head.coif ?? 0x1f2a4a).multiplyScalar(stuff === 'cloth' ? 0.75 : 0.55).getHex();
+        for (const mesh of buildQingHood(group, head, r, steel, bind, { lowDetail, hood: MING_ELITE_HOOD, stuff })) {
           if (mesh.userData.hoodCloth && head.hoodStuff && DETAIL_MAPS.on && !lowDetail) clothPropMaterial(mesh.material, head.hoodStuff);
         }
       }
