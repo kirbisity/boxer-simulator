@@ -62,6 +62,7 @@ export const KIT_ARMS = {
   samuraiTosei: { second: ['katana', 'wakizashi'], sword: 'katana', short: 'wakizashi' },
   ashigaru: { second: ['wakizashi'], sword: 'wakizashi', short: 'wakizashi' },
   ronin: { second: ['wakizashi', 'katana'], sword: 'katana', short: 'wakizashi' },
+  kensei: { second: ['wakizashi'], sword: 'katana', short: 'wakizashi' },
   sohei: { second: ['katana', 'wakizashi'], sword: 'katana', short: 'wakizashi' },
   // China and the Manchu: the dao (the Qi family's long sabre for his gunners), the jian of the Han; the iron mace at the saddle.
   mingBrigandine: { second: ['dao', 'dagger'], sword: 'dao', short: 'dagger' },

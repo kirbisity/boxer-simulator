@@ -24,7 +24,7 @@ export const REGION_PLACES = {
 /** The regions each outfit kind (outfits.js) draws faces from: the first is the commonest; a fighter gets one or two of them, blended. */
 export const KIT_REGIONS = {
   // Japan
-  samurai: ['japan'], ashigaru: ['japan'], samuraiTosei: ['japan'], oyoroi: ['japan'], ronin: ['japan'], yakuza: ['japan'], sohei: ['japan'], sumo: ['japan'],
+  samurai: ['japan'], ashigaru: ['japan'], samuraiTosei: ['japan'], oyoroi: ['japan'], ronin: ['japan'], kensei: ['japan'], yakuza: ['japan'], sohei: ['japan'], sumo: ['japan'],
   wokou: ['japan', 'china'], wokouArmoured: ['japan', 'china'],
   // China
   mingGarrison: ['china', 'taiwan'], mingBrigandine: ['china', 'taiwan'], mingEliteInfantry: ['china'], mingElite: ['china', 'taiwan'], mingIronLamellar: ['china', 'taiwan'],

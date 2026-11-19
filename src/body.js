@@ -411,10 +411,19 @@ export const PRESETS = {
   // sword dance was one of the "three wonders" of Xuanzong's court (with Li
   // Bai's poems and Zhang Xu's script), and he fought with the jian on the
   // frontier. The wuxia hero: no armour, tall, strong, very quick.
+  // (His build and look the user's, 2026-11-19: leaner, long hair loose, clean-shaven, a fair face of China.)
   wuxia: {
-    name: 'Pei Min', style: 'wuxia', sex: 'male', heightCm: 180, frame: 'large', age: 30, exercise: 0.67, calories: 4500, skill: 1,
+    name: 'Pei Min', style: 'wuxia', sex: 'male', heightCm: 180, frame: 'medium', age: 30, exercise: 0.72, calories: 4400, skill: 1,
     outfit: { kind: 'wuxia', design: 0 }, accessories: [],
-    look: { skinTone: 'lightTan', hairStyle: 'bun', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown' },
+    look: { skinTone: 'light', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown', faceShape: null, faceRegion: 'china', skinShade: 1.4 },
+  },
+  // Miyamoto Musashi (1584-1645), the Sword Saint (kensei): some sixty duels and never beaten, by his own account (Gorin no sho,
+  // 1645), Sasaki Kojirō killed on Ganryūjima in 1612, when he was 28. A big man for his day (the accounts make him near six
+  // shaku, ~180 cm), lean and hard. No armour, no helmet: a duellist in kosode and hakama, the katana in his hands.
+  swordSaint: {
+    name: 'Miyamoto Musashi', style: 'katana', sex: 'male', heightCm: 180, frame: 'medium', age: 28, exercise: 0.78, calories: 3900, skill: 1,
+    outfit: { kind: 'kensei', design: 0 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'sakayaki', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown', faceRegion: 'japan' },
   },
   // Guan Yu (d. 220), the Three Kingdoms general of the Romance: "nine chi
   // tall", a face the colour of a ripe jujube (here a ruddy tan, a soldier's

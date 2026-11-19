@@ -1772,6 +1772,21 @@ export const OUTFITS = {
       { label: 'White robe, blue sash', special: true, top: { kind: 'longsleeve', color: '#e9e4d8' }, bottom: { kind: 'pants', color: '#d9d3c4' }, armor: { kind: 'wuxiaRobe', color: '#e9e4d8', cloth: '#ebe6da', cloth2: '#3f5f82' }, feet: { kind: 'compactBoot', color: '#1a1614' } },
     ],
   },
+  // The sword saint's dress (Miyamoto Musashi's, as his self-portrait and the Edo prints show a duellist): a kosode and the
+  // wide hakama, a sash with the pair of swords through it at the left hip, straw sandals; no armour, no helmet. A master of
+  // the sword (`skill` 0.95, the wuxia hero's tier and above the rōnin's), and a man who answered every challenge.
+  kensei: {
+    skill: 0.95,
+    faction: 'japanese',
+    label: 'Sword saint — kosode and hakama', movement: 'excellent', fists: 'bare',
+    sidearm: 'wakizashi',
+    hairStyle: 'sakayaki',
+    protection: { blunt: 0, cut: 0.05, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } },
+    courage: 0.9,
+    designs: [
+      { label: 'Dark kosode, grey hakama', special: true, top: { kind: 'kosode', color: '#2a2a30' }, bottom: { kind: 'hakama', color: '#5a5a60', long: true }, feet: { kind: 'sandal', color: '#5a3a22' }, extras: [{ kind: 'sashEnds', color: '#1a1a1e' }, { kind: 'daisho', color: '#15151a', cord: '#3a2a1c' }] },
+    ],
+  },
   // ---- Rome: the legions of the early Empire (1st century AD) ----
   // A legionary: the segmented iron cuirass (lorica segmentata) over a red
   // tunic, the Imperial Gallic helmet with its cheek pieces and deep neck

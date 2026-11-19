@@ -156,6 +156,8 @@ export const NAMES_KIT = {
   'Red robe, iron lamellar': '红袍，铁札甲',
   'Han cavalry — iron lamellar': '汉骑——铁札甲',
   'Wuxia — robe and sash': '武侠——长衫束带',
+  'Sword saint — kosode and hakama': '剑圣——小袖袴',
+  'Dark kosode, grey hakama': '深色小袖，灰袴',
   'White robe, blue sash': '白衫，蓝腰带',
   'Legionary — lorica segmentata': '军团兵——环片甲',
   'Segmentata, red tunic': '环片甲，红短袍',

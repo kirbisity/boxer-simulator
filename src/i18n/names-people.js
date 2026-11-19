@@ -38,6 +38,7 @@ export const NAMES_PEOPLE = {
   'Iron Pagoda': '铁浮屠',
   'Han Crossbowman': '汉军弩手',
   'Wuxia Swordsman': '武侠剑客',
+  'Sword Saint': '剑圣',
   'Wokou Pirate': '倭寇',
   'Ming Elite Infantry': '戚家军',
   'Ming Elite Musketeer': '精锐鸟铳手',
