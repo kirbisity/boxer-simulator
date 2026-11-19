@@ -4289,7 +4289,14 @@ export function step(world, dt) {
   for (const fighter of world.fighters) {
     if (fighter.detail !== 'proxy' || fighter.dormant) continue;
     if (fighter.mount) carryProxyRider(world, fighter, dt);
-    else if (proxyBeat(world, fighter)) poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
+    else if (proxyBeat(world, fighter)) {
+      // The pose he is leaving, and when: drawn between it and the new one until the next beat (main.js smoothProxies), so on
+      // screen he moves every frame though he is posed every `proxyEvery` steps.
+      (fighter.proxyFrom ??= new Float32Array(fighter.x.length)).set(fighter.x);
+      fighter.proxyDirs = [fighter.weapon?.dir?.slice() ?? null, fighter.offWeapon?.dir?.slice() ?? null];
+      fighter.proxyAt = world.steps;
+      poseProxy(fighter, dt * WORLD.tiers.proxyEvery);
+    }
   }
   for (const horse of world.horses) {
     horseTimers(world, horse, dt);

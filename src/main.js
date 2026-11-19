@@ -1297,11 +1297,49 @@ function showCameraBar(watching) {
   $('#frame-all').hidden = !free;
 }
 
+/**
+ * A proxy (physics.js poseProxy: a far man of a big battle, posed without dynamics every WORLD.tiers.proxyEvery steps) drawn
+ * the share of the way from the pose he left to the one he was given that the clock has gone since (`since`: the share of a
+ * step past the last), a beat behind: posed only every other step, drawn so he stood still on the steps between and moved
+ * in jerks. Only the picture: the pose is put back after drawing. Its cost: a lerp of his points (~60 numbers) each frame.
+ */
+function smoothProxies(world, since) {
+  const every = WORLD.tiers.proxyEvery;
+  if (!world || every <= 1) return () => {};
+  const kept = [];
+  for (const fighter of world.fighters) {
+    if (fighter.detail !== 'proxy' || fighter.dormant || fighter.mount || !fighter.proxyFrom) continue;
+    const beats = world.steps - fighter.proxyAt;
+    if (beats < 0 || beats >= every) continue;
+    const share = Math.min(1, (beats + since) / every);
+    if (share >= 1) continue;
+    const now = fighter.x.slice();
+    const dirs = [fighter.weapon?.dir, fighter.offWeapon?.dir];
+    kept.push({ fighter, now, dirs });
+    const from = fighter.proxyFrom;
+    for (let at = 0; at < now.length; at += 1) fighter.x[at] = from[at] + (now[at] - from[at]) * share;
+    [fighter.weapon, fighter.offWeapon].forEach((weapon, which) => {
+      const then = fighter.proxyDirs?.[which];
+      if (weapon?.dir && then) weapon.dir = unit(blend(then, weapon.dir, share));
+    });
+  }
+  return () => {
+    for (const { fighter, now, dirs } of kept) {
+      fighter.x.set(now);
+      if (fighter.weapon && dirs[0]) fighter.weapon.dir = dirs[0];
+      if (fighter.offWeapon && dirs[1]) fighter.offWeapon.dir = dirs[1];
+    }
+  };
+}
+
 function draw(dt, { render: drawIt = true } = {}) {
-  const restore = blendWorld(state.world, state.before, state.paused ? 1 : state.accumulator / STEP);
+  const since = state.paused ? 1 : state.accumulator / STEP;
+  const restore = blendWorld(state.world, state.before, since);
+  const restoreProxies = smoothProxies(state.world, since);
   try {
     drawWorld(dt, drawIt);
   } finally {
+    restoreProxies();
     restore();
   }
 }
