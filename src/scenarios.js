@@ -666,7 +666,7 @@ export const ARMIES = {
   legion: {
     label: 'The legion',
     ranks: {
-      legionary: { label: 'Legionary', kinds: ['legionary'], styles: ['pilum'], make: (random) => drilledSoldier(PRESETS.legionary, random) },
+      legionary: { label: 'Legionary', kinds: ['legionary'], styles: ['legionary'], make: (random) => drilledSoldier(PRESETS.legionary, random) },
       centurion: { label: 'Centurion', kinds: ['centurion'], styles: ['centurion'], make: (random) => drilledSoldier(PRESETS.centurion, random) },
       ala: { label: 'Auxiliary horse', kinds: ['romanAuxiliary'], mounted: true, styles: ['longsword', 'spear'], make: (random, style) => romanHorseman(random, style) },
     },
@@ -808,7 +808,7 @@ export const ARMIES = {
   crassus: {
     label: "Crassus's army",
     ranks: {
-      legionary: { label: 'Legionary', kinds: ['republicanLegionary'], styles: ['pilum'], make: (random) => republicanLegionary(random) },
+      legionary: { label: 'Legionary', kinds: ['republicanLegionary'], styles: ['legionary'], make: (random) => republicanLegionary(random) },
       gauls: { label: 'Gallic horse', kinds: ['romanAuxiliary'], mounted: true, styles: ['spear', 'longsword'], make: (random, style) => gallicHorseman(random, style) },
     },
   },

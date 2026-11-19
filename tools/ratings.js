@@ -35,11 +35,15 @@ export const RATING = {
   settle: { minBouts: Number(process.env.RATING_MIN_BOUTS ?? 4), share: 0.85 },
   // The panel besides the references: the men nearest these quantiles of the last table's scores. Five spread over the
   // range (a 100-fold one, a macaque to a bayara) put a near match within about ×2-3 of every man, where a pairing says most.
-  panelQuantiles: [0.1, 0.3, 0.5, 0.7, 0.9],
+  // (0.97 too: the strongest men must meet someone above them, or a cluster that beats all else floats up unbounded.)
+  panelQuantiles: [0.1, 0.3, 0.5, 0.7, 0.9, 0.97],
   // The panel's own pairings are fought to this many bouts: every rating hangs on where the panel sits.
   panelBouts: Number(process.env.RATING_PANEL_BOUTS ?? 12),
-  // Then each man against this many nearest by fitted strength (not already met).
+  // Then each man against this many nearest by fitted strength (not already met), at least `bracket` of them above him and as
+  // many below where there are any: a man met only by weaker men (or stronger) has nothing pinning his level from the other
+  // side, and his score drifts with whichever few close calls the draw gave him (×2-3 run to run, 2026-11-19).
   nearest: Number(process.env.RATING_NEAREST ?? 2),
+  bracket: 2,
   // A bout's score (0..1, to the first man): `health` of it from how much of each was left at the end (half and half: his health
   // left less the other's, a man out having none), the rest from who won (a win 1, a draw a half). A win at full health is 1;
   // a win barely alive ~0.75; a draw the healthier ahead.
@@ -254,7 +258,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     games.push(...await fight('2. everyone against the panel', keys.filter((key) => !panel.includes(key)).flatMap((key) => panel.map((member) => [key, member]))));
     let strength = fitAll(games, 'maximus');
     // 3. Everyone against the nearest by that fit.
-    const nearestTo = (key) => keys.filter((other) => other !== key && !fought.has(keyOf(key, other))).sort((x, y) => Math.abs(Math.log(strength[x] / strength[key])) - Math.abs(Math.log(strength[y] / strength[key]))).slice(0, RATING.nearest);
+    const nearestTo = (key) => {
+      const near = keys.filter((other) => other !== key && !fought.has(keyOf(key, other))).sort((x, y) => Math.abs(Math.log(strength[x] / strength[key])) - Math.abs(Math.log(strength[y] / strength[key])));
+      const above = near.filter((other) => strength[other] > strength[key]).slice(0, RATING.bracket);
+      const below = near.filter((other) => strength[other] <= strength[key]).slice(0, RATING.bracket);
+      const chosen = [...new Set([...above, ...below])];
+      for (const other of near) if (chosen.length < Math.max(RATING.nearest, chosen.length) && !chosen.includes(other)) chosen.push(other);
+      return chosen;
+    };
     games.push(...await fight('3. everyone against the nearest', keys.flatMap((key) => nearestTo(key).map((other) => [key, other]))));
     strength = fitAll(games, 'maximus');
     const provisional = { ...strength };

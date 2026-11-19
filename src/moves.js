@@ -2109,7 +2109,8 @@ STYLES.yari = { ...STYLES.spear, label: 'Yari', weapon: 'yari' };
 STYLES.flintlock = { ...STYLES.matchlock, label: 'Flintlock musket', weapon: 'flintlock' };
 // The legionary before the lines meet: the pilum held up behind the scutum, thrown from within 15 m (`reach`), then his
 // sword drawn and the legionary's ways (`fallback`: physics.js rearm, the pilum gone).
-STYLES.pilum = { ...STYLES.crossbow, label: 'Pilum', weapon: 'pilum', shield: 'scutum', shieldGuard: STYLES.legionary.shieldGuard, fallback: 'legionary',
+// (Left out for now, 2026-11-19: no kit or man carries it and the builders do not offer it; `passive` keeps it off the pickers.)
+STYLES.pilum = { ...STYLES.crossbow, passive: true, label: 'Pilum', weapon: 'pilum', shield: 'scutum', shieldGuard: STYLES.legionary.shieldGuard, fallback: 'legionary',
   ranged: { ...STYLES.crossbow.ranged, reach: 15, shotSeconds: 0.6, reloadSafe: 0, line: true }, weaponGuard: { hand: [0.02, 0.85, -0.1], dir: [0.9, 0.35, 0.05] } };
 // The halberdier: the war hammer's two-handed ways (the chop from above and the side, the thrust), the axe for the hammer.
 STYLES.halberd = { ...STYLES.warhammer, label: 'Halberd', weapon: 'halberd' };
