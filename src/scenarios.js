@@ -92,22 +92,30 @@ function sekigaharaSide(random, army, colours) {
 }
 
 // Pyongyang, 1593: the Ming army storms the city held by Konishi
-// Yukinaga. Fifteen Ming foot and forty-four Japanese; the Ming regulars
+// Yukinaga. Nineteen Ming foot and forty Japanese (and three Japanese horse); the Ming regulars
 // only — brigandine and elite — led by an elite with the guandao; gun and bow
 // men behind on both sides. Li Rusong's Liaodong horse ride with them (below):
 // the Ming came south with the northern cavalry the Japanese did not have; here
 // the Japanese hold the city with more men than the Ming bring to this part of the wall.
+// (With them some of the southern infantry, Qi Jiguang's drilled Zhejiang men who came with Song Yingchang and stormed the
+// walls beside the northern troops: the user's call, 2026-11-19.)
 const PYONGYANG_MING = {
   elite: { guandao: 2, threeEyed: 1 },
   brigandine: { swordShield: 5, spear: 4, matchlock: 3 },
+  eliteInfantry: { langxian: 1, swordShield: 2, matchlock: 1 },
 };
+// Each rank's men as made (cast.js mingSoldier): the southern infantry in their own kit and build.
+const PYONGYANG_MING_RANK = { eliteInfantry: { people: 'qi', design: 0 } };
 // (Samurai fewer, the ashigaru more, as the army was: the user's call, 2026-11-18; was 12 samurai and 32 ashigaru.)
 // (Guns more, bows fewer: Konishi's men held the walls with the teppō, the Korean and Ming accounts of 1592-93 full of its
 // volleys and few of arrows; was 13 guns and 8 bows: the user's call, 2026-11-19.)
 const PYONGYANG_JAPANESE = {
   samurai: { katana: 4, naginata: 1, spear: 1 },
-  ashigaru: { spear: 17, matchlock: 18, archerYumi: 3 },
+  ashigaru: { spear: 17, matchlock: 14, archerYumi: 3 },
 };
+// (A few guns fewer, and a few mounted samurai: the Japanese had horse, if far less of it than the Ming; was 18 guns and no
+// horse: the user's call, 2026-11-19.)
+const PYONGYANG_JAPANESE_HORSE = { spear: 2, katana: 1 };
 // The Ming horse: northern heavy cavalry, sabres and spears with a few three-eyed guns; the Japanese had none in the field.
 const PYONGYANG_HORSE = { dao: 4, spear: 5, threeEyed: 2 };
 
@@ -123,7 +131,7 @@ function shootersBehind(warriors) {
 
 function pyongyangSides(random) {
   const ming = [];
-  for (const [rank, styles] of Object.entries(PYONGYANG_MING)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) ming.push(mingSoldier(random, style, rank));
+  for (const [rank, styles] of Object.entries(PYONGYANG_MING)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) ming.push(mingSoldier(random, style, rank, PYONGYANG_MING_RANK[rank]));
   const japanese = [];
   for (const [rank, styles] of Object.entries(PYONGYANG_JAPANESE)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) japanese.push(sengokuWarrior(random, SEKIGAHARA_WEST, style, rank));
   const red = shootersBehind(ming);
@@ -258,12 +266,15 @@ const CAJAMARCA_INCA = 1 + Object.values(CAJAMARCA.inca).reduce((sum, styles) =>
 // Zeelandia against Koxinga's army: his masked "iron men" in scale, his
 // regulars in brigandine, garrison troops, and a few Japanese.
 const ZEELANDIA = {
-  dutch: { musketeer: 9, pikeman: 6, officer: 3 },
+  // (Two of the pikemen with the halberd, a sergeant's arm: the user's call, 2026-11-19.)
+  dutch: { musketeer: 9, pikeman: 4, halberdier: 2, officer: 3 },
   // About a third of his regulars in iron lamellar with arm guards, units of their own (spears and shields); the rest in
   // the brigandine vest.
   // (The iron men fewer, the garrison troops more: a larger army, most of it of the lower tiers; was 6 iron men and 12
   // garrison men, 30 in all: the user's call, 2026-11-19.)
-  koxinga: { elite: { guandao: 3, swordShield: 1 }, brigandine: { swordShield: 3, spear: 1, matchlock: 3 }, lamellar: { spear: 2, swordShield: 1 }, garrison: { spear: 11, dao: 4, matchlock: 3 }, ronin: { ronin: 2 } },
+  // (Fewer of his men against the Dutch, a few iron men and the rest garrison troops: the fight was too one-sided; was 34
+  // with brigandine and lamellar regulars: the user's call, 2026-11-19.)
+  koxinga: { elite: { guandao: 2, swordShield: 1 }, brigandine: {}, lamellar: {}, garrison: { spear: 10, dao: 4, matchlock: 3 }, ronin: { ronin: 2 } },
 };
 
 // A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders
@@ -704,6 +715,7 @@ export const ARMIES = {
       elite: { label: 'Elite', kinds: ['mingElite'], styles: ['guandao', 'matchlock', 'threeEyed', 'swordShield'], make: mingRank('elite', MING_PEOPLE.pyongyang) },
       brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.pyongyang) },
       garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.pyongyang) },
+      eliteInfantry: { label: 'Southern infantry', kinds: ['mingEliteInfantry'], styles: ['langxian', 'swordShield', 'matchlock', 'spear'], make: mingRank('eliteInfantry', 'qi', 0) },
       horse: { label: 'Liaodong horse', kinds: ['mingIronLamellar'], mounted: true, styles: ['dao', 'spear', 'threeEyed'], make: (random, style) => mingHorseman(random, style) },
     },
   },
@@ -736,7 +748,7 @@ export const ARMIES = {
     label: 'The VOC',
     ranks: {
       musketeer: { label: 'Musketeer', kinds: ['conquistadorQuilted'], styles: ['matchlock'], make: (random) => europeanSoldier(random, 'musketeer') },
-      pikeman: { label: 'Pikeman', kinds: ['conquistadorPlate'], styles: ['spear'], make: (random) => europeanSoldier(random, 'pikeman') },
+      pikeman: { label: 'Pikeman', kinds: ['conquistadorPlate'], styles: ['spear', 'halberd'], make: (random, style) => europeanSoldier(random, style === 'halberd' ? 'halberdier' : 'pikeman') },
       officer: { label: 'Officer', kinds: ['conquistadorPlate'], styles: ['espada'], make: (random) => europeanSoldier(random, 'officer') },
     },
   },
@@ -1343,18 +1355,18 @@ export const SCENARIOS = {
   pyongyang: {
     title: 'Pyongyang',
     place: 'Pyongyang, Joseon · 8 February 1593',
-    blurb: { en: 'The Ming army retakes the city from the Japanese. Fifteen Ming regulars — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun — and eleven of Li Rusong\'s horsemen in iron lamellar on the flank, against forty-four Japanese samurai and ashigaru.', zh: '明军从日军手里夺回平壤。十五名明军——精锐披钉甲，使大刀、放火铳；布面甲兵持刀牌、长枪、鸟铳——侧翼是李如松的十一名铁札甲骑兵，对阵日本武士和足轻四十四人。' },
+    blurb: { en: 'The Ming army retakes the city from the Japanese. Nineteen Ming foot — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun, and a few of the drilled southern infantry with the wolf-brush spear — and eleven of Li Rusong\'s horsemen in iron lamellar on the flank, against forty Japanese samurai and ashigaru and three mounted samurai.', zh: '明军从日军手里夺回平壤。明军步卒十九人——精锐披钉甲，使大刀、放火铳；布面甲兵持刀牌、长枪、鸟铳；还有几名操练有素的南兵，持狼筅——侧翼是李如松的十一名铁札甲骑兵，对阵日本武士和足轻四十人，另有骑马武士三人。' },
     scene: 'sengoku',
     arena: { halfX: 14, halfZ: 9 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
-    roster: { en: 'Twenty-six Ming (eleven on horse) · forty-four Japanese', zh: '明军二十六人（十一骑） · 日军四十四人' },
+    roster: { en: 'Thirty Ming (eleven on horse) · forty-three Japanese (three on horse)', zh: '明军三十人（十一骑） · 日军四十三人（三骑）' },
     formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 } },
     cast: (random) => pyongyangSides(random),
     wings: {
       arena: { halfX: 28, halfZ: 15 },
       camera: { yaw: -0.5, pitch: 0.42, distance: 26, maxDistance: 33 },
-      formation: { red: { wings: { side: 1 } } },
-      cast: (random, sides) => ({ red: [...sides.red, ...company(PYONGYANG_HORSE, (style) => mingHorseman(random, style))], blue: sides.blue }),
+      formation: { red: { wings: { side: 1 } }, blue: { wings: { side: -1 } } },
+      cast: (random, sides) => ({ red: [...sides.red, ...company(PYONGYANG_HORSE, (style) => mingHorseman(random, style))], blue: [...sides.blue, ...company(PYONGYANG_JAPANESE_HORSE, (style) => samuraiHorseman(random, SEKIGAHARA_WEST, style))] }),
     },
     // The armies its sides may be set up from (ARMIES; muster.js).
     armies: { red: ['ming'], blue: ['west'] },
@@ -1406,11 +1418,11 @@ export const SCENARIOS = {
   zeelandia: {
     title: 'Fort Zeelandia',
     place: 'Baxemboy, Formosa · 1661',
-    blurb: { en: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers and pikemen march out to meet his army on the sand: masked iron men in scale, regulars in the brigandine vest and in iron lamellar, garrison troops and a few Japanese.", zh: '郑成功登陆，要拿热兰遮城。荷兰东印度公司的火枪手和长枪兵开出城，在沙滩上迎战他的大军：戴铁面、披鳞甲的铁人，穿布面甲背心和铁札甲的正兵，营兵，还有几个日本人。' },
+    blurb: { en: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers, pikemen and halberdiers march out to meet his army on the sand: a few masked iron men in scale, garrison troops and a few Japanese.", zh: '郑成功登陆，要拿热兰遮城。荷兰东印度公司的火枪手、长枪兵和戟兵开出城，在沙滩上迎战他的大军：几名戴铁面、披鳞甲的铁人，营兵，还有几个日本人。' },
     scene: 'coastFort',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
-    roster: { en: 'Eighteen Dutch · thirty-two of Koxinga\'s army', zh: '荷兰人十八名 · 郑成功部三十二人' },
+    roster: { en: 'Eighteen Dutch · twenty-two of Koxinga\'s army', zh: '荷兰人十八名 · 郑成功部二十二人' },
     formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.35 } },
     cast: (random) => {
       const army = ZEELANDIA.koxinga;

@@ -24,13 +24,15 @@ test('Fort Zeelandia: the iron men are all masked and in scale; a few ronin amon
   const { SCENARIOS } = await import('../src/scenarios.js');
   const cast = SCENARIOS.zeelandia.cast(seededRandom(2));
   const elites = cast.blue.filter((fighter) => fighter.outfit.kind === 'mingElite');
-  assert.ok(elites.length >= 4);
+  assert.ok(elites.length >= 3);
   for (const elite of elites) {
     const design = OUTFITS.mingElite.designs[elite.outfit.design];
     assert.equal(design.armor.kind, 'mingScale');
     assert.ok(design.head.mask);
   }
-  assert.ok(cast.blue.some((fighter) => fighter.outfit.kind === 'mingGarrison') && cast.blue.some((fighter) => fighter.outfit.kind === 'mingBrigandine'));
+  // A few iron men, the rest garrison troops (no brigandine regulars since 2026-11-19).
+  assert.ok(cast.blue.filter((fighter) => fighter.outfit.kind === 'mingGarrison').length > cast.blue.length / 2);
+  assert.ok(cast.red.some((fighter) => fighter.style === 'halberd'), 'halberds among the Dutch');
   const ronin = cast.blue.filter((fighter) => fighter.outfit.kind === 'ronin');
   assert.ok(ronin.length >= 1 && ronin.length <= 3);
   assert.ok(cast.red.every((fighter) => factionOf(fighter) === 'knights'));

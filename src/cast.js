@@ -328,6 +328,7 @@ export function europeanSoldier(random = Math.random, type = 'rodelero') {
     rodelero: ['conquistadorQuilted', 'espadaRodela', [0, 1, 2, 4], 'spanish'],
     arquebusier: ['conquistadorQuilted', 'matchlock', [0, 1, 2, 4], 'spanish'],
     pikeman: ['conquistadorPlate', 'spear', [3], 'dutch'],
+    halberdier: ['conquistadorPlate', 'halberd', [3], 'dutch'],
     musketeer: ['conquistadorQuilted', 'matchlock', [3], 'dutch'],
     officer: ['conquistadorPlate', 'espada', [3], 'dutch'],
   }[type];
