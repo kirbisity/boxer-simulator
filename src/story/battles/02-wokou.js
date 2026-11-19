@@ -15,7 +15,7 @@
 //    (scenarios.js qiJiguangLevel: its squad layout, drill and discipline, reused), in his elite infantry's kit (outfits.js
 //    mingEliteInfantry). No trench: a raid is not waited for.
 //
-// Numbers (assumed, stated): thirty-six raiders (the Taizhou mix ×1.4: 4 rōnin, 13 Japanese, 19 Chinese) against three
+// Numbers (assumed, stated): thirty-six raiders (the wokou band ×1.4: 4 rōnin, 1 samurai, 31 Chinese) against three
 // squads (36), 1 : 1, 72 men. The water town of the wokou levels (scene 'jiangnan', its morning mist).
 //
 // The hero: in his squad's place by his rank (life.rank) and place in the line (life.place): a soldier in the front
@@ -23,15 +23,16 @@
 // leader at the squad's back with the dao (the Jixiao xinshu's 队长); an officer behind the company. His living comrades
 // take the places of his squad nearest his, closest bond first, each with his place's weapon.
 
-import { roninWarrior, wokouRaider } from '../../cast.js';
+import { roninWarrior, wokouRaider, wokouSamurai } from '../../cast.js';
 import { seededRandom } from '../../physics.js';
 import { qiJiguangLevel } from '../../scenarios.js';
 import { koreaAssemble, koreaHeroKit, KOREA_KIT, koreaFighter, koreaComrades, koreaKitFor, koreaStandIn } from './korea.js';
 
 export const WOKOU_1588 = {
   year: 1588,
-  // The raiders (rōnin, Japanese, Chinese), in the Taizhou band's proportions scaled to 36.
-  raiders: { ronin: { ronin: 4 }, japanese: { katana: 9, odachi: 4 }, chinese: { dao: 10, spear: 9 } },
+  // The raiders: the wokou band of every wokou battle (scenarios.js WOKOU.band) scaled to 36: mostly Chinese, a few rōnin,
+  // one samurai without his helmet.
+  raiders: { ronin: { ronin: 4 }, samurai: { katana: 1 }, chinese: { dao: 17, spear: 14 }, bareHead: true },
   squads: 3,
   // The squads' front (m from the middle of the square); the raiders' as far the other way (Qi's level drawn apart: 8 × 1.5).
   front: 12,
@@ -78,7 +79,10 @@ export const wokouBattle = {
     const spec = WOKOU_1588;
     const { squad, drill, discipline } = koreaSquad();
     // Raiders: the Japanese at the front, the rōnin among them, the Chinese behind (scenarios.js wokouRaiders' order).
-    const japanese = [...Object.entries(spec.raiders.ronin).flatMap(([style, n]) => Array.from({ length: n }, () => roninWarrior(random, style))), ...Object.entries(spec.raiders.japanese).flatMap(([style, n]) => Array.from({ length: n }, () => wokouRaider(random, style, 'japanese')))];
+    const japanese = [...Object.entries(spec.raiders.ronin).flatMap(([style, n]) => Array.from({ length: n }, () => roninWarrior(random, style))), ...Object.entries(spec.raiders.samurai).flatMap(([style, n]) => Array.from({ length: n }, () => {
+      const man = wokouSamurai(random, style);
+      return spec.raiders.bareHead ? { ...man, outfit: { ...man.outfit, bareHead: true } } : man;
+    }))];
     const chinese = Object.entries(spec.raiders.chinese).flatMap(([style, n]) => Array.from({ length: n }, () => wokouRaider(random, style, 'chinese')));
     // The company: three squads side by side, each man at his place (blue, at +x: x = front + back, z = across).
     const men = [];

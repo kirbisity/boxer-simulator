@@ -56,14 +56,14 @@ test('a prize fight pairs boxers in gloves, within a weight class', async () => 
   }
 });
 
-test('the rebellion: two lords and three foot soldiers against twenty simply drawn rebels with pitchforks', async () => {
+test('the rebellion: a lord and three foot soldiers against twenty simply drawn rebels with pitchforks', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const cast = SCENARIOS.rebellion.cast(Math.random);
-  assert.equal(cast.red.length, 5);
+  assert.equal(cast.red.length, 4);
   assert.equal(cast.blue.length, 20);
-  // Two lords in full plate, three foot soldiers each with his own weapon.
+  // A lord in full plate, three foot soldiers each with his own weapon.
   const lords = cast.red.filter((fighter) => fighter.outfit.kind === 'knight');
-  assert.equal(lords.length, 2);
+  assert.equal(lords.length, 1);
   assert.ok(lords.every((lord) => /^(Sir|Lord) /.test(lord.name)), 'named for their rank');
   const soldiers = cast.red.filter((fighter) => fighter.outfit.kind === 'footman');
   assert.equal(soldiers.length, 3);
@@ -97,17 +97,18 @@ test('the rebellion opens with the knights in a tight line and the rebels a loos
   assert.ok(new Set(rebels.map((fighter) => fighter.root[0].toFixed(1))).size > 6, 'not in ranks');
 });
 
-test('Sekigahara: the East in red, the West in black and blue, one more of the West, teppō and spears and six horse a side; Agincourt\'s archers and men-at-arms; Cerignola\'s arquebusiers, Landsknechts, gendarmes and Swiss', async () => {
+test('Sekigahara: the East in red, the West in black and blue, one more of the West, mostly ashigaru, teppō and spears and three horse a side; Agincourt\'s archers and men-at-arms; Cerignola\'s arquebusiers, Landsknechts, gendarmes and Swiss', async () => {
   const { SCENARIOS, battleOf } = await import('../src/scenarios.js');
   const sekigahara = SCENARIOS.sekigahara.cast(seededRandom(7));
   const { red: east, blue: west } = battleOf('sekigahara').cast(seededRandom(7));
-  assert.equal(sekigahara.red.length, 28, 'the East on foot');
-  assert.equal(sekigahara.blue.length, 29, 'the West on foot');
-  assert.equal(east.length, 34, 'with its six horse');
+  assert.equal(sekigahara.red.length, 31, 'the East on foot');
+  assert.equal(sekigahara.blue.length, 32, 'the West on foot');
+  assert.equal(east.length, 34, 'with its three horse');
   assert.equal(west.length, 35, 'the West one more');
   for (const side of [east, west]) {
-    assert.equal(side.filter((man) => man.mounted).length, 6, 'six mounted samurai a flank');
-    assert.equal(side.filter((man) => man.style === 'matchlock' && man.outfit.kind === 'ashigaru').length, 5, 'five teppō ashigaru');
+    assert.equal(side.filter((man) => man.mounted).length, 3, 'three mounted samurai a flank');
+    assert.ok(side.filter((man) => man.outfit.kind !== 'ashigaru').length <= 7, 'samurai about one in six');
+    assert.equal(side.filter((man) => man.style === 'matchlock' && man.outfit.kind === 'ashigaru').length, 7, 'seven teppō ashigaru');
     assert.ok(side.filter((man) => man.style === 'yari' && man.outfit.kind === 'ashigaru').length >= 8, 'the yari');
     assert.ok(side.every((man) => man.outfit.tint.armor === side[0].outfit.tint.armor), 'one colour to an army');
   }

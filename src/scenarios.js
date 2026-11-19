@@ -60,13 +60,14 @@ const WEATHER_SEA_FOG = { fog: WEATHER_MIST.port, colour: 0x3c362e, sky: 0.85, h
 // armies were, the West one more: thirty-five to thirty-four, each with its mounted samurai on a flank to charge when
 // the lines close (`wings` below). Blades and polearms first (the front ranks), the bows and guns last.
 const SEKIGAHARA_SIDE = {
+  // (Samurai about one man in six, as the armies were mostly ashigaru: the user's call, 2026-11-18; was 8-9 on foot.)
   east: {
-    samurai: { katana: 3, naginata: 2, spear: 2, archerYumi: 1 },
-    ashigaru: { spear: 8, archerYumi: 3, matchlock: 5, katana: 3, naginata: 1 },
+    samurai: { katana: 2, naginata: 1 },
+    ashigaru: { spear: 14, archerYumi: 4, matchlock: 7, katana: 2, naginata: 1 },
   },
   west: {
-    samurai: { katana: 3, naginata: 2, spear: 2, archerYumi: 2 },
-    ashigaru: { spear: 8, archerYumi: 3, matchlock: 5, katana: 3, naginata: 1 },
+    samurai: { katana: 2, naginata: 1 },
+    ashigaru: { spear: 14, archerYumi: 5, matchlock: 7, katana: 2, naginata: 1 },
   },
 };
 
@@ -74,7 +75,7 @@ const SEKIGAHARA_SIDE = {
 const SEKIGAHARA_EAST = { tint: { armor: '#9a1f18', lace: '#1a1a1d' }, banner: '#b3161b' };
 const SEKIGAHARA_WEST = { tint: { armor: '#1c2030', lace: '#2a4a9a' }, banner: '#1f3f8a' };
 // A side's mounted samurai: spears (the yari from the saddle), a sword and the bow.
-const SEKIGAHARA_HORSE = { spear: 3, katana: 1, archerYumi: 2 };
+const SEKIGAHARA_HORSE = { spear: 2, archerYumi: 1 };
 // Sekigahara's morning: the valley's fog still lying low, the sun coming through it (Agincourt is fought in the same place and light).
 const SEKIGAHARA_WEATHER = { fog: WEATHER_MIST.sekigahara, sky: 0.65, pale: 0.6, mistLine: [-1, 6], sun: 0.85 };
 
@@ -99,9 +100,10 @@ const PYONGYANG_MING = {
   elite: { guandao: 2, threeEyed: 1 },
   brigandine: { swordShield: 5, spear: 4, matchlock: 3 },
 };
+// (Samurai fewer, the ashigaru more, as the army was: the user's call, 2026-11-18; was 12 samurai and 32 ashigaru.)
 const PYONGYANG_JAPANESE = {
-  samurai: { katana: 6, naginata: 2, spear: 4 },
-  ashigaru: { spear: 14, matchlock: 11, archerYumi: 7 },
+  samurai: { katana: 4, naginata: 1, spear: 1 },
+  ashigaru: { spear: 17, matchlock: 13, archerYumi: 8 },
 };
 // The Ming horse: northern heavy cavalry, sabres and spears with a few three-eyed guns; the Japanese had none in the field.
 const PYONGYANG_HORSE = { dao: 4, spear: 5, threeEyed: 2 };
@@ -276,15 +278,11 @@ const WOKOU = {
   // home (the raids' fighting core, as the Ming saw it), in their own armour:
   // they lead the rush, well before the rest (`lead`). No ashigaru: the user's
   // call, 2026-11-09, the men who crossed to raid were the sword class.
-  // These are the raiders of Taizhou, 1561 (Qi Jiguang's level): by then the
-  // bands were mostly Chinese, the Japanese a stiffening of swordsmen.
-  raiders: { ronin: { ronin: 4 }, samurai: { katana: 5, odachi: 3 }, chinese: { dao: 8, spear: 6 } },
-  // The raid of 1554 (the wokou level) is a Japanese band: rōnin and samurai
-  // out of the wars at home (the raids' fighting core, as the Ming saw it),
-  // with their own swords, ōdachi and yari; a few Chinese of the coast with
-  // them, guides and pirates of the islands, who keep to the back (`samurai`:
-  // men of the samurai class, armoured, cast.js sengokuWarrior, under no lord's colours).
-  raid: { ronin: { ronin: 8 }, samurai: { katana: 6, odachi: 3, yari: 2, naginata: 1 }, chinese: { dao: 4, spear: 2 } },
+  // One band for every wokou battle (the user's call, 2026-11-18: the same raiders at Taizhou, 1561, in the raid of 1554
+  // and in 1588): mostly Chinese of the coast with dao and spear, a few rōnin, and one samurai without his helmet
+  // (`bareHead`: in what he had, not a lord's harness), as the Ming saw the later bands: Chinese, a stiffening of
+  // Japanese swordsmen.
+  band: { ronin: { ronin: 3 }, samurai: { katana: 1 }, chinese: { dao: 12, spear: 10 }, bareHead: true },
   // How far (m) the Japanese of the band stand out ahead of the line, and of the Chinese behind them: the swordsmen
   // leap in at a run well ahead (Chouhai tubian: the Japanese in front, the Chinese following on), here about two
   // ranks' depth of open ground. Ahead rather than the Chinese further back: the square has no more room behind.
@@ -303,6 +301,9 @@ const WOKOU = {
 
 // The raiders as they come on: a loose crowd, nine abreast; the Japanese in the front ranks `WOKOU.lead` m ahead of the
 // line, the rōnin first among them, the Chinese as far again behind them (raidersOrder).
+WOKOU.raiders = WOKOU.band;
+WOKOU.raid = WOKOU.band;
+
 const WOKOU_RAIDERS_ORDER = { front: WOKOU.front, spacing: 1.3, rowSpacing: 1.6, perRow: 9, loose: 0.5 };
 // The garrison drawn up across the square in two long ranks, the bows in a row of their own before them to loose as the raiders come
 // on, the spears and dao close behind (the square is too shallow for the usual 4 m: `shootersFront` here 1.5 m).
@@ -316,7 +317,10 @@ const WOKOU_GARRISON_ORDER = { front: WOKOU.front, spacing: 1.2, rowSpacing: 1.6
  */
 function wokouRaiders(random, mix = WOKOU.raiders) {
   const ronin = company(mix.ronin, (style) => roninWarrior(random, style));
-  const japanese = company(mix.samurai, (style) => wokouSamurai(random, style));
+  const japanese = company(mix.samurai, (style) => {
+    const man = wokouSamurai(random, style);
+    return mix.bareHead ? { ...man, outfit: { ...man.outfit, bareHead: true } } : man;
+  });
   const every = WOKOU_RAIDERS_ORDER.perRow / ronin.length;
   ronin.forEach((man, index) => japanese.splice(Math.min(japanese.length, Math.floor(index * every + every / 2)), 0, man));
   return [...japanese, ...company(mix.chinese, (style) => wokouRaider(random, style, 'chinese'))];
@@ -1274,23 +1278,23 @@ export const SCENARIOS = {
   rebellion: {
     title: 'Peasant Rebellion',
     place: 'The market square, Maidstone, Kent · June 1381',
-    blurb: { en: 'The town has risen. Two lords in plate ride in on their destriers, with three of their foot soldiers behind them, to put it down — and meet twenty peasants with spears in the market square.', zh: '镇子反了。两位老爷披着板甲、骑着战马进城来镇压，身后跟着三个步卒——集市广场上，迎面是二十个攥着长矛的农民。' },
+    blurb: { en: 'The town has risen. A lord in plate rides in on his destrier, with three of his foot soldiers behind him, to put it down — and meet twenty peasants with spears in the market square.', zh: '镇子反了。一位老爷披着板甲、骑着战马进城来镇压，身后跟着三个步卒——集市广场上，迎面是二十个攥着长矛的农民。' },
     scene: 'town',
     weather: { fog: WEATHER_MIST.rebellion, sky: 0.55, pale: 0.55, sun: 0.9 },
     arena: { halfX: 9, halfZ: 7 },
     // Never further out than the house fronts.
     camera: { yaw: -0.55, pitch: 0.42, distance: 10, maxDistance: 10.5 },
-    roster: { en: 'Two mounted knights and three foot soldiers · twenty rebels with spears', zh: '骑士两名（骑马）、步卒三名 · 持矛乱民二十名' },
+    roster: { en: 'A mounted knight and three foot soldiers · twenty rebels with spears', zh: '骑士一名（骑马）、步卒三名 · 持矛乱民二十名' },
     // Drawn apart a quarter (not SPREAD's half): the square holds no more between its house fronts, the lords' horses behind their foot.
     spread: 1.25,
     // Knights in a tight line, shoulder to shoulder; the rebels a loose crowd, well across the square.
     formation: { red: { front: 4.5, spacing: 0.85 }, blue: { front: 5, spacing: 1.5, rowSpacing: 1.6, loose: 0.55 } },
     // The whole cast, made fresh for each visit (the rebels differ every time).
     cast: (random) => ({
-      red: [nobleKnight(random, 'longsword'), footSoldier(random, 'spear'), nobleKnight(random, 'warhammer'), footSoldier(random, 'bow'), footSoldier(random, 'longsword')],
+      red: [nobleKnight(random, 'longsword'), footSoldier(random, 'spear'), footSoldier(random, 'bow'), footSoldier(random, 'longsword')],
       blue: Array.from({ length: 20 }, () => rebel(random)),
     }),
-    // The lords ride in on their destriers, the foot behind them (the square is only so wide between the house fronts).
+    // The lord rides in on his destrier, the foot behind him (the square is only so wide between the house fronts).
     wings: {
       arena: { halfX: 11, halfZ: 8.5 },
       formation: { red: { front: 7.5, spacing: 1.2, wings: { out: 2, back: 1, spacing: 3, release: 14, by: 6 } } },
@@ -1305,12 +1309,12 @@ export const SCENARIOS = {
   sekigahara: {
     title: 'Sekigahara',
     place: 'Sekigahara, Mino · 21 October 1600',
-    blurb: { en: 'The battle that ends the Sengoku. Thirty-four of the East in red against thirty-five of the West in black and blue, in the morning fog: bows and teppō in front, spears, blades and polearms behind, and six mounted samurai on a flank of each army to charge when the lines close.', zh: '终结战国的一战。晨雾里，东军三十四人着红，西军三十五人着黑蓝：弓和铁炮在前，长枪、刀、长柄兵器在后，两军侧翼各有六名骑马武士，阵线一接就冲进去。' },
+    blurb: { en: 'The battle that ends the Sengoku. Thirty-four of the East in red against thirty-five of the West in black and blue, in the morning fog: bows and teppō in front, spears, blades and polearms behind, and three mounted samurai on a flank of each army to charge when the lines close.', zh: '终结战国的一战。晨雾里，东军三十四人着红，西军三十五人着黑蓝：弓和铁炮在前，长枪、刀、长柄兵器在后，两军侧翼各有三名骑马武士，阵线一接就冲进去。' },
     scene: 'sengoku',
     weather: SEKIGAHARA_WEATHER,
     arena: { halfX: 17, halfZ: 11 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 17, maxDistance: 22 },
-    roster: { en: 'Thirty-four of the East and thirty-five of the West: samurai and ashigaru, six of the samurai on horse a side', zh: '东军三十四人、西军三十五人：武士与足轻，每方六名武士骑马' },
+    roster: { en: 'Thirty-four of the East and thirty-five of the West: mostly ashigaru, a few samurai, three of them on horse a side', zh: '东军三十四人、西军三十五人：多为足轻，武士寥寥，每方三名武士骑马' },
     // Ten abreast: the bows and teppō in the front rows, the blades and polearms behind them.
     formation: { red: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 }, blue: { front: 6, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.3 } },
     cast: (random) => ({ red: sekigaharaSide(random, 'east', SEKIGAHARA_EAST), blue: sekigaharaSide(random, 'west', SEKIGAHARA_WEST) }),
@@ -1436,7 +1440,7 @@ export const SCENARIOS = {
   wokou: {
     title: 'Wokou raid',
     place: 'A water town, Zhejiang · 1554',
-    blurb: { en: 'Sea raiders come up the canals in the morning mist, a Japanese band of rōnin and samurai in their own armour, leaping in at a run well ahead of a few Chinese pirates who hang back behind them: long swords and great two-handed swords, yari, dao and spears, and hardly a gun among them. In the market square by the bridge they meet the town\'s garrison, more of them than the raiders: old men, thin boys and the underfed in hemp vests, spears and dao and a few bows, no guns, and a pair of brigandine regulars among them.', zh: '晨雾里，一伙海寇顺着河道摸上来，是日本人：浪人和披甲的武士远远冲在前头，几个中国海盗缩在后面——长刀、野太刀、长枪、腰刀，几乎不见火器。桥边集市上，他们撞上了镇里的守军，人比倭寇多：老头、瘦小子、吃不饱的穷汉，一身麻布坎肩，长枪腰刀，几张弓，没有火器，当中夹着两个穿布面甲的正兵。' },
+    blurb: { en: 'Sea raiders come up the canals in the morning mist: Chinese pirates of the coast with dao and spears, and out ahead of them at a run a few rōnin and one samurai without his helmet, the long swords of the band. Hardly a gun among them. In the market square by the bridge they meet the town\'s garrison, more of them than the raiders: old men, thin boys and the underfed in hemp vests, spears and dao and a few bows, no guns, and a pair of brigandine regulars among them.', zh: '晨雾里，一伙海寇顺着河道摸上来：多是沿海的中国海盗，提着腰刀长枪；前头冲着几个浪人，还有一个没戴头盔的武士，是这伙人里使长刀的。几乎不见火器。桥边集市上，他们撞上了镇里的守军，人比倭寇多：老头、瘦小子、吃不饱的穷汉，一身麻布坎肩，长枪腰刀，几张弓，没有火器，当中夹着两个穿布面甲的正兵。' },
     scene: 'jiangnan',
     weather: { fog: WEATHER_MIST.wokou, sky: 0.75, pale: 0.7, mistLine: [-1, 7], sun: 0.85 },
     arena: { halfX: 14, halfZ: 9 },
