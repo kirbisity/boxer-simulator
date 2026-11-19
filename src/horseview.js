@@ -41,6 +41,16 @@ const HORSE_LOOK = {
   firmness: 0.45,
 };
 
+/**
+ * The bard's skirt swings a little with the horse's momentum (a pilot on the Jurchen lamellar bard, the Iron Pagoda's: `kinds`),
+ * as hair does: a point on a damped spring behind the horse's body (its own frequency `hz`, damping ratio under 1 so it swings
+ * past and back), hanging `trail` s of the body's speed behind it, never more than `reach` m off; moved in the vertex shader,
+ * each point by how far down the hanging skirt it is (none above `top`, the barrel's widest, all at `hem`, shares of the
+ * withers' height), so the plates over the back and the saddle stay put and the hem swings most. Heavier than hair: stiffer
+ * and shorter; up and down by `lift` of it (hung plates rise and fall less than they swing). Drawing only (the physics' capsules do not move); not in low detail.
+ */
+export const BARD_SWAY = { kinds: ['lamellar'], hz: 2.4, damping: 0.5, trail: 0.008, reach: 0.035, lift: 0.5, jump: 0.7, top: 0.8, hem: 0.42 };
+
 const horseUp = new THREE.Vector3(0, 1, 0);
 const horseX = new THREE.Vector3();
 const horseY = new THREE.Vector3();
@@ -114,10 +124,17 @@ function horseMaterials(view) {
  */
 function bardMaterial(view, tile, finish) {
   view.bardMaterials ??= new Map();
-  // A brigandine's facing (the `brigandine` tile) is the rider's cloth, studded in his gilt (horses.js mountOf `finish`).
   const faced = tile === 'brigandine';
   const key = `${tile}|${finish?.steel ?? '-'}|${finish?.lace ?? '-'}${faced ? `|${finish?.cloth ?? '-'}|${finish?.gold ?? '-'}` : ''}`;
-  if (!view.bardMaterials.has(key)) {
+  if (!view.bardMaterials.has(key)) view.bardMaterials.set(key, makeBardMaterial(view, tile, finish));
+  return view.bardMaterials.get(key);
+}
+
+/** A bard's material made anew (bardMaterial keeps one per look; a swaying bard has its own: BARD_SWAY). */
+function makeBardMaterial(view, tile, finish) {
+  // A brigandine's facing (the `brigandine` tile) is the rider's cloth, studded in his gilt (horses.js mountOf `finish`).
+  const faced = tile === 'brigandine';
+  {
     const base = steelMaterial(view.steelEnv, { vertexColors: true });
     if (faced && finish?.cloth) base.color = new THREE.Color(finish.cloth);
     else if (finish?.steel) base.color = new THREE.Color(finish.steel).lerp(new THREE.Color(0xffffff), 0.35);
@@ -128,9 +145,79 @@ function bardMaterial(view, tile, finish) {
     // (A bard's broad plates would mirror only the ground under them: a little less of a mirror than the rider's harness, which
     // turns every way; mail and lamellae less bright again.)
     const metalness = tile === 'lamellae' || tile === 'mail' ? 0.75 : 0.85;
-    view.bardMaterials.set(key, doubleSided(armourDetailMaterial(base, tile, { cords, metalness })));
+    return doubleSided(armourDetailMaterial(base, tile, { cords, metalness }));
   }
-  return view.bardMaterials.get(key);
+}
+
+/** The swing of one horse's bard (BARD_SWAY): `uniform` (the frame's own axes, m) is what its materials read; `update` moves it. */
+function bardSwing() {
+  return { uniform: { value: new THREE.Vector3() }, at: null, was: [0, 0, 0], speed: [0, 0, 0], pace: [0, 0, 0] };
+}
+
+const bardWorld = new THREE.Vector3();
+const bardTurn = new THREE.Quaternion();
+
+/** Move a horse's bard swing by dt, after its frame: a damped spring behind the frame's origin (as clothsway.js ClothSwing). */
+function updateBardSwing(swing, frame, dt) {
+  const spec = BARD_SWAY;
+  frame.updateMatrixWorld(true);
+  frame.getWorldPosition(bardWorld);
+  const target = [bardWorld.x, bardWorld.y, bardWorld.z];
+  const moved = swing.at ? Math.hypot(target[0] - swing.was[0], target[1] - swing.was[1], target[2] - swing.was[2]) : Infinity;
+  if (!swing.at || moved > spec.jump || !(dt > 0)) {
+    if (!swing.at || moved > spec.jump) {
+      swing.at = target.slice();
+      swing.was = target.slice();
+      swing.speed = [0, 0, 0];
+      swing.pace = [0, 0, 0];
+      swing.uniform.value.set(0, 0, 0);
+    }
+    return;
+  }
+  const omega = Math.PI * 2 * spec.hz;
+  const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
+  const h = dt / steps;
+  const off = [0, 0, 0];
+  for (let axis = 0; axis < 3; axis += 1) {
+    const pace = (target[axis] - swing.was[axis]) / dt;
+    swing.pace[axis] += (pace - swing.pace[axis]) * Math.min(1, dt / 0.08);
+    for (let step = 1; step <= steps; step += 1) {
+      const goal = swing.was[axis] + ((target[axis] - swing.was[axis]) * step) / steps;
+      swing.speed[axis] += (omega * omega * (goal - swing.at[axis]) - 2 * spec.damping * omega * (swing.speed[axis] - pace)) * h;
+      swing.at[axis] += swing.speed[axis] * h;
+    }
+    swing.was[axis] = target[axis];
+    off[axis] = (swing.at[axis] - target[axis] - swing.pace[axis] * spec.trail) * (axis === 1 ? spec.lift : 1);
+  }
+  const far = Math.hypot(...off);
+  if (far > spec.reach) {
+    for (let axis = 0; axis < 3; axis += 1) {
+      off[axis] *= spec.reach / far;
+      swing.at[axis] = target[axis] + off[axis] / (axis === 1 ? spec.lift : 1) + swing.pace[axis] * spec.trail;
+    }
+  }
+  // Into the frame's own axes (its turn only), as its geometry is.
+  frame.getWorldQuaternion(bardTurn).invert();
+  swing.uniform.value.set(off[0], off[1], off[2]).applyQuaternion(bardTurn);
+}
+
+/** Make a material (or an outline's) move its points by a bard's swing, by how far down the hanging skirt each is (BARD_SWAY). */
+function swayBard(material, swing, withers) {
+  const before = material.onBeforeCompile;
+  const baseKey = material.customProgramCacheKey?.() ?? '';
+  const top = (BARD_SWAY.top * withers).toFixed(4);
+  const span = ((BARD_SWAY.top - BARD_SWAY.hem) * withers).toFixed(4);
+  material.onBeforeCompile = (shader, renderer) => {
+    before?.call(material, shader, renderer);
+    shader.uniforms.uBardSwing = swing.uniform;
+    shader.vertexShader = `uniform vec3 uBardSwing;\n${shader.vertexShader}`.replace(
+      '#include <morphtarget_vertex>',
+      `float bardHang = clamp( ( ${top} - position.y ) / ${span}, 0.0, 1.0 );\ntransformed += uBardSwing * bardHang * bardHang;\n#include <morphtarget_vertex>`,
+    );
+  };
+  material.customProgramCacheKey = () => `${baseKey}|bardSway`;
+  material.needsUpdate = true;
+  return material;
 }
 
 /** A mesh of a shared geometry (not freed with the horse), inked if asked. */
@@ -214,7 +301,17 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
   body.add(frame);
   const owned = [];
   const bard = (tile) => bardMaterial(view, tile, horse.finish);
-  horsePart(frame, parts.body, materials, { ink, bard });
+  // A swaying bard (BARD_SWAY): the body's pieces in materials of this horse's own, reading its swing.
+  const swaying = !low && BARD_SWAY.kinds.includes(horse.barding) ? bardSwing() : null;
+  if (swaying) {
+    const own = { ...materials, soft: swayBard(doubleSided(surface(0xffffff, { vertexColors: true })), swaying, W), metal: swayBard(doubleSided(steelMaterial(view.steelEnv, { vertexColors: true })), swaying, W) };
+    const meshes = horsePart(frame, parts.body, own, { ink, bard: (tile) => swayBard(makeBardMaterial(view, tile, horse.finish), swaying, W) });
+    swaying.materials = [];
+    for (const mesh of meshes) {
+      swaying.materials.push(mesh.material);
+      for (const child of mesh.children) if (child.userData.outline && child.material) swayBard(child.material, swaying, W);
+    }
+  } else horsePart(frame, parts.body, materials, { ink, bard });
   // Neck, head, ears: the neck pivots at the withers, the head at the poll, the ears at their bases.
   const neck = new THREE.Group();
   neck.position.set(...rig.neckPivot);
@@ -259,7 +356,7 @@ export function buildHorseView(view, horse, { detail = 'full' } = {}) {
   }
   view.scene.add(group);
   return {
-    horse, model, group, body, frame, neck, head, ears, legs, hang, owned, detail, base,
+    horse, model, group, body, frame, neck, head, ears, legs, hang, owned, detail, base, swaying,
     drawn: { ...horse, capsules: [], legs: {} },
     clock: null, lastTime: null, gaitRoll: 0, lameLeg: null,
   };
@@ -729,6 +826,7 @@ export function updateHorseView(view, world = null) {
     }
   }
   if (view.base) updateBaseHorse(view, horse, dt);
+  if (view.swaying) updateBardSwing(view.swaying, view.frame, dt);
   // Hair and cloth hang from where everything now is.
   if (view.hang.tail) {
     view.group.updateMatrixWorld(true);
@@ -1029,6 +1127,8 @@ export function disposeHorseView(view, horseView) {
     horseView.base.mesh.geometry.dispose();
     horseView.base.mesh.material.dispose();
   }
+  // (A swaying bard's materials are this horse's own, on shared geometry: freed here.)
+  for (const material of horseView.swaying?.materials ?? []) material.dispose();
   for (const mesh of horseView.owned) {
     mesh.parent?.remove(mesh);
     disposeObject(mesh);
