@@ -889,8 +889,17 @@ export function updateHorseView(view, world = null) {
   }
   if (view.base) updateBaseHorse(view, horse, dt);
   if (view.swaying) {
-    updateBardSwing(view.swaying, view.frame, dt);
-    updateBardTwist(view.swaying, horse.yaw, dt);
+    // Only under a man who has the soft swing now (main.js softSwing: the man played, the two of a duel); else at rest.
+    const rider = world?.fighters.find((fighter) => fighter.id === horse.rider) ?? null;
+    if (!world || rider?.softSwing) {
+      updateBardSwing(view.swaying, view.frame, dt);
+      updateBardTwist(view.swaying, horse.yaw, dt);
+    } else if (view.swaying.at) {
+      view.swaying.at = null;
+      view.swaying.turn = null;
+      view.swaying.uniform.value.set(0, 0, 0);
+      view.swaying.twist.value = 0;
+    }
   }
   // Hair and cloth hang from where everything now is.
   if (view.hang.tail) {

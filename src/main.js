@@ -1390,6 +1390,10 @@ function drawWorld(dt, drawIt = true) {
   showCameraBar(!followed && !sheet);
   // Crowd weapons, shields and banners are drawn as instanced batches, filled as the views update.
   beginCrowdBatches(scene);
+  // The armour's soft swing (horseview.js BARD_SWAY, wardrobe.js PAGODA_SWAY): always on the man played, on both men of a duel,
+  // on no one else of a crowd (its cost kept to the one or two men looked at).
+  const duel = world.fighters.length <= 2;
+  for (const fighter of world.fighters) fighter.softSwing = Boolean(fighter.player) || duel;
   for (const view of state.horseViews ?? []) updateHorseView(view, world);
   const safe = safeMen(world, followed);
   selectCrowdDraw(scene, state.views, safe, world.stage ? STAGE_CROWD_VIEW : CROWD_VIEW);

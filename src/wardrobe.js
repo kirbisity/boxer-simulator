@@ -2354,9 +2354,21 @@ function pagodaSwing(group, weights, instanced) {
       object.rotation.y = rest.get(object).turn + twist * share;
     });
   };
+  let resting = true;
   holder.userData.swing = {
     angle: 0,
-    update(dt) {
+    soft: true,
+    // `soft`: whether this man has the swing now (main.js softSwing): without it the tiers hang at rest, at no cost.
+    update(dt, hitAt = null, time = 0, soft = true) {
+      if (!soft) {
+        if (!resting) {
+          move(new THREE.Vector3(), 0);
+          resting = true;
+          at = null;
+        }
+        return;
+      }
+      resting = false;
       if (!group.parent || !(dt > 0)) return;
       group.updateWorldMatrix(true, false);
       group.getWorldPosition(pagodaScratch.at);

@@ -26,6 +26,8 @@ export const SAMPLE_SETS = {
   armourstep: Array.from({ length: 14 }, (_, index) => `armourstep-${index + 1}`),
   // Lamellae rattling on a man or a horse that moves (the user's clip of 2026-11-18): a lamellar or scale coat's step, a barded horse's hoof.
   lamellarstep: Array.from({ length: 5 }, (_, index) => `lamellarstep-${index + 1}`),
+  // Mail's rings jingling as he walks (the user's clip of 2026-11-18).
+  mailstep: Array.from({ length: 8 }, (_, index) => `mailstep-${index + 1}`),
   clatter: ['clatter-1'],
   maceswing: ['maceswing-1'],
   gunshot: ['gunshot-1', 'gunshot-2'],

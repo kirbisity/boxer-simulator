@@ -17,7 +17,8 @@ const DIR = 'src/audio/samples';
 // (A thunder's roar is the longest single take, 2.6 s; the army's charge loop, 6 s of a dull roar at 32 kb/s, is the largest one-shot file.)
 const FILE_CAP = 25 * 1024;
 // (The one-shot takes ~300 KB, the cries and the charge ~170 KB, the three ambience beds ~230 KB.)
-const TOTAL_CAP = 900 * 1024;
+// (960 KB since the lamellar and mail steps, 2026-11-18: was 900; the custom page has room, 12.98 of its 15.5 MB.)
+const TOTAL_CAP = 960 * 1024;
 const half = () => 0.5;
 const plan = (event) => samplePlan(event.type, SOUND_FAMILIES[event.type].params(event), event, half);
 
@@ -498,7 +499,7 @@ test('grenades: a frag is a grenade blast with the big explosion\'s rumble under
   assert.ok(SOUND_FAMILIES.shot.params({ kind: 'frag' }).level > 160);
 });
 
-test('armour heard as it moves: lamellar rattles with the step, plate clanks louder than mail; a barded horse rattles or clanks with its forehooves and its rider\'s armour with the hoof', () => {
+test('armour heard as it moves: lamellar rattles with the step, plate clanks, mail jingles, leather creaks; a barded horse rattles or clanks with its forehooves and its rider\'s armour with the hoof', () => {
   const half = () => 0.5;
   const step = (armour) => samplePlan('step', { surface: 'grass', pace: 2, armour }, { mass: 85 }, half);
   const lamellar = step('lamellar');
@@ -506,7 +507,11 @@ test('armour heard as it moves: lamellar rattles with the step, plate clanks lou
   const plate = step('plate').extra[0];
   const mail = step('mail').extra[0];
   assert.equal(plate.set, 'armourstep');
-  assert.ok(plate.trim > mail.trim, 'plate louder than mail');
+  assert.equal(mail.set, 'mailstep', 'mail its own jingle');
+  assert.ok(plate.trim > 1.2 && mail.trim >= 1.2, 'both raised to be heard over the step');
+  assert.equal(step('leather').extra[0].set, 'lamellarstep', 'hard leather a placeholder creak');
+  assert.ok(step('leather').extra[0].trim < lamellar.extra[0].trim, 'quieter than iron');
+  assert.equal(step('padded').extra.length, 0, 'quilting silent');
   assert.equal(step('none').extra.length, 0);
   const hoof = (event) => samplePlan('horse', { kind: 'hoof', surface: 'grass' }, { gait: 'gallop', speed: 9, mass: 600, ...event }, half);
   assert.equal(hoof({}).extra.length, 0, 'an unarmoured horse: the hoof alone');

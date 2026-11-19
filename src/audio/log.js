@@ -102,12 +102,16 @@ export function coveringAt(fighter, part) {
   return guard.deflects ? 'plate' : 'padded';
 }
 
-// The step's and the fall's armour: what jingles or clanks on a man as he moves (scale rattles as lamellar does; leather as padding).
-const KIT_ARMOUR = { plate: 'plate', mail: 'mail', lamellar: 'lamellar', scale: 'lamellar', padded: 'padded', leather: 'padded', wood: 'padded', flesh: 'none' };
+// The step's and the fall's armour: what jingles or clanks on a man as he moves (scale rattles as lamellar does; hard leather creaks).
+const KIT_ARMOUR = { plate: 'plate', mail: 'mail', lamellar: 'lamellar', scale: 'lamellar', padded: 'padded', leather: 'leather', wood: 'padded', flesh: 'none' };
+// Kits that move otherwise than a blow on them sounds: the kazaghand is cloth outside (a blow lands in padding) and mail within,
+// which jingles as he walks.
+const MOVING_ARMOUR = { kazaghand: 'mail' };
 
-/** The armour a fighter moves in, as his steps and falls sound: none | mail | plate | lamellar | padded (his trunk's covering). */
+/** The armour a fighter moves in, as his steps and falls sound: none | mail | plate | lamellar | leather | padded (his trunk's covering). */
 export function armourOf(fighter) {
-  return KIT_ARMOUR[coveringAt(fighter, 'trunk')];
+  const kind = outfitOf(fighter.body.inputs).look.armor?.kind;
+  return MOVING_ARMOUR[kind] ?? KIT_ARMOUR[coveringAt(fighter, 'trunk')];
 }
 
 /** A shield's face as a blow sounds on it: an iron buckler or a steel rodela rings; boards, wicker, hide and a riot shield's plastic knock. */

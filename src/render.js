@@ -3324,7 +3324,8 @@ export function updateFighterView(fighterView, dt, time) {
   if (!fighterView.headDetached) fighterView.head.update(step, fighter, time, hairColliders);
   for (const dangle of fighterView.dangles) dangle.update(step, colliders.slice(1));
   // A helmet's tassel, plume or feathers swing after the head (chinahelmview.js); still while paused (dt 0).
-  if (!fighterView.headDetached) for (const swing of fighterView.swings ?? []) swing.update(step, fighter.hitAt?.[P.head] ?? null, time);
+  // (An armour's soft swing, `soft`, only where the man has it: main.js softSwing.)
+  if (!fighterView.headDetached) for (const swing of fighterView.swings ?? []) swing.update(step, fighter.hitAt?.[P.head] ?? null, time, fighter.softSwing !== false);
   if (fighterView.layer === 'physics') updatePhysicsLayer(fighterView);
 }
 

@@ -124,13 +124,16 @@ export const stepWeight = (mass) => sfxClamp(((mass ?? 80) - STEP_WEIGHT.light) 
 
 /** The recorded ground under a step (its plan without `extra`), or null where the ground has no recording (wood, sand, snow). */
 /**
- * The take of what a moving body's armour makes (STEP_ARMOUR: plate's and mail's clank, lamellar's rattle), at `strength` (0..1, how hard
+ * The take of what a moving body's armour makes (STEP_ARMOUR: plate's clank, mail's jingle, lamellar's rattle, leather's creak), at `strength` (0..1, how hard
  * the step or the hoof came down) and `rate` (the body's own: a heavier one lower), or null for none.
  */
+// (Mail its own recording since 2026-11-18, raised to be heard over the step (the clip is quiet: rings, not plates); hard leather
+// (a riot shell, a gladiator's hide) the lamellar rattle low and soft, a creak, in place of a recording of its own; quilting none.)
 const STEP_ARMOUR = {
   plate: { set: 'armourstep', trim: 1.45, rate: 1 },
-  mail: { set: 'armourstep', trim: 0.8, rate: 1.15 },
+  mail: { set: 'mailstep', trim: 1.5, rate: 1 },
   lamellar: { set: 'lamellarstep', trim: 1.1, rate: 1 },
+  leather: { set: 'lamellarstep', trim: 0.4, rate: 0.7 },
 };
 // A horse's armour (and his rider's) heard with the hoof: a share of a man's step's loudness (each comes with two hooves a stride, the
 // rider's with one), the bard's a little lower (a horse's bigger plates on a heavier body).
@@ -273,7 +276,8 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
     }
     case 'fall':
     case 'land': {
-      const armoured = params.armour === 'plate' || params.armour === 'mail';
+      // (Lamellar and scale crash going down as plate and mail do: a coat of iron plates, a little less of them.)
+      const armoured = params.armour === 'plate' || params.armour === 'mail' || params.armour === 'lamellar';
       const s = sampleStrength(params.speed, 0.8, 9);
       const synth = { ...params, armour: 'none' };
       // A body going down (any man, any kit): the recorded thud, harder the faster he comes down and louder, lower and drawn out the
@@ -288,8 +292,10 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       } : null;
       if (!armoured) return body ? { ...body, synth: wet ? synth : null, synthGain: wet ? wet.synthGain : 0 } : null;
       // A man in armour going down crashes with it (over the body's thud); landing on his feet, a heavy step's clank.
-      if (params.kind === 'fall') return { set: 'clatter', trim: (params.armour === 'mail' ? 0.5 : 0.75) * sampleLerp(0.6, 1.1, s), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.2, 0.85, 1.15) * 0.9 * jitter(0.04), seconds: sampleLerp(0.4, 1, s), fade: 0.2, skip: 0, extra: body ? [body] : [], synth: body && !wet ? null : synth, synthGain: wet ? wet.synthGain : 1 };
-      return { set: 'armourstep', trim: 0.8 * sampleLerp(0.7, 1.2, s), rate: 0.9 * jitter(0.05), seconds: null, fade: 0.06, skip: 0, synth, synthGain: 1 };
+      if (params.kind === 'fall') return { set: 'clatter', trim: (params.armour === 'plate' ? 0.75 : params.armour === 'lamellar' ? 0.6 : 0.5) * sampleLerp(0.6, 1.1, s), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.2, 0.85, 1.15) * 0.9 * jitter(0.04), seconds: sampleLerp(0.4, 1, s), fade: 0.2, skip: 0, extra: body ? [body] : [], synth: body && !wet ? null : synth, synthGain: wet ? wet.synthGain : 1 };
+      // Landing on his feet: his armour's own step take (STEP_ARMOUR), a heavy one.
+      const landed = armourTake(params.armour, s, 0.9, jitter);
+      return { ...landed, trim: landed.trim * 0.65, synth, synthGain: 1 };
     }
     case 'mech': {
       const shutting = params.state === 'closed' || params.state === 'shut' || params.state === 'down' || params.state === 'closing';
