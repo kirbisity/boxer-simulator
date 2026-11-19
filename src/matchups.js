@@ -5,14 +5,12 @@ export const MATCHUPS = {
   "strong": [
    "machines",
    "bare hands",
-   "guns"
+   "spears and polearms"
   ],
-  "weak": [
-   "blunt weapons"
-  ],
+  "weak": [],
   "best": "Humanoid robot",
-  "worst": "Azap Archer",
-  "text": "Strong against machines, bare hands and guns. Weak against blunt weapons."
+  "worst": "Wall-Storming Janissary",
+  "text": "Strong against machines, bare hands and spears and polearms."
  },
  "maximilian": {
   "strong": [
@@ -21,657 +19,647 @@ export const MATCHUPS = {
    "bare hands"
   ],
   "weak": [
-   "blunt weapons"
+   "machines",
+   "bows"
   ],
   "best": "Silverback",
-  "worst": "Mace Sipahi",
-  "text": "Strong against beasts, the unarmoured and bare hands. Weak against blunt weapons."
+  "worst": "Three-Eyed Gunner",
+  "text": "Strong against beasts, the unarmoured and bare hands. Weak against machines and bows."
  },
  "ironPagoda": {
   "strong": [
    "guns",
-   "beasts"
+   "bows",
+   "blunt weapons"
   ],
   "weak": [],
   "best": "Teppō Gunner",
-  "worst": "Spear Footman",
-  "text": "Strong against guns and beasts."
+  "worst": "Pvt. Owen Kade",
+  "text": "Strong against guns, bows and blunt weapons."
  },
  "combatBot": {
-  "strong": [
-   "blunt weapons",
-   "bows"
-  ],
-  "weak": [],
-  "best": "Hammer Knight",
-  "worst": null,
-  "text": "Strong against blunt weapons and bows."
- },
- "specialForces": {
-  "strong": [
-   "blunt weapons",
-   "bows",
-   "spears and polearms"
-  ],
+  "strong": [],
   "weak": [
    "machines",
    "guns"
   ],
-  "best": "Hammer Knight",
+  "best": null,
   "worst": "Vision 60, rifle turret",
-  "text": "Strong against blunt weapons, bows and spears and polearms. Weak against machines and guns."
+  "text": "Weak against machines and guns."
+ },
+ "specialForces": {
+  "strong": [
+   "blunt weapons",
+   "spears and polearms"
+  ],
+  "weak": [
+   "machines"
+  ],
+  "best": "Kanabō Brute",
+  "worst": "Vision 60, rifle turret",
+  "text": "Strong against blunt weapons and spears and polearms. Weak against machines."
  },
  "flamer": {
   "strong": [
    "machines",
-   "guns",
-   "blunt weapons"
+   "guns"
   ],
   "weak": [
    "blades"
   ],
   "best": "Vision 60, rifle turret",
-  "worst": "Noble Knight",
-  "text": "Strong against machines, guns and blunt weapons. Weak against blades."
+  "worst": "Hammer Knight",
+  "text": "Strong against machines and guns. Weak against blades."
  },
  "hammer": {
   "strong": [
-   "blades",
-   "bows"
+   "guns",
+   "bows",
+   "spears and polearms"
   ],
-  "weak": [
-   "machines",
-   "beasts",
-   "bare hands"
-  ],
-  "best": "Noble Knight",
-  "worst": "Flame Trooper",
-  "text": "Strong against blades and bows. Weak against machines, beasts and bare hands."
+  "weak": [],
+  "best": "Flame Trooper",
+  "worst": null,
+  "text": "Strong against guns, bows and spears and polearms."
  },
  "plate": {
   "strong": [
+   "beasts",
    "the unarmoured",
-   "spears and polearms",
    "bare hands"
   ],
   "weak": [
-   "bows"
-  ],
-  "best": "Flame Trooper",
-  "worst": "Three-Eyed Gunner",
-  "text": "Strong against the unarmoured, spears and polearms and bare hands. Weak against bows."
- },
- "mingThreeEyed": {
-  "strong": [
-   "spears and polearms",
-   "the unarmoured",
-   "heavy armour"
-  ],
-  "weak": [],
-  "best": "Banner Glaive-Man",
-  "worst": "Kanabō Brute",
-  "text": "Strong against spears and polearms, the unarmoured and heavy armour."
- },
- "mingGuandao": {
-  "strong": [
-   "guns",
    "blunt weapons",
-   "the unarmoured"
-  ],
-  "weak": [
-   "bows",
-   "beasts",
-   "bare hands"
-  ],
-  "best": "Janissary Musketeer",
-  "worst": "Kheshig Archer",
-  "text": "Strong against guns, blunt weapons and the unarmoured. Weak against bows, beasts and bare hands."
- },
- "mingEliteGun": {
-  "strong": [
-   "machines",
-   "guns"
-  ],
-  "weak": [
-   "beasts",
    "bows",
    "riders"
   ],
-  "best": "Janissary Musketeer",
-  "worst": "Silverback",
-  "text": "Strong against machines and guns. Weak against beasts, bows and riders."
+  "best": "Silverback",
+  "worst": "Mace Sipahi",
+  "text": "Strong against beasts, the unarmoured and bare hands. Weak against blunt weapons, bows and riders."
  },
- "infantry": {
-  "strong": [
-   "blunt weapons",
-   "bows",
-   "the unarmoured"
-  ],
-  "weak": [
-   "machines",
-   "spears and polearms"
-  ],
-  "best": "Hammer Knight",
-  "worst": "Vision 60, rifle turret",
-  "text": "Strong against blunt weapons, bows and the unarmoured. Weak against machines and spears and polearms."
- },
- "kanabo": {
-  "strong": [
-   "bows",
-   "riders",
-   "spears and polearms"
-  ],
-  "weak": [
-   "beasts",
-   "bare hands"
-  ],
-  "best": "Janissary Musketeer",
-  "worst": "Silverback",
-  "text": "Strong against bows, riders and spears and polearms. Weak against beasts and bare hands."
- },
- "odachi": {
+ "mingThreeEyed": {
   "strong": [
    "guns",
-   "blades",
-   "blunt weapons"
+   "riders",
+   "heavy armour"
   ],
   "weak": [
    "beasts",
-   "bare hands",
-   "spears and polearms"
+   "the unarmoured"
   ],
-  "best": "Janissary Musketeer",
+  "best": "Iron-Faced Cuman",
   "worst": "Silverback",
-  "text": "Strong against guns, blades and blunt weapons. Weak against beasts, bare hands and spears and polearms."
+  "text": "Strong against guns, riders and heavy armour. Weak against beasts and the unarmoured."
  },
- "tosei": {
+ "mingEliteGun": {
   "strong": [
-   "blades",
-   "guns"
-  ],
-  "weak": [
+   "guns",
    "machines",
-   "spears and polearms",
-   "bare hands"
-  ],
-  "best": "Warrior Monk",
-  "worst": "Humanoid robot",
-  "text": "Strong against blades and guns. Weak against machines, spears and polearms and bare hands."
- },
- "joan": {
-  "strong": [
-   "spears and polearms"
-  ],
-  "weak": [
-   "blunt weapons",
-   "machines",
-   "guns"
-  ],
-  "best": "Iron Pagoda",
-  "worst": "Oirat Warlord",
-  "text": "Strong against spears and polearms. Weak against blunt weapons, machines and guns."
- },
- "cuman": {
-  "strong": [
-   "bows",
    "blades"
   ],
   "weak": [
    "beasts",
    "the unarmoured",
-   "bare hands"
+   "bows"
   ],
-  "best": "Kheshig Archer",
-  "worst": "Silverback",
-  "text": "Strong against bows and blades. Weak against beasts, the unarmoured and bare hands."
+  "best": "Company Musketeer",
+  "worst": "Three-Eyed Gunner",
+  "text": "Strong against guns, machines and blades. Weak against beasts, the unarmoured and bows."
  },
- "guanYu": {
+ "mingGuandao": {
   "strong": [
+   "blades",
+   "guns"
+  ],
+  "weak": [
+   "blunt weapons",
+   "bows"
+  ],
+  "best": "Company Musketeer",
+  "worst": "Banner Glaive-Man",
+  "text": "Strong against blades and guns. Weak against blunt weapons and bows."
+ },
+ "infantry": {
+  "strong": [
+   "blunt weapons",
+   "bows"
+  ],
+  "weak": [
+   "machines",
+   "spears and polearms"
+  ],
+  "best": "Kanabō Brute",
+  "worst": "Vision 60, rifle turret",
+  "text": "Strong against blunt weapons and bows. Weak against machines and spears and polearms."
+ },
+ "kanabo": {
+  "strong": [],
+  "weak": [
+   "beasts",
+   "bare hands",
+   "the unarmoured"
+  ],
+  "best": "Noble Knight",
+  "worst": "Silverback",
+  "text": "Weak against beasts, bare hands and the unarmoured."
+ },
+ "odachi": {
+  "strong": [
+   "guns",
+   "machines"
+  ],
+  "weak": [
+   "spears and polearms",
+   "blunt weapons",
+   "bows"
+  ],
+  "best": "Conquistador Arquebusier",
+  "worst": "Bayara Guard",
+  "text": "Strong against guns and machines. Weak against spears and polearms, blunt weapons and bows."
+ },
+ "tosei": {
+  "strong": [
+   "guns"
+  ],
+  "weak": [
    "machines",
    "bare hands",
    "beasts"
   ],
-  "weak": [
-   "blunt weapons",
-   "riders",
-   "heavy armour"
+  "best": "Janissary Musketeer",
+  "worst": "Humanoid robot",
+  "text": "Strong against guns. Weak against machines, bare hands and beasts."
+ },
+ "joan": {
+  "strong": [
+   "beasts",
+   "spears and polearms",
+   "bare hands"
   ],
-  "best": "Humanoid robot",
-  "worst": "Mace Sipahi",
-  "text": "Strong against machines, bare hands and beasts. Weak against blunt weapons, riders and heavy armour."
+  "weak": [
+   "machines",
+   "guns"
+  ],
+  "best": "Sumo Grand Champion",
+  "worst": "SWAT Pistoleer",
+  "text": "Strong against beasts, spears and polearms and bare hands. Weak against machines and guns."
+ },
+ "cuman": {
+  "strong": [
+   "blades"
+  ],
+  "weak": [
+   "bows",
+   "bare hands",
+   "beasts"
+  ],
+  "best": "Noble Knight",
+  "worst": "Three-Eyed Gunner",
+  "text": "Strong against blades. Weak against bows, bare hands and beasts."
+ },
+ "guanYu": {
+  "strong": [
+   "beasts",
+   "bare hands",
+   "machines"
+  ],
+  "weak": [
+   "spears and polearms"
+  ],
+  "best": "Warrior Monk",
+  "worst": "Ming Elite Infantry",
+  "text": "Strong against beasts, bare hands and machines. Weak against spears and polearms."
  },
  "tametomo": {
   "strong": [
-   "beasts",
-   "the unarmoured"
+   "bows"
+  ],
+  "weak": [
+   "machines",
+   "spears and polearms"
+  ],
+  "best": "Genoese Crossbowman",
+  "worst": "Saladin",
+  "text": "Strong against bows. Weak against machines and spears and polearms."
+ },
+ "naginata": {
+  "strong": [
+   "spears and polearms"
   ],
   "weak": [
    "machines",
    "bows",
-   "blunt weapons"
+   "bare hands"
   ],
-  "best": "Silverback",
+  "best": "Jousting King",
   "worst": "Humanoid robot",
-  "text": "Strong against beasts and the unarmoured. Weak against machines, bows and blunt weapons."
+  "text": "Strong against spears and polearms. Weak against machines, bows and bare hands."
  },
  "oyoroi": {
   "strong": [],
   "weak": [
    "guns",
-   "blunt weapons",
-   "machines"
+   "machines",
+   "bows"
   ],
-  "best": "Great-Bow Archer",
-  "worst": "Arquebusier",
-  "text": "Weak against guns, blunt weapons and machines."
- },
- "naginata": {
-  "strong": [
-   "blades",
-   "beasts",
-   "the unarmoured"
-  ],
-  "weak": [
-   "bows",
-   "spears and polearms",
-   "machines"
-  ],
-  "best": "Saladin",
-  "worst": "Kheshig Archer",
-  "text": "Strong against blades, beasts and the unarmoured. Weak against bows, spears and polearms and machines."
+  "best": "Maximus",
+  "worst": "Janissary Musketeer",
+  "text": "Weak against guns, machines and bows."
  },
  "bannerGuandao": {
   "strong": [
-   "the unarmoured",
-   "guns",
-   "beasts"
+   "spears and polearms",
+   "blunt weapons",
+   "riders"
   ],
   "weak": [
-   "bows",
-   "riders",
-   "heavy armour"
+   "beasts",
+   "the unarmoured",
+   "bare hands"
   ],
-  "best": "Janissary Musketeer",
-  "worst": "Three-Eyed Gunner",
-  "text": "Strong against the unarmoured, guns and beasts. Weak against bows, riders and heavy armour."
+  "best": "Bayara Guard",
+  "worst": "Silverback",
+  "text": "Strong against spears and polearms, blunt weapons and riders. Weak against beasts, the unarmoured and bare hands."
  },
  "bannerSpear": {
   "strong": [
    "beasts",
-   "the unarmoured",
+   "spears and polearms",
    "bows"
   ],
   "weak": [
-   "blunt weapons",
    "machines"
   ],
   "best": "Silverback",
-  "worst": "Mace Sipahi",
-  "text": "Strong against beasts, the unarmoured and bows. Weak against blunt weapons and machines."
+  "worst": "Humanoid robot",
+  "text": "Strong against beasts, spears and polearms and bows. Weak against machines."
  },
  "templar": {
   "strong": [
-   "bows",
-   "blades"
-  ],
-  "weak": [
-   "beasts",
-   "the unarmoured",
-   "blunt weapons"
-  ],
-  "best": "Conquistador Captain",
-  "worst": "Silverback",
-  "text": "Strong against bows and blades. Weak against beasts, the unarmoured and blunt weapons."
- },
- "bannerArcher": {
-  "strong": [
-   "machines",
-   "blades",
-   "guns"
-  ],
-  "weak": [
    "blunt weapons",
-   "spears and polearms"
-  ],
-  "best": "Humanoid robot",
-  "worst": "Templar Grand Master",
-  "text": "Strong against machines, blades and guns. Weak against blunt weapons and spears and polearms."
- },
- "archer": {
-  "strong": [
-   "guns"
+   "blades",
+   "bows"
   ],
   "weak": [
    "machines",
    "bare hands",
    "beasts"
   ],
-  "best": "Ming Musketeer",
-  "worst": "Conquistador Captain",
-  "text": "Strong against guns. Weak against machines, bare hands and beasts."
+  "best": "Commodus",
+  "worst": "Humanoid robot",
+  "text": "Strong against blunt weapons, blades and bows. Weak against machines, bare hands and beasts."
  },
- "steppeShield": {
+ "bannerArcher": {
   "strong": [
-   "machines",
-   "blunt weapons",
-   "blades"
-  ],
-  "weak": [
-   "beasts",
-   "the unarmoured",
-   "bows"
-  ],
-  "best": "Frontier Gazi",
-  "worst": "Silverback",
-  "text": "Strong against machines, blunt weapons and blades. Weak against beasts, the unarmoured and bows."
- },
- "mandukhai": {
-  "strong": [],
-  "weak": [
-   "guns",
-   "machines",
    "blunt weapons"
   ],
-  "best": "Wuxia Swordsman",
-  "worst": "Ming Musketeer",
-  "text": "Weak against guns, machines and blunt weapons."
+  "weak": [
+   "spears and polearms",
+   "beasts",
+   "the unarmoured"
+  ],
+  "best": "Oirat Warlord",
+  "worst": "Iron Pagoda",
+  "text": "Strong against blunt weapons. Weak against spears and polearms, beasts and the unarmoured."
  },
- "scissor": {
+ "archer": {
   "strong": [
    "blunt weapons"
   ],
   "weak": [
    "machines",
    "bare hands",
-   "riders"
+   "beasts"
   ],
-  "best": "Commodus",
+  "best": "Oirat Warlord",
+  "worst": "Humanoid robot",
+  "text": "Strong against blunt weapons. Weak against machines, bare hands and beasts."
+ },
+ "steppeShield": {
+  "strong": [
+   "blunt weapons",
+   "blades",
+   "machines"
+  ],
+  "weak": [
+   "beasts",
+   "the unarmoured",
+   "bare hands"
+  ],
+  "best": "Glaive Maiden",
+  "worst": "Silverback",
+  "text": "Strong against blunt weapons, blades and machines. Weak against beasts, the unarmoured and bare hands."
+ },
+ "mandukhai": {
+  "strong": [
+   "blades"
+  ],
+  "weak": [
+   "guns",
+   "machines",
+   "bows"
+  ],
+  "best": "Maximus",
+  "worst": "Teppō Gunner",
+  "text": "Strong against blades. Weak against guns, machines and bows."
+ },
+ "scissor": {
+  "strong": [
+   "bows",
+   "the unarmoured"
+  ],
+  "weak": [
+   "machines",
+   "heavy armour",
+   "spears and polearms"
+  ],
+  "best": "Steppe Horse Archer",
   "worst": "Pvt. Owen Kade",
-  "text": "Strong against blunt weapons. Weak against machines, bare hands and riders."
+  "text": "Strong against bows and the unarmoured. Weak against machines, heavy armour and spears and polearms."
  },
  "firefighter": {
   "strong": [
-   "beasts",
+   "guns",
    "machines",
-   "guns"
+   "beasts"
   ],
   "weak": [
-   "bows"
+   "blunt weapons",
+   "riders",
+   "heavy armour"
   ],
-  "best": "Chimpanzee",
-  "worst": "Lady Ashford",
-  "text": "Strong against beasts, machines and guns. Weak against bows."
+  "best": "Patrol Officer",
+  "worst": "Shaolin Staff Monk",
+  "text": "Strong against guns, machines and beasts. Weak against blunt weapons, riders and heavy armour."
  },
  "bayara": {
   "strong": [
    "beasts",
-   "bare hands",
-   "the unarmoured"
-  ],
-  "weak": [
+   "the unarmoured",
    "bows"
   ],
-  "best": "Silverback",
-  "worst": "Three-Eyed Gunner",
-  "text": "Strong against beasts, bare hands and the unarmoured. Weak against bows."
+  "weak": [
+   "spears and polearms",
+   "blunt weapons"
+  ],
+  "best": "Conquistador Arquebusier",
+  "worst": "Banner Glaive-Man",
+  "text": "Strong against beasts, the unarmoured and bows. Weak against spears and polearms and blunt weapons."
  },
  "murmillo": {
   "strong": [
-   "blunt weapons",
+   "the unarmoured",
    "beasts",
-   "the unarmoured"
-  ],
-  "weak": [
-   "machines",
-   "bows",
-   "heavy armour"
-  ],
-  "best": "Commodus",
-  "worst": "Pvt. Owen Kade",
-  "text": "Strong against blunt weapons, beasts and the unarmoured. Weak against machines, bows and heavy armour."
- },
- "secutor": {
-  "strong": [
-   "beasts"
+   "bows"
   ],
   "weak": [
    "machines",
    "spears and polearms",
-   "blunt weapons"
+   "heavy armour"
   ],
-  "best": "Chimpanzee",
+  "best": "Wall-Storming Janissary",
   "worst": "Pvt. Owen Kade",
-  "text": "Strong against beasts. Weak against machines, spears and polearms and blunt weapons."
+  "text": "Strong against the unarmoured, beasts and bows. Weak against machines, spears and polearms and heavy armour."
+ },
+ "secutor": {
+  "strong": [
+   "guns"
+  ],
+  "weak": [
+   "machines",
+   "heavy armour",
+   "spears and polearms"
+  ],
+  "best": "SWAT Pistoleer",
+  "worst": "Pvt. Owen Kade",
+  "text": "Strong against guns. Weak against machines, heavy armour and spears and polearms."
  },
  "vocPikeman": {
   "strong": [
    "beasts",
    "the unarmoured",
-   "bows"
-  ],
-  "weak": [
-   "machines"
-  ],
-  "best": "Silverback",
-  "worst": "Ming Spearman",
-  "text": "Strong against beasts, the unarmoured and bows. Weak against machines."
- },
- "sipahi": {
-  "strong": [
-   "blunt weapons",
-   "machines",
-   "riders"
-  ],
-  "weak": [
-   "beasts",
-   "the unarmoured",
-   "guns"
-  ],
-  "best": "Guan Yu",
-  "worst": "Silverback",
-  "text": "Strong against blunt weapons, machines and riders. Weak against beasts, the unarmoured and guns."
- },
- "saladin": {
-  "strong": [],
-  "weak": [
-   "machines",
-   "bare hands",
-   "beasts"
-  ],
-  "best": "Maximus",
-  "worst": "Humanoid robot",
-  "text": "Weak against machines, bare hands and beasts."
- },
- "sohei": {
-  "strong": [
-   "beasts",
-   "the unarmoured",
    "bare hands"
   ],
   "weak": [
-   "bows",
-   "blunt weapons",
-   "riders"
+   "machines",
+   "spears and polearms"
   ],
   "best": "Silverback",
-  "worst": "One-Eyed Dragon",
-  "text": "Strong against beasts, the unarmoured and bare hands. Weak against bows, blunt weapons and riders."
+  "worst": "Humanoid robot",
+  "text": "Strong against beasts, the unarmoured and bare hands. Weak against machines and spears and polearms."
  },
- "hidalgo": {
-  "strong": [],
+ "saladin": {
+  "strong": [
+   "bows"
+  ],
   "weak": [
    "machines",
+   "bare hands",
+   "spears and polearms"
+  ],
+  "best": "Great-Bow Archer",
+  "worst": "Humanoid robot",
+  "text": "Strong against bows. Weak against machines, bare hands and spears and polearms."
+ },
+ "sipahi": {
+  "strong": [
+   "riders",
+   "blades",
+   "bows"
+  ],
+  "weak": [
+   "beasts",
    "the unarmoured",
    "blunt weapons"
   ],
-  "best": "Fan-Shooter Archer",
-  "worst": "Wuxia Swordsman",
-  "text": "Weak against machines, the unarmoured and blunt weapons."
+  "best": "Noble Knight",
+  "worst": "Silverback",
+  "text": "Strong against riders, blades and bows. Weak against beasts, the unarmoured and blunt weapons."
+ },
+ "sohei": {
+  "strong": [
+   "guns",
+   "the unarmoured",
+   "beasts"
+  ],
+  "weak": [
+   "spears and polearms",
+   "blunt weapons",
+   "riders"
+  ],
+  "best": "Arquebusier",
+  "worst": "Ming Elite Infantry",
+  "text": "Strong against guns, the unarmoured and beasts. Weak against spears and polearms, blunt weapons and riders."
+ },
+ "hidalgo": {
+  "strong": [
+   "blunt weapons",
+   "bows"
+  ],
+  "weak": [
+   "machines",
+   "bare hands",
+   "spears and polearms"
+  ],
+  "best": "Oirat Warlord",
+  "worst": "Humanoid robot",
+  "text": "Strong against blunt weapons and bows. Weak against machines, bare hands and spears and polearms."
  },
  "centurion": {
   "strong": [
    "blunt weapons",
-   "the unarmoured"
-  ],
-  "weak": [
-   "machines",
-   "bare hands",
-   "beasts"
-  ],
-  "best": "Murmillo",
-  "worst": "Pvt. Owen Kade",
-  "text": "Strong against blunt weapons and the unarmoured. Weak against machines, bare hands and beasts."
- },
- "hoplomachus": {
-  "strong": [
-   "blades",
-   "spears and polearms",
+   "guns",
    "riders"
   ],
   "weak": [
+   "heavy armour",
+   "machines"
+  ],
+  "best": "Riot Shield Officer",
+  "worst": "Ashigaru Archer",
+  "text": "Strong against blunt weapons, guns and riders. Weak against heavy armour and machines."
+ },
+ "hoplomachus": {
+  "strong": [
+   "blades"
+  ],
+  "weak": [
    "machines",
-   "guns",
-   "bare hands"
+   "spears and polearms",
+   "guns"
   ],
   "best": "Maximus",
   "worst": "Pvt. Owen Kade",
-  "text": "Strong against blades, spears and polearms and riders. Weak against machines, guns and bare hands."
+  "text": "Strong against blades. Weak against machines, spears and polearms and guns."
  },
  "thraex": {
   "strong": [
-   "machines",
-   "bare hands",
-   "blunt weapons"
+   "blunt weapons",
+   "guns",
+   "blades"
   ],
   "weak": [
    "spears and polearms"
   ],
-  "best": "Mini humanoid robot",
+  "best": "Riot Shield Officer",
   "worst": "Lady Ashford",
-  "text": "Strong against machines, bare hands and blunt weapons. Weak against spears and polearms."
+  "text": "Strong against blunt weapons, guns and blades. Weak against spears and polearms."
  },
  "mingEliteInfantry": {
   "strong": [
-   "machines",
+   "beasts",
    "bare hands",
    "bows"
   ],
   "weak": [
    "guns"
   ],
-  "best": "Frontier Gazi",
-  "worst": "Conquistador Arquebusier",
-  "text": "Strong against machines, bare hands and bows. Weak against guns."
+  "best": "Warrior Monk",
+  "worst": "Ming Musketeer",
+  "text": "Strong against beasts, bare hands and bows. Weak against guns."
  },
  "gaziAlp": {
-  "strong": [],
-  "weak": [
-   "beasts",
-   "the unarmoured",
-   "spears and polearms"
+  "strong": [
+   "blunt weapons",
+   "blades"
   ],
-  "best": "Maximus",
-  "worst": "Silverback",
-  "text": "Weak against beasts, the unarmoured and spears and polearms."
+  "weak": [
+   "machines",
+   "bare hands",
+   "guns"
+  ],
+  "best": "Genoese Crossbowman",
+  "worst": "Humanoid robot",
+  "text": "Strong against blunt weapons and blades. Weak against machines, bare hands and guns."
  },
  "legionary": {
   "strong": [
    "blunt weapons",
-   "riders",
-   "the unarmoured"
-  ],
-  "weak": [
-   "machines",
-   "bare hands",
+   "the unarmoured",
    "beasts"
   ],
-  "best": "Maid of Orléans",
+  "weak": [
+   "machines"
+  ],
+  "best": "Steppe Horse Archer",
   "worst": "Pvt. Owen Kade",
-  "text": "Strong against blunt weapons, riders and the unarmoured. Weak against machines, bare hands and beasts."
+  "text": "Strong against blunt weapons, the unarmoured and beasts. Weak against machines."
  },
  "mingGun": {
   "strong": [
-   "blunt weapons",
-   "machines",
-   "blades"
+   "spears and polearms",
+   "blades",
+   "machines"
   ],
   "weak": [
    "beasts",
-   "bows"
+   "the unarmoured"
   ],
-  "best": "Warrior Queen",
+  "best": "Ming Elite Infantry",
   "worst": "Silverback",
-  "text": "Strong against blunt weapons, machines and blades. Weak against beasts and bows."
+  "text": "Strong against spears and polearms, blades and machines. Weak against beasts and the unarmoured."
  },
  "mingShield": {
   "strong": [],
   "weak": [
-   "guns",
    "machines",
+   "heavy armour",
    "bare hands"
   ],
-  "best": "Old Orlok",
-  "worst": "Two-Sword Rōnin",
-  "text": "Weak against guns, machines and bare hands."
+  "best": null,
+  "worst": "Humanoid robot",
+  "text": "Weak against machines, heavy armour and bare hands."
  },
  "mingBrigSpear": {
   "strong": [
-   "beasts",
-   "the unarmoured",
-   "riders"
-  ],
-  "weak": [
    "guns",
-   "bows",
-   "machines"
+   "beasts",
+   "heavy armour"
   ],
-  "best": "Silverback",
-  "worst": "Ming Musketeer",
-  "text": "Strong against beasts, the unarmoured and riders. Weak against guns, bows and machines."
- },
- "crossbowman": {
-  "strong": [
-   "blunt weapons",
-   "the unarmoured"
-  ],
-  "weak": [
-   "machines",
-   "bare hands",
-   "beasts"
-  ],
-  "best": "Wuxia Swordsman",
-  "worst": "Humanoid robot",
-  "text": "Strong against blunt weapons and the unarmoured. Weak against machines, bare hands and beasts."
+  "weak": [],
+  "best": "Scissor Gladiator",
+  "worst": "Azap Archer",
+  "text": "Strong against guns, beasts and heavy armour."
  },
  "arquebus": {
   "strong": [
    "machines",
-   "blunt weapons",
-   "blades"
+   "spears and polearms",
+   "bows"
   ],
   "weak": [
    "beasts",
-   "the unarmoured",
-   "spears and polearms"
+   "the unarmoured"
   ],
   "best": "Tiger of Kai",
   "worst": "Silverback",
-  "text": "Strong against machines, blunt weapons and blades. Weak against beasts, the unarmoured and spears and polearms."
+  "text": "Strong against machines, spears and polearms and bows. Weak against beasts and the unarmoured."
+ },
+ "crossbowman": {
+  "strong": [],
+  "weak": [
+   "machines",
+   "bare hands",
+   "spears and polearms"
+  ],
+  "best": null,
+  "worst": "Humanoid robot",
+  "text": "Weak against machines, bare hands and spears and polearms."
  },
  "footSpear": {
   "strong": [
-   "spears and polearms",
+   "bows",
    "beasts",
-   "riders"
+   "the unarmoured"
   ],
   "weak": [
    "machines",
-   "guns",
-   "blunt weapons"
+   "riders",
+   "blades"
   ],
-  "best": "Iron Pagoda",
-  "worst": "Humanoid robot",
-  "text": "Strong against spears and polearms, beasts and riders. Weak against machines, guns and blunt weapons."
+  "best": "English Longbowman",
+  "worst": "Templar Grand Master",
+  "text": "Strong against bows, beasts and the unarmoured. Weak against machines, riders and blades."
  },
  "swatShotgun": {
   "strong": [
@@ -680,220 +668,215 @@ export const MATCHUPS = {
    "beasts"
   ],
   "weak": [],
-  "best": "Company Musketeer",
-  "worst": null,
+  "best": "Conquistador Arquebusier",
+  "worst": "Ōdachi Champion",
   "text": "Strong against guns, bows and beasts."
  },
  "teppo": {
   "strong": [
    "machines",
-   "blunt weapons"
-  ],
-  "weak": [
-   "beasts",
-   "the unarmoured",
-   "bare hands"
-  ],
-  "best": "Mace Sipahi",
-  "worst": "Silverback",
-  "text": "Strong against machines and blunt weapons. Weak against beasts, the unarmoured and bare hands."
- },
- "pistol": {
-  "strong": [
-   "bows",
-   "riders",
-   "guns"
-  ],
-  "weak": [
+   "blunt weapons",
    "blades"
   ],
-  "best": "Ashigaru Archer",
-  "worst": "Wall-Storming Janissary",
-  "text": "Strong against bows, riders and guns. Weak against blades."
+  "weak": [
+   "spears and polearms",
+   "beasts"
+  ],
+  "best": "Oirat Warlord",
+  "worst": "Iron Pagoda",
+  "text": "Strong against machines, blunt weapons and blades. Weak against spears and polearms and beasts."
  },
  "ashigaruBow": {
   "strong": [
    "bows",
-   "beasts"
+   "beasts",
+   "riders"
   ],
   "weak": [
    "guns",
    "blunt weapons",
    "machines"
   ],
-  "best": "Han Crossbowman",
+  "best": "Steppe Horse Archer",
   "worst": "SWAT Pistoleer",
-  "text": "Strong against bows and beasts. Weak against guns, blunt weapons and machines."
+  "text": "Strong against bows, beasts and riders. Weak against guns, blunt weapons and machines."
  },
  "ashigaruSpear": {
   "strong": [
    "beasts",
-   "bare hands",
-   "the unarmoured"
+   "the unarmoured",
+   "blunt weapons"
   ],
   "weak": [
-   "bows",
-   "blunt weapons",
-   "riders"
+   "machines",
+   "heavy armour",
+   "guns"
   ],
   "best": "Silverback",
-  "worst": "Maximus",
-  "text": "Strong against beasts, bare hands and the unarmoured. Weak against bows, blunt weapons and riders."
+  "worst": "Humanoid robot",
+  "text": "Strong against beasts, the unarmoured and blunt weapons. Weak against machines, heavy armour and guns."
+ },
+ "pistol": {
+  "strong": [
+   "bows",
+   "guns",
+   "riders"
+  ],
+  "weak": [
+   "machines",
+   "blunt weapons"
+  ],
+  "best": "Steppe Horse Archer",
+  "worst": "Wall-Storming Janissary",
+  "text": "Strong against bows, guns and riders. Weak against machines and blunt weapons."
  },
  "baton": {
   "strong": [
-   "machines",
-   "bare hands",
-   "beasts"
-  ],
-  "weak": [
-   "blunt weapons",
-   "the unarmoured",
-   "riders"
-  ],
-  "best": "Mini humanoid robot",
-  "worst": "Retiarius",
-  "text": "Strong against machines, bare hands and beasts. Weak against blunt weapons, the unarmoured and riders."
- },
- "footBow": {
-  "strong": [
+   "bows",
+   "beasts",
    "guns"
   ],
   "weak": [
    "blunt weapons",
    "machines",
-   "bows"
-  ],
-  "best": "Maximus",
-  "worst": "Commodus",
-  "text": "Strong against guns. Weak against blunt weapons, machines and bows."
- },
- "hanCrossbow": {
-  "strong": [
-   "beasts"
-  ],
-  "weak": [
-   "guns",
-   "bows"
-  ],
-  "best": "Riot Shield Officer",
-  "worst": "Mini humanoid robot",
-  "text": "Strong against beasts. Weak against guns and bows."
- },
- "riot": {
-  "strong": [
-   "machines",
-   "bare hands",
-   "beasts"
-  ],
-  "weak": [
-   "guns",
-   "the unarmoured",
-   "heavy armour"
-  ],
-  "best": "Mini humanoid robot",
-  "worst": "Wall-Storming Janissary",
-  "text": "Strong against machines, bare hands and beasts. Weak against guns, the unarmoured and heavy armour."
- },
- "ronin": {
-  "strong": [
-   "blades",
-   "bows",
-   "heavy armour"
-  ],
-  "weak": [
-   "guns",
-   "machines",
-   "blunt weapons"
-  ],
-  "best": "Ming Shield Soldier",
-  "worst": "Ming Musketeer",
-  "text": "Strong against blades, bows and heavy armour. Weak against guns, machines and blunt weapons."
- },
- "arquebusier": {
-  "strong": [
-   "machines",
-   "spears and polearms",
-   "blades"
-  ],
-  "weak": [
-   "blunt weapons",
-   "beasts",
-   "the unarmoured"
-  ],
-  "best": "Humanoid robot",
-  "worst": "General's Retainer",
-  "text": "Strong against machines, spears and polearms and blades. Weak against blunt weapons, beasts and the unarmoured."
- },
- "kheshig": {
-  "strong": [
-   "guns",
-   "bows"
-  ],
-  "weak": [
-   "blunt weapons",
-   "beasts",
    "spears and polearms"
   ],
-  "best": "Wuxia Swordsman",
-  "worst": "Commodus",
-  "text": "Strong against guns and bows. Weak against blunt weapons, beasts and spears and polearms."
+  "best": "Lady Ashford",
+  "worst": "Azap Spearman",
+  "text": "Strong against bows, beasts and guns. Weak against blunt weapons, machines and spears and polearms."
  },
- "rodelero": {
+ "footBow": {
   "strong": [],
   "weak": [
    "machines",
    "bare hands",
+   "bows"
+  ],
+  "best": "Warrior Queen",
+  "worst": "Humanoid robot",
+  "text": "Weak against machines, bare hands and bows."
+ },
+ "hanCrossbow": {
+  "strong": [
+   "machines"
+  ],
+  "weak": [
+   "guns",
+   "spears and polearms",
+   "bows"
+  ],
+  "best": "Pvt. Owen Kade",
+  "worst": "Ashigaru Archer",
+  "text": "Strong against machines. Weak against guns, spears and polearms and bows."
+ },
+ "riot": {
+  "strong": [
+   "guns",
+   "riders",
+   "blunt weapons"
+  ],
+  "weak": [
+   "machines"
+  ],
+  "best": "Maid of Orléans",
+  "worst": "Wall-Storming Janissary",
+  "text": "Strong against guns, riders and blunt weapons. Weak against machines."
+ },
+ "ronin": {
+  "strong": [
    "beasts"
   ],
+  "weak": [
+   "guns",
+   "machines",
+   "the unarmoured"
+  ],
   "best": "Maximus",
-  "worst": "Humanoid robot",
-  "text": "Weak against machines, bare hands and beasts."
+  "worst": "Janissary Musketeer",
+  "text": "Strong against beasts. Weak against guns, machines and the unarmoured."
  },
- "esen": {
+ "arquebusier": {
   "strong": [
-   "blades",
-   "riders",
+   "machines",
    "bows"
   ],
   "weak": [
-   "machines",
-   "blunt weapons",
-   "bare hands"
-  ],
-  "best": "Maid of Orléans",
-  "worst": "Pvt. Owen Kade",
-  "text": "Strong against blades, riders and bows. Weak against machines, blunt weapons and bare hands."
- },
- "maximus": {
-  "strong": [
-   "guns",
    "beasts",
-   "spears and polearms"
+   "the unarmoured",
+   "guns"
   ],
-  "weak": [
-   "blunt weapons",
-   "blades",
-   "machines"
-  ],
-  "best": "SWAT Pistoleer",
-  "worst": "Oirat Warlord",
-  "text": "Strong against guns, beasts and spears and polearms. Weak against blunt weapons, blades and machines."
+  "best": "Humanoid robot",
+  "worst": "Silverback",
+  "text": "Strong against machines and bows. Weak against beasts, the unarmoured and guns."
  },
- "jaguar": {
+ "rodelero": {
   "strong": [
-   "beasts",
-   "spears and polearms",
-   "bare hands"
-  ],
-  "weak": [
-   "bows",
    "blunt weapons",
    "blades"
   ],
-  "best": "Chimpanzee",
+  "weak": [
+   "machines",
+   "bare hands",
+   "spears and polearms"
+  ],
+  "best": "Maximus",
+  "worst": "Humanoid robot",
+  "text": "Strong against blunt weapons and blades. Weak against machines, bare hands and spears and polearms."
+ },
+ "kheshig": {
+  "strong": [
+   "bows",
+   "blades",
+   "guns"
+  ],
+  "weak": [
+   "blunt weapons",
+   "beasts",
+   "spears and polearms"
+  ],
+  "best": "Sword Saint",
+  "worst": "Commodus",
+  "text": "Strong against bows, blades and guns. Weak against blunt weapons, beasts and spears and polearms."
+ },
+ "esen": {
+  "strong": [
+   "machines"
+  ],
+  "weak": [
+   "the unarmoured",
+   "guns",
+   "blunt weapons"
+  ],
+  "best": "Maximus",
+  "worst": "Commodus",
+  "text": "Strong against machines. Weak against the unarmoured, guns and blunt weapons."
+ },
+ "maximus": {
+  "strong": [
+   "bows",
+   "beasts"
+  ],
+  "weak": [
+   "blades",
+   "machines"
+  ],
+  "best": "Ashigaru Archer",
+  "worst": "Hoplomachus",
+  "text": "Strong against bows and beasts. Weak against blades and machines."
+ },
+ "jaguar": {
+  "strong": [
+   "guns",
+   "spears and polearms"
+  ],
+  "weak": [
+   "bows",
+   "beasts",
+   "blades"
+  ],
+  "best": "Sumo Grand Champion",
   "worst": "Lady Ashford",
-  "text": "Strong against beasts, spears and polearms and bare hands. Weak against bows, blunt weapons and blades."
+  "text": "Strong against guns and spears and polearms. Weak against bows, beasts and blades."
  },
  "vocMusketeer": {
   "strong": [
@@ -901,63 +884,76 @@ export const MATCHUPS = {
    "bows"
   ],
   "weak": [
-   "blunt weapons",
    "guns",
+   "spears and polearms",
    "beasts"
   ],
   "best": "Humanoid robot",
-  "worst": "General's Retainer",
-  "text": "Strong against machines and bows. Weak against blunt weapons, guns and beasts."
+  "worst": "Ming Elite Musketeer",
+  "text": "Strong against machines and bows. Weak against guns, spears and polearms and beasts."
  },
  "eagle": {
   "strong": [
-   "guns",
-   "blades",
-   "the unarmoured"
+   "machines",
+   "blunt weapons",
+   "blades"
   ],
-  "weak": [
-   "bows"
-  ],
-  "best": "Murmillo",
+  "weak": [],
+  "best": "Pvt. Owen Kade",
   "worst": "Ashigaru Archer",
-  "text": "Strong against guns, blades and the unarmoured. Weak against bows."
+  "text": "Strong against machines, blunt weapons and blades."
  },
  "dogVision60": {
   "strong": [
-   "blunt weapons",
-   "spears and polearms",
-   "riders"
+   "machines"
   ],
   "weak": [],
-  "best": "Infantry Rifleman",
+  "best": "Special Forces Rifleman",
   "worst": "Flame Trooper",
-  "text": "Strong against blunt weapons, spears and polearms and riders."
+  "text": "Strong against machines."
  },
  "humanoid": {
   "strong": [
-   "blades"
+   "blades",
+   "bows",
+   "riders"
   ],
   "weak": [
    "machines",
    "bare hands",
    "beasts"
   ],
-  "best": "Saladin",
+  "best": "One-Eyed Dragon",
   "worst": "Pvt. Owen Kade",
-  "text": "Strong against blades. Weak against machines, bare hands and beasts."
+  "text": "Strong against blades, bows and riders. Weak against machines, bare hands and beasts."
  },
- "dogSpot": {
+ "miniHumanoid": {
   "strong": [
-   "spears and polearms"
+   "blades"
   ],
   "weak": [
-   "guns",
+   "bare hands",
    "blunt weapons",
    "beasts"
   ],
-  "best": "Retiarius",
+  "best": "Garrison Swordsman",
   "worst": "Back-Alley Thug",
-  "text": "Strong against spears and polearms. Weak against guns, blunt weapons and beasts."
+  "text": "Strong against blades. Weak against bare hands, blunt weapons and beasts."
+ },
+ "dogSpot": {
+  "strong": [
+   "spears and polearms",
+   "riders",
+   "heavy armour"
+  ],
+  "weak": [
+   "beasts",
+   "guns",
+   "bows"
+  ],
+  "best": "Cage Wrestler",
+  "worst": "Back-Alley Thug",
+  "text": "Strong against spears and polearms, riders and heavy armour. Weak against beasts, guns and bows."
  },
  "dogGo2": {
   "strong": [
@@ -966,189 +962,328 @@ export const MATCHUPS = {
   ],
   "weak": [
    "beasts",
-   "bare hands",
-   "blunt weapons"
+   "machines",
+   "bare hands"
   ],
   "best": "Patrol Officer",
   "worst": "Temple Monkey",
-  "text": "Strong against guns and spears and polearms. Weak against beasts, bare hands and blunt weapons."
+  "text": "Strong against guns and spears and polearms. Weak against beasts, machines and bare hands."
  },
- "miniHumanoid": {
-  "strong": [],
-  "weak": [
-   "beasts",
-   "guns",
-   "bare hands"
+ "janissaryGun": {
+  "strong": [
+   "machines",
+   "blunt weapons",
+   "spears and polearms"
   ],
-  "best": "Han Crossbowman",
-  "worst": "Chimpanzee",
-  "text": "Weak against beasts, guns and bare hands."
+  "weak": [],
+  "best": "Tiger of Kai",
+  "worst": "One-Eyed Dragon",
+  "text": "Strong against machines, blunt weapons and spears and polearms."
  },
  "gorilla": {
   "strong": [
-   "bare hands",
    "bows",
-   "blunt weapons"
+   "bare hands",
+   "guns"
   ],
   "weak": [
    "spears and polearms"
   ],
-  "best": "Ming Elite Musketeer",
-  "worst": "Ming Spearman",
-  "text": "Strong against bare hands, bows and blunt weapons. Weak against spears and polearms."
+  "best": "Mace Sipahi",
+  "worst": "Company Pikeman",
+  "text": "Strong against bows, bare hands and guns. Weak against spears and polearms."
  },
- "janissaryGun": {
-  "strong": [],
+ "swordSaint": {
+  "strong": [
+   "beasts"
+  ],
   "weak": [
    "bows",
-   "riders",
-   "blunt weapons"
+   "guns",
+   "the unarmoured"
   ],
-  "best": "Humanoid robot",
-  "worst": "General's Retainer",
-  "text": "Weak against bows, riders and blunt weapons."
+  "best": "Silverback",
+  "worst": "Old Orlok",
+  "text": "Strong against beasts. Weak against bows, guns and the unarmoured."
  },
  "wuxia": {
   "strong": [
-   "blunt weapons",
+   "spears and polearms",
    "beasts",
-   "the unarmoured"
+   "guns"
   ],
   "weak": [
-   "guns",
-   "machines",
    "bows"
   ],
-  "best": "Conquistador Captain",
-  "worst": "Old Orlok",
-  "text": "Strong against blunt weapons, beasts and the unarmoured. Weak against guns, machines and bows."
+  "best": "Iron Pagoda",
+  "worst": "Steppe Horse Archer",
+  "text": "Strong against spears and polearms, beasts and guns. Weak against bows."
  },
  "commodus": {
   "strong": [
-   "machines",
    "blunt weapons",
-   "riders"
+   "machines",
+   "bare hands"
   ],
   "weak": [
-   "the unarmoured",
-   "beasts"
+   "spears and polearms",
+   "guns",
+   "blades"
   ],
-  "best": "Maid of Orléans",
-  "worst": "Legionary",
-  "text": "Strong against machines, blunt weapons and riders. Weak against the unarmoured and beasts."
+  "best": "Oirat Warlord",
+  "worst": "Templar Grand Master",
+  "text": "Strong against blunt weapons, machines and bare hands. Weak against spears and polearms, guns and blades."
+ },
+ "mexica": {
+  "strong": [
+   "machines",
+   "guns",
+   "heavy armour"
+  ],
+  "weak": [
+   "blunt weapons",
+   "bows",
+   "the unarmoured"
+  ],
+  "best": "Pvt. Owen Kade",
+  "worst": "Riot Shield Officer",
+  "text": "Strong against machines, guns and heavy armour. Weak against blunt weapons, bows and the unarmoured."
+ },
+ "azapArcher": {
+  "strong": [
+   "guns",
+   "the unarmoured"
+  ],
+  "weak": [
+   "machines",
+   "spears and polearms",
+   "riders"
+  ],
+  "best": "Judoka",
+  "worst": "Old Orlok",
+  "text": "Strong against guns and the unarmoured. Weak against machines, spears and polearms and riders."
+ },
+ "steppeArcher": {
+  "strong": [
+   "beasts",
+   "bare hands"
+  ],
+  "weak": [
+   "guns",
+   "heavy armour",
+   "riders"
+  ],
+  "best": "Wuxia Swordsman",
+  "worst": "SWAT Pistoleer",
+  "text": "Strong against beasts and bare hands. Weak against guns, heavy armour and riders."
+ },
+ "azapSpear": {
+  "strong": [
+   "guns",
+   "blunt weapons",
+   "the unarmoured"
+  ],
+  "weak": [
+   "bows",
+   "riders",
+   "blades"
+  ],
+  "best": "Patrol Officer",
+  "worst": "Maid of Orléans",
+  "text": "Strong against guns, blunt weapons and the unarmoured. Weak against bows, riders and blades."
+ },
+ "janissary": {
+  "strong": [
+   "machines",
+   "blunt weapons",
+   "guns"
+  ],
+  "weak": [
+   "blades",
+   "riders",
+   "the unarmoured"
+  ],
+  "best": "Pvt. Owen Kade",
+  "worst": "Murmillo",
+  "text": "Strong against machines, blunt weapons and guns. Weak against blades, riders and the unarmoured."
  },
  "ladyAshford": {
   "strong": [
    "beasts",
-   "blades",
+   "bare hands",
    "bows"
   ],
   "weak": [
    "guns"
   ],
-  "best": "Han Crossbowman",
+  "best": "Ashigaru Archer",
   "worst": "SWAT Baton Officer",
-  "text": "Strong against beasts, blades and bows. Weak against guns."
+  "text": "Strong against beasts, bare hands and bows. Weak against guns."
  },
- "mexica": {
+ "retiarius": {
   "strong": [
+   "beasts",
    "guns",
-   "machines",
    "bare hands"
   ],
   "weak": [
-   "blunt weapons",
    "riders",
-   "blades"
-  ],
-  "best": "SWAT Pistoleer",
-  "worst": "Oirat Warlord",
-  "text": "Strong against guns, machines and bare hands. Weak against blunt weapons, riders and blades."
- },
- "azapArcher": {
-  "strong": [
-   "machines",
-   "bare hands",
-   "beasts"
-  ],
-  "weak": [
-   "guns",
-   "spears and polearms",
-   "riders"
-  ],
-  "best": "Pvt. Owen Kade",
-  "worst": "SWAT Pistoleer",
-  "text": "Strong against machines, bare hands and beasts. Weak against guns, spears and polearms and riders."
- },
- "steppeArcher": {
-  "strong": [
-   "beasts"
-  ],
-  "weak": [
-   "guns"
+   "heavy armour",
+   "spears and polearms"
   ],
   "best": "SWAT Baton Officer",
-  "worst": "SWAT Pistoleer",
-  "text": "Strong against beasts. Weak against guns."
+  "worst": "Maid of Orléans",
+  "text": "Strong against beasts, guns and bare hands. Weak against riders, heavy armour and spears and polearms."
  },
- "police": {
+ "chimp": {
   "strong": [
+   "beasts"
+  ],
+  "weak": [
+   "riders",
+   "heavy armour",
+   "bows"
+  ],
+  "best": "Judoka",
+  "worst": "Maid of Orléans",
+  "text": "Strong against beasts. Weak against riders, heavy armour and bows."
+ },
+ "mingSpear": {
+  "strong": [
+   "guns",
+   "blunt weapons",
+   "the unarmoured"
+  ],
+  "weak": [
    "machines",
    "riders",
    "heavy armour"
   ],
+  "best": "Arena Whip-Master",
+  "worst": "Mini humanoid robot",
+  "text": "Strong against guns, blunt weapons and the unarmoured. Weak against machines, riders and heavy armour."
+ },
+ "wokou": {
+  "strong": [
+   "guns",
+   "blunt weapons"
+  ],
+  "weak": [
+   "machines",
+   "bare hands",
+   "bows"
+  ],
+  "best": "Patrol Officer",
+  "worst": "Mini humanoid robot",
+  "text": "Strong against guns and blunt weapons. Weak against machines, bare hands and bows."
+ },
+ "boxer": {
+  "strong": [
+   "guns",
+   "blunt weapons",
+   "the unarmoured"
+  ],
+  "weak": [
+   "riders",
+   "heavy armour"
+  ],
+  "best": "Patrol Officer",
+  "worst": "Spot with arm",
+  "text": "Strong against guns, blunt weapons and the unarmoured. Weak against riders and heavy armour."
+ },
+ "lorarius": {
+  "strong": [
+   "blunt weapons",
+   "beasts",
+   "the unarmoured"
+  ],
+  "weak": [
+   "machines",
+   "blades"
+  ],
+  "best": "Mixed Martial Artist",
+  "worst": "Mini humanoid robot",
+  "text": "Strong against blunt weapons, beasts and the unarmoured. Weak against machines and blades."
+ },
+ "shaolin": {
+  "strong": [
+   "guns",
+   "blunt weapons",
+   "machines"
+  ],
+  "weak": [
+   "blades",
+   "beasts",
+   "spears and polearms"
+  ],
+  "best": "Patrol Officer",
+  "worst": "Garrison Spearman",
+  "text": "Strong against guns, blunt weapons and machines. Weak against blades, beasts and spears and polearms."
+ },
+ "mingDao": {
+  "strong": [
+   "the unarmoured",
+   "guns",
+   "blunt weapons"
+  ],
+  "weak": [
+   "machines",
+   "bows",
+   "riders"
+  ],
+  "best": "Sumo Grand Champion",
+  "worst": "Mini humanoid robot",
+  "text": "Strong against the unarmoured, guns and blunt weapons. Weak against machines, bows and riders."
+ },
+ "police": {
+  "strong": [],
   "weak": [
    "guns",
    "beasts",
    "the unarmoured"
   ],
   "best": "Spot with arm",
-  "worst": "Cage Wrestler",
-  "text": "Strong against machines, riders and heavy armour. Weak against guns, beasts and the unarmoured."
+  "worst": "Kickboxer",
+  "text": "Weak against guns, beasts and the unarmoured."
  },
- "janissary": {
+ "mix": {
   "strong": [
    "guns",
-   "blunt weapons",
-   "beasts"
+   "bows"
   ],
   "weak": [
-   "blades",
-   "spears and polearms",
-   "riders"
-  ],
-  "best": "SWAT Pistoleer",
-  "worst": "Rebel Thraex",
-  "text": "Strong against guns, blunt weapons and beasts. Weak against blades, spears and polearms and riders."
- },
- "retiarius": {
-  "strong": [
    "blunt weapons",
-   "guns",
-   "beasts"
-  ],
-  "weak": [
-   "machines",
    "riders",
    "heavy armour"
   ],
-  "best": "SWAT Baton Officer",
-  "worst": "Spot with arm",
-  "text": "Strong against blunt weapons, guns and beasts. Weak against machines, riders and heavy armour."
+  "best": "Patrol Officer",
+  "worst": "Arena Whip-Master",
+  "text": "Strong against guns and bows. Weak against blunt weapons, riders and heavy armour."
  },
- "mingDao": {
-  "strong": [
-   "machines",
-   "beasts",
-   "bare hands"
-  ],
+ "lordAshford": {
+  "strong": [],
   "weak": [
    "bows",
-   "blades"
+   "machines",
+   "heavy armour"
   ],
-  "best": "Spot with arm",
+  "best": null,
   "worst": "Lady Ashford",
-  "text": "Strong against machines, beasts and bare hands. Weak against bows and blades."
+  "text": "Weak against bows, machines and heavy armour."
+ },
+ "peasant": {
+  "strong": [
+   "beasts",
+   "bows"
+  ],
+  "weak": [
+   "blunt weapons",
+   "machines",
+   "riders"
+  ],
+  "best": "Muay Thai Fighter",
+  "worst": "Mini humanoid robot",
+  "text": "Strong against beasts and bows. Weak against blunt weapons, machines and riders."
  },
  "taekwondo": {
   "strong": [
@@ -1156,99 +1291,132 @@ export const MATCHUPS = {
    "beasts"
   ],
   "weak": [
-   "machines",
-   "blades",
-   "riders"
+   "riders",
+   "heavy armour",
+   "blades"
   ],
   "best": "Patrol Officer",
-  "worst": "Maximus",
-  "text": "Strong against guns and beasts. Weak against machines, blades and riders."
+  "worst": "Maid of Orléans",
+  "text": "Strong against guns and beasts. Weak against riders, heavy armour and blades."
  },
- "lorarius": {
-  "strong": [],
+ "knife": {
+  "strong": [
+   "bows",
+   "blunt weapons"
+  ],
   "weak": [
+   "machines",
+   "beasts",
+   "riders"
+  ],
+  "best": "Kickboxer",
+  "worst": "Mini humanoid robot",
+  "text": "Strong against bows and blunt weapons. Weak against machines, beasts and riders."
+ },
+ "kickboxer": {
+  "strong": [
+   "guns",
    "bows",
    "beasts"
   ],
-  "best": "Heavyweight Boxer",
-  "worst": "Lady Ashford",
-  "text": "Weak against bows and beasts."
+  "weak": [
+   "riders",
+   "heavy armour",
+   "blades"
+  ],
+  "best": "Patrol Officer",
+  "worst": "Spot with arm",
+  "text": "Strong against guns, bows and beasts. Weak against riders, heavy armour and blades."
  },
- "mingSpear": {
+ "judo": {
   "strong": [],
   "weak": [
-   "bows"
+   "beasts",
+   "bare hands",
+   "machines"
   ],
-  "best": "Heavyweight Boxer",
-  "worst": "Lady Ashford",
-  "text": "Weak against bows."
+  "best": "Maximus",
+  "worst": "Chimpanzee",
+  "text": "Weak against beasts, bare hands and machines."
  },
- "chimp": {
+ "sumo": {
   "strong": [
    "machines",
+   "bare hands",
+   "beasts"
+  ],
+  "weak": [
+   "bows",
+   "blades",
+   "riders"
+  ],
+  "best": "Mini humanoid robot",
+  "worst": "Garrison Swordsman",
+  "text": "Strong against machines, bare hands and beasts. Weak against bows, blades and riders."
+ },
+ "muayThai": {
+  "strong": [
+   "bows",
+   "guns"
+  ],
+  "weak": [
+   "blunt weapons",
+   "machines",
+   "riders"
+  ],
+  "best": "Garrison Crossbowman",
+  "worst": "Pitchfork Peasant",
+  "text": "Strong against bows and guns. Weak against blunt weapons, machines and riders."
+ },
+ "taichi": {
+  "strong": [
+   "beasts"
+  ],
+  "weak": [
+   "machines",
+   "riders",
+   "heavy armour"
+  ],
+  "best": "Chacma Baboon",
+  "worst": "Spot with arm",
+  "text": "Strong against beasts. Weak against machines, riders and heavy armour."
+ },
+ "street": {
+  "strong": [
+   "guns",
+   "blunt weapons",
    "bare hands"
+  ],
+  "weak": [
+   "beasts",
+   "blades"
+  ],
+  "best": "Rebel Peasant Leader",
+  "worst": "Yakuza Knifeman",
+  "text": "Strong against guns, blunt weapons and bare hands. Weak against beasts and blades."
+ },
+ "bat": {
+  "strong": [
+   "machines",
+   "guns",
+   "beasts"
   ],
   "weak": [
    "bows",
    "blades"
   ],
   "best": "Mini humanoid robot",
-  "worst": "Fire-Suited Fireman",
-  "text": "Strong against machines and bare hands. Weak against bows and blades."
+  "worst": "Heavyweight Boxer",
+  "text": "Strong against machines, guns and beasts. Weak against bows and blades."
  },
- "azapSpear": {
+ "mingCrossbow": {
   "strong": [
-   "blunt weapons",
-   "beasts",
-   "the unarmoured"
-  ],
-  "weak": [
-   "machines",
-   "heavy armour",
-   "bows"
-  ],
-  "best": "Riot Shield Officer",
-  "worst": "Mini humanoid robot",
-  "text": "Strong against blunt weapons, beasts and the unarmoured. Weak against machines, heavy armour and bows."
- },
- "lordAshford": {
-  "strong": [
-   "blunt weapons",
-   "machines",
-   "guns"
+   "beasts"
   ],
   "weak": [],
-  "best": "Pitchfork Peasant",
-  "worst": null,
-  "text": "Strong against blunt weapons, machines and guns."
- },
- "shaolin": {
-  "strong": [
-   "machines",
-   "bare hands",
-   "beasts"
-  ],
-  "weak": [
-   "bows"
-  ],
-  "best": "Spot with arm",
-  "worst": "Maximus",
-  "text": "Strong against machines, bare hands and beasts. Weak against bows."
- },
- "wokou": {
-  "strong": [
-   "guns",
-   "bare hands",
-   "the unarmoured"
-  ],
-  "weak": [
-   "bows",
-   "blades",
-   "beasts"
-  ],
-  "best": "Heavyweight Boxer",
-  "worst": "Lady Ashford",
-  "text": "Strong against guns, bare hands and the unarmoured. Weak against bows, blades and beasts."
+  "best": "Chacma Baboon",
+  "worst": "Kickboxer",
+  "text": "Strong against beasts."
  },
  "brawler": {
   "strong": [
@@ -1256,213 +1424,43 @@ export const MATCHUPS = {
    "beasts",
    "the unarmoured"
   ],
-  "weak": [],
-  "best": "Patrol Officer",
-  "worst": null,
-  "text": "Strong against guns, beasts and the unarmoured."
- },
- "boxer": {
-  "strong": [
-   "guns",
-   "bows"
-  ],
   "weak": [
-   "beasts",
-   "the unarmoured",
-   "bare hands"
+   "riders",
+   "heavy armour",
+   "blunt weapons"
   ],
   "best": "Patrol Officer",
-  "worst": "Arena Whip-Master",
-  "text": "Strong against guns and bows. Weak against beasts, the unarmoured and bare hands."
- },
- "sumo": {
-  "strong": [
-   "bows",
-   "beasts",
-   "bare hands"
-  ],
-  "weak": [],
-  "best": "Garrison Crossbowman",
-  "worst": "Yakuza Knifeman",
-  "text": "Strong against bows, beasts and bare hands."
- },
- "kickboxer": {
-  "strong": [
-   "bows",
-   "guns",
-   "the unarmoured"
-  ],
-  "weak": [
-   "machines",
-   "beasts",
-   "riders"
-  ],
-  "best": "Garrison Crossbowman",
   "worst": "Spot with arm",
-  "text": "Strong against bows, guns and the unarmoured. Weak against machines, beasts and riders."
- },
- "judo": {
-  "strong": [
-   "guns",
-   "bows",
-   "blunt weapons"
-  ],
-  "weak": [
-   "bare hands",
-   "beasts",
-   "machines"
-  ],
-  "best": "Yakuza Knifeman",
-  "worst": "Kickboxer",
-  "text": "Strong against guns, bows and blunt weapons. Weak against bare hands, beasts and machines."
- },
- "mingCrossbow": {
-  "strong": [
-   "beasts",
-   "blunt weapons",
-   "spears and polearms"
-  ],
-  "weak": [],
-  "best": "Street Brawler",
-  "worst": "Sumo Grand Champion",
-  "text": "Strong against beasts, blunt weapons and spears and polearms."
- },
- "peasant": {
-  "strong": [],
-  "weak": [
-   "blunt weapons",
-   "guns",
-   "blades"
-  ],
-  "best": "Yakuza Knifeman",
-  "worst": "Lord Ashford",
-  "text": "Weak against blunt weapons, guns and blades."
- },
- "muayThai": {
-  "strong": [
-   "beasts"
-  ],
-  "weak": [
-   "guns",
-   "machines",
-   "bare hands"
-  ],
-  "best": "Chacma Baboon",
-  "worst": "Sumo Grand Champion",
-  "text": "Strong against beasts. Weak against guns, machines and bare hands."
- },
- "mix": {
-  "strong": [
-   "guns"
-  ],
-  "weak": [
-   "beasts",
-   "bows",
-   "blunt weapons"
-  ],
-  "best": "Patrol Officer",
-  "worst": "Chimpanzee",
-  "text": "Strong against guns. Weak against beasts, bows and blunt weapons."
- },
- "bat": {
-  "strong": [
-   "machines",
-   "blunt weapons",
-   "riders"
-  ],
-  "weak": [],
-  "best": "Spot with arm",
-  "worst": "Cage Wrestler",
-  "text": "Strong against machines, blunt weapons and riders."
+  "text": "Strong against guns, beasts and the unarmoured. Weak against riders, heavy armour and blunt weapons."
  },
  "baboon": {
   "strong": [
    "guns",
-   "blunt weapons",
-   "beasts"
-  ],
-  "weak": [],
-  "best": "Yakuza Knifeman",
-  "worst": "Cage Wrestler",
-  "text": "Strong against guns, blunt weapons and beasts."
- },
- "knife": {
-  "strong": [
-   "guns"
+   "machines",
+   "riders"
   ],
   "weak": [
+   "bows",
    "beasts",
-   "blades",
-   "machines"
+   "blunt weapons"
   ],
-  "best": "Street Brawler",
-  "worst": "Chacma Baboon",
-  "text": "Strong against guns. Weak against beasts, blades and machines."
+  "best": "Patrol Officer",
+  "worst": "Cage Wrestler",
+  "text": "Strong against guns, machines and riders. Weak against bows, beasts and blunt weapons."
  },
- "taichi": {
+ "unskilled": {
   "strong": [
    "blunt weapons"
   ],
   "weak": [
-   "bows",
-   "machines",
-   "blades"
-  ],
-  "best": "Street Brawler",
-  "worst": "Garrison Crossbowman",
-  "text": "Strong against blunt weapons. Weak against bows, machines and blades."
- },
- "street": {
-  "strong": [
-   "guns"
-  ],
-  "weak": [
-   "bows",
-   "beasts",
-   "bare hands"
-  ],
-  "best": "Patrol Officer",
-  "worst": "Garrison Crossbowman",
-  "text": "Strong against guns. Weak against bows, beasts and bare hands."
- },
- "unskilled": {
-  "strong": [],
-  "weak": [
-   "guns",
-   "machines"
-  ],
-  "best": null,
-  "worst": "Patrol Officer",
-  "text": "Weak against guns and machines."
- },
- "policeBaton": {
-  "strong": [
-   "blunt weapons",
-   "beasts",
-   "bare hands"
-  ],
-  "weak": [
-   "bows",
-   "guns"
-  ],
-  "best": "Starved Rebel",
-  "worst": "Garrison Crossbowman",
-  "text": "Strong against blunt weapons, beasts and bare hands. Weak against bows and guns."
- },
- "starved": {
-  "strong": [
-   "machines"
-  ],
-  "weak": [
-   "beasts",
-   "blunt weapons",
+   "bare hands",
    "bows"
   ],
-  "best": "Go2 robot dog",
-  "worst": "Baton Patrolwoman",
-  "text": "Strong against machines. Weak against beasts, blunt weapons and bows."
+  "best": "Baton Patrolwoman",
+  "worst": "Street Brawler",
+  "text": "Strong against blunt weapons. Weak against bare hands and bows."
  },
- "macaque": {
+ "starved": {
   "strong": [
    "machines",
    "riders",
@@ -1470,11 +1468,35 @@ export const MATCHUPS = {
   ],
   "weak": [
    "blunt weapons",
-   "beasts",
+   "the unarmoured",
    "bows"
   ],
   "best": "Go2 robot dog",
   "worst": "Baton Patrolwoman",
-  "text": "Strong against machines, riders and heavy armour. Weak against blunt weapons, beasts and bows."
+  "text": "Strong against machines, riders and heavy armour. Weak against blunt weapons, the unarmoured and bows."
+ },
+ "policeBaton": {
+  "strong": [
+   "blunt weapons"
+  ],
+  "weak": [
+   "beasts",
+   "bows",
+   "bare hands"
+  ],
+  "best": "Starved Rebel",
+  "worst": "Chacma Baboon",
+  "text": "Strong against blunt weapons. Weak against beasts, bows and bare hands."
+ },
+ "macaque": {
+  "strong": [
+   "machines",
+   "riders",
+   "heavy armour"
+  ],
+  "weak": [],
+  "best": "Go2 robot dog",
+  "worst": "Rebel Peasant Leader",
+  "text": "Strong against machines, riders and heavy armour."
  }
 };
