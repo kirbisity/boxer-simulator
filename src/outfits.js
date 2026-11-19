@@ -1247,6 +1247,10 @@ export const OUTFITS = {
       // the plain head-shaped bowl of three plates, its brow embossed in a scowl (the Met's, 17th c.).
       toseiBowlDesign('Nanban kabuto: russet iron', 'nanban', '#5e3e2c', '#1d2a4f', null, '#1c1d26'),
       toseiBowlDesign('Zunari kabuto: russet iron', 'zunari', '#5a3a28', '#1d2a3a', 'crescent', '#23202b'),
+      // The nanban dō gusoku (a set of its own): a European peascod breastplate, bought off the Portuguese ships or forged in
+      // copy of one, lacquered russet and worn with the Japanese kote, kusazuri and suneate; under the Nanban kabuto dressed
+      // in white yak hair, a black menpo (the Tokyo National Museum's and Kunōzan Tōshōgū's, c. 1600).
+      { ...toseiBowlDesign('Nanban dō: russet iron', 'nanban', '#5b3b2a', '#1d2a4f', null, '#1c1d26', { mask: 'black', maskPlain: true, plume: '#e9e3d2' }), armor: { kind: 'nanbanDo', color: '#5b3b2a', lace: '#1d2a4f', mail: '#2a2a2e', gold: '#d6a743' } },
     ],
   },
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,

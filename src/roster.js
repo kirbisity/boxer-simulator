@@ -49,6 +49,7 @@ export const UNIT_NAMES = {
   maximilian: 'Jousting King',
   crossbowman: 'Genoese Crossbowman',
   tosei: 'One-Eyed Dragon',
+  nanban: 'Christian Daimyō',
   hammer: 'Hammer Knight',
   oyoroi: 'Tiger of Kai',
   tametomo: 'Great-Bow Archer',
@@ -168,6 +169,7 @@ export const WARRIORS = [
   // worked than the preset's 0.6, at 0.7).
   warrior('crossbowman', 'Ottone Doria', PRESETS.crossbow, { skill: 0.45, exercise: 0.7 }),
   warrior('tosei', 'Date Masamune', PRESETS.samurai, { name: 'Date Masamune', heightCm: 160, calories: 3525, outfit: { kind: 'samuraiTosei', design: 2 }, accessories: ['crest'] }),
+  warrior('nanban', 'Takayama Ukon', PRESETS.nanbanLord),
   warrior('hammer', 'Gunnar Holt', PRESETS.warhammer),
   warrior('oyoroi', 'Takeda Shingen', PRESETS.samurai),
   // The Japanese flagship: Deadliest Warrior opens the faction on him (`flagship`), whatever his rating.
@@ -188,7 +190,7 @@ export const WARRIORS = [
   { ...warrior('guanYu', 'Guan Yu', PRESETS.guanYu), legend: { order: 6, kicker: { en: 'God of War', zh: '武圣' }, line: { en: 'The Green Dragon Crescent Blade: great sweeping cuts from far off.', zh: '青龙偃月刀：隔着老远，大开大合地抡过来。' } } },
   warrior('hanCrossbow', 'Li Ling', PRESETS.hanCrossbow),
   warrior('wuxia', 'Pei Min', PRESETS.wuxia),
-  warrior('swordSaint', 'Miyamoto Musashi', PRESETS.swordSaint),
+  warrior('swordSaint', 'Tsukahara Bokuden', PRESETS.swordSaint),
   { ...warrior('kheshig', 'Subutai', PRESETS.kheshig), legend: { order: 10, kicker: { en: 'The Khan\'s Guard', zh: '大汗宿卫' }, line: { en: 'Quick arrows from the composite bow, then straight in with the flanged mace.', zh: '复合弓连珠快箭，射完提骨朵直接冲进来。' } } },
   warrior('esen', 'Esen Taishi', PRESETS.maceShield),
   warrior('mandukhai', 'Mandukhai Khatun', PRESETS.saber),

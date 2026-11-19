@@ -1073,6 +1073,13 @@ export const ARMOR_KINDS = {
     trunk: [-0.1, 1.02, 1.19, { rows: ['steel', 'steel', 'steel2'], rivets: 4 }], skirt: [0.5, 0.45, 1.24, { ...LACED, gaps: [0, Math.PI / 2, -Math.PI / 2], gapWidth: 0.07 }], collar: 'steel',
     upperArm: [-0.2, 0.62, 1.5, { ...LACED, board: { wide: 0.24 } }], forearm: [-0.04, -0.04, 1.3, SPLINTED_SLEEVE], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.3, SPLINTED_SHIN],
   },
+  // The nanban dō gusoku: a European peascod breastplate (one rigid ridged shell, rigidBreastplate) over the Japanese harness,
+  // its laced kusazuri, the kusari-kote's mail over the upper arm and splinted forearms, haidate and suneate as the tōsei's.
+  nanbanDo: {
+    trunk: [[-0.1, 0.97, 1.12, MAIL], [-0.04, 0.96, 1.22, 'steel']], skirt: [0.5, 0.45, 1.24, { ...LACED, gaps: [0, Math.PI / 2, -Math.PI / 2], gapWidth: 0.07 }], collar: 'mail',
+    rigidBreastplate: [0.32, 0.96],
+    upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.04, -0.04, 1.3, SPLINTED_SLEEVE], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.3, SPLINTED_SHIN],
+  },
   // A rōnin on a private errand, his armour hidden under the kosode: only the manchira's mail showing at the collar, the
   // kusari-kote's dark linen sleeves with an iron splint along each forearm, a sash of two colours, the kyahan's linen
   // wraps over the shins (the tatami-dō is sewn inside the robe: not drawn).

@@ -132,6 +132,8 @@ export const ARMOUR_TILES = {
   bayaraCoat: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   // Tosei gusoku: the solid do of lacquered horizontal lames; its kusazuri and sleeves in sugake.
   toseiDo: { 'trunk.steel': 'yokohagi', kozane: 'sugake' },
+  // The nanban dō: the European breastplate plain hammered steel, its kusazuri and sleeves in sugake as the tōsei's.
+  nanbanDo: { 'trunk.steel': 'munitionPlate', kozane: 'sugake' },
   // The rōnin's kusari-kote: a splint of munition iron along each forearm.
   roninDo: { 'forearm.steel': 'munitionPlate' },
   okegawa: { armor: 'yokohagi', kozane: 'sugake' },
@@ -156,7 +158,7 @@ export const ARMOUR_EDGES = {
 export const ARMOUR_COVERAGE = {
   heavyRiot: ['polymer'], riot: ['polymer'], patrolVest: null, plateCarrier: null,
   plate: ['plate', 'fluted', 'harnessEdge'], templar: ['mail', 'plate'], brigandine: ['euroBrigandine', 'munitionPlate', 'harnessEdge'], haubergeon: ['mail'], breastplate: ['munitionPlate', 'harnessEdge'],
-  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], okegawa: ['yokohagi', 'sugake', 'plate'], roninDo: ['mail', 'munitionPlate'],
+  lamellar: ['kozane', 'plate'], oyoroi: ['kozane', 'mail', 'plate'], toseiDo: ['yokohagi', 'sugake', 'plate'], nanbanDo: ['munitionPlate', 'sugake', 'mail', 'plate'], okegawa: ['yokohagi', 'sugake', 'plate'], roninDo: ['mail', 'munitionPlate'],
   doMaru: ['kozane'], doMaruSode: ['kozane'],
   // The arena's: their greaves and manicae (their helmets are drawn their own way).
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
@@ -442,6 +444,7 @@ export const CLOTH_GARMENTS = {
   armor: {
     // Japan: lacquered iron and kozane are metal (the armour tiles), laced in silk braid; the ō-yoroi's brocade sleeve.
     toseiDo: { '*': 'none', lace: 'silk' },
+    nanbanDo: { '*': 'none', lace: 'silk' },
     roninDo: { '*': 'none', lace: 'silk', cloth: 'cotton', cloth2: 'cotton' },
     okegawa: { '*': 'none', lace: 'silk' },
     doMaru: { '*': 'none', lace: 'silk' },

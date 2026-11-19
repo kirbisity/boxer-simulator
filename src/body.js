@@ -417,11 +417,20 @@ export const PRESETS = {
     outfit: { kind: 'wuxia', design: 0 }, accessories: [],
     look: { skinTone: 'light', hairStyle: 'long', hairColor: '#120d0a', facialHair: 'none', eyeColor: 'brown', faceShape: null, faceRegion: 'china', skinShade: 1.4 },
   },
-  // Miyamoto Musashi (1584-1645), the Sword Saint (kensei): some sixty duels and never beaten, by his own account (Gorin no sho,
-  // 1645), Sasaki Kojirō killed on Ganryūjima in 1612, when he was 28. A big man for his day (the accounts make him near six
-  // shaku, ~180 cm), lean and hard. No armour, no helmet: a duellist in kosode and hakama, the katana in his hands.
+  // Takayama Ukon (1552-1615), the Christian daimyō (Justo, baptised at twelve): lord of Takatsuki, a captain of Nobunaga's and
+  // Hideyoshi's, who gave up his domain in 1587 rather than his faith, and died in exile in Manila. In the nanban dō gusoku
+  // (OUTFITS.samuraiTosei's nanbanDo set), the yari a mounted lord fought with; the katana at his belt. Mid-thirties, a
+  // samurai's build.
+  nanbanLord: {
+    name: 'Takayama Ukon', style: 'yari', sex: 'male', heightCm: 162, frame: 'medium', age: 35, exercise: 0.7, calories: 3500,
+    outfit: { kind: 'samuraiTosei', design: 8 }, accessories: [],
+    look: { skinTone: 'lightTan', hairStyle: 'sakayaki', hairColor: '#120d0a', facialHair: 'mustache', eyeColor: 'brown', faceRegion: 'japan' },
+  },
+  // Tsukahara Bokuden (1489-1571), the Sword Saint (kensei) of the Kashima school: by the tradition, nineteen duels with live
+  // blades and some thirty battles, never wounded but by arrows (the rōnin is Musashi). A big man for his day, lean and hard. No
+  // armour, no helmet: a duellist in kosode and hakama, the katana in his hands.
   swordSaint: {
-    name: 'Miyamoto Musashi', style: 'katana', sex: 'male', heightCm: 180, frame: 'medium', age: 28, exercise: 0.78, calories: 3900, skill: 1,
+    name: 'Tsukahara Bokuden', style: 'katana', sex: 'male', heightCm: 180, frame: 'medium', age: 28, exercise: 0.78, calories: 3900, skill: 1,
     outfit: { kind: 'kensei', design: 0 }, accessories: [],
     look: { skinTone: 'lightTan', hairStyle: 'sakayaki', hairColor: '#120d0a', facialHair: 'stubble', eyeColor: 'brown', faceRegion: 'japan' },
   },

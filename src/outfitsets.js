@@ -243,6 +243,15 @@ export const OUTFIT_SETS = {
       blurb: { en: 'Nanban kabuto, helmet of the southern barbarians. A Spanish or Portuguese cabasset bought off the ships, or hammered in copy of one; the skull raised from one piece of thick steel, with no seam for a blow to open. Fashion and proof at once, for a lord who traded with the foreigners.\nThe ships brought the guns that made such helmets worth wearing. They also brought priests.\nWithin a generation the shogun had banned the faith, crucified converts at Nagasaki and closed the ports to all but the Dutch.', zh: '南蛮兜。西班牙或葡萄牙的卡巴塞盔，从南蛮船上买来，或照样仿打。盔顶以一整块厚钢锤成，没有可供劈开的接缝。既是时样，又经得起打，配给与洋人通商的大名。\n船上运来铁炮，这样的盔才值得一戴。船上也下来了传教士。\n不出一代，将军禁教，在长崎将信徒钉上十字架，港口只留给荷兰人。' },
       patch: { extraMass: 0.256, helmet: { mass: 3.3, padding: 0.55, curve: 0.9 }, protection: { bullet: { head: 0.55 }, regions: { head: { blunt: 0.82, cut: 0.97, pierce: 0.8 } } } },
     },
+    // The nanban dō: a European breastplate in place of the dō's riveted lames. One plate of thicker steel (~3 mm against the
+    // lames' ~2), its keel turning a point and a blow aside, and proofed by a shot at closer range than a Japanese dō (the
+    // test dents on surviving pieces: Bottomley and Hopson 1988): the torso's blunt 0.75, pierce 0.93 and a ball 0.7 (was
+    // 0.7, 0.9, 0.55); about 1.5 kg heavier than the tōsei dō, under the Nanban kabuto (that set's head).
+    {
+      key: 'nanbanDo', designs: [8], name: 'Tōsei gusoku — Nanban dō',
+      blurb: { en: 'Nanban dō. A Portuguese breastplate, ridged down the middle, lacquered russet and laced onto a samurai harness. Proofed with a musket at close range; the dent stays as the receipt.\nThe lords who wore it traded with the Jesuits, and some were baptised with their whole domains, guns and saltpetre arriving with the faith.\nWhen the faith fell out of favour, the converts were told to step on a picture of Christ. The armour was kept.', zh: '南蛮胴。葡萄牙胸甲，中脊隆起，漆成赤褐，编缀在武士的具足上。近距离以铁炮试射，弹痕留作收据。\n穿它的大名与耶稣会通商，有的连同整个领地一起受洗，铁炮和硝石随信仰一同上岸。\n后来信仰失宠，信徒被命令踩踏基督像。甲胄倒是留了下来。' },
+      patch: { extraMass: 0.275, helmet: { mass: 3.3, padding: 0.55, curve: 0.9 }, protection: { blunt: 0.75, cut: 0.97, pierce: 0.93, bullet: { head: 0.55, torso: 0.7 }, regions: { head: { blunt: 0.82, cut: 0.97, pierce: 0.8 } } } },
+    },
     {
       key: 'zunari', designs: [7], name: 'Tōsei gusoku — zunari kabuto',
       blurb: { en: 'Zunari kabuto. Three plain plates riveted into a head-shaped bowl, a frown embossed at the brow; made fast and cheap by the thousand for the armies of the 1600s. It turned a blow nearly as well as a lord’s, at a fraction of the cost.\nSekigahara, 1600: some 160,000 men on one field in one morning. The victor, Tokugawa Ieyasu, then disarmed the country.\nThe cheap helmets went home with whoever had survived.', zh: '头形兜。三块素铁板铆成头形，眉间压出一道皱纹；十七世纪的大军所需，成千上万地赶制。挡刀几乎不输大名的盔，价钱却只是零头。\n一六〇〇年，关原。一个上午，一片原野上挤进约十六万人。胜者德川家康随后收缴了天下的兵器。\n廉价的盔，随活下来的人回了家。' },
