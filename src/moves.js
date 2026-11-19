@@ -2105,6 +2105,9 @@ STYLES.dogTurret = {
 
 // The spear's ways with a people's own spear: the ashigaru's yari, the rebel's pitchfork.
 STYLES.yari = { ...STYLES.spear, label: 'Yari', weapon: 'yari' };
+// The dangpa's man: the spear's ways, but the fork held up to meet the blow (catch a blade between the prongs and beat it
+// down) before the thrust, the heavy head slower to bring round (Jixiao xinshu: the dangpa guards the spears' flank).
+STYLES.dangpa = { ...STYLES.spear, label: 'Dangpa', weapon: 'dangpa', tempo: 0.9, defences: { weaponBlock: 0.65, stepBack: 0.35 }, defendChance: 0.8, attacks: { spearThrust: 0.5, spearJab: 0.3, spearSweep: 0.2 } };
 STYLES.pitchfork = { ...STYLES.spear, label: 'Pitchfork', weapon: 'pitchfork' };
 // The flanged mace without a shield: the steppe horseman's sidearm, its guard the haft across.
 STYLES.mace = { ...STYLES.maceShield, label: 'Mace', hidden: true, shield: undefined, shieldGuard: undefined, defences: { weaponBlock: 0.45, stepBack: 0.55 } };

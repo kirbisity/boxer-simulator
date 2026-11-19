@@ -580,16 +580,22 @@ const brigandineOf = (guard, make) => {
  * (pierce 0.85, PIERCE_SCALE). What sets the kits apart is what else they wear: steel arm guards (MING_ARM_GUARD), mail under it
  * (UNDER_ARMOUR.mail), a mask. (Each kit had its own figures for the coat: the Ming elite's 0.7 / 0.95 / 0.87, the coat itself
  * credited with what its arm guards and lapping give; the user's call, 2026-11-10.)
- * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.70, cut 0.92 (was 0.93), pierce 0.77 (was 0.85, then 0.82).
+ * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.58, cut 0.91, pierce 0.74 (were 0.70, 0.92, 0.77). Against a solid
+ * breastplate (one shell that takes a blow over the whole chest, and a point with nothing between its plates to bite on):
+ * a coat of small plates each driven in alone, the quilting under them spreading only some of it, below the breastplate
+ * against a blow and a point, as a European brigandine is; still above the European one for its thicker quilting. And so
+ * the Bayara in it, his mail under, short of a knight's harness (2026-11-19).
  */
-const PLATE_COAT = brigandineOf({ blunt: 0.72, cut: 0.93, pierce: 0.85 }, 'ming');
+const PLATE_COAT = brigandineOf({ blunt: 0.6, cut: 0.92, pierce: 0.82 }, 'ming');
 
 /**
  * The Ming soldier's brigandine (a vest of plates, no sleeves): the same plates inside a thinner padded coat, one plate deep
  * where the coat of plates laps: a blow spread a little less, an edge a little less turned; a point as any brigandine's.
- * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.64, cut 0.89 (was 0.9), pierce 0.77 (was 0.85, then 0.82).
+ * Its make the Ming's (BRIGANDINE_MAKES.ming): blunt 0.48, cut 0.87, pierce 0.72 (were 0.64, 0.89, 0.77): under a European
+ * breastplate's 0.5 / 1 / 0.95 against a blow, an edge and a point, as the coat of plates is (PLATE_COAT), and thinner
+ * padded than it (2026-11-19).
  */
-const PLATE_VEST = brigandineOf({ blunt: 0.66, cut: 0.9, pierce: 0.85 }, 'ming');
+const PLATE_VEST = brigandineOf({ blunt: 0.5, cut: 0.88, pierce: 0.8 }, 'ming');
 
 
 /**

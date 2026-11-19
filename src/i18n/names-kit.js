@@ -493,6 +493,7 @@ export const NAMES_KIT = {
   'Heavy spear': '重枪',
   'Yari': '十文字枪',
   'Langxian': '狼筅',
+  'Dangpa': '镋钯',
   'Pitchfork': '草叉',
   'Pistol': '手枪',
   'Adams revolver': '亚当斯左轮',

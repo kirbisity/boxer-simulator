@@ -501,6 +501,17 @@ export const WEAPONS = {
     harm: { thrust: { pierce: 1.5, blunt: 0.22, cut: 0.3 }, swing: { blunt: 0.5, cut: 0.4 } },
     contactSeconds: 0.005, rotation: 0.5, wrist: { omega: 13, zeta: 0.85 }, threat: 3.9, art: 'artSpear', grip: 0.5,
   },
+  // The dangpa (镋钯) of Qi Jiguang's mandarin-duck squad (Jixiao xinshu, 1560): a forked iron head on a wooden shaft of 7 chi
+  // 6 cun (~2.4 m), some 5 jin (~3 kg): a long straight middle prong and two side prongs curving up from a crossbar, the
+  // squad's rear pair (with the long spears in front of them) to catch a blade between the prongs, beat it down and stab
+  // (and to rest the fire-arrows on: not here). Heavier at the head than a spear (`balance`), slower to bring round, its
+  // middle prong a point and its side prongs a second edge to a sweep (`swing` cut 0.35).
+  dangpa: {
+    art: 'artSpear',
+    pointFrom: 0, label: 'Dangpa', hands: 'two', length: 1.75, strikeFrom: 1.4, handle: 0.65, spacing: 0.5, leadAhead: true, mass: 3, balance: 0.75, radius: 0.02, pointWidth: 0.02, tines: 3,
+    harm: { thrust: { pierce: 1.3, blunt: 0.3, cut: 0.2 }, swing: { blunt: 0.6, cut: 0.35 } },
+    contactSeconds: 0.005, rotation: 0.45, wrist: { omega: 11, zeta: 0.85 }, threat: 3.8, grip: 0.55,
+  },
   // The langxian (wolf-brush) of Qi Jiguang's mandarin-duck squad (Jixiao
   // xinshu): a whole bamboo of about 1 zhang 5 chi (some 4.7 m), its side
   // branches left on in tiers along the upper part and their ends hardened,

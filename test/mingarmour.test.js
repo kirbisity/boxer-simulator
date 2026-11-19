@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { OUTFITS } from '../src/outfits.js';
 
-test('the Ming elite coat is heavier-plated than the Japanese armour; its arms and the Ming horseman\'s in solid steel', () => {
+test('the Ming elite coat carries more iron than the Japanese armour; its arms and the Ming horseman\'s in solid steel', () => {
   const elite = OUTFITS.mingElite;
   const tosei = OUTFITS.samuraiTosei;
   assert.ok(elite.bulletRating >= tosei.bulletRating, 'proof against a ball at least as the tōsei dō');
   assert.ok(elite.protection.bullet.torso >= tosei.protection.bullet.torso);
-  assert.ok(elite.protection.blunt >= tosei.protection.blunt && elite.protection.blunt > OUTFITS.ashigaru.protection.blunt);
+  // Against a blow: a coat of small plates under the tōsei's solid lames (as under a breastplate: outfits.js PLATE_COAT), over
+  // the ashigaru's and a European brigandine's.
+  assert.ok(elite.protection.blunt < tosei.protection.blunt && elite.protection.blunt > OUTFITS.ashigaru.protection.blunt);
+  assert.ok(elite.protection.blunt > OUTFITS.footman.protection.blunt);
   assert.ok(elite.extraMass > tosei.extraMass, 'more iron in it');
   for (const kind of ['mingElite', 'mingIronLamellar']) {
     for (const part of ['UpperArm', 'Forearm']) {

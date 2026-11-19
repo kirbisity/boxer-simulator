@@ -93,6 +93,8 @@ export const UNIT_NAMES = {
   taekwondo: 'Taekwondo Black Belt',
   judo: 'Judoka',
   mingEliteInfantry: 'Ming Elite Infantry',
+  mingEliteSpear: 'Qi Long Spearman',
+  mingDangpa: 'Dangpa Soldier',
   mingEliteGun: 'Ming Elite Musketeer',
   mingShield: 'Ming Shield Soldier',
   mingBrigSpear: 'Ming Spearman',
@@ -221,6 +223,10 @@ export const WARRIORS = [
   warrior('judo', 'Saigo Shiro', PRESETS.judo),
   // Qi Jiguang's men (outfits.js mingEliteInfantry): the sleeved brigandine, the steel guard on the front arm, the langxian.
   warrior('mingEliteInfantry', 'Feng Da', PRESETS.langxian),
+  // The rest of the mandarin-duck squad (Jixiao xinshu): the four long spears behind the langxian, who kill what it holds,
+  // and the two dangpa at the rear, who guard the spears' flank; the same brigandine, the same drill.
+  warrior('mingEliteSpear', 'Zhou Shun', PRESETS.langxian, { name: 'Zhou Shun', style: 'spear', age: 25, outfit: { kind: 'mingEliteInfantry', design: 1 } }),
+  warrior('mingDangpa', 'Lin Hu', PRESETS.langxian, { name: 'Lin Hu', style: 'dangpa', age: 29, outfit: { kind: 'mingEliteInfantry', design: 2 } }),
   warrior('mingEliteGun', 'Wu Weizhong', PRESETS.guandao, { name: 'Wu Weizhong', style: 'matchlock', outfit: { kind: 'mingElite', design: 1 } }),
   warrior('mingShield', 'Chen Bao', PRESETS.swordShield),
   warrior('mingBrigSpear', 'Sun Qi', PRESETS.swordShield, { name: 'Sun Qi', style: 'spear', outfit: { kind: 'mingBrigandine', design: 2 } }),

@@ -115,6 +115,74 @@ export const KIT_ARMS = {
   yakuza: { second: ['knife'], sword: 'knife', short: 'knife' },
 };
 
+// Each kit's main weapons (styles: moves.js STYLES), as men in that kit fought with them: the weapons its army gave its men
+// or its lords chose, never any weapon at all. A drilled soldier was given one and trained with it for years (a unit apiece:
+// the roster's men keep theirs); a man made in the builders may take any of his kit's (`firstOptions`). A kit not listed (the
+// ring, the street, the arena, the machines) keeps whatever style he chose.
+// - Qi Jiguang's men: the mandarin-duck squad's shield and dao, langxian, long spear and dangpa, and the musketeers' gun
+//   (Jixiao xinshu, 1560). The Ming army's regulars: the same weapons, the bow and the three-eyed gun besides.
+// - Japan: the samurai's katana, yari, naginata, ōdachi and bow (the kanabō the rare big man's); the ashigaru's yari, teppō and
+//   bow, never the katana; the rōnin's swords.
+export const KIT_FIRST = {
+  knight: ['longsword', 'warhammer', 'mace', 'lance'],
+  joan: ['joan', 'longsword', 'lance'],
+  tournament: ['lance', 'longsword', 'warhammer'],
+  templar: ['templar', 'maceShield', 'longsword', 'lance'],
+  footman: ['pike', 'spear', 'crossbow', 'matchlock', 'bow', 'armingBuckler'],
+  archer: ['longbow', 'shortSword'],
+  forger: ['shortSword', 'dagger'],
+  levy: ['spear', 'longbow', 'shortSword'],
+  conquistadorPlate: ['espada', 'espadaRodela', 'pike', 'spear', 'lance', 'rapier'],
+  conquistadorQuilted: ['espadaRodela', 'matchlock', 'crossbow', 'espada', 'pike'],
+  samurai: ['katana', 'naginata', 'yumi', 'bow'],
+  oyoroi: ['yumi', 'katana', 'naginata'],
+  samuraiTosei: ['katana', 'yari', 'naginata', 'odachi', 'yumi', 'kanabo'],
+  ashigaru: ['yari', 'matchlock', 'archerYumi'],
+  ronin: ['nito', 'ronin', 'katana'],
+  kensei: ['katana', 'nito'],
+  sohei: ['naginata', 'katana', 'staff'],
+  mingBrigandine: ['swordShield', 'spear', 'matchlock', 'mingBow', 'threeEyed', 'dao'],
+  mingEliteInfantry: ['langxian', 'swordShield', 'spear', 'dangpa', 'matchlock'],
+  mingElite: ['guandao', 'dao', 'threeEyed', 'matchlock', 'mingLance', 'mingBow', 'langyaShield'],
+  bannerArmour: ['manchuBow', 'spear', 'guandao', 'dao', 'mingLance'],
+  bayara: ['bayaraLance', 'bayaraBow', 'dao', 'guandao'],
+  guanYu: ['guanYu', 'dao'],
+  ironPagoda: ['jinLance', 'langya', 'langyaShield'],
+  hanSoldier: ['nu', 'jian', 'spear'],
+  hanCavalry: ['jian', 'spear', 'nu'],
+  mingIronLamellar: ['saber', 'mingLance', 'mingBow', 'dao'],
+  wokou: ['dao', 'katana', 'spear', 'matchlock'],
+  wokouArmoured: ['katana', 'dao', 'yari', 'matchlock'],
+  legionary: ['legionary', 'gladius'],
+  centurion: ['centurion', 'gladius'],
+  republicanLegionary: ['legionary', 'gladius'],
+  romanAuxiliary: ['spathaOval', 'spearOval', 'spatha'],
+  lateRoman: ['spathaOval', 'spearOval', 'spatha'],
+  goth: ['spearRound', 'spathaRound', 'spatha'],
+  gothNoble: ['spathaRound', 'spearRound', 'spatha'],
+  hun: ['steppeBow', 'spatha', 'saber'],
+  hunNoble: ['steppeBow', 'spatha', 'saber'],
+  cataphract: ['kontos', 'spatha', 'mace'],
+  parthianArcher: ['steppeBow', 'shortSword'],
+  steppeLight: ['steppeBow', 'saber'],
+  steppeMedium: ['kheshigBow', 'saber', 'maceShield', 'saberShield'],
+  kheshig: ['kheshigBow', 'saberShield', 'maceShield', 'saber'],
+  cumanHeavy: ['cumanBow', 'kilij', 'kilijShield', 'mace'],
+  xiongnu: ['steppeBow', 'shortSword'],
+  azap: ['spear', 'steppeBow', 'kilij'],
+  janissary: ['matchlock', 'yatagan', 'kilij'],
+  ottomanHeavy: ['maceShield', 'kilijShield', 'kilij', 'mace'],
+  gaziAlp: ['kilijShield', 'maceShield', 'kilij', 'steppeBow'],
+  saladin: ['saladin', 'maceShield', 'steppeBow'],
+  mexicaWarrior: ['macuahuitl', 'tepoztopilli'],
+  mexicaElite: ['macuahuitl', 'tepoztopilli'],
+};
+
+/** The main weapons (styles) his kit may fight with, its own first; none for a kit not listed (any style stands). */
+export function firstOptions(inputs) {
+  return (KIT_FIRST[inputs?.outfit?.kind] ?? []).filter((style) => STYLES[style]);
+}
+
 /** His first weapon's kind (his style's), or null (bare hands, a mix of styles). */
 export function firstWeapon(inputs) {
   return STYLES[inputs?.style]?.weapon ?? null;

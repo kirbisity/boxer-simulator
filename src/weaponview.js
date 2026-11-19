@@ -929,6 +929,28 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       }
       break;
     }
+    case 'dangpa': {
+      // The dangpa: a dark wooden shaft, an iron socket and a crossbar at the head; the long middle prong a narrow blade, and on
+      // each side a prong curving out and up from the crossbar's end to stand a little short of the middle one.
+      const iron = steelMaterial(envMap, { vertexColors: false, color: 0x5a5b5e, roughness: 0.55 });
+      const crown = spec.strikeFrom;
+      group.add(cylinder(0.016, 0.019, -spec.handle, crown, surface(0x3a2a1c, { roughness: 0.6 }), 8));
+      group.add(cylinder(0.014, 0.02, crown - 0.12, crown + 0.02, iron, 8));
+      const bar = cylinder(0.009, 0.009, -0.11, 0.11, iron, 6);
+      bar.rotation.z = Math.PI / 2;
+      bar.position.y = crown + 0.02;
+      group.add(bar);
+      group.add(bladeMesh(bladeGeometry(crown, spec.length - crown, 0.026, 0.01, 0.1), polished));
+      for (const side of [1, -1]) {
+        const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(side * 0.11, crown + 0.02, 0), new THREE.Vector3(side * 0.14, crown + 0.1, 0), new THREE.Vector3(side * 0.1, crown + 0.26, 0));
+        group.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 8, 0.007, 5, false), iron));
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.008, 0.05, 5), iron);
+        tip.position.set(side * 0.096, crown + 0.28, 0);
+        tip.rotation.z = side * 0.25;
+        group.add(tip);
+      }
+      break;
+    }
     case 'pitchfork': {
       // A hay fork: a rough wooden shaft, an iron bow across its end, and
       // two long tines rising from it.
