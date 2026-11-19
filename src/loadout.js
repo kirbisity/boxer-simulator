@@ -56,11 +56,11 @@ export const KIT_ARMS = {
   levy: { second: ['dagger', 'shortSword'], sword: 'shortSword', short: 'dagger' },
   conquistadorPlate: { second: ['espada', 'dagger', 'rapier'], sword: 'espada', short: 'dagger', third: ['flangedMace', 'espada'] },
   conquistadorQuilted: { second: ['espada', 'dagger', 'rapier'], sword: 'espada', short: 'dagger', third: ['flangedMace'] },
-  // Japan: the daisho (the katana and the wakizashi), the ashigaru's uchigatana and wakizashi. No saddle mace.
+  // Japan: the daisho (the katana and the wakizashi), the ashigaru's wakizashi alone (the katana a samurai's). No saddle mace.
   samurai: { second: ['katana', 'wakizashi'], sword: 'katana', short: 'wakizashi' },
   oyoroi: { second: ['katana', 'wakizashi'], sword: 'katana', short: 'wakizashi' },
   samuraiTosei: { second: ['katana', 'wakizashi'], sword: 'katana', short: 'wakizashi' },
-  ashigaru: { second: ['katana', 'wakizashi'], sword: 'katana', short: 'wakizashi' },
+  ashigaru: { second: ['wakizashi'], sword: 'wakizashi', short: 'wakizashi' },
   ronin: { second: ['wakizashi', 'katana'], sword: 'katana', short: 'wakizashi' },
   sohei: { second: ['katana', 'wakizashi'], sword: 'katana', short: 'wakizashi' },
   // China and the Manchu: the dao (the Qi family's long sabre for his gunners), the jian of the Han; the iron mace at the saddle.

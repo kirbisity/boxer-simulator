@@ -20,6 +20,10 @@ test('the second by the first: the hammer knight a longsword, the kanabo and the
   assert.equal(second('samurai'), 'wakizashi');
   assert.equal(second('naginata'), 'katana');
   assert.equal(second('longbow'), 'shortSword');
+  // The ashigaru his wakizashi alone (the katana a samurai's); the Ming garrison man nothing.
+  assert.equal(second('yari'), 'wakizashi');
+  assert.ok(!secondOptions(normaliseInputs(structuredClone(PRESETS.yari))).includes('katana'));
+  assert.equal(second('mingSpear'), null);
   // The arena's men carry nothing at the belt.
   assert.equal(second('maximus'), null);
 });

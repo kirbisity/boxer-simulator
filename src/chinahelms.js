@@ -169,6 +169,50 @@ export const QING_HELMS = {
   },
 };
 
+// The general's household men's helmet (明盔 of the 1590s-1620s, the Liaodong generals' 家丁): the banners' cone, a little
+// fuller above the band (the Later Jin took the shape from the Ming border helmets), drawn up into a narrow neck.
+const RETAINER_CONE = [[0.12, 1], [0.4, 1.01], [0.7, 0.95], [1.0, 0.83], [1.3, 0.65], [1.55, 0.47], [1.78, 0.31], [1.97, 0.2], [2.1, 0.15]];
+
+/**
+ * The Ming officers' helmets, drawn as the banners' are (QING_HELMS' fields) but in the finish of the kit's own steel
+ * (`finish: 'own'`, the peak's and the finial's too: kitFinish) and with `seamShift` (where round the seams fall, a share of
+ * a plate: 0 puts one straight down the front) and a `pennant` on the spire (its foot and top, shares of the tube's height,
+ * how far it flies; its colour the kit's tassel's).
+ */
+export const MING_OFFICER_HELMS = {
+  retainerBowl: {
+    label: 'Retainer helmet', zh: '家丁明盔', period: 'Ming, late 16th-early 17th c.', finish: 'own',
+    note: 'The banners\' cone, a little fuller, of four steel plates under riveted strips (one straight down the front), a riveted band, a flat steel peak over the brow, a stepped steel neck and a tall spire flying a small red pennant (认旗); after the user\'s three photographs (a reconstruction in scale, one in studded red cloth, and a surviving helmet with its peak and mail aventail).',
+    profile: RETAINER_CONE,
+    ellipse: [1.1, 0.93], gap: 0.11,
+    brim: { reach: 0.04, fall: 0.0, lip: 0.02 },
+    plates: 4, seamShift: 0, strips: true, rivets: true, band: true,
+    finial: { kind: 'tube', r: 0.05, h: 1.05, finish: 'own', tiers: [[2.04, 2.36, 0.2, 0.13, 'neck'], [2.36, 2.42, 0.16, 0.16, 'ring']], rings: [0.28, 0.97] },
+    peak: { reach: 0.34, width: 0.78, thick: 0.035, step: 0.3, drop: 0.04, finish: 'own', edge: 'own' },
+    pennant: { from: 0.3, to: 0.94, fly: 0.8 },
+  },
+};
+
+/**
+ * The finish of a kit's own steel (`colour`), made once and kept in CHINA_FINISHES under its name: black lacquer where it
+ * is near black, gilt where it is gold, else polished steel of that colour; polished as the kit's plates are (wardrobe.js
+ * WARDROBE.steel: metalness 0.9, roughness 0.26), the hammering barely showing (`polished`).
+ */
+export function kitFinish(colour) {
+  const hex = `#${(typeof colour === 'number' ? colour : parseInt(String(colour).replace('#', ''), 16)).toString(16).padStart(6, '0')}`;
+  const name = `kit${hex}`;
+  if (CHINA_FINISHES[name]) return name;
+  const [red, green, blue] = [0, 2, 4].map((at) => parseInt(hex.slice(1 + at, 3 + at), 16) / 255);
+  const light = 0.3 * red + 0.59 * green + 0.11 * blue;
+  const gold = red - blue > 0.15;
+  CHINA_FINISHES[name] = light < 0.15
+    ? { label: 'Black lacquer', colour: hex, accent: '#c9a24a', metalness: 0.15, roughness: 0.32 }
+    : gold
+      ? { label: 'Gilt', colour: hex, metalness: 0.9, roughness: 0.26, polished: true }
+      : { label: 'Polished steel', colour: hex, metalness: 0.9, roughness: 0.26, polished: true };
+  return name;
+}
+
 /**
  * The banners' hood (the user's photographs of the Qing helmets at the Met and Sotheby's): padded cloth, the coat's own,
  * studded in rows as the coat is and bound at every edge in its binding, hung inside the bowl's rim from `top`. Two narrow
@@ -333,7 +377,6 @@ export function mingHoodGrid(hood = MING_HOOD, { rows = 4, cols = 40 } = {}) {
 }
 
 export const HONGYING_MOUNTS = {
-  mingHelm: { top: 2.78, length: 0.85, spike: [2.6, 3.3], hull: [[1.62, 0.7], [1.92, 0.43], [2.08, 0.24], [2.62, 0.19], [2.8, 0.1]] },
   steppeHelm: { top: 2.98, length: 0.62, spike: [2.43, 3.13], hull: [[2.2, 0.16], [2.5, 0.08], [3.1, 0.06]] },
   mingHat: { top: 2.2, length: 0.7, spike: [1.35, 2.35], hull: [[1.2, 0.95], [1.4, 0.75], [1.6, 0.5], [1.8, 0.2], [2.3, 0.08]] },
 };

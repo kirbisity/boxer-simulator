@@ -19,7 +19,7 @@ import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildQingHood, buildTassel } from './chinahelmview.js';
-import { HONGYING_MOUNTS, mingHoodGrid, SWING, swingStep, TASSELS } from './chinahelms.js';
+import { HONGYING_MOUNTS, MING_OFFICER_HELMS, mingHoodGrid, SWING, swingStep, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, headRadiusAt, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf, knightGrid } from './knighthelms.js';
 
@@ -1885,32 +1885,16 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       break;
     }
     case 'mingHelm': {
-      // A Ming officer's helmet (the bowl of the 1500s–1600s): a tall pointed
-      // steel bowl, swelling above the brow and drawn up to a finial tube,
-      // riveted bands down it front, back and sides, a brow band, a spike
-      // on the finial and the red horsehair tassel (hongying) bound under it,
-      // falling round the finial over the bowl's top; padded cloth flaps
-      // studded with rivets hanging from the rim over the cheeks and neck.
+      // A Ming general's household man's helmet (chinahelms.js MING_OFFICER_HELMS retainerBowl, or the kit's `design`): the
+      // banners' cone a little fuller, of riveted plates in the kit's own steel, a peak over the brow and a spire with its
+      // pennant, fitted over the head; under it the flaps of the coat's stuff, or the steel neck guard.
       const bowlSteel = metal(steel, color);
-      const profile = [[1.12, 0.05], [1.15, 0.4], [1.08, 0.82], [0.9, 1.25], [0.64, 1.62], [0.37, 1.92], [0.17, 2.08], [0.1, 2.12]];
-      const bowl = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x * r, y * r)), 24), bowlSteel);
-      bowl.material = bowlSteel.clone();
-      bowl.material.side = THREE.DoubleSide;
-      const band = new THREE.Mesh(new THREE.TorusGeometry(1.13 * r, 0.07 * r, 6, 24), metal(steel, head.gold ?? 0xd6a743));
-      band.rotation.x = Math.PI / 2;
-      band.position.y = 0.1 * r;
-      // The riveted bands: down the bowl's curve, a hair proud of it.
-      const strap = metal(steel, new THREE.Color(color).multiplyScalar(0.7).getHex());
-      for (let side = 0; side < 4; side += 1) {
-        const turn = (side / 4) * Math.PI * 2;
-        const path = new THREE.CatmullRomCurve3(profile.slice(0, -1).map(([x, y]) => new THREE.Vector3(Math.cos(turn) * (x + 0.04) * r, y * r, Math.sin(turn) * (x + 0.04) * r)));
-        group.add(new THREE.Mesh(new THREE.TubeGeometry(path, 10, 0.05 * r, 4), strap));
-      }
-      const finial = new THREE.Mesh(new THREE.CylinderGeometry(0.11 * r, 0.14 * r, 0.6 * r, 10), bowlSteel);
-      finial.position.y = 2.32 * r;
-      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.05 * r, 0.7 * r, 8), bowlSteel);
-      spike.position.y = 2.95 * r;
-      group.add(bowl, band, finial, spike, hongying(r, HONGYING_MOUNTS.mingHelm, head.tassel, lowDetail));
+      const design = head.design ?? 'retainerBowl';
+      buildMingDesignHelm(group, { ...head, design }, r, steel, { lowDetail });
+      fitted = true;
+      // Its outline [radius at the face, y] up the bowl, for the decoration.
+      const shape = MING_OFFICER_HELMS[design];
+      const profile = shape.profile.map(([y, scale]) => [scale * shape.ellipse[0], y]);
       if (head.neck === 'steel') {
         // A steel neck guard: three lames stepping out from the rim to the
         // shoulders, open over the face (+x).
@@ -1923,7 +1907,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       } else {
         // The flaps: padded cloth open over the face (+x), from the rim to the
         // shoulders, rows of rivet heads over them (studdedHood).
-        studdedHood(group, head, r, steel);
+        studdedHood(group, head, r, steel, { top: 1.12, bottom: 1.7 });
       }
       // Its decoration, where one was chosen (outfits.js ARMOUR_DECOR: the lion face and wings, or the guardians).
       if (head.decor) mingHelmDecor(group, head.decor, r, steel, profile, color);

@@ -4,7 +4,7 @@
 
 /* global THREE */
 
-import { BRIM_V, brimGrid, CHINA_FINISHES, finialTop, HAN_HOOD, MING_HELMS, QING_HELMS, QING_HOOD, qingHoodPoint, qingHoodSheets, qingHoodStuds, rimPath, shellEdge, shellGrid, shellRadius, shellV, SHELL_V, swingStep, SWING, tasselStrands, TASSELS } from './chinahelms.js';
+import { BRIM_V, brimGrid, CHINA_FINISHES, finialTop, HAN_HOOD, kitFinish, MING_HELMS, MING_OFFICER_HELMS, QING_HELMS, QING_HOOD, qingHoodPoint, qingHoodSheets, qingHoodStuds, rimPath, shellEdge, shellGrid, shellRadius, shellV, SHELL_V, swingStep, SWING, tasselStrands, TASSELS } from './chinahelms.js';
 import { surface } from './toon.js';
 
 const CHINA_TURN = Math.PI * 2;
@@ -113,11 +113,11 @@ function chinaDesignSheet(key, design, finishName, lace) {
     const x = random() * width;
     const y = random() * height;
     const size = 2 + random() * 6;
-    h.fillStyle = `rgba(${random() < 0.5 ? '0,0,0' : '255,255,255'},${finish.glyph ? 0.03 : 0.08})`;
+    h.fillStyle = `rgba(${random() < 0.5 ? '0,0,0' : '255,255,255'},${finish.glyph || finish.polished ? 0.03 : 0.08})`;
     h.beginPath();
     h.arc(x, y, size, 0, CHINA_TURN);
     h.fill();
-    c.fillStyle = `rgba(${random() < 0.5 ? '0,0,0' : '255,255,255'},${finish.glyph ? 0.025 : 0.05})`;
+    c.fillStyle = `rgba(${random() < 0.5 ? '0,0,0' : '255,255,255'},${finish.glyph || finish.polished ? 0.015 : 0.05})`;
     c.beginPath();
     c.arc(x, y, size * 1.6, 0, CHINA_TURN);
     c.fill();
@@ -141,7 +141,7 @@ function chinaDesignSheet(key, design, finishName, lace) {
   // The plates' seams: one plate's edge laid over the next, riveted down it (or a raised strip over it, riveted).
   if (design.plates) {
     for (let plate = 0; plate < design.plates; plate += 1) {
-      const theta = -Math.PI + (CHINA_TURN * (plate + 0.5)) / design.plates;
+      const theta = -Math.PI + (CHINA_TURN * (plate + (design.seamShift ?? 0.5))) / design.plates;
       for (const shift of [-width, 0, width]) {
         const x = xOf(theta) + shift;
         const strip = design.strips ? 0.13 * perU : 0.05 * perU;
@@ -519,15 +519,52 @@ function chinaPeak(design, r, steel) {
 }
 
 /**
+ * A pennant on a helmet's spire (`design.pennant`: its foot and top, shares of the tube's height, and how far it flies back):
+ * a strip of cloth bound to the spire, a little narrower at the fly, rippling.
+ */
+function chinaPennant(design, r, colour, lowDetail) {
+  const { from, to, fly } = design.pennant;
+  const top = design.profile.at(-1)[0];
+  const [y0, y1] = [top + design.finial.h * from, top + design.finial.h * to];
+  const columns = lowDetail ? 3 : 10;
+  const positions = [];
+  const indices = [];
+  for (let c = 0; c <= columns; c += 1) {
+    const t = c / columns;
+    const x = -(design.finial.r + fly * t);
+    const narrow = (y1 - y0) * 0.18 * t;
+    const ripple = Math.sin(t * Math.PI * 2.2) * 0.035 * t;
+    positions.push(x * r, (y0 + narrow) * r, ripple * r, x * r, (y1 - narrow * 0.4) * r, ripple * r);
+    if (c < columns) indices.push(c * 2, c * 2 + 2, c * 2 + 1, c * 2 + 1, c * 2 + 2, c * 2 + 3);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const cloth = surface(new THREE.Color(colour).getHex(), { roughness: 0.9 });
+  cloth.side = THREE.DoubleSide;
+  const mesh = new THREE.Mesh(geometry, cloth);
+  mesh.name = 'helm-pennant';
+  return mesh;
+}
+
+/**
  * The Ming soldier's helmet in its design (MING_HELMS: `head.design`, its finish `head.finish`): the fitted bowl wearing its
  * sheet, the brim, the finial and its plume, the chin cords. Returns the meshes it added.
  */
 export function buildMingDesignHelm(group, head, r, steel, { lowDetail = false } = {}) {
   // (The banners' helmets are drawn the same way: QING_HELMS.)
-  const design = MING_HELMS[head.design] ?? QING_HELMS[head.design];
-  if (!design) return false;
-  const finish = CHINA_FINISHES[head.finish ?? design.finish];
-  const sheet = chinaDesignSheet(head.design, design, head.finish ?? design.finish);
+  const found = MING_HELMS[head.design] ?? QING_HELMS[head.design] ?? MING_OFFICER_HELMS[head.design];
+  if (!found) return false;
+  // In the kit's own steel (`'own'`: its colour's finish, kitFinish), the bowl, its peak and its finial alike.
+  const own = kitFinish(head.color ?? '#a7adb6');
+  const mine = (name) => (name === 'own' ? own : name);
+  const design = found.finish === 'own' || found.peak?.finish === 'own' || found.finial?.finish === 'own'
+    ? { ...found, finish: mine(found.finish), peak: found.peak && { ...found.peak, finish: mine(found.peak.finish), edge: mine(found.peak.edge) }, finial: found.finial && { ...found.finial, finish: mine(found.finial.finish) } }
+    : found;
+  const finishName = head.finish ?? design.finish;
+  const finish = CHINA_FINISHES[finishName];
+  const sheet = chinaDesignSheet(head.design, design, finishName);
   const material = chinaFinish(steel, finish, sheet);
   const seg = lowDetail ? { rows: 12, cols: 24 } : { rows: 22, cols: 48 };
   const bowl = chinaGridMesh(shellGrid(design, seg), material, r);
@@ -547,6 +584,8 @@ export function buildMingDesignHelm(group, head, r, steel, { lowDetail = false }
     tip.position.y = design.profile.at(-1)[0] * r;
     group.add(tip);
   }
+  // A small pennant flying back from the spire (`pennant`), in the kit's tassel's red.
+  if (design.pennant) group.add(chinaPennant(design, r, head.tassel ?? '#b3161b', lowDetail));
   // The kit's own plume where it gives one (`head.plume`), else the design's.
   const plume = TASSELS[head.plume] ? head.plume : design.plume;
   if (plume && !lowDetail) group.add(buildTassel(TASSELS[plume], r, { at: [0, finialTop(design) - 0.03, 0] }));
