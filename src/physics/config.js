@@ -1547,6 +1547,12 @@ export const WORLD = {
   //   hardly ever leaned; at 0.6 he leans for the men a little further out (to ~40° at most) and the cuts meet them.
   mount: {
     startApart: 12,
+    // A charge held straight (physics/mounted.js goalFromFootwork): a horse at the gallop is not turned with every side-step of the
+    // man it is ridden at (a dodger's weave, a step one way and back), it is set on a line and held on it: the rider's heading
+    // eased toward where he looks over `settle` s (a weave of ~1-2 Hz all but lost in it, a man who runs off the line followed),
+    // and only in the last moment, the man within `lastMoment` s of the horse's pace, turned onto him at once (`snap` s). From
+    // `from` m/s (a canter); slower, the horse goes where he looks.
+    chargeSteer: { from: 4, settle: 1.2, lastMoment: 0.8, snap: 0.12 },
     // Getting down and up of his own will (physics/mounted.js dismount, mountHorse; the player's horse button): only with the horse
     // at `speed` m/s or slower (a walk), set down `beside` m off its side; a riderless horse standing within `reach` m is mounted.
     dismount: { speed: 1.8, beside: 0.9, reach: 1.6 },

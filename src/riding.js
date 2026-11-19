@@ -7,7 +7,7 @@
 import { P } from './body.js';
 import { MOVES, STYLES, moveRange } from './moves.js';
 import { aimPoint, bladeFor, dropWeapon, point, throwPunch, toLocal, WORLD } from './physics.js';
-import { leanedShoulder, mountJump, mountJumpBlocked, mountJumpLead, mountJumpOf, steerInside, turnRadius } from './physics/mounted.js';
+import { chargeLine, leanedShoulder, mountJump, mountJumpBlocked, mountJumpLead, mountJumpOf, steerInside, turnRadius } from './physics/mounted.js';
 import { ammoCarried } from './physics/ranged.js';
 import { DOG_JUMP } from './robotdogs.js';
 import { vec, yawRotate } from './pose.js';
@@ -564,8 +564,8 @@ export function ride(world, fighter, opponent, style, dt, { gunfight }) {
     // His own foot in the way: round the end of them first (RIDING.flank).
     const round = roundOwnFoot(world, fighter, me, target);
     const aim = round ? [round[0] - me[0], round[2] - me[2]] : [passAt[0] - me[0], passAt[2] - me[2]];
-    // Close in, the line is held (no swerve at the last moment).
-    const heading = distance > 3 ? headingOf(aim[0], aim[1]) : horse.goal.heading;
+    // The line held (WORLD.mount.chargeSteer: his man's side-steps not followed), turned onto him only in the last moment.
+    const heading = chargeLine(world, fighter, horse, headingOf(aim[0], aim[1]), dt, opponent, true);
     setGoal(heading, world.time < ride.holdUntil ? 0 : horse.paces.gallop * ride.plan.pace);
     if (ahead < -0.1 || distance < 1) {
       ride.phase = 'past';

@@ -1090,7 +1090,27 @@ export function goalFromFootwork(world, fighter, dt) {
     horse.goal = { heading: horse.yaw, speed: -1 };
     return;
   }
-  horse.goal = { heading, speed: Math.min(1, size) * (fighter.running ? horse.paces.gallop : horse.paces.canter) };
+  horse.goal = { heading: chargeLine(world, fighter, horse, heading, dt), speed: Math.min(1, size) * (fighter.running ? horse.paces.gallop : horse.paces.canter) };
+}
+
+/**
+ * A charge held straight (WORLD.mount.chargeSteer): at the gallop the heading he wants (`heading`) is eased into the line the horse
+ * holds (`horse.chargeHeading`) over `settle` s, so the side-steps of the man he rides at do not swing it; with that man within
+ * `lastMoment` s of the horse's pace, it is turned onto him at once. Slower than `from`, or riding at no one, it is as he wants.
+ */
+export function chargeLine(world, fighter, horse, heading, dt, foe = fighter.focus !== null && fighter.focus !== undefined ? world.fighters[fighter.focus] : null, galloping = fighter.running) {
+  const spec = WORLD.mount.chargeSteer;
+  const pace = Math.abs(horse.speed ?? 0);
+  if (!galloping || pace < spec.from || !foe || foe.state === 'out') {
+    horse.chargeHeading = heading;
+    return heading;
+  }
+  const apart = Math.hypot(foe.x[P.pelvis * 3] - horse.at[0], foe.x[P.pelvis * 3 + 2] - horse.at[1]);
+  const settle = apart / pace < spec.lastMoment ? spec.snap : spec.settle;
+  const held = horse.chargeHeading ?? horse.yaw;
+  const off = Math.atan2(Math.sin(heading - held), Math.cos(heading - held));
+  horse.chargeHeading = held + off * Math.min(1, dt / settle);
+  return horse.chargeHeading;
 }
 
 /**
