@@ -40,7 +40,8 @@ const NO_PROTECTION = { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0, torso: 0
 // plate over the back of the hand on a cloth glove, the fingers and palm in cloth (Bottomley and Hopson 1988): some of a cut
 // turned, little of a point or a blow; and most armies' men went bare-handed (`bare`): the Ming and Qing coats of plates and
 // their arm guards stopped at the wrist (the Wubei zhi's and the Qing armouries' pieces have no gauntlets), as did the
-// breastplate men of Europe. A kit with `fists: 'gauntlet'` wears gauntlets; any other is bare unless it says.
+// breastplate men of Europe, the steppe's riders, the Jin's heavy horse and the cataphracts: of the armies here only the
+// knights (and the Templar's mail mittens) and the samurai covered the hand. A kit with `fists: 'gauntlet'` wears gauntlets; any other is bare unless it says.
 export const HAND_COVERS = {
   bare: { blunt: 0, cut: 0, pierce: 0 },
   tekko: { blunt: 0.2, cut: 0.55, pierce: 0.2 },
@@ -1692,7 +1693,8 @@ export const OUTFITS = {
     horse: 'manchu', barding: 'lamellar',
     skill: 0.7,
     faction: 'chinese', plated: true,
-    label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'gauntlet',
+    // Bare-handed (HAND_COVERS: was gauntleted): the Jin's lamellar stopped at the wrist, as Chinese armour did; in Asia and the steppe only the knight and the samurai covered the hand.
+    label: 'Iron Pagoda — Jin heavy armour', movement: 'limited', fists: 'bare',
     // The wolf-tooth mace (langya bang) at the saddle, drawn once the spear is lost (STYLES.langya; was the dao): the
     // horseman's spear first, the mace for the press, where it crushes what a point and an edge glance off (the user's
     // call, 2026-11-08).
@@ -1989,7 +1991,8 @@ export const OUTFITS = {
     // Rides (the Cumans' small hardy steppe horse; no barding in the graves).
     horse: 'steppe',
     faction: 'steppe',
-    label: 'Cuman — mail and plates, masked helmet', movement: 'good', fists: 'gauntlet',
+    // Bare-handed (HAND_COVERS: was gauntleted): the steppe's mail and plates stopped at the wrist; in Asia and the steppe only the knight and the samurai covered the hand.
+    label: 'Cuman — mail and plates, masked helmet', movement: 'good', fists: 'bare',
     // The long, deep-curved sabre of the Kipchak kurgans (WEAPONS.kilij: the kılıç's forerunner), not the Mongol's gentler one.
     sidearm: 'kilij',
     // Mail-and-plate shirt ~11 kg, vambraces ~1 kg, mail mittens ~0.5 kg, helmet, aventail and mask ~2.5 kg: ~15 kg on a
@@ -2200,7 +2203,8 @@ export const OUTFITS = {
     horse: 'turkoman', barding: 'lamellar',
     faction: 'parthians',
     skill: 0.65,
-    label: 'Parthian cataphract — scale and kontos', movement: 'limited', fists: 'gauntlet',
+    // Bare-handed (HAND_COVERS: was gauntleted): the hands left free for the kontos and the reins; in Asia and the steppe only the knight and the samurai covered the hand.
+    label: 'Parthian cataphract — scale and kontos', movement: 'limited', fists: 'bare',
     sidearm: 'spatha',
     // Armour at 0.55 of its old weight (was 0.4): iron scale and laminated limbs: ~18 kg on an 80 kg man (real ~20–30 kg).
     extraMass: 0.22,
