@@ -143,6 +143,8 @@ export const UI_MENU = {
   'wizard.wornInfo': { en: 'What they wear: its story and its stats', zh: '身上穿的：来历和数据' },
   'wizard.setInfo': { en: '{name}: its story and its stats', zh: '{name}：来历和数据' },
   'wizard.helmet': { en: 'Helmet', zh: '头盔' },
+  'wizard.second': { en: 'Second weapon (belt)', zh: '副武器（腰间）' },
+  'wizard.third': { en: 'Saddle weapon (mounted)', zh: '鞍上武器（骑乘）' },
   'wizard.helmet.own': { en: "The set's own", zh: '套装原配' },
   'wizard.helmet.none': { en: 'No helmet', zh: '不戴头盔' },
   'wizard.finish': { en: 'Finish', zh: '样式' },

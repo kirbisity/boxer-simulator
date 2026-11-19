@@ -17,6 +17,7 @@
 
 import { HELM_NAMES, OUTFIT_BLURBS, OUTFIT_SETS } from './outfitsets.js';
 import { cutOfEdgeProof, edgeProofOf, pierceOfPuncture, punctureOf } from './weapons.js';
+import { KIT_ARMS, resolveArms } from './loadout.js';
 
 export const DAMAGE_TYPES = ['blunt', 'cut', 'pierce'];
 
@@ -3473,6 +3474,8 @@ export function gearTraits(inputs) {
   const headChanged = bare || Boolean(helm);
   const helmShift = headChanged ? ((bare ? 0 : helm.helmet.mass) - ownHelmet(spec, kind, design).mass) / HELM_SLOT_BODY_KG : 0;
   const female = inputs.sex === 'female';
+  // His weapons by slot (loadout.js).
+  const arms = resolveArms({ ...inputs, outfit: { ...inputs.outfit, kind } });
   const bySex = female ? spec.female ?? {} : {};
   const feet = (female && look.femaleFeet) || look.feet;
   const under = underArmourOf(inputs, spec);
@@ -3527,8 +3530,11 @@ export function gearTraits(inputs) {
     breastplate: spec.breastplate ?? 0,
     // How the helmet keeps the face (HELMETS `face`; a mask closes an open one): 'closed', 'sealed', 'open'; 'bare' with none.
     helmFace: helmFaceOf(inputs, spec, look),
-    // A second weapon carried with this kit (a style key), drawn once when the first is lost; a man's own (`inputs.sidearm`) before the kit's.
-    sidearm: inputs.sidearm ?? spec.sidearm ?? null,
+    // His second weapon (loadout.js: slot 2, a weapon kind at his belt, by his kit and his first, or his own choice), drawn when the
+    // first is lost or put by; a kit loadout.js does not list keeps its own (`sidearm`, a style key) or the man's.
+    sidearm: KIT_ARMS[kind] ? arms.second : inputs.sidearm ?? spec.sidearm ?? null,
+    // His third (slot 3: a weapon at the saddle, for a man who rides), drawn from the saddle when the first two are gone.
+    saddle: arms.third,
     // A hand grenade carried with this kit (weapons.js THROWABLES: 'frag', 'flashbang'), thrown once (physics/throwable.js); a man's own (`inputs.throwable`, null for none) before the kit's.
     throwable: inputs.throwable !== undefined ? inputs.throwable : spec.throwable ?? null,
     // Weapons built into the forearms, by side (`mounted`: { r, l }, weapon kinds): one in use at a time, the other drawn on its arm.

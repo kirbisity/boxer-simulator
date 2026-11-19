@@ -5,6 +5,7 @@
 // A landed punch hands its momentum to the struck part, which flies until
 // the fighter's muscles, after a reflex delay, catch it.
 
+import { drawnStyle } from './loadout.js';
 import { BODY, buildBody, P, PARTICLES, SEGMENTS } from './body.js';
 import { idleMotion, lifePhases } from './life.js';
 import { blowSide, DEFENCES, MOVES, STYLES, strikeTargets } from './moves.js';
@@ -170,7 +171,7 @@ export function createFighter(inputs, { id, corner, x, facing, random }) {
     restAt: undefined, restFor: undefined, temperament: undefined, seenPunch: undefined, reactAt: undefined, reacted: undefined,
     // stowed: his bow (or crossbow, or gun) slung for his sidearm (swapSidearm), with the style he shot it in.
     stowed: null,
-    sidearmDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
+    sidearmDrawn: undefined, saddleDrawn: undefined, bladeMet: undefined, severed: undefined, severedCapsules: undefined, stumbleUntil: undefined, pendingArm: undefined,
     // A limb lost (maiming.js): the great vessels opened, the shock of it and when, the parts an edge has cut (a limb they
     // ruin bleeds as torn open), whether he fights on from the ground with a leg gone, and when he died of the blood lost.
     vessels: undefined, maimShock: undefined, maimShockAt: undefined, maimFeltAt: undefined, cutParts: undefined, limbCuts: undefined, fractured: undefined, groundFight: undefined, diedAt: undefined,
@@ -561,13 +562,17 @@ function rearm(world, fighter, weapon) {
   // else he fights mixed.
   // A man whose sidearm is the weapon he just lost (a Ming soldier's dao) has his kit's spare.
   const gear = fighter.body.gear;
-  const sidearmKind = fighter.sidearmDrawn ? null : gear.sidearm !== weapon.kind ? gear.sidearm : gear.spare ?? null;
-  // A kit names its sidearm by style; a bare weapon kind is fought in that weapon's style.
-  const sidearm = sidearmKind && !STYLES[sidearmKind] ? styleForWeapon(sidearmKind) ?? null : sidearmKind;
+  // His second (loadout.js slot 2) if not yet drawn; else, in the saddle, his third (slot 3) if not yet drawn.
+  const second = fighter.sidearmDrawn ? null : gear.sidearm !== weapon.kind ? gear.sidearm : gear.spare ?? null;
+  const third = !second && fighter.mount && !fighter.saddleDrawn && gear.saddle && gear.saddle !== weapon.kind ? gear.saddle : null;
+  const sidearmKind = second ?? third;
+  // A kit names its sidearm by style; a weapon kind is fought in the style it is drawn in (loadout.js drawnStyle: no shield with it).
+  const sidearm = sidearmKind && !STYLES[sidearmKind] ? drawnStyle(sidearmKind) ?? styleForWeapon(sidearmKind) ?? null : sidearmKind;
   const fallback = STYLES[fighter.style]?.fallback;
   // His sword hand gone (maiming.js): nothing to draw into it; he fights with what he has left.
   const next = armGone(fighter, 'r') ? 'mix' : fallback && fallback !== 'mix' ? fallback : sidearm ?? fallback ?? 'mix';
-  if (next === sidearm) fighter.sidearmDrawn = true;
+  if (next === sidearm && second) fighter.sidearmDrawn = true;
+  if (next === sidearm && third) fighter.saddleDrawn = true;
   fighter.weapon = null;
   if (fighter.state === 'down') {
     // Down, he draws the next weapon (if any) as he gets up.
@@ -575,7 +580,8 @@ function rearm(world, fighter, weapon) {
     fighter.pendingArm = next;
     return;
   }
-  armFighter(fighter, next, { random: world.random });
+  // (A sword drawn brings no shield with it: one he has stays on his arm.)
+  armFighter(fighter, next, { random: world.random, shield: next !== sidearm });
   if (fighter.weapon) world.events.push({ time: world.time, kind: 'drew', fighter: fighter.id, weapon: fighter.weapon.kind, effects: [`draws the ${fighter.weapon.spec.label.toLowerCase()}`] });
 }
 

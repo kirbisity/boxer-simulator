@@ -2284,6 +2284,8 @@ function detailedView(view, fighter, simple) {
   if (simple) thinOut(layers.skin, skinMesh);
   view.scene.add(group);
   const fighterView = {
+    // (The hilts at his belt: hidden while that weapon is in his hand, updateFighterView.)
+    sheathHilts: hips.userData.hilts ?? null,
     fighter, group, layers, bones, built, skinMesh, skinOutline, muscle: null, skeleton, skeletonBuilt: false, attachments, shells, slosh: skin.slosh,
     baseColors, vertexSegment, damageVersion: -1, headProps, dangles, swings: headgear?.swings ?? [], steelMesh, steelOutline: skin.steelOutline, detailMeshes: skin.detailMeshes, detailOutlines: skin.detailOutlines,
     ...physicsLayer, head: headView, layer: 'skin', frames: built.bindFrames, lacquer, rigid, machine, bodyStyle,
@@ -3247,6 +3249,8 @@ export function updateFighterView(fighterView, dt, time) {
     });
   }
   const fighter = fighterView.fighter;
+  // A second weapon drawn from its scabbard (loadout.js): the hilt at his belt goes with it.
+  if (fighterView.sheathHilts) for (const hilt of fighterView.sheathHilts) hilt.visible = !(fighter.weapon?.held && fighter.weapon.kind === hilt.userData.sheathHilt);
   // A crowd fighter lying still (out, his body asleep) is drawn as he was:
   // nothing of him has moved since (his hips and head are where they were).
   if (fighterView.baked && fighter.state === 'out') {

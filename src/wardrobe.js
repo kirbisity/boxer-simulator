@@ -2,6 +2,8 @@
 // on the body, tattoos, steel, and the pieces that are not part of the body
 // mesh — fists, footwear, headgear and the things that swing.
 
+import { carriedAs, resolveArms } from './loadout.js';
+import { WEAPONS } from './weapons.js';
 import { clothWearOf, drapeWear } from './clothwear.js';
 import { Dangle } from './dangle.js';
 import { WORLD } from './physics/config.js';
@@ -68,7 +70,74 @@ export function dressFor(inputs, cornerHex) {
   const optionalHead = OUTFITS[kind]?.optionalHead;
   const headChosen = !optionalHead || (inputs.accessories ?? []).includes(optionalHead);
   const head = !headChosen ? null : look.head && tint?.armor ? { ...look.head, color: tint.armor, lace: tint.lace ?? look.head.lace } : look.head;
-  return { kind, design, look, top, bottom, armor, feet, head, extras: look.extras ?? [], tattoo: look.tattoo, female, color, banner: inputs.outfit?.banner ?? null };
+  // His second weapon at his belt (loadout.js slot 2): a sword in its scabbard at the left hip, a dagger in its sheath at the right
+  // (a kit that draws its own, the samurai's daisho, keeps that).
+  const extras = [...(look.extras ?? [])];
+  const second = resolveArms(inputs).second;
+  const carried = carriedAs(second);
+  if ((carried === 'sword' || carried === 'dagger') && !extras.some((extra) => extra.kind === 'daisho')) extras.push({ kind: 'sheath', weapon: second, carried });
+  return { kind, design, look, top, bottom, armor, feet, head, extras, tattoo: look.tattoo, female, color, banner: inputs.outfit?.banner ?? null };
+}
+
+// A scabbard's look by its sword's people: its leather or lacquer, the grip's binding and the guard's metal (`guard`: a cross,
+// a disc (the tsuba, the dao's), or a knuckle bow's stand-in, a small cross).
+const SHEATHS = {
+  european: { scabbard: '#3a2618', grip: '#2a1a10', guard: '#9aa0a8', shape: 'cross' },
+  japanese: { scabbard: '#141418', grip: '#1c1c22', guard: '#2a2a2e', shape: 'disc' },
+  chinese: { scabbard: '#4a1a14', grip: '#2a1410', guard: '#b08a3a', shape: 'disc' },
+  steppe: { scabbard: '#3a2a1a', grip: '#2a1a10', guard: '#b08a3a', shape: 'cross' },
+  ancient: { scabbard: '#5a3a22', grip: '#3a2416', guard: '#b08a3a', shape: 'none' },
+};
+const SHEATH_OF = {
+  katana: 'japanese', wakizashi: 'japanese', dao: 'chinese', changdao: 'chinese', jian: 'chinese', saber: 'steppe', kilij: 'steppe', yatagan: 'steppe',
+  sayf: 'steppe', gladius: 'ancient', spatha: 'ancient', sica: 'ancient',
+};
+
+/**
+ * A sword in its scabbard at the left hip (or a dagger in its sheath at the right), hung from the belt sloping back, its hilt
+ * forward of the hip: the scabbard as long as the blade, the hilt its grip and guard (loadout.js slot 2). The hilt is drawn apart
+ * (`userData.sheathHilt`, the weapon's kind) so that the view hides it while that weapon is in his hand (render.js).
+ */
+function buildSheath(body, extra, hips) {
+  const scale = body.heightM / 1.8;
+  const spec = WEAPONS[extra.weapon];
+  if (!spec) return;
+  const look = SHEATHS[SHEATH_OF[extra.weapon] ?? 'european'];
+  const dagger = extra.carried === 'dagger';
+  const blade = Math.max(0.15, spec.length);
+  const grip = Math.max(0.09, Math.min(0.3, spec.handle ?? 0.12));
+  const width = Math.max(0.016, (spec.radius ?? 0.012) * 2.1);
+  const side = (dagger ? -1 : 1) * (body.segments.trunk.skinRadius * 1.04 + 0.012 * scale);
+  // Down and back from the belt at about 45 degrees (the hilt forward at the hand, the tip clear of the calf), a little out from the hip.
+  const heading = new THREE.Vector3(-0.95, -1, side > 0 ? 0.12 : -0.12).normalize();
+  const sheath = new THREE.Group();
+  const leather = surface(new THREE.Color(look.scabbard).getHex(), { roughness: 0.55 });
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(width * 0.8 * scale, width * scale, blade * scale, 8), leather);
+  tube.scale.z = 0.5;
+  tube.position.y = (-blade * scale) / 2;
+  sheath.add(tube);
+  // The hilt, out of the scabbard's mouth: the guard, the grip, the pommel.
+  const hilt = new THREE.Group();
+  hilt.userData.sheathHilt = extra.weapon;
+  const steel = surface(new THREE.Color(look.guard).getHex(), { roughness: 0.35, metalness: 0.8 });
+  if (look.shape === 'cross' && !dagger) {
+    const cross = new THREE.Mesh(new THREE.BoxGeometry(0.02 * scale, 0.012 * scale, (spec.length > 0.9 ? 0.2 : 0.14) * scale), steel);
+    hilt.add(cross);
+  } else if (look.shape === 'disc') {
+    const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * scale, 0.035 * scale, 0.006 * scale, 12), steel);
+    hilt.add(disc);
+  }
+  const wrap = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * scale, 0.016 * scale, grip * scale, 8), surface(new THREE.Color(look.grip).getHex(), { roughness: 0.85 }));
+  wrap.position.y = (grip * scale) / 2 + 0.006 * scale;
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.018 * scale, 8, 6), steel);
+  pommel.position.y = grip * scale + 0.01 * scale;
+  hilt.add(wrap, pommel);
+  sheath.add(hilt);
+  // The scabbard's length (the group's -y) along `heading`, its mouth at the belt just before the hip.
+  sheath.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), heading);
+  sheath.position.set(0.06 * scale, 0.02 * scale, side);
+  hips.add(sheath);
+  (hips.userData.hilts ??= []).push(hilt);
 }
 
 /** The colour of each role the body mesh is painted with, for this dress. */
@@ -3944,6 +4013,10 @@ export function buildSwinging(body, dress, collar, hips, cornerHex) {
   const dangles = [];
   for (const extra of dress.extras) {
     const color = extra.color === 'corner' ? cornerHex : extra.color;
+    if (extra.kind === 'sheath') {
+      buildSheath(body, extra, hips);
+      continue;
+    }
     if (extra.kind === 'tie') {
       const tie = new Dangle(collar, [0.1 * scale, -0.07 * scale, 0], [0.28, -1, 0], 0.3 * scale, { sag: extra.loose ? 0.9 : 0.5, damping: 0.2 });
       const blade = new THREE.Mesh(new THREE.BoxGeometry(0.008 * scale, 0.3 * scale, 0.05 * scale), surface(color));

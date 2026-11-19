@@ -20,6 +20,7 @@ import { customBattleScreen } from './custombattleview.js';
 import { CUSTOM_BATTLE } from './custombattle.js';
 import { lineShown, pairedOpponent, ratingOf, starsOf, styleName, WARRIORS } from './roster.js';
 import { WEAPONS } from './weapons.js';
+import { resolveArms, secondOptions, thirdOptions } from './loadout.js';
 import { boltedOn, breedOf, canRide, mountOf } from './horses.js';
 import { shadeGradient, shadeTone, toneShade } from './skintones.js';
 import { fightUiHomeSwitch } from './fightui/toggle.js';
@@ -646,6 +647,29 @@ export function installMenus(game) {
         return withInfo(card, () => el('div', { className: 'style-info' }, el('b', { textContent: tname(style.label) }), el('p', { textContent: pick(STYLE_NOTES[key]) })), t('wizard.styleInfo', { name: tname(style.label) }));
       }
     }
+    // His second weapon (at his belt) and his third (at his saddle, for a kit that rides), each from what his kit carried
+    // (loadout.js); nothing at all is a choice too.
+    function armsFields() {
+      const weaponWord = (kind) => (kind === 'none' ? t('wizard.nothing') : tname(WEAPONS[kind].label));
+      const fields = [];
+      const second = secondOptions(inputs);
+      if (second.length) {
+        fields.push(el('div', { className: 'field' }, el('b', { textContent: t('wizard.second') }), buttons(['none', ...second], () => resolveArms(inputs).second ?? 'none', (kind) => {
+          gearTouched = true;
+          inputs.arms = { ...inputs.arms, second: kind };
+          delete inputs.sidearm;
+        }, weaponWord)));
+      }
+      const riding = { ...inputs, mounted: true };
+      const third = canRide(inputs) ? thirdOptions(riding) : [];
+      if (third.length) {
+        fields.push(el('div', { className: 'field' }, el('b', { textContent: t('wizard.third') }), buttons(['none', ...third], () => resolveArms(riding).third ?? 'none', (kind) => {
+          gearTouched = true;
+          inputs.arms = { ...inputs.arms, third: kind };
+        }, weaponWord)));
+      }
+      return fields;
+    }
     // Outfit sets (outfitsets.js) under their factions, each a small tile (its picture and name), its description and stats in
     // a pop-up; the one worn above them (a tap: its card), with its finishes (colours, crests: the same stats).
     function stepGear(content) {
@@ -670,6 +694,7 @@ export function installMenus(game) {
       content.append(
         wornPick,
         el('div', { className: 'field' }, el('b', { textContent: t('wizard.helmet') }), helmPicker()),
+        ...armsFields(),
         ...(designs.length < 2 ? [] : [el('div', { className: 'field' }, el('b', { textContent: t('wizard.finish') }), buttons(designs.map(([, at]) => String(at)), () => String(outfit.design ?? 0), (at) => { gearTouched = true; inputs.outfit = { ...outfit, design: Number(at) }; }, (at) => tname(OUTFITS[outfit.kind].designs[at].label)))]),
         // The metal's steel and its decoration, where the kit offers them (outfits.js finishOptions).
         ...Object.entries(finishOptions(worn.kind)).filter(([, choices]) => choices).map(([field, choices]) => el('div', { className: 'field' }, el('b', { textContent: field === 'steel' ? t('wizard.steel') : t('wizard.decoration') }),
