@@ -1573,6 +1573,7 @@ const TOCAPU_ROLES = ['cloth', 'gold', 'lace', 'cloth2', 'leather', 'cloth', 'la
 /** A paint as the loft wants it: a role, or a function of the ring and its place. */
 function paintFor(paint, armor) {
   if (typeof paint === 'string' || typeof paint === 'function') return paint;
+  if (paint.far && FAR_PATTERNS.some((key) => paint[key])) return farPaint(paint);
   if (paint.mail) return (ring, angle, index, step) => ((index + step) % 2 ? 'mail' : 'mail2');
   if (paint.heraldry) return (ring, angle) => heraldry(armor?.heraldry, ring.t, Math.sin(angle), Math.cos(angle));
   if (paint.mon) {
@@ -1644,6 +1645,22 @@ function paintFor(paint, armor) {
     if (paint.edge && index === 0) return paint.edge;
     if (paint.rows) return paint.rows[index % paint.rows.length];
     return paint.base;
+  };
+}
+
+// The patterns painted into a piece's colours where its detail is not drawn (a crowd): rivets, scales, lamellae and their
+// lacing, lames, laced rows, mail's rings, brocade and braid. Seen from afar each blurred into a mottle (a camouflage
+// pattern over the coat); there the piece is one colour, its splits and its hem kept (farPaint).
+const FAR_PATTERNS = ['mail', 'studded', 'scales', 'lamellae', 'lames', 'rows', 'rivets', 'brocade', 'braid'];
+
+/** A patterned piece seen from afar (FAR_PATTERNS): its one colour, the robe in its splits, its edges bound. */
+function farPaint(paint) {
+  const one = paint.mail ? 'mail' : paint.studded ? paint.base : paint.scales || paint.lamellae || paint.lames ? 'steel' : paint.rows ? paint.rows[0] : paint.base ?? 'armor';
+  return (ring, angle, index) => {
+    if (paint.studded && ((paint.opening && Math.cos(angle) > 1 - paint.opening) || inLamellaGap(paint, angle))) return paint.edge ?? paint.base;
+    if (paint.lamellae && inLamellaGap(paint, angle)) return 'cloth';
+    if (paint.edge && index === 0) return paint.edge;
+    return one;
   };
 }
 
@@ -4545,7 +4562,9 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     }
     // Drawn as faces of their own, the rivets and the mirror are not painted as well.
     const studsDrawn = Boolean(paint?.studded && !lowDetail);
-    loft(mesh, rings, split ? split.sides : sides, { color: paintFor(studsDrawn ? { ...paint, studsDrawn, mirror: null } : paint, armor), inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), ...(split ? { holes: split.holes } : frontOnly) });
+    // (From afar, lowDetail: one colour, not its pattern; farPaint.)
+    const shown = paint && typeof paint === 'object' && lowDetail ? { ...paint, far: true } : paint;
+    loft(mesh, rings, split ? split.sides : sides, { color: paintFor(studsDrawn ? { ...shown, studsDrawn, mirror: null } : shown, armor), inflate, capStart: overShoulder, capEnd: false, ...(bones ? { bones } : {}), ...(shape ? { shape } : {}), ...(split ? { holes: split.holes } : frontOnly) });
     if (split) {
       const { edge, stand } = legPanelsOn(mesh, rings, inflate, paint, boned, sides, split, panel(studsDrawn));
       // The front panel's own rivet heads, in columns down it as the skirt's.
