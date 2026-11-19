@@ -17,7 +17,7 @@ import { gapsOf } from './physics/gaps.js';
 import { handling } from './handling.js';
 import { RUN_STEER, runSteer } from './runsteer.js';
 import { jogSpeed, runSpeed } from './physics/gait.js';
-import { FINISHER, finishTarget, startFinisher, updateFinisher } from './finisher.js';
+import { executable, FINISHER, finishTarget, startFinisher, updateFinisher } from './finisher.js';
 import { lowTarget, startLowStrike, updateLowStrike } from './lowstrike.js';
 import { chargeAt, ringHeading } from './riding.js';
 import { ARTS, artBlocked, feelAdrenaline, startArt } from './weaponarts.js';
@@ -806,7 +806,8 @@ function reachBetween(fighter, other) {
 export function finishOnAttack(world, fighter, orders) {
   if (fighter.punch) return false;
   const prey = finishTarget(world, fighter, { locked: orders.lock, range: FINISHER.tapReach });
-  return Boolean(prey) && prey.state === 'down' && startFinisher(world, fighter, prey, { range: FINISHER.tapReach });
+  // (Lying down, or standing broken open by his big deflect: executable.)
+  return Boolean(prey) && (prey.state === 'down' || executable(world, prey)) && startFinisher(world, fighter, prey, { range: FINISHER.tapReach });
 }
 
 /**

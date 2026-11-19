@@ -2900,7 +2900,8 @@ function updateIntent(world, fighter, dt) {
   runCarry(world, fighter, intent, dt);
   // On a scaling ladder: square to it, leaned along it, his hands on its rungs (physics/ladders.js).
   if (fighter.climbing) ladderPose(world, fighter, intent);
-  if (fighter.handsDown) {
+  // (Broken open by a big deflect, physics/deflect.js breakOpen: his arms fallen to his sides, his blade off the line, his face open.)
+  if (fighter.handsDown || fighter.brokenOpen > 0) {
     // Hands at the sides, for portraits and design sheets.
     // (Hanging at the angle that just clears his trunk's side, thin close in, fat out: pose.js restArmAngle.)
     const hang = restArmAngle(fighter.body);
@@ -8642,7 +8643,8 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   if (closing < WORLD.minImpactSpeed) return null;
   struck.add(defender.id);
   // On a curved helmet a blow not square to it skids: less of it goes in, edge and point and weight alike.
-  const glance = helmetGlance(defender, capsule, relative, closing);
+  // (An execution's point put to the sights, finisher.js `zone`: put into the slit, not met on the curve of the helm.)
+  const glance = punch.finisher?.zone && capsule.key === 'head' ? { share: 1, twist: 1 } : helmetGlance(defender, capsule, relative, closing);
   // (A finisher's point is driven down with his weight: never slower than `finisher.drive` m/s, however the arm slowed at the floor.)
   const goingIn = Math.max(closing, punch.finisher?.drive ?? 0) * glance.share;
 
@@ -8666,7 +8668,7 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
     const event = { time: world.time, kind: 'deflect', fighter: defender.id, byPlayer: Boolean(defender.player), attacker: attacker.id, punch: punch.type, weapon: defender.weapon.kind, point: closest.onFirst, normal, impulse, energy, assisted: true, effects: [`deflected with the ${defender.weapon.spec.label.toLowerCase()}`] };
     world.pendingImpulses.push({ fighter: attacker, shares: [[main, 1], [P[`${weapon.main}Elbow`], 0.5]], direction: normal, impulse });
     reel(world, attacker, energy, event);
-    if (big) breakOpen(world, attacker, event);
+    if (big) throwDownOpen(world, attacker, event);
     world.events.push(event);
     if (world.ear) soundEvent(world, 'clash', { at: closest.onFirst, speed: goingIn, a: 'blade', b: weaponPart(weapon, distance), mass: Math.max(wspec.mass ?? 1, defender.weapon.spec.mass ?? 1), deflect: true, byPlayer: Boolean(defender.player), big, energy });
     return false;
@@ -8699,7 +8701,9 @@ function registerWeaponImpact(world, attacker, defender, striker, closest, capsu
   // Into a gap in rigid armour (BLADES.gaps): only where there is one (physics/gaps.js gapZoneAt: the armpit, the groin, the
   // throat, the sights, the bend of a joint; never the middle of the breast, the back or the crown), then only what is under it, and no glance.
   const rigid = (covered.cut ?? 0) >= gapsOf(body.gear).rigidFrom && mix.cut + mix.pierce > 0.2;
-  const gapZone = rigid ? gapZoneAt(defender, capsule.key, contactPoint, normal) : null;
+  // (An execution's point, placed through the sights of the helm of a man standing broken open before him: finisher.js `zone`,
+  // the sights wherever on the helm it is first met, as the hand puts it there.)
+  const gapZone = rigid ? (punch.finisher?.zone && capsule.key === 'head' ? punch.finisher.zone : gapZoneAt(defender, capsule.key, contactPoint, normal)) : null;
   // A heavy point that wanders (punch.wander, m) is put into a gap the less often: a gap is a hand's breadth (`size`).
   const placed = BLADES.gaps.size / (BLADES.gaps.size + (punch.wander ?? 0));
   // (A finisher's point is placed, not thrown in a fight: put where the plates part, the visor, the armpit, the throat, it finds
@@ -9197,6 +9201,8 @@ function pressOnShield(attacker, defender, striker, hit, away, depth) {
 
 /** Every blade of one man against every blade of the other (two blades: up to four pairs). */
 function clashBlades(world, first, second) {
+  // (An execution: the blade of the man broken open is knocked wide and meets nothing of the man putting the point in: finisher.js.)
+  if ((first.brokenOpen > 0 && second.finisher?.execution) || (second.brokenOpen > 0 && first.finisher?.execution)) return;
   if (!first.weapon?.held && !first.offWeapon?.held) return;
   if (!second.weapon?.held && !second.offWeapon?.held) return;
   for (const a of heldBlades(first)) {
@@ -9311,7 +9317,7 @@ function clashWeapons(world, first, second, a = first.weapon, b = second.weapon)
     const answering = parrier.punch && strokeOf(parrier, blade) === null && parrier.punch.t <= parrier.punch.spec.extendUntil;
     const event = { time: world.time, kind: 'deflect', fighter: parrier.id, byPlayer: Boolean(parrier.player), attacker: striker.id, punch: stroke.type, weapon: blade.kind, off: blade === parrier.offWeapon || undefined, answering: answering || undefined, point: met, normal, impulse, energy, effects: [`deflected with the ${blade.spec.label.toLowerCase()}`] };
     reel(world, striker, energy, event);
-    if (big) breakOpen(world, striker, event);
+    if (big) throwDownOpen(world, striker, event);
     world.events.push(event);
   } else if (parried) {
     const [parrier, blade, striker, stroke] = parried;
@@ -9538,6 +9544,17 @@ export function stagger(world, fighter, severity, event, anyone = false) {
  * A deflected man's arm jarred back (WORLD.deflect reel): he reels for a beat, longer the harder his blow met the blade
  * (its energy over `reelJoules`), his stroke gone; not a stagger's seconds, and no stumble.
  */
+/**
+ * A big deflect's striker (WORLD.deflect.big): broken open (physics/deflect.js breakOpen), standing helpless `open` s, his to be
+ * executed by the man played (`executableUntil`: finisher.js, standing before him, puts the point through his sights).
+ */
+function throwDownOpen(world, fighter, event) {
+  breakOpen(world, fighter, event);
+  // On his feet, his head up and his face (the sights of his helm) to the man before him: thrown down, he lay on his face and
+  // the point had nowhere to go.
+  if (fighter.state === 'up' && !fighter.mount) fighter.executableUntil = world.time + WORLD.deflect.big.open;
+}
+
 function reel(world, fighter, energy, event) {
   const spec = WORLD.deflect;
   if (fighter.state !== 'up') return;

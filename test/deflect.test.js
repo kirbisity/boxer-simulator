@@ -118,3 +118,29 @@ test('the big deflect: the man played\'s guard up closest of all before the blow
   const share = Math.min(WORLD.deflect.big.most, Math.max(WORLD.deflect.big.least, WORLD.deflect.window * WORLD.deflect.big.share)) / WORLD.deflect.window;
   assert.ok(share >= 0.1 && share <= 0.25, `${share}`);
 });
+
+test('a man broken open by the big deflect is the player\'s to execute: standing before him, the point through the sights of his helm, a knight\'s too (most often his death)', async () => {
+  const { startFinisher, updateFinisher, finishTarget } = await import('../src/finisher.js');
+  let killed = 0;
+  let through = 0;
+  for (let seed = 1; seed <= 6; seed += 1) {
+    const world = createWorld([{ inputs: { ...structuredClone(PRESETS.contender), style: 'katana' }, corner: 'red' }, { inputs: structuredClone(PRESETS.knight), corner: 'blue' }], { seed });
+    const [man, knight] = world.fighters;
+    man.player = true;
+    placeFighter(man, -0.9, 0);
+    placeFighter(knight, 0.9, 0);
+    for (let t = 0; t < 0.3; t += 1 / 120) advance(world, 1 / 120, () => {});
+    knight.brokenOpen = WORLD.deflect.big.open;
+    knight.executableUntil = world.time + WORLD.deflect.big.open;
+    assert.equal(finishTarget(world, man, { range: 3.2 })?.id, knight.id, 'offered, standing');
+    const from = world.events.length;
+    assert.ok(startFinisher(world, man, knight, { range: 3.2 }));
+    assert.equal(man.finisher.entry.region, 'face');
+    for (let t = 0; t < 3 && man.finisher; t += 1 / 120) advance(world, 1 / 120, (current) => updateFinisher(current, man, 1 / 120));
+    const events = world.events.slice(from);
+    assert.ok(events.some((event) => event.kind === 'execution'), 'the camera\'s moment');
+    if (events.some((event) => event.kind === 'landed' && event.effects.includes('into a gap in the armour'))) through += 1;
+    if (knight.state === 'out') killed += 1;
+  }
+  assert.ok(through >= 4 && killed >= 4, `${through} through the sights, ${killed} killed of 6`);
+});

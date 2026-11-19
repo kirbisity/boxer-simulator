@@ -11,6 +11,7 @@
 
 import { P } from './body.js';
 import { vec, yawRotate } from './pose.js';
+import { MOVES, STYLES } from './moves.js';
 import { WEAPONS } from './weapons.js';
 import { gapsOf, gapUnder, gapZoneAt } from './physics/gaps.js';
 import { capsuleEnds, capsules, drawForFinisher, hostile, plantFeet, point, protectionAt, restoreAfterFinisher, shieldDisc, throwPunch, WORLD } from './physics.js';
@@ -78,6 +79,9 @@ export const FINISHER = {
   kneelAlong: [null, 0, 0.6],
   // Kneeling, with a gap to be had only from a little round him, the steps he takes there (s at most).
   shiftSeconds: 0.6,
+  // An execution (a man broken open on his feet by the player's big deflect): he stands this far (m) from the man's hips, and his
+  // blade's reach more, before he thrusts.
+  standing: 0.45,
 };
 
 // The places on a man that a point is put to, in order of preference when they are alike. `key` is the part of him struck first,
@@ -280,6 +284,19 @@ export function finisherBlade(fighter) {
   return FINISHER.belt;
 }
 
+/** His style's thrust (its attacks', a strike with the point: a katana's tsuki), or null for a style with none. */
+function execThrust(fighter) {
+  const attacks = Object.keys(STYLES[fighter.style]?.attacks ?? {});
+  return attacks.find((name) => MOVES[name]?.kind === 'strike' && MOVES[name]?.mode === 'thrust' && MOVES[name]?.path === 'blade') ?? null;
+}
+
+/** Whether his weapon in hand has a point to put through a helm's sights (a sword's, a spear's, a dagger's), not a ranged one. */
+function pointed(fighter) {
+  const held = fighter.weapon?.held ? fighter.weapon.spec : null;
+  // (A war hammer's beak or spike is no point for the sights: a weapon swung beak first goes to the finisher's dagger.)
+  return Boolean(held && !held.ranged && !held.beak && (held.harm?.thrust?.pierce ?? 0) >= 0.5);
+}
+
 /** Whether the fighter is in a state to kneel and strike: on his feet, steady, hands free. */
 export function canFinish(fighter) {
   return fighter.state === 'up' && !fighter.crawling && !fighter.netted && !fighter.mount && !fighter.finisher && !fighter.clinch && !fighter.pin
@@ -292,6 +309,14 @@ export function helplessOnFloor(man) {
   // (On his knees by his own choice, the player's crawl, he is not helpless: he can strike and stand.)
   // (Nor on his knees fighting on from the ground, a leg gone and his nerve held: physics.js groundFight.)
   return man.state === 'down' || Boolean(man.crawling && !man.crawlChosen && !man.groundFight && man.state === 'up');
+}
+
+/**
+ * Whether a man stands broken open by a big deflect (physics.js throwDownOpen: `brokenOpen`, `executableUntil`): on his feet, no
+ * guard, his face to the man before him, his to be executed by the man played.
+ */
+export function executable(world, man) {
+  return man.state === 'up' && man.brokenOpen > 0 && (man.executableUntil ?? -Infinity) > world.time && !man.mount;
 }
 
 /** Whether a man on the floor is within reach of this one: the hips apart on the floor, and on the same level. */
@@ -307,7 +332,7 @@ function within(fighter, man, range) {
  * while the enemies about them had others to fight (an AI man's own judgement: ai.js); the player's button stays off near any.
  */
 function engaged(world, fighter, watched = false) {
-  return world.fighters.some((other) => other !== fighter && hostile(other, fighter) && other.state === 'up' && !other.crawling && !other.dormant && !other.fled
+  return world.fighters.some((other) => other !== fighter && hostile(other, fighter) && other.state === 'up' && !other.crawling && !other.dormant && !other.fled && !(other.brokenOpen > 0)
     && !(other.driven && !(world.stage?.aware?.minds?.[other.id]?.state === 'aggro'))
     && (!watched || other.focus === fighter.id) && within(fighter, other, FINISHER.threat));
 }
@@ -324,7 +349,8 @@ export function finishTarget(world, fighter, { anyone = false, locked = null, ra
     let best = null;
     let bestApart = Infinity;
     for (const man of world.fighters) {
-      if (man === fighter || !helplessOnFloor(man) || !allowed(man) || !within(fighter, man, range)) continue;
+      // (Standing broken open by his big deflect, a man is the player's to execute: executable.)
+      if (man === fighter || !(helplessOnFloor(man) || (fighter.player && executable(world, man))) || !allowed(man) || !within(fighter, man, range)) continue;
       const apart = Math.hypot(man.x[P.pelvis * 3] - fighter.x[P.pelvis * 3], man.x[P.pelvis * 3 + 2] - fighter.x[P.pelvis * 3 + 2]) - (man.id === locked ? 0.5 : 0);
       if (apart < bestApart) {
         best = man;
@@ -352,6 +378,16 @@ function kneelingPlace(fighter, target, aim, plan = {}) {
   return [aim[0] + (along[0] * headward + across[0] * sideward) * FINISHER.standOff, aim[1], aim[2] + (along[1] * headward + across[1] * sideward) * FINISHER.standOff];
 }
 
+/** Where he stands to execute a man on his feet (an execution): before him, at his blade's thrusting reach, on the side he is on. */
+function standingPlace(fighter, target) {
+  const hips = point(fighter.x, P.pelvis);
+  const at = point(target.x, P.pelvis);
+  const toward = [hips[0] - at[0], hips[2] - at[2]];
+  const length = Math.hypot(toward[0], toward[1]) || 1;
+  const reach = FINISHER.standing + (fighter.weapon?.held ? fighter.weapon.spec.length * 0.55 : 0.3);
+  return [at[0] + (toward[0] / length) * reach, at[1], at[2] + (toward[1] / length) * reach];
+}
+
 /** Say what happened to the finisher in the log: 'finisher' on starting, 'finisherAborted' on giving up. */
 function logFinisher(world, fighter, kind, target, effects) {
   world.events.push({ time: world.time, kind, attacker: fighter.id, defender: target.id, effects });
@@ -362,11 +398,23 @@ function logFinisher(world, fighter, kind, target, effects) {
  * cannot (not on his feet, hands busy, the man not on the floor or too far, no blade to hold).
  */
 export function startFinisher(world, fighter, target, { region = null, force = false, range = FINISHER.reach } = {}) {
-  if (world.armed === false || !canFinish(fighter) || !target || target === fighter || !helplessOnFloor(target) || !within(fighter, target, range * (force ? 2 : 1))) return false;
+  // A man broken open by the man played's big deflect (WORLD.deflect.big, physics.js throwDownOpen): his execution, standing before
+  // him, the point put through the sights of his helm (the face: the one way into any harness, a knight's as much as a bare-headed
+  // man's), with the player's own weapon if it has a point and the face is open (else the finisher's blade), the camera closing on it (drama.js
+  // DRAMA.execution).
+  const execution = Boolean(fighter.player) && Boolean(target) && executable(world, target);
+  if (world.armed === false || !canFinish(fighter) || !target || target === fighter || !(helplessOnFloor(target) || execution) || !within(fighter, target, range * (force ? 2 : 1))) return false;
+  if (execution) region = 'face';
   // The gap he looks for (planFinisher); a place asked for is put to as asked, from where he is; with every line blocked, the least protected place.
   const plan = region ? null : planFinisher(fighter, target);
   const entry = (region && REGIONS.find((item) => item.region === region)) || plan?.entry || leastProtected(target);
-  const kind = finisherBlade(fighter);
+  // (Through a closed helm's sights, the dagger's work, the rondel's as the masters taught it, his sidearm or a knife from his belt;
+  // a face open or bare, his own weapon's point if it has one.)
+  const closedHelm = ['closed', 'sealed'].includes(target.body.gear.helmet?.face);
+  const kind = execution && pointed(fighter) && !closedHelm ? 'held' : finisherBlade(fighter);
+  // (An execution with his own weapon: his style's own thrust, at the weapon's reach, in place of the dagger's stab down: execThrust.)
+  // (With the dagger, standing: the thrust from the shoulder at his face, `executeStanding`, not the stab down at a man on the floor.)
+  const own = execution ? (kind === 'held' && pointed(fighter) && !closedHelm ? execThrust(fighter) : null) ?? 'executeStanding' : null;
   let keep = null;
   if (kind !== 'held') {
     keep = drawForFinisher(world, fighter, kind);
@@ -375,8 +423,9 @@ export function startFinisher(world, fighter, target, { region = null, force = f
   fighter.punch = null;
   fighter.rush = null;
   fighter.defence = null;
-  fighter.finisher = { asked: Boolean(region), target: target.id, entry, keep, phase: 'approach', t: 0, started: world.time, kneeling: 0, thrustAt: null, shoulder: plan?.shoulder ?? null, plan, place: plan ? { along: plan.along } : {} };
+  fighter.finisher = { asked: Boolean(region), execution, standing: execution, target: target.id, entry: own ? { ...entry, move: own } : entry, keep, phase: 'approach', t: 0, started: world.time, kneeling: 0, thrustAt: null, shoulder: plan?.shoulder ?? null, plan, place: plan ? { along: plan.along } : {} };
   logFinisher(world, fighter, 'finisher', target, [`draws the ${fighter.weapon.spec.label.toLowerCase()} to finish him`]);
+  if (execution) world.events.push({ time: world.time, kind: 'execution', fighter: target.id, attacker: fighter.id, effects: ['to be executed'] });
   return true;
 }
 
@@ -426,7 +475,8 @@ function brokenOff(world, fighter, state, target) {
   if (fighter.state !== 'up' || fighter.netted || fighter.mount) return 'brought down';
   if (fighter.stagger > 0 || fighter.dazed > 0 || fighter.pain || struckSince(world, fighter, state.started)) return 'struck while he knelt';
   if (state.phase === 'approach' || state.phase === 'kneel' || (state.phase === 'thrust' && !state.thrustAt)) {
-    if (!helplessOnFloor(target)) return target.state === 'out' ? 'the man is dead' : 'the man is up';
+    // (An execution: the man still standing broken open; recovered, he is a man to fight again.)
+    if (state.standing ? !(target.state === 'up' && target.brokenOpen > 0) : !helplessOnFloor(target)) return target.state === 'out' ? 'the man is dead' : state.standing ? 'he has recovered' : 'the man is up';
     if (!within(fighter, target, FINISHER.lost)) return 'the man is gone';
   }
   return null;
@@ -453,14 +503,15 @@ export function updateFinisher(world, fighter, dt) {
   const drift = state.lastAim ? Math.hypot(aim[0] - state.lastAim[0], aim[1] - state.lastAim[1], aim[2] - state.lastAim[2]) / dt : 0;
   state.lastAim = aim;
   if (state.phase === 'approach') {
-    const place = kneelingPlace(fighter, target, aim, state.place);
+    const place = state.standing ? standingPlace(fighter, target) : kneelingPlace(fighter, target, aim, state.place);
     const apart = Math.hypot(place[0] - hips[0], place[2] - hips[2]);
     if (apart <= FINISHER.arrived || state.t > FINISHER.approachMost) {
-      state.phase = 'kneel';
+      // (Standing before him: no kneeling, the point straight in.)
+      state.phase = state.standing ? 'thrust' : 'kneel';
       state.t = 0;
       // Where he kneels, he looks again (the man has moved, or he did not get all the way): the place from here whose line is clear;
       // if a gap is to be had only from a little further round him, he shifts there first (once).
-      if (!state.asked && settleAim(fighter, target, state, !state.shifted)) {
+      if (!state.asked && !state.standing && settleAim(fighter, target, state, !state.shifted)) {
         state.shifted = true;
         state.phase = 'approach';
         state.t = FINISHER.approachMost - FINISHER.shiftSeconds;
@@ -486,14 +537,15 @@ export function updateFinisher(world, fighter, dt) {
     state.t = 0;
   }
   if (state.phase === 'thrust') {
-    pinWeightOn(target);
+    if (!state.standing) pinWeightOn(target);
     // Until the blade turns down onto its line (the windup), he still looks: a leg that has slid across the place is not stabbed.
     if (!state.asked && (!state.thrustAt || (fighter.punch === state.punch && fighter.punch.t < fighter.punch.spec.windup))) settleAim(fighter, target, state);
     const place = regionPoint(target, state.entry.region, hips, state.shoulder);
     if (fighter.punch && fighter.punch === state.punch) fighter.punch.at = place;
     if (!fighter.punch && !state.thrustAt && ((drift < FINISHER.settledBelow && turned(fighter, place) < FINISHER.squared) || state.t > FINISHER.settleMost)) {
       if (throwPunch(world, fighter, state.entry.move, state.entry.key === 'head' ? 'head' : 'body', { at: place })) {
-        fighter.punch.finisher = state.entry.gap === false ? { ...FINISHER.profile, gap: 0 } : FINISHER.profile;
+        // (An execution's point is put through the sights of his helm: `zone`, physics.js.)
+        fighter.punch.finisher = state.entry.gap === false ? { ...FINISHER.profile, gap: 0 } : state.execution ? { ...FINISHER.profile, zone: 'sights' } : FINISHER.profile;
         state.thrustAt = world.time;
         state.punch = fighter.punch;
       } else if (state.t > FINISHER.thrustWithin) {
@@ -503,6 +555,11 @@ export function updateFinisher(world, fighter, dt) {
     } else if (state.thrustAt && fighter.punch !== state.punch) {
       state.phase = 'withdraw';
       state.t = 0;
+    }
+    // An execution's blow home: the camera's jolt (drama.js DRAMA.executionBlow).
+    if (state.execution && !state.struck && state.punch?.landed) {
+      state.struck = true;
+      world.events.push({ time: world.time, kind: 'executionBlow', fighter: target.id, attacker: fighter.id, effects: ['executed through the sights'] });
     }
     return true;
   }
