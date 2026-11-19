@@ -238,6 +238,20 @@ export const QING_HOOD = {
 };
 
 /**
+ * The Ming retainer's hood under his helmet (MING_OFFICER_HELMS retainerBowl): the banners' hood (QING_HOOD) in its shape,
+ * the flaps brought further forward over the cheeks and closed over the ears (no ear hole), hanging a little lower: the
+ * studded red cloth of the user's second photograph, the steel scales of the first. Of the coat's own stuff (wardrobe.js
+ * mingHelm; chinahelmview.js buildQingHood `scales`: overlapping steel scales in rows, `scale` their size and pitch).
+ */
+export const MING_ELITE_HOOD = {
+  ...QING_HOOD,
+  flaps: { from: 0.25, to: 0.64, hem: -1.36 },
+  back: { from: 0.67, hem: -1.4 },
+  ear: null,
+  scale: { pitch: 0.13, size: 0.085 },
+};
+
+/**
  * The hood's sheets (QING_HOOD): each a band round the head's axis, `phi` [from, to] round from the face (rad; the left
  * side +z), its top and hem (y) as functions of φ, its ellipse [front, side] at the top and at the hem, its `centre` (x),
  * its `kind` (flap, back, collar).
@@ -293,7 +307,7 @@ export function qingHoodStuds(hood = QING_HOOD) {
       for (let column = 0; column < columns - (shift ? 1 : 0); column += 1) {
         const phi = from + inset + offset + shift + column * step;
         // Clear of the ear holes.
-        if (sheet.kind === 'flap') {
+        if (sheet.kind === 'flap' && hood.ear) {
           const { ear } = hood;
           const y = sheet.top(phi) + (sheet.hem(phi) - sheet.top(phi)) * s;
           if (Math.abs(Math.abs(phi) - ear.at * Math.PI) * ((a + b) / 2) < ear.r + 0.07 && Math.abs(y - ear.y) < ear.r + 0.07) continue;

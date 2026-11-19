@@ -19,7 +19,7 @@ import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
 import { buildWarMask } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildQingHood, buildTassel } from './chinahelmview.js';
-import { HONGYING_MOUNTS, MING_OFFICER_HELMS, mingHoodGrid, SWING, swingStep, TASSELS } from './chinahelms.js';
+import { HONGYING_MOUNTS, MING_ELITE_HOOD, MING_OFFICER_HELMS, mingHoodGrid, SWING, swingStep, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, headRadiusAt, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
 import { knightFormOf, knightGrid } from './knighthelms.js';
 
@@ -1905,9 +1905,13 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
           group.add(ring);
         }
       } else {
-        // The flaps: padded cloth open over the face (+x), from the rim to the
-        // shoulders, rows of rivet heads over them (studdedHood).
-        studdedHood(group, head, r, steel, { top: 1.12, bottom: 1.7 });
+        // The hood: the banners' (chinahelms.js MING_ELITE_HOOD), its flaps closer over the cheeks and the ears, the collar
+        // round the throat; of the coat's own stuff, its cloth studded in gilt, or its steel in scales (`flapSteel`), the
+        // edges bound in the cloth a shade darker.
+        const bind = new THREE.Color(head.coif ?? 0x1f2a4a).multiplyScalar(head.flapSteel ? 0.55 : 0.75).getHex();
+        for (const mesh of buildQingHood(group, head, r, steel, bind, { lowDetail, hood: MING_ELITE_HOOD, scales: Boolean(head.flapSteel) })) {
+          if (mesh.userData.hoodCloth && head.hoodStuff && DETAIL_MAPS.on && !lowDetail) clothPropMaterial(mesh.material, head.hoodStuff);
+        }
       }
       // Its decoration, where one was chosen (outfits.js ARMOUR_DECOR: the lion face and wings, or the guardians).
       if (head.decor) mingHelmDecor(group, head.decor, r, steel, profile, color);
@@ -2282,54 +2286,6 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false } = {}) {
 // The Ming helmet's red tassel (hongying): a hank of horsehair dyed red, bound round the finial's spike and falling all
 // round it over the top of the bowl; every Ming helmet bore one, the soldier's iron hat and the officer's tall bowl alike.
 // Drawn as strands of hair (chinahelmview.js buildTassel, chinahelms.js TASSELS.hongying) that swing as the head moves.
-
-/**
- * Padded cloth flaps hanging from a helmet's rim over the cheeks, the ears and the neck to the shoulders, open over the face
- * (+x) by `open` (rad), flaring from `top` to `bottom` (head radii), rows of rivet heads over them (one instanced mesh): the Ming elite's, of the coat's own stuff (its
- * cloth, or its steel, `flapSteel`, where the coat is scale), its edges bound in the coat's binding (`trim`) where it has one.
- * (The banners' hood is its own: chinahelmview.js buildQingHood.)
- */
-function studdedHood(group, head, r, steel, { open = Math.PI * 0.5, trim = null, top = 1.2, bottom = 1.75 } = {}) {
-  const start = Math.PI / 2 + open / 2;
-  const span = Math.PI * 2 - open;
-  const [tall, at] = [1.4, -0.6];
-  const coif = new THREE.Mesh(new THREE.CylinderGeometry(top * r, bottom * r, tall * r, 22, 3, true, start, span), head.flapSteel ? metal(steel, new THREE.Color(head.coif).getHex()).clone() : surface(head.coif ?? 0x1f2a4a, { roughness: 0.85 }));
-  coif.material.side = THREE.DoubleSide;
-  coif.position.y = at * r;
-  const rows = 3;
-  const columns = 11;
-  const studs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.06 * r, 6, 4), metal(steel, head.gold ?? 0xd6a743), rows * columns);
-  const place = new THREE.Object3D();
-  let stud = 0;
-  for (let row = 0; row < rows; row += 1) {
-    const down = (row + 0.6) / (rows + 0.4);
-    const radius = (top + (bottom - top) * down + 0.03) * r;
-    for (let column = 0; column < columns; column += 1) {
-      const theta = start + span * ((column + 0.5 + (row % 2) * 0.5) / (columns + 0.5));
-      place.position.set(Math.sin(theta) * radius, (0.1 - tall * down) * r, Math.cos(theta) * radius);
-      place.updateMatrix();
-      studs.setMatrixAt(stud, place.matrix);
-      stud += 1;
-    }
-  }
-  studs.userData.noOutline = true;
-  group.add(coif, studs);
-  if (!trim) return;
-  // The binding: a band round the hem, and down both edges of the face's opening.
-  const bound = surface(trim, { roughness: 0.85 });
-  const hem = new THREE.Mesh(new THREE.CylinderGeometry((bottom - 0.02) * r, (bottom + 0.03) * r, 0.14 * r, 22, 1, true, start, span), bound);
-  hem.material.side = THREE.DoubleSide;
-  hem.position.y = (at - tall / 2 + 0.07) * r;
-  group.add(hem);
-  for (const theta of [start, start + span]) {
-    const from = new THREE.Vector3(Math.sin(theta) * (top + 0.02) * r, (at + tall / 2) * r, Math.cos(theta) * (top + 0.02) * r);
-    const to = new THREE.Vector3(Math.sin(theta) * (bottom + 0.02) * r, (at - tall / 2) * r, Math.cos(theta) * (bottom + 0.02) * r);
-    const edge = new THREE.Mesh(new THREE.CylinderGeometry(0.06 * r, 0.06 * r, from.distanceTo(to), 6), bound);
-    edge.position.copy(from).add(to).multiplyScalar(0.5);
-    edge.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
-    group.add(edge);
-  }
-}
 
 /**
  * A red horsehair tassel bound to a helmet's spike where its mount says (chinahelms.js HONGYING_MOUNTS: `top`, `length`,
