@@ -35,6 +35,51 @@ export const MOVEMENT = {
 // `bullet`: share of a pistol round's harm stopped, by region (see GUN).
 const NO_PROTECTION = { blunt: 0, cut: 0, pierce: 0, bullet: { head: 0, torso: 0, limb: 0 } };
 
+// What the armour's metal is (a kit's `metal`), and how much harder an edge or a point must come to go through it than through
+// the same piece in plain wrought iron, the stuff the kits' figures are set for (`proof`: the energy to cut or pierce it, as a
+// share of iron's). A plate's resistance to an edge or a point goes with its hardness and strength: Williams measured the
+// medieval and Renaissance plate he sectioned at ~100 VPH for slag-laden bloomery iron, ~150 for wrought iron, ~200-250 for an
+// air-cooled medium-carbon steel and ~350-450 for one quenched and tempered, the energy to defeat a plate of a given thickness
+// rising with it (Williams, The Knight and the Blast Furnace, 2003; Williams, The Sword and the Crucible, 2012). A blow is
+// spread by the plate's stiffness and what is under it, not its hardness: `blunt` is the same in any metal.
+// - poorIron: bloomery iron full of slag, unevenly carburised: the lorica segmentata's sheet (Williams's and Sim's samples of
+//   Corbridge and Carlisle plates), munition armour made by the thousand (the ashigaru's okegawa-dō).
+// - iron: wrought or low-carbon iron, most armour of every age here (the reference: the kits' figures).
+// - steel: a medium-carbon steel left as it cooled: the better munition and the European breastplates traded east (the
+//   nanban dō's, sold proofed).
+// - hardenedSteel: quenched and tempered steel, the best Milanese and German harness of the 15th-16th c.
+// - bronze: work-hardened tin bronze, the arena's helmets and greaves: about wrought iron's hardness, less tough.
+export const ARMOUR_METALS = {
+  poorIron: { proof: 0.8, vph: 100 },
+  iron: { proof: 1, vph: 150 },
+  steel: { proof: 1.35, vph: 230 },
+  hardenedSteel: { proof: 1.8, vph: 400 },
+  bronze: { proof: 0.9, vph: 140 },
+};
+
+/**
+ * A kit's figures in its own metal (ARMOUR_METALS): the edge proof and the puncture energy of each metal figure scaled from iron's;
+ * only the parts in `to` where its metal is only some of it (`metalTo`: 'torso' the kit's own figures, else region keys).
+ */
+function tempered(protection, metal, to = null) {
+  if ((ARMOUR_METALS[metal]?.proof ?? 1) === 1) return protection;
+  const within = (key) => !to || to.includes(key);
+  const regions = protection.regions ? Object.fromEntries(Object.entries(protection.regions).map(([key, value]) => [key, within(key) ? temperFigures(value, metal) : value])) : undefined;
+  return { ...(within('torso') ? temperFigures(protection, metal) : protection), ...(regions ? { regions } : {}) };
+}
+
+/** One set of figures (blunt, cut, pierce) in a metal (ARMOUR_METALS): its edge proof and puncture energy scaled from iron's. */
+function temperFigures(figures, metal) {
+  const proof = ARMOUR_METALS[metal]?.proof ?? 1;
+  if (proof === 1 || !figures || (figures.worn && metal !== 'bronze')) return figures;
+  const out = { ...figures };
+  // (A better metal never lowers a figure, nor a worse one raises it: the conversions stop short of proof.)
+  const toward = (was, now) => (proof > 1 ? Math.max(was, now) : Math.min(was, now));
+  if (out.cut > 0) out.cut = toward(out.cut, Math.round(cutOfEdgeProof(edgeProofOf(out.cut) * proof) * 1000) / 1000);
+  if (out.pierce > 0) out.pierce = toward(out.pierce, Math.round(pierceOfPuncture(punctureOf(out.pierce) * proof) * 1000) / 1000);
+  return out;
+}
+
 // What covers the hands (a kit's `hands`; physics.js protectionAt for a hand): a gauntlet of plate or mail carries the harness
 // on over the hand (`gauntlet`: the kit's limb figures, as for the forearm); the samurai's kote ends in the tekkō, a small iron
 // plate over the back of the hand on a cloth glove, the fingers and palm in cloth (Bottomley and Hopson 1988): some of a cut
@@ -883,6 +928,8 @@ export const OUTFITS = {
     ],
   },
   knight: {
+    // Quenched and tempered steel, the best Milanese and German harness (ARMOUR_METALS).
+    metal: 'hardenedSteel',
     // Trained: a knight: trained in arms from a page (`skill`: OUTFITS' tiers).
     skill: 0.75,
     // Rides (full plate: the great horse in a steel bard).
@@ -936,6 +983,8 @@ export const OUTFITS = {
   // and over the plate the huque of crimson cloth the Duke of Orléans gave
   // her. The plate's protection, the head bare.
   joan: {
+    // A harness of the best Milanese steel, hardened (ARMOUR_METALS).
+    metal: 'hardenedSteel',
     // Trained: in plate among knights (`skill`: OUTFITS' tiers).
     skill: 0.75,
     // Rides (full plate: the great horse in a steel bard).
@@ -979,6 +1028,8 @@ export const OUTFITS = {
   //   against a blow (`poise`), and he moves slowly (`movement: 'slow'`).
   // Not dealt at random (no `family`); in no level.
   tournament: {
+    // The jousting harness: hardened steel, made to take the lance (ARMOUR_METALS).
+    metal: 'hardenedSteel',
     // Trained: a knight: trained in arms from a page (`skill`: OUTFITS' tiers).
     skill: 0.75,
     // Rides (full plate: the great horse in a steel bard).
@@ -1284,6 +1335,8 @@ export const OUTFITS = {
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,
   // cloth sleeves, the jingasa hat; less protection, lighter, quicker.
   ashigaru: {
+    // Munition iron, made by the thousand (ARMOUR_METALS).
+    metal: 'poorIron',
     // Trained: a drilled foot soldier, a season's training (`skill`: OUTFITS' tiers).
     skill: 0.35,
     faction: 'japanese',
@@ -1314,6 +1367,8 @@ export const OUTFITS = {
   },
   // A gladiator armed as a Greek hoplite: little armour over a bare body.
   hoplomachus: {
+    // Bronze helmet, manica plates and greaves (ARMOUR_METALS).
+    metal: 'bronze',
     // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
     skill: 0.7,
     faction: 'gladiators',
@@ -1330,6 +1385,8 @@ export const OUTFITS = {
   // Murmillo: the big fish-crested helmet with its grille, a manica on the
   // sword arm, a short greave: the head well kept, the body bare.
   murmillo: {
+    // Bronze helmet, manica plates and greaves (ARMOUR_METALS).
+    metal: 'bronze',
     // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
     skill: 0.7,
     faction: 'gladiators',
@@ -1344,6 +1401,8 @@ export const OUTFITS = {
   },
   // Secutor: the smooth egg helmet that nothing catches on, manica, high greave.
   secutor: {
+    // Bronze helmet, manica plates and greaves (ARMOUR_METALS).
+    metal: 'bronze',
     // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
     skill: 0.7,
     faction: 'gladiators',
@@ -1359,6 +1418,8 @@ export const OUTFITS = {
   // Retiarius: the net-fighter, almost naked: no helmet, the galerus on the
   // left shoulder and a manica on that arm. Fast, and easily hurt.
   retiarius: {
+    // Bronze helmet, manica plates and greaves (ARMOUR_METALS).
+    metal: 'bronze',
     // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
     skill: 0.7,
     faction: 'gladiators',
@@ -1374,6 +1435,8 @@ export const OUTFITS = {
   // Thraex: the griffin-crested brimmed helmet, quilted wraps and high
   // greaves on both legs, manica: the legs best kept of any.
   thraex: {
+    // Bronze helmet, manica plates and greaves (ARMOUR_METALS).
+    metal: 'bronze',
     // Trained: a gladiator: a professional, trained daily in the ludus (`skill`: OUTFITS' tiers).
     skill: 0.7,
     faction: 'gladiators',
@@ -1829,6 +1892,8 @@ export const OUTFITS = {
   // guard, the belt and its studded apron, hobnailed caligae. Iron over the
   // trunk and shoulders, the head in iron; the arms and legs bare.
   legionary: {
+    // Bloomery sheet, slag-laden and soft (Corbridge and Carlisle samples: ARMOUR_METALS).
+    metal: 'poorIron',
     // Trained: a professional of 25 years' service, drilled at the post daily (`skill`: OUTFITS' tiers).
     skill: 0.55,
     faction: 'romans', plated: true,
@@ -3240,7 +3305,9 @@ function helmPiece(kind, design) {
   const spec = setSpec(kind, setOfDesign(kind, at).key);
   const protection = { ...NO_PROTECTION, ...spec.protection };
   const guard = protection.regions?.head ?? { blunt: protection.blunt, cut: protection.cut, pierce: protection.pierce, deflects: Boolean(protection.deflects ?? spec.deflects) };
-  return { kind, design: at, head, spec, helmet: spec.helmet ?? HELMETS[head.kind] ?? NO_HELMET, guard, bullet: protection.bullet?.head ?? 0 };
+  // (In its own kit's metal, wherever it is worn: ARMOUR_METALS.)
+  const metal = !spec.metalTo || spec.metalTo.includes('head') ? spec.metal ?? 'iron' : 'iron';
+  return { kind, design: at, head, spec, helmet: spec.helmet ?? HELMETS[head.kind] ?? NO_HELMET, guard: temperFigures(guard, metal), bullet: protection.bullet?.head ?? 0 };
 }
 
 /** A head piece's key in HELM_NAMES: its kind, its design or style, and '+mask' with a face mask. */
@@ -3553,7 +3620,12 @@ export function gearTraits(inputs) {
     extraMass: inputs.outfit?.extraMass ?? Math.max(0, (spec.extraMass ?? 0) + (under?.extraMass ?? 0) + helmShift),
     // The part of that weight that is not armour (an exoframe's frame, a robot's battery): poise counts it as a load (physics poiseOf).
     carriedShare: inputs.outfit?.carriedShare ?? spec.carriedShare ?? 0,
-    protection: layeredProtection(inputs.outfit?.bareHead ? bareHeaded({ ...NO_PROTECTION, ...spec.protection }) : helmedBy({ ...NO_PROTECTION, ...spec.protection }, wornHelm(inputs)), under),
+    // (In the kit's own metal: ARMOUR_METALS.)
+    protection: layeredProtection((() => {
+      const own = tempered({ ...NO_PROTECTION, ...spec.protection }, spec.metal ?? 'iron', spec.metalTo ?? null);
+      return inputs.outfit?.bareHead ? bareHeaded(own) : helmedBy(own, wornHelm(inputs));
+    })(), under),
+    metal: spec.metal ?? 'iron',
     // The layer under his kit (UNDER_ARMOUR), or null: under its gaps (physics/gaps.js gapUnder), and its heat (physics/heat.js).
     under,
     deflects: Boolean(spec.deflects),

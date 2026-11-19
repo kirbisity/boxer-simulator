@@ -104,3 +104,22 @@ test('as drawn: the conquistador\'s mail stops at the elbow, the Ming coat at th
   for (const key of Object.keys(PARTS)) for (const t of ALONG) assert.ok(protectionAt(knight, key, t).cut >= 0.95, `${key} ${t}`);
   assert.ok(protectionAt(knight, 'lShank', 0.98).cut >= 0.95, 'the sabaton');
 });
+
+test('metal quality: a harder metal turns more of an edge and a point, never spreads a blow better; plain iron is the figures as set', async () => {
+  const { ARMOUR_METALS } = await import('../src/outfits.js');
+  assert.equal(ARMOUR_METALS.iron.proof, 1);
+  const order = ['poorIron', 'iron', 'steel', 'hardenedSteel'];
+  for (let i = 1; i < order.length; i += 1) assert.ok(ARMOUR_METALS[order[i]].proof > ARMOUR_METALS[order[i - 1]].proof && ARMOUR_METALS[order[i]].vph > ARMOUR_METALS[order[i - 1]].vph);
+  const knight = gearOf('knight', 0);
+  const legionary = gearOf('legionary', 0);
+  assert.equal(knight.metal, 'hardenedSteel');
+  assert.equal(legionary.metal, 'poorIron');
+  assert.ok(protectionAt(knight, 'trunk', 0.5).pierce > OUTFITS.knight.protection.pierce, 'hardened plate over the iron figure');
+  assert.ok(protectionAt(legionary, 'trunk', 0.5).pierce < OUTFITS.legionary.protection.pierce, 'slag-laden sheet under it');
+  assert.equal(protectionAt(knight, 'trunk', 0.5).blunt, OUTFITS.knight.protection.blunt, 'a blow the same');
+  // The nanban dō's European steel is its breastplate and helmet: the Japanese kote stay iron.
+  const nanban = gearOf('samuraiTosei', 8);
+  const tosei = gearOf('samuraiTosei', 0);
+  assert.ok(protectionAt(nanban, 'trunk', 0.5).pierce > protectionAt(tosei, 'trunk', 0.5).pierce);
+  assert.equal(protectionAt(nanban, 'lForearm', 0.5).pierce, protectionAt(tosei, 'lForearm', 0.5).pierce);
+});

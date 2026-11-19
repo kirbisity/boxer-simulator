@@ -250,7 +250,7 @@ export const OUTFIT_SETS = {
     {
       key: 'nanbanDo', designs: [8], name: 'Tōsei gusoku — Nanban dō',
       blurb: { en: 'Nanban dō. A Portuguese breastplate, ridged down the middle, lacquered russet and laced onto a samurai harness. Proofed with a musket at close range; the dent stays as the receipt.\nThe lords who wore it traded with the Jesuits, and some were baptised with their whole domains, guns and saltpetre arriving with the faith.\nWhen the faith fell out of favour, the converts were told to step on a picture of Christ. The armour was kept.', zh: '南蛮胴。葡萄牙胸甲，中脊隆起，漆成赤褐，编缀在武士的具足上。近距离以铁炮试射，弹痕留作收据。\n穿它的大名与耶稣会通商，有的连同整个领地一起受洗，铁炮和硝石随信仰一同上岸。\n后来信仰失宠，信徒被命令踩踏基督像。甲胄倒是留了下来。' },
-      patch: { extraMass: 0.275, helmet: { mass: 3.3, padding: 0.55, curve: 0.9 }, protection: { blunt: 0.75, cut: 0.97, pierce: 0.93, bullet: { head: 0.55, torso: 0.7 }, regions: { head: { blunt: 0.82, cut: 0.97, pierce: 0.8 } } } },
+      patch: { extraMass: 0.275, metal: 'steel', metalTo: ['torso', 'head'], helmet: { mass: 3.3, padding: 0.55, curve: 0.9 }, protection: { blunt: 0.75, cut: 0.97, pierce: 0.93, bullet: { head: 0.55, torso: 0.7 }, regions: { head: { blunt: 0.82, cut: 0.97, pierce: 0.8 } } } },
     },
     {
       key: 'zunari', designs: [7], name: 'Tōsei gusoku — zunari kabuto',
