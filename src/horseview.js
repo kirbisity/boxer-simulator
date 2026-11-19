@@ -49,7 +49,14 @@ const HORSE_LOOK = {
  * withers' height), so the plates over the back and the saddle stay put and the hem swings most. Heavier than hair: stiffer
  * and shorter; up and down by `lift` of it (hung plates rise and fall less than they swing). Drawing only (the physics' capsules do not move); not in low detail.
  */
-export const BARD_SWAY = { kinds: ['lamellar'], hz: 2.4, damping: 0.5, trail: 0.008, reach: 0.035, lift: 0.5, jump: 0.7, top: 0.8, hem: 0.42 };
+// (Swinging as hair does, the user's call, 2026-11-18: was hz 2.4, damping 0.5, reach 3.5 cm, no twist.) `twist`: the turn's own
+// spring, so the skirt trails the horse round as it turns and swings side to side after (`twistHz`, `twistDamping`, at most
+// `twistReach` rad about the barrel's middle, `pivot` × the withers forward of the frame's origin); `curve`: how the share
+// grows down the skirt (under 2: more of it moves).
+export const BARD_SWAY = {
+  kinds: ['lamellar'], hz: 1.5, damping: 0.3, trail: 0.02, reach: 0.1, lift: 0.5, jump: 0.7, top: 0.8, hem: 0.42, curve: 1.5,
+  twistHz: 1.3, twistDamping: 0.3, twistReach: 0.12, pivot: -0.05,
+};
 
 const horseUp = new THREE.Vector3(0, 1, 0);
 const horseX = new THREE.Vector3();
@@ -151,7 +158,39 @@ function makeBardMaterial(view, tile, finish) {
 
 /** The swing of one horse's bard (BARD_SWAY): `uniform` (the frame's own axes, m) is what its materials read; `update` moves it. */
 function bardSwing() {
-  return { uniform: { value: new THREE.Vector3() }, at: null, was: [0, 0, 0], speed: [0, 0, 0], pace: [0, 0, 0] };
+  return { uniform: { value: new THREE.Vector3() }, twist: { value: 0 }, at: null, was: [0, 0, 0], speed: [0, 0, 0], pace: [0, 0, 0], turn: null, turnSpeed: 0, lastYaw: 0 };
+}
+
+/** The turn's spring (BARD_SWAY `twist`): the skirt's own heading trailing the horse's (`yaw`), the lag (rad) into `uniform`. */
+function updateBardTwist(swing, yaw, dt) {
+  const spec = BARD_SWAY;
+  if (swing.turn === null || !(dt > 0)) {
+    if (swing.turn === null) {
+      swing.turn = yaw;
+      swing.lastYaw = yaw;
+      swing.turnSpeed = 0;
+      swing.twist.value = 0;
+    }
+    return;
+  }
+  // Unwrapped: the heading carried on past ±π.
+  const target = swing.lastYaw + Math.atan2(Math.sin(yaw - swing.lastYaw), Math.cos(yaw - swing.lastYaw));
+  const rate = (target - swing.lastYaw) / dt;
+  const omega = Math.PI * 2 * spec.twistHz;
+  const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
+  const h = dt / steps;
+  for (let step = 1; step <= steps; step += 1) {
+    const goal = swing.lastYaw + ((target - swing.lastYaw) * step) / steps;
+    swing.turnSpeed += (omega * omega * (goal - swing.turn) - 2 * spec.twistDamping * omega * (swing.turnSpeed - rate)) * h;
+    swing.turn += swing.turnSpeed * h;
+  }
+  swing.lastYaw = target;
+  let lag = swing.turn - target;
+  if (Math.abs(lag) > spec.twistReach) {
+    lag = Math.sign(lag) * spec.twistReach;
+    swing.turn = target + lag;
+  }
+  swing.twist.value = lag;
 }
 
 const bardWorld = new THREE.Vector3();
@@ -207,12 +246,20 @@ function swayBard(material, swing, withers) {
   const baseKey = material.customProgramCacheKey?.() ?? '';
   const top = (BARD_SWAY.top * withers).toFixed(4);
   const span = ((BARD_SWAY.top - BARD_SWAY.hem) * withers).toFixed(4);
+  const pivot = (BARD_SWAY.pivot * withers).toFixed(4);
   material.onBeforeCompile = (shader, renderer) => {
     before?.call(material, shader, renderer);
     shader.uniforms.uBardSwing = swing.uniform;
-    shader.vertexShader = `uniform vec3 uBardSwing;\n${shader.vertexShader}`.replace(
+    shader.uniforms.uBardTwist = swing.twist;
+    // The share down the skirt; then the turn's lag about the barrel's middle (as three's turn about y), then the swing.
+    shader.vertexShader = `uniform vec3 uBardSwing;\nuniform float uBardTwist;\n${shader.vertexShader}`.replace(
       '#include <morphtarget_vertex>',
-      `float bardHang = clamp( ( ${top} - position.y ) / ${span}, 0.0, 1.0 );\ntransformed += uBardSwing * bardHang * bardHang;\n#include <morphtarget_vertex>`,
+      `float bardHang = pow( clamp( ( ${top} - position.y ) / ${span}, 0.0, 1.0 ), ${BARD_SWAY.curve.toFixed(2)} );
+float bardTurn = uBardTwist * bardHang;
+vec2 bardAt = transformed.xz - vec2( ${pivot}, 0.0 );
+transformed.xz = vec2( ${pivot}, 0.0 ) + vec2( bardAt.x * cos( bardTurn ) + bardAt.y * sin( bardTurn ), - bardAt.x * sin( bardTurn ) + bardAt.y * cos( bardTurn ) );
+transformed += uBardSwing * bardHang;
+#include <morphtarget_vertex>`,
     );
   };
   material.customProgramCacheKey = () => `${baseKey}|bardSway`;
@@ -826,7 +873,10 @@ export function updateHorseView(view, world = null) {
     }
   }
   if (view.base) updateBaseHorse(view, horse, dt);
-  if (view.swaying) updateBardSwing(view.swaying, view.frame, dt);
+  if (view.swaying) {
+    updateBardSwing(view.swaying, view.frame, dt);
+    updateBardTwist(view.swaying, horse.yaw, dt);
+  }
   // Hair and cloth hang from where everything now is.
   if (view.hang.tail) {
     view.group.updateMatrixWorld(true);

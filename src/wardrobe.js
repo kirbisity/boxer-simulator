@@ -2302,9 +2302,11 @@ function buildPagodaHelm(group, head, r, steel, color, { laced = false, still = 
  * never more than `reach` m off; each tier moved by its share (none at `top`, the rim, all at `hem`, head radii up from the
  * eyes), the lowest round the chin and neck the most. Drawing only.
  */
-const PAGODA_SWAY = { hz: 2.2, damping: 0.4, trail: 0.01, reach: 0.02, jump: 0.7, top: -0.1, hem: -1.92 };
+// (Swinging more, as hair does, the user's call, 2026-11-18: was hz 2.2, damping 0.4, reach 2 cm, no twist.) `twist*`: the turn's
+// own spring, the tiers trailing the head round as it turns (at most `twistReach` rad about the helmet's upright axis).
+const PAGODA_SWAY = { hz: 1.6, damping: 0.3, trail: 0.02, reach: 0.05, jump: 0.7, top: -0.1, hem: -1.92, twistHz: 1.5, twistDamping: 0.3, twistReach: 0.15 };
 
-const pagodaScratch = { at: new THREE.Vector3(), turn: new THREE.Quaternion(), move: new THREE.Vector3(), offset: new THREE.Matrix4() };
+const pagodaScratch = { at: new THREE.Vector3(), turn: new THREE.Quaternion(), move: new THREE.Vector3(), offset: new THREE.Matrix4(), spin: new THREE.Matrix4(), ahead: new THREE.Vector3(), euler: new THREE.Euler() };
 
 /**
  * The aventail's swing (render.js moves it each frame: `userData.swing.update(dt)`), on a holder in the helmet: the laced tiers'
@@ -2319,13 +2321,17 @@ function pagodaSwing(group, weights, instanced) {
   const speed = [0, 0, 0];
   const pace = [0, 0, 0];
   const rest = new Map();
-  const move = (offset) => {
+  // The turn's spring: the tiers' heading trailing the helmet's.
+  let turn = null;
+  let turnSpeed = 0;
+  let lastYaw = 0;
+  const move = (offset, twist) => {
     if (instanced) {
       const { plates, dots, placements, tierPlates, r } = instanced;
       const dotOffset = new THREE.Matrix4();
       tierPlates.forEach(([from, to], tier) => {
         const share = weights[tier] ?? 0;
-        pagodaScratch.offset.makeTranslation(offset.x * share, offset.y * share, offset.z * share);
+        pagodaScratch.offset.makeTranslation(offset.x * share, offset.y * share, offset.z * share).multiply(pagodaScratch.spin.makeRotationY(twist * share));
         for (let index = from; index < to; index += 1) {
           const placed = pagodaScratch.offset.clone().multiply(placements[index]);
           plates.setMatrixAt(index, placed);
@@ -2342,9 +2348,10 @@ function pagodaSwing(group, weights, instanced) {
     group.traverse((object) => {
       const tier = object.userData.aventailTier;
       if (tier === undefined) return;
-      if (!rest.has(object)) rest.set(object, object.position.clone());
+      if (!rest.has(object)) rest.set(object, { at: object.position.clone(), turn: object.rotation.y });
       const share = weights[tier] ?? 0;
-      object.position.copy(rest.get(object)).addScaledVector(offset, share);
+      object.position.copy(rest.get(object).at).addScaledVector(offset, share);
+      object.rotation.y = rest.get(object).turn + twist * share;
     });
   };
   holder.userData.swing = {
@@ -2355,13 +2362,22 @@ function pagodaSwing(group, weights, instanced) {
       group.getWorldPosition(pagodaScratch.at);
       const target = pagodaScratch.at.toArray();
       const moved = at ? Math.hypot(target[0] - was[0], target[1] - was[1], target[2] - was[2]) : Infinity;
+      // The helmet's heading in the world (its forward, +x, turned about the vertical).
+      group.getWorldQuaternion(pagodaScratch.turn);
+      pagodaScratch.ahead.set(1, 0, 0).applyQuaternion(pagodaScratch.turn);
+      const yaw = Math.atan2(-pagodaScratch.ahead.z, pagodaScratch.ahead.x);
       if (!at || moved > spec.jump) {
         at = target.slice();
         was = target.slice();
         speed.fill(0);
         pace.fill(0);
+        turn = yaw;
+        lastYaw = yaw;
+        turnSpeed = 0;
         return;
       }
+      const heading = lastYaw + Math.atan2(Math.sin(yaw - lastYaw), Math.cos(yaw - lastYaw));
+      const rate = (heading - lastYaw) / dt;
       const omega = Math.PI * 2 * spec.hz;
       const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
       const h = dt / steps;
@@ -2384,11 +2400,23 @@ function pagodaSwing(group, weights, instanced) {
           at[axis] = target[axis] + off[axis] + pace[axis] * spec.trail;
         }
       }
+      const turnOmega = Math.PI * 2 * spec.twistHz;
+      for (let step = 1; step <= steps; step += 1) {
+        const goal = lastYaw + ((heading - lastYaw) * step) / steps;
+        turnSpeed += (turnOmega * turnOmega * (goal - turn) - 2 * spec.twistDamping * turnOmega * (turnSpeed - rate)) * h;
+        turn += turnSpeed * h;
+      }
+      lastYaw = heading;
+      let twist = turn - heading;
+      if (Math.abs(twist) > spec.twistReach) {
+        twist = Math.sign(twist) * spec.twistReach;
+        turn = heading + twist;
+      }
       // Into the helmet's own axes (its turn, and its scale: a helmet drawn narrower is moved as far in the world).
-      group.getWorldQuaternion(pagodaScratch.turn).invert();
+      pagodaScratch.turn.invert();
       const scale = group.getWorldScale(new THREE.Vector3());
       pagodaScratch.move.set(...off).applyQuaternion(pagodaScratch.turn).divide(scale);
-      move(pagodaScratch.move);
+      move(pagodaScratch.move, twist);
     },
   };
   return holder;
