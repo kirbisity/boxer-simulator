@@ -11,7 +11,7 @@
 // and falls as any man, from the saddle's height at the horse's speed, gets
 // up and fights on foot. A horse that falls throws him too.
 
-import { shieldCovering, soundEvent, soundHit } from '../audio/log.js';
+import { armourOf, shieldCovering, soundEvent, soundHit } from '../audio/log.js';
 import { surfaceAt } from '../audio/surface.js';
 import { BODY, P } from '../body.js';
 import { BARDING, bardingAt, breedOf, HORSE_LOAD, mountOf } from '../horses.js';
@@ -757,9 +757,15 @@ function hoofBeats(world, horse, gait, before) {
     const phase = gait.phase[leg.key];
     if ((horse.stride + phase) % 1 >= (before + phase) % 1) continue;
     const hoof = horse.legs[leg.key].hoof;
-    soundEvent(world, 'horse', { at: hoof, kind: 'hoof', gait: gait.name, speed: Math.abs(horse.speed), surface: surfaceAt(world, hoof[0], hoof[1], hoof[2]), mass: ladenMass(world, horse), horse: horse.id, leg: leg.key });
+    // What rattles as he comes down: his bard with each forehoof (`bard`), his rider's armour with the off fore (`rider`), once a stride.
+    const bard = leg.fore ? HOOF_BARD[BARDING[horse.barding]?.covering ?? horse.barding] ?? null : null;
+    const rider = leg.key === 'rFore' && horse.rider !== null ? world.fighters.find((fighter) => fighter.id === horse.rider && fighter.mount === horse) : null;
+    soundEvent(world, 'horse', { at: hoof, kind: 'hoof', gait: gait.name, speed: Math.abs(horse.speed), surface: surfaceAt(world, hoof[0], hoof[1], hoof[2]), mass: ladenMass(world, horse), horse: horse.id, leg: leg.key, bard, rider: rider ? armourOf(rider) : null });
   }
 }
+
+// A bard's covering as its sound with the hoof (audio/sfx/sampled.js): lamellae and scale rattle, plate clanks; a cloth trapper or none, nothing.
+const HOOF_BARD = { lamellar: 'lamellar', scale: 'lamellar', brigandine: 'lamellar', plate: 'plate' };
 
 /** A horse's cry (a neigh in pain, as it goes down), from its head. */
 function horseCry(world, horse, kind) {

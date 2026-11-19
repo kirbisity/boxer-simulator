@@ -497,3 +497,20 @@ test('grenades: a frag is a grenade blast with the big explosion\'s rumble under
   assert.ok(flash.seconds < 0.5 && !flash.extra, 'short, no rumble');
   assert.ok(SOUND_FAMILIES.shot.params({ kind: 'frag' }).level > 160);
 });
+
+test('armour heard as it moves: lamellar rattles with the step, plate clanks louder than mail; a barded horse rattles or clanks with its forehooves and its rider\'s armour with the hoof', () => {
+  const half = () => 0.5;
+  const step = (armour) => samplePlan('step', { surface: 'grass', pace: 2, armour }, { mass: 85 }, half);
+  const lamellar = step('lamellar');
+  assert.equal(lamellar.extra[0].set, 'lamellarstep', 'a lamellar coat rattles');
+  const plate = step('plate').extra[0];
+  const mail = step('mail').extra[0];
+  assert.equal(plate.set, 'armourstep');
+  assert.ok(plate.trim > mail.trim, 'plate louder than mail');
+  assert.equal(step('none').extra.length, 0);
+  const hoof = (event) => samplePlan('horse', { kind: 'hoof', surface: 'grass' }, { gait: 'gallop', speed: 9, mass: 600, ...event }, half);
+  assert.equal(hoof({}).extra.length, 0, 'an unarmoured horse: the hoof alone');
+  assert.deepEqual(hoof({ bard: 'lamellar' }).extra.map((take) => take.set), ['lamellarstep']);
+  assert.deepEqual(hoof({ bard: 'plate', rider: 'plate' }).extra.map((take) => take.set), ['armourstep', 'armourstep']);
+  assert.ok(hoof({ bard: 'lamellar' }).extra[0].rate < lamellar.extra[0].rate * 1.1, 'the bard lower than a man\'s coat');
+});

@@ -123,6 +123,24 @@ const WOODEN_MECHS = { chest: 0, door: 1 };
 export const stepWeight = (mass) => sfxClamp(((mass ?? 80) - STEP_WEIGHT.light) / (STEP_WEIGHT.heavy - STEP_WEIGHT.light), 0, 1);
 
 /** The recorded ground under a step (its plan without `extra`), or null where the ground has no recording (wood, sand, snow). */
+/**
+ * The take of what a moving body's armour makes (STEP_ARMOUR: plate's and mail's clank, lamellar's rattle), at `strength` (0..1, how hard
+ * the step or the hoof came down) and `rate` (the body's own: a heavier one lower), or null for none.
+ */
+const STEP_ARMOUR = {
+  plate: { set: 'armourstep', trim: 1.45, rate: 1 },
+  mail: { set: 'armourstep', trim: 0.8, rate: 1.15 },
+  lamellar: { set: 'lamellarstep', trim: 1.1, rate: 1 },
+};
+// A horse's armour (and his rider's) heard with the hoof: a share of a man's step's loudness (each comes with two hooves a stride, the
+// rider's with one), the bard's a little lower (a horse's bigger plates on a heavier body).
+const HOOF_ARMOUR = { trim: 0.85, bardRate: 0.85 };
+function armourTake(armour, strength, rate, jitter) {
+  const spec = STEP_ARMOUR[armour];
+  if (!spec) return null;
+  return { set: spec.set, trim: spec.trim * sampleLerp(0.8, 1.3, strength), rate: rate * spec.rate * jitter(0.05), seconds: null, fade: 0.06, skip: 0 };
+}
+
 function groundStep(params, event, jitter) {
   const ground = (event.heels && HEEL_STEPS[params.surface]) || GROUND_STEPS[params.surface];
   if (!ground) return null;
@@ -244,11 +262,10 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       }, s);
     }
     case 'step': {
-      const armoured = params.armour === 'plate' || params.armour === 'mail';
       // The armour's clank with each step (mail lighter and brighter), over the footfall: a man in plate is heard by his kit
-      // before his feet (it was 0.6 and 0.4 of the clip's peak, under the step; raised to carry over it).
-      const mail = params.armour === 'mail';
-      const armour = armoured ? { set: 'armourstep', trim: (mail ? 0.8 : 1.2) * sampleLerp(0.8, 1.3, sampleStrength(params.pace, 0.5, 6)), rate: sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.25, 0.85, 1.15) * (mail ? 1.15 : 1) * jitter(0.05), seconds: null, fade: 0.06, skip: 0 } : null;
+      // before his feet (it was 0.6 and 0.4 of the clip's peak, under the step; raised to carry over it; plate 1.45, was 1.2, a
+      // little louder again: the user's call, 2026-11-18). Lamellar or scale rattles (its own recording).
+      const armour = armourTake(params.armour, sampleStrength(params.pace, 0.5, 6), sfxClamp((85 / Math.max(40, event.mass ?? 85)) ** 0.25, 0.85, 1.15), jitter);
       const ground = groundStep(params, event, jitter);
       // The ground recorded (the armour's take on top of it), or the synth's ground under the armour's take, or the synth alone.
       if (ground) return { ...ground, extra: armour ? [armour] : [], synth: ground.synth, synthGain: ground.synthGain };
@@ -348,7 +365,12 @@ export function samplePlan(type, params, event = {}, random = Math.random) {
       // squelch or splash, lower and louder (a horse's weight).
       const pace = HOOF_PACE[event.gait] ?? HOOF_PACE.trot;
       const wet = Boolean(HOOF_WET[params.surface]);
-      return { set, trim: pace.trim * (wet ? 1.3 : 1), rate: sfxClamp((500 / Math.max(150, event.mass ?? 500)) ** 0.15, 0.85, 1.15) * pace.rate * (wet ? 0.75 : 1) * jitter(0.05), seconds: null, fade: wet ? 0.08 : 0.03, skip: 0, synth: null, synthGain: 0 };
+      // What rattles or clanks as he comes down (physics/mounted.js hoofBeats): his bard on the forehooves (`bard`: lamellar and
+      // scale rattle, plate clanks; lower, as the plates are bigger and the horse heavier: HOOF_ARMOUR), his rider's armour once
+      // a stride (`rider`), the faster the gait the harder.
+      const strength = sampleStrength(event.speed ?? 3, 1, 12);
+      const extra = [armourTake(event.bard, strength, HOOF_ARMOUR.bardRate, jitter), armourTake(event.rider, strength, 1, jitter)].filter(Boolean).map((take) => ({ ...take, trim: take.trim * HOOF_ARMOUR.trim, delay: 0.01 }));
+      return { set, trim: pace.trim * (wet ? 1.3 : 1), rate: sfxClamp((500 / Math.max(150, event.mass ?? 500)) ** 0.15, 0.85, 1.15) * pace.rate * (wet ? 0.75 : 1) * jitter(0.05), seconds: null, fade: wet ? 0.08 : 0.03, skip: 0, extra, synth: null, synthGain: 0 };
     }
     case 'shot':
       // A matchlock: the recorded report, the synth's low boom under it (what a recording through a phone has little of).
