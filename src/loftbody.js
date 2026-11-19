@@ -1621,7 +1621,7 @@ function paintFor(paint, armor) {
     // Laminated plate in a crowd: its bands as rows, a dark line between.
     if (paint.lames) return index % 2 ? 'steel2' : 'steel';
     // A brigandine (studded): its edges and front opening bound in the second
-    // colour, the splits showing it too; in a crowd, the rivets as dots.
+    // colour, the splits showing it too; in a crowd, the cloth plain.
     if (paint.studded) {
       if ((paint.edge && index === 0) || (paint.opening && Math.cos(angle) > 1 - paint.opening) || inLamellaGap(paint, angle)) return paint.edge ?? paint.base;
       if (paint.studsDrawn) return paint.base;
@@ -1630,7 +1630,9 @@ function paintFor(paint, armor) {
       if (paint.apron && apronEdge(paint.apron, ring.t, angle)) return paint.edge ?? paint.base;
       if (paint.placket && Math.cos(angle) > Math.cos(paint.placket * 2)) return paint.edge ?? paint.base;
       if (paint.bands && index > 0 && index % 2 === 0) return 'steel';
-      return index % 2 === 1 && step % 2 === 0 ? 'gold' : paint.base;
+      // (No rivets painted as dots: at a distance they blurred into a mottle, a camouflage pattern; seen from afar the
+      // heads are too small to tell and the coat reads as its cloth.)
+      return paint.base;
     }
     // Lamellae drawn plainly (a crowd): rows of plates and their lacing; the robe in the splits.
     if (paint.lamellae) return inLamellaGap(paint, angle) ? 'cloth' : index % 3 === 2 ? 'lace' : 'steel';
