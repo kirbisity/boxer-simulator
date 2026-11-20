@@ -1644,7 +1644,7 @@ export const OUTFITS = {
   // men "in iron from head to foot, only the eyes showing"): his own shock troops, picked for strength (a man had to lift a
   // stone lion of ~300 jin to be taken), in a Sino-Japanese harness made for them. The Zheng house was half Japanese (he was
   // born at Hirado) and kept Japanese armourers and men: the full iron face (sōmen), the kote, haidate and suneate on the
-  // limbs, lacquer against the sea air; over that a coat of broad iron scales heavier than a tōsei dō, against the Manchu
+  // legs (and the Ming elite's steel guards on the arms), lacquer against the sea air; over that a coat of broad iron scales heavier than a tōsei dō, against the Manchu
   // bows and the Dutch muskets. They fought shoulder to shoulder at the front, the long zhanmadao or the dao behind a big
   // rattan shield, to walk through arrows and volleys and cut down horse (Taiwan waiji, 臺灣外記: 戴鐵面，被鐵甲，執斬馬刀).
   // The cost: ~23 kg of iron and a closed face in a Fujian or Taiwan summer (physics/heat.js, the place's climate), and slow
@@ -1654,8 +1654,6 @@ export const OUTFITS = {
     skill: 0.6,
     faction: 'chinese', bulletRating: 1000, plated: true,
     label: 'Iron man — Koxinga\'s scale and iron face', movement: 'limited', fists: 'bare',
-    // The kote's tekkō over the back of each hand (HAND_COVERS).
-    hands: 'tekko',
     sidearm: 'dao',
     spare: 'dagger',
     // Bare iron scales and plates: a point skids off them (as off the Ming elite's helmet and the tōsei's plates).
@@ -1664,9 +1662,9 @@ export const OUTFITS = {
     // two deep and thicker against the Manchu bows' heavy heads, the iron face, the Japanese limb pieces.
     extraMass: 0.32,
     // The coat proof against a ball as the Ming elite's and better (thicker iron, two scales deep: `bulletRating` 1000, the
-    // trunk's share 0.6); the face behind its iron (the head's figures: the sōmen as the steppe's iron faces); the limbs in
-    // the kote's splints and the haidate's and suneate's plates, as the tōsei's (kote).
-    protection: { blunt: 0.72, cut: 0.96, pierce: 0.91, bullet: { head: 0.5, torso: 0.6, limb: 0.2 }, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.82, deflects: true }, limb: kote({ blunt: 0.7, cut: 0.95, pierce: 0.9 }) } },
+    // trunk's share 0.6); the face behind its iron (the head's figures: the sōmen as the steppe's iron faces); the arms in the
+    // Ming elite's steel arm guards (MING_ARM_GUARD), the legs in the haidate's and suneate's plates, as the tōsei's (kote).
+    protection: { blunt: 0.72, cut: 0.96, pierce: 0.91, bullet: { head: 0.5, torso: 0.6, limb: 0.2 }, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.82, deflects: true }, limb: kote({ blunt: 0.7, cut: 0.95, pierce: 0.9 }), UpperArm: MING_ARM_GUARD, Forearm: MING_ARM_GUARD } },
     // Its gaps as the tōsei's (the harness the limb pieces are), the scales' coat closed but at the armholes.
     gaps: { mail: ['elbow'], mailMake: 'butted', thrust: 0.5, lacing: 0.1 },
     courage: 0.7,

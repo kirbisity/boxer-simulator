@@ -134,16 +134,17 @@ def scale(n):
 def iron_scale(n):
     # Koxinga's iron men's scale (the user's reference, 2026-11-20): broad tongue-shaped iron scales, flat across, their
     # feet a full half-round, hung in rows each half a scale off the last, each foot lying over the heads of the row below;
-    # bright hammered iron, a shadow under every foot. Larger than the Ming coat's (the `scale` tile's 22 mm): 50 mm across,
-    # a row every 46 mm, each plate ~78 mm long. Tile: four scales across, two rows up (detailmaps.js `ironScale`).
-    P, R, Wd, L = 0.05, 0.046, 0.048, 0.078
-    W, H = 4 * P, 2 * R
+    # bright hammered iron, a shadow under every foot. Larger than the Ming coat's (the `scale` tile's 22 mm): 32 mm across,
+    # a row every 29 mm, each plate ~50 mm long, its rise to its foot as deep as the larger ones' (the relief reads at this
+    # size). Tile: six scales across, two rows up (detailmaps.js `ironScale`).
+    P, R, Wd, L = 0.032, 0.029, 0.031, 0.05
+    W, H = 6 * P, 2 * R
     t = Tile(W, H, n, 61)
     best = np.full(t.X.shape, -1.0)
     tone = np.full(t.X.shape, 0.82)
     for row in range(-1, 4):
-        top = (row + 1) * R + 0.01
-        for col in range(-1, 6):
+        top = (row + 1) * R + 0.006
+        for col in range(-1, 8):
             cx = (col + 0.5 * (row % 2)) * P
             ddx = t.X - cx
             s = (top - t.Y) / L
@@ -153,10 +154,10 @@ def iron_scale(n):
             edge = np.where(t.Y < foot_c, Wd / 2 - q, np.minimum(Wd / 2 - np.abs(ddx), top - t.Y))
             # Rising down the scale to its foot (each lies over the next), a gentle dish across, the edge eased.
             across = 1 - (ddx / (Wd / 2)) ** 2
-            z = 0.0006 + 0.0034 * np.clip(s, 0, 1) + 0.0004 * across - 0.0006 * (1 - smooth(0, 0.0016, edge))
+            z = 0.0006 + 0.0034 * np.clip(s, 0, 1) + 0.0005 * across - 0.0008 * (1 - smooth(0, 0.0012, edge))
             take = inside & (z > best)
             best = np.where(take, z, best)
-            tone = np.where(take, 0.8 + 0.08 * (((row % 2) * 4 + col % 4) * 0.618 % 1.0), tone)
+            tone = np.where(take, 0.8 + 0.08 * (((row % 2) * 6 + col % 6) * 0.618 % 1.0), tone)
     gap = best < 0
     t.z = np.where(gap, 0.0, best) + t.noise(24, 3, 18, 0.00006)
     t.grey(np.where(gap, 0.12, tone + t.noise(14, 2, 10, 0.05)))

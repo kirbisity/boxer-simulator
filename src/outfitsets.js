@@ -319,7 +319,7 @@ export const OUTFIT_SETS = {
   ironMan: [
     {
       key: 'own', designs: [0, 1, 2], name: 'Iron man — scale and iron face',
-      blurb: { en: 'Broad iron scales over Japanese arm and leg guards, a Ming helmet and an iron face with only the eyes cut through. Some twenty-five kilos of iron on a man picked by lifting a stone lion.\nThey walked through Manchu arrows and Dutch volleys behind rattan shields and cut down horse with sabres as long as a man.\nIn the Formosan summer the iron did to them slowly what the muskets could not.', zh: '宽大的铁鳞甲，日式臂甲腿甲，明盔，铁面只开两只眼。二十多公斤铁，压在举得起石狮的汉子身上。\n他们顶着藤牌，走过满洲人的箭雨和荷兰人的排枪，用一人高的斩马刀砍马腿。\n台湾的夏天里，火枪做不到的事，那身铁慢慢替它做了。' },
+      blurb: { en: 'Iron scales, Ming steel arm guards and Japanese leg guards, a Ming helmet and an iron face with only the eyes cut through. Some twenty-five kilos of iron on a man picked by lifting a stone lion.\nThey walked through Manchu arrows and Dutch volleys behind rattan shields and cut down horse with sabres as long as a man.\nIn the Formosan summer the iron did to them slowly what the muskets could not.', zh: '铁鳞甲，明式钢臂甲，日式腿甲，明盔，铁面只开两只眼。二十多公斤铁，压在举得起石狮的汉子身上。\n他们顶着藤牌，走过满洲人的箭雨和荷兰人的排枪，用一人高的斩马刀砍马腿。\n台湾的夏天里，火枪做不到的事，那身铁慢慢替它做了。' },
       patch: {},
     },
   ],

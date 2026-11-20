@@ -39,9 +39,9 @@ export const DETAIL_ARMOUR = {
   // https://www.yalealumnimagazine.com/articles/3919-heavy-metal-from-the-ancient-romans; Roman scale sizes,
   // https://www.romanarmytalk.com/rat/showthread.php?tid=12652).
   scale: { band: 600, columns: 6, pitch: 0.02, rows: 2, row: 0.024, hangs: true },
-  // Koxinga's iron men's scale: broad tongue-shaped iron scales, 50 mm across, a row every 46 mm, each half a scale off the
-  // last (hardtiles.py iron_scale).
-  ironScale: { band: 1900, columns: 4, pitch: 0.05, rows: 2, row: 0.046, hangs: true },
+  // Koxinga's iron men's scale: tongue-shaped iron scales, 32 mm across, a row every 29 mm, each half a scale off the last
+  // (hardtiles.py iron_scale; smaller, the user's call, 2026-11-20: were 50 mm, a row every 46).
+  ironScale: { band: 1900, columns: 6, pitch: 0.032, rows: 2, row: 0.029, hangs: true },
   // The European brigandine (15th century, Italian and English): velvet over 64 x 50 mm tinned plates in rows overlapping
   // upward, each held by a triangle of three star-headed rivets with a fourth above (the Worcester Art Museum's Italian
   // fragment, c. 1450, https://worcester.emuseum.com/objects/49120; Royal Armouries III.1664; https://en.wikipedia.org/wiki/Brigandine).
@@ -131,8 +131,9 @@ export const ARMOUR_TILES = {
   mingElite: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   mingScale: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   mingEliteLamellar: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
-  // Koxinga's iron men: their own broad scales (ironScale); the Japanese limb pieces' laced rows in sugake, as the tōsei's.
-  ironManScale: { scales: 'ironScale', kozane: 'sugake' },
+  // Koxinga's iron men: their own scales (ironScale); the Ming elite's arm guards in hammered iron; the Japanese leg pieces'
+  // laced rows in sugake, as the tōsei's.
+  ironManScale: { scales: 'ironScale', kozane: 'sugake', 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   // The Bayara's arm guards and gilt shoulder plates: hammered lames, as the Ming elite's.
   bayaraCoat: { 'upperArm.steel': 'munitionPlate', 'forearm.steel': 'munitionPlate' },
   // Tosei gusoku: the solid do of lacquered horizontal lames; its kusazuri and sleeves in sugake.
@@ -169,7 +170,7 @@ export const ARMOUR_COVERAGE = {
   hoplomachus: ['plate'], murmillo: ['plate'], secutor: ['plate'], retiarius: ['plate'], thraex: ['plate'], maximus: null, commodus: null, scissor: ['scale', 'plate'],
   mingVest: null, mingBrigandine: ['brigandine'], mingEliteInfantry: ['brigandine', 'munitionPlate'], mingLamellar: ['lamellae', 'bifu'], mingScaleCoat: ['scale', 'bifu'],
   bannerCoat: ['brigandine'], bayaraCoat: ['brigandine', 'plate', 'munitionPlate'],
-  mingElite: ['brigandine', 'plate', 'munitionPlate'], mingScale: ['scale', 'plate', 'munitionPlate'], mingEliteLamellar: ['lamellae', 'plate', 'munitionPlate'], ironManScale: ['ironScale', 'sugake', 'plate'],
+  mingElite: ['brigandine', 'plate', 'munitionPlate'], mingScale: ['scale', 'plate', 'munitionPlate'], mingEliteLamellar: ['lamellae', 'plate', 'munitionPlate'], ironManScale: ['ironScale', 'sugake', 'plate', 'munitionPlate'],
   ironPagoda: ['lamellae', 'plate'], guanYu: ['scale', 'plate'], hanLamellar: ['lamellae'], wuxiaRobe: null,
   segmentata: ['segmentata'], centurion: ['mail', 'plate'], hauberk: ['mail'], hamata: ['mail'],
   mongolDeel: null, mongolLamellar: ['lamellae'], mongolIron: ['lamellae', 'plate'], kheshig: ['scale', 'plate'], girdle: null,
