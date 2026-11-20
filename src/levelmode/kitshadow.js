@@ -108,7 +108,9 @@ export function ktShadowRelease() {
  * the Object3D they are in (its other things are hidden for the draw). `strength` 0..1 is what the shader takes of the sun in shadow; 0 frees the map
  * instead. Draws nothing if the same sun was baked already (`key`). Returns the milliseconds it took (0 if it did nothing).
  */
-export function ktShadowBake(renderer, root, casters, dir, strength, key = '') {
+export function ktShadowBake(renderer, root, casters, dir, strength, key = '', size = KT_SHADOW.size) {
+  // (`size`: texels along the longer side, for a place wider than the headland; no more than the device can hold.)
+  size = Math.min(size, renderer.capabilities.maxTextureSize);
   ktShadowInit();
   const info = ktShadow.uKitShadowInfo.value;
   if (!(strength > 0) || !casters.length) {
@@ -145,8 +147,8 @@ export function ktShadowBake(renderer, root, casters, dir, strength, key = '') {
   Object.assign(camera, { left: low.x - pad, right: high.x + pad, bottom: low.y - pad, top: high.y + pad, near: Math.max(0.1, -high.z - pad), far: -low.z + pad });
   camera.updateProjectionMatrix();
   const wide = Math.max(across, up);
-  const width = Math.max(2, Math.round((KT_SHADOW.size * across) / wide));
-  const height = Math.max(2, Math.round((KT_SHADOW.size * up) / wide));
+  const width = Math.max(2, Math.round((size * across) / wide));
+  const height = Math.max(2, Math.round((size * up) / wide));
   if (!baked.target || baked.target.width !== width || baked.target.height !== height) {
     baked.target?.dispose();
     baked.target = new THREE.WebGLRenderTarget(width, height, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, type: THREE.UnsignedByteType, depthBuffer: true, stencilBuffer: false, generateMipmaps: false });
@@ -181,7 +183,7 @@ export function ktShadowBake(renderer, root, casters, dir, strength, key = '') {
   const e = camera.matrixWorld.elements;
   ktShadow.uKitShadowAxes.value[0].set(e[0], e[1], e[2]);
   ktShadow.uKitShadowAxes.value[1].set(e[4], e[5], e[6]);
-  info.y = wide / KT_SHADOW.size;
+  info.y = wide / size;
   info.z = camera.far - camera.near;
   info.w = KT_SHADOW.bias;
   ktShadow.uKitSunDir.value.copy(sun);

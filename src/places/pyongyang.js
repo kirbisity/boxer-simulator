@@ -837,7 +837,7 @@ export const PYONGYANG_LIGHT = {
 // hills and walls hide some; 0.7 left the views with the sun behind flat: on the gate seen so, the darkest
 // twentieth of the frame went from 23 to 17 of 255, the middle 137 to 130). (The camera's meter, which is told the
 // same share, opens a little for it; each weather's `ev` takes that back so the lit snow keeps its place on the curve.)
-const PY_SHADE = { sky: 0.55 };
+const PY_SHADE = { sky: 0.7 };
 
 // Two of the kit's shared figures that were set against the canal town and do not fit this place (tkKeep's `look`):
 //   street  the light a shut-in place (the gate's passage, under the pavilion's and the houses' eaves) has from
@@ -1622,7 +1622,7 @@ export function buildPyongyang(_arena = null, { shift = [0, 0], key = 'pyongyang
     weathers: { snow: 'siegesnow', dawn: 'siegedawn', morning: 'siegemorning', late: 'siegelate', overcast: 'siegeovercast', hazy: 'siegesnowhazy', bare: 'clear' },
     first: 'snow',
     own: {
-      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.8, white: 4, saturation: 0.95, warmth: -0.02, ev: -0.5 }, cover: 0.32, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.3, visibility: 1800, hazeHeight: 70, glare: [2, 8], fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
+      siegesnow: ['flurries', { label: 'Snow showers on the wall', grade: { contrast: 1.55, white: 4, saturation: 1.0, warmth: 0.0, ev: -0.35, split: 0.2 }, cover: 0.32, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.3, visibility: 1800, hazeHeight: 70, glare: [2.2, 9], shafts: 1.8, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.3, thick: 12000 } }],
       siegedawn: ['flurries', { label: 'Clear morning on the wall', grade: { contrast: 1.8, white: 4, saturation: 0.92, warmth: -0.14, ev: -0.4 }, cover: 0.28, deck: 0.8, sun: 1, gloom: 0, fine: 0.1, visibility: 1200, hazeHeight: 60, glare: [2.8, 6], tint: PY_MIST, wind: 0.5, gust: 0.05, fall: null }],
       siegemorning: ['flurries', { label: 'Mid-morning on the wall', grade: { contrast: 0.95, saturation: 0.95, warmth: 0, ev: 0.1 }, cover: 0.26, deck: 0.6, sun: 1, gloom: 0, fine: 1.6, visibility: 35000, hazeHeight: 800, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 12000 } }],
       siegelate: ['flurries', { label: 'Late afternoon on the wall', grade: { contrast: 1.75, white: 4, saturation: 0.95, warmth: 0.05, ev: -0.4 }, cover: 0.25, deck: 0.7, sun: 1, gloom: 0.1, fine: 0.6, visibility: 4000, hazeHeight: 150, glare: [2.5, 7], fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.06, thick: 12000 } }],

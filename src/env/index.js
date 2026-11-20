@@ -660,7 +660,7 @@ export function envUpdate(view, world, lead = null) {
   view.scene.fog.color.setRGB(state.air.horizon[0] * fogLight, state.air.horizon[1] * fogLight, state.air.horizon[2] * fogLight);
   // The shafts: the share of light the air scatters toward the eye over the depth of a view (what falls is part
   // of that air), of the sun there is.
-  state.shafts = ENV.quality[envChosen.tier].airShade ? 0 : ENV.post.shafts * state.weather.sun * (1 - Math.exp(-extinction * ENV.post.shaftPath));
+  state.shafts = ENV.post.shafts * (state.weather.shafts ?? 1) * state.weather.sun * (1 - Math.exp(-extinction * ENV.post.shaftPath));
 
   // The sun's shadow: its box carried where the place asks, and its width in the edge (terrain.js
   // envInstallShadow): texels of blur per unit of the map's depth, of the box as it is now.

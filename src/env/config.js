@@ -204,7 +204,8 @@ export const ENV = {
     // cards) that just reaches the ceiling, `warmth` moved from blue to red (0.02: 2 % each way). All by eye
     // against the two reference frames' tone ranges (their darkest 5 % under 0.13 of full scale, their median
     // near 0.3 to 0.4, measured from the files), and so that a fighter in shade is never under about 0.15.
-    grade: { ev: 0, contrast: 1.28, saturation: 1.06, white: 6, warmth: 0 },
+    // `split`: the lights warmed and the darks cooled by this share at the ends (post.js), 0 unless a weather says.
+    grade: { ev: 0, contrast: 1.28, saturation: 1.06, white: 6, warmth: 0, split: 0 },
   },
 
   // ---- light past the lens: glare, shafts, the lens's own falloff (post.js) -----------------------------------
@@ -224,16 +225,24 @@ export const ENV = {
     // fading by exp(-distance x shaftFade) (distance in picture heights). They are light scattered toward the eye
     // by lit air, so their strength is the share of light the haze scatters over `shaftPath` m,
     // 1 - exp(-extinction x path), times the weather's share of sun: 0.6 in the mist, under 0.01 on a clear day.
-    // They are drawn only where the air's shade is not walked sight line by sight line (quality.airShade): where
-    // it is, the shafts are in the air itself, in their places in depth, and these on top of them counted the
-    // same light twice, as thin streaks fanned from the sun's place across whatever stood in front.
+    // They are drawn on every tier that has the passes, the one that walks the air's shade sight line by sight
+    // line too: the walk reads the crowns' cover from a map of the ground and gives the shade its place in depth,
+    // but its shafts are soft and were lost in the mist's own light, and what is seen looking up a low sun
+    // through a wood is these, fanned from the sun's place between the trunks. So that they do not lie as streaks
+    // across what stands in front, each point takes them by the air before it (`shaftAir`).
     // The path is by eye (about the depth of a view through the trees); the rest follows from the air.
     shaftFrom: 0.55,
     shaftReach: 0.85,
     shaftSteps: 28,
     shaftFade: 1.5,
     shaftPath: 60,
-    shafts: 0.5,
+    shafts: 1.3,
+    // The air a thing must stand behind for 63 % of the shafts to lie before it (m): they are light in the air
+    // on the way to it, so a trunk at arm's length is dark against them and a wood 30 m off is veiled. By eye.
+    shaftAir: 10,
+    // The same measure for what throws them: a bright thing nearer than about this (m) is the thing itself, not
+    // lit air behind it (the sun's glint on wet mud at the feet drew a fan of streaks down the picture). By eye.
+    shaftSource: 22,
     // The shafts fade as the sun leaves the picture and are gone with it this many half-pictures from the middle.
     shaftOff: 2.6,
     // A simple lens lights the film's corners less than its middle, by cos^4 of the angle off its axis (the
@@ -639,11 +648,11 @@ export const ENV = {
     // `ofMean` as a multiple of the mean wind) at which the rest begin to come and at which all of it is there]:
     // the rest ride the gust pattern, so a gust is seen arriving as a thicker curtain of it.
     rain: { box: [28, 16, 28], count: 9000, fall: 8, ride: 1, size: 0.012, streak: 0.028, wander: 0 },
-    // Snow is smeared over the same exposure as rain: at its own fall it stays a flake (3 cm), on a 10 m/s wind
-    // it draws a quarter of a metre long. Six tenths of a snowfall comes in the gusts (by eye, against how a
+    // Snow is smeared over a shorter exposure than rain (1/90 s, a camera stopped down for the snow's glare): at
+    // its own fall it stays a flake, on a 10 m/s wind it draws a hand long, a flake still and not a dash. Six tenths of a snowfall comes in the gusts (by eye, against how a
     // squall is seen crossing open ground: the fall itself is no thicker there, but the wind brings its curtains
     // and what it has lifted with them).
-    snow: { box: [26, 14, 26], count: 7000, fall: 1.2, ride: 1, size: 0.022, streak: 0.028, wander: 0.35, gusts: [0.4, 0.85, 1.45], ofMean: true },
+    snow: { box: [26, 14, 26], count: 7000, fall: 1.2, ride: 1, size: 0.024, streak: 0.011, wander: 0.35, gusts: [0.4, 0.85, 1.45], ofMean: true },
     // Snow lifted off where it lies: loose dry snow begins to drift along the ground at about 5 m/s and blows
     // in sheets by 9 or 10 (approximate, from memory of the figures for dry new snow; wet or crusted snow needs
     // much more). Drawn wherever a weather leaves snow lying (particles.js envParticlesSet).
@@ -999,7 +1008,9 @@ export const PLACE_ENV = {
     // 3.9 / 200 x 16 / sin 15 = 1.2 of mist and keeps exp(-0.42 x 1.2) = 0.6 of its key on the ground
     // (ENV.air.hazeForward: most of what the mist scatters still goes on down the beam); in the weather's
     // own 150 m and 26 m it keeps 0.33 and the bands were lost in the mist's own light. By eye between the two.
-    weatherHere: { visibility: 200, hazeHeight: 16 },
+    // (The camera's grade for it: the wood's green kept, where the open air's mist is greyed, and the split
+    // that holds the shafts warm against the shade's green-blue. By eye against the reference wood.)
+    weatherHere: { visibility: 200, hazeHeight: 16, grade: { contrast: 1.5, saturation: 1.0, warmth: 0.0, split: 0.14 } },
     sun: { azimuth: -0.4, elevation: 15 },
     air: { visibility: 24000, hazeHeight: 800 },
     clouds: { cover: 0.25 },

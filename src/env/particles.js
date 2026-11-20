@@ -23,15 +23,19 @@ import { envRandom } from './noise.js';
 // How each kind is drawn: 'streak' a line along its own velocity, 'dot' a soft round facing the camera, 'flake' a
 // small flat thing tumbling. `alpha` its opacity; `glow` true adds its light to the picture (a mote in a sunbeam)
 // instead of covering what is behind it; `low` crowds it toward the ground (dust is lifted from it).
+// `through`: the sun's light it sends on toward an eye looking up the light, as a multiple of the sun on a white
+// card at the sun's own place, falling off within some 25 degrees of it: a snowflake or a drop between the eye
+// and the sun is a spark, a leaf there is lit through like a lamp's shade, where the same thing down-sun is a
+// plain lit fleck. `sizes`: how far its pieces differ in size, the largest over the least. Both by eye.
 const ENV_PARTICLE_DRAWN = {
-  rain: { style: 'streak', alpha: 0.42, glow: false, low: false },
-  snow: { style: 'streak', alpha: 0.92, glow: false, low: false },
-  spindrift: { style: 'dot', alpha: 0.1, glow: false, low: true },
-  leaves: { style: 'flake', alpha: 1, glow: false, low: false },
-  petals: { style: 'flake', alpha: 1, glow: false, low: false },
-  motes: { style: 'dot', alpha: 0.85, glow: true, low: false },
-  dust: { style: 'dot', alpha: 0.085, glow: false, low: true },
-  litter: { style: 'flake', alpha: 1, glow: false, low: false },
+  rain: { style: 'streak', alpha: 0.42, glow: false, low: false, through: 1.2, sizes: 1.5 },
+  snow: { style: 'streak', alpha: 0.92, glow: false, low: false, through: 2.2, sizes: 2.6 },
+  spindrift: { style: 'dot', alpha: 0.1, glow: false, low: true, through: 1.5, sizes: 1 },
+  leaves: { style: 'flake', alpha: 1, glow: false, low: false, through: 1.6, sizes: 2 },
+  petals: { style: 'flake', alpha: 1, glow: false, low: false, through: 1.2, sizes: 1.4 },
+  motes: { style: 'dot', alpha: 0.85, glow: true, low: false, through: 0, sizes: 1 },
+  dust: { style: 'dot', alpha: 0.085, glow: false, low: true, through: 1.2, sizes: 1 },
+  litter: { style: 'flake', alpha: 1, glow: false, low: false, through: 0.6, sizes: 1.6 },
 };
 const ENV_PARTICLE_STYLES = ['streak', 'dot', 'flake'];
 
@@ -51,6 +55,8 @@ uniform vec4 uMove;
 uniform vec4 uDrawn;
 uniform vec3 uColours[4];
 uniform float uColourCount;
+// x: the sun's light it sends on toward an eye looking up the light; y: its largest pieces over its least.
+uniform vec2 uThrough;
 // What stands over the ground: a picture of its top, laid over the place from uRoofBox.xy (m) at uRoofBox.zw
 // (1 / m); the top is its texel . uRoofPick + uRoofBase (m).
 uniform sampler2D uRoof;
@@ -105,8 +111,10 @@ void main() {
   toEye /= max(away, 1e-3);
   // Nothing is drawn thinner than a pixel and a bit: it is drawn that wide and as much fainter.
   float least = away * uDrawn.z * 1.3;
-  float size = max(uMove.z, least);
-  float alpha = uDrawn.y * fade * min(1.0, uMove.z / least) * smoothstep(0.25, 0.9, away);
+  // (Few large pieces, many small: the size about its mean, by a seed squared.)
+  float own = uMove.z * mix(1.0, uThrough.y, r3 * r3) * 2.0 / (1.0 + uThrough.y * 0.5 + 0.5);
+  float size = max(own, least);
+  float alpha = uDrawn.y * fade * min(1.0, own / least) * smoothstep(0.25, 0.9, away);
   float local = envGust(middle.xz);
   // The share of it the gusts bring is there only where the wind is that strong: a curtain crossing with the gust.
   float needs = mix(uGusts.y, uGusts.z, clamp((r - uGusts.x) / max(1.0 - uGusts.x, 1e-3), 0.0, 1.0));
@@ -138,9 +146,11 @@ void main() {
   facing = 0.45 + 0.55 * abs(dot(cross(axis, other), uEnvSunDir));
 #endif
 
-  // Its light: the sun where the clouds let it through, and the sky.
-  float sunShare = envSunShare(middle);
-  vec3 light = uEnvSunColour * sunShare * facing + uEnvSkyLight;
+  // Its light: the sun where the clouds and what stands sunward of it (a crown, a trunk, a roof) let it through,
+  // and the sky. It is lit in a shaft and dim in a wall's shade, as the air it falls through is.
+  float sunShare = envAirSun(middle);
+  float toSun = max(dot(-toEye, uEnvSunDir), 0.0);
+  vec3 light = uEnvSunColour * sunShare * (facing + uThrough.x * pow(toSun, 9.0)) + uEnvSkyLight;
   vec3 colour = uColours[int(min(floor(r3 * uColourCount), 3.0))];
 #if GLOW == 1
   // A mote is seen by the sunlight it throws forward: bright toward the sun, nothing in shade.
@@ -235,6 +245,7 @@ export function envBuildParticles(map, cover = null) {
         uDrawn: { value: new THREE.Vector4(spec.wander, drawn.alpha, 0.001, drawn.low ? 1 : 0) },
         uColours: { value: [0, 1, 2, 3].map(() => new THREE.Color(0xffffff)) },
         uColourCount: { value: 1 },
+        uThrough: { value: new THREE.Vector2(drawn.through, drawn.sizes) },
         uLate: { value: new THREE.Vector3(0, 0, 0) },
         uLateDepth: { value: null },
       },

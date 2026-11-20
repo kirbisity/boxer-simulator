@@ -47,6 +47,7 @@ export function envToneOf(air, weather, place) {
     gain: 1 + sigma / white,
     saturation: grade.saturation,
     warmth: grade.warmth,
+    split: grade.split ?? 0,
   };
 }
 
@@ -132,8 +133,12 @@ void main() {
 // on the way (what is bright between the eye's line and the sun is haze in the sun, or the sky that lights it).
 // uSun: xy the sun's place (uv; it may lie off the picture, whose edge then stands for what is beyond it),
 // z strength, w the picture's width over its height.
+// What is summed is lit air: the sky, and what stands far enough off to be veiled (uRange.z m of air before it
+// count it 63 %). A near bright thing (a glint on wet ground, a white coat) is not air and throws no shaft.
 const ENV_POST_SHAFTS = /* glsl */ `
 uniform sampler2D uFrom;
+uniform sampler2D uDepth;
+uniform vec3 uRange;
 uniform vec4 uSun;
 varying vec2 vUv;
 void main() {
@@ -144,7 +149,9 @@ void main() {
   for (int i = 0; i < ${ENV.post.shaftSteps}; i++) {
     vec3 c = texture2D(uFrom, p).rgb;
     float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-    sum += c * max(luma - ${ENV.post.shaftFrom.toFixed(2)}, 0.0) / max(luma, 1e-4) * exp(-span * float(i) * ${ENV.post.shaftFade.toFixed(2)});
+    float z = texture2D(uDepth, p).x;
+    float air = 1.0 - exp(-uRange.x * uRange.y / (uRange.y - z * (uRange.y - uRange.x)) / uRange.z);
+    sum += c * air * air * max(luma - ${ENV.post.shaftFrom.toFixed(2)}, 0.0) / max(luma, 1e-4) * exp(-span * float(i) * ${ENV.post.shaftFade.toFixed(2)});
     p += pace;
   }
   gl_FragColor = vec4(sum * uSun.z / ${ENV.post.shaftSteps.toFixed(1)}, 1.0);
@@ -156,6 +163,9 @@ const ENV_POST_FRAME = /* glsl */ `
 uniform sampler2D uFrom;
 uniform sampler2D uBloom;
 uniform sampler2D uShafts;
+uniform sampler2D uDepth;
+uniform vec3 uRange;
+uniform float uSplit;
 uniform vec4 uTone;
 uniform vec4 uGrade;
 uniform vec3 uLens;
@@ -163,11 +173,23 @@ varying vec2 vUv;
 ${ENV_GLSL_FILM}
 void main() {
   vec3 light = pow(max(texture2D(uFrom, vUv).rgb, 0.0), vec3(2.2)) * uTone.x;
-  light += texture2D(uBloom, vUv).rgb * uGrade.z + texture2D(uShafts, vUv).rgb * uLens.z;
+  light += texture2D(uBloom, vUv).rgb * uGrade.z;
+  // The shafts are light in the air between the eye and what is seen: a thing a few metres off has little lit
+  // air before it (uRange.z m of air show 63 % of them), so a near trunk stands dark across the shafts behind it.
+  if (uLens.z > 0.0) {
+    float z = texture2D(uDepth, vUv).x;
+    float far_ = uRange.x * uRange.y / (uRange.y - z * (uRange.y - uRange.x));
+    light += texture2D(uShafts, vUv).rgb * uLens.z * (1.0 - exp(-far_ / uRange.z));
+  }
   vec2 off = (vUv - 0.5) * 2.0 * uLens.xy;
   float cosine = 1.0 / (1.0 + dot(off, off));
   light *= mix(1.0, cosine * cosine, uGrade.w);
   vec3 c = envFilm(light, uTone, uGrade.xy);
+  // The grade's split: the picture's lights toward the sun's amber and its darks toward the sky's blue, by this
+  // share at the two ends and nothing at the middle (a low sun's day as film holds it: gold on what the sun
+  // touches, blue in the shade, where one balance for the whole frame can only have one of them).
+  float key = dot(c, vec3(0.2126, 0.7152, 0.0722)) - 0.5;
+  c *= 1.0 + uSplit * key * vec3(1.0, 0.1, -1.0);
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
   gl_FragColor = vec4(c, 1.0);
 }`;
@@ -255,8 +277,8 @@ function envPostMake(renderer) {
     blur: pass(ENV_POST_BLUR, blur),
     // The same blur, laid over what its target holds: a level of the bloom added to the one above it.
     add: pass(ENV_POST_BLUR, blur, { blending: THREE.AdditiveBlending, transparent: true }),
-    shafts: pass(ENV_POST_SHAFTS, { uFrom: { value: null }, uSun: { value: new THREE.Vector4() } }),
-    frame: pass(ENV_POST_FRAME, { uFrom: { value: null }, uBloom: { value: null }, uShafts: { value: null }, uTone: { value: new THREE.Vector4() }, uGrade: { value: new THREE.Vector4() }, uLens: { value: new THREE.Vector3() } }),
+    shafts: pass(ENV_POST_SHAFTS, { uFrom: { value: null }, uDepth: { value: null }, uRange: { value: new THREE.Vector3() }, uSun: { value: new THREE.Vector4() } }),
+    frame: pass(ENV_POST_FRAME, { uFrom: { value: null }, uBloom: { value: null }, uShafts: { value: null }, uDepth: { value: null }, uRange: { value: new THREE.Vector3() }, uSplit: { value: 0 }, uTone: { value: new THREE.Vector4() }, uGrade: { value: new THREE.Vector4() }, uLens: { value: new THREE.Vector3() } }),
     air: pass(envPostAirShader(), { ...envUniforms(), uDepth: { value: null }, uUnproject: { value: new THREE.Matrix4() }, uEye: { value: new THREE.Vector3() }, uRange: { value: new THREE.Vector2() } }),
     unshade: pass(ENV_POST_UNSHADE, { uFrom: { value: null }, uAir: { value: null }, uDepth: { value: null }, uStep: { value: new THREE.Vector2() }, uRange: { value: new THREE.Vector2() } }),
     targets: [],
@@ -395,6 +417,8 @@ export function envPostDraw(view, tone, level, shafts, air) {
       rays = shafts * Math.min(1, Math.max(0, (tune.shaftOff - Math.max(Math.abs(x), Math.abs(y))) / (tune.shaftOff - 1)));
       if (rays > 0) {
         post.shafts.uniforms.uSun.value.set(x * 0.5 + 0.5, y * 0.5 + 0.5, 1, camera.aspect);
+        post.shafts.uniforms.uDepth.value = post.main.depthTexture;
+        post.shafts.uniforms.uRange.value.set(camera.near, camera.far, tune.shaftSource);
         run(post.shafts, post.half, post.rays[0], 0, 0, 0, 0);
         run(post.blur, post.rays[0], post.rays[1], 1, 0, 0, 1);
       }
@@ -404,6 +428,9 @@ export function envPostDraw(view, tone, level, shafts, air) {
   const u = post.frame.uniforms;
   u.uBloom.value = levels[0].texture;
   u.uShafts.value = post.rays[1].texture;
+  u.uDepth.value = post.main.depthTexture;
+  u.uRange.value.set(camera.near, camera.far, tune.shaftAir);
+  u.uSplit.value = tone.split;
   u.uTone.value.set(tone.exposure, tone.contrast, tone.sigma, tone.gain);
   u.uGrade.value.set(tone.saturation, tone.warmth, tune.bloom, tune.vignette);
   const tangent = Math.tan((camera.fov * Math.PI) / 360);

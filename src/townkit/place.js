@@ -22,7 +22,9 @@ export const TK_PLACE = {
   // `openShadow`: how much of the sun the baked shadow takes in the open air, all of it: there the sky's light is the
   // lit probe and the lie map's share, not a flat fill the shadow has to leave room for (a place's own `shadow`
   // share is for the flat light of the open air off).
-  sun: { half: 16, distance: 60, openShadow: 1 },
+  // `baked`: the baked shadow's map, texels along its longer side (half that on the low tier): a town 300 m long is
+  // drawn at 7 cm a texel, where the headland's 2048 gave it 15 and a roof's shadow on the snow a street away was stepped.
+  sun: { half: 16, distance: 60, openShadow: 1, baked: 4096 },
   // The cube mirror's side (px) and the rain's streaks: how many, the box they fall in round the camera (m), their length and speed.
   mirror: 128, rain: { count: 2600, box: [34, 16, 34], length: 0.55, speed: 13 },
 };
@@ -377,7 +379,7 @@ export function tkKeep(root, meshes, { sun, shadow = 0.8, sky = null, rain = nul
     if (ktShadow.uKitShadowInfo.value?.x !== taken || state.checked !== view.renderer.info.render.frame >> 6 || state.baked !== dir.x + dir.z) {
       state.checked = view.renderer.info.render.frame >> 6;
       state.baked = dir.x + dir.z;
-      ktShadowBake(view.renderer, root, meshes.userData.casters, [dir.x, dir.y, dir.z], taken, key);
+      ktShadowBake(view.renderer, root, meshes.userData.casters, [dir.x, dir.y, dir.z], taken, key, tier === 'low' ? TK_PLACE.sun.baked / 2 : TK_PLACE.sun.baked);
     }
     if (state.mirrored !== (open ? `air:${view.env.weather.name}` : 'own')) takeMirror(view, open);
     else if (state.mirror && tkWeather.uTkEnv.value !== state.mirror.texture && (open ? state.mirror.userData.float : true) && tier !== 'low') {
