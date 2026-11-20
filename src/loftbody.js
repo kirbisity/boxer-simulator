@@ -300,6 +300,11 @@ export const LOFT = {
   // from its seam) goes `hung` of the way with the chest it hangs from and the rest with the arm it lies on, so it lifts by
   // three quarters of what the arm does and never stands out level with it.
   stiff: { sharpen: 3, panels: 8, coat: 0.5, hung: 0.25 },
+  // A skirt's splits (its `gaps`, the panels it parts into over the legs): drawn this wide (rad, half-width) at most, a seam
+  // where one panel meets and overlaps the next, not an open slit with the robe showing down the thigh (the user's call,
+  // 2026-11-20: real armour skirts lapped their panels; what guards a place is what is drawn over it, coverage.js, and the
+  // skirt guards the thigh all round). The panels still part over the legs as before.
+  skirtSeam: 0.012,
   // Loose cloth (looseness): cloth lying on the body moves with it, cloth standing `from` m off the skin begins to hang free
   // and at `full` m is wholly loose (a skirt's hem, a hanging sleeve, a trouser leg of hakama): what the air and his own
   // movement then swing (clothsway.js). `cell` (m): the grid the skin's points are sorted into for the search.
@@ -1053,6 +1058,10 @@ const MANICA = { rows: ['steel', 'lace'] };
 // The Ming elite's neck guard: two steel lames in front of the throat and the top of the chest, the lower stepped out
 // over the upper, open at the back and the sides (`front`: the half width round it covers, rad; the user's first
 // photograph of a general's household man); no band round the neck (the hood's flaps cover it behind).
+// The Ottoman sipahi's dizçek (Askeri Müze; the Met's 16th-century thigh-and-knee defences of mail and plate): rows of
+// small plates set in mail over the front of the thigh, from under the skirt's hem to the knee, and a round knee cop
+// (the user's call, 2026-11-20: his thighs and knees were drawn bare).
+const SIPAHI_KNEES = { thigh: [0.3, 0.98, 1.2, { rows: ['steel', 'steel2', 'mail'] }], knee: [0.82, 1.05, 1.45, 'steel'], };
 const ELITE_NECK_GUARD = [[0.94, 1.0, 1.3, { base: 'steel2', front: 0.7 }], [0.9, 0.955, 1.34, { base: 'steel2', front: 0.55 }]];
 // The Ming elite's arms: a great spaulder of steel lames over the shoulder,
 // and lames down the upper arm (the forearm's to the wrist, in the kit).
@@ -1230,12 +1239,13 @@ export const ARMOR_KINDS = {
     upperArm: [[-0.3, 0.5, 1.6, { rows: ['gold', 'gold'] }], [0.45, 1.02, 1.36, { lames: 6, base: 'steel2' }]], forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }],
     mirrors: [[0.62, 0, 0.3, 1.36, 'steel']],
   },
-  // A conquistador: the breastplate over the doublet, short tassets, mail
-  // sleeves and collar; the doublet's cloth shows below.
+  // A conquistador: the breastplate over his mail shirt, short tassets, and the shirt's mail showing below them to
+  // mid-thigh, its sleeves to the wrist and its collar (the long-sleeved mail shirt of 16th-century Spain, worn under the
+  // breastplate: the user's call, 2026-11-20, were sleeves to the elbow and no mail below the tassets).
   conquistador: {
-    trunk: [[-0.06, 0.97, 1.12, MAIL], [0.1, 0.96, 1.22, 'steel']], skirt: [0.3, 0.4, 1.24, { rows: ['steel', 'steel2'] }], collar: 'mail',
+    trunk: [[-0.06, 0.97, 1.12, MAIL], [0.1, 0.96, 1.22, 'steel']], skirt: [[0.5, 0.42, 1.15, MAIL], [0.3, 0.4, 1.24, { rows: ['steel', 'steel2'] }]], collar: 'mail',
     rigidBreastplate: [0.32, 0.96],
-    upperArm: [-0.3, 1.04, 1.14, MAIL],
+    upperArm: [-0.3, 1.04, 1.14, MAIL], forearm: [-0.06, 0, 1.14, MAIL],
   },
   // A corset: boned cloth from the hips to under the bust, laced tight (the
   // body under it is drawn in, `cinch`; see LOFT.corset).
@@ -1452,7 +1462,7 @@ export const ARMOR_KINDS = {
   // Mail-and-plate (krug): rows of plates set in a mail shirt, mail to the thighs, iron vambraces.
   krug: {
     trunk: [[-0.1, 1.0, 1.12, MAIL], [0.15, 0.85, 1.2, { rows: ['steel', 'steel', 'mail'] }]], skirt: [0.6, 0.45, 1.18, MAIL], collar: 'mail',
-    upperArm: [-0.3, 0.55, 1.15, MAIL], forearm: [-0.04, -0.03, 1.3, 'steel'],
+    upperArm: [-0.3, 0.55, 1.15, MAIL], forearm: [-0.04, -0.03, 1.3, 'steel'], ...SIPAHI_KNEES,
   },
   // The krug of great plates (Ottoman, 16th century): a mail shirt to the knee, and over it the round domed plate on the
   // belly with its boss, a plate across the breast, one at each side and two down the back, each a rigid piece with the
@@ -1461,7 +1471,7 @@ export const ARMOR_KINDS = {
     trunk: [-0.1, 1.0, 1.12, MAIL], skirt: [0.95, 0.5, 1.16, MAIL], collar: 'mail',
     plates: [[0.6, 0.9, 0, 0.62, 1.18, 'steel', 'gold'], [0.18, 0.62, 1.57, 0.36, 1.18, 'steel', 'gold'], [0.18, 0.62, -1.57, 0.36, 1.18, 'steel', 'gold'], [0.5, 0.9, Math.PI, 0.7, 1.18, 'steel', 'gold'], [0.12, 0.46, Math.PI, 0.7, 1.18, 'steel', 'gold']],
     discs: [[0.35, 0, 0.105, 1.24, 'steel', 'gold', 0.022], [0.35, 0, 0.03, 1.24, 'steel', 'steel2', 0.038]],
-    upperArm: [[-0.3, 0.55, 1.15, MAIL], [-0.24, 0.14, 1.48, 'steel']], forearm: [-0.04, -0.03, 1.3, 'steel'],
+    upperArm: [[-0.3, 0.55, 1.15, MAIL], [-0.24, 0.14, 1.48, 'steel']], forearm: [-0.04, -0.03, 1.3, 'steel'], ...SIPAHI_KNEES,
   },
   // The bekhter: rows of narrow plates down the chest and back, set in the shirt's mail and gilt along their edges, the
   // front open down the middle and buckled shut with leather straps (`plates`, their straps and buckles); laminated plates
@@ -1472,7 +1482,7 @@ export const ARMOR_KINDS = {
     studs: [0.3, 0.38, 0.46, 0.54, 0.62, 0.7, 0.78, 0.86].map((t) => [t - 0.035, 0, 0.045, 1.27, 'gold']),
     belt: [-0.02, 0.1, 1.22, 'leather'],
     discs: [[0.05, 0, 0.045, 1.25, 'steel', 'gold', 0.015]],
-    upperArm: [[-0.3, 0.55, 1.15, MAIL], [-0.26, 0.34, 1.48, { lames: 4, base: 'steel' }]], forearm: [-0.04, -0.03, 1.3, 'steel'],
+    upperArm: [[-0.3, 0.55, 1.15, MAIL], [-0.26, 0.34, 1.48, { lames: 4, base: 'steel' }]], forearm: [-0.04, -0.03, 1.3, 'steel'], ...SIPAHI_KNEES,
   },
   // The Cuman's mail and plates (12th-13th c.; OUTFITS.cumanHeavy): a mail shirt to mid-thigh, its sleeves to the elbow,
   // and laced over it rows of narrow plain steel plates (CUMAN_LAMES) from the collarbone to the hips, in columns: one each
@@ -4530,6 +4540,8 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
   // A piece from the table: `slot` (trunk, skirt, upperArm...) and `material` (detailmaps.js pieceMaterial, from its paint) choose
   // the tile it wears where the detail maps are drawn (armourTileOf).
   const tablePiece = (rings, inflate, paint, bones, shape = null, slot = null, material = pieceMaterial(paint)) => {
+    // A skirt's splits drawn as the seams where its panels meet and overlap (LOFT.skirtSeam), not open slits down the thigh.
+    if (slot === 'skirt' && paint?.gaps && (paint.gapWidth ?? 0) > LOFT.skirtSeam) paint = { ...paint, gapWidth: LOFT.skirtSeam };
     const tile = DETAIL_MAPS.on && !lowDetail ? armourTileOf(tileKind, material, slot) : null;
     const boned = bones ?? (() => null);
     // Stiff as what it is made of (stiffnessOf); a skirt's rows panel by panel, as it parts over the legs.

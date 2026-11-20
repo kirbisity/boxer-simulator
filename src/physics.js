@@ -885,10 +885,21 @@ function guardAt(gear, capsuleKey, along = null) {
   const atHand = part === 'Hand' || (part === 'Forearm' && along != null && along >= ARMOUR_COVER.handFrom);
   const atFoot = part === 'Shank' && along != null && along >= ARMOUR_COVER.footFrom;
   const handKey = capsuleKey.replace('Forearm', 'Hand');
-  const named = regions && (atHand ? regions[handKey] ?? regions.Hand : regions[capsuleKey] ?? regions[part]);
+  let named = regions && (atHand ? regions[handKey] ?? regions.Hand : regions[capsuleKey] ?? regions[part]);
   if (atHand && !named && gear.handCover) return { ...gear.protection, deflects: false, bites: undefined, ...gear.handCover };
   const side = /^[lr](?=[A-Z])/.test(capsuleKey) ? capsuleKey[0] : 'l';
   const cover = armourCoverOf(gear)?.[side] ?? null;
+  // A part's `worn` figures, where they are the clothes on it (breeches, a quilted sleeve): where a piece of armour is drawn
+  // over the place and guards it better (the kit's own figures, or its stuff's: mail), the armour guards it as at a place the
+  // kit does not name, not the clothes under it (a conquistador's tassets and mail skirt over his breeches, the Ming
+  // regular's lamellar sleeves over his quilted ones). A worn figure that is the armour itself (a gladiator's greave, drawn by
+  // arenaview.js) stands.
+  if (named?.worn && cover && along != null && !atHand && !atFoot && part !== 'head' && part !== 'trunk') {
+    const name = part[0].toLowerCase() + part.slice(1);
+    const over = cover[name] ? piecesAt(cover, name, along).find((piece) => ARMOUR_COVER.armour.includes(piece.material)) : null;
+    const guard = over ? (over.material !== cover.main && COVERED_STUFF[over.material]) || gear.protection : null;
+    if (guard && (guard.cut ?? 0) > (named.cut ?? 0)) named = null;
+  }
   // A part the kit names keeps its figures where anything is drawn over it, or where the region says it is worn though the
   // table does not draw it (`worn`: boots, a quilted sleeve, a gladiator's manica drawn by arenaview.js); else it is bare.
   if (named && cover && part !== 'head' && part !== 'trunk' && !named.worn && !atHand) {

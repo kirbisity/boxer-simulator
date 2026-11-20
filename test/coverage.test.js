@@ -89,10 +89,15 @@ test('the hand: bare but for a gauntlet (the knights) or the tekkō (the samurai
   assert.ok(protectionAt(gearOf('samuraiTosei', 0), 'rForearm', 0.95).cut > 0.3, 'the tekkō');
 });
 
-test('as drawn: the conquistador\'s mail stops at the elbow, the Ming coat at the knee, the tōsei\'s haidate short of the knee; the knight all over', () => {
+test('as drawn: the conquistador\'s mail to the wrist and below his tassets, the sipahi\'s dizçek over the thigh and knee, the Ming coat at the knee, the tōsei\'s haidate short of the knee; the knight all over', () => {
   const conquistador = gearOf('conquistadorPlate', 0);
   assert.ok(protectionAt(conquistador, 'lUpperArm', 0.5).cut >= 0.8, 'mail sleeve');
-  assert.equal(protectionAt(conquistador, 'lForearm', 0.5).cut, 0, 'the forearm in the doublet');
+  assert.ok(protectionAt(conquistador, 'lForearm', 0.5).cut >= 0.8, 'the mail sleeve down the forearm');
+  assert.equal(protectionAt(conquistador, 'lForearm', 0.95).cut, 0, 'the hand bare');
+  assert.ok(protectionAt(conquistador, 'lThigh', 0.4).cut >= 0.8, 'the mail shirt below the tassets');
+  const sipahi = gearOf('ottomanHeavy', 0);
+  assert.ok(protectionAt(sipahi, 'lThigh', 0.8).cut > 0.9, 'the dizçek over the thigh');
+  assert.ok(protectionAt(sipahi, 'lShank', 0.05).cut > 0.9, 'the knee cop');
   assert.equal(protectionAt(conquistador, 'trunk', 0.05).cut, 0.85, 'the mail skirt below the breastplate: mail');
   const ming = gearOf('mingBrigandine', 0);
   assert.ok(protectionAt(ming, 'lThigh', 0.5).cut > 0.8);
