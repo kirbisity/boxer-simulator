@@ -57,7 +57,16 @@ export const BARD_SWAY = {
   // `hang`: where the skirt hangs from, the point the spring follows (× the withers: over the croup, behind the saddle, at the
   // barrel's top), so the stride's rock, pitch and bob swing it as a pendulum, not only the horse's pace and turns (followed at
   // the frame's origin, under the barrel, it hardly moved as the body rocked: rigid from behind, the user's call, 2026-11-18).
-  kinds: ['lamellar'], hz: 1.2, damping: 0.22, trail: 0.02, reach: 0.16, lift: 0.7, jump: 0.7, top: 0.8, hem: 0.42, curve: 1.3,
+  // (Softer, as hair, the user's call, 2026-11-20: was hz 1.2, reach 0.16, one spring, no ripple.)
+  kinds: ['lamellar'], hz: 0.95, damping: 0.2, trail: 0.02, reach: 0.2, lift: 0.7, jump: 0.7, top: 0.8, hem: 0.42, curve: 1.3,
+  // `chain`: the hem on a second spring following the first (its own `hz`, `damping`, at most `reach` m off the horse), the
+  // skirt between the two by how far down it is: the hem lags the upper skirt as a lock of hair lags the head. `ripple`: a wave
+  // run across the plates (`waves` per m along the horse and round it, `hz`), `amp` m at the hem at full stir, the stir the
+  // horse's pace over `pace` m/s and the swing's own reach, so the panels lift out of step as hair does, and still at rest.
+  chain: { hz: 0.8, damping: 0.18, reach: 0.26 },
+  // `hold`: how many reaches out the springs themselves are held (the drawn offset eased into one reach before that).
+  hold: 2.5,
+  ripple: { amp: 0.03, hz: 1.4, waves: [7, 5], pace: 6 },
   hang: [-0.42, 1.0, 0],
   // `flare`: the skirt flaring out from the horse as it lags his rise and fall each stride (m out per m of the vertical lag;
   // `tuck` of it inward, the panels laid back against him), the flanks out to the sides, the rump's panel behind `rear` and the
@@ -167,7 +176,7 @@ function makeBardMaterial(view, tile, finish) {
 
 /** The swing of one horse's bard (BARD_SWAY): `uniform` (the frame's own axes, m) is what its materials read; `update` moves it. */
 function bardSwing() {
-  return { uniform: { value: new THREE.Vector3() }, twist: { value: 0 }, at: null, was: [0, 0, 0], speed: [0, 0, 0], pace: [0, 0, 0], turn: null, turnSpeed: 0, lastYaw: 0 };
+  return { uniform: { value: new THREE.Vector3() }, hem: { value: new THREE.Vector3() }, ripple: { value: new THREE.Vector2() }, twist: { value: 0 }, at: null, was: [0, 0, 0], speed: [0, 0, 0], pace: [0, 0, 0], chain: [0, 0, 0], chainSpeed: [0, 0, 0], clock: 0, turn: null, turnSpeed: 0, lastYaw: 0 };
 }
 
 /** The turn's spring (BARD_SWAY `twist`): the skirt's own heading trailing the horse's (`yaw`), the lag (rad) into `uniform`. */
@@ -205,6 +214,22 @@ function updateBardTwist(swing, yaw, dt) {
 const bardWorld = new THREE.Vector3();
 const bardTurn = new THREE.Quaternion();
 
+/**
+ * A swing's offset eased into its reach (`off`, m, changed in place): drawn `reach * tanh(|off| / reach)` along it, so it
+ * slows into the limit rather than stopping at it (a hard stop kinked the skirt each time it reached it: at a gallop the
+ * trail alone is about the reach); the spring itself (`at`) held back only at BARD_SWAY.hold reaches, so it never runs off.
+ */
+function softReach(off, at, target, pace, reach, spec) {
+  const far = Math.hypot(...off);
+  if (!(far > 0)) return;
+  const hold = reach * spec.hold;
+  if (far > hold) {
+    for (let axis = 0; axis < 3; axis += 1) at[axis] = target[axis] + (off[axis] * hold) / far / (axis === 1 ? spec.lift : 1) + pace[axis] * spec.trail;
+  }
+  const drawn = reach * Math.tanh(Math.min(far, hold) / reach);
+  for (let axis = 0; axis < 3; axis += 1) off[axis] *= drawn / far;
+}
+
 /** Move a horse's bard swing by dt, after its frame: a damped spring behind the frame's origin (as clothsway.js ClothSwing). */
 function updateBardSwing(swing, frame, dt) {
   const spec = BARD_SWAY;
@@ -218,7 +243,10 @@ function updateBardSwing(swing, frame, dt) {
       swing.was = target.slice();
       swing.speed = [0, 0, 0];
       swing.pace = [0, 0, 0];
+      swing.chain = target.slice();
+      swing.chainSpeed = [0, 0, 0];
       swing.uniform.value.set(0, 0, 0);
+      swing.hem.value.set(0, 0, 0);
     }
     return;
   }
@@ -226,27 +254,35 @@ function updateBardSwing(swing, frame, dt) {
   const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
   const h = dt / steps;
   const off = [0, 0, 0];
+  const hem = [0, 0, 0];
   for (let axis = 0; axis < 3; axis += 1) {
     const pace = (target[axis] - swing.was[axis]) / dt;
     swing.pace[axis] += (pace - swing.pace[axis]) * Math.min(1, dt / 0.08);
+    const chainOmega = Math.PI * 2 * spec.chain.hz;
     for (let step = 1; step <= steps; step += 1) {
       const goal = swing.was[axis] + ((target[axis] - swing.was[axis]) * step) / steps;
-      swing.speed[axis] += (omega * omega * (goal - swing.at[axis]) - 2 * spec.damping * omega * (swing.speed[axis] - pace)) * h;
+      // (Damped against the horse's pace smoothed, not one frame's: a frame's own is uneven, the drawing blended between steps.)
+      swing.speed[axis] += (omega * omega * (goal - swing.at[axis]) - 2 * spec.damping * omega * (swing.speed[axis] - swing.pace[axis])) * h;
       swing.at[axis] += swing.speed[axis] * h;
+      // The hem follows the upper skirt.
+      swing.chainSpeed[axis] += (chainOmega * chainOmega * (swing.at[axis] - swing.chain[axis]) - 2 * spec.chain.damping * chainOmega * (swing.chainSpeed[axis] - swing.speed[axis])) * h;
+      swing.chain[axis] += swing.chainSpeed[axis] * h;
     }
     swing.was[axis] = target[axis];
     off[axis] = (swing.at[axis] - target[axis] - swing.pace[axis] * spec.trail) * (axis === 1 ? spec.lift : 1);
+    hem[axis] = (swing.chain[axis] - target[axis] - swing.pace[axis] * spec.trail) * (axis === 1 ? spec.lift : 1);
   }
-  const far = Math.hypot(...off);
-  if (far > spec.reach) {
-    for (let axis = 0; axis < 3; axis += 1) {
-      off[axis] *= spec.reach / far;
-      swing.at[axis] = target[axis] + off[axis] / (axis === 1 ? spec.lift : 1) + swing.pace[axis] * spec.trail;
-    }
-  }
+  softReach(hem, swing.chain, target, swing.pace, spec.chain.reach, spec);
+  softReach(off, swing.at, target, swing.pace, spec.reach, spec);
   // Into the frame's own axes (its turn only), as its geometry is.
   frame.getWorldQuaternion(bardTurn).invert();
   swing.uniform.value.set(off[0], off[1], off[2]).applyQuaternion(bardTurn);
+  swing.hem.value.set(hem[0], hem[1], hem[2]).applyQuaternion(bardTurn);
+  // The ripple's clock and stir (its phase run on; the stir eased, so it swells and dies away rather than switching).
+  const ripple = spec.ripple;
+  swing.clock += dt * Math.PI * 2 * ripple.hz;
+  const stir = Math.min(1, Math.hypot(swing.pace[0], swing.pace[2]) / ripple.pace + Math.hypot(...hem) / spec.chain.reach);
+  swing.ripple.value.set(swing.clock % 1000, swing.ripple.value.y + (stir - swing.ripple.value.y) * Math.min(1, dt / 0.4));
 }
 
 /** Make a material (or an outline's) move its points by a bard's swing, by how far down the hanging skirt each is (BARD_SWAY). */
@@ -260,20 +296,25 @@ function swayBard(material, swing, withers) {
   material.onBeforeCompile = (shader, renderer) => {
     before?.call(material, shader, renderer);
     shader.uniforms.uBardSwing = swing.uniform;
+    shader.uniforms.uBardHem = swing.hem;
+    shader.uniforms.uBardRipple = swing.ripple;
     shader.uniforms.uBardTwist = swing.twist;
     // The share down the skirt; then the turn's lag about the barrel's middle (as three's turn about y), then the swing.
-    shader.vertexShader = `uniform vec3 uBardSwing;\nuniform float uBardTwist;\n${shader.vertexShader}`.replace(
+    shader.vertexShader = `uniform vec3 uBardSwing;\nuniform vec3 uBardHem;\nuniform vec2 uBardRipple;\nuniform float uBardTwist;\n${shader.vertexShader}`.replace(
       '#include <morphtarget_vertex>',
       `float bardHang = pow( clamp( ( ${top} - position.y ) / ${span}, 0.0, 1.0 ), ${BARD_SWAY.curve.toFixed(2)} );
 float bardTurn = uBardTwist * bardHang;
 vec2 bardAt = transformed.xz - vec2( ${pivot}, 0.0 );
 transformed.xz = vec2( ${pivot}, 0.0 ) + vec2( bardAt.x * cos( bardTurn ) + bardAt.y * sin( bardTurn ), - bardAt.x * sin( bardTurn ) + bardAt.y * cos( bardTurn ) );
-transformed += uBardSwing * bardHang;
+vec3 bardSwingHere = mix( uBardSwing, uBardHem, bardHang );
+transformed += bardSwingHere * bardHang;
 vec2 bardOut = vec2( position.x > ${front} ? position.x - ${front} : ( position.x < ${rear} ? position.x - ${rear} : 0.0 ), position.z );
 bardOut /= max( length( bardOut ), 1e-4 );
-float bardFlare = uBardSwing.y * ${BARD_SWAY.flare.toFixed(2)};
+float bardFlare = bardSwingHere.y * ${BARD_SWAY.flare.toFixed(2)};
 if ( bardFlare < 0.0 ) bardFlare *= ${BARD_SWAY.tuck.toFixed(2)};
 transformed.xz += bardOut * bardFlare * bardHang;
+float bardWave = sin( uBardRipple.x - position.x * ${BARD_SWAY.ripple.waves[0].toFixed(2)} + abs( position.z ) * ${BARD_SWAY.ripple.waves[1].toFixed(2)} );
+transformed.xz += bardOut * bardWave * ${BARD_SWAY.ripple.amp.toFixed(3)} * ( 0.25 + 0.75 * uBardRipple.y ) * bardHang;
 #include <morphtarget_vertex>`,
     );
   };
@@ -811,7 +852,7 @@ function lameLegOf(horse) {
 const horseDown = [0, -1, 0];
 
 /** Put the horse where it is now (its legs in their stride, rolled over if down). `world` gives the time and the rider. */
-export function updateHorseView(view, world = null) {
+export function updateHorseView(view, world = null, frameDt = null) {
   if (view.robot) return updateRobotDogView(view, world);
   const horse = view.horse;
   const drawn = view.drawn;
@@ -820,7 +861,10 @@ export function updateHorseView(view, world = null) {
   poseHorse(drawn);
   const W = horse.withers;
   const time = world?.time ?? performance.now() / 1000;
-  const dt = view.lastTime === null ? 0 : Math.max(0, Math.min(0.05, time - view.lastTime));
+  // The step: the drawn frame's own (main.js drawWorld, at the fight's pace), when given. The world's clock moves in whole
+  // physics steps while the horse is drawn blended between them, so a spring stepped by it had nothing on one frame and two
+  // steps on the next against a horse that had moved smoothly: the bard and the flesh jerked at the physics' rate.
+  const dt = frameDt !== null ? Math.max(0, Math.min(0.05, frameDt)) : view.lastTime === null ? 0 : Math.max(0, Math.min(0.05, time - view.lastTime));
   view.lastTime = time;
   const up = horse.state === 'up';
   const speed = Math.abs(horse.speed);

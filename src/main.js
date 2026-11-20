@@ -1138,7 +1138,7 @@ function snapshot(world) {
     // (A dormant man of a stage is not drawn and does not move: nothing to blend.)
     fighters: world.fighters.map((fighter) => (fighter.dormant ? null : { x: fighter.x.slice(), dir: fighter.weapon?.dir?.slice(), offDir: fighter.offWeapon?.dir?.slice() })),
     debris: world.debris.map((piece) => ({ x: piece.x?.slice(), q: piece.q?.slice() })),
-    horses: (world.horses ?? []).map((horse) => ({ at: horse.at.slice(), yaw: horse.yaw, stride: horse.stride })),
+    horses: (world.horses ?? []).map((horse) => ({ at: horse.at.slice(), yaw: horse.yaw, stride: horse.stride, speed: horse.speed, roll: horse.roll, bank: horse.bank })),
   };
 }
 
@@ -1168,13 +1168,16 @@ function blendWorld(world, before, share) {
   (world.horses ?? []).forEach((horse, index) => {
     const then = before.horses?.[index];
     if (!then) return;
-    kept.push({ horse, at: horse.at, yaw: horse.yaw, stride: horse.stride });
+    kept.push({ horse, at: horse.at, yaw: horse.yaw, stride: horse.stride, speed: horse.speed, roll: horse.roll, bank: horse.bank });
     horse.at = blend(then.at, horse.at, share);
     horse.yaw = then.yaw + Math.atan2(Math.sin(horse.yaw - then.yaw), Math.cos(horse.yaw - then.yaw)) * share;
     // The stride wraps round at 1: blended the short way.
     let stride = horse.stride - then.stride;
     stride -= Math.round(stride);
     horse.stride = (((then.stride + stride * share) % 1) + 1) % 1;
+    // His pace and his lean into a turn too (they set the gait's reach and the body's tilt the bard hangs from): else they
+    // stepped at the physics' rate under a horse drawn smoothly.
+    for (const key of ['speed', 'roll', 'bank']) if (Number.isFinite(then[key]) && Number.isFinite(horse[key])) horse[key] = then[key] + (horse[key] - then[key]) * share;
   });
   world.debris.forEach((piece, index) => {
     const then = before.debris[index];
@@ -1190,7 +1193,7 @@ function blendWorld(world, before, share) {
   return () => {
     for (const entry of kept) {
       if (entry.horse) {
-        Object.assign(entry.horse, { at: entry.at, yaw: entry.yaw, stride: entry.stride });
+        Object.assign(entry.horse, { at: entry.at, yaw: entry.yaw, stride: entry.stride, speed: entry.speed, roll: entry.roll, bank: entry.bank });
       } else if (entry.fighter) {
         entry.fighter.x.set(entry.x);
         if (entry.dir && entry.fighter.weapon) entry.fighter.weapon.dir = entry.dir;
@@ -1396,7 +1399,7 @@ function drawWorld(dt, drawIt = true) {
   // on no one else of a crowd (its cost kept to the one or two men looked at).
   const duel = world.fighters.length <= 2;
   for (const fighter of world.fighters) fighter.softSwing = Boolean(fighter.player) || duel;
-  for (const view of state.horseViews ?? []) updateHorseView(view, world);
+  for (const view of state.horseViews ?? []) updateHorseView(view, world, state.paused ? 0 : dt * state.speed * fightPace());
   const safe = safeMen(world, followed);
   selectCrowdDraw(scene, state.views, safe, world.stage ? STAGE_CROWD_VIEW : CROWD_VIEW);
   if (world.stage && stageView) {
@@ -4235,6 +4238,8 @@ const boxer = window.boxer = {
     return BODY_STYLE;
   },
   // Trailer capture: a rider and his horse put at (x, z) facing `yaw` (physics/mounted.js placeMounted): the joust's two lanes.
+  // Each horse's bard swing now (horseview.js BARD_SWAY: the skirt's offset in the horse's frame, m), or null (tests).
+  bardSwing: () => (state.horseViews ?? []).map((view) => view.swaying?.uniform.value.toArray() ?? null),
   placeRider: (id, x, z, yaw) => placeMounted(state.world.fighters[id], x, z, yaw),
   // Trailer capture: the menus shut over a fight started by a hook (fight() leaves them open).
   closeMenus: () => menus.close(),
