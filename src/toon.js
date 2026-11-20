@@ -7,6 +7,7 @@
 /* global THREE */
 import { activeLook } from './looks.js';
 import { outlineScale } from './looks/kit.js';
+import { swayCloth } from './clothsway.js';
 
 export const STYLE = {
   /** The shading style of the look in force: 'toon' or 'soft'. */
@@ -83,6 +84,8 @@ export function outlineFor(mesh, width = STYLE.outlineWidth) {
   material.customProgramCacheKey = () => `outline-${width.toFixed(5)}${inked ? '-ink' : ''}`;
   // (Kept on the material for what bakes a still body's outline into place: fallenview.js.)
   material.userData.outlineWidth = width;
+  // (A skinned mesh whose loose cloth or armour sways, clothsway.js: its ink sways with it, or the line stood off a moving hem.)
+  if (mesh.isSkinnedMesh && mesh.material?.userData?.clothSwing) swayCloth(material, mesh.material.userData.clothSwing);
   const outline = mesh.isSkinnedMesh ? new THREE.SkinnedMesh(mesh.geometry, material) : new THREE.Mesh(mesh.geometry, material);
   if (mesh.isSkinnedMesh) outline.bind(mesh.skeleton, mesh.bindMatrix);
   outline.userData.outline = true;

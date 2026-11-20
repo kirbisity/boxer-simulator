@@ -755,6 +755,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       // The mail coif under it, from inside its lower edge down over the neck to the shoulders (`coif`: its colour).
       if (head.coif) {
         const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.08 * r, 1.3 * r, 0.75 * r, 20, 1, true), surface(new THREE.Color(head.coif).getHex(), { roughness: 0.9 }));
+        coif.userData.hangs = 'mail';
         coif.material.side = THREE.DoubleSide;
         coif.position.y = (sides[0][0] - 0.22) * r;
         group.add(coif);
@@ -779,6 +780,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       slits.position.set(1.12 * r, 0.12 * r, 0);
       slits.userData.noOutline = true;
       const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.45 * r, 0.8 * r, 18, 1, true), steel);
+      aventail.userData.hangs = 'mail';
       aventail.position.y = -0.95 * r;
       group.add(skull, visor, slits, aventail);
       break;
@@ -865,6 +867,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         // A mail coif under it.
         if (head.coif) {
           const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.36 * r, 1.0 * r, 18, 1, true), metal(steel, 0x7d8087));
+          coif.userData.hangs = 'mail';
           coif.position.y = -0.95 * r;
           group.add(coif);
         }
@@ -886,6 +889,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       group.add(crown, brim, ridge);
       if (head.coif) {
         const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.08 * r, 1.4 * r, 1.1 * r, 18, 1, true), metal(steel, 0x7d8087));
+        coif.userData.hangs = 'mail';
         coif.position.y = -0.85 * r;
         group.add(coif);
       }
@@ -1313,6 +1317,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         group.add(plume);
       }
       const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.16 * r, 1.7 * r, 1.25 * r, 22, 3, true, Math.PI * 0.8, Math.PI * 1.4), metal(steel, head.coif ?? color));
+      aventail.userData.hangs = 'mail';
       aventail.material.side = THREE.DoubleSide;
       aventail.position.y = -0.52 * r;
       group.add(aventail);
@@ -1468,6 +1473,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       // detail tile) where the maps are drawn.
       // (Open at the face by `open`, rad, round the front.)
       const aventail = new THREE.Mesh(new THREE.CylinderGeometry(1.17 * r, 1.65 * r, form.aventail * r, 22, 2, true, Math.PI / 2 + form.open / 2, Math.PI * 2 - form.open), mailCloth);
+      aventail.userData.hangs = 'mail';
       aventail.position.y = (0.1 - form.aventail / 2) * r;
       if (DETAIL_MAPS.on && !lowDetail) wearTile(aventail, 'mail', { moulded: true });
       group.add(aventail);
@@ -1670,6 +1676,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
           linen.side = THREE.DoubleSide;
           const wrap = new THREE.Mesh(geometry, linen);
           wrap.name = 'helm-hood';
+          wrap.userData.hangs = 'cloth';
           group.add(wrap);
         }
         fitted = true;
@@ -1799,6 +1806,7 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         group.add(holder);
       }
       const aventail = new THREE.Mesh(new THREE.CylinderGeometry(SPANGENHELM.base * r, (SPANGENHELM.base + 0.3) * r, 0.9 * r, 20, 2, true, Math.PI * 0.8, Math.PI * 1.4), metal(steel, head.coif ?? color));
+      aventail.userData.hangs = 'mail';
       aventail.material.side = THREE.DoubleSide;
       aventail.position.y = (SPANGENHELM.brow - 0.45) * r;
       group.add(aventail);
@@ -1999,7 +2007,10 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
       if (material?.color && !(material.metalness > 0.5) && own.has(material.color.getHex())) clothPropMaterial(material, stuff);
     });
   }
+  // Its hanging pieces (a mail aventail or coif, a cloth hood: `userData.hangs`) swing after the head (hangingSwing): not in a crowd.
+  const hanging = lowDetail ? [] : hangingPieces(group);
   inkAll(group);
+  if (hanging.length) group.add(hangingSwing(group, hanging));
   // A helmet is a thin shell: drawn from both sides (toon.js doubleSided), so from under its brim or inside it is never a hole.
   doubleSided(group);
   // What swings (a tassel, a plume, feathers: chinahelmview.js), moved each frame by render.js.
@@ -2647,6 +2658,7 @@ function buildKnightHelm(group, head, r, iron) {
   // The great helm over the Templar's mail coif.
   if (head.coif && !form.parts.aventail) {
     const coif = new THREE.Mesh(new THREE.CylinderGeometry(1.0 * r, 1.36 * r, 0.8 * r, 18, 1, true), surface(new THREE.Color(head.coif).getHex(), { roughness: 0.9 }));
+    coif.userData.hangs = 'mail';
     coif.material.side = THREE.DoubleSide;
     coif.position.y = -1.72 * r;
     group.add(coif);
@@ -3202,6 +3214,117 @@ const MENPO_HAIR = {
   tuft: { count: 26, width: 0.085, y: -0.57, length: 0.11, stand: 0.03 },
   steps: 5, thick: 0.02,
 };
+
+/** A helmet's hanging pieces (`userData.hangs`: 'mail' or 'cloth'), their materials made their own to swing. */
+function hangingPieces(group) {
+  const pieces = [];
+  group.traverse((object) => {
+    if (object.isMesh && object.userData.hangs && !object.userData.outline) pieces.push(object);
+  });
+  return pieces;
+}
+
+/** Move a material's points by a hanging swing (HANG_SWAY): each by how far below its piece's top it hangs, times its give. */
+function hangMaterial(material, uniforms) {
+  const before = material.onBeforeCompile;
+  const baseKey = material.customProgramCacheKey?.() ?? '';
+  material.onBeforeCompile = (shader, renderer) => {
+    before?.call(material, shader, renderer);
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = `uniform vec3 uHangSwing;\nuniform vec3 uHangPiece;\n${shader.vertexShader}`.replace(
+      '#include <morphtarget_vertex>',
+      `transformed += uHangSwing * ( uHangPiece.z * pow( clamp( ( uHangPiece.x - position.y ) / uHangPiece.y, 0.0, 1.0 ), ${HANG_SWAY.curve.toFixed(2)} ) );
+#include <morphtarget_vertex>`,
+    );
+  };
+  material.customProgramCacheKey = () => `${baseKey}|hang`;
+  material.needsUpdate = true;
+}
+
+/**
+ * The hanging pieces of a helmet (hangingPieces) swinging after the head, as the Iron Pagoda's aventail does (the user's call,
+ * 2026-11-20: every flexible armour): a point on a damped spring behind the helmet (HANG_SWAY `hz`, `damping`), hanging
+ * `trail` s of its speed behind, eased into `reach` m; each piece moved by how far below its own top a point hangs (none at
+ * its top, where it is fixed, all at its foot), times its give (`give`: mail, or a cloth hood, freer). Their ink moves with
+ * them. Only on a man who has the soft swing now (main.js softSwing), else at rest. Returns the holder carrying the swing.
+ */
+function hangingSwing(group, pieces) {
+  const spec = HANG_SWAY;
+  const swing = { value: new THREE.Vector3() };
+  for (const piece of pieces) {
+    piece.geometry.computeBoundingBox();
+    const box = piece.geometry.boundingBox;
+    const uniforms = { uHangSwing: swing, uHangPiece: { value: new THREE.Vector3(box.max.y, Math.max(1e-4, box.max.y - box.min.y), spec.give[piece.userData.hangs] ?? 1) } };
+    piece.material = piece.material.clone();
+    hangMaterial(piece.material, uniforms);
+    for (const child of piece.children) if (child.userData.outline && child.material) {
+      child.material = child.material.clone();
+      hangMaterial(child.material, uniforms);
+    }
+  }
+  const holder = new THREE.Object3D();
+  holder.name = 'hanging-swing';
+  let at = null;
+  let was = [0, 0, 0];
+  const speed = [0, 0, 0];
+  const pace = [0, 0, 0];
+  const world = new THREE.Vector3();
+  const turn = new THREE.Quaternion();
+  holder.userData.swing = {
+    angle: 0,
+    soft: true,
+    update(dt, hitAt = null, time = 0, soft = true) {
+      if (!soft || !group.parent) {
+        at = null;
+        swing.value.set(0, 0, 0);
+        return;
+      }
+      if (!(dt > 0)) return;
+      group.updateWorldMatrix(true, false);
+      const target = group.getWorldPosition(world).toArray();
+      const moved = at ? Math.hypot(target[0] - was[0], target[1] - was[1], target[2] - was[2]) : Infinity;
+      if (!at || moved > spec.jump) {
+        at = target.slice();
+        was = target.slice();
+        speed.fill(0);
+        pace.fill(0);
+        swing.value.set(0, 0, 0);
+        return;
+      }
+      const omega = Math.PI * 2 * spec.hz;
+      const steps = Math.max(1, Math.ceil(dt / (1 / 120)));
+      const h = dt / steps;
+      const off = [0, 0, 0];
+      for (let axis = 0; axis < 3; axis += 1) {
+        const now = (target[axis] - was[axis]) / dt;
+        pace[axis] += (now - pace[axis]) * Math.min(1, dt / 0.08);
+        for (let step = 1; step <= steps; step += 1) {
+          const goal = was[axis] + ((target[axis] - was[axis]) * step) / steps;
+          speed[axis] += (omega * omega * (goal - at[axis]) - 2 * spec.damping * omega * (speed[axis] - pace[axis])) * h;
+          at[axis] += speed[axis] * h;
+        }
+        was[axis] = target[axis];
+        off[axis] = at[axis] - target[axis] - pace[axis] * spec.trail;
+      }
+      // Eased into its reach, the spring held back at twice it.
+      const far = Math.hypot(...off);
+      if (far > 0) {
+        if (far > 2 * spec.reach) for (let axis = 0; axis < 3; axis += 1) at[axis] -= off[axis] * (1 - (2 * spec.reach) / far);
+        const drawn = spec.reach * Math.tanh(Math.min(far, 2 * spec.reach) / spec.reach);
+        for (let axis = 0; axis < 3; axis += 1) off[axis] *= drawn / far;
+      }
+      // Into the helmet's own axes (its turn and scale).
+      group.getWorldQuaternion(turn).invert();
+      const scale = group.getWorldScale(new THREE.Vector3());
+      swing.value.set(...off).applyQuaternion(turn).divide(scale);
+    },
+  };
+  return holder;
+}
+
+// The hanging pieces' swing (hangingSwing): as the Iron Pagoda's aventail (PAGODA_SWAY) but eased into its reach; `give` of
+// it by what the piece is (a cloth hood lighter than mail); `curve`: how the share grows down the piece.
+const HANG_SWAY = { hz: 1.5, damping: 0.28, trail: 0.02, reach: 0.06, jump: 0.7, curve: 1.3, give: { mail: 1, cloth: 1.4 } };
 
 // The gorget's (nodowa's) middle under a war mask, head radii: hanging from the mask's foot under the chin.
 const MASK_THROAT_Y = -1.5;

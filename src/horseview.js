@@ -58,7 +58,7 @@ export const BARD_SWAY = {
   // barrel's top), so the stride's rock, pitch and bob swing it as a pendulum, not only the horse's pace and turns (followed at
   // the frame's origin, under the barrel, it hardly moved as the body rocked: rigid from behind, the user's call, 2026-11-18).
   // (Softer, as hair, the user's call, 2026-11-20: was hz 1.2, reach 0.16, one spring, no ripple.)
-  kinds: ['lamellar'], hz: 0.95, damping: 0.2, trail: 0.02, reach: 0.2, lift: 0.7, jump: 0.7, top: 0.8, hem: 0.42, curve: 1.3,
+  kinds: ['lamellar', 'brigandine', 'mingFront'], hz: 0.95, damping: 0.2, trail: 0.02, reach: 0.2, lift: 0.7, jump: 0.7, top: 0.8, hem: 0.42, curve: 1.3,
   // `chain`: the hem on a second spring following the first (its own `hz`, `damping`, at most `reach` m off the horse), the
   // skirt between the two by how far down it is: the hem lags the upper skirt as a lock of hair lags the head. `ripple`: a wave
   // run across the plates (`waves` per m along the horse and round it, `hz`), `amp` m at the hem at full stir, the stir the

@@ -12,7 +12,7 @@ import { relax, skinWeights, skinWeightsSteps } from './bodymesh.js';
 import { vec } from './pose.js';
 import { BONE, bindPoints, boneFrames } from './rig.js';
 import { factionOf, glovedFists, outfitOf, RAGS, ragHemTorn, ragSleeveTorn, ragTear, ragTorn } from './outfits.js';
-import { ARMOUR_EDGES, ARMOUR_TILES, armourTileOf, clothMaterialOf, clothUvAt, DETAIL_ARMOUR, DETAIL_MAPS, isLacedTile, mailUv, measureRings, pieceMaterial, plateUvAt, stripUv, tileSize, tileUv } from './detailmaps.js';
+import { ARMOUR_EDGES, ARMOUR_TILES, armourTileOf, clothMaterialOf, clothUvAt, DETAIL_ARMOUR, DETAIL_MAPS, detailKindOf, isLacedTile, mailUv, measureRings, pieceMaterial, plateUvAt, stripUv, tileSize, tileUv } from './detailmaps.js';
 import { detailUv, FLAT_UV } from './skindetail.js';
 import { SCULPT, SCULPT_TRUNK, limbShapes, sculptProfile, neckShape, sculptCoverShare, sculptTraits, trunkProfiles, trunkShapes } from './sculpt.js';
 import { SLOSH_BONES, sloshFigures, sloshWeights } from './fatslosh.js';
@@ -303,7 +303,14 @@ export const LOFT = {
   // Loose cloth (looseness): cloth lying on the body moves with it, cloth standing `from` m off the skin begins to hang free
   // and at `full` m is wholly loose (a skirt's hem, a hanging sleeve, a trouser leg of hakama): what the air and his own
   // movement then swing (clothsway.js). `cell` (m): the grid the skin's points are sorted into for the search.
-  sway: { from: 0.022, full: 0.12, cell: 0.13 },
+  // `lying`: the trace a garment's cloth lying on the body is marked by (clothsway.js reads it as a floor in its soft swing).
+  sway: { from: 0.022, full: 0.12, cell: 0.13, lying: 0.001 },
+  // Armour that gives (the user's call, 2026-11-20: as the Iron Pagoda's bard, every flexible armour, men and horses alike): a
+  // piece wearing one of these tiles hangs as loose as cloth would standing as far off the skin, times its give (mail freest,
+  // laced lamellae and kozane a little stiffer, scales stiffer, a coat of plates in cloth stiffer still; plate, a solid dō, a
+  // krug's discs and a segmentata's bands not at all). Its point is marked armour (negative: clothsway.js gives it the
+  // swing and the ripple, little of the wind). Drawn with the detail maps only (the tile is read off the point's coordinates).
+  armourGive: { mail: 0.95, lamellae: 0.8, kozane: 0.8, sugake: 0.8, scale: 0.7, ironScale: 0.65, brigandine: 0.6, euroBrigandine: 0.5, bifu: 0.3 },
   // A board hung beside a limb (boardOn: a sode, a coat's shoulder flap): `wide` (m) across, its edges bowed `bow` (m) in
   // towards the limb, `columns` faces across; laced lames each stand `tilt` (m) out at the head over the foot of the lame
   // above, `row` (m) tall where no laced tile gives the height.
@@ -399,6 +406,8 @@ function patchUv(mesh, rings, role, index, place, angle) {
   if (!ringMeasures.has(rings)) ringMeasures.set(rings, measureRings(rings, 1));
   mesh.uvs.set(index, plateUvAt(ringMeasures.get(rings), place, angle, mesh.patchTile ?? 'plate'));
 }
+// A garment's cloth (roles): a shirt, trousers, a coat's cloth; not its leather, lacing or fittings (looseness `lying`).
+const FABRIC_ROLES = new Set(['top', 'bottom', 'cloth', 'cloth2']);
 // A modern kit's moulded shell and pads (roles), which take its shell tile (`mesh.shellTile`) as steel takes its steel tile.
 const SHELL_ROLES = new Set(['armor', 'pad']);
 
@@ -480,10 +489,13 @@ function bodyAt(mesh, ring, angle) {
 
 /**
  * How loose each point of the cloth hangs (0 lying on the body .. 1 free; null when none does): by how far it stands off the
- * nearest skin (LOFT.sway). Skin, steel, shells and every stiff body's points are 0: nothing rigid sways.
+ * nearest skin (LOFT.sway). Skin, steel, shells and every stiff body's points are 0: nothing rigid sways; but a flexible
+ * armour's points (by their tile, `uvs`: LOFT.armourGive) hang as cloth would times their give, marked negative.
  */
-function looseness(positions, regions, stiff) {
+function looseness(positions, regions, stiff, uvs = null) {
   const { from, full, cell } = LOFT.sway;
+  // A flexible armour's give at a point (LOFT.armourGive), from the tile its coordinates are in; 0 elsewhere.
+  const giveAt = (vertex) => (uvs ? LOFT.armourGive[detailKindOf(uvs[vertex * 2])] ?? 0 : 0);
   const count = regions.length;
   const key = (x, y, z) => `${x},${y},${z}`;
   const at = (vertex, axis) => Math.floor(positions[vertex * 3 + axis] / cell);
@@ -500,7 +512,8 @@ function looseness(positions, regions, stiff) {
   let any = false;
   for (let vertex = 0; vertex < count; vertex += 1) {
     const role = regions[vertex];
-    if (role === 'skin' || stiff[vertex] || STEEL_ROLES.has(role) || SHELL_ROLES.has(role)) continue;
+    const give = role === 'skin' ? 0 : giveAt(vertex);
+    if (role === 'skin' || (!give && (stiff[vertex] || STEEL_ROLES.has(role) || SHELL_ROLES.has(role)))) continue;
     const [x, y, z] = [positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2]];
     const [cx, cy, cz] = [at(vertex, 0), at(vertex, 1), at(vertex, 2)];
     let nearest = full * full;
@@ -514,8 +527,11 @@ function looseness(positions, regions, stiff) {
       }
     }
     const share = Math.min(1, Math.max(0, (Math.sqrt(nearest) - from) / (full - from)));
-    sway[vertex] = share * share * (3 - 2 * share);
-    if (sway[vertex] > 0) any = true;
+    const loose = share * share * (3 - 2 * share);
+    // (Armour negative: clothsway.js. A garment's cloth lying on the body is marked by a trace, LOFT.sway.lying, so the soft
+    // swing of the man played can stir it too: clothsway.js `soft`.)
+    sway[vertex] = give ? -loose * give : loose > 0 ? loose : FABRIC_ROLES.has(role) ? LOFT.sway.lying : 0;
+    if (sway[vertex] !== 0) any = true;
   }
   return any ? sway : null;
 }
@@ -5233,7 +5249,7 @@ export function* buildLoftBodySteps(body, { faceted = false, lowDetail = false, 
     for (let vertex = 0; vertex < positionArray.length / 3; vertex += 1) uvs.set(mesh.uvs.get(vertex) ?? FLAT_UV, vertex * 2);
   }
   // How loose the cloth hangs, point by point (measured while the skin under it is still here); not on a crowd's body.
-  let sway = lowDetail ? null : looseness(positionArray, colors, stiff);
+  let sway = lowDetail ? null : looseness(positionArray, colors, stiff, uvs);
   // Under armour (`hideCovered`): the skin the pieces cover is left out (every triangle of it), and the points no triangle uses.
   let hidden = 0;
   if (hideCovered && covered) {

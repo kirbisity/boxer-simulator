@@ -3351,6 +3351,8 @@ export function updateFighterView(fighterView, dt, time) {
     fighterView.skeleton[index].matrix.fromArray(matrix);
     fighterView.skeleton[index].matrixWorldNeedsUpdate = true;
   });
+  // (The soft swing where the man has it: main.js softSwing, the man played and the two of a duel; clothsway.js `soft`.)
+  if (fighterView.bones.swing) fighterView.bones.swing.softWanted = fighter.softSwing ? 1 : 0;
   fighterView.bones.swing?.update(frames, dt);
   // Bones whose part was cut off: what skin is left on them shrinks into the joint.
   for (const index of fighterView.severedBones ?? []) {
