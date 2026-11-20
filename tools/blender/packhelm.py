@@ -27,9 +27,13 @@ SHEETS = {
     'formKettleRidged': {'size': 512}, 'formKettleBurgundian': {'size': 512, 'cut': True},
     'formSalletGerman': {'size': 512, 'cut': True}, 'formCabassetSpanish': {'size': 512},
     'formTurbanTurkman': {'size': 512, 'cut': True},
+    # The Kipchak helmet's bowl (helmsheets.py kipchak_bowl_atlas).
+    'formKipchakBowl': {'size': 512},
     'maskMenpo': {'size': 512, 'alpha': True},
     # The war masks of China, the steppe and the sultanates (helmsheets.py WORLD_MASKS): quick, small sheets.
-    **{name: {'size': 256, 'alpha': True} for name in ('maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskVentail')},
+    **{name: {'size': 256, 'alpha': True} for name in ('maskTiemian', 'maskShoumian', 'maskHorde', 'maskVentail')},
+    # The steppe man's iron face, modelled in full (helmsheets.py kipchak_atlas).
+    'maskKipchak': {'size': 512, 'alpha': True},
 }
 QUALITY = {'albedo': 84, 'normal': 86, 'orm': 78}
 AO_IN_ALBEDO = 0.7

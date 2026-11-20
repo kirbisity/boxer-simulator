@@ -17,7 +17,7 @@ import { CLOTH_GARMENTS, clothMaterialOf, DETAIL_MAPS, HELMET_PART_TILES, HELMET
 import { clothPropMaterial, wearTile } from './detailtex.js';
 import { HELM_STYLE } from './helmstyle.js';
 import { helmMapSheet, helmMapsReady, helmMaterial } from './helmmaps.js';
-import { buildWarMask } from './menpo.js';
+import { buildWarMask, hairStrands, maskPointAt } from './menpo.js';
 import { buildHanHood, buildMingDesignHelm, buildQingHood, buildTassel } from './chinahelmview.js';
 import { HONGYING_MOUNTS, MING_ELITE_HOOD, MING_OFFICER_HELMS, mingHoodGrid, SWING, swingStep, TASSELS } from './chinahelms.js';
 import { designFormOf, formGrid, formPoint, headRadiusAt, HELM_SPAN, KABUTO_FORM, maskOnFace, MASK_FITS } from './helmforms.js';
@@ -1418,7 +1418,10 @@ export function buildHeadgear(body, head, colors, steel, cornerHex, { lowDetail 
         place.setXYZ(index, x * swell, y, z * swell);
       }
       bowlGeometry.computeVertexNormals();
-      const bowl = new THREE.Mesh(bowlGeometry, iron);
+      // The Kipchak bowl wears its sheet (helmsheets.py kipchak_bowl_atlas: its hammer pits, the teardrop panels, the band
+      // and its rivets) where the maps are drawn.
+      const bowlSheet = head.bowl === 'kipchak' && !lowDetail && helmMapsReady() ? helmMaterial(iron, 'formKipchakBowl') : null;
+      const bowl = new THREE.Mesh(bowlGeometry, bowlSheet ?? iron);
       bowl.position.y = 0.06 * r;
       const gilt = metal(steel, head.gold ?? 0xd6a743);
       const band = new THREE.Mesh(new THREE.TorusGeometry(1.19 * r, 0.07 * r, 6, 24), gilt);
@@ -3100,7 +3103,8 @@ function buildKabuto(group, head, r, steel, color, lowDetail = false) {
     group.add(hagumaHair(r, head.plume, outline.at(-1)[0], [[-0.05 - (head.tiers ?? 4) * 0.24, foot.x / r + 0.2 + flare], [outline[0][0] - 0.02, outline[0][1] + (build.skull?.brim ?? 0.1)], ...outline], lowDetail));
   }
   // The menpō (menpo.js: its form and maps, set on the face by helmforms.js MASK_FITS) in the kit's finish: russet iron
-  // (`mask: 'iron'`), black lacquer (`black`), or the helmet's own colour (`red`); red lacquer inside.
+  // (`mask: 'iron'`), black lacquer (`black`), red lacquer (`vermilion`), or the helmet's own colour (`red`); red lacquer
+  // inside; a horsehair moustache where the kit has one (`maskHair`).
   if (head.mask) samuraiMask(group, head, r, steel, color, lace);
 }
 
@@ -3110,18 +3114,14 @@ function buildKabuto(group, head, r, steel, color, lowDetail = false) {
  * one above, laced in the kit's lace (the laced tile: `helmPart`), a cord along the foot of each.
  */
 function samuraiMask(group, head, r, steel, color, lace) {
-  const tint = head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : MENPO.black;
+  const tint = head.mask === 'red' ? color : MENPO[head.mask] ?? MENPO.black;
   const plain = metal(steel, tint).clone();
   plain.side = THREE.DoubleSide;
   buildWarMask(group, 'menpo', r, tint, steel.envMap, { plain });
-  const fit = MASK_FITS.menpo;
   const hookIron = metal(steel, MENPO.hook);
   const [hookX, hookY, hookOut] = MENPO.hookAt;
-  const polar = Math.acos(hookY / fit.R);
-  const across = hookX / (fit.R * Math.sin(polar));
   for (const side of [1, -1]) {
-    const radius = fit.R + hookOut;
-    const at = maskOnFace(fit, [radius * Math.sin(polar) * Math.cos(across), radius * Math.cos(polar), side * radius * Math.sin(polar) * Math.sin(across)]);
+    const at = maskPointAt('menpo', side * hookX, hookY, hookOut);
     const hook = new THREE.Group();
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.016 * r, 0.02 * r, 0.09 * r, 6), hookIron);
     post.rotation.z = -Math.PI / 2;
@@ -3133,6 +3133,8 @@ function samuraiMask(group, head, r, steel, color, lace) {
     hook.rotation.y = -Math.atan2(at[2], at[0]);
     group.add(hook);
   }
+  // A horsehair moustache and chin tuft set into the mask (`maskHair`, its colour), as the dressier menpō had.
+  if (head.maskHair) group.add(menpoHair(head.maskHair, r));
   const lameLacquer = metal(steel, MENPO.throat);
   const [height, step, top, widen, flare] = MENPO.lames;
   for (let tier = 0; tier < MENPO.lameCount; tier += 1) {
@@ -3151,15 +3153,63 @@ function samuraiMask(group, head, r, steel, color, lace) {
   }
 }
 
+/**
+ * A menpō's horsehair (MENPO_HAIR): the moustache swept out from under the nose past the mouth's corners, and the tuft on
+ * the chin, in `colour`; strands placed on the mask's own surface (menpo.js maskPointAt), the same every time.
+ */
+function menpoHair(colour, r) {
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+  const strands = [];
+  const { moustache, tuft, steps } = MENPO_HAIR;
+  for (const side of [1, -1]) {
+    for (let k = 0; k < moustache.count; k += 1) {
+      const rootX = moustache.root[0] + random() * (moustache.root[1] - moustache.root[0]);
+      const rootY = moustache.y + (random() - 0.5) * 0.03;
+      const reach = moustache.reach * (0.65 + 0.45 * random());
+      const droop = moustache.droop * (0.6 + 0.8 * random());
+      strands.push(Array.from({ length: steps }, (_, step) => {
+        const t = step / (steps - 1);
+        const at = maskPointAt('menpo', side * (rootX + reach * t), rootY - droop * t * t - 0.02 * t, moustache.stand * (0.6 + t) + 0.01 * random());
+        return new THREE.Vector3(...at).multiplyScalar(r);
+      }));
+    }
+  }
+  for (let k = 0; k < tuft.count; k += 1) {
+    const rootX = (random() - 0.5) * 2 * tuft.width;
+    const length = tuft.length * (0.7 + 0.4 * random());
+    strands.push(Array.from({ length: steps }, (_, step) => {
+      const t = step / (steps - 1);
+      const at = maskPointAt('menpo', rootX * (1 - 0.3 * t), tuft.y - length * t, tuft.stand * (0.6 + t));
+      return new THREE.Vector3(...at).multiplyScalar(r);
+    }));
+  }
+  const hair = new THREE.Mesh(hairStrands(strands, MENPO_HAIR.thick * r), surface(colour, { roughness: 0.9 }));
+  hair.userData.noOutline = true;
+  return hair;
+}
+
+// The menpō's horsehair, on its sheet (helmsheets.py MENPO; r): the moustache's strands `count` a side from the upper lip
+// (`root` X range at `y`), reaching `reach` out and drooping `droop`, standing `stand` off the iron; the chin tuft's
+// `count` strands `width` either side of the middle at `y`, `length` long; each strand `steps` points, `thick` at the root.
+const MENPO_HAIR = {
+  moustache: { count: 60, root: [0.02, 0.22], y: -0.255, reach: 0.44, droop: 0.1, stand: 0.04 },
+  tuft: { count: 26, width: 0.085, y: -0.57, length: 0.11, stand: 0.03 },
+  steps: 5, thick: 0.02,
+};
+
 // The gorget's (nodowa's) middle under a war mask, head radii: hanging from the mask's foot under the chin.
 const MASK_THROAT_Y = -1.5;
 
 // The menpō's finishes and fittings (samuraiMask). `black`: black-lacquered iron, drawn a little lighter than black so the
 // mask's relief reads; `iron`: russet iron (sabi-nuri: the bare iron rusted brown and lacquered clear, the commonest
-// finish); `throat` the yodarekake's black lacquer; `hook` the cord hooks' iron, `hookAt` (X, Y on the mask's sheet, how
+// finish); `vermilion` red lacquer (shu-urushi); `throat` the yodarekake's black lacquer; `hook` the cord hooks' iron, `hookAt` (X, Y on the mask's sheet, how
 // far out) where they stand on the cheek wings; `throatY` the first lame's middle (head radii); `lameCount` lames of `lames` [height, step down, top radius, each lame's
 // widening, its flare to its foot] (head radii).
-const MENPO = { black: 0x2c2b2f, iron: 0x47372d, throat: 0x1b1a1d, hook: 0x2a2624, hookAt: [1.08, -0.42, 0.08], throatY: -1.4, lameCount: 4, lames: [0.15, 0.125, 0.7, 0.065, 0.07] };
+const MENPO = { black: 0x2c2b2f, iron: 0x47372d, vermilion: 0x8a2c1c, throat: 0x1b1a1d, hook: 0x2a2624, hookAt: [1.08, -0.42, 0.08], throatY: -1.4, lameCount: 4, lames: [0.15, 0.125, 0.7, 0.065, 0.07] };
 
 // The metal each of the other war masks is drawn in (menpo.js): of the helmet's steel, bronze, its gilt, or its mail.
 const WORLD_MASK_METAL = {
@@ -3178,7 +3228,9 @@ function worldMask(group, head, r, steel, color) {
   const tintOf = WORLD_MASK_METAL[head.maskDesign];
   if (!tintOf || HELM_STYLE.masks === 'now' || !helmMapsReady()) return false;
   const span = HELM_SPAN[head.kind] ?? null;
-  if (!buildWarMask(group, head.maskDesign, r, tintOf(head, color), steel.envMap, { span, bare: head.maskDesign === 'menpo' })) return false;
+  // Drawn in the helmet's own steel (its colour the mask's metal: steel, bronze or gilt), to match the rest of the set.
+  const tint = tintOf(head, color);
+  if (!buildWarMask(group, head.maskDesign, r, tint, steel.envMap, { span, steel: metal(steel, tint) })) return false;
   const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), metal(steel, head.mail ?? head.coif ?? color).clone());
   throat.material.side = THREE.DoubleSide;
   throat.position.y = MASK_THROAT_Y * r;

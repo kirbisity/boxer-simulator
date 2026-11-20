@@ -237,6 +237,7 @@ WEAR = {
     'formSecutor': ('steel', (0.4, 0.4)),
     'formScissor': ('steel', (0.4, 0.4)),
     'formTurbanTurkman': ('steel', (0.4, 0.4)),
+    'formKipchakBowl': ('steel', (0.9, 0.3)),
     'maskTiemian': ('steel', (0.2, 0.2)),
     'maskShoumian': ('steel', (0.2, 0.2)),
     'maskKipchak': ('steel', (0.2, 0.2)),

@@ -495,9 +495,14 @@ function dressedFighters() {
     'mask-black': masked('samuraiTosei', 0),
     'mask-red': masked('samuraiTosei', 1),
     'mask-oni': masked('samuraiTosei', 5),
+    'mask-daimyo': masked('samurai', 3),
+    'mask-silver': masked('samuraiTosei', 3),
     'mask-blackoni': masked('samuraiTosei', 2),
     'mask-oyoroi': masked('samurai', 4),
     'mask-ironman': masked('mingElite', 4),
+    'cuman-iron': masked('cumanHeavy', 0),
+    'cuman-dark': masked('cumanHeavy', 1),
+    'kheshig-face': masked('kheshig', 0),
     'ming-blackgold': masked('mingElite', 2),
   };
   return query.get('fighter').split(',').map((key) => {

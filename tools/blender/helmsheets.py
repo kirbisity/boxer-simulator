@@ -663,9 +663,160 @@ def world_mask_atlas(name):
     return atlas
 
 
+
+# The steppe man's iron face (maskKipchak: the Cuman's, and the khan's guard's), modelled as the menpō is: from the
+# surviving Kipchak masks (the Lipovets mask; references in src/helmmaps.js) and the hammered steel faces of the type:
+# brows arched over each eye and joined over the nose, the top edge following them; almond eyes cut through under heavy
+# lids; a long straight nose, flared at the wings; hollow cheeks under the cheekbones; the moustache standing out in relief,
+# swept past the mouth's corners and curled up at its ends, its hairs incised; closed lips; a rounded chin; the whole
+# raised under the hammer, its pits left in it. In the sheet's measures (r; X across, Y up as drawn on the FULL sphere,
+# set on the face by helmforms.js MASK_FITS.kipchak: Y 0.04 the eyes, -0.49 the mouth, -1.0 the chin's foot).
+KIPCHAK = {
+    'outline': [(-0.05, 0.5), (0.0, 0.5), (0.1, 0.57), (0.26, 0.61), (0.44, 0.58), (0.7, 0.55), (0.95, 0.5), (1.13, 0.36),
+                (1.21, 0.05), (1.2, -0.38), (1.1, -0.68), (0.82, -0.9), (0.42, -1.0), (0.0, -1.03), (-0.05, -1.03)],
+    'brow': [(0.0, 0.33), (0.08, 0.37), (0.2, 0.4), (0.34, 0.37), (0.46, 0.28), (0.53, 0.17)],
+    'eye': (0.235, 0.06, 0.125, 0.047, -0.1),
+    'nose': [(0.36, 0.05, 0.05), (0.2, 0.1, 0.055), (0.0, 0.15, 0.065), (-0.17, 0.21, 0.08), (-0.24, 0.13, 0.11), (-0.28, 0.0, 0.1)],
+    'moustache': [(0.0, -0.34), (0.08, -0.35), (0.18, -0.39), (0.28, -0.47), (0.36, -0.5), (0.43, -0.46), (0.45, -0.39)],
+    'mouth': -0.5,
+    'chin': ((0.0, -0.76), 0.22, 0.18, 0.06),
+}
+
+
+def kipchak_atlas(name):
+    spec = WORLD_MASKS[name]
+    atlas = Atlas(name, base=METAL, rough=0.38, metal=1.0)
+    region = atlas.region((0, 0, 1, 1), mask_surface(spec), spec['az'] * spec['R'])
+    X, Y = region.s['X'], region.s['Y']
+    region.paint(np.ones(X.shape), mask=1.0)
+    k = KIPCHAK
+    outline, signed = outline_field(X, Y, k['outline'], 0.02)
+    relief = np.zeros(X.shape, np.float32)
+    # The face's planes: the brow forward, the cheekbones, the cheeks hollow beneath them, the chin.
+    relief += dome(ellipse(X, Y, 0.0, 0.0, 0.8, 1.0), 1.0) * 0.06
+    relief += dome(np.hypot(X - 0.42, (Y + 0.08) * 1.3), 0.22) * 0.045
+    relief -= dome(np.hypot(X - 0.42, (Y + 0.36) * 1.1), 0.2) * 0.035
+    (cx, cy), crx, cry, ch = k['chin']
+    relief += dome(ellipse(X, Y, cx, cy, crx, cry), 1.0) * ch
+    # The brows: one ridge arched over each eye, joined over the nose.
+    brow = seg_dist(X, Y, curve(k['brow'], 40))
+    relief += bead(brow, 0.07) * 0.06
+    # The eye sockets sunk, the lids round the almond cut-outs (the upper one heavier).
+    ex, ey, erx, ery, ea = k['eye']
+    eye = ellipse(X, Y, ex, ey, erx, ery, ea)
+    relief -= dome(ellipse(X, Y, ex, ey + 0.01, erx * 1.7, ery * 3.0, ea), 1.0) * 0.05
+    relief += bead(np.abs(eye - 1.25), 0.35) * (0.02 + 0.015 * (Y > ey))
+    # The nose: a long straight ridge, its wings flared.
+    ys = [p[0] for p in k['nose']][::-1]
+    height = np.interp(Y, ys, [p[1] for p in k['nose']][::-1]) * ((Y <= ys[-1]) & (Y >= ys[0]))
+    half = np.interp(Y, ys, [p[2] for p in k['nose']][::-1])
+    nose = height * np.clip(1 - (X / half) ** 2, 0, None) ** 1.1
+    nose = np.maximum(nose, dome(np.hypot(X - 0.075, (Y + 0.25) * 1.3), 0.08) * 0.1)
+    relief += nose
+    # The moustache standing out, and the lips under it.
+    moustache = seg_dist(X, Y, curve(k['moustache'], 40))
+    taper = np.clip(1 - X / 0.5, 0.35, 1)
+    m = bead(moustache, 0.055 * taper)
+    relief += m * 0.05
+    lips = np.abs(Y - k['mouth'] - 0.03 * (X / 0.16) ** 2)
+    relief += bead(lips, 0.05) * smooth((0.2 - X) / 0.04) * 0.02
+    coarse = mask_grid(atlas, region, relief, spec, MENPO_GRID, 0.03)
+    region.add(relief - coarse)
+    # The fine work: the moustache's hairs incised along it; the lips' parting; the nostrils; the eyes cut through.
+    along = np.arctan2(Y + 0.6, X + 0.1)
+    region.add(-(0.5 + 0.5 * np.cos(along * 260)) ** 4 * smooth(m * 3) * 0.004)
+    region.add(-bead(lips, 0.008) * smooth((0.16 - X) / 0.03) * 0.015)
+    region.paint(bead(lips, 0.006) * smooth((0.15 - X) / 0.03), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+    nostril = ellipse(X, Y, 0.06, -0.29, 0.032, 0.017, 0.3)
+    region.add(-smooth((1 - nostril) / 0.3) * 0.02)
+    region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+    region.add(bead(np.abs(eye - 1.04), 0.06) * 0.008)
+    region.paint(smooth((1.0 - eye) / 0.05), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+    region.paint(smooth((1.02 - eye) / 0.02), cut=0.0)
+    # Raised under the hammer: its pits all over, deeper than a polished plate's.
+    rng = np.random.default_rng(11)
+    pits = region.blur(rng.standard_normal(X.shape).astype(np.float32), 0.012)
+    pits /= pits.std() + 1e-9
+    region.add(-np.clip(pits, 0, None) ** 1.5 * 0.0012)
+    hammered(region, 0.0015, 0.06, seed=4)
+    # The holes for the laces and the hinge at the brow; the rolled edge; the outline cut.
+    for x, y in ((1.1, 0.3), (1.15, -0.1), (1.08, -0.55)):
+        hole = np.hypot(X - x, Y - y)
+        region.paint(smooth((0.016 - hole) / 0.005), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+        region.add(bead(np.abs(hole - 0.022), 0.008) * 0.006)
+    region.add(bead(np.abs(signed - 0.018), 0.018) * 0.012)
+    region.paint(1 - outline, cut=0.0)
+    h = region.view('h') / region.k
+    wear = smooth((h - region.blur(h, 0.035)) * 160) * region.view('mask')
+    region.paint(wear * 0.6, rgb=METAL + 0.08)
+    return atlas
+
+
+# The Kipchak helmet's bowl (wardrobe.js CHICHAK.kipchak: its profile and ten facets), its sheet laid as the lathe lays
+# its coordinates (u round from the back, the face at u 0.25; v up the profile point by point). From the surviving
+# Kipchak and Golden Horde bowls (references in src/helmmaps.js): raised under the hammer and left pitted all over; a
+# teardrop panel sunk in each facet but the front one (where the mask's hinge plate is), its point up; the brow band
+# below a scored line, a row of rivets round it for the lining and the aventail's leather.
+KIPCHAK_BOWL = {
+    'profile': [(1.2, 0), (1.21, 0.28), (1.13, 0.58), (0.94, 0.88), (0.7, 1.18), (0.47, 1.5), (0.28, 1.84), (0.14, 2.18), (0.05, 2.48), (0, 2.6)],
+    'sides': 10,
+    'teardrop': (1.42, 0.62, 0.15),
+    'band': 0.34,
+    'rivets': (0.16, 20),
+}
+
+
+def kipchak_bowl_atlas(name):
+    k = KIPCHAK_BOWL
+    profile = np.array(k['profile'], np.float32)
+    step = np.hypot(np.diff(profile[:, 0]), np.diff(profile[:, 1]))
+    arc = np.concatenate([[0], np.cumsum(step)])
+    length = float(arc[-1])
+
+    def to(x, y):
+        t = y * (len(profile) - 1)
+        radius = np.interp(t, np.arange(len(profile)), profile[:, 0])
+        along = np.interp(t, np.arange(len(profile)), arc)
+        angle = (x - 0.25) * 2 * PI
+        angle = (angle + PI) % (2 * PI) - PI
+        return {'X': angle * radius, 'Y': along, 'angle': angle, 'radius': radius}
+
+    atlas = Atlas(name, base=METAL, rough=0.34, metal=1.0)
+    region = atlas.region((0, 0, 1, 1), to, 2 * PI * 1.2)
+    angle, radius, Y = region.s['angle'], region.s['radius'], region.s['Y']
+    # The teardrops: one on each facet but the front one, measured across its facet.
+    facet = 2 * PI / k['sides']
+    centre = np.round((angle - facet / 2) / facet) * facet + facet / 2
+    front = np.abs(centre) < facet / 2
+    across = (angle - centre) * radius
+    ty, tall, wide = k['teardrop']
+    up = np.clip((Y - (ty - tall / 2)) / tall, 0, 1)
+    half = wide * np.sqrt(np.clip(np.sin(PI * up ** 0.7), 0, None)) * (Y > ty - tall / 2) * (Y < ty + tall / 2)
+    inside_drop = smooth((half - np.abs(across)) / 0.02) * (1 - front)
+    edge = bead(np.abs(np.abs(across) - half), 0.014) * (half > 0.01) * (1 - front)
+    region.add(-inside_drop * 0.012 - edge * 0.006)
+    region.paint(inside_drop * 0.35, mul=(0.86, 0.86, 0.87))
+    # The brow band under its scored line, and the rivets round it.
+    region.add(-bead(np.abs(Y - k['band']), 0.012) * 0.008)
+    ry, count = k['rivets']
+    pitch = 2 * PI / count
+    nearest = np.round(angle / pitch) * pitch
+    region.add(cap(np.hypot((angle - nearest) * radius, Y - ry), 0.035) * 0.02)
+    # Raised under the hammer: pitted all over, the pits a little darker.
+    rng = np.random.default_rng(21)
+    pits = region.blur(rng.standard_normal(region.x.shape).astype(np.float32), 0.014)
+    pits /= pits.std() + 1e-9
+    dents = np.clip(pits, 0, None) ** 1.5
+    region.add(-dents * 0.0016)
+    region.paint(smooth(dents * 0.6) * 0.5, mul=(0.82, 0.82, 0.83))
+    hammered(region, 0.002, 0.08, seed=9)
+    return atlas
+
 BUILDERS = {
     'maskMenpo': lambda: mask_atlas('maskMenpo'),
     **{name: (lambda name=name: world_mask_atlas(name)) for name in WORLD_MASKS},
+    'maskKipchak': lambda: kipchak_atlas('maskKipchak'),
+    'formKipchakBowl': lambda: kipchak_bowl_atlas('formKipchakBowl'),
 }
 
 

@@ -145,17 +145,15 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
 /**
  * A war mask's lacquer wearing its sheet: the lacquer (the albedo's alpha) drawn in `tint`, the rest (a nostril, the
  * mouth's dark rim, gilt) in the sheet's own colours; the outline and openings cut by the normal map's alpha; both sides
- * drawn, the inside in red lacquer (`inside`: a menpō's, as most were finished behind). `bare`: lacquered sheet worn as
- * bare metal (MASK_BARE_METAL), polished.
+ * drawn, the inside in red lacquer (`inside`: a menpō's, as most were finished behind).
  */
-export function maskMaterial(name, tint, envMap, inside = MASK_INSIDE, bare = false) {
+export function maskMaterial(name, tint, envMap, inside = MASK_INSIDE) {
   const sheet = helmMapSheet(name);
   if (!sheet) return null;
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff, map: sheet.map, normalMap: sheet.normalMap, roughnessMap: sheet.ormMap, metalnessMap: sheet.ormMap,
     roughness: 1, metalness: 1, envMap: envMap ?? null, envMapIntensity: 1.1, side: THREE.DoubleSide,
   });
-  if (bare) Object.assign(material, { metalnessMap: null, metalness: MASK_BARE_METAL });
   const uniforms = { uMaskTint: { value: new THREE.Color(tint) }, uMaskInside: { value: new THREE.Color(inside) } };
   material.userData.crowdColor = new THREE.Color(tint).getHex();
   material.onBeforeCompile = (shader) => {
@@ -172,13 +170,41 @@ export function maskMaterial(name, tint, envMap, inside = MASK_INSIDE, bare = fa
     );
   };
   material.customProgramCacheKey = () => 'war-mask';
-  material.userData.bareMask = bare;
   return material;
 }
 
-// The red lacquer inside a war mask; a bare-metal mask's metalness.
+/**
+ * A metal war mask wearing its sheet in the helmet's own steel (`base`, the helmet's material, its colour set): the same
+ * colour and reflections as the helmet it hangs from, the polish its sheet's (as a helmet's own sheet: helmMaterial), its relief (normal map) and its dark openings and
+ * worn edges (the albedo) over it; the outline and openings cut by the normal map's alpha; both sides drawn, the inside
+ * the same steel, darker.
+ */
+export function maskSteelMaterial(name, base) {
+  const sheet = helmMapSheet(name);
+  if (!sheet) return null;
+  const material = base.clone();
+  Object.assign(material, { vertexColors: false, map: sheet.map, normalMap: sheet.normalMap, roughnessMap: sheet.ormMap, roughness: 1, side: THREE.DoubleSide });
+  material.normalScale = new THREE.Vector2(MASK_STEEL_RELIEF, MASK_STEEL_RELIEF);
+  material.userData = { ...material.userData, crowdColor: base.color.getHex() };
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <map_fragment>',
+      `#include <map_fragment>
+#if defined( USE_MAP ) && defined( USE_NORMALMAP )
+  if ( texture2D( normalMap, vUv ).a < 0.5 ) discard;
+  if ( !gl_FrontFacing ) diffuseColor.rgb *= 0.45;
+#endif`,
+    );
+  };
+  material.customProgramCacheKey = () => 'war-mask-steel';
+  return material;
+}
+
+// How strongly a steel mask's sheet relief shows in the helmet's steel.
+const MASK_STEEL_RELIEF = 0.8;
+
+// The red lacquer inside a war mask.
 const MASK_INSIDE = 0x8a2214;
-const MASK_BARE_METAL = 0.85;
 
 /** Triangles drawn for a group (outlines included), for the comparison. */
 export function triangleCount(object) {
