@@ -58,7 +58,7 @@ import { buildStormPlace, stormRelease } from './levelmode/storm.js';
 import { showWorks, updateWorksView } from './worksview.js';
 import { worksOf } from './physics/fieldworks.js';
 import { buildCanalTown, CANAL_TOWN_LIGHT } from './places/canaltown.js';
-import { buildPyongyang, PYONGYANG_LIGHT } from './places/pyongyang.js';
+import { buildPyongyang, buildPyongyangTown, PYONGYANG_LIGHT } from './places/pyongyang.js';
 // (The kit's door to the open air: townkit/air.js puts env/'s registration where the kit's places find it.)
 import './townkit/air.js';
 
@@ -151,7 +151,7 @@ export function setPlace(view, place, arena, weather = null) {
   view.floor = floor;
   if (!swapped && place === view.place && weather === (view.weather ?? null)) return;
   view.weatherBrought = brought;
-  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, canaltown: buildCanalTown, pyongyang: buildPyongyang, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
+  const builders = { ring: buildRing, subway: buildSubway, colosseum: buildColosseum, meadow: buildMeadow, stadium: buildStadium, town: buildTown, port: buildPort, sengoku: buildSengoku, canaltown: buildCanalTown, pyongyang: buildPyongyang, pyongyangtown: buildPyongyangTown, plain: buildPlain, field: buildField, coastFort: () => buildCoast({ fort: true }), coastVillage: () => buildCoast({ fort: false }), jiangnan: buildJiangnan, cajamarca: buildCajamarca, mobei: () => buildOpenPlain('mobei', arena), catalaunian: () => buildOpenPlain('catalaunian', arena), carrhae: () => buildOpenPlain('carrhae', arena), sarhu: () => buildOpenPlain('sarhu', arena), agincourt: buildAgincourt, cerignola: buildCerignola, lastgate: buildLastGateField, stage: buildStageSky, dunnottar: () => buildStormPlace({ buildRain }) };
   if (!view.places[place] && builders[place]) {
     view.places[place] = builders[place](arena);
     // A wet or polished surface reflects the sky (the steel's environment), faintly.
@@ -437,6 +437,7 @@ const PLACE_LIGHT = {
   // The story's places built by the town kit (src/places): each brings its own light.
   canaltown: CANAL_TOWN_LIGHT,
   pyongyang: PYONGYANG_LIGHT,
+  pyongyangtown: PYONGYANG_LIGHT,
   // A highland valley at 2,700 m late in the afternoon: thin clear air, the haze warm toward evening, the hills 90 m out and more.
   cajamarca: { background: 0xd8d0bc, fog: [60, 190], far: 200, key: 0xffe2b8, keyIntensity: 0.12, rim: 0xffd6a0, sun: 0.95 },
   // Agincourt: a low grey October sky after rain, the light flat, the woods dark.
@@ -475,6 +476,8 @@ export const PLACE_ARENAS = {
   canaltown: { halfX: 18, halfZ: 9, own: true },
   // (The wall's stretch that chapter 3 storms: story/battles/03-pyongyang.js PYONGYANG_1593.arena.)
   pyongyang: { halfX: 135, halfZ: 9, own: true },
+  // (The town's gate square, Battle Mode's Pyongyang: places/pyongyang-city.js PY_TOWN_FIGHT, its wider field.)
+  pyongyangtown: { halfX: 26, halfZ: 15, own: true },
   // The square of Cajamarca between its long halls (props/cajamarca.js CAJAMARCA_PLAN).
   cajamarca: { halfX: 16, halfZ: 11 },
   // The battlefields of 1415 and 1503, their floors as their levels have them (scenarios.js AGINCOURT, CERIGNOLA).

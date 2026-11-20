@@ -8,6 +8,7 @@ import { caloriesForBodyFat, caloriesForWeight } from './physiology.js';
 import { createWorld, seededRandom } from './physics.js';
 import { STYLES } from './moves.js';
 import { SUBWAY_ARENA } from './props/subway.js';
+import { pyongyangTownTerrain } from './places/pyongyang.js';
 import { atahualpa, bannerman, conquistadorHorseman, drilledSoldier, englishArcher, englishManAtArms, europeanSoldier, footSoldier, frenchFoot, frenchKnight, pikeman, hanHorseman, hospitaller, incaMan, mingHorseman, mingSoldier, mountedKnight, nobleKnight, ottomanSoldier, rebel, romanHorseman, roninWarrior, samuraiHorseman, sengokuWarrior, swatOfficer, wokouRaider, wokouSamurai, yakuza } from './cast.js';
 import { gallicHorseman, gothWarrior, hunRider, infantrySoldier, lateRomanSoldier, parthianRider, republicanLegionary, xiongnuRider } from './cast.js';
 
@@ -944,6 +945,9 @@ export const SPREAD = {
     jiangnan: { halfX: 18 },
     // The lane between the container stacks: their ends at ±11.3 m (props/harbour.js).
     port: { halfX: 11 },
+    // Pyongyang's gate square (places/pyongyang-city.js PY_TOWN_FIGHT, 40 m in from the wall): the foot of the wall's inner
+    // bank at about 26 m to the west.
+    pyongyangtown: { halfX: 26 },
   },
 };
 
@@ -1384,14 +1388,18 @@ export const SCENARIOS = {
     title: 'Pyongyang',
     place: 'Pyongyang, Joseon · 8 February 1593',
     blurb: { en: 'The Ming army retakes the city from the Japanese. Nineteen Ming foot — elites in plated brigandine with guandao and guns, brigandine men with sword and shield, spear and gun, and a few of the drilled southern infantry with the wolf-brush spear — and eleven of Li Rusong\'s horsemen in iron lamellar on the flank, against forty Japanese samurai and ashigaru and three mounted samurai.', zh: '明军从日军手里夺回平壤。明军步卒十九人——精锐披钉甲，使大刀、放火铳；布面甲兵持刀牌、长枪、鸟铳；还有几名操练有素的南兵，持狼筅——侧翼是李如松的十一名铁札甲骑兵，对阵日本武士和足轻四十人，另有骑马武士三人。' },
-    scene: 'sengoku',
-    arena: { halfX: 14, halfZ: 9 },
+    // Fought in the town (places/pyongyang-city.js): the gate square, where the Ming who came in through the gate meet the
+    // Japanese holding the main street, among the shops and the bell pavilion (its houses solid: the arena's `terrain`).
+    scene: 'pyongyangtown',
+    climate: 'pyongyang',
+    arena: { halfX: 14, halfZ: 9, get terrain() { return pyongyangTownTerrain(); } },
     camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
     roster: { en: 'Thirty Ming (eleven on horse) · forty-three Japanese (three on horse)', zh: '明军三十人（十一骑） · 日军四十三人（三骑）' },
     formation: { red: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 }, blue: { front: 5, spacing: 1.3, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.3 } },
     cast: (random) => pyongyangSides(random),
     wings: {
-      arena: { halfX: 28, halfZ: 15 },
+      // (No longer than the square's room: SPREAD.room.pyongyangtown.)
+      arena: { halfX: 26, halfZ: 15, get terrain() { return pyongyangTownTerrain(); } },
       camera: { yaw: -0.5, pitch: 0.42, distance: 26, maxDistance: 33 },
       formation: { red: { wings: { side: 1 } }, blue: { wings: { side: -1 } } },
       cast: (random, sides) => ({ red: [...sides.red, ...company(PYONGYANG_HORSE, (style) => mingHorseman(random, style))], blue: [...sides.blue, ...company(PYONGYANG_JAPANESE_HORSE, (style) => samuraiHorseman(random, SEKIGAHARA_WEST, style))] }),

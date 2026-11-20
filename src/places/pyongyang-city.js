@@ -27,11 +27,22 @@ import { TK_HANOK, tkBell, tkCompoundRuns, tkHall, tkHallSolids, tkRoofedGate, t
  * the tile's grey; `rich`: the share of a block's houses that are tiled, by how far south the block lies (the well-off near
  * the street, the poor toward the river).
  */
+/**
+ * The Battle Mode fight in the town (scenarios.js SCENARIOS.pyongyang): its middle `at` (m, in the place's frame), at the
+ * gate square's east side where the main street leaves it, so that the field takes in the square, the bell pavilion, the
+ * shops on both its sides and the mouth of the street (and of the market street on its wider field). Battles are fought
+ * about the world's origin, so the place is drawn, and its solids given to the physics, moved by `-at`.
+ */
+export const PY_TOWN_FIGHT = { at: [40, -50] };
+
 export const PY_CITY = {
   square: { x: [15, 42], z: [-63, -37] },
   avenue: { half: 3.5, x: [15, 142] },
   market: { x: 61, half: 3, z: [-46.5, 118] },
-  lanes: { ew: [-3, 31, 65, 99], ns: [33, 90, 120], half: 2 },
+  lanes: { ew: [34, 66, 99], ns: [33, 90, 120], half: 2 },
+  // The broad street east from the wall (as wide as Seoul's Jongno, about 18 m, over the battle strip the story's chapter 3
+  // fights along inside the wall: story/battles/03-pyongyang.js, |z| <= 9, whose physics has no houses).
+  broad: { z: 0, half: 10 },
   compound: { x: [86, 132], z: [-44, -8], gate: 109 },
   temple: { way: 67, gate: -64, lower: { x: [50, 84], z: [-80, -95] }, upper: { x: [52, 82], z: [-96, -113] } },
   crest: { at: [25, -110] },
@@ -100,8 +111,9 @@ export function pyCityPlan(groundAt) {
   const mx = c.market.x;
   paving.push({ material: 'street', x: [mx - c.market.half, mx + c.market.half], z: [az + ah, c.market.z[1]] });
   ways.push({ line: [[mx, az], [mx, c.market.z[1]]], half: 2.2, kind: 'cart', strength: 0.9 });
-  shopRow([mx - c.market.half, c.lanes.ew[0] - c.lanes.half], [mx - c.market.half, az + ah + 1], 17);
-  shopRow([mx + c.market.half, az + ah + 1], [mx + c.market.half, c.lanes.ew[0] - c.lanes.half], 18);
+  const broadNorth = c.broad.z - c.broad.half;
+  shopRow([mx - c.market.half, broadNorth], [mx - c.market.half, az + ah + 1], 17);
+  shopRow([mx + c.market.half, az + ah + 1], [mx + c.market.half, broadNorth], 18);
 
   // The governor's compound: walls, the gate pavilion on the avenue, the main hall on its terrace, two side halls, old trees.
   const [gx0, gx1] = c.compound.x;
@@ -161,6 +173,8 @@ export function pyCityPlan(groundAt) {
   // house (a main wing at its back, a side wing, yard walls with a roofed gate on the lane, a jar terrace, a tree) or a
   // thatched cottage (one wing, a low wall of field stone), the tiled ones the likelier the nearer the avenue.
   const lh = c.lanes.half;
+  paving.push({ material: 'street', x: [16, c.east], z: [c.broad.z - c.broad.half + 1.5, c.broad.z + c.broad.half - 1.5] });
+  ways.push({ line: [[4.8, c.broad.z], [c.east, c.broad.z]], half: c.broad.half - 2, kind: 'cart', strength: 0.9 });
   for (const z of c.lanes.ew) {
     ways.push({ line: [[16, z], [c.east, z]], half: lh - 0.4, kind: 'foot', strength: 0.75 });
   }
@@ -173,7 +187,7 @@ export function pyCityPlan(groundAt) {
   // (The market street splits the column it runs through.)
   const blocksX = columns.flatMap(([a, b]) => (a < marketCut[0] && b > marketCut[1] ? [[a, marketCut[0]], [marketCut[1], b]] : [[a, b]]));
   // (South of the square's and the avenue's shops.)
-  const zs = [-29.5, ...c.lanes.ew.flatMap((z) => [z - lh, z + lh]), 121];
+  const zs = [-29.5, c.broad.z - c.broad.half, c.broad.z + c.broad.half, ...c.lanes.ew.flatMap((z) => [z - lh, z + lh]), 121];
   const rows = [];
   for (let k = 0; k + 1 < zs.length; k += 2) rows.push([zs[k], zs[k + 1]]);
   let yard = 0;

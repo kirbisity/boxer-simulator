@@ -65,6 +65,7 @@ export const PLACE_WIND = {
   // Pyongyang in the first month (places/pyongyang.js): that country's winter wind, out of the north-west and gusty
   // (a fresh breeze near the ground, about 4 m/s; -x is west and -z north there, so it blows on the wall's outer face).
   pyongyang: { toward: [0.8, 0.6], speed: 4, gust: 0.5 },
+  pyongyangtown: { toward: [0.8, 0.6], speed: 4, gust: 0.5 },
   cajamarca: { toward: [-0.8, 0.6], speed: 2.5, gust: 0.35 },
   // Mobei: the fighting ran on to dusk with a wind getting up off the Gobi.
   mobei: { toward: [0.94, 0.34], speed: 6, gust: 0.45 },

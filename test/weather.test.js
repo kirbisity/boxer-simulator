@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { SCENARIOS, WEATHER_MIST } from '../src/scenarios.js';
 import { JIANGNAN_PLAN } from '../src/props/jiangnan.js';
 
-test('the misty levels are the two wokou levels, the rebellion, Sekigahara, Sarhu (an April dusk by the Hun River), Agincourt (grey after rain), Cerignola (a dusk haze) and Pier 9 (sea fog); Pyongyang, in the same place as Sekigahara, is clear', () => {
+test('the misty levels are the two wokou levels, the rebellion, Sekigahara, Sarhu (an April dusk by the Hun River), Agincourt (grey after rain), Cerignola (a dusk haze) and Pier 9 (sea fog); Pyongyang, in its own town, is not fogged', () => {
   const misty = Object.entries(SCENARIOS).filter(([, scenario]) => scenario.weather?.fog).map(([id]) => id).sort();
   assert.deepEqual(misty, ['agincourt', 'cerignola', 'port', 'qiJiguang', 'rebellion', 'sarhu', 'sekigahara', 'wokou']);
   // Pier 9's fog is a night fog: dim and warm (the sodium light in it), and the lamps glow.
@@ -11,7 +11,8 @@ test('the misty levels are the two wokou levels, the rebellion, Sekigahara, Sarh
   const [r, g, b] = [(sea.colour >> 16) & 255, (sea.colour >> 8) & 255, sea.colour & 255];
   assert.ok(r >= g && g >= b && r < 80, 'dim warm grey');
   assert.equal(sea.halos, true);
-  assert.equal(SCENARIOS.pyongyang.scene, SCENARIOS.sekigahara.scene);
+  // (Fought in the town's gate square since 2026-11-20, under the place's own weathers: places/pyongyang.js.)
+  assert.equal(SCENARIOS.pyongyang.scene, 'pyongyangtown');
   assert.equal(SCENARIOS.pyongyang.weather, undefined);
 });
 

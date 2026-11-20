@@ -211,7 +211,7 @@ const PROBE_LITE_PLACES = {
   // Places that draw their own sky and aim their own sun (the town kit's: townkit/place.js tkKeep): the ambient is baked
   // from the place's light (render.js PLACE_LIGHT `sky`: zenith, haze, sunColour, ground over the day's; its horizon the
   // place's fog), one probe each, and the look's dome is left out.
-  own: ['canaltown', 'pyongyang'],
+  own: ['canaltown', 'pyongyang', 'pyongyangtown'],
 };
 const probeLiteKind = (place) => (PROBE_LITE_PLACES.own.includes(place) ? 'own' : PROBE_LITE_PLACES.storm.includes(place) ? 'storm' : PROBE_LITE_PLACES.night.includes(place) ? 'night' : PROBE_LITE_PLACES.hall.includes(place) ? 'hall' : 'day');
 

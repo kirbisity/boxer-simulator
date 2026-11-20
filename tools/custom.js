@@ -209,6 +209,12 @@ export const PYONGYANG_LIGHT = { background: 0xd3dbe2, fog: [150, 1500], far: 24
 export function buildPyongyang() {
   return new THREE.Group();
 }
+export function buildPyongyangTown() {
+  return new THREE.Group();
+}
+export function pyongyangTownTerrain() {
+  return null;
+}
 export function pyongyangPlan() {
   return null;
 }

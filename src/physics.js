@@ -29,7 +29,7 @@ import { armourHardness, bluntEdge, driveShaft, dullEdge, hackShield, partHardne
 import { blockStep, carried, recordContact, setDrive, slopeFall, slopeHold, solvePress } from './physics/press.js';
 import { beginRise, restedToRise, riseMargins, riseTarget, standWobble, supportLimit, updateRise } from './physics/rising.js';
 import { bankOf, cornerPace, cornerShare, cornering, footworkQuickness, limpOf, pushOff, runChange, runLean, runSpeed, strideOf, turnRateMost } from './physics/gait.js';
-import { awayFromEdges, ceilingAt, floorAt, pushOut } from './physics/terrain.js';
+import { awayFromEdges, ceilingAt, floorAt, pushOut, solidAt } from './physics/terrain.js';
 import { overdraftDepth, drawStamina, overdraws, takeWind, fatigueScale, recoveryShare } from './physics/overdraft.js';
 import { climateOf, freshHeat, heatMark, heatRecovery, heatStrength, stepHeat } from './physics/heat.js';
 import { bowShotCost, strokeHeft, swingEffort } from './physics/effort.js';
@@ -1828,6 +1828,49 @@ export function placeOnFloor(fighter, x, z, floor, yaw) {
   plantFeet(fighter);
 }
 
+/**
+ * Each man drawn up inside a solid (a house, a wall, a terrace's side) moved to the nearest open ground at the street's level
+ * (within MUSTER_OPEN.rise of the floor where the line was drawn up), out to MUSTER_OPEN.reach m and inside the arena; a rider
+ * with his horse's room about him (MUSTER_OPEN.rider), a man on foot his own (MUSTER_OPEN.foot); each a step clear of every
+ * other man (MUSTER_OPEN.apart; riders `horses` apart), so that the men of one house do not all come out on one spot, and
+ * none further toward the enemy than his place in the line (`ahead`).
+ */
+const MUSTER_OPEN = { reach: 16, step: 0.5, rise: 0.6, foot: 0.4, rider: 1.4, apart: 0.9, horses: 2.2, ahead: 0.3 };
+function onOpenGround(fighters, arena, riding) {
+  const terrain = arena.terrain;
+  // (A spot moved to keeps a step clear of every other man, a rider a horse's room clear of every other rider.)
+  const clearOfMen = (x, z, self, rider) => fighters.every((other) => other === self || Math.hypot(x - other.root[0], z - other.root[1]) >= (rider && riding(other.body.inputs) ? MUSTER_OPEN.horses : MUSTER_OPEN.apart));
+  const open = (x, z, room) => {
+    if (Math.abs(x) > arena.halfX - room || Math.abs(z) > arena.halfZ - room) return false;
+    const floor = floorAt(terrain, x, z, MUSTER_OPEN.rise + 0.5);
+    if (floor === null || floor === undefined || floor > MUSTER_OPEN.rise || floor < -MUSTER_OPEN.rise) return false;
+    // (Asked above the floor by more than the room, or the ground he stands on is itself the solid he is in.)
+    if (solidAt(terrain, x, floor + room + 0.1, z, room) || solidAt(terrain, x, floor + room + 1, z, room)) return false;
+    return true;
+  };
+  for (const fighter of fighters) {
+    const room = riding(fighter.body.inputs) ? MUSTER_OPEN.rider : MUSTER_OPEN.foot;
+    const [x, z] = fighter.root;
+    if (open(x, z, room)) continue;
+    let spot = null;
+    for (let reach = MUSTER_OPEN.step; reach <= MUSTER_OPEN.reach && !spot; reach += MUSTER_OPEN.step) {
+      const around = Math.max(8, Math.ceil((2 * Math.PI * reach) / MUSTER_OPEN.step));
+      for (let k = 0; k < around; k += 1) {
+        const angle = (k / around) * 2 * Math.PI;
+        const [sx, sz] = [x + Math.cos(angle) * reach, z + Math.sin(angle) * reach];
+        // (Aside or back from his place, never toward the enemy: red faces +x.)
+        const forward = fighter.corner === 'red' ? sx - x : x - sx;
+        if (forward <= MUSTER_OPEN.ahead && open(sx, sz, room) && clearOfMen(sx, sz, fighter, room === MUSTER_OPEN.rider)) {
+          spot = [sx, sz];
+          break;
+        }
+      }
+    }
+    if (!spot) continue;
+    placeOnFloor(fighter, spot[0], spot[1], floorAt(terrain, spot[0], spot[1], MUSTER_OPEN.rise + 0.5) ?? 0, fighter.yaw);
+  }
+}
+
 // ---- Level mode: a man made over in place -------------------------------------------------
 
 /** The headgear props a fighter's inputs ask for (worn, on his head). */
@@ -2035,6 +2078,9 @@ export function createWorld(fighterInputs, { seed = 1, arena = { halfX: WORLD.ri
   }
   if (general) centreGeneral(fighters, general, formation[general.corner], riding);
   for (const fighter of fighters) fighter.arena = arena;
+  // A battle fought among buildings (`arena.terrain`: a town's houses, walls and terraces as solids): a man whose place in
+  // the line falls where a house stands musters on the nearest open ground instead (onOpenGround).
+  if (arena.terrain) onOpenGround(fighters, arena, riding);
   // On fieldworks with relief (a bank, a rampart, a hill: physics/fieldworks.js ditches), each man stood on the ground where he is
   // placed, not at y = 0 inside it (the stance snaps to the relief on the first step, and a body sunk a metre in is flung out).
   const works = worksOf(arena);

@@ -13,7 +13,7 @@
 // two-storey pavilion over it); it carries the name of the one gate the story's sources name at the assault, the Hamgu
 // gate (含毬門). Its true form, the wall's line and the lie of the ground in 1593 are not known here: typical, not surveyed.
 
-import { fieldOf, slabOf, wallLine, wallOf } from '../physics/terrain.js';
+import { createTerrain, fieldOf, slabOf, wallLine, wallOf } from '../physics/terrain.js';
 import { STORY_WALL } from '../story/ground/walls.js';
 import { tkgFrame } from '../townkit/geo.js';
 import { tkFbm, tkRandom } from '../townkit/tex.js';
@@ -23,7 +23,7 @@ import { TK_LAY } from '../townkit/lay.js';
 import { tkStir } from '../townkit/stir.js';
 import { TK_GLOW, TK_MATERIALS } from '../townkit/weather.js';
 import { TK_THINGS, tkArrows, tkBasket, tkBrazier, tkCampfire, tkCart, tkDrift, tkFirewood, tkIcicles, tkLadder, tkMantlet, tkPoles, tkSacks, tkScatter, tkStack, tkTub, tkTuft } from '../townkit/things.js';
-import { PY_CITY, PY_FAR_TOWN, pyCityDraw, pyCityPlan, pyCitySolids, pyFarTownDraw, pyFarTownPlan, pyInFarTown } from './pyongyang-city.js';
+import { PY_CITY, PY_FAR_TOWN, PY_TOWN_FIGHT, pyCityDraw, pyCityPlan, pyCitySolids, pyFarTownDraw, pyFarTownPlan, pyInFarTown } from './pyongyang-city.js';
 import { TK_WORKS, tkGatehouse, tkGatehouseSolids, tkPavilion, tkPavilionSolids, tkRampart, tkRampartSolids, tkWorksStair, tkWorksStairSolid } from '../townkit/works.js';
 
 /** The place's plan (m). Choices for the game's ground, set against the battle's field and a walker's reach; none is a measurement of the real town. */
@@ -752,6 +752,21 @@ export function pyongyangSolids() {
 }
 
 /** The place as a stage (levelmode/stage.js) to walk in: one section, nobody in it. */
+let pyTownTerrainMade = null;
+/**
+ * The town fight's terrain (scenarios.js SCENARIOS.pyongyang): the place's solids (pyongyangSolids) moved by -PY_TOWN_FIGHT.at,
+ * so that the fight's middle is the world's origin. Made once.
+ */
+export function pyongyangTownTerrain() {
+  if (pyTownTerrainMade) return pyTownTerrainMade;
+  const [x, z] = PY_TOWN_FIGHT.at;
+  pyTownTerrainMade = createTerrain(pyongyangSolids().map((solid) => ({ ...solid, at: [solid.at[0] - x, solid.at[1] - z] })));
+  return pyTownTerrainMade;
+}
+
+/** The place drawn for the town fight: moved as its terrain is (pyongyangTownTerrain). */
+export const buildPyongyangTown = () => buildPyongyang(null, { shift: [-PY_TOWN_FIGHT.at[0], -PY_TOWN_FIGHT.at[1]], key: 'pyongyangtown' });
+
 export function pyongyangStage() {
   pyGrounded();
   const t = PYONGYANG_PLACE;
@@ -1330,8 +1345,14 @@ const PY_WEATHERED = {
 // fewer (`tint` over the foliage sheet's green, by eye).
 const PY_OAK = { kind: 'broad', tint: [0.95, 0.55, 0.3], spread: 0.55 };
 
-export function buildPyongyang() {
+/**
+ * The place drawn. `shift` ([dx, dz], m): the whole place moved by it, for a battle fought about the world's origin at some
+ * other point of it (the town's square: PY_TOWN_FIGHT), with everything it tells the open air and the snow's lie moved alike;
+ * `key` the place's own key then (render.js: 'pyongyangtown').
+ */
+export function buildPyongyang(_arena = null, { shift = [0, 0], key = 'pyongyang' } = {}) {
   const t = PYONGYANG_PLACE;
+  const [dx, dz] = shift;
   const plan = pyongyangPlan();
   const { wall } = plan;
   const tier = tkTier();
@@ -1508,7 +1529,8 @@ export function buildPyongyang() {
   const woodMeshes = tkMeshes(woods, materials, { tier });
   woodMeshes.name = 'pyongyang-woods';
   const root = new THREE.Group();
-  root.name = 'pyongyang';
+  root.name = key;
+  root.position.set(dx, 0, dz);
   const sky = tkSky({ horizon: PY_LIGHT.haze, zenith: 0x7fa3d0, cloud: 0.3, cloudColour: 0xf4f4f0, radius: 2200, sun: PY_LIGHT.sun, glow: 0.3 });
   // The gate's name on its board (the story's: the Hamgu gate), on the outer side under the upper eave.
   const board = pyNameBoard('含毬門');
@@ -1608,7 +1630,17 @@ export function buildPyongyang() {
       siegesnowhazy: ['flurries', { label: 'Snow showers on the wall, hazier sky', grade: { contrast: 1.34, saturation: 0.92, warmth: -0.01, ev: -0.9 }, cover: 0.5, sun: 1, gloom: 0.85, visibility: 14000, fall: { kind: 'snow', share: 1, under: [0.04, 0.16], least: 0.12, thick: 4000 } }],
     },
   };
-  tkKeep(root, meshes, { look: PY_LOOK, sun: PY_LIGHT.sun, shadow: 0.6, sky, key: 'pyongyang', tier, mirrorAt: [-20, 1.6, 0], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...(PYONGYANG_WEATHER[view.weather?.town?.name] ?? PYONGYANG_WEATHER.snow), ...(view.weather?.town ?? null) }) });
+  // (Moved (`shift`): what the open air and the snow's lie are told in the world's frame, moved with the place.)
+  if (dx || dz) {
+    const { height, openings, litAt } = air.description;
+    Object.assign(air.description, {
+      height: (x, z) => height(x - dx, z - dz),
+      openings: openings.map((opening) => ({ ...opening, at: [opening.at[0] + dx, opening.at[1], opening.at[2] + dz] })),
+      litAt: [litAt[0] + dx, litAt[1], litAt[2] + dz],
+    });
+    lay.lay.min = [lay.lay.min[0] + dx, lay.lay.min[1] + dz];
+  }
+  tkKeep(root, meshes, { look: PY_LOOK, sun: PY_LIGHT.sun, shadow: 0.6, sky, key, tier, mirrorAt: [-20 + dx, 1.6, dz], lay, north: [0, -1], air, stir: moved.tick, weather: (view) => ({ ...(PYONGYANG_WEATHER[view.weather?.town?.name] ?? PYONGYANG_WEATHER.snow), ...(view.weather?.town ?? null) }) });
   root.userData.lay = lay.lay;
   root.userData.scattered = scattered;
   root.userData.dispose = () => {
