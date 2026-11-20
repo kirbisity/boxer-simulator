@@ -144,6 +144,7 @@ export const KIT_FIRST = {
   mingBrigandine: ['swordShield', 'spear', 'matchlock', 'mingBow', 'threeEyed', 'dao'],
   mingEliteInfantry: ['langxian', 'swordShield', 'spear', 'dangpa', 'matchlock'],
   mingElite: ['guandao', 'dao', 'threeEyed', 'matchlock', 'mingLance', 'mingBow', 'langyaShield'],
+  ironMan: ['zhanmadao', 'rattanShield', 'dao'],
   bannerArmour: ['manchuBow', 'spear', 'guandao', 'dao', 'mingLance'],
   bayara: ['bayaraLance', 'bayaraBow', 'dao', 'guandao'],
   guanYu: ['guanYu', 'dao'],

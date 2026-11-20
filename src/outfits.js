@@ -361,6 +361,20 @@ function mingEliteInfantryDesign(label, cloth, bind = shade(cloth, 0.35), extra 
 // The helm's hood (`aventail`) is of the coat's armour: the brigandine's own cloth and gilt rivets ('brigandine'), lamellae
 // laced in the coat's lacing where the coat is scale or lamellar ('lamellar': a scale coat under a lamellar hood, the user's
 // first photograph), or mail ('mail', `helm.aventail`: the surviving helmet of the third), in the coat's steel.
+/**
+ * One of Koxinga's iron men: the broad iron scale coat and the Japanese limb pieces (loftbody.js ironManScale) in `steel`,
+ * laced in `lace`, over the coat beneath (`cloth`); the Ming elite's helmet in the same iron, its lamellar neck guard, and
+ * the full iron face (menpo.js somen) under it, only the eyes showing.
+ */
+function ironManDesign(label, steel, cloth, lace) {
+  return {
+    label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' },
+    armor: { kind: 'ironManScale', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', lace },
+    head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: steel, aventail: 'lamellar', lace, tassel: '#b3161b', mask: true, maskDesign: 'somen' },
+    feet: { kind: 'compactBoot', color: '#141416' },
+  };
+}
+
 function mingEliteDesign(label, cloth, coif, steel, helm = {}, look = {}) {
   const aventail = helm.aventail ?? (look.kind === 'mingScale' || look.kind === 'mingEliteLamellar' ? 'lamellar' : 'brigandine');
   return { label, top: { kind: 'longsleeve', color: shade(cloth, 0.6) }, bottom: { kind: 'pants', color: '#1c1a18' }, armor: { kind: 'mingElite', color: steel, cloth, cloth2: shade(cloth, 0.35), gold: '#c9a24a', leather: '#2a1d14', ...look }, head: { kind: 'mingHelm', color: steel, gold: '#c9a24a', coif: aventail === 'brigandine' ? cloth : steel, aventail, lace: look.lace ?? '#3a2016', tassel: '#b3161b', ...helm }, feet: { kind: 'compactBoot', color: '#141416' } };
@@ -1626,6 +1640,42 @@ export const OUTFITS = {
   // steel bowl helmet with a padded coif — or a steel neck guard and a steel
   // face mask. Covered from head to knee: a blade glances off it as off a
   // knight's plate, and so do arrows.
+  // Koxinga's iron men (鐵人, Zheng Chenggong's 1650s-60s; the Taiwan waiwen and the Dutch accounts of Zeelandia, 1661-62:
+  // men "in iron from head to foot, only the eyes showing"): his own shock troops, picked for strength (a man had to lift a
+  // stone lion of ~300 jin to be taken), in a Sino-Japanese harness made for them. The Zheng house was half Japanese (he was
+  // born at Hirado) and kept Japanese armourers and men: the full iron face (sōmen), the kote, haidate and suneate on the
+  // limbs, lacquer against the sea air; over that a coat of broad iron scales heavier than a tōsei dō, against the Manchu
+  // bows and the Dutch muskets. They fought shoulder to shoulder at the front, the long zhanmadao or the dao behind a big
+  // rattan shield, to walk through arrows and volleys and cut down horse (Taiwan waiji, 臺灣外記: 戴鐵面，被鐵甲，執斬馬刀).
+  // The cost: ~23 kg of iron and a closed face in a Fujian or Taiwan summer (physics/heat.js, the place's climate), and slow
+  // feet (`movement`). Only Koxinga's army fields them (no `family`: never dealt at random).
+  ironMan: {
+    // Trained and drilled as a body; picked men, not a caste.
+    skill: 0.6,
+    faction: 'chinese', bulletRating: 1000, plated: true,
+    label: 'Iron man — Koxinga\'s scale and iron face', movement: 'limited', fists: 'bare',
+    // The kote's tekkō over the back of each hand (HAND_COVERS).
+    hands: 'tekko',
+    sidearm: 'dao',
+    spare: 'dagger',
+    // Bare iron scales and plates: a point skids off them (as off the Ming elite's helmet and the tōsei's plates).
+    deflects: true,
+    // ~23 kg of iron on a 73 kg man: over the tōsei gusoku's ~18 kg (0.25) and the Ming elite's ~20 (0.27): the scales lapped
+    // two deep and thicker against the Manchu bows' heavy heads, the iron face, the Japanese limb pieces.
+    extraMass: 0.32,
+    // The coat proof against a ball as the Ming elite's and better (thicker iron, two scales deep: `bulletRating` 1000, the
+    // trunk's share 0.6); the face behind its iron (the head's figures: the sōmen as the steppe's iron faces); the limbs in
+    // the kote's splints and the haidate's and suneate's plates, as the tōsei's (kote).
+    protection: { blunt: 0.72, cut: 0.96, pierce: 0.91, bullet: { head: 0.5, torso: 0.6, limb: 0.2 }, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.82, deflects: true }, limb: kote({ blunt: 0.7, cut: 0.95, pierce: 0.9 }) } },
+    // Its gaps as the tōsei's (the harness the limb pieces are), the scales' coat closed but at the armholes.
+    gaps: { mail: ['elbow'], mailMake: 'butted', thrust: 0.5, lacing: 0.1 },
+    courage: 0.7,
+    designs: [
+      ironManDesign('Bright iron scale', '#a7adb6', '#1c1c20', '#1a1c24'),
+      ironManDesign('Dark iron, red cord', '#5a5d64', '#5a1a14', '#8a1418'),
+      ironManDesign('Black-lacquered iron', '#25262a', '#2a2a30', '#b3161b'),
+    ],
+  },
   mingElite: {
     // Rides (Ming elite cavalry: the generals' household men on the pick of the border army's bought horses, horses.js mingBorder),
     // armoured in front only (horses.js BARDING.mingFront: the face plate, the collar, the chest apron; the flanks bare).
@@ -1663,9 +1713,7 @@ export const OUTFITS = {
       mingEliteDesign('Imperial blue', '#1f2f6a', '#e8e0cc', '#a7adb6'),
       mingEliteDesign('Black and gold', '#18181c', '#5a1a14', '#8f949b', { aventail: 'mail' }),
       mingEliteDesign('Gilt scale', '#5a1a14', '#7a1418', '#b8a066', {}, { kind: 'mingScale', lace: '#3a2016' }),
-      // Koxinga's iron men (scenarios.js ARMIES.koxinga, design 4): the steel scale under an iron menpō in the helmet's bare
-      // steel; the only Chinese kit masked (the user's call, 2026-11-20), never dealt to a Ming elite at random (`chosen`).
-      { ...mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true, maskDesign: 'menpo' }, { kind: 'mingScale', lace: '#1a1c24' }), chosen: true },
+      mingEliteDesign('Steel scale', '#1c1c20', '#e8e0cc', '#a7adb6', {}, { kind: 'mingScale', lace: '#1a1c24' }),
       // Qi Jiguang's and his household guards' (Qi Jiguang's level): the elite's protection drawn as
       // iron lamellar laced in crimson over the crimson coat. A level's, not dealt at random.
       { ...mingEliteDesign('Iron lamellar, crimson lacing', '#8a1418', '#8a1418', '#8f949b', {}, { kind: 'mingEliteLamellar', lace: '#8a1418' }), levelOnly: true },

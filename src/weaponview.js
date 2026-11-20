@@ -1320,6 +1320,21 @@ export function buildWeaponMesh(kind, envMap, colour = '#b3161b') {
       group.add(notch, collar, tassel, spike);
       break;
     }
+    case 'zhanmadao': {
+      // A long dark haft bound in iron at the head, an iron collar, the long single-edged blade with a gentle curve to its
+      // back, a short iron butt.
+      const bladeStart = spec.strikeFrom - 0.04;
+      const bladeLength = spec.length - bladeStart;
+      group.add(cylinder(0.017, 0.019, -spec.handle, bladeStart + 0.02, surface(0x2a1d14, { roughness: 0.6 }), 10));
+      for (const y of [bladeStart - 0.3, bladeStart - 0.16]) group.add(cylinder(0.02, 0.02, y - 0.01, y + 0.01, steel, 10));
+      const bend = (y) => -0.05 * ((y - bladeStart) / bladeLength) ** 1.8;
+      group.add(bladeMesh(bladeGeometry(bladeStart, bladeLength, 0.05, 0.008, 0.12, bend), polished));
+      const collar = cylinder(0.026, 0.022, bladeStart - 0.06, bladeStart + 0.01, steel, 10);
+      const guard = cylinder(0.045, 0.045, bladeStart - 0.075, bladeStart - 0.06, steel, 12);
+      const butt = cylinder(0.012, 0.019, -spec.handle - 0.06, -spec.handle + 0.01, steel, 8);
+      group.add(collar, guard, butt);
+      break;
+    }
     case 'qinglong': {
       // The Green Dragon Crescent Blade: a dark green shaft bound in gold, a
       // gilt dragon's head at the blade whose jaws hold it, a broad crescent

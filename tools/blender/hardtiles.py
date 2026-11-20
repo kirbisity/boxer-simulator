@@ -131,6 +131,39 @@ def scale(n):
     return t
 
 
+def iron_scale(n):
+    # Koxinga's iron men's scale (the user's reference, 2026-11-20): broad tongue-shaped iron scales, flat across, their
+    # feet a full half-round, hung in rows each half a scale off the last, each foot lying over the heads of the row below;
+    # bright hammered iron, a shadow under every foot. Larger than the Ming coat's (the `scale` tile's 22 mm): 50 mm across,
+    # a row every 46 mm, each plate ~78 mm long. Tile: four scales across, two rows up (detailmaps.js `ironScale`).
+    P, R, Wd, L = 0.05, 0.046, 0.048, 0.078
+    W, H = 4 * P, 2 * R
+    t = Tile(W, H, n, 61)
+    best = np.full(t.X.shape, -1.0)
+    tone = np.full(t.X.shape, 0.82)
+    for row in range(-1, 4):
+        top = (row + 1) * R + 0.01
+        for col in range(-1, 6):
+            cx = (col + 0.5 * (row % 2)) * P
+            ddx = t.X - cx
+            s = (top - t.Y) / L
+            foot_c = top - L + Wd / 2
+            q = np.hypot(ddx, t.Y - foot_c)
+            inside = ((np.abs(ddx) < Wd / 2) & (s >= 0) & (t.Y >= foot_c)) | ((q < Wd / 2) & (t.Y < foot_c))
+            edge = np.where(t.Y < foot_c, Wd / 2 - q, np.minimum(Wd / 2 - np.abs(ddx), top - t.Y))
+            # Rising down the scale to its foot (each lies over the next), a gentle dish across, the edge eased.
+            across = 1 - (ddx / (Wd / 2)) ** 2
+            z = 0.0006 + 0.0034 * np.clip(s, 0, 1) + 0.0004 * across - 0.0006 * (1 - smooth(0, 0.0016, edge))
+            take = inside & (z > best)
+            best = np.where(take, z, best)
+            tone = np.where(take, 0.8 + 0.08 * (((row % 2) * 4 + col % 4) * 0.618 % 1.0), tone)
+    gap = best < 0
+    t.z = np.where(gap, 0.0, best) + t.noise(24, 3, 18, 0.00006)
+    t.grey(np.where(gap, 0.12, tone + t.noise(14, 2, 10, 0.05)))
+    t.rough = np.where(gap, 0.85, 0.28 + t.noise(14, 2, 10, 0.06))
+    return t
+
+
 def brigandine(n):
     # The Ming brigandine (bumian jia): cloth over small overlapping iron plates, the plates riveted
     # to the cloth from inside, so the face shows rows of domed copper-alloy rivet heads, each plate's foot standing a little
@@ -518,7 +551,7 @@ def panels(n):
 FAMILIES = {
     'segmentata': segmentata, 'scale': scale, 'brigandine': brigandine, 'euroBrigandine': euro_brigandine,
     'harnessEdge': harness_edge, 'krug': krug, 'yokohagi': yokohagi, 'sugake': sugake, 'etched': etched, 'polymer': polymer,
-    'panels': panels, 'munitionPlate': munition_plate, 'bifu': bifu, 'fluted': fluted,
+    'panels': panels, 'munitionPlate': munition_plate, 'bifu': bifu, 'fluted': fluted, 'ironScale': iron_scale,
 }
 
 

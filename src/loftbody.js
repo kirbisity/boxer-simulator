@@ -1316,6 +1316,16 @@ export const ARMOR_KINDS = {
     upperArm: ELITE_ARM, forearm: [-0.04, -0.03, 1.34, { lames: 6, base: 'steel2' }], 
     mirrors: [[0.62, 0, 0.3, 1.42, 'steel']],
   },
+  // Koxinga's iron men (鐵人, 1650s-60s): a Sino-Japanese harness of their own. The coat of broad iron scales (the
+  // ironScale tile: tongue-shaped plates hung in rows, each foot over the row below) from the collar to mid-thigh, belted,
+  // the Ming elite's neck guard over it; Japanese pieces on the limbs, from the Hirado armourers who served the Zheng
+  // house: the splinted kote on the forearms, laced shoulder guards, the haidate's laced plates over the thighs under the
+  // coat's skirt, the splinted suneate on the shins. No mirror: the scales are the coat.
+  ironManScale: {
+    trunk: [[-0.06, 0.97, 1.24, { lamellae: 20, pointDown: true, gaps: [0], gapWidth: 0.02 }], [0.14, 0.24, 1.4, { buckle: 'gold', base: 'leather' }], ...ELITE_NECK_GUARD],
+    skirt: [0.95, 0.42, 1.36, { lamellae: 20, pointDown: true, gaps: [0, Math.PI, Math.PI / 2, -Math.PI / 2], gapWidth: 0.05 }],
+    upperArm: [-0.2, 0.62, 1.5, { ...LACED, board: { wide: 0.24 } }], forearm: [-0.04, -0.04, 1.3, SPLINTED_SLEEVE], thigh: [0.25, 0.85, 1.3, LACED], shin: [0.04, 0.86, 1.3, SPLINTED_SHIN],
+  },
   // Ming elite: the long brigandine coat to below the knee, its plates
   // riveted close (gilt heads, more and smaller than a soldier's), bound in a
   // dark edge, split for riding; a round steel mirror (huxinjing) over the

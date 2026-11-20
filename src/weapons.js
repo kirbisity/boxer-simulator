@@ -1096,6 +1096,18 @@ export const WEAPONS = {
     // Its heavy head drives some of a blow through armour (`crush`): between the naginata (none) and the war hammer (0.45); its blunt share too, 1.05 between their 0.625 and 1.6.
     contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 12, zeta: 0.85 }, threat: 4.7, art: 'artWheel', crush: 0.3,
   },
+  // The zhanmadao (斬馬刀, "horse-cutting sabre"): Koxinga's iron men's long-hafted sabre, "the Yunnan horse-cutting sabre"
+  // (雲南斬馬刀, Taiwan waiji): a long single-edged blade, gently curved, on a haft as long again, swung two-handed to cut a
+  // horse's legs or a man in armour. No blade survives as theirs; its measures are the family's (the Ming changdao's blade
+  // and the podao's haft): ~0.8 m of blade on ~1.0 m of haft, ~2.6 kg, between the naginata (1.5 m, 2.35 kg) and the
+  // guandao (1.6 m, 2.95 kg) and longer than either. Fought as they are, great sweeping cuts; its edge longer and finer than
+  // the guandao's crescent, its head lighter (cuts more, knocks men about less, a little of a blow through armour).
+  zhanmadao: {
+    label: 'Zhanmadao', hands: 'two', length: 1.8, strikeFrom: 1.0, handle: 0.6, spacing: 0.45, leadAhead: true, edgeLeads: true, mass: 2.6, balance: 0.55, radius: 0.015, curve: 0.04,
+    harm: { swing: { cut: 1.35, blunt: 0.75 }, thrust: { pierce: 0.65, cut: 0.15, blunt: 0.3 } },
+    contactSeconds: 0.005, rotation: 0.85, wrist: { omega: 13, zeta: 0.84 }, threat: 4.8, art: 'artWheel', crush: 0.15,
+    build: { shaftRadius: 0.017 },
+  },
   // The jian: the Chinese straight sword, double-edged, one hand. The Han's
   // were long: excavated iron jian run 0.85-1 m of blade and more (to ~1.1 m
   // overall and beyond), with a long grip; this one has 0.95 m. Light at the
@@ -1362,6 +1374,10 @@ export const SHIELDS = {
   // A Ming soldier's small round shield. Drawn as the rattan shield (tengpai, the user's call, 2026-11-15: the surviving ones in
   // the photographs); met as it was, a board (material, size and mass unchanged: a look only).
   roundShield: { label: 'Round shield', radius: 0.3, mass: 2.2, offset: 0.07, armHarm: 0.15, hold: 1.1, look: 'tengpai', material: 'planks' },
+  // The great rattan shield of Koxinga's iron men (藤牌, ~0.9 m across: the Ming tengpai at its largest, two and a half to
+  // three chi): rattan coiled tight, light for its size, and a broad wall against arrows and the edge (the Dutch at
+  // Zeelandia saw his men come on behind them through the volleys).
+  rattanShield: { label: 'Rattan shield', radius: 0.45, mass: 3.0, offset: 0.08, armHarm: 0.18, hold: 1.2, look: 'tengpai', material: 'wicker' },
   // The Spanish rodela: a round steel shield, heavy and proof against cuts and thrusts.
   rodela: { label: 'Rodela', radius: 0.29, mass: 3.5, offset: 0.07, armHarm: 0.12, hold: 1.4, look: 'steel', material: 'steelPlate' },
   // The Mexica chimalli: a round shield of wicker or wood faced with feathers and hide.

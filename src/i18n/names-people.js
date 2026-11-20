@@ -44,6 +44,8 @@ export const NAMES_PEOPLE = {
   'Ming Elite Infantry': '戚家军',
   'Ming Elite Musketeer': '精锐鸟铳手',
   'Ming Shield Soldier': '藤牌手',
+  'Iron Man Swordsman': '铁人斩马刀手',
+  'Iron Man Shieldbearer': '铁人藤牌手',
   'Qi Long Spearman': '戚家军长枪手',
   'Dangpa Soldier': '镋钯手',
   'Halberdier': '长戟兵',

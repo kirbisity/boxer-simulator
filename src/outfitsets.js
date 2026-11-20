@@ -315,6 +315,14 @@ export const OUTFIT_SETS = {
       patch: { extraMass: 0.15, protection: { blunt: 0.58, cut: 0.84, pierce: 0.85, regions: { head: { blunt: 0.55, cut: 0.85, pierce: 0.55 }, UpperArm: { blunt: 0.58, cut: 0.84, pierce: 0.85 }, Forearm: { blunt: 0.58, cut: 0.84, pierce: 0.85 } } } },
     },
   ],
+  // Koxinga's iron men: one set, their scale, the Japanese limb pieces and the iron face.
+  ironMan: [
+    {
+      key: 'own', designs: [0, 1, 2], name: 'Iron man — scale and iron face',
+      blurb: { en: 'Broad iron scales over Japanese arm and leg guards, a Ming helmet and an iron face with only the eyes cut through. Some twenty-five kilos of iron on a man picked by lifting a stone lion.\nThey walked through Manchu arrows and Dutch volleys behind rattan shields and cut down horse with sabres as long as a man.\nIn the Formosan summer the iron did to them slowly what the muskets could not.', zh: '宽大的铁鳞甲，日式臂甲腿甲，明盔，铁面只开两只眼。二十多公斤铁，压在举得起石狮的汉子身上。\n他们顶着藤牌，走过满洲人的箭雨和荷兰人的排枪，用一人高的斩马刀砍马腿。\n台湾的夏天里，火枪做不到的事，那身铁慢慢替它做了。' },
+      patch: {},
+    },
+  ],
   mingElite: [
     {
       key: 'brigandine', designs: [0, 1, 2], name: 'Ming elite — brigandine, open helm',
@@ -322,14 +330,9 @@ export const OUTFIT_SETS = {
       patch: {},
     },
     {
-      key: 'scale', designs: [3], name: 'Ming elite — scale armour, open helm',
+      key: 'scale', designs: [3, 4], name: 'Ming elite — scale armour, open helm',
       blurb: { en: 'Long coat of steel scales, polished and gilded at the edges, under a plumed helmet. On parade it shimmered like a goldfish: exactly as expensive as it looked, and about as useful.\nThe Wanli Emperor did not hold court for some twenty-five years. His guards stood gleaming before an empty hall.\nThe silver meant for the border troops went on gilt and parades.', zh: '明军侍卫的长鳞甲与缨盔。钢鳞磨亮，边缘鎏金。阅兵时闪如金鱼。华贵如其外表，也仅止于外表。\n万历皇帝二十余年不上朝。他的侍卫立在空荡的大殿前，金光闪闪。\n本该发给边军的饷银，化作了金箔与仪仗。' },
       patch: { extraMass: 0.28, protection: { blunt: 0.6, cut: 0.96, pierce: 0.85 } },
-    },
-    {
-      key: 'scaleMasked', designs: [4], name: 'Ming elite — scale armour, masked helm',
-      blurb: { en: 'Steel scales and an iron half mask: the full harness of a warlord’s chosen few, heavy as duty and as hard to take off. Not an inch of the man shows. A walking statue of his master’s importance.\nIn 1644 rebels marched into Beijing. The last Ming emperor hanged himself behind his palace.\nThe masked guards found there was no one left to guard.', zh: '家丁的鳞甲与铁面。将门亲信的全副披挂，重如差事，也如差事一般脱不下来。浑身不露一寸。一尊会走的雕像，雕的是主子的分量。\n一六四四年，闯军入北京。崇祯皇帝自缢于宫后煤山。\n戴面具的侍卫这才发现，已无人可守。' },
-      patch: { extraMass: 0.285, protection: { blunt: 0.6, cut: 0.96, pierce: 0.85, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
     },
     {
       key: 'lamellar', designs: [5], name: 'Ming elite — iron lamellar',

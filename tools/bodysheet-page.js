@@ -25,6 +25,7 @@ import { compositionKey, skinTextureCache } from '../src/skintex.js';
 import { buildHead } from '../src/face.js';
 import { buildFootwear, buildHand, buildHeadgear, dressFor, roleColors, steelEnvironment, steelMaterial } from '../src/wardrobe.js';
 import { OUTFITS } from '../src/outfits.js';
+import { photoFaceFor, setPhotoFaces } from '../src/photoface.js';
 import { progression } from './bodysheet-cast.js';
 import { applySkinTextures } from '../src/skintex.js';
 import { detailMaterial } from '../src/skindetail.js';
@@ -310,7 +311,8 @@ function lightLike(original) {
 /** A head, hands and feet, set on the pose as the game sets them. */
 function addExtremities(group, body, built, frames, points, { helmet = null, hair = 'bald', beard = 'none' } = {}) {
   const hex = SHEET.clay;
-  const faceLook = { hairStyle: hair, facialHair: beard, hairColor: '#2a1d14', faceMorph: Boolean(styleSpec(STYLE).face) };
+  // (`photo=1`: the game's photo heads, as a fight draws them; the clay drawn head otherwise.)
+  const faceLook = { hairStyle: hair, facialHair: beard, hairColor: '#2a1d14', faceMorph: Boolean(styleSpec(STYLE).face), photoFace: PHOTO ? photoFaceFor(body.inputs) : null };
   const head = buildHead(body, faceLook, hex, 0x888888);
   const seat = body.lengths.headRadius * (BASE_BODY.head.seat - BASE_BODY.head.lift);
   const headFrame = frames[BONE.head];
@@ -499,7 +501,9 @@ function dressedFighters() {
     'mask-silver': masked('samuraiTosei', 3),
     'mask-blackoni': masked('samuraiTosei', 2),
     'mask-oyoroi': masked('samurai', 4),
-    'mask-ironman': masked('mingElite', 4),
+    'mask-ironman': masked('ironMan', 0),
+    'ironman-dark': masked('ironMan', 1),
+    'ironman-black': masked('ironMan', 2),
     'cuman-iron': masked('cumanHeavy', 0),
     'cuman-dark': masked('cumanHeavy', 1),
     'kheshig-face': masked('kheshig', 0),
@@ -511,7 +515,10 @@ function dressedFighters() {
   });
 }
 
+const PHOTO = query.get('photo') === '1';
+
 async function main() {
+  if (PHOTO) await setPhotoFaces(true);
   // `outfit`: the progression dressed in an outfit (outfits.js kind, its first design), to see the clothes on every build.
   const outfit = query.get('outfit');
   const rows = query.get('fighter') ? dressedFighters() : progression(SEX).map((row) => (outfit ? { ...row, label: `${outfit} · ${row.label}`, inputs: { ...row.inputs, outfit: { kind: outfit, design: 0 } } } : row));

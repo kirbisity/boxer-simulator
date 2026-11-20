@@ -36,6 +36,8 @@ export const PEOPLES = {
       brigandine: { heightCm: 2, weightKg: 3, exercise: 0.15 },
       // Koxinga picked his "iron men" by strength (they had to lift a stone lion): his elite is the big men of his army.
       elite: { heightCm: 7, weightKg: 11, exercise: 0.3 },
+      // The iron men themselves, the strongest of those (a stone lion of ~300 jin lifted to be taken): bigger and heavier still.
+      ironMan: { heightCm: 8, weightKg: 15, exercise: 0.34 },
       // Sea raiders: short, thick men of the boats and the oar, heavy for their height.
       raider: { heightCm: -3, weightKg: 5, exercise: 0.16 },
     },

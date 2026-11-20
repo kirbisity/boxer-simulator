@@ -1210,6 +1210,24 @@ export const STYLES = {
     plans: { pressure: 1.2, counter: 1, outboxer: 0.8, brawler: 0.5 },
     pressure: 0.2,
   },
+  // Koxinga's iron men's dao behind the great rattan shield (SHIELDS.rattanShield), as the sword and shield are fought.
+  rattanShield: {
+    label: 'Dao and rattan shield', weapon: 'dao', shield: 'rattanShield', fallback: 'mix',
+    cadence: { work: 1.1, move: 0.9, burst: 0.6, mobility: 0.45 },
+    stance: { blade: 0.45, crouch: 0.07, width: 1.15, lean: 0.12, guardHeight: 0 },
+    weaponGuard: { hand: [0.08, 0.6, -0.14], dir: [1, 0.2, 0.05] },
+    shieldGuard: [0.3, 0.72, 0.05],
+    idle: { bounce: 0.3, sway: 0.6, rock: 0.3 },
+    attacks: { gladiusThrust: 0.5, gladiusCut: 0.4, forehand: 0.1 },
+    combos: { 'gladiusCut gladiusThrust': 0.5, 'gladiusThrust gladiusCut': 0.5 },
+    comboChance: 0.35,
+    tempo: 1.35,
+    defences: { shieldBlock: 0.65, stepBack: 0.35 },
+    defendChance: 0.62,
+    headMovement: 0.1,
+    plans: { pressure: 1.2, counter: 1, outboxer: 0.8, brawler: 0.5 },
+    pressure: 0.2,
+  },
   // The espada alone (a hidalgo): thrust first, as the Spanish school taught.
   espada: {
     label: 'Espada', weapon: 'espada', fallback: 'mix',
@@ -1552,6 +1570,24 @@ export const STYLES = {
   // The guandao, fought as the naginata: great sweeping cuts from far off.
   guandao: {
     label: 'Guandao', weapon: 'guandao',
+    cadence: { work: 1.1, move: 0.85, burst: 0.6, mobility: 0.55 },
+    stance: { blade: 0.42, crouch: 0.06, width: 1.28, lean: 0.05, guardHeight: 0 },
+    weaponGuard: { hand: [0.1, 0.55, -0.06], dir: [1, 0.5, 0] },
+    idle: { bounce: 0.15, sway: 0.4, rock: 0.3 },
+    attacks: { naginataSweep: 0.4, naginataCut: 0.3, naginataRising: 0.1, naginataThrust: 0.2 },
+    combos: { 'naginataSweep naginataCut': 0.45, 'naginataThrust naginataSweep': 0.3, 'naginataRising naginataCut': 0.25 },
+    comboChance: 0.45,
+    tempo: 1.2,
+    defences: { weaponBlock: 0.6, stepBack: 0.4 },
+    defendChance: 0.7,
+    headMovement: 0.05,
+    plans: { outboxer: 1.4, counter: 1.1, pressure: 0.8, brawler: 0.4 },
+    pressure: 0.05,
+    rangeInside: 0.2,
+  },
+  // The zhanmadao (Koxinga's iron men's), fought as the guandao: great sweeping cuts at men and horses' legs from far off.
+  zhanmadao: {
+    label: 'Zhanmadao', weapon: 'zhanmadao',
     cadence: { work: 1.1, move: 0.85, burst: 0.6, mobility: 0.55 },
     stance: { blade: 0.42, crouch: 0.06, width: 1.28, lean: 0.05, guardHeight: 0 },
     weaponGuard: { hand: [0.1, 0.55, -0.06], dir: [1, 0.5, 0] },

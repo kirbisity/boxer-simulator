@@ -520,7 +520,7 @@ def mask_grid(atlas, region, relief, spec, size=GRID, blur=0.06):
 FULL = {'R': 1.12, 'az': 0.42 * PI, 'top': 0.2 * PI, 'bottom': 0.86 * PI}
 HALF = {'R': 1.1, 'az': 0.44 * PI, 'top': 0.42 * PI, 'bottom': 0.88 * PI}
 WORLD_MASKS = {
-    'maskTiemian': FULL, 'maskShoumian': FULL, 'maskKipchak': FULL, 'maskHorde': FULL,
+    'maskTiemian': FULL, 'maskShoumian': FULL, 'maskKipchak': FULL, 'maskHorde': FULL, 'maskSomen': FULL,
     'maskVentail': HALF,
 }
 WORLD_N = 512
@@ -812,11 +812,82 @@ def kipchak_bowl_atlas(name):
     hammered(region, 0.002, 0.08, seed=9)
     return atlas
 
+
+# Koxinga's iron men's sōmen (maskSomen): the whole face in iron, only the eyes showing, after the Japanese sōmen (Met
+# 24176; references in src/helmmaps.js) made for the Zheng house: a broad brow over almond eyes cut through, a hooked nose
+# as the menpō's, the cheekbones and the crease past the mouth's corner, a small open mouth to breathe through, a jutting
+# chin; the iron finished in grooves round the mouth as the menpō's. Stern, not a demon's. On the FULL sphere, set on the
+# face as the steppe's iron faces are (helmforms.js MASK_FITS.somen: Y 0.04 the eyes, -0.49 the mouth, -1.0 the chin).
+SOMEN = {
+    'outline': [(-0.05, 0.74), (0.0, 0.74), (0.3, 0.73), (0.6, 0.68), (0.92, 0.56), (1.12, 0.34), (1.2, 0.02), (1.19, -0.38),
+                (1.09, -0.68), (0.82, -0.9), (0.42, -1.0), (0.0, -1.03), (-0.05, -1.03)],
+    'brow': [(0.05, 0.27), (0.18, 0.33), (0.33, 0.32), (0.46, 0.24)],
+    'eye': (0.235, 0.06, 0.12, 0.042, -0.12),
+    'nose': [(0.24, 0.05, 0.06), (0.1, 0.11, 0.075), (-0.04, 0.21, 0.1), (-0.13, 0.26, 0.13), (-0.19, 0.21, 0.15), (-0.24, 0.09, 0.14), (-0.28, 0.0, 0.11)],
+    'mouth': (-0.5, 0.17, 0.045),
+    'chin': ((0.0, -0.78), 0.26, 0.2, 0.08),
+}
+
+
+def somen_atlas(name):
+    spec = WORLD_MASKS[name]
+    atlas = Atlas(name, base=METAL, rough=0.36, metal=1.0)
+    region = atlas.region((0, 0, 1, 1), mask_surface(spec), spec['az'] * spec['R'])
+    X, Y = region.s['X'], region.s['Y']
+    region.paint(np.ones(X.shape), mask=1.0)
+    k = SOMEN
+    outline, signed = outline_field(X, Y, k['outline'], 0.02)
+    relief = np.zeros(X.shape, np.float32)
+    relief += dome(ellipse(X, Y, 0.0, 0.0, 0.85, 1.0), 1.0) * 0.06
+    relief += dome(np.hypot(X - 0.45, (Y + 0.1) * 1.2), 0.3) * 0.06
+    (cx, cy), crx, cry, ch = k['chin']
+    relief += dome(ellipse(X, Y, cx, cy, crx, cry), 1.0) * ch
+    brow = seg_dist(X, Y, curve(k['brow'], 30))
+    relief += bead(brow, 0.08) * 0.05
+    ex, ey, erx, ery, ea = k['eye']
+    eye = ellipse(X, Y, ex, ey, erx, ery, ea)
+    relief -= dome(ellipse(X, Y, ex, ey, erx * 1.6, ery * 2.8, ea), 1.0) * 0.045
+    relief += bead(np.abs(eye - 1.25), 0.35) * 0.015
+    ys = [p[0] for p in k['nose']][::-1]
+    height = np.interp(Y, ys, [p[1] for p in k['nose']][::-1]) * ((Y <= ys[-1]) & (Y >= ys[0]))
+    half = np.interp(Y, ys, [p[2] for p in k['nose']][::-1])
+    nose = np.maximum(height * np.clip(1 - (X / half) ** 2, 0, None) ** 1.2, dome(np.hypot(X - 0.13, (Y + 0.22) * 1.3), 0.08) * 0.12)
+    relief += nose
+    crease = seg_dist(X, Y, curve([(0.19, -0.2), (0.27, -0.33), (0.31, -0.48), (0.31, -0.6)], 30))
+    relief += dome(crease, 0.15) * 0.035 * (X > 0.25) - bead(crease, 0.03) * 0.025
+    my, mw, mh = k['mouth']
+    mouth = ellipse(X, Y, 0.0, my - 0.02 * (X / mw) ** 2, mw, mh)
+    relief += dome(ellipse(X, Y, 0.0, my + 0.04, 0.3, 0.2), 1.0) * 0.06 + bead(np.abs(mouth - 1.3), 0.45) * 0.025
+    relief *= smooth((mouth - 0.9) / 0.1) * smooth((eye - 0.9) / 0.1)
+    coarse = mask_grid(atlas, region, relief, spec, MENPO_GRID, 0.03)
+    region.add(relief - coarse)
+    # The grooves round the mouth (as the menpō's), down the nose; the brow's lines left plain.
+    pitch, depth = 0.026, 0.0024
+    rings = np.hypot(X / 1.05, (Y - my) / 0.78)
+    on_nose = smooth(nose / 0.06)
+    lower = smooth((0.0 - Y) / 0.1)
+    region.add(-(((0.5 + 0.5 * np.cos(2 * PI * rings / pitch)) ** 6) * (1 - on_nose) * lower + ((0.5 + 0.5 * np.cos(2 * PI * (X / np.maximum(half, 0.05)) * 0.11 / pitch)) ** 6) * on_nose) * depth)
+    hammered(region, 0.0012, 0.05, seed=12)
+    nostril = ellipse(X, Y, 0.075, -0.235, 0.045, 0.02, 0.4)
+    region.add(-smooth((1 - nostril) / 0.35) * 0.03)
+    region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+    for opening in (mouth, eye):
+        region.add(bead(np.abs(opening - 1.04), 0.06) * 0.01)
+        region.paint(smooth((1.0 - opening) / 0.05), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
+        region.paint(smooth((1.02 - opening) / 0.02), cut=0.0)
+    region.add(bead(np.abs(signed - 0.018), 0.018) * 0.012)
+    region.paint(1 - outline, cut=0.0)
+    h = region.view('h') / region.k
+    wear = smooth((h - region.blur(h, 0.035)) * 160) * region.view('mask')
+    region.paint(wear * 0.6, rgb=METAL + 0.08)
+    return atlas
+
 BUILDERS = {
     'maskMenpo': lambda: mask_atlas('maskMenpo'),
     **{name: (lambda name=name: world_mask_atlas(name)) for name in WORLD_MASKS},
     'maskKipchak': lambda: kipchak_atlas('maskKipchak'),
     'formKipchakBowl': lambda: kipchak_bowl_atlas('formKipchakBowl'),
+    'maskSomen': lambda: somen_atlas('maskSomen'),
 }
 
 

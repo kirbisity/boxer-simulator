@@ -98,6 +98,8 @@ export const UNIT_NAMES = {
   mingDangpa: 'Dangpa Soldier',
   mingEliteGun: 'Ming Elite Musketeer',
   mingShield: 'Ming Shield Soldier',
+  ironManBlade: 'Iron Man Swordsman',
+  ironManShield: 'Iron Man Shieldbearer',
   mingBrigSpear: 'Ming Spearman',
   mingGun: 'Ming Musketeer',
   mingCrossbow: 'Garrison Crossbowman',
@@ -231,6 +233,10 @@ export const WARRIORS = [
   warrior('mingEliteSpear', 'Zhou Shun', PRESETS.langxian, { name: 'Zhou Shun', style: 'spear', age: 25, outfit: { kind: 'mingEliteInfantry', design: 1 } }),
   warrior('mingDangpa', 'Lin Hu', PRESETS.langxian, { name: 'Lin Hu', style: 'dangpa', age: 29, outfit: { kind: 'mingEliteInfantry', design: 2 } }),
   warrior('mingEliteGun', 'Wu Weizhong', PRESETS.guandao, { name: 'Wu Weizhong', style: 'matchlock', outfit: { kind: 'mingElite', design: 1 } }),
+  // Koxinga's iron men (outfits.js ironMan): their own scale and iron face; Chen Ze, who led them at Baxemboy (1661), with the
+  // zhanmadao, and Ma Xin with the dao and the great rattan shield; southern men picked for strength (peoples.js mingSouth ironMan).
+  warrior('ironManBlade', 'Chen Ze', PRESETS.guandao, { name: 'Chen Ze', style: 'zhanmadao', heightCm: 171, frame: 'large', age: 34, outfit: { kind: 'ironMan', design: 0 } }),
+  warrior('ironManShield', 'Ma Xin', PRESETS.guandao, { name: 'Ma Xin', style: 'rattanShield', heightCm: 171, frame: 'large', age: 30, outfit: { kind: 'ironMan', design: 1 } }),
   warrior('mingShield', 'Chen Bao', PRESETS.swordShield),
   warrior('mingBrigSpear', 'Sun Qi', PRESETS.swordShield, { name: 'Sun Qi', style: 'spear', outfit: { kind: 'mingBrigandine', design: 2 } }),
   warrior('mingGun', 'Zhao Liu', PRESETS.mingMatchlock),

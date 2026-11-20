@@ -20,16 +20,18 @@ test('obsidian flakes set in wood: a short club and a short spear that cut shall
   for (const club of [macuahuitl, tepoztopilli]) assert.ok(club.cleave < 1 && club.harm.swing.blunt < katana.harm.swing.blunt + 0.01);
 });
 
-test('Fort Zeelandia: the iron men are all masked and in scale; a few ronin among Koxinga\'s men', async () => {
+test('Fort Zeelandia: the iron men in their own scale and iron faces, with the zhanmadao or the rattan shield; a few ronin among Koxinga\'s men', async () => {
   const { SCENARIOS } = await import('../src/scenarios.js');
   const cast = SCENARIOS.zeelandia.cast(seededRandom(2));
-  const elites = cast.blue.filter((fighter) => fighter.outfit.kind === 'mingElite');
-  assert.ok(elites.length >= 3);
-  for (const elite of elites) {
-    const design = OUTFITS.mingElite.designs[elite.outfit.design];
-    assert.equal(design.armor.kind, 'mingScale');
-    assert.ok(design.head.mask);
+  const ironMen = cast.blue.filter((fighter) => fighter.outfit.kind === 'ironMan');
+  assert.ok(ironMen.length >= 3);
+  for (const man of ironMen) {
+    const design = OUTFITS.ironMan.designs[man.outfit.design];
+    assert.equal(design.armor.kind, 'ironManScale');
+    assert.equal(design.head.maskDesign, 'somen');
+    assert.ok(['zhanmadao', 'rattanShield'].includes(man.style), man.style);
   }
+  assert.ok(!cast.blue.some((fighter) => fighter.outfit.kind === 'mingElite'), 'no Ming elite among them');
   // A few iron men, the rest garrison troops (no brigandine regulars since 2026-11-19).
   assert.ok(cast.blue.filter((fighter) => fighter.outfit.kind === 'mingGarrison').length > cast.blue.length / 2);
   assert.ok(cast.red.some((fighter) => fighter.style === 'halberd'), 'halberds among the Dutch');

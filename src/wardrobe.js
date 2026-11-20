@@ -3131,6 +3131,7 @@ function samuraiMask(group, head, r, steel, color, lace) {
     hook.add(post, tip);
     hook.position.set(at[0] * r, at[1] * r, at[2] * r);
     hook.rotation.y = -Math.atan2(at[2], at[0]);
+    hook.userData.maskPiece = true;
     group.add(hook);
   }
   // A horsehair moustache and chin tuft set into the mask (`maskHair`, its colour), as the dressier menpō had.
@@ -3189,6 +3190,7 @@ function menpoHair(colour, r) {
   }
   const hair = new THREE.Mesh(hairStrands(strands, MENPO_HAIR.thick * r), surface(colour, { roughness: 0.9 }));
   hair.userData.noOutline = true;
+  hair.userData.maskPiece = true;
   return hair;
 }
 
@@ -3215,8 +3217,8 @@ const MENPO = { black: 0x2c2b2f, iron: 0x47372d, vermilion: 0x8a2c1c, throat: 0x
 const WORLD_MASK_METAL = {
   tiemian: (head, color) => color, kipchak: (head, color) => color, shoumian: () => 0x9a7a4a,
   horde: (head) => head.gold ?? 0xc9a23a, ventail: (head, color) => head.mail ?? head.coif ?? color,
-  // Koxinga's iron men: the samurai's menpō in the helmet's bare steel.
-  menpo: (head, color) => color,
+  // Koxinga's iron men: the whole iron face (sōmen) in the helmet's iron.
+  somen: (head, color) => color,
 };
 
 /**

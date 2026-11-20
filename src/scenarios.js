@@ -274,7 +274,7 @@ const ZEELANDIA = {
   // garrison men, 30 in all: the user's call, 2026-11-19.)
   // (Fewer of his men against the Dutch, a few iron men and the rest garrison troops: the fight was too one-sided; was 34
   // with brigandine and lamellar regulars: the user's call, 2026-11-19.)
-  koxinga: { elite: { guandao: 2, swordShield: 1 }, brigandine: {}, lamellar: {}, garrison: { spear: 10, dao: 4, matchlock: 3 }, ronin: { ronin: 2 } },
+  koxinga: { ironMan: { zhanmadao: 2, rattanShield: 1 }, brigandine: {}, lamellar: {}, garrison: { spear: 10, dao: 4, matchlock: 3 }, ronin: { ronin: 2 } },
 };
 
 // A wokou raid on the Zhejiang coast, 1550s: rōnin and Chinese sea raiders
@@ -755,8 +755,8 @@ export const ARMIES = {
   koxinga: {
     label: "Koxinga's army",
     ranks: {
-      // His iron men, every one masked, in scale (the elite's masked scale design).
-      elite: { label: 'Iron man', kinds: ['mingElite'], styles: ['guandao', 'swordShield'], make: mingRank('elite', MING_PEOPLE.koxinga, 4) },
+      // His iron men (OUTFITS ironMan: their own scale, Japanese limb pieces and iron faces).
+      ironMan: { label: 'Iron man', kinds: ['ironMan'], styles: ['zhanmadao', 'rattanShield'], make: mingRank('ironMan', MING_PEOPLE.koxinga) },
       brigandine: { label: 'Brigandine', kinds: ['mingBrigandine'], designs: [0, 1, 2], styles: ['swordShield', 'spear', 'matchlock'], make: mingRank('brigandine', MING_PEOPLE.koxinga) },
       lamellar: { label: 'Iron lamellar', kinds: ['mingBrigandine'], designs: [3, 4], styles: ['spear', 'swordShield'], make: mingRank('brigandine', MING_PEOPLE.koxinga, 3) },
       garrison: { label: 'Garrison', kinds: ['mingGarrison'], styles: ['spear', 'dao', 'matchlock'], make: mingRank('garrison', MING_PEOPLE.koxinga) },
@@ -1418,7 +1418,7 @@ export const SCENARIOS = {
   zeelandia: {
     title: 'Fort Zeelandia',
     place: 'Baxemboy, Formosa · 1661',
-    blurb: { en: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers, pikemen and halberdiers march out to meet his army on the sand: a few masked iron men in scale, garrison troops and a few Japanese.", zh: '郑成功登陆，要拿热兰遮城。荷兰东印度公司的火枪手、长枪兵和戟兵开出城，在沙滩上迎战他的大军：几名戴铁面、披鳞甲的铁人，营兵，还有几个日本人。' },
+    blurb: { en: "Koxinga lands to take Fort Zeelandia. The VOC's musketeers, pikemen and halberdiers march out to meet his army on the sand: a few iron men in scale and iron faces with their long sabres and rattan shields, garrison troops and a few Japanese.", zh: '郑成功登陆，要拿热兰遮城。荷兰东印度公司的火枪手、长枪兵和戟兵开出城，在沙滩上迎战他的大军：几名戴铁面、披鳞甲的铁人，营兵，还有几个日本人。' },
     scene: 'coastFort',
     arena: { halfX: 15, halfZ: 10 },
     camera: { yaw: -0.5, pitch: 0.42, distance: 16, maxDistance: 20 },
@@ -1426,8 +1426,8 @@ export const SCENARIOS = {
     formation: { red: { front: 5, spacing: 1.2, rowSpacing: 1.5, shootersFront: SHOOTERS_FRONT_GAP, perRow: 9, loose: 0.15 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.6, shootersFront: SHOOTERS_FRONT_GAP, perRow: 10, loose: 0.35 } },
     cast: (random) => {
       const army = ZEELANDIA.koxinga;
-      // The iron men, every one masked, in scale (the elite's masked scale design).
-      const ironMen = company(army.elite, (style) => mingSoldier(random, style, 'elite', { people: 'mingSouth', design: 4 }));
+      // The iron men (OUTFITS ironMan): the long zhanmadao, or the dao behind the great rattan shield.
+      const ironMen = company(army.ironMan, (style) => mingSoldier(random, style, 'ironMan', { people: 'mingSouth' }));
       const regulars = company(army.brigandine, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingSouth' }));
       const lamellar = company(army.lamellar, (style) => mingSoldier(random, style, 'brigandine', { people: 'mingSouth', design: 3 + Math.floor(random() * 2) }));
       const garrison = company(army.garrison, (style) => mingSoldier(random, style, 'garrison', { people: 'mingSouth' }));

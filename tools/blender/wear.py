@@ -227,6 +227,7 @@ WEAR = {
     'formCabassetSpanish': ('munition', (0.4, 0.4)),
     'segmentata': ('steel', (0.18, 0.156)),
     'scale': ('steel', (0.12, 0.048)),
+    'ironScale': ('steel', (0.2, 0.092)),
     'krug': ('steel', (0.072, 0.063)),
     'bifu': ('munition', (0.08, 0.15)),
     'polymer': ('polymer', (0.1, 0.1)),
@@ -245,6 +246,7 @@ WEAR = {
     'maskVentail': ('mail', (0.2, 0.2)),
     # (A war mask's sheet is half a face, about 0.2 m to a side.)
     'maskMenpo': ('lacquer', (0.2, 0.2)),
+    'maskSomen': ('steel', (0.2, 0.2)),
 }
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

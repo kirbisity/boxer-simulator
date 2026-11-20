@@ -436,6 +436,8 @@ export const WORLD = {
       // Byeokjegwan, north of Hanseong (Seoul), 27 February 1593: Seoul's February mean 0.7 °C, rising to ~2 by its end;
       // the paddies thawing to mud. Humidity ~55-60%.
       byeokjegwan: { air: 1, humidity: 0.6 },
+      // Baxemboy before Fort Zeelandia (Tainan), May 1661: Tainan's May mean ~27 °C, the plum rains coming, humidity ~80%.
+      coastFort: { air: 27, humidity: 0.8 },
       // Ulsan, the siege of 29 January - 19 February 1598: Ulsan's January mean 2.4 °C (nights -1.8), humidity ~49%.
       ulsan: { air: 1, humidity: 0.5 },
     },

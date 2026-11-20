@@ -651,6 +651,8 @@ export const MASK_FITS = {
   ...Object.fromEntries(['tiemian', 'horde'].map((name) => [name, { R: 1.12, gap: 0.06, span: 0.84, y: WORLD_FACE_Y }])),
   shoumian: { R: 1.12, gap: 0.06, span: [0.95, 0.63, 0.92], y: WORLD_FACE_Y },
   kipchak: { R: 1.12, gap: 0.06, span: [0.66, 0.62, 0.8], square: 0.15, y: WORLD_FACE_Y },
+  // Koxinga's iron men's sōmen: the whole face, the eyes over the eyes, the jaw guard out a little before the chin.
+  somen: { R: 1.12, gap: 0.06, span: 0.84, chin: 0.08, y: WORLD_FACE_Y },
   ventail: { R: 1.1, gap: 0.07, span: 0.84, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
 };
 

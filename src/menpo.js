@@ -13,7 +13,7 @@ import { HELM_MAP_DATA } from './helmmaps-data.js';
 import { maskOnFace, MASK_FITS } from './helmforms.js';
 
 export const MASK_SHEETS = {
-  menpo: 'maskMenpo',
+  menpo: 'maskMenpo', somen: 'maskSomen',
   tiemian: 'maskTiemian', shoumian: 'maskShoumian', kipchak: 'maskKipchak', horde: 'maskHorde', ventail: 'maskVentail',
 };
 
@@ -78,6 +78,8 @@ export function buildWarMask(group, style, r, tint, envMap, { span = null, plain
   if (!material) return null;
   const mask = new THREE.Mesh(maskGeometry(grid, r, MASK_FITS[style]), material);
   mask.userData.noOutline = true;
+  // (Fitted to the face it is worn over when the man is drawn: render.js fitMasksToFace.)
+  mask.userData.warMask = true;
   mask.castShadow = true;
   if (span) mask.scale.set(1 / span[0], 1 / span[1], 1 / span[2]);
   group.add(mask);

@@ -2036,6 +2036,55 @@ function skinnedMesh(built, bones, colors, { indices = built.indices, material =
 export const SKIN_DQ = { base: true };
 
 /** Ways to build the skin: see bodystyles.js. V7 (a loft wrapped onto the flesh field, with maps) is the default; 'lofted' the old one. */
+/**
+ * A war mask set out clear of the face it is worn over (menpo.js marks it `warMask`, the pieces on it `maskPiece`): the masks
+ * are fitted to the helmets' own head (helmforms.js HELM_HEAD), and a man's face (a photo head's nose, lips and chin, a
+ * broad jaw) can stand further forward than that head. At each height the face's front (within MASK_FIT.across of the
+ * middle) is measured against the mask's, and the mask and its pieces are drawn out from the head's middle by enough that
+ * the face stays MASK_FIT.clear behind it everywhere; nothing moves where the face is already behind it.
+ */
+function fitMasksToFace(gear, head) {
+  const masks = [];
+  gear.traverse((object) => { if (object.userData.warMask) masks.push(object); });
+  if (!masks.length) return;
+  const pieces = [];
+  gear.traverse((object) => { if (object.userData.warMask || object.userData.maskPiece) pieces.push(object); });
+  head.updateMatrixWorld(true);
+  const toHead = new THREE.Matrix4().copy(head.matrixWorld).invert();
+  const point = new THREE.Vector3();
+  // The front (x) of what is drawn at each height band (y), of the meshes `take` accepts.
+  const fronts = (root, take) => {
+    const rows = new Map();
+    root.traverse((mesh) => {
+      if (!mesh.isMesh || !mesh.visible || !take(mesh)) return;
+      const position = mesh.geometry.attributes.position;
+      const matrix = new THREE.Matrix4().multiplyMatrices(toHead, mesh.matrixWorld);
+      for (let index = 0; index < position.count; index += 1) {
+        point.fromBufferAttribute(position, index).applyMatrix4(matrix);
+        const band = Math.round(point.y / MASK_FIT.band);
+        if (Math.abs(point.z) > MASK_FIT.across * Math.max(0.01, Math.abs(point.x)) + MASK_FIT.across * 0.05) continue;
+        rows.set(band, Math.max(rows.get(band) ?? -Infinity, point.x));
+      }
+    });
+    return rows;
+  };
+  const inGear = (mesh) => { for (let object = mesh; object; object = object.parent) if (object === gear) return true; return false; };
+  const face = fronts(head, (mesh) => !inGear(mesh));
+  const mask = fronts(gear, (mesh) => mesh.userData.warMask);
+  let scale = 1;
+  for (const [band, front] of mask) {
+    if (typeof band !== 'number' || !Number.isInteger(band) || !(front > 0)) continue;
+    const behind = face.get(band);
+    if (behind === undefined || !Number.isFinite(behind)) continue;
+    scale = Math.max(scale, (behind + MASK_FIT.clear * front) / front);
+  }
+  if (scale > 1) for (const piece of pieces) { piece.scale.x *= scale; piece.position.x *= scale; }
+}
+
+// How a war mask is set clear of the face (fitMasksToFace): the height bands it is measured in (in the head's own units), the
+// front strip measured (|z| within `across` of the forward distance), and the clearance kept (a share of the mask's reach).
+const MASK_FIT = { band: 0.01, across: 0.35, clear: 0.03 };
+
 export const BODY_STYLES = BODY_STYLE_KEYS;
 export let BODY_STYLE = DEFAULT_BODY_STYLE;
 export function setBodyStyle(style) {
@@ -2183,6 +2232,7 @@ function detailedView(view, fighter, simple) {
     headgear.group.scale.set(spanX, spanY, spanZ * widen);
     headView.group.add(headgear.group);
     const hidden = headgear.hidesHair ? headView.hideHair({ beard: headgear.showsBeard }) : [];
+    fitMasksToFace(headgear.group, headView.group);
     // A crowd template is baked with both heads (crowdview.js HEAD_VARIANT): the helmet, and the hair it hides, each marked.
     if (simple) {
       headVariant(headgear.group, 'helmed');
