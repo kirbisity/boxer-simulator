@@ -152,9 +152,13 @@ def iron_scale(n):
             q = np.hypot(ddx, t.Y - foot_c)
             inside = ((np.abs(ddx) < Wd / 2) & (s >= 0) & (t.Y >= foot_c)) | ((q < Wd / 2) & (t.Y < foot_c))
             edge = np.where(t.Y < foot_c, Wd / 2 - q, np.minimum(Wd / 2 - np.abs(ddx), top - t.Y))
-            # Rising down the scale to its foot (each lies over the next), a gentle dish across, the edge eased.
-            across = 1 - (ddx / (Wd / 2)) ** 2
-            z = 0.0006 + 0.0034 * np.clip(s, 0, 1) + 0.0005 * across - 0.0008 * (1 - smooth(0, 0.0012, edge))
+            # Each scale domed (convex, as the reference: raised from a plate, not flat): an arch across its width, rolling over
+            # and down round its foot as a half dome, on a plane rising down the scale (each lies over the row below); its edge
+            # a thin rim of the plate's own thickness. The dome ~5.5 mm high on a 32 mm scale (well rounded, as the reference).
+            arch = np.sqrt(np.clip(1 - (ddx / (Wd / 2)) ** 2, 0, None))
+            cap = np.sqrt(np.clip(1 - (q / (Wd / 2)) ** 2, 0, None))
+            dome = np.where(t.Y < foot_c, cap, arch * smooth(0, 0.35, s))
+            z = 0.0005 + 0.0016 * np.clip(s, 0, 1) + 0.0055 * dome ** 0.8 - 0.0004 * (1 - smooth(0, 0.0008, edge))
             take = inside & (z > best)
             best = np.where(take, z, best)
             tone = np.where(take, 0.8 + 0.08 * (((row % 2) * 6 + col % 6) * 0.618 % 1.0), tone)
