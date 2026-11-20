@@ -15,7 +15,7 @@ import tilebake as tb  # noqa: E402
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 OUT = argv[0]
-NAMES = argv[1:] or ['formMurmillo', 'formThraex', 'formHoplomachus', 'formSecutor', 'formScissor', 'maskOni', 'maskRessei', 'maskTengu']
+NAMES = argv[1:] or ['formMurmillo', 'formThraex', 'formHoplomachus', 'formSecutor', 'formScissor', 'maskMenpo']
 
 for name in NAMES:
     height = np.load(os.path.join(OUT, f'{name}_src_h.npy')).astype(np.float32)

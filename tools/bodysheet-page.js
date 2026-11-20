@@ -23,7 +23,8 @@ import { BONES, BONE, bindPoints, boneFrames, frameMatrix } from '../src/rig.js'
 import { buildSkinMesh, skinTexturesNow, styleSpec } from '../src/bodystyles.js';
 import { compositionKey, skinTextureCache } from '../src/skintex.js';
 import { buildHead } from '../src/face.js';
-import { buildFootwear, buildHand, buildHeadgear, dressFor, roleColors, steelMaterial } from '../src/wardrobe.js';
+import { buildFootwear, buildHand, buildHeadgear, dressFor, roleColors, steelEnvironment, steelMaterial } from '../src/wardrobe.js';
+import { OUTFITS } from '../src/outfits.js';
 import { progression } from './bodysheet-cast.js';
 import { applySkinTextures } from '../src/skintex.js';
 import { detailMaterial } from '../src/skindetail.js';
@@ -103,7 +104,7 @@ const SHEET = {
   distance: 6.1,
   target: [0, 0.97, 0],
   // Camera bearings from the fighter's front (+x), degrees.
-  views: { front: 0, rear: 215, back: 180, side: 90, face: 0, face3q: 38, front3q: 35, high: 145 },
+  views: { front: 0, rear: 215, back: 180, side: 90, face: 0, face3q: 38, faceside: 72, facelow: 20, front3q: 35, high: 145 },
   // Views seen from above (m the camera is raised over the target, at the full-body distance): the shoulders' tops.
   raised: { high: 1.6 },
   header: 78,
@@ -328,7 +329,8 @@ function addExtremities(group, body, built, frames, points, { helmet = null, hai
   const colors = { ...roleColors(dress, new THREE.Color(hex)), accent: dress.feet.accent };
   const plain = plainMaterial();
   if (helmet) {
-    const steel = steelMaterial(null, { vertexColors: false, color: 0x9aa4ad });
+    // (The game's steel reflections, so polished and lacquered metal reads as it does in a fight.)
+    const steel = steelMaterial(steelEnvironment(renderer), { vertexColors: false, color: helmet.color ?? 0x9aa4ad });
     const headgear = buildHeadgear(body, helmet, colors, steel, 0x888888, {});
     if (headgear) {
       head.group.add(headgear.group);
@@ -445,7 +447,7 @@ function pointCamera(view, crop, subject) {
   const bearing = (SHEET.views[view] * Math.PI) / 180;
   const [tx, ty, tz] = SHEET.target;
   const faceView = view.startsWith('face');
-  const zoom = faceView ? 5.6 : { torso: 2.1, chest: 3.4, legs: 2.2 }[crop] ?? 1;
+  const zoom = faceView ? 5.6 * Number(query.get('facezoom') ?? 1) : { torso: 2.1, chest: 3.4, legs: 2.2 }[crop] ?? 1;
   const target = faceView ? [tx, subject.headY - 0.05, tz] : { torso: [tx, 1.28, tz], chest: [tx, 1.34, tz], legs: [tx, 0.55, tz] }[crop] ?? [tx, ty, tz];
   const distance = SHEET.distance / zoom;
   camera.position.set(target[0] + Math.cos(bearing) * distance, target[1] + (faceView ? 0.01 : 0.12) + (SHEET.raised[view] ?? 0) / zoom, target[2] + Math.sin(bearing) * distance);
@@ -476,6 +478,8 @@ function dressedFighters() {
   // The extremes of the progression (very obese, starved) in plate, for the helmets and the hair.
   const extreme = (fat) => progression('male').find((row) => row.key === (fat ? 'veryObese' : 'starved')).inputs;
   const helmed = (fat) => ({ ...extreme(fat), outfit: { kind: 'knight', design: 0 } });
+  // A samurai kit's kabuto and war mask (outfits.js: its design's `head`) on the plain man.
+  const masked = (kind, design) => ({ inputs: { ...base, outfit: { kind, design } }, extras: { helmet: OUTFITS[kind].designs[design].head } });
   const presets = {
     knight: PRESETS.knight,
     gambeson: { ...base, outfit: { kind: 'forger', design: 0 } },
@@ -486,6 +490,15 @@ function dressedFighters() {
     'open-thin': { inputs: helmed(false), extras: { helmet: { kind: 'headguard', color: '#9aa4ad' } } },
     'hair-fat': { inputs: { ...helmed(true), outfit: { kind: 'mma', design: 0 } }, extras: { hair: 'long', beard: 'beard' } },
     'hair-thin': { inputs: { ...helmed(false), outfit: { kind: 'mma', design: 0 } }, extras: { hair: 'long', beard: 'beard' } },
+    // The samurai's war masks: russet iron (the ō-yoroi's horned kabuto), black lacquer (the tōsei), red (the russet tōsei), Kojima's oni.
+    'mask-iron': masked('samurai', 1),
+    'mask-black': masked('samuraiTosei', 0),
+    'mask-red': masked('samuraiTosei', 1),
+    'mask-oni': masked('samuraiTosei', 5),
+    'mask-blackoni': masked('samuraiTosei', 2),
+    'mask-oyoroi': masked('samurai', 4),
+    'mask-ironman': masked('mingElite', 4),
+    'ming-blackgold': masked('mingElite', 2),
   };
   return query.get('fighter').split(',').map((key) => {
     const preset = presets[key];
@@ -504,6 +517,8 @@ async function main() {
     if (MOTION) subjects.push(...motionFrames(subject).map((frame) => ({ ...frame, column: { ...column, label: frame.moment === null ? `${column.label} (no masses)` : `${column.label} · ${MOTION} ${frame.moment.toFixed(2)} s` } })));
     else subjects.push(subject);
   }
+  // `wait` (ms): time for baked maps (helmets, masks) to decode before the shots.
+  if (query.get('wait')) await new Promise((resolve) => setTimeout(resolve, Number(query.get('wait'))));
   const width = CELL_W * SCALE;
   const height = CELL_H * SCALE;
   const sheet = document.createElement('canvas');

@@ -3099,135 +3099,74 @@ function buildKabuto(group, head, r, steel, color, lowDetail = false) {
     const foot = shikoro((head.tiers ?? 4) - 1);
     group.add(hagumaHair(r, head.plume, outline.at(-1)[0], [[-0.05 - (head.tiers ?? 4) * 0.24, foot.x / r + 0.2 + flare], [outline[0][0] - 0.02, outline[0][1] + (build.skull?.brim ?? 0.1)], ...outline], lowDetail));
   }
-  // A mask in a design under study (helmstyle.js `masks`), drawn with baked maps (menpo.js), set on the face (helmforms.js
-  // MASK_FITS); the gorget under it, hanging from under the chin.
-  // `own`: the kit's own mask design (`maskDesign`; an oni somen for `mask: 'oni'`, else the commoner ressei-men).
-  const maskDesign = HELM_STYLE.masks === 'own' ? head.maskDesign ?? (head.mask === 'oni' ? 'oni' : 'ressei') : HELM_STYLE.masks;
-  const maskTint = head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : MENPO.black;
-  if (head.mask && maskDesign !== 'now' && helmMapsReady() && buildWarMask(group, maskDesign, r, maskTint, steel.envMap, null, Boolean(head.maskPlain))) {
-    // The throat guard (yodare-kake): three laced lames hung from the mask's chin, each wider than the one above, a cord at
-    // the foot of each.
-    for (let tier = 0; tier < 3; tier += 1) {
-      const [top, bottom] = [0.75 + tier * 0.075, 0.83 + tier * 0.075];
-      const lame = new THREE.Mesh(new THREE.CylinderGeometry(top * r, bottom * r, 0.15 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), head.mask === 'oni' ? metal(steel, 0x101012) : head.mask === 'iron' ? metal(steel, MENPO.throat) : bowlSteel);
-      lame.material = lame.material.clone();
-      lame.material.side = THREE.DoubleSide;
-      lame.position.y = (MASK_THROAT_Y + 0.14 - tier * 0.14) * r;
-      lame.userData.helmPart = 'shikoro';
-      const cord = new THREE.Mesh(new THREE.CylinderGeometry(bottom * 1.005 * r, bottom * 1.012 * r, 0.035 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), lace);
-      cord.material = lace.clone();
-      cord.material.side = THREE.DoubleSide;
-      cord.position.y = lame.position.y - 0.075 * r;
-      group.add(lame, cord);
-    }
-    // A half mask (the ressei-men) made an oni's: a scowling brow over the eyes and tusks at the corners of the mouth.
-    if (MENPO.scowled.includes(maskDesign)) oniScowl(group, r, metal(steel, maskTint), !head.maskPlain);
-  } else if (head.mask === 'oni') {
-  // An oni somen: the whole face in black iron, heavy brows, glaring eye
-  // holes, a snarl with fangs, and two short horns at the brow.
-    const iron = metal(steel, 0x101012);
-    const face = new THREE.Mesh(new THREE.SphereGeometry(1.08 * r, 18, 12, Math.PI * 0.6, Math.PI * 0.8, Math.PI * 0.22, Math.PI * 0.62), iron);
-    face.material = iron.clone();
-    face.material.side = THREE.DoubleSide;
-    face.userData.facePatch = true;
-    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.16 * r, 0.14 * r, 0.95 * r), iron);
-    brow.position.set(1.08 * r, 0.3 * r, 0);
-    const glare = surface(0x8a1a12, { emissive: 0x3a0806 });
-    const eyes = [1, -1].map((side) => {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.09 * r, 8, 6), glare);
-      eye.position.set(1.06 * r, 0.16 * r, side * 0.24 * r);
-      eye.scale.x = 0.5;
-      return eye;
-    });
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.16 * r, 0.3 * r, 6), iron);
-    nose.rotation.z = -Math.PI / 2;
-    nose.position.set(1.14 * r, -0.04 * r, 0);
-    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.12 * r, 0.5 * r), surface(0x2a0a08));
-    mouth.position.set(1.06 * r, -0.36 * r, 0);
-    const bone = surface(0xe8e2d0);
-    const fangs = [0.16, -0.16].map((z) => {
-      const fang = new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, 0.2 * r, 5), bone);
-      fang.position.set(1.08 * r, -0.26 * r, z * r);
-      return fang;
-    });
-    const horns = [1, -1].map((side) => {
-      const horn = new THREE.Mesh(new THREE.ConeGeometry(0.08 * r, 0.42 * r, 6), bone);
-      horn.position.set(0.95 * r, 0.62 * r, side * 0.4 * r);
-      horn.rotation.set(side * -0.35, 0, -0.35);
-      return horn;
-    });
-    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), iron);
-    throat.material = iron.clone();
-    throat.material.side = THREE.DoubleSide;
-    throat.position.y = MASK_THROAT_Y * r;
-    setOnFace(MASK_FITS.oniFace, r, face, brow, ...eyes, nose, mouth, ...fangs, ...horns);
-    group.add(face, brow, ...eyes, nose, mouth, ...fangs, ...horns, throat);
-  } else if (head.mask) {
-  // Menpo: the lower face guard, with a nose and a bristling moustache.
-    const maskSteel = metal(steel, head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : 0x141416);
-    // Sphere angles: x = −cos φ, so the front (+x) is at φ = π.
-    const menpo = new THREE.Mesh(new THREE.SphereGeometry(1.06 * r, 18, 10, Math.PI * 0.58, Math.PI * 0.84, Math.PI * 0.52, Math.PI * 0.36), maskSteel);
-    menpo.material = maskSteel.clone();
-    menpo.material.side = THREE.DoubleSide;
-    menpo.userData.facePatch = true;
-    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.14 * r, 0.32 * r, 8), maskSteel);
-    nose.rotation.z = -Math.PI / 2;
-    nose.position.set(1.08 * r, -0.12 * r, 0);
-    const moustache = new THREE.Mesh(new THREE.BoxGeometry(0.06 * r, 0.08 * r, 0.6 * r), surface(0xe8e4da));
-    moustache.position.set(1.06 * r, -0.34 * r, 0);
-    const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), lace);
-    throat.material = lace.clone();
-    throat.material.side = THREE.DoubleSide;
-    throat.position.y = MASK_THROAT_Y * r;
-    setOnFace(MASK_FITS.menpo, r, menpo, nose, moustache);
-    group.add(menpo, nose, moustache, throat);
+  // The menpō (menpo.js: its form and maps, set on the face by helmforms.js MASK_FITS) in the kit's finish: russet iron
+  // (`mask: 'iron'`), black lacquer (`black`), or the helmet's own colour (`red`); red lacquer inside.
+  if (head.mask) samuraiMask(group, head, r, steel, color, lace);
+}
+
+/**
+ * The samurai's menpō and what hangs on it: the mask, its cord hooks (ori-kugi) standing out from the cheek wings, and the
+ * throat guard (yodarekake): MENPO.lames lacquered lames hung from under its chin, each broader and flared more than the
+ * one above, laced in the kit's lace (the laced tile: `helmPart`), a cord along the foot of each.
+ */
+function samuraiMask(group, head, r, steel, color, lace) {
+  const tint = head.mask === 'red' ? color : head.mask === 'iron' ? MENPO.iron : MENPO.black;
+  const plain = metal(steel, tint).clone();
+  plain.side = THREE.DoubleSide;
+  buildWarMask(group, 'menpo', r, tint, steel.envMap, { plain });
+  const fit = MASK_FITS.menpo;
+  const hookIron = metal(steel, MENPO.hook);
+  const [hookX, hookY, hookOut] = MENPO.hookAt;
+  const polar = Math.acos(hookY / fit.R);
+  const across = hookX / (fit.R * Math.sin(polar));
+  for (const side of [1, -1]) {
+    const radius = fit.R + hookOut;
+    const at = maskOnFace(fit, [radius * Math.sin(polar) * Math.cos(across), radius * Math.cos(polar), side * radius * Math.sin(polar) * Math.sin(across)]);
+    const hook = new THREE.Group();
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.016 * r, 0.02 * r, 0.09 * r, 6), hookIron);
+    post.rotation.z = -Math.PI / 2;
+    post.position.x = 0.045 * r;
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.014 * r, 0.016 * r, 0.06 * r, 6), hookIron);
+    tip.position.set(0.085 * r, -0.025 * r, 0);
+    hook.add(post, tip);
+    hook.position.set(at[0] * r, at[1] * r, at[2] * r);
+    hook.rotation.y = -Math.atan2(at[2], at[0]);
+    group.add(hook);
+  }
+  const lameLacquer = metal(steel, MENPO.throat);
+  const [height, step, top, widen, flare] = MENPO.lames;
+  for (let tier = 0; tier < MENPO.lameCount; tier += 1) {
+    const upper = (top + tier * widen) * r;
+    const lower = upper + flare * r;
+    const lame = new THREE.Mesh(new THREE.CylinderGeometry(upper, lower, height * r, 18, 1, true, Math.PI * 0.06, Math.PI * 0.88), lameLacquer);
+    lame.material = lame.material.clone();
+    lame.material.side = THREE.DoubleSide;
+    lame.position.y = (MENPO.throatY - tier * step) * r;
+    lame.userData.helmPart = 'shikoro';
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(lower * 1.004, lower * 1.012, 0.03 * r, 18, 1, true, Math.PI * 0.06, Math.PI * 0.88), lace);
+    cord.material = lace.clone();
+    cord.material.side = THREE.DoubleSide;
+    cord.position.y = lame.position.y - (height / 2) * r;
+    group.add(lame, cord);
   }
 }
 
-// The gorget's (nodowa's) middle under a samurai's mask, head radii: hanging from the mask's foot under the chin.
+// The gorget's (nodowa's) middle under a war mask, head radii: hanging from the mask's foot under the chin.
 const MASK_THROAT_Y = -1.5;
 
-// The samurai's half masks read as an oni's face (the menpo of the 16th-17th c. were made to frighten: the Met's 13.112.15,
-// the British Museum's menpo with their hooked noses, open snarls and moustaches): `scowled`, the mask designs (menpo.js) given
-// a heavy scowling brow of iron over the eyes (its inner ends drawn down to the nose, two furrows between) and tusks at the
-// mouth's corners. `black`: black-lacquered iron, drawn a little lighter than black so the mask's relief reads; `iron`: russet
-// iron (sabi-nuri: the bare iron rusted brown and lacquered clear, the commonest finish of a menpo), its throat lames `throat`.
-// `brow` [inner, outer] (z, y) of each brow on the face, head radii; `tusks` (z, y, height) on the lower lip.
-const MENPO = { scowled: ['ressei'], black: 0x2c2b2f, iron: 0x4a3830, throat: 0x1b1a1d, brow: [[0.06, -0.01], [0.46, 0.13]], stand: 0.1, thick: 0.065, tusks: [0.15, -0.86, 0.2] };
-
-/** The scowl and (`tusked`) tusks on a half mask (MENPO), in `iron` the mask's own metal, on the face as the mask is (helmforms.js headRadiusAt). */
-function oniScowl(group, r, iron, tusked = true) {
-  const onFace = (z, y, stand) => {
-    const azimuth = Math.asin(Math.max(-0.95, Math.min(0.95, z / 1.05)));
-    const radius = headRadiusAt(azimuth, y) + stand;
-    return new THREE.Vector3(radius * Math.cos(azimuth) * r, y * r, radius * Math.sin(azimuth) * r);
-  };
-  const [[innerZ, innerY], [outerZ, outerY]] = MENPO.brow;
-  const bone = surface(0xe8e2d0, { roughness: 0.4 });
-  for (const side of [1, -1]) {
-    // The brow: thick at the nose and arched, its inner end low (the scowl).
-    const brow = Array.from({ length: 7 }, (_, step) => {
-      const t = step / 6;
-      return onFace(side * (innerZ + (outerZ - innerZ) * t), innerY + (outerY - innerY) * t + 0.035 * Math.sin(Math.PI * t), MENPO.stand);
-    });
-    group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(brow), 12, MENPO.thick * r, 5, false), iron));
-    // A furrow up from the nose between the brows.
-    const furrow = [onFace(side * 0.03, -0.06, MENPO.stand - 0.02), onFace(side * 0.045, 0.06, MENPO.stand - 0.01), onFace(side * 0.05, 0.13, MENPO.stand - 0.02)];
-    group.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(furrow), 6, 0.022 * r, 4, false), iron));
-    // A tusk up from the corner of the mouth.
-    if (!tusked) continue;
-    const [tuskZ, tuskY, tall] = MENPO.tusks;
-    const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.045 * r, tall * r, 6), bone);
-    tusk.position.copy(onFace(side * tuskZ, tuskY + tall / 2, 0.17));
-    tusk.rotation.x = side * -0.25;
-    group.add(tusk);
-  }
-}
+// The menpō's finishes and fittings (samuraiMask). `black`: black-lacquered iron, drawn a little lighter than black so the
+// mask's relief reads; `iron`: russet iron (sabi-nuri: the bare iron rusted brown and lacquered clear, the commonest
+// finish); `throat` the yodarekake's black lacquer; `hook` the cord hooks' iron, `hookAt` (X, Y on the mask's sheet, how
+// far out) where they stand on the cheek wings; `throatY` the first lame's middle (head radii); `lameCount` lames of `lames` [height, step down, top radius, each lame's
+// widening, its flare to its foot] (head radii).
+const MENPO = { black: 0x2c2b2f, iron: 0x47372d, throat: 0x1b1a1d, hook: 0x2a2624, hookAt: [1.08, -0.42, 0.08], throatY: -1.4, lameCount: 4, lames: [0.15, 0.125, 0.7, 0.065, 0.07] };
 
 // The metal each of the other war masks is drawn in (menpo.js): of the helmet's steel, bronze, its gilt, or its mail.
 const WORLD_MASK_METAL = {
   tiemian: (head, color) => color, kipchak: (head, color) => color, shoumian: () => 0x9a7a4a,
   horde: (head) => head.gold ?? 0xc9a23a, ventail: (head, color) => head.mail ?? head.coif ?? color,
+  // Koxinga's iron men: the samurai's menpō in the helmet's bare steel.
+  menpo: (head, color) => color,
 };
 
 /**
@@ -3239,28 +3178,13 @@ function worldMask(group, head, r, steel, color) {
   const tintOf = WORLD_MASK_METAL[head.maskDesign];
   if (!tintOf || HELM_STYLE.masks === 'now' || !helmMapsReady()) return false;
   const span = HELM_SPAN[head.kind] ?? null;
-  if (!buildWarMask(group, head.maskDesign, r, tintOf(head, color), steel.envMap, span)) return false;
+  if (!buildWarMask(group, head.maskDesign, r, tintOf(head, color), steel.envMap, { span, bare: head.maskDesign === 'menpo' })) return false;
   const throat = new THREE.Mesh(new THREE.CylinderGeometry(0.75 * r, 0.95 * r, 0.42 * r, 16, 1, true, Math.PI * 0.05, Math.PI * 0.9), metal(steel, head.mail ?? head.coif ?? color).clone());
   throat.material.side = THREE.DoubleSide;
   throat.position.y = MASK_THROAT_Y * r;
   if (span) throat.scale.set(1 / span[0], 1 / span[1], 1 / span[2]);
   group.add(throat);
   return true;
-}
-
-/**
- * The pieces of a mask drawn on its sphere set on the face (helmforms.js maskOnFace with `fit`): a patch of the sphere
- * (`userData.facePatch`) has every vertex moved, a piece on it (a nose, a brow, an eye) its place.
- */
-function setOnFace(fit, r, ...pieces) {
-  const onFace = (x, y, z) => maskOnFace(fit, [x / r, y / r, z / r]).map((value) => value * r);
-  for (const piece of pieces) {
-    if (piece.userData.facePatch) {
-      const position = piece.geometry.attributes.position;
-      for (let index = 0; index < position.count; index += 1) position.setXYZ(index, ...onFace(position.getX(index), position.getY(index), position.getZ(index)));
-      piece.geometry.computeVertexNormals();
-    } else piece.position.set(...onFace(piece.position.x, piece.position.y, piece.position.z));
-  }
 }
 
 // How much bigger than first drawn a crest and a plume stand: they are meant to be seen.

@@ -17,6 +17,6 @@ test('Pyongyang: the Japanese outnumber the Ming; the Ming bring more horse; the
   assert.ok(blue.length > red.length, `${blue.length} Japanese against ${red.length} Ming`);
   const horse = red.filter((fighter) => fighter.mounted).length;
   assert.ok(horse > 8, `${horse} Ming horse`);
-  assert.deepEqual(new Set(red.map((fighter) => fighter.outfit.kind)), new Set(['mingElite', 'mingBrigandine', 'mingIronLamellar']));
+  assert.deepEqual(new Set(red.map((fighter) => fighter.outfit.kind)), new Set(['mingElite', 'mingBrigandine', 'mingIronLamellar', 'mingEliteInfantry']));
   assert.deepEqual(new Set(blue.map((fighter) => fighter.outfit.kind.replace('Tosei', ''))), new Set(['samurai', 'ashigaru']));
 });

@@ -636,18 +636,14 @@ export const KABUTO_FORM = (() => {
  * How each of the samurai's masks is set on the face: drawn on a sphere (radius `R`; menpo.js, wardrobe.js), each of its
  * points is moved to stand `gap` off the face (HELM_HEAD) in the same direction round, its height mapped by `y`: heights
  * on the mask [as drawn, on the face] from the top down (its top edge, the eyes, the nose, the mouth, the chin's foot),
- * straight between. The oni somen covers the whole face, its top under the kabuto's foot, its eye holes over the eyes;
- * the half masks (menpo, ressei-men, tengu) from under the eyes, the nose over the nose, the mouth over the mouth, the chin
- * cupped under the chin. Relief stands off the mask as drawn.
+ * straight between. The menpō from under the eyes, the nose over the nose, the mouth over the mouth, the chin cupped
+ * under the chin. Relief stands off the mask as drawn.
  */
 const WORLD_FACE_Y = [[0.91, 0.3], [0.04, -0.07], [-0.49, -0.74], [-1.0, -1.42]];
 export const MASK_FITS = {
-  oni: { R: 1.12, gap: 0.06, span: [0.8, 0.98], chin: 0.2, y: [[0.91, 0.3], [0.16, -0.07], [-0.37, -0.74], [-1.0, -1.42]] },
-  ressei: { R: 1.1, gap: 0.06, span: [0.8, 0.98], chin: 0.2, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
-  tengu: { R: 1.1, gap: 0.06, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
-  // The masks as first drawn (`#masks=now`, or without the maps): the menpo and the oni's whole face.
-  menpo: { R: 1.06, gap: 0.06, y: [[-0.067, -0.28], [-0.12, -0.45], [-0.34, -0.74], [-0.98, -1.42]] },
-  oniFace: { R: 1.08, gap: 0.06, y: [[0.83, 0.3], [0.16, -0.07], [-0.04, -0.45], [-0.36, -0.74], [-0.94, -1.42]] },
+  // The samurai's menpō: from under the eyes (its cheek wings up beside them) to under the chin, the nose over the nose, the
+  // mouth over the mouth, the chin cupped under the chin, narrow over the cheekbones and broad at the jaw.
+  menpo: { R: 1.1, gap: 0.06, span: [0.82, 0.9], chin: 0.13, y: [[0.27, -0.2], [-0.4, -0.74], [-1.06, -1.42]] },
   // The quick variants of China, the steppe and the sultanates (menpo.js): the whole-face ones on the oni somen's patch,
   // but their eyes cut through, so drawn (0.12 r low, as the oni's) with the eye holes over the eyes, the mouth over the
   // mouth; the ventail as the half masks. (The mail veil is the Turkman turban helmet's own aventail: DESIGN_FORMS.)

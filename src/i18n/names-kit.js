@@ -127,9 +127,9 @@ export const NAMES_KIT = {
   'Ming — elite brigandine': '明军——精锐布面甲',
   'Crimson': '绯红',
   'Imperial blue': '御蓝',
-  'Black and gold, masked': '黑金，兽面',
+  'Black and gold': '黑金',
   'Gilt scale': '鎏金鳞甲',
-  'Steel scale, masked': '钢鳞甲，兽面',
+  'Steel scale, masked': '钢鳞甲，铁面',
   'Iron lamellar, crimson lacing': '铁札甲，绯绦',
   'Eight Banners (Later Jin) — banner armour': '八旗（后金）——旗甲',
   'Plain Yellow': '正黄',
@@ -145,8 +145,6 @@ export const NAMES_KIT = {
   'Yellow brocade': '黄锦',
   'White brocade': '白锦',
   'Red brocade': '红锦',
-  'Blue brocade, steel face': '蓝锦，铁面',
-  'Yellow brocade, steel face': '黄锦，铁面',
   'Iron Pagoda — Jin heavy armour': '铁浮屠——金国重甲',
   'Polished steel, black plume': '亮钢，黑缨',
   'Blued steel, brass edging': '烤蓝钢，黄铜包边',
@@ -356,7 +354,6 @@ export const NAMES_KIT = {
 
   // ---- Outfit sets (outfitsets.js names) ----
   'Bayara guard — open helmet': '巴牙喇护军——敞面盔',
-  'Bayara guard — steel face': '巴牙喇护军——铁面',
   'Gothic harness — sallet and bevor': '哥特甲——萨雷盔与护颌',
   'Milanese harness — hounskull bascinet': '米兰甲——犬吻盔',
   'Late harness — close helmet': '晚期板甲——闭合盔',
@@ -397,9 +394,8 @@ export const NAMES_KIT = {
   'Ming iron lamellar — pointed helmet': '明军铁札甲——尖顶盔',
   'Ming iron scale coat': '明军铁鳞甲',
   'Ming elite — brigandine, open helm': '明军精锐——布面甲，敞面盔',
-  'Ming elite — brigandine, masked helm': '明军精锐——布面甲，兽面盔',
   'Ming elite — scale armour, open helm': '明军精锐——鳞甲，敞面盔',
-  'Ming elite — scale armour, masked helm': '明军精锐——鳞甲，兽面盔',
+  'Ming elite — scale armour, masked helm': '明军精锐——鳞甲，铁面盔',
   'Ming elite — iron lamellar': '明军精锐——铁札甲',
 
   // ---- Helmets (HELM_NAMES, helmChoices) ----
@@ -424,7 +420,7 @@ export const NAMES_KIT = {
   'Ming riveted helmet': '明军铆钉盔',
   'Ming pointed helmet': '明军尖顶盔',
   'Ming elite helmet': '明军精锐盔',
-  'Ming elite helmet and mask': '明军精锐兽面盔',
+  'Ming elite helmet and mask': '明军精锐铁面盔',
   'Banner helmet': '八旗盔',
   'Bayara helmet': '巴牙喇盔',
   'Iron Pagoda helmet': '铁浮屠盔',

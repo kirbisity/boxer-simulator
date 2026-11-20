@@ -143,36 +143,42 @@ export function helmMaterial(base, name, { side = THREE.FrontSide, duller = fals
 }
 
 /**
- * A war mask's lacquer wearing its sheet: the lacquer (the albedo's alpha) drawn in `tint`, the rest (teeth, gilt, the
- * mouth's red, hair) in the sheet's own colours, or `plain`: the mask without its horsehair and gilding, its teeth and the
- * moustache's ground the bare lacquered iron (most surviving menpo have lost the hair, and many never had it); the outline
- * cut by the normal map's alpha; both sides drawn.
+ * A war mask's lacquer wearing its sheet: the lacquer (the albedo's alpha) drawn in `tint`, the rest (a nostril, the
+ * mouth's dark rim, gilt) in the sheet's own colours; the outline and openings cut by the normal map's alpha; both sides
+ * drawn, the inside in red lacquer (`inside`: a menpō's, as most were finished behind). `bare`: lacquered sheet worn as
+ * bare metal (MASK_BARE_METAL), polished.
  */
-export function maskMaterial(name, tint, envMap, plain = false) {
+export function maskMaterial(name, tint, envMap, inside = MASK_INSIDE, bare = false) {
   const sheet = helmMapSheet(name);
   if (!sheet) return null;
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff, map: sheet.map, normalMap: sheet.normalMap, roughnessMap: sheet.ormMap, metalnessMap: sheet.ormMap,
     roughness: 1, metalness: 1, envMap: envMap ?? null, envMapIntensity: 1.1, side: THREE.DoubleSide,
   });
-  const uniforms = { uMaskTint: { value: new THREE.Color(tint) }, uMaskPlain: { value: plain ? 1 : 0 } };
+  if (bare) Object.assign(material, { metalnessMap: null, metalness: MASK_BARE_METAL });
+  const uniforms = { uMaskTint: { value: new THREE.Color(tint) }, uMaskInside: { value: new THREE.Color(inside) } };
   material.userData.crowdColor = new THREE.Color(tint).getHex();
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
-    shader.fragmentShader = `uniform vec3 uMaskTint;\nuniform float uMaskPlain;\n${shader.fragmentShader}`.replace(
+    shader.fragmentShader = `uniform vec3 uMaskTint;\nuniform vec3 uMaskInside;\n${shader.fragmentShader}`.replace(
       '#include <map_fragment>',
       `#include <map_fragment>
 #if defined( USE_MAP ) && defined( USE_NORMALMAP )
   if ( texture2D( normalMap, vUv ).a < 0.5 ) discard;
-  vec3 maskBare = uMaskTint * ( 0.55 + 0.5 * dot( texelColor.rgb, vec3( 0.3333 ) ) );
-  diffuseColor.rgb = mix( mix( diffuseColor.rgb, maskBare, uMaskPlain ), diffuseColor.rgb * uMaskTint + max( texelColor.rgb - vec3( 0.86 ), 0.0 ) * vec3( 1.7, 0.6, 0.35 ) * ( 1.0 - uMaskPlain ), texelColor.a );
+  diffuseColor.rgb = mix( diffuseColor.rgb, diffuseColor.rgb * uMaskTint + max( texelColor.rgb - vec3( 0.86 ), 0.0 ) * vec3( 1.7, 0.6, 0.35 ), texelColor.a );
+  if ( !gl_FrontFacing ) diffuseColor.rgb = uMaskInside * ( 0.8 + 0.25 * texelColor.a );
   diffuseColor.a = opacity;
 #endif`,
     );
   };
   material.customProgramCacheKey = () => 'war-mask';
+  material.userData.bareMask = bare;
   return material;
 }
+
+// The red lacquer inside a war mask; a bare-metal mask's metalness.
+const MASK_INSIDE = 0x8a2214;
+const MASK_BARE_METAL = 0.85;
 
 /** Triangles drawn for a group (outlines included), for the comparison. */
 export function triangleCount(object) {

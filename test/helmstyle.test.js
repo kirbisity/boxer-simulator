@@ -6,7 +6,7 @@ import { HELM_FORMS } from '../src/helmforms.js';
 
 test('the helmets are the remodelled ones unless the address asks for the old; each kit\'s own mask unless asked', () => {
   assert.deepEqual(helmStyleFrom(''), { helmets: 'new', masks: 'own', kettle: 'own', knight: 'own' });
-  assert.deepEqual(helmStyleFrom('#helmets=now&masks=ressei&kettle=b'), { helmets: 'now', masks: 'ressei', kettle: 'b', knight: 'own' });
+  assert.deepEqual(helmStyleFrom('#helmets=now&masks=now&kettle=b'), { helmets: 'now', masks: 'now', kettle: 'b', knight: 'own' });
   assert.deepEqual(helmStyleFrom('#maps=off&helmets=now&kettle=now'), { helmets: 'now', masks: 'own', kettle: 'now', knight: 'own' });
   assert.deepEqual(helmStyleFrom('#helmets=b&masks=kabuki&kettle=x'), { helmets: 'new', masks: 'own', kettle: 'own', knight: 'own' });
   assert.deepEqual(helmStyleFrom('#kettle=d'), { helmets: 'new', masks: 'own', kettle: 'own', knight: 'own' }, 'the barbute is not offered');
@@ -17,7 +17,7 @@ test('the helmets are the remodelled ones unless the address asks for the old; e
 });
 
 test('every helmet kind and mask has its sheet baked; a mask carries its mesh relief', () => {
-  const sheets = [...Object.values(HELM_FORMS).map((form) => form.sheet), 'maskOni', 'maskRessei', 'maskTengu', 'maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskVentail', 'formTurbanTurkman'];
+  const sheets = [...Object.values(HELM_FORMS).map((form) => form.sheet), 'maskMenpo', 'maskTiemian', 'maskShoumian', 'maskKipchak', 'maskHorde', 'maskVentail', 'formTurbanTurkman'];
   for (const name of sheets) {
     const sheet = HELM_MAP_DATA[name];
     assert.ok(sheet && sheet.albedo && sheet.normal && sheet.orm, name);

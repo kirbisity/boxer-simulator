@@ -140,9 +140,9 @@ test('the crests stand on their bowls; the feather holders on the bowl\'s side',
   }
 });
 
-test('the samurai\'s masks sit on the face: off it by their gap, the chin cupped, as drawn on their sheets', () => {
-  // The oni and ressei are narrow over the eyes, broad and square at the jaw, the jaw guard standing out in front.
-  for (const name of ['oni', 'ressei']) {
+test('the samurai\'s menpō sits on the face: off it by its gap, the chin cupped, as drawn on its sheet', () => {
+  // Narrow over the cheekbones, broad at the jaw, the jaw guard standing out in front.
+  for (const name of ['menpo']) {
     const fit = MASK_FITS[name];
     const at = (y) => maskOnFace(fit, [fit.R * Math.cos(1.2) * Math.sqrt(Math.max(0, 1 - (y / fit.R) ** 2)) / Math.cos(1.2) * Math.cos(1.2), y, fit.R * Math.sin(1.2) * Math.sqrt(Math.max(0, 1 - (y / fit.R) ** 2))]);
     assert.ok(Math.abs(Math.atan2(at(0.2)[2], at(0.2)[0])) < Math.abs(Math.atan2(at(-0.9)[2], at(-0.9)[0])), `${name}: narrower above than at the jaw`);
@@ -187,9 +187,10 @@ test('the guardian face is straight-sided, neither pinched nor swelling at the m
 const WORLD_MASKS = ['tiemian', 'shoumian', 'kipchak', 'horde', 'ventail'];
 
 test('the war masks of China, the steppe and the sultanates: each worn by its kits, most designs bare-faced', () => {
-  // The picked ones: the guardian beast face, the steppe iron face, and the Cuman lord's gilt half-mask (the others built, not worn).
-  const PICKED = ['shoumian', 'kipchak', 'horde'];
-  const wearers = { mingElite: ['shoumian', 'shoumian'], kheshig: ['kipchak', 'kipchak'], cumanHeavy: ['kipchak', 'kipchak', 'horde'], bayara: ['kipchak', 'kipchak'] };
+  // The picked ones: the steppe iron face, the Cuman lord's gilt half-mask, and the menpō in bare steel on Koxinga's iron
+  // men, the only masked Chinese (the others built, not worn; no Jurchen masked).
+  const PICKED = ['kipchak', 'horde', 'menpo'];
+  const wearers = { mingElite: ['menpo'], kheshig: ['kipchak', 'kipchak'], cumanHeavy: ['kipchak', 'kipchak', 'horde'] };
   const worn = new Set();
   for (const [kit, masks] of Object.entries(wearers)) {
     const designs = OUTFITS[kit].designs.filter((design) => !design.levelOnly);
@@ -207,7 +208,7 @@ test('the war masks of China, the steppe and the sultanates: each worn by its ki
 });
 
 test('the war masks of China, the steppe and the sultanates stand off the face, never in it, the same either side', () => {
-  for (const style of WORLD_MASKS) {
+  for (const style of [...WORLD_MASKS, 'menpo']) {
     const fit = MASK_FITS[style];
     const { grid } = HELM_MAP_DATA[MASK_SHEETS[style]];
     const { positions } = maskPoints(grid, 1, fit);

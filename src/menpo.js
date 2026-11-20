@@ -1,18 +1,19 @@
-// The samurai's war masks drawn with baked maps (the design study: helmstyle.js `masks`): an oni somen (the whole face of
-// a demon: bunched brows of black horsehair, glaring eyes, a broad nose, a snarl round gilt teeth and white tusks, the brow
-// and cheeks furrowed; drawn a little low, below the kabuto's peak), a ressei-men (the fierce old man: a hooked nose, deep wrinkles, the mouth open on white teeth, a
-// white horsehair moustache and chin tuft) or a karasu tengu (a crow's beak, feathered cheeks). Each is a patch of a sphere
-// before the face, pushed out by its relief's coarse part (the sheet's `grid`, helmsheets.py) and wearing the rest in its
-// maps; its outline is cut by the maps, its lacquer drawn in the wearer's colour (red, or black). References: helmmaps.js.
-// The quick variants of China, the steppe and the sultanates (helmsheets.py WORLD_MASKS) are made the same way, on the
-// same two patches, their metal (iron, bronze, gilt, mail) drawn in the colour the helmet gives (wardrobe.js worldMask).
+// The war masks drawn with baked maps. The samurai's is the menpō (the half mask from under the eyes to under the chin,
+// russet iron or lacquered: a hooked nose, broad cheekbones and the crease past the mouth's corner, the mouth open in a
+// grimace, the chin jutting, the cheek wings flared where the helmet's cord passes behind them, the iron finished in fine
+// grooves round the mouth and down the nose; red lacquer inside). It is a patch of a sphere before the face, pushed out by
+// its relief's coarse part (the sheet's `grid`, helmsheets.py) and wearing the rest in its maps; its outline and mouth
+// are cut by the maps. References: helmmaps.js.
+// The quick variants of China, the steppe and the sultanates (helmsheets.py WORLD_MASKS) are made the same way, their
+// metal (iron, bronze, gilt, mail) drawn in the colour the helmet gives (wardrobe.js worldMask).
 
 /* global THREE */
 import { helmMapSheet, maskMaterial } from './helmmaps.js';
+import { HELM_MAP_DATA } from './helmmaps-data.js';
 import { maskOnFace, MASK_FITS } from './helmforms.js';
 
 export const MASK_SHEETS = {
-  oni: 'maskOni', ressei: 'maskRessei', tengu: 'maskTengu',
+  menpo: 'maskMenpo',
   tiemian: 'maskTiemian', shoumian: 'maskShoumian', kipchak: 'maskKipchak', horde: 'maskHorde', ventail: 'maskVentail',
 };
 
@@ -65,14 +66,17 @@ export function maskGeometry(grid, r, fit = null) {
 /**
  * A war mask in style `style` (MASK_SHEETS), added to `group` (head coordinates); `tint` the lacquer's (or the metal's)
  * colour, `envMap` the steel's reflections; `span` the helmet's drawn span (helmforms.js HELM_SPAN), undone for the mask
- * so it stays fitted to the face; `plain`, without its hair and gilding (maskMaterial). Returns the mask's mesh, or null when its sheet is not there (draw the old one).
+ * so it stays fitted to the face; `bare`, the menpō in bare metal (its inside the same metal, darker) rather than
+ * lacquer. Without the maps (`#maps=off`, tests), the same form in `plain` (a material), if given. Returns the mask's
+ * mesh, or null when it cannot be drawn.
  */
-export function buildWarMask(group, style, r, tint, envMap, span = null, plain = false) {
+export function buildWarMask(group, style, r, tint, envMap, { span = null, plain = null, bare = false } = {}) {
   const name = MASK_SHEETS[style];
-  const sheet = name && helmMapSheet(name);
-  if (!sheet?.grid) return null;
-  const material = maskMaterial(name, tint, envMap, plain);
-  const mask = new THREE.Mesh(maskGeometry(sheet.grid, r, MASK_FITS[style]), material);
+  const grid = name && HELM_MAP_DATA[name]?.grid;
+  if (!grid) return null;
+  const material = helmMapSheet(name) ? maskMaterial(name, tint, envMap, bare ? new THREE.Color(tint).multiplyScalar(0.45).getHex() : undefined, bare) : plain;
+  if (!material) return null;
+  const mask = new THREE.Mesh(maskGeometry(grid, r, MASK_FITS[style]), material);
   mask.userData.noOutline = true;
   mask.castShadow = true;
   if (span) mask.scale.set(1 / span[0], 1 / span[1], 1 / span[2]);

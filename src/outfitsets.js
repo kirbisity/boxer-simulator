@@ -22,15 +22,9 @@ const CUMAN_BLURB = { en: 'Plated mail and hinged steel face of a Cuman of a kha
 const BAYARA_BLURB = { en: 'Armour of the Bayara, the banner guard. Brocade over iron plates, a steel mirror over the heart, gilt at the shoulders.\nThe guard was picked from every company. Wherever the line broke, they went in first; whenever a city fell, they were paid first.\nIn 1619 four Ming columns were swallowed one by one. The silver owed to the Ming garrisons had long gathered dust in the palace vaults of Beijing.\nLoyalty was never free. The Khan simply paid on time.', zh: '八旗护军巴牙喇的铠甲。锦缎为面，铁叶为里，心口悬一面护心镜，肩头鎏金。\n护军由各牛录挑选而出。阵中凡有缺口，必是他们先入；城破之日，财货先分护军。\n一六一九年，明军四路，被逐一吞没。而那些本该发给明军的饷银，早已在京城内库里积了尘。\n忠诚并非无价。只是大汗从不拖欠。' };
 
 export const OUTFIT_SETS = {
-  // The Bayara: the open helmet, or (one in three) the steel face of the steppe's masked helmets, which guards the face too.
+  // The Bayara: the open helmet (no mask among the Jurchen: the user's call, 2026-11-20).
   bayara: [
     { key: 'open', designs: [0, 1, 2, 3], name: 'Bayara guard — open helmet', blurb: BAYARA_BLURB, patch: {} },
-    {
-      key: 'masked', designs: [4, 5], name: 'Bayara guard — steel face',
-      blurb: { en: 'Iron face of the Bayara guard, hung beneath the helmet in the old manner of the Mongol nobles. Brows, nose and a set mouth in iron; the eyes cut through.\nIt did not flinch at the Ming guns. It could not.\nThe Khan had chosen these men by name, yet their faces were hidden. The Ming gunners saw only iron coming, and afterwards no one could say which man had run.\nThe gunner aimed at the iron face. The man behind it fell.', zh: '巴牙喇的铁面。垂于盔下，仿蒙古贵人旧制。眉、鼻、紧抿的嘴，皆以铁打成，眼处开两道缝。\n明军铳响，这张脸纹丝不动。本也动不了。\n大汗亲手点选的人，面目却藏在铁后。明军铳手只见一片铁涌来；战后，也无人说得出是谁先逃。\n铳手瞄的是铁面。倒下的，是铁面后的人。' },
-      // The steel face over the cheeks and the brow: a blow to the face meets plate, a point turns.
-      patch: { extraMass: 0.297, protection: { bullet: { head: 0.5 }, regions: { head: { blunt: 0.62, cut: 0.97, pierce: 0.74, deflects: true } } } },
-    },
   ],
   knight: [
     {
@@ -323,14 +317,9 @@ export const OUTFIT_SETS = {
   ],
   mingElite: [
     {
-      key: 'brigandine', designs: [0, 1], name: 'Ming elite — brigandine, open helm',
+      key: 'brigandine', designs: [0, 1, 2], name: 'Ming elite — brigandine, open helm',
       blurb: { en: 'Heavy brigandine and articulated steel armguards of a jiading, the household man of a wealthy general. Thick, overlapping tempered steel within: a wall of iron beneath the master’s vanity.\nBehind every man so armed stood three conscripts, stripped of their own gear and sent to march in threadbare cotton.\nThe general kept the ledger himself.', zh: '家丁的布面甲与分节钢臂缚。只赏给豪门将领的家丁。内里厚叠精钢甲叶。主子的体面之下，砌着一堵铁墙。\n每一个披挂齐整的家丁身后，都站着三个被剥了甲的营兵，裹着露絮的破棉袄上阵。\n账本，由将军自己掌管。' },
       patch: {},
-    },
-    {
-      key: 'brigandineMasked', designs: [2], name: 'Ming elite — brigandine, masked helm',
-      blurb: { en: 'Household man’s brigandine, and a steel helmet shaped like a snarling guardian beast. The best smiths in the province, paid to give the master’s anger a face.\nA man without a face could be sent to do anything: seize a rival’s family, burn a village behind on its taxes.\nWhen the master fell from favour, the mask went into chains with the rest of the household.', zh: '家丁的布面甲与镇兽钢盔。盔作龇牙的镇兽之形。全省最好的匠人收了钱，专为主子的怒气打一张脸。\n没有脸的人，什么差事都使得：抄政敌的家，烧欠税的村。\n主子失宠那日，这张面具与一家老小一同上了枷。' },
-      patch: { extraMass: 0.275, protection: { regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
     },
     {
       key: 'scale', designs: [3], name: 'Ming elite — scale armour, open helm',
@@ -339,7 +328,7 @@ export const OUTFIT_SETS = {
     },
     {
       key: 'scaleMasked', designs: [4], name: 'Ming elite — scale armour, masked helm',
-      blurb: { en: 'Steel scales and the snarling beast mask: the full harness of a warlord’s chosen few, heavy as duty and as hard to take off. Not an inch of the man shows. A walking statue of his master’s importance.\nIn 1644 rebels marched into Beijing. The last Ming emperor hanged himself behind his palace.\nThe masked guards found there was no one left to guard.', zh: '家丁的鳞甲与兽面盔。将门亲信的全副披挂，重如差事，也如差事一般脱不下来。浑身不露一寸。一尊会走的雕像，雕的是主子的分量。\n一六四四年，闯军入北京。崇祯皇帝自缢于宫后煤山。\n戴面具的侍卫这才发现，已无人可守。' },
+      blurb: { en: 'Steel scales and an iron half mask: the full harness of a warlord’s chosen few, heavy as duty and as hard to take off. Not an inch of the man shows. A walking statue of his master’s importance.\nIn 1644 rebels marched into Beijing. The last Ming emperor hanged himself behind his palace.\nThe masked guards found there was no one left to guard.', zh: '家丁的鳞甲与铁面。将门亲信的全副披挂，重如差事，也如差事一般脱不下来。浑身不露一寸。一尊会走的雕像，雕的是主子的分量。\n一六四四年，闯军入北京。崇祯皇帝自缢于宫后煤山。\n戴面具的侍卫这才发现，已无人可守。' },
       patch: { extraMass: 0.285, protection: { blunt: 0.6, cut: 0.96, pierce: 0.85, regions: { head: { blunt: 0.68, cut: 0.97, pierce: 0.8 } } } },
     },
     {

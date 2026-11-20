@@ -243,9 +243,7 @@ WEAR = {
     'maskHorde': ('steel', (0.2, 0.2)),
     'maskVentail': ('mail', (0.2, 0.2)),
     # (A war mask's sheet is half a face, about 0.2 m to a side.)
-    'maskOni': ('lacquer', (0.2, 0.2)),
-    'maskRessei': ('lacquer', (0.2, 0.2)),
-    'maskTengu': ('lacquer', (0.2, 0.2)),
+    'maskMenpo': ('lacquer', (0.2, 0.2)),
 }
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

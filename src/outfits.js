@@ -1195,9 +1195,9 @@ export const OUTFITS = {
     courage: 0.85,
     designs: [
       { label: 'Crescent', top: { kind: 'longsleeve', color: '#1c1d26' }, bottom: { kind: 'pants', color: '#23202b' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#1d2a4f', gold: '#d6a743', panel: true, leather: '#5a3a22', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'crescent', lace: '#1d2a4f', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
-      { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25, panel: true, leather: '#3a2a3a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'kuwagata', mask: 'iron', maskPlain: true, lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
+      { label: 'Golden horns', top: { kind: 'longsleeve', color: '#141416' }, bottom: { kind: 'pants', color: '#1a1a1d' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#121214', gold: '#d6a743', sode: 1.25, panel: true, leather: '#3a2a3a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'kuwagata', mask: 'iron', lace: '#121214', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#141416' } },
       { label: 'Sun disc', top: { kind: 'longsleeve', color: '#2a2a30' }, bottom: { kind: 'pants', color: '#2a2a30' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#e8e4da', gold: '#d6a743', panel: true, leather: '#6a4a2a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#17171a', crest: 'sun', lace: '#e8e4da', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#e8e4da' } },
-      { label: 'Daimyo', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#2a0c0e' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#d6a743', gold: '#d6a743', sode: 1.3, panel: true, leather: '#2a3a5a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'tall', mask: 'iron', maskDesign: 'oni', lace: '#d6a743', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
+      { label: 'Daimyo', top: { kind: 'longsleeve', color: '#3a1012' }, bottom: { kind: 'pants', color: '#2a0c0e' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#d6a743', gold: '#d6a743', sode: 1.3, panel: true, leather: '#2a3a5a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'tall', mask: 'iron', lace: '#d6a743', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#1a1b22' } },
       { label: 'Antlers', top: { kind: 'longsleeve', color: '#16201a' }, bottom: { kind: 'pants', color: '#1a221c' }, armor: { kind: 'lamellar', color: '#b3161b', lace: '#2f5a3a', gold: '#d6a743', panel: true, leather: '#4a3a1a', trim: true }, head: { kind: 'kabuto', flare: 0.07, tiers: 5, fukigaeshi: 1.5, color: '#b3161b', crest: 'antlers', mask: 'black', lace: '#2f5a3a', gold: '#d6a743' }, feet: { kind: 'tabi', color: '#16201a' } },
     ],
   },
@@ -1312,15 +1312,15 @@ export const OUTFITS = {
     designs: [
       toseiDesign('Iron', '#3b3e44', '#1d2a4f', 'crescent', 'black', '#1c1d26'),
       // Russet iron under a shiinari bowl dressed in white yak hair, laced dark blue.
-      { ...toseiDesign('Russet', '#6b4a32', '#1d2a4f', null, 'red', '#2a1f18'), head: { kind: 'kabuto', design: 'shiinari', color: '#6b4a32', mask: 'red', maskPlain: true, plume: '#e9e3d2', lace: '#1d2a4f', gold: '#d6a743' } },
-      { ...toseiDesign('Black lacquer', '#17171a', '#b3161b', 'tall', 'black', '#141416'), head: { kind: 'kabuto', color: '#17171a', crest: 'crescent', mask: 'black', maskDesign: 'oni', plume: '#e9e3d2', lace: '#b3161b', gold: '#d6a743' } },
+      { ...toseiDesign('Russet', '#6b4a32', '#1d2a4f', null, 'red', '#2a1f18'), head: { kind: 'kabuto', design: 'shiinari', color: '#6b4a32', mask: 'red', plume: '#e9e3d2', lace: '#1d2a4f', gold: '#d6a743' } },
+      { ...toseiDesign('Black lacquer', '#17171a', '#b3161b', 'tall', 'black', '#141416'), head: { kind: 'kabuto', color: '#17171a', crest: 'crescent', mask: 'black', plume: '#e9e3d2', lace: '#b3161b', gold: '#d6a743' } },
       toseiDesign('Silver', '#9aa0a8', '#1d2a4f', 'sun', 'black', '#23202b'),
       toseiDesign('Blued steel', '#2c3a4a', '#d6a743', 'antlers', 'red', '#16201a'),
       // Kojima's own (`special`: his alone, never dealt at random; the same
       // tōsei gusoku, the same protection): red lacquer laced black, the
       // kabuto dressed all round in grey yak hair (shaguma, as Edo-period
-      // helmets were), and a black oni face (a full somen).
-      { ...toseiDesign('Oni', '#8e1c16', '#141416', null, 'oni', '#2a0c0e'), special: true, head: { kind: 'kabuto', color: '#8e1c16', mask: 'oni', hair: '#7a766f', lace: '#141416', gold: '#c9a24a' } },
+      // helmets were), and a black-lacquered menpō.
+      { ...toseiDesign('Oni', '#8e1c16', '#141416', null, 'black', '#2a0c0e'), special: true, head: { kind: 'kabuto', color: '#8e1c16', mask: 'black', hair: '#7a766f', lace: '#141416', gold: '#c9a24a' } },
       // The kabuto in other constructions (sets of their own: outfitsets.js): the Nanban kabuto, a European cabasset's skull
       // raised in one piece, its narrow brim and rivets (the British Museum's, c. 1600); the zunari,
       // the plain head-shaped bowl of three plates, its brow embossed in a scowl (the Met's, 17th c.).
@@ -1329,7 +1329,7 @@ export const OUTFITS = {
       // The nanban dō gusoku (a set of its own): a European peascod breastplate, bought off the Portuguese ships or forged in
       // copy of one, lacquered russet and worn with the Japanese kote, kusazuri and suneate; under the Nanban kabuto dressed
       // in white yak hair, a black menpo (the Tokyo National Museum's and Kunōzan Tōshōgū's, c. 1600).
-      { ...toseiBowlDesign('Nanban dō: russet iron', 'nanban', '#5b3b2a', '#1d2a4f', null, '#1c1d26', { mask: 'black', maskPlain: true, plume: '#e9e3d2' }), armor: { kind: 'nanbanDo', color: '#5b3b2a', lace: '#1d2a4f', mail: '#2a2a2e', gold: '#d6a743' } },
+      { ...toseiBowlDesign('Nanban dō: russet iron', 'nanban', '#5b3b2a', '#1d2a4f', null, '#1c1d26', { mask: 'black', plume: '#e9e3d2' }), armor: { kind: 'nanbanDo', color: '#5b3b2a', lace: '#1d2a4f', mail: '#2a2a2e', gold: '#d6a743' } },
     ],
   },
   // Ashigaru: a foot soldier's plain lacquered okegawa-do, short skirt,
@@ -1660,9 +1660,11 @@ export const OUTFITS = {
     designs: [
       mingEliteDesign('Crimson', '#8a1418', '#1f2a4a', '#a7adb6'),
       mingEliteDesign('Imperial blue', '#1f2f6a', '#e8e0cc', '#a7adb6'),
-      mingEliteDesign('Black and gold, masked', '#18181c', '#5a1a14', '#8f949b', { mask: true, maskDesign: 'shoumian', aventail: 'mail' }),
+      mingEliteDesign('Black and gold', '#18181c', '#5a1a14', '#8f949b', { aventail: 'mail' }),
       mingEliteDesign('Gilt scale', '#5a1a14', '#7a1418', '#b8a066', {}, { kind: 'mingScale', lace: '#3a2016' }),
-      mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true, maskDesign: 'shoumian' }, { kind: 'mingScale', lace: '#1a1c24' }),
+      // Koxinga's iron men (scenarios.js ARMIES.koxinga, design 4): the steel scale under an iron menpō in the helmet's bare
+      // steel; the only Chinese kit masked (the user's call, 2026-11-20), never dealt to a Ming elite at random (`chosen`).
+      { ...mingEliteDesign('Steel scale, masked', '#1c1c20', '#e8e0cc', '#a7adb6', { mask: true, maskDesign: 'menpo' }, { kind: 'mingScale', lace: '#1a1c24' }), chosen: true },
       // Qi Jiguang's and his household guards' (Qi Jiguang's level): the elite's protection drawn as
       // iron lamellar laced in crimson over the crimson coat. A level's, not dealt at random.
       { ...mingEliteDesign('Iron lamellar, crimson lacing', '#8a1418', '#8a1418', '#8f949b', {}, { kind: 'mingEliteLamellar', lace: '#8a1418' }), levelOnly: true },
@@ -1744,9 +1746,6 @@ export const OUTFITS = {
       bayaraDesign('Yellow brocade', '#d9a524', '#7a1418'),
       bayaraDesign('White brocade', '#e2ddcf', '#7a1418'),
       bayaraDesign('Red brocade', '#a8242a', '#2a1a14'),
-      // One in three in the steel face of the steppe's masked helmets (OUTFIT_SETS bayara `masked`).
-      bayaraDesign('Blue brocade, steel face', '#5a78a6', '#1f2f5a', { mask: true, maskDesign: 'kipchak' }),
-      bayaraDesign('Yellow brocade, steel face', '#d9a524', '#7a1418', { mask: true, maskDesign: 'kipchak' }),
     ],
   },
   // The Iron Pagoda (tiefutu): the Jurchen Jin's armoured heavy horse of the

@@ -338,18 +338,17 @@ def emboss(region, X, Y, paint, rect, height, soft=0.012, gild=0.0, px=512):
 # Each mask is a patch of a sphere (radius R, `az` either side of the front, from polar angle `top` to `bottom`), displaced
 # out by its relief: the coarse part goes to the mesh (`grid`, sampled here), the rest to the maps. u: the angle from the
 # middle (folded: the two halves mirror), v: up.
+# The samurai's war mask: the menpō (the half mask from under the eyes to under the chin), one design, drawn in the kit's
+# finish (russet iron, black or red lacquer: src/wardrobe.js). `top` reaches up to the cheek wings beside the eyes.
 MASKS = {
-    'maskOni': {'R': 1.12, 'az': 0.42 * PI, 'top': 0.2 * PI, 'bottom': 0.86 * PI},
-    'maskRessei': {'R': 1.1, 'az': 0.44 * PI, 'top': 0.42 * PI, 'bottom': 0.88 * PI},
-    'maskTengu': {'R': 1.1, 'az': 0.44 * PI, 'top': 0.42 * PI, 'bottom': 0.88 * PI},
+    'maskMenpo': {'R': 1.1, 'az': 0.44 * PI, 'top': 0.375 * PI, 'bottom': 0.88 * PI},
 }
 GRID = 17
+# The menpō's mesh is finer than the world masks' (its nose, cheekbones, lips and chin are modelled, not painted).
+MENPO_GRID = 33
 # u = (angle / az) ** MASK_U_POWER: more of the sheet for the middle of the face, less for the cheeks.
 MASK_U_POWER = 0.6
 LACQUER = np.array([0.82, 0.82, 0.82])
-MOUTH = np.array([0.5, 0.05, 0.035])
-TEETH = np.array([0.92, 0.9, 0.82])
-HAIR = np.array([0.9, 0.88, 0.84])
 
 
 def mask_surface(spec):
@@ -362,30 +361,6 @@ def mask_surface(spec):
 
 def wrinkle(X, Y, points, width=0.018, depth=0.015):
     return -bead(seg_dist(X, Y, curve(points, 30)), width) * depth
-
-
-def hair(region, X, Y, roots, length, sweep, droop, count, width, height, colour=HAIR, seed=3):
-    """Horsehair: `count` strands from points along `roots`, each running `length` out (sweeping `sweep`, drooping
-    `droop`), a mound of hair `height` high with fine strand grooves."""
-    rng = np.random.default_rng(seed)
-    field = np.zeros(X.shape, np.float32)
-    path = curve(roots, 40)
-    for k in range(count):
-        p = path[int(rng.integers(0, len(path)))]
-        ln = length * rng.uniform(0.7, 1.1)
-        pts = [(p[0] + sweep * ln * t + rng.normal(0, 0.01), p[1] - droop * ln * t * t + rng.normal(0, 0.01)) for t in np.linspace(0, 1, 6)]
-        xs = [q[0] for q in pts]
-        ys = [q[1] for q in pts]
-        near = (X > min(xs) - width * 2) & (X < max(xs) + width * 2) & (Y > min(ys) - width * 2) & (Y < max(ys) + width * 2)
-        if not near.any():
-            continue
-        strand = bead(seg_dist(X[near], Y[near], pts), width * rng.uniform(0.7, 1.2)) * (1 - 0.3 * rng.random())
-        field[near] = np.maximum(field[near], strand)
-    mound = region.blur(field, width * 1.5)
-    region.add(mound * height * 1.2 + field * height * 0.35)
-    weight = smooth(field * 2.2)
-    region.paint(weight, rgb=colour, rough=0.85, metal=0.0, mask=0.0)
-    return weight
 
 
 def teeth(region, X, Y, y_top, y_bottom, x_max, count, colour, metal, rough, h=0.03, down=True):
@@ -402,135 +377,138 @@ def teeth(region, X, Y, y_top, y_bottom, x_max, count, colour, metal, rough, h=0
     region.paint(smooth((Y - lo) / 0.008) * smooth((hi - Y) / 0.008) * (X < x_max) * (1 - block), rgb=HOLE, rough=1.0, metal=0.0, mask=0.0)
     return block
 
+# The menpō, from the surviving 17th-century pieces (the russet-iron menpō with its laced yodarekake and the red-lacquered
+# inside, Met 31974 and the like; references in src/helmmaps.js), in the sheet's own measures (r; X across from the middle,
+# Y up, as drawn on the sphere before helmforms.js MASK_FITS sets it on the face):
+#   `outline` the right half's edge, from the nose bridge round the cheek wing and the jaw to the chin's foot;
+#   `nose` the profile [(Y, height, half-width)] down the hooked nose; `alae` its wings; `nostril` the slits under them;
+#   `cheek` the cheekbones; `crease` the line from the nose's wing past the mouth's corner (the cheek swells over it);
+#   `mouth` the open grimace (centre Y, half-width, half-height), its lips standing forward; `chin` the jutting chin;
+#   `flare` how far the cheek wings stand off at their edge; `lines` the pitch and depth of the grooves the iron was
+#   finished in (round the mouth, and down the nose); `drain` the sweat hole under the chin.
+MENPO = {
+    'outline': [(-0.05, 0.38), (0.0, 0.38), (0.08, 0.37), (0.13, 0.25), (0.19, 0.08), (0.3, -0.01), (0.48, 0.03), (0.68, 0.15),
+                (0.86, 0.3), (1.0, 0.4), (1.13, 0.39), (1.2, 0.2), (1.21, -0.12), (1.14, -0.42), (0.98, -0.66), (0.76, -0.84),
+                (0.5, -0.96), (0.24, -1.02), (0.0, -1.04), (-0.05, -1.04)],
+    'nose': [(0.38, 0.05, 0.075), (0.22, 0.11, 0.08), (0.06, 0.2, 0.09), (-0.05, 0.29, 0.12), (-0.11, 0.27, 0.15), (-0.16, 0.14, 0.15), (-0.21, 0.0, 0.12)],
+    'alae': ((0.135, -0.12), 0.085, 0.13),
+    'nostril': ((0.075, -0.165), 0.045, 0.02, 0.4),
+    'cheek': ((0.52, -0.1), 0.38, 0.07),
+    'crease': [(0.19, -0.1), (0.28, -0.25), (0.35, -0.42), (0.36, -0.56)],
+    'mouth': (-0.42, 0.25, 0.072),
+    'chin': ((0.0, -0.77), 0.3, 0.22, 0.09),
+    'flare': 0.06,
+    'lines': (0.026, 0.0028),
+    'drain': (0.0, -0.95, 0.03),
+}
+
+
+def nose_profile(Y):
+    """The nose's height and half-width at each Y, along MENPO['nose'] (zero above and below it)."""
+    ys = [p[0] for p in MENPO['nose']][::-1]
+    hs = [p[1] for p in MENPO['nose']][::-1]
+    ws = [p[2] for p in MENPO['nose']][::-1]
+    inside_nose = (Y <= ys[-1]) & (Y >= ys[0])
+    return np.interp(Y, ys, hs) * inside_nose, np.interp(Y, ys, ws)
+
+
+def outline_field(X, Y, polygon, soft):
+    """The outline as a soft step: 1 well inside, 0 outside, `soft` r wide."""
+    inner = inside(X, Y, polygon)
+    edge = seg_dist(X, Y, polygon + polygon[:1])
+    signed = np.where(inner > 0.5, edge, -edge)
+    return smooth(signed / soft + 0.5), signed
+
 
 def mask_atlas(name):
     spec = MASKS[name]
-    atlas = Atlas(name, base=LACQUER, rough=0.3, metal=0.0)
+    atlas = Atlas(name, base=LACQUER, rough=0.36, metal=0.0)
     region = atlas.region((0, 0, 1, 1), mask_surface(spec), spec['az'] * spec['R'])
     X, Y = region.s['X'], region.s['Y']
     region.paint(np.ones(X.shape), mask=1.0)
-    rng = np.random.default_rng(5)
-    peel = region.blur(rng.standard_normal(X.shape).astype(np.float32), 0.02)
-    region.add(peel / (peel.std() + 1e-9) * 0.0015)
+    m = MENPO
+    outline, signed = outline_field(X, Y, m['outline'], 0.02)
+
+    # ---- The form: what the mesh carries (smoothed), the rest in the maps.
     relief = np.zeros(X.shape, np.float32)
-    width = spec['az'] * spec['R']
-    if name == 'maskOni':
-        # The somen: the whole face of a demon. Brows bunched and swept up, eyes glaring holes, a broad flat nose with flared
-        # nostrils, cheeks swollen, the mouth wide in a snarl round gilt teeth and four tusks, the brow and cheeks furrowed.
-        # Drawn lower than the face beneath (the kabuto's peak hides the brow): the features 0.12 r down.
-        Y = Y + 0.12
-        outline = smooth((0.95 * width - X - np.clip(-0.45 - Y, 0, None) * 0.9) / 0.04)
-        relief += dome(ellipse(X, Y, 0.0, 0.05, 1.0, 0.9), 1.0) * 0.08
-        brow = seg_dist(X, Y, [(0.05, 0.28), (0.22, 0.36), (0.5, 0.5)])
-        relief += dome(brow, 0.12) * 0.13
-        relief += dome(ellipse(X, Y, 0.38, -0.12, 0.22, 0.18), 1.0) * 0.08
-        nose = dome(ellipse(X, Y, 0.0, -0.02, 0.2, 0.18), 1.0) * 0.2 + dome(seg_dist(X, Y, [(0, 0.28), (0, 0.0)]), 0.08) * 0.08
-        relief += nose
-        relief += dome(ellipse(X, Y, 0.0, -0.72, 0.25, 0.15), 1.0) * 0.06
-        mouth = ellipse(X, Y, 0.0, -0.37 - 0.05 * (X / 0.32) ** 2, 0.33, 0.13)
-        relief += bead(np.abs(mouth - 1.0), 0.25) * 0.04
-        sink = smooth((1.0 - mouth) / 0.15) * 0.03
-        eye = ellipse(X, Y, 0.27, 0.16, 0.12, 0.055, -0.35)
-        relief -= smooth((1.0 - eye) / 0.3) * 0.04
-        region.add(relief - mask_grid(atlas, region, relief, spec) - sink)
-        region.add(bead(np.abs(eye - 1.1), 0.25) * 0.015)
-        region.paint(smooth((1.0 - eye) / 0.12), rgb=HOLE, rough=1.0, mask=0.0)
-        region.paint(smooth((0.98 - mouth) / 0.06), rgb=MOUTH, rough=0.35, mask=0.0)
-        teeth(region, X, Y, -0.29, -0.36, 0.26, 4, GILT, 1.0, 0.25, 0.03)
-        teeth(region, X, Y, -0.47, -0.41, 0.24, 4, GILT, 1.0, 0.25, 0.03, down=False)
-        for (x0, y0, y1) in ((0.24, -0.28, -0.47), (0.17, -0.48, -0.31)):
-            tusk = bead(seg_dist(X, Y, [(x0, y0), (x0 + 0.015, y1)]), 0.03) * smooth(1 - np.abs(Y - (y0 + y1) / 2) / abs(y1 - y0) * 1.6)
-            region.add(tusk * 0.04)
-            region.paint(smooth(tusk * 4), rgb=TEETH, rough=0.3, metal=0.0, mask=0.0)
-        nostril = np.minimum(ellipse(X, Y, 0.09, -0.12, 0.05, 0.03, 0.4), 9)
-        region.add(-smooth((1 - nostril) / 0.3) * 0.03)
-        region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, mask=0.0)
-        for y in (0.6, 0.67, 0.74):
-            region.add(wrinkle(X, Y, [(0.0, y - 0.03), (0.2, y), (0.45, y - 0.02), (0.7, y - 0.06)], 0.02, 0.018))
-        for k in range(3):
-            region.add(wrinkle(X, Y, [(0.42, 0.18 - k * 0.04), (0.55, 0.16 - k * 0.07), (0.66, 0.12 - k * 0.1)], 0.014, 0.012))
-        region.add(wrinkle(X, Y, [(0.03, 0.42), (0.04, 0.3)], 0.016, 0.02))
-        region.add(wrinkle(X, Y, [(0.16, -0.08), (0.3, -0.22), (0.38, -0.42)], 0.025, 0.025))
-        region.add(wrinkle(X, Y, [(0.12, -0.62), (0.25, -0.58), (0.36, -0.5)], 0.016, 0.012))
-        # Horsehair brows, black and bristling.
-        hair(region, X, Y, [(0.08, 0.34), (0.25, 0.4), (0.45, 0.5)], 0.18, 0.9, 0.3, 140, 0.012, 0.02, colour=(0.06, 0.055, 0.05), seed=11)
-    else:
-        # The menpo: from under the eyes to under the chin. Ressei-men, the fierce old man: a hooked nose, the cheeks and
-        # chin cut with deep wrinkles, the mouth open on white teeth, a horsehair moustache and a chin tuft, the sweat drain.
-        # Karasu tengu: a crow's beak in place of nose and mouth, feathered cheeks.
-        outline = smooth((0.97 * width - X - np.clip(Y - 0.0, 0, None) * 0.8 - np.clip(-0.72 - Y, 0, None) * 1.2) / 0.04)
-        top = 0.2 - 0.24 * np.exp(-((X - 0.3) / 0.16) ** 2)
-        outline *= smooth((top - Y) / 0.03)
-        relief += dome(ellipse(X, Y, 0.0, -0.4, 1.0, 0.8), 1.0) * 0.05
-        relief += dome(ellipse(X, Y, 0.4, -0.2, 0.25, 0.2), 1.0) * 0.06
-        relief += dome(ellipse(X, Y, 0.0, -0.78, 0.25, 0.14), 1.0) * 0.06
-        if name == 'maskRessei':
-            nose = dome(ellipse(X, Y, 0.0, -0.06, 0.15, 0.22), 1.0) * 0.16 + dome(seg_dist(X, Y, [(0, 0.15), (0, -0.12)]), 0.07) * 0.08
-            relief += nose
-            mouth = ellipse(X, Y, 0.0, -0.4 - 0.06 * (X / 0.28) ** 2, 0.28, 0.08)
-            relief += bead(np.abs(mouth - 1.0), 0.3) * 0.03
-            sink = smooth((1.0 - mouth) / 0.2) * 0.025
-        else:
-            beak_top = seg_dist(X, Y, [(0, 0.1), (0, -0.25), (0, -0.55)])
-            beak = np.clip(1 - np.hypot(X / 0.22, (Y + 0.22) / 0.42), 0, None) ** 1.3
-            relief += beak * (0.35 + 0.25 * smooth((0.05 - Y) / 0.5)) + dome(beak_top, 0.08) * 0.05
-            mouth = np.full(X.shape, 9.0, np.float32)
-            sink = 0.0
-        region.add(relief - mask_grid(atlas, region, relief, spec) - sink)
-        if name == 'maskRessei':
-            region.paint(smooth((0.98 - mouth) / 0.08), rgb=MOUTH, rough=0.35, mask=0.0)
-            teeth(region, X, Y, -0.355, -0.41, 0.2, 4, TEETH, 0.0, 0.3, 0.025)
-            teeth(region, X, Y, -0.46, -0.42, 0.18, 4, TEETH, 0.0, 0.3, 0.025, down=False)
-            nostril = ellipse(X, Y, 0.07, -0.21, 0.04, 0.025, 0.3)
-            region.add(-smooth((1 - nostril) / 0.3) * 0.03)
-            region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, mask=0.0)
-            for k in range(4):
-                region.add(wrinkle(X, Y, [(0.2 + k * 0.07, 0.05), (0.26 + k * 0.08, -0.2), (0.3 + k * 0.08, -0.45 - k * 0.04)], 0.016, 0.02))
-            region.add(wrinkle(X, Y, [(0.12, -0.15), (0.24, -0.32), (0.3, -0.48)], 0.024, 0.028))
-            for k in range(3):
-                region.add(wrinkle(X, Y, [(0.0, -0.62 - k * 0.06), (0.15, -0.6 - k * 0.07), (0.28, -0.56 - k * 0.08)], 0.014, 0.014))
-            hair(region, X, Y, [(0.02, -0.27), (0.1, -0.29), (0.2, -0.33)], 0.34, 1.0, 0.5, 260, 0.011, 0.035, seed=4)
-            hair(region, X, Y, [(0.0, -0.6), (0.08, -0.62)], 0.3, 0.15, 1.3, 120, 0.011, 0.03, seed=5)
-        else:
-            beak_edge = np.abs(Y + 0.38 + 0.15 * (X / 0.22) ** 2)
-            region.add(-bead(beak_edge, 0.014) * smooth((0.22 - X) / 0.03) * 0.03)
-            region.paint(bead(beak_edge, 0.012) * smooth((0.2 - X) / 0.03), rgb=HOLE, rough=1.0, mask=0.0)
-            nostril = ellipse(X, Y, 0.06, 0.02, 0.035, 0.02)
-            region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, mask=0.0)
-            region.add(-smooth((1 - nostril) / 0.3) * 0.02)
-            off_beak = smooth((X - 0.24) / 0.05)
-            row = np.floor(Y / 0.09)
-            scale = np.hypot(np.mod(X + 0.045 * row, 0.09) - 0.045, np.mod(Y, 0.09) - 0.07)
-            region.add(cap(scale, 0.07) * 0.015 * off_beak)
-            region.add(bead(np.abs(Y + 0.1 - 0.2 * X), 0.02) * 0.02 * off_beak)
-            region.paint(smooth(beak * 3) * 0.6, rgb=(0.06, 0.05, 0.05), rough=0.25, mask=0.0)
-        # The sweat drain under the chin, and the cord posts on the cheeks.
-        drain = np.hypot(X, Y + 0.86)
-        region.add(bead(np.abs(drain - 0.035), 0.012) * 0.01 - smooth((0.03 - drain) / 0.008) * 0.015)
-        region.paint(smooth((0.03 - drain) / 0.008), rgb=HOLE, rough=1.0, mask=0.0)
-        add_rivets(region, X, Y, [(0.95 * width - 0.2, -0.35)], 0.06, 0.05)
-    # The rolled edge round the cut outline.
-    region.add(bead(np.abs(outline - 0.5) * 0.08, 0.03) * 0.02)
+    # The hooked nose: a ridge down the middle, highest just above its tip, its wings either side.
+    height, half = nose_profile(Y)
+    across = np.clip(1 - (X / half) ** 2, 0, None)
+    nose = height * across ** 1.2
+    (ax, ay), ar, ah = m['alae']
+    nose = np.maximum(nose, dome(np.hypot(X - ax, (Y - ay) * 1.3), ar) * ah)
+    relief += nose
+    # The cheekbones, and the cheek swelling over the crease from the nose to the mouth's corner.
+    (cx, cy), cr, ch = m['cheek']
+    relief += dome(np.hypot(X - cx, (Y - cy) * 1.2), cr) * ch
+    crease_d = seg_dist(X, Y, curve(m['crease'], 30))
+    beside = X > np.interp(Y, [p[1] for p in m['crease']][::-1], [p[0] for p in m['crease']][::-1])
+    relief += dome(crease_d, 0.16) * 0.045 * beside - bead(crease_d, 0.035) * 0.03
+    # The upper lip and the lips round the open mouth, standing forward; the groove under the lower lip; the chin.
+    my, mw, mh = m['mouth']
+    mouth = ellipse(X, Y, 0.0, my - 0.035 * (X / mw) ** 2, mw, mh)
+    relief += dome(ellipse(X, Y, 0.0, my + 0.05, 0.4, 0.26), 1.0) * 0.08
+    relief += bead(np.abs(mouth - 1.25), 0.45) * 0.03
+    relief -= bead(np.abs(Y - (my - 0.17) + 0.06 * (X / 0.3) ** 2), 0.05) * 0.02 * (np.abs(X) < 0.32)
+    (chx, chy), crx, cry, chh = m['chin']
+    relief += dome(ellipse(X, Y, chx, chy, crx, cry), 1.0) * chh
+    # The cheek wings standing off the face at their edge (flared, as forged: the cord passes behind them).
+    relief += smooth((X - 0.9) / 0.35) * smooth((Y + 0.75) / 0.3) * m['flare']
+    # The mouth is open: nothing of the form inside it.
+    relief *= smooth((mouth - 0.9) / 0.1)
+    coarse = mask_grid(atlas, region, relief, spec, MENPO_GRID, 0.03)
+    region.add(relief - coarse)
+
+    # ---- The fine work, in the maps.
+    # The grooves the iron was finished in: round the mouth in widening rings (horizontal over the chin, slanting up the
+    # cheeks), and straight down the nose.
+    pitch, depth = m['lines']
+    rings = np.hypot(X / 1.05, (Y - my) / 0.78)
+    groove = (0.5 + 0.5 * np.cos(2 * PI * rings / pitch)) ** 6
+    down_nose = (0.5 + 0.5 * np.cos(2 * PI * (X / np.maximum(half, 0.05)) * 0.11 / pitch)) ** 6
+    on_nose = smooth(nose / 0.06)
+    region.add(-(groove * (1 - on_nose) + down_nose * on_nose) * depth)
+    hammered(region, 0.0012, 0.04, seed=7)
+    # The nostrils: slits under the wings.
+    (nx, ny), nrx, nry, nang = m['nostril']
+    nostril = ellipse(X, Y, nx, ny, nrx, nry, nang)
+    region.add(-smooth((1 - nostril) / 0.35) * 0.03)
+    region.paint(smooth((1 - nostril) / 0.3), rgb=HOLE, rough=1.0, mask=0.0)
+    # The mouth's rim: a rolled edge round the opening, dark just inside it; the opening cut out.
+    region.add(bead(np.abs(mouth - 1.04), 0.06) * 0.012)
+    region.paint(smooth((1.0 - mouth) / 0.04), rgb=HOLE, rough=1.0, mask=0.0)
+    # The sweat drain under the chin.
+    dx, dy, dr = m['drain']
+    drain = np.hypot(X - dx, Y - dy)
+    region.add(bead(np.abs(drain - dr), 0.012) * 0.01 - smooth((dr - drain) / 0.008) * 0.015)
+    region.paint(smooth((dr - 0.004 - drain) / 0.006), rgb=HOLE, rough=1.0, mask=0.0)
+    # The iron's own unevenness: a few shades of russet (the tint gives the colour).
+    rng = np.random.default_rng(5)
+    mottle = region.blur(rng.standard_normal(X.shape).astype(np.float32), 0.05)
+    mottle /= mottle.std() + 1e-9
+    region.paint(np.ones(X.shape), mul=(1 + 0.06 * mottle[..., None]) * np.ones(3, np.float32))
+    # The rolled edge round the outline, and the outline cut.
+    region.add(bead(np.abs(signed - 0.018), 0.018) * 0.012)
     region.paint(1 - outline, cut=0.0)
-    # Wear: the lacquer rubbed thin on every raised edge, the red undercoat (or the iron) showing (the shader reads the
-    # lacquer's albedo above its base as wear, src/helmmaps.js).
+    region.paint(smooth((1.02 - mouth) / 0.02), cut=0.0)
+    # Wear: the lacquer rubbed thin on every raised edge.
     h = region.view('h') / region.k
     wear = smooth((h - region.blur(h, 0.035)) * 160) * region.view('mask')
-    region.paint(wear * 0.9, rgb=LACQUER + 0.18)
+    region.paint(wear * 0.7, rgb=LACQUER + 0.14)
     return atlas
 
 
-def mask_grid(atlas, region, relief, spec):
-    """The coarse relief the mesh carries: `relief` (smoothed) sampled on a GRID x GRID lattice over (u, v), v from the
-    bottom (the mesh's vertices, src/menpo.js). Returns the smoothed relief: what the mesh shows, so the maps carry only
-    the rest."""
-    smoothed = region.blur(relief, 0.06)
+def mask_grid(atlas, region, relief, spec, size=GRID, blur=0.06):
+    """The coarse relief the mesh carries: `relief` (smoothed by `blur` r) sampled on a `size` x `size` lattice over (u, v),
+    v from the bottom (the mesh's vertices, src/menpo.js). Returns the smoothed relief: what the mesh shows, so the maps
+    carry only the rest."""
+    smoothed = region.blur(relief, blur)
     n = relief.shape[0]
-    idx = np.linspace(0, n - 1, GRID)
+    idx = np.linspace(0, n - 1, size)
     rows = np.round(idx[::-1]).astype(int)
     cols = np.round(idx).astype(int)
     lattice = smoothed[np.ix_(rows, cols)]
-    atlas.grid = {'size': GRID, 'R': spec['R'], 'az': spec['az'], 'top': spec['top'], 'bottom': spec['bottom'],
+    atlas.grid = {'size': size, 'R': spec['R'], 'az': spec['az'], 'top': spec['top'], 'bottom': spec['bottom'],
                   'power': MASK_U_POWER, 'heights': [round(float(v), 4) for v in lattice.reshape(-1)]}
     return smoothed
 
@@ -686,9 +664,7 @@ def world_mask_atlas(name):
 
 
 BUILDERS = {
-    'maskOni': lambda: mask_atlas('maskOni'),
-    'maskRessei': lambda: mask_atlas('maskRessei'),
-    'maskTengu': lambda: mask_atlas('maskTengu'),
+    'maskMenpo': lambda: mask_atlas('maskMenpo'),
     **{name: (lambda name=name: world_mask_atlas(name)) for name in WORLD_MASKS},
 }
 
