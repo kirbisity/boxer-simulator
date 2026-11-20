@@ -23,6 +23,7 @@ import { TK_LAY } from '../townkit/lay.js';
 import { tkStir } from '../townkit/stir.js';
 import { TK_GLOW, TK_MATERIALS } from '../townkit/weather.js';
 import { TK_THINGS, tkArrows, tkBasket, tkBrazier, tkCampfire, tkCart, tkDrift, tkFirewood, tkIcicles, tkLadder, tkMantlet, tkPoles, tkSacks, tkScatter, tkStack, tkTub, tkTuft } from '../townkit/things.js';
+import { PY_CITY, PY_FAR_TOWN, pyCityDraw, pyCityPlan, pyCitySolids, pyFarTownDraw, pyFarTownPlan, pyInFarTown } from './pyongyang-city.js';
 import { TK_WORKS, tkGatehouse, tkGatehouseSolids, tkPavilion, tkPavilionSolids, tkRampart, tkRampartSolids, tkWorksStair, tkWorksStairSolid } from '../townkit/works.js';
 
 /** The place's plan (m). Choices for the game's ground, set against the battle's field and a walker's reach; none is a measurement of the real town. */
@@ -157,23 +158,9 @@ export function pyongyangPlan() {
   const runs = [range(t.wall.z[0], t.gate.z - t.gate.wide / 2), range(t.gate.z + t.gate.wide / 2, t.wall.z[1])];
   // The ladders' heads (the battle's): the parapet is open there, as the battle's own is. Measured along the southern run.
   const gaps = t.wall.ladders.map((z) => [z - STORY_WALL.ladder / 2 - runs[1][0][1], z + STORY_WALL.ladder / 2 - runs[1][0][1]]);
-  // The town: a street in from the gate, a cross street, and rows facing the open ground kept behind the wall.
-  const east = head + t.inside.cells * step - 34;
-  const street = [t.gate.z - 3, t.gate.z + 3];
-  const clear = t.strip[0] + 3.5;
-  const homes = { depth: 6.5, widths: [5.5, 8.5], two: 0, vary: 0.25, firewalls: 0, walls: ['plaster', 'rubble', 'plaster'], grounds: [['wall', 'door', 'wall'], ['lattice', 'door'], ['wall', 'lattice', 'door'], ['boards', 'door']], extra: { roof: { kind: 'hip', overhang: 0.9, sag: 0.3, lift: 0.12 } } };
-  const rows = [
-    // (Each row is walked with its houses on the left hand: townkit/build.js tkRow. The cross street runs x 58..64.)
-    ['streetNorth', [26, street[0]], [east, street[0]], 1], ['streetSouthA', [east, street[1]], [64, street[1]], 2], ['streetSouthB', [58, street[1]], [26, street[1]], 12],
-    ['groundNorthA', [22, -clear], [58, -clear], 3], ['groundNorthB', [64, -clear], [east, -clear], 13],
-    ['groundSouthA', [east, clear], [64, clear], 4], ['groundSouthB', [58, clear], [22, clear], 14],
-    ['crossWest', [58, -clear - 8], [58, street[1] + 8], 5], ['crossEast', [64, street[1] + 8], [64, -clear - 8], 6],
-    ['southWest', [58, 62], [58, clear + 8], 7], ['southEast', [64, clear + 8], [64, 62], 8],
-    ['farSouth', [east, 66], [22, 66], 9], ['farNorth', [30, -64], [east, -64], 10],
-    ['farEastNorth', [east + 1.5, -64], [east + 1.5, -clear], 15], ['farEastSouth', [east + 1.5, clear], [east + 1.5, 66], 16],
-  ];
-  const houses = [];
-  for (const [row, from, to, seed] of rows) for (const house of tkRow({ from, to, seed: seed * 17, ...homes })) houses.push({ ...house, row, far: row.startsWith('far'), blindBack: true });
+  // The town (places/pyongyang-city.js): its square, streets, compound, temple, pavilions, houses and yards.
+  const city = pyCityPlan((x, z) => tkFieldAt(inside, x, z));
+  const houses = city.houses;
   // Pines on the hill and by the wall, bare trees in the yards and along the road; boulders on the open ground.
   const random = tkRandom(1593);
   const trees = [];
@@ -189,20 +176,21 @@ export function pyongyangPlan() {
   }
   // (The hill's pines: its west flank outside the wall, and its slope inside.)
   for (let k = 0; k < 64; k += 1) {
-    const inside = k % 3 === 0;
-    const x = inside ? 16 + random() * 94 : -142 + random() * 136;
-    const z = inside ? -112 + random() * 38 : -127 + random() * 50;
+    // (The town's own trees inside the wall are its plan's: pyCityPlan.)
+    const inside = false;
+    const x = -142 + random() * 136;
+    const z = -127 + random() * 50;
     if (Math.abs(z - pyRoad(x)) < 5) continue;
     trees.push({ at: [x, z], y: inside ? pyFoot(z) : pyOutside(x, z), kind: 'pine', high: 6 + 6 * random(), seed: 200 + k });
   }
-  for (const [x, z] of [[30, -96], [52, -104], [78, -92], [102, -108], [124, -98], [20, -84], [90, -80], [40, 36], [86, 34], [110, -30], [36, -32], [96, 84], [44, 88], [128, 20]]) trees.push({ at: [x, z], y: pyFoot(z), kind: z < t.hill.z[0] ? 'pine' : 'bare', high: 7 + 3 * random(), seed: Math.round(x + z), yard: z > t.hill.z[0] });
+  trees.push(...city.trees);
   const gateFrame = tkgFrame(wall.x - t.gate.out, 0, t.gate.z, -Math.PI / 2);
   // The foreground's crags, stele and ruin first (PY_FORE), the field's outcrops kept off them.
   const fore = pyForePlan();
   const crags = pyCrags(fore, trees);
   const keep = [...crags.map((stone) => [...stone.at, stone.size * 0.6]), ...[fore.stele, fore.ruin].filter(Boolean).map((thing) => [...thing.at, 6])];
   const outcrops = [...crags, ...pyOutcrops(trees, rocks, keep)];
-  pyPlanMade = { wall, outside, inside, south, runs, gaps, houses, trees, rocks, outcrops, fore, gateFrame, head, east: head + t.inside.cells * step, edge: east + 0.8 };
+  pyPlanMade = { wall, outside, inside, south, runs, gaps, houses, city, trees, rocks, outcrops, fore, gateFrame, head, east: head + t.inside.cells * step, edge: PY_CITY.east };
   return pyPlanMade;
 }
 
@@ -740,7 +728,7 @@ export function pyongyangSolids() {
   solids.push(...tkPavilionSolids(pavilions.gate, { storeys: t.pavilion }, t.gate.high));
   // The terrace's ends beside the stairs' heads (the block is wider than the walk): closed with a low wall.
   for (const side of [-1, 1]) solids.push(wallLine([wall.x + wall.face + wall.walk + 0.2, t.gate.z + (side * t.gate.wide) / 2], [wall.x - t.gate.out + t.gate.deep, t.gate.z + (side * t.gate.wide) / 2], 0.3, t.gate.high - 0.5, t.gate.high + 2.5), wallLine([wall.x - t.gate.out, t.gate.z + (side * t.gate.wide) / 2], [wall.x + wall.face + 0.1, t.gate.z + (side * t.gate.wide) / 2], 0.3, t.gate.high - 0.5, t.gate.high + 2.5));
-  for (const house of plan.houses) solids.push(tkHouseSolid(house));
+  solids.push(...pyCitySolids(plan.city));
   for (const tree of plan.trees) if (!tree.yard) solids.push(wallOf(tree.at, [0.6, 0.6], tree.y - 1, tree.y + 4));
   for (const rock of plan.rocks) if (rock.size > 1.1) solids.push(wallOf(rock.at, [rock.size * 0.8, rock.size * 0.8], rock.y - 1, rock.y + rock.size));
   // (The foreground's ruined post and stele: PY_FORE.)
@@ -958,7 +946,7 @@ const PY_ROAD = { proud: 0.04, step: 2.5 };
 // side (m: coarser than a town's lanes need, the ground being four times a town's; null on the low tier, which takes
 // the kit's own), and the wind of the day for what it lays: out of the north-west, as that country's winter wind is
 // (toward [x, z]), so the wall's outer face is the windward one and the snow piles at its foot.
-const PY_LAY = { box: { x: [-150, 116], z: [-130, 130] }, texel: 0.2, wind: [0.8, 0.6] };
+const PY_LAY = { box: { x: [-150, 147], z: [-130, 130] }, texel: 0.2, wind: [0.8, 0.6] };
 
 // The columns' ways over the field. Men crossing open snow under fire do not walk a ruled line: each file follows
 // the one before it round the knolls and drifts, the ways draw together and part, and they spread only where the
@@ -999,11 +987,12 @@ function pyWays(plan) {
   const { wall } = plan;
   const road = [];
   for (let x = t.outside.x[0] + 2; x < wall.x - t.gate.out; x += 5) road.push([x, pyRoad(x)]);
-  road.push([wall.x - t.gate.out, t.gate.z], [plan.east - 34, t.gate.z]);
+  road.push([wall.x - t.gate.out, t.gate.z]);
   const walk = wall.x + wall.face + wall.thick + (wall.walk - wall.thick) / 2;
   return [
     { line: road, half: 1.9, kind: 'cart', strength: 1 },
-    { line: [[61, t.gate.z], [61, -t.strip[0] - 3.5]], half: 1.6, kind: 'foot', strength: 0.8 },
+    // (The town's streets and lanes: pyCityPlan.)
+    ...plan.city.ways,
     // (The columns: three files' breadth each to the three ladders, and the ground before the wall where they massed.)
     ...t.wall.ladders.flatMap((z, k) => pyColumnWay(wall.x - 0.5, z, k)),
     // (And the paths between them, each from one column's way over to the next.)
@@ -1204,7 +1193,7 @@ function pyDress(blocks, stir, plan, lay, eave, tier) {
   // The town: a clay stack and its smoke at the end of each house with a fire lit; icicles along the near eaves.
   for (const house of plan.houses) {
     const dice = tkRandom(house.seed * 31 + 5);
-    const frame = tkgFrame(house.at[0], 0, house.at[1], house.yaw ?? 0);
+    const frame = tkgFrame(house.at[0], house.base ?? 0, house.at[1], house.yaw ?? 0);
     if (dice() < s.hearths) {
       const [x, , z] = frame(house.width / 2 + 0.45, 0, -house.depth / 2 + 0.8);
       blocks.at(house.at[0], house.at[1], house.far).round('plaster', tkgFrame(x, 0, z), 0, 0, 0, 2.3, 0.2, 0.15, { colour: [0.5, 0.44, 0.38], sides: 7 });
@@ -1337,6 +1326,10 @@ const PY_WEATHERED = {
 };
 
 /** The place built (a THREE.Group for render.js's places). */
+// An oak in its dead leaves (Mongolian oak keeps them, brown, into the spring): the broad crown, its leaves brown and
+// fewer (`tint` over the foliage sheet's green, by eye).
+const PY_OAK = { kind: 'broad', tint: [0.95, 0.55, 0.3], spread: 0.55 };
+
 export function buildPyongyang() {
   const t = PYONGYANG_PLACE;
   const plan = pyongyangPlan();
@@ -1390,7 +1383,8 @@ export function buildPyongyang() {
           const [px, pz] = [x + every * woodRandom(), z + every * woodRandom()];
           const [size, kept, shade, girth, old, laden, turn, kind] = [woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom(), woodRandom()];
           const out = Math.max(Math.abs(px), Math.abs(pz));
-          if (out < from || out >= to || pyOffWalked(px, pz) < 8 || pyRiver(pz) > 0.05) continue;
+          // (Not in the town's far part, PY_FAR_TOWN.)
+          if (out < from || out >= to || pyOffWalked(px, pz) < 8 || pyRiver(pz) > 0.05 || pyInFarTown(px, pz)) continue;
           const thick = woodThick(px, pz);
           if (kept >= thick) continue;
           const tall = (high[0] + (high[1] - high[0]) * size) * (w.small + (1 - w.small) * Math.min(1, thick * 1.5)) * (old < w.oldOne ? w.old : 1);
@@ -1455,7 +1449,7 @@ export function buildPyongyang() {
   const masonry = TK_WORKS.masonry;
   for (const [index, run] of plan.runs.entries()) tkRampart(blocks.at(run[0][0], run[0][1]), run, { ...wall, gaps: index ? plan.gaps : [], masonry, seed: index + 1 });
   const crest = pyFoot(t.wall.z[0]);
-  tkRampart(blocks.wide, Array.from({ length: 9 }, (_, k) => [plan.east + 60 - k * ((plan.east + 60 - wall.x) / 8), t.wall.z[0], crest, crest + wall.high]), { ...wall, inner: () => crest, masonry, seed: 7 });
+  tkRampart(blocks.wide, Array.from({ length: 13 }, (_, k) => [PY_FAR_TOWN.wall - k * ((PY_FAR_TOWN.wall - wall.x) / 12), t.wall.z[0], crest, crest + wall.high]), { ...wall, inner: () => crest, masonry, seed: 7 });
   tkRampart(blocks.wide, pySouthRun(), { ...wall, inner: (node) => node[2], masonry, seed: 9 });
   // The gate: its block, the stairs up from the walk, the pavilion on its terrace; the corner's pavilion.
   const gate = blocks.at(wall.x, t.gate.z);
@@ -1464,11 +1458,13 @@ export function buildPyongyang() {
   const pavilions = pyPavilions();
   const eave = tkPavilion(gate, pavilions.gate, { storeys: t.pavilion });
   tkPavilion(blocks.at(wall.x, t.wall.z[0]), pavilions.corner, { storeys: t.corner, board: false, overhang: 1.2 });
-  for (const house of plan.houses) tkHouse(blocks.at(house.at[0], house.at[1], house.far), house);
-  for (const tree of plan.trees) tkTree(blocks.at(...tree.at), tree.at[0], tree.y, tree.at[1], { ...tree, laden: PY_LADEN });
-  // The street in from the gate, cobbled, and the cross street.
-  tkPaving(blocks.wide, 'street', wall.x - t.gate.out + t.gate.deep, plan.east - 34, t.gate.z - 2.6, t.gate.z + 2.6, 0.03, [0.86, 0.86, 0.84]);
-  tkPaving(blocks.wide, 'street', 58.4, 63.6, t.gate.z + 2.6, -t.strip[0] - 3.5, 0.03, [0.86, 0.86, 0.84]);
+  // The town (places/pyongyang-city.js): its houses, halls, pavilions, terraces, walls, gates, pagoda, lanterns, paving;
+  // its far part on east to the east wall (drawn only), and that wall from the hill's crest south toward the river.
+  pyCityDraw(blocks, plan.city, (x, z) => tkFieldAt(plan.inside, x, z));
+  pyFarTownDraw(blocks, pyFarTownPlan(pyFar), (builder, tree) => tkTree(builder, tree.at[0], tree.y, tree.at[1], { ...tree, ...(tree.kind === 'oak' ? PY_OAK : null), laden: PY_LADEN }));
+  tkRampart(blocks.wide, Array.from({ length: 11 }, (_, k) => { const z = t.wall.z[0] + k * ((PY_FAR_TOWN.z[1] + 8 - t.wall.z[0]) / 10); const foot = Math.max(pyFar(PY_FAR_TOWN.wall, z), pyFoot(z)); return [PY_FAR_TOWN.wall, z, foot, foot + wall.high]; }), { ...wall, inner: (node) => node[2], masonry, seed: 12 });
+  // (An oak keeps its dead leaves through a Korean winter: a broad crown in their brown.)
+  for (const tree of plan.trees) tkTree(blocks.at(...tree.at), tree.at[0], tree.y, tree.at[1], { ...tree, ...(tree.kind === 'oak' ? PY_OAK : null), laden: PY_LADEN });
   // The trodden ground: the road out from the gate (a ribbon laid on the ground's own heights) and the columns' way to the wall.
   // (Each strip of the ribbon takes the ground's height under its own corners, a finger above it: it has no sides to show
   // where the ground falls away across the road.)
