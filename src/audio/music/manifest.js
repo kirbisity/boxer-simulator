@@ -66,6 +66,7 @@ export const SCENE_MUSIC = {
   // No Andean cue: the nearest in the game, the Americas' (the Mexica's).
   cajamarca: 'aztec',
   zeelandia: 'china',
+  nanjing: 'china',
   // The Japanese pirates slipping into a Ming water town.
   wokou: 'shinobi',
   qiJiguang: 'china',

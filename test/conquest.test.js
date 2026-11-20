@@ -110,3 +110,17 @@ test('Tametomo stands and shoots, never backing off; a man in close, he drops th
   assert.ok(charged > 10, `he ran in after the bow (${charged} frames)`);
   assert.notEqual(archer.weapon?.kind, 'yumi', 'the bow is down');
 });
+
+test('Nanjing: Koxinga\'s iron men in front of his levies, the banners and a wing of Bayara on horse against them, in the lower Yangzi\'s late summer', async () => {
+  const { SCENARIOS, battleOf } = await import('../src/scenarios.js');
+  const { red, blue } = battleOf('nanjing').cast(seededRandom(2));
+  const ironMen = red.filter((fighter) => fighter.outfit.kind === 'ironMan');
+  assert.equal(ironMen.length, 8);
+  assert.ok(red.slice(0, 8).every((fighter) => fighter.outfit.kind === 'ironMan'), 'the iron men in front');
+  assert.ok(red.filter((fighter) => fighter.outfit.kind === 'mingGarrison').length > red.length / 2 - 1, 'most of his army levies');
+  assert.equal(blue.filter((fighter) => fighter.mounted).length, 8);
+  assert.ok(blue.every((fighter) => ['bannerArmour', 'bayara'].includes(fighter.outfit.kind)));
+  assert.equal(SCENARIOS.nanjing.climate, 'nanjing1659');
+  assert.deepEqual(SCENARIOS.nanjing.armies, { red: ['koxinga'], blue: ['banners'] });
+});
+

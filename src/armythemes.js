@@ -194,6 +194,7 @@ export const BATTLE_THEMES = {
   sekigahara: { red: ['ii', 'east'], blue: ['west'] },
   cajamarca: { red: ['spaniards'], blue: ['inca'] },
   zeelandia: { red: ['dutch'], blue: ['mingRed'] },
+  nanjing: { red: ['mingRed'], blue: ['banners'] },
   // The Siege of Rhodes (1522) is the same Order and the same enemy as Malta (1565): the same colours.
   rhodes: { red: ['hospitallers'], blue: ['ottomans'] },
   agincourt: { red: ['french'], blue: ['english'] },

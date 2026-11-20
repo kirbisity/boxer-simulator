@@ -479,7 +479,7 @@ function newBout() {
   const arena = scenario?.arena ?? PLACE_ARENAS[place];
   // In a battle the man played is his side's general, drawn up in the middle of his arm (physics.js centreGeneral); the sandbox already stands its lead in the middle.
   const general = scenario && state.game !== 'tutorial' ? { corner: state.playSide, index: state.lead[state.playSide] ?? 0 } : null;
-  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation, place, general });
+  state.world = createWorld([...sides[0], ...sides[1]], { seed: state.seed, arena, rules: scenario?.rules, formation: scenario?.formation, place, climate: scenario?.climate, general });
   presentWorld(place, arena, scenario);
   if (state.game === 'tutorial') placeYard();
 }

@@ -13,7 +13,7 @@ const sides = (key, seed = 1) => battleOf(key).cast(seededRandom(seed));
 const riders = (side) => side.filter(isMounted);
 
 // Who rides in each map, per side: [red, blue].
-const WINGS_OF = { legion: [6, 6], sekigahara: [6, 6], pyongyang: [11, 0], rebellion: [2, 0] };
+const WINGS_OF = { legion: [6, 6], sekigahara: [6, 6], pyongyang: [11, 0], rebellion: [2, 0], nanjing: [0, 8] };
 
 test('the cavalry helpers make riders in the kit of their time, on the horse their people rode', () => {
   const random = seededRandom(4);

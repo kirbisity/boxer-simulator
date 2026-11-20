@@ -64,6 +64,8 @@ export function unitsOf(level, corner) {
   const units = [];
   for (const armyKey of level.armies?.[corner] ?? []) {
     for (const [rankKey, rank] of Object.entries(ARMIES[armyKey].ranks)) {
+      // (A rank its battle leaves out, `leave`: an army's men who were not at this fight, Koxinga's rōnin at Nanjing.)
+      if (level.leave?.[corner]?.includes(`${armyKey}.${rankKey}`)) continue;
       for (const style of rank.styles) {
         units.push({
           id: `${armyKey}.${rankKey}.${style}`,

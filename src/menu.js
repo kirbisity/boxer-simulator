@@ -324,7 +324,7 @@ export function installMenus(game) {
     // The training yard: every control, one at a time.
     const yard = choice({ glyph: 'target', kicker: t('menu.levels.yard.kicker'), title: t('menu.levels.yard.title'), text: t('menu.levels.yard.text'), onClick: () => { close(); game.tutorial(); }, tone: 'gold' });
     const card = ([key, level]) => {
-      const play = choice({ glyph: { rebellion: 'wheat', pride: 'glove', port: 'ship', agincourt: 'bow', cerignola: 'flame', sekigahara: 'torii', pyongyang: 'pagoda', cajamarca: 'sun', zeelandia: 'anchor', wokou: 'pennon', qiJiguang: 'shield', rhodes: 'moon' }[key] ?? 'banner', kicker: tname(pick(level.place)).split(' · ').pop(), title: tname(level.title), text: pick(level.blurb), onClick: () => { close(); game.level(key); } });
+      const play = choice({ glyph: { rebellion: 'wheat', pride: 'glove', port: 'ship', agincourt: 'bow', cerignola: 'flame', sekigahara: 'torii', pyongyang: 'pagoda', cajamarca: 'sun', zeelandia: 'anchor', nanjing: 'pagoda', wokou: 'pennon', qiJiguang: 'shield', rhodes: 'moon' }[key] ?? 'banner', kicker: tname(pick(level.place)).split(' · ').pop(), title: tname(level.title), text: pick(level.blurb), onClick: () => { close(); game.level(key); } });
       addBattleThumb(play, key);
       const told = withStory(play, { title: tname(level.title), kicker: tname(pick(level.place)), lines: [pick(level.blurb), pick(level.roster)] });
       // (The card's kicker is the date alone, to fit one line; the info button has the place too.) A battle of armies (a `cast`) can be set up; a duel cannot.

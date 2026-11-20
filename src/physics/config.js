@@ -438,6 +438,8 @@ export const WORLD = {
       byeokjegwan: { air: 1, humidity: 0.6 },
       // Baxemboy before Fort Zeelandia (Tainan), May 1661: Tainan's May mean ~27 °C, the plum rains coming, humidity ~80%.
       coastFort: { air: 27, humidity: 0.8 },
+      // Nanjing, 9 September 1659: Nanjing's September mean ~23 °C, its first days ~26, less ~1 °C for the Little Ice Age; humid.
+      nanjing1659: { air: 25, humidity: 0.78 },
       // Ulsan, the siege of 29 January - 19 February 1598: Ulsan's January mean 2.4 °C (nights -1.8), humidity ~49%.
       ulsan: { air: 1, humidity: 0.5 },
     },

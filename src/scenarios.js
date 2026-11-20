@@ -179,6 +179,34 @@ function sarhuSides(random) {
   return { red, blue: banners };
 }
 
+// Nanjing, 9 September 1659 (順治十六年七月二十三): Koxinga's northern expedition up the Yangzi has beaten the Qing at
+// Zhenjiang and sat down before Nanjing for a fortnight, his army in camps on the hills outside the walls, expecting the
+// city to yield. The Qing garrison sorties: Manchu horse out of a gate at dawn round the flank of Yu Xin's camp, then the
+// foot on the hills, and his army, caught strung out, breaks (Gan Hui and Yu Xin killed; Taiwan waiji, Qing shilu). His
+// iron men among them, on foot as always, and a few brigandine regulars; most of his army the coast's levies. Against him
+// the banners of the city's garrison and the Bayara on horse. In the drawn-up battle here they meet line to line; the
+// horse comes round a flank (`wings`), as it did. Nothing in it is set to an outcome: the iron men hold or break as the
+// line does (the user's reference, 2026-11-20: in a held line against horse their exchange was good, broken in the open it
+// was ruinous).
+const NANJING = {
+  koxinga: {
+    ironMan: { zhanmadao: 5, rattanShield: 3 },
+    brigandine: { swordShield: 4, spear: 4 },
+    garrison: { spear: 8, matchlock: 6, dao: 4 },
+  },
+  banners: { spear: 10, dao: 4, guandao: 4, manchuBow: 8 },
+  bayara: { bayaraLance: 8 },
+};
+
+/** Koxinga's army before Nanjing (his iron men in front, the guns behind) and the banners of the city's garrison. */
+function nanjingSides(random) {
+  const army = [];
+  for (const [rank, styles] of Object.entries(NANJING.koxinga)) for (const [style, count] of Object.entries(styles)) for (let index = 0; index < count; index += 1) army.push(mingSoldier(random, style, rank, { people: 'mingSouth' }));
+  const red = shootersBehind(army);
+  red[0] = { ...red[0], name: 'Gan Hui' };
+  return { red, blue: shootersBehind(company(NANJING.banners, (style) => bannerman(random, style))) };
+}
+
 /** `count` men from `make(style)`, for each style. */
 function company(styles, make) {
   const men = [];
@@ -1440,6 +1468,30 @@ export const SCENARIOS = {
     armies: { red: ['dutch'], blue: ['koxinga'] },
     fighters: [],
   },
+  nanjing: {
+    title: 'Nanjing',
+    place: 'The hills outside Nanjing · 9 September 1659',
+    blurb: { en: "Koxinga's army has sat before Nanjing for a fortnight, waiting for the city to yield. At dawn the garrison comes out: Manchu horse round the flank, the banners up the hill. In front of his line, his iron men in scale and iron faces with their long sabres and rattan shields; behind them the coast's levies.", zh: '郑成功大军围南京半月，坐等开城。拂晓，城中守军杀出：满洲骑兵绕侧翼，八旗步卒上山。阵前是他的铁人，鳞甲铁面，长柄斩马刀，大藤牌；身后是沿海的乡兵。' },
+    scene: 'field',
+    // The lower Yangzi in early September: hot and close.
+    climate: 'nanjing1659',
+    arena: { halfX: 14, halfZ: 9 },
+    camera: { yaw: -0.5, pitch: 0.42, distance: 15, maxDistance: 19 },
+    roster: { en: 'Thirty-four of Koxinga\'s army, eight of them iron men · thirty-four of the Eight Banners, eight Bayara on horse', zh: '郑成功部三十四人，其中铁人八名 · 八旗兵三十四人，其中巴牙喇八骑' },
+    // His line close and in order (the iron men's whole worth was the line, `loose` low); the banners' looser.
+    formation: { red: { front: 6, spacing: 1.15, rowSpacing: 1.45, shootersFront: SHOOTERS_FRONT_GAP, perRow: 8, loose: 0.12 }, blue: { front: 5, spacing: 1.2, rowSpacing: 1.5, perRow: 8, loose: 0.25 } },
+    cast: (random) => nanjingSides(random),
+    wings: {
+      arena: { halfX: 28, halfZ: 15 },
+      camera: { yaw: -0.5, pitch: 0.42, distance: 26, maxDistance: 33 },
+      formation: { blue: { wings: { side: -1 } } },
+      cast: (random, sides) => ({ red: sides.red, blue: [...sides.blue, ...company(NANJING.bayara, (style) => bannerman(random, style, 'bayara', { mounted: true }))] }),
+    },
+    armies: { red: ['koxinga'], blue: ['banners'] },
+    // (His rōnin were Zeelandia's few, not this army's: muster.js unitsOf `leave`.)
+    leave: { red: ['koxinga.ronin'] },
+    fighters: [],
+  },
   rhodes: {
     title: 'Siege of Rhodes',
     place: 'Bastion of Aragon, Rhodes · 24 September 1522',
@@ -1575,5 +1627,5 @@ export function scenarioWorld(key, seed = 1) {
   const scenario = battleOf(key);
   // A battle's armies are drawn from its cast, at the same seed.
   const fighters = scenario.cast ? Object.entries(scenario.cast(seededRandom(seed))).flatMap(([corner, side]) => side.map((inputs) => ({ inputs, corner }))) : scenarioFighters(scenario);
-  return createWorld(fighters, { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation, place: scenario.scene });
+  return createWorld(fighters, { seed, arena: scenario.arena, rules: scenario.rules, formation: scenario.formation, place: scenario.scene, climate: scenario.climate });
 }
