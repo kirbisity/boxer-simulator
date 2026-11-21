@@ -1086,9 +1086,13 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
   arenaRun(marble, [[0.0, 0], [0.26, 0], [0.26, 0.05], [0.22, 0.1], [0.04, 0.1], [0.0, 0.05]], { length: inner.length, y: parapetTop, warp: inner.warp, tile: ARENA_MARBLE_TILE, colour: tone(0.98) });
   arenaSweep(marble, [[arenaOffset(rx, rz, 0.2), podiumHeight + 0.2], [scaled(treadIn(0)), podiumHeight + 0.2]], { steps: 320, tile: ARENA_MARBLE_TILE, colour: deck });
 
-  // ---- The velarium: the awning drawn over the side away from the sun, on ropes from the masts ----
+  // ---- The velarium: the awning drawn out over the seats all round on ropes from the masts, in widths with the sky
+  // between them, the sand's middle left open to the sun (as the sources and the paintings have it: an awning over
+  // the spectators, not over the fight). The sun comes down through the opening and between the widths, so the arena's
+  // dust shows it as one great beam and a fan of lesser ones.
   const mastTop = 19.3;
-  const sail = { t0: 2.45, t1: 4.35 };
+  // How many widths, and the share of each bay of them that is sky.
+  const sails = { count: 20, gap: 0.3 };
   const sailProfile = [];
   for (let k = 0; k <= 6; k += 1) {
     const f = k / 6;
@@ -1101,20 +1105,20 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     };
     sailProfile.push([curve, mastTop - 0.4 - (mastTop - 0.4 - 15.6) * f - 0.7 * Math.sin(Math.PI * f)]);
   }
-  arenaSweep(linen, sailProfile.slice().reverse(), { ...sail, steps: 120, tile: 2, colour: (p) => {
-    // Alternate widths dyed and plain, as the paintings show it.
-    const angle = Math.atan2(p.z / rz, p.x / rx);
-    const stripe = Math.floor(angle * 12) % 2 === 0;
-    return stripe ? [0.98, 0.95, 0.88] : [0.86, 0.62, 0.42];
-  } });
   const ropes = [];
-  for (let index = 0; index < ARENA_BAYS * 3; index += 1) {
-    const u = (index + 0.5) * (bay / 3);
-    const t = outer.angleOf(u);
-    const [mx, mz] = off(0.12)(t);
-    const [ix, iz] = scaled(1.3)(t);
-    const covered = (t > sail.t0 && t < sail.t1) || (t + Math.PI * 2 > sail.t0 && t + Math.PI * 2 < sail.t1);
-    if (covered && index % 2 === 0) ropes.push(mx, mastTop, mz, ix, 15.5, iz);
+  const turn = (Math.PI * 2) / sails.count;
+  for (let index = 0; index < sails.count; index += 1) {
+    const t0 = index * turn;
+    const t1 = t0 + turn * (1 - sails.gap);
+    // Alternate widths dyed and plain, as the paintings show it.
+    const tint = index % 2 === 0 ? [0.98, 0.95, 0.88] : [0.86, 0.62, 0.42];
+    arenaSweep(linen, sailProfile.slice().reverse(), { t0, t1, steps: 8, tile: 2, colour: () => tint });
+    // Each width hangs between two ropes, mast to the ring over the sand.
+    for (const t of [t0, t1]) {
+      const [mx, mz] = off(0.12)(t);
+      const [ix, iz] = scaled(1.3)(t);
+      ropes.push(mx, mastTop, mz, ix, 15.5, iz);
+    }
   }
 
   // ---- Left behind: litter in the empty stands, the arena hands' tools by a great gate ----

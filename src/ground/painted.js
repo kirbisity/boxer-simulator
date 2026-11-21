@@ -15,6 +15,9 @@
 // the place's own painted texture, which the foothills wear too.
 
 /* global THREE */
+import { envDress } from '../env/air.js';
+import { PLACE_ENV } from '../env/config.js';
+import { ENV_GLSL_PRESS, ENV_PRESS, envPressUniforms } from '../env/press.js';
 import { BLOOD_DYE_GLSL, bloodDyeShader } from '../blooddye.js';
 import { LAST_GATE } from '../lastgate.js';
 import { groundDetailLayer } from '../detailtex.js';
@@ -597,7 +600,8 @@ const PAINTED_GROUND_LAYERS = {
         s.dome(x + Math.cos(a) * length * t, y + Math.sin(a) * length * t, rr(6, 10), rr(4, 7), a, 'rgba(110,80,50,0.08)', 0.3, 0.5, 0.6);
       }
     }
-    for (let index = 0; index < 12; index += 1) paintedGroundFoot(s, rr(0, 512), rr(0, 512), rr(0, 6.3), rr(0.85, 1.05), 0.34, 'rgba(110,75,40,0.16)');
+    // (No painted prints: the same dozen feet came round with every tile and read as outlines; the sand takes the
+    // prints of whoever walks on it, `press` below.)
     return paintedGroundFinish(s, {
       relief: 6,
       rough: 0.95,
@@ -882,7 +886,7 @@ const PAINTED_GROUND_LAYERS = {
  */
 const PAINTED_GROUND_BAKED = {
   grass: 'grass', 'grass:flowers': 'grass', trampled: 'grass', dirt: 'earth', mud: 'earth', 'mud:hoof': 'earth', 'mud:foot': 'earth', 'mud:mixed': 'earth',
-  drygrass: 'drygrass', steppe: 'drygrass', grit: 'gravel', gravel: 'gravel', 'gravel:pale': 'gravel', desert: 'sand', sandRaked: 'sand', sandTrodden: 'sand',
+  drygrass: 'drygrass', steppe: 'drygrass', grit: 'gravel', gravel: 'gravel', 'gravel:pale': 'gravel', desert: 'sand',
   beachDry: 'beach', beachWet: 'beach', cobbles: 'cobble', 'cobbles:worn': 'setts', slabs: 'slabs', concrete: 'concrete', 'concrete:worn': 'concrete',
 };
 
@@ -1020,6 +1024,11 @@ const PAINTED_GROUND_PLACES = {
   },
   colosseum: {
     a: 'sandRaked', b: 'sandTrodden', tiles: [1.5, 1.7], bomb: [2, 1], macro: PAINTED_GROUND_SAND_MACRO, match: 0.3,
+    // The rake's furrows and the trodden hollows stand out under a high sun (`relief`: the layers' slopes, as many times
+    // over), and the sand takes a print: loose to `press[0]` m (a foot sinks a few centimetres into raked dry sand, far
+    // less than into new snow: by eye), its walls' slope drawn `press[1]` times over so so shallow a print still
+    // reads, its packed bed darker by `press[2]`.
+    relief: 1.8, press: [0.045, 3.2, 0.2],
     decal: [0.33, 0.13, 0.08, 0.7], decalRough: 0.6,
     layout: (x, z, f, random) => {
       const ring = Math.hypot(x / 6, z / 4.2) + (f(x * 0.35, z * 0.35, 20) - 0.5) * 0.45;
@@ -1163,6 +1172,10 @@ uniform float uPgRelief;
 uniform float uPgOrigRough;
 uniform vec2 uPgEnv;
 varying vec3 vPaintedWorld;
+#ifdef PAINTED_PRESS
+uniform vec3 uPgPress;
+${ENV_GLSL_PRESS}
+#endif
 #ifdef PAINTED_POOLS
 ${BLOOD_DYE_GLSL}
 #endif
@@ -1234,6 +1247,15 @@ pgRough = mix(pgRough, uPgDecalRough, pgDec);
   pgRough = mix(pgRough, uPgOrigRough, pgFar);
   pgSlope *= 1.0 - pgFar;
 #endif
+#ifdef PAINTED_PRESS
+  // Loose ground a foot sinks into (the open air's record of what has pressed the ground, env/press.js, read as lying
+  // snow reads it but only uPgPress.x m deep): the print's walls lean the light, its bed is packed darker.
+  // (The record keeps a body's underside, and a planted foot's is its ankle, some centimetres up: the print is read
+  // at lying snow's depth, which that reaches, and drawn at the sand's.)
+  vec4 pgPrint = envSnowPrint(pgP, ${ENV_PRESS.snow.toFixed(3)});
+  pgSlope -= pgPrint.yz * uPgPress.x / ${ENV_PRESS.snow.toFixed(3)} * uPgPress.y;
+  pgCol *= 1.0 - uPgPress.z * pgPrint.w;
+#endif
 diffuseColor.rgb *= pgCol;
 vec3 pgNormalW = normalize(vec3(pgSlope.x, 1.0, pgSlope.y));
 `;
@@ -1261,7 +1283,8 @@ function paintedGroundMaterial(view, spec, layers, layout, box, original) {
     uPgDecal: { value: new THREE.Vector4(...decal) },
     uPgDecalRough: { value: spec.decalRough ?? 1 },
     uPgFade: { value: new THREE.Vector4(...(spec.keepOut ?? [0, 0]), -2, 5) },
-    uPgRelief: { value: 1 },
+    uPgRelief: { value: spec.relief ?? 1 },
+    uPgPress: { value: new THREE.Vector3(...(spec.press ?? [0, 0, 0])) },
     uPgOrigRough: { value: original.roughness },
     uPgEnv: { value: new THREE.Vector2(...(spec.envSplit ?? [1, 1])) },
   };
@@ -1275,8 +1298,10 @@ function paintedGroundMaterial(view, spec, layers, layout, box, original) {
   if (fade) material.defines = { PAINTED_FADE: '' };
   if (spec.quay) material.defines = { ...material.defines, PAINTED_QUAY: '' };
   if (spec.pools) material.defines = { ...material.defines, PAINTED_POOLS: '' };
+  if (spec.press) material.defines = { ...material.defines, PAINTED_PRESS: '' };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
+    if (spec.press) Object.assign(shader.uniforms, envPressUniforms());
     if (spec.pools) bloodDyeShader(shader);
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vPaintedWorld;')
@@ -1289,7 +1314,7 @@ function paintedGroundMaterial(view, spec, layers, layout, box, original) {
       .replace('#include <lights_fragment_maps>', '#include <lights_fragment_maps>\n#if defined( RE_IndirectSpecular )\nradiance *= mix(uPgEnv.x, uPgEnv.y, pgWet);\n#endif')
       .replace('#include <tonemapping_fragment>', '#ifdef PAINTED_POOLS\ngl_FragColor.rgb *= mix(vec3(1.0), bloodDyeFilter, pgBlood);\n#endif\n#include <tonemapping_fragment>');
   };
-  material.customProgramCacheKey = () => `painted-ground${fade ? '-fade' : ''}${spec.quay ? '-quay' : ''}${spec.pools ? '-pools' : ''}`;
+  material.customProgramCacheKey = () => `painted-ground${fade ? '-fade' : ''}${spec.quay ? '-quay' : ''}${spec.pools ? '-pools' : ''}${spec.press ? '-press' : ''}`;
   return material;
 }
 
@@ -1326,6 +1351,8 @@ function paintedGroundBuild({ place, view, scale, keepOut, grounds, rng }) {
     const mine = layers.a.mean;
     const calib = own ? own.map((value, channel) => Math.max(0.6, Math.min(1.6, 1 + (value / Math.max(0.02, mine[channel]) - 1) * spec.match))) : [1, 1, 1];
     const material = paintedGroundMaterial(view, tiled, layers, layout.texture, box, { map: ground.material.map, roughness: ground.material.roughness ?? 0.95, calib });
+    // (On a place that draws itself and joins the open air, env/config.js `own`, the ground takes the air's haze as its walls do.)
+    if (PLACE_ENV[place]?.own) envDress(material);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.receiveShadow = true;
     mesh.userData.paintedGround = true;

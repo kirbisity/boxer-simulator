@@ -895,6 +895,26 @@ export const ENV_PLACE_PLAIN = {
 };
 
 export const PLACE_ENV = {
+  // The amphitheatre in the afternoon (it draws itself: props/arena.js): the sun over the far-left rim, so the cavea's
+  // shadow lies across part of the sand and the fight is seen against the light; the bowl holds the dust the fights
+  // and the crowd raise (no wind gets down into it), thick enough that the sun's light is seen in the air where the
+  // rim and the awning let it through and not where they shade it.
+  // (The dust: a haze of 170 m in a layer 16 m deep, about the cavea's height. By eye against stills of a dusty arena;
+  // a figure for the air of a real arena is not known to me.)
+  colosseum: {
+    ...ENV_PLACE_PLAIN,
+    own: true,
+    weather: 'dust',
+    weatherHere: { visibility: 120, hazeHeight: 16, wind: 0.25, gust: 0.05, sun: 0.92, cover: 0.1, shafts: 1.6, fall: { kind: 'dust', share: 0.5 }, grade: { contrast: 1.4, saturation: 0.95, warmth: 0.035, split: 0.12, ev: 0.6 } },
+    sun: { azimuth: -2.6, elevation: 54 },
+    air: { visibility: 20000, hazeHeight: 900 },
+    clouds: { cover: 0.12 },
+    shadowBox: { half: 26, depth: 80 },
+    far: 400,
+    meter: { sky: 0.6, frame: 0.1 },
+    litAt: [0, 30, 0],
+    drift: [{ kind: 'motes', share: 1, colours: [0xf2dcae, 0xe6c890] }],
+  },
   // A village green on the brow of a down late on a summer afternoon under heavy broken cloud, the sun low over the
   // left shoulder: the grass uncut beyond the fence, the land in shade with light crossing it and falling away to
   // wooded hills that fade ridge behind ridge into the haze (the first reference).
