@@ -13,8 +13,9 @@ import { tkMaterials, tkSetAir, tkSetLay, tkSetLook, tkSetWeather, tkWeather } f
 export const TK_PLACE = {
   // The side of a block of ground (m): pieces are gathered by block so that three culls what is behind the camera, and
   // the fine detail of a block (tile rolls, rafters, lattice frames) is drawn only within `near` m of the camera's
-  // focus. 24 m is about four house fronts; 46 m is where a tile roll is under a pixel at the usual view.
-  block: 24, near: 46,
+  // focus. 24 m is about four house fronts; 46 m is where a tile roll is under a pixel at the usual view. `merge`: what is
+  // never switched is drawn this many blocks square at a time (tkMeshes).
+  block: 24, near: 46, merge: 3,
   // The low tier (a phone, a slow integrated GPU): no fine detail at any distance, sheets at half size, no cube mirror.
   low: { near: 0, size: 256, mirror: false, rain: 0.5 },
   // The sun's own shadow camera while a kit place is shown: its half width round the camera's focus (m) and how far off
@@ -71,6 +72,8 @@ export function tkBlocks(cell = TK_PLACE.block, { near = true } = {}) {
     /** One builder for things too large to belong to a block (the ground, far hills): never level-of-detail switched. */
     wide,
     all: () => [...blocks.values()],
+    /** Each block with its place in the grid: [[column, row], builder]. */
+    keyed: () => [...blocks.entries()].map(([key, builder]) => [key.split(',').map(Number), builder]),
     free() {
       for (const builder of blocks.values()) builder.free();
       wide.free();
@@ -116,7 +119,31 @@ export function tkMeshes(blocks, materials, { tier = 'high' } = {}) {
       }
     }
   };
-  for (const builder of blocks.all()) add(builder, false);
+  // What is never switched (level 'all': walls, roofs, the ground's own things) is drawn `TK_PLACE.merge` blocks square
+  // at a time: one draw for a material over that square, where a town of 24 m blocks was a thousand draws a frame,
+  // and as many again into the sun's shadow map, which is what the frame waited on. The switched detail stays by the
+  // block, as it is shown and hidden by the block.
+  const merged = new Map();
+  for (const [[column, row], builder] of blocks.keyed()) {
+    const kept = [];
+    for (const batch of builder.batches()) {
+      if (batch.level !== 'all' || !batch.position.length) { kept.push(batch); continue; }
+      const key = `${batch.material}|${Math.floor(column / TK_PLACE.merge)},${Math.floor(row / TK_PLACE.merge)}`;
+      if (!merged.has(key)) merged.set(key, []);
+      merged.get(key).push(batch);
+    }
+    add({ batches: () => kept }, false);
+  }
+  const joined = (parts, name) => {
+    const out = new Float32Array(parts.reduce((sum, part) => sum + part[name].length, 0));
+    let at = 0;
+    for (const part of parts) { out.set(part[name], at); at += part[name].length; }
+    return out;
+  };
+  for (const parts of merged.values()) {
+    const batch = parts.length === 1 ? parts[0] : { material: parts[0].material, level: 'all', position: joined(parts, 'position'), normal: joined(parts, 'normal'), uv: joined(parts, 'uv'), colour: joined(parts, 'colour') };
+    add({ batches: () => [batch] }, false);
+  }
   add(blocks.wide, true);
   // The corners are the meshes' now: the builders let theirs go.
   blocks.free();

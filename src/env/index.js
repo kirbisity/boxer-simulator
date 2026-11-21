@@ -37,7 +37,7 @@ import { envMeter, envPostAble, envPostDraw, envToneOf } from './post.js';
 import { envPressForget, envPressStep } from './press.js';
 import { envLieOf } from './lie.js';
 import { activeLook } from '../looks.js';
-import { hidePaintedSky, replaceEnvironment, setRenderer } from '../looks/kit.js';
+import { FIGURE_SHADE, hidePaintedSky, setShadowMapSize, sweepFigureShade, replaceEnvironment, setRenderer } from '../looks/kit.js';
 import { probeLiteProject } from '../looks/probe-lite.js';
 import { PLACE_ARENAS, reapplyPlace } from '../render.js';
 import { placeWind, setWindOver } from '../wind.js';
@@ -356,6 +356,7 @@ export function envLeave(view) {
     // (Where the look has been put back already (looks.js resetForLook, before the next place's scenery) it has
     // taken its own map back from every material; otherwise the map the open air found goes back.)
     if (view.steelEnv === view.envSteelOurs) replaceEnvironment(view, view.envSteelWas);
+    FIGURE_SHADE.value.set(0, 1, 0);
     view.envSteelOurs.dispose();
     view.envSteelOurs = null;
   }
@@ -548,6 +549,11 @@ function envCarryShadow(view, state, box) {
   const sun = view.lights.sun;
   const camera = sun.shadow.camera;
   const [sx, sy, sz] = state.air.sun;
+  // (A finer map at the top tier where the place asks: the look's own, 1024, is 8 cm a texel over a box of 84 m.)
+  if (box.size) {
+    state.shadowSizeWas ??= sun.shadow.mapSize.x;
+    setShadowMapSize(sun, envChosen.tier === 'high' ? box.size : Math.min(box.size, state.shadowSizeWas));
+  }
   if (camera.right !== box.half || camera.far !== box.depth * 1.5) {
     camera.left = camera.bottom = -box.half;
     camera.right = camera.top = box.half;
@@ -667,6 +673,11 @@ export function envUpdate(view, world, lead = null) {
   if (own.shadowBox) envCarryShadow(view, state, own.shadowBox);
   const shadow = view.lights.sun.shadow;
   shadow.radius = -((shadow.camera.far - shadow.camera.near) * ENV.shadow.sunWidth * ENV.shadow.soften) / ((shadow.camera.right - shadow.camera.left) / shadow.mapSize.x);
+  // The figures take that shadow too (looks/kit.js FIGURE_SHADE), looked up a little off their surfaces.
+  state.figureSweep = ((state.figureSweep ?? 0) + 1) % ENV.shadow.figure.every;
+  if (state.figureSweep === 1 || view.scene.children.length !== state.figureCount) sweepFigureShade(view.scene);
+  state.figureCount = view.scene.children.length;
+  FIGURE_SHADE.value.set(1, ENV.shadow.figure.mirror, (ENV.shadow.figure.off * (shadow.camera.right - shadow.camera.left)) / shadow.mapSize.x);
   if (parts.beams) envBeamsLook(parts.beams, eye);
   // What stands on the ground, for the shade at its feet and the grass under them: the fighters nearest the camera.
   const bodies = u.uEnvBodies.value;

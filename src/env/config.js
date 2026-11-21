@@ -282,6 +282,12 @@ export const ENV = {
     most: 4.5,
     // How far (texels) the map is searched for what stands between a point and the sun.
     search: 5,
+    // The figures in it (looks/kit.js FIGURE_SHADE): `mirror`, what is left of the picture a metal mirrors when it
+    // stands in full shade (a plate under an awning still mirrors the open sky above the rim, and below it the
+    // shaded sand and the men round it in place of sunlit ones: about half, by eye; unmeasured); `off`, how far
+    // (the map's texels) a point is moved off its surface before it is looked up, so a body does not shade itself
+    // in stripes; `every`, frames between looks through the scene for bodies made since.
+    figure: { mirror: 0.5, off: 1.5, every: 30 },
     // Tree shade: under a crown the near map's shade is broken into flecks of sun the size of the gaps between
     // leaves' masses (`dapple` m), moving as the crown sways (the gust where it stands, `dappleSway` m per m/s).
     // The flecks are sharp where the shade is thin and close up as it deepens. By eye.
@@ -863,7 +869,8 @@ export const ENV_WEATHER = {
 //   height: (x, z) => m, its own ground (what lies on the ground lies on it; level at 0 if left out);
 //   shadowBox: { half, depth } (m): the sun's shadow box is carried with the camera, `half` each way round the
 //     ground it looks at and `depth` deep, for a place whose fighters may stand anywhere on it (left out: the
-//     look's own box round the middle of the floor);
+//     look's own box round the middle of the floor); `size`: the shadow map's side in texels at the top tier (left
+//     out: the look's own);
 //   far: m, the camera's far plane (left out: as the place's own lighting set it);
 //   wind: { toward: [x, z], speed m/s, gust 0..1 }, its own wind where wind.js PLACE_WIND has none for it;
 //   cover: what stands over the ground (roofs, a vault, a bridge), so nothing falls through it and blown snow
@@ -909,7 +916,7 @@ export const PLACE_ENV = {
     sun: { azimuth: -2.6, elevation: 54 },
     air: { visibility: 20000, hazeHeight: 900 },
     clouds: { cover: 0.12 },
-    shadowBox: { half: 42, depth: 110 },
+    shadowBox: { half: 34, depth: 110, size: 2048 },
     far: 400,
     meter: { sky: 0.6, frame: 0.1 },
     litAt: [0, 45, 0],

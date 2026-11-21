@@ -340,6 +340,7 @@ export function envInstallShadow() {
   const tune = ENV.shadow;
   const at = 'vec2 texelSize = vec2( 1.0 ) / shadowMapSize;';
   const search = `${at}
+    float envSure = - 1.0;
     if ( shadowRadius < 0.0 ) {
       vec2 envMet = vec2( 0.0 );
       float envTurn = 6.2832 * fract( sin( dot( gl_FragCoord.xy, vec2( 12.9898, 78.233 ) ) ) * 43758.5453 );
@@ -349,10 +350,22 @@ export function envInstallShadow() {
         if ( envDepth < shadowCoord.z ) envMet += vec2( envDepth, 1.0 );
       }
       shadowRadius = envMet.y > 0.0 ? clamp( ( shadowCoord.z - envMet.x / envMet.y ) * - shadowRadius, ${tune.least.toFixed(2)}, ${tune.most.toFixed(2)} ) : ${tune.least.toFixed(2)};
+      // Nothing between the point and the sun anywhere round it, nor at it: lit, and the filter's seventeen looks
+      // are not made; everything round it and it shaded: shaded. Only a shadow's edge is filtered, which is a few
+      // of a frame's points (most of what a full frame cost in shadow was the filter over lit ground).
+      float envHere = step( shadowCoord.z, unpackRGBAToDepth( texture2D( shadowMap, shadowCoord.xy ) ) );
+      if ( envMet.y < 0.5 && envHere > 0.5 ) envSure = 1.0;
+      else if ( envMet.y > 7.5 && envHere < 0.5 ) envSure = 0.0;
     }`;
   const chunk = THREE.ShaderChunk.shadowmap_pars_fragment;
   if (!chunk.includes(at)) console.warn('env: the renderer has no filtered shadow to widen; shadows keep one edge');
-  THREE.ShaderChunk.shadowmap_pars_fragment = chunk.replace(at, search);
+  let widened = chunk.replace(at, search);
+  // (The filter itself, the first after the search: skipped where the search has settled it.)
+  const from = widened.indexOf('shadow = (', widened.indexOf(search));
+  const close = ') * ( 1.0 / 17.0 );';
+  const to = widened.indexOf(close, from);
+  if (chunk.includes(at) && from > 0 && to > 0) widened = `${widened.slice(0, from)}if ( envSure >= 0.0 ) shadow = envSure; else { ${widened.slice(from, to + close.length)} }${widened.slice(to + close.length)}`;
+  THREE.ShaderChunk.shadowmap_pars_fragment = widened;
 }
 
 /** The uniforms a material needs for that (with `lights: true`), beside its own. */

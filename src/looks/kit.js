@@ -177,6 +177,84 @@ export function unlinearise(material) {
   }
 }
 
+// ---- The sun's shade on what stands on the ground ---------------------------------
+
+/**
+ * Figures in the sun's shadow. A fighter, a horse, a weapon casts a shadow and was never drawn in one: a man under
+ * an awning's shade or behind a wall stood as bright as one in the sun, and polished plate, which is lit almost
+ * wholly by the picture it mirrors, showed no shade at all. Where the open air says so (env/index.js sets this each
+ * frame), every lit material on a mesh that casts and does not receive takes the sun's shadow map as the ground
+ * does, and what a metal mirrors is dimmed in that shade: the ground and the things round a shaded plate are in the
+ * same shade, and they are most of what it mirrors below the sky.
+ *   x  1: such meshes take the shadow; 0: as they were (indoors, the other looks);
+ *   y  what is left of a mirrored picture in full shade (0..1);
+ *   z  m a point is moved off its surface, along the normal, before it is looked up in the shadow map: a body is
+ *      finer than the map's texels, and without it a lit surface shades itself in stripes.
+ */
+export const FIGURE_SHADE = { value: new THREE.Vector3(0, 1, 0) };
+
+const FIGURE_FRAGMENT_PARS = `#include <lights_pars_begin>
+uniform vec3 uFigureShade;
+float figureLit = 1.0;
+#define receiveShadow ( receiveShadow || uFigureShade.x > 0.5 )`;
+const FIGURE_FRAGMENT_SHADOW = `#include <shadowmap_pars_fragment>
+#ifdef USE_SHADOWMAP
+float figureShadow( sampler2D map, vec2 size, float bias, float radius, vec4 coord ) {
+  float lit = getShadow( map, size, bias, radius, coord );
+  figureLit = min( figureLit, lit );
+  return lit;
+}
+#define getShadow figureShadow
+#endif`;
+const FIGURE_FRAGMENT_MIRROR = `#include <lights_fragment_maps>
+#if defined( RE_IndirectSpecular )
+radiance *= mix( uFigureShade.y, 1.0, figureLit );
+#endif`;
+const FIGURE_VERTEX_SHADOW = `#ifdef USE_SHADOWMAP
+vec3 figureOff = inverseTransformDirection( transformedNormal, viewMatrix ) * ( receiveShadow ? 0.0 : uFigureShade.z );
+#define worldPosition ( worldPosition + vec4( figureOff, 0.0 ) )
+#endif
+#include <shadowmap_vertex>
+#ifdef USE_SHADOWMAP
+#undef worldPosition
+#endif`;
+
+/** Make a lit material take the sun's shadow where FIGURE_SHADE says (once). */
+function shadeFigure(material) {
+  // (The hook itself is the mark, found down the chain of hooks laid over it: a clone copies userData and not the hook.)
+  for (let hook = material.onBeforeCompile; hook; hook = hook.previous) if (hook.shadesFigure) return;
+  if (!(material.isMeshStandardMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial)) return;
+  const previous = material.onBeforeCompile;
+  const baseKey = material.customProgramCacheKey();
+  const patched = (shader, renderer) => {
+    previous.call(material, shader, renderer);
+    if (shader.fragmentShader.includes('uFigureShade') || !shader.fragmentShader.includes('#include <shadowmap_pars_fragment>')) return;
+    shader.uniforms.uFigureShade = FIGURE_SHADE;
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <lights_pars_begin>', FIGURE_FRAGMENT_PARS)
+      .replace('#include <shadowmap_pars_fragment>', FIGURE_FRAGMENT_SHADOW)
+      .replace('#include <lights_fragment_maps>', FIGURE_FRAGMENT_MIRROR);
+    const declared = shader.vertexShader.includes('#include <lights_pars_begin>') ? '' : 'uniform bool receiveShadow;\n';
+    shader.vertexShader = `uniform vec3 uFigureShade;\n${declared}${shader.vertexShader}`.replace('#include <shadowmap_vertex>', FIGURE_VERTEX_SHADOW);
+  };
+  patched.previous = previous;
+  patched.shadesFigure = true;
+  material.onBeforeCompile = patched;
+  material.customProgramCacheKey = () => `${baseKey}|figureShade`;
+  material.needsUpdate = true;
+}
+
+/**
+ * Make every lit material on a mesh that casts a shadow and does not receive one take the sun's shadow where
+ * FIGURE_SHADE says. A material already so is skipped quickly: called again as bodies are made (env/index.js).
+ */
+export function sweepFigureShade(root) {
+  root.traverse((object) => {
+    if (!object.isMesh || !object.castShadow || object.receiveShadow || !object.material) return;
+    for (const material of Array.isArray(object.material) ? object.material : [object.material]) shadeFigure(material);
+  });
+}
+
 /**
  * Walk a scene graph and make every material linear-workflow (`linear`) or
  * authored again. A material already so is skipped quickly, so a later sweep
