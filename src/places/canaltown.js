@@ -642,7 +642,7 @@ export function buildCanalTown() {
   const t = CANAL_TOWN;
   const plan = canalTownPlan();
   const tier = tkTier();
-  const blocks = tkBlocks();
+  const blocks = tkBlocks(undefined, { near: tier !== 'low' });
   const world = tkgFrame();
   const stir = tkStir(2);
   const fronts = [];

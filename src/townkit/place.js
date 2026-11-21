@@ -52,30 +52,40 @@ export function tkSetTier(tier) {
   tkTierNow = tier == null ? null : tier === 'low' ? 'low' : 'high';
 }
 
-/** Builders by block of ground: `at(x, z)` is the builder for whatever stands at world (x, z). */
-export function tkBlocks(cell = TK_PLACE.block) {
+/**
+ * Builders by block of ground: `at(x, z)` is the builder for whatever stands at world (x, z). `near: false` (the low tier):
+ * the fine detail is never made. `free()` lets the corners go once the meshes are made (tkMeshes).
+ */
+export function tkBlocks(cell = TK_PLACE.block, { near = true } = {}) {
   const blocks = new Map();
+  const wide = tkgBuilder({ near });
   return {
     cell,
     /** `plain`: for a thing no walker comes near: its fine detail is never made. */
     at(x, z, plain = false) {
       const key = `${Math.floor(x / cell)},${Math.floor(z / cell)}`;
-      if (!blocks.has(key)) blocks.set(key, tkgBuilder());
+      if (!blocks.has(key)) blocks.set(key, tkgBuilder({ near }));
       const builder = blocks.get(key);
       return plain ? { ...builder, at: (level, work) => (level === 'near' ? undefined : builder.at(level, work)) } : builder;
     },
     /** One builder for things too large to belong to a block (the ground, far hills): never level-of-detail switched. */
-    wide: tkgBuilder(),
+    wide,
     all: () => [...blocks.values()],
+    free() {
+      for (const builder of blocks.values()) builder.free();
+      wide.free();
+      blocks.clear();
+    },
   };
 }
 
 function tkGeometry(batch) {
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(batch.position), 3));
-  geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(batch.normal), 3));
-  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(batch.uv), 2));
-  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(batch.colour), 3));
+  // (The batch's views are its own copies of what was laid: taken as they are.)
+  geometry.setAttribute('position', new THREE.BufferAttribute(batch.position, 3));
+  geometry.setAttribute('normal', new THREE.BufferAttribute(batch.normal, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(batch.uv, 2));
+  geometry.setAttribute('color', new THREE.BufferAttribute(batch.colour, 3));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;
@@ -108,6 +118,8 @@ export function tkMeshes(blocks, materials, { tier = 'high' } = {}) {
   };
   for (const builder of blocks.all()) add(builder, false);
   add(blocks.wide, true);
+  // The corners are the meshes' now: the builders let theirs go.
+  blocks.free();
   group.userData.casters = casters;
   group.userData.detail = (focus) => {
     const fine = near > 0 && tkTier() !== 'low';

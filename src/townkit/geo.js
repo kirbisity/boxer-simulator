@@ -42,15 +42,66 @@ const tkgUnit = (a) => {
 const TKG_WHITE = [1, 1, 1];
 
 /**
- * The builder. `quad`, `tri` and the shapes below add to the batch named `${material}|${level}`; `batches()` gives each
- * as `{ material, level, position, normal, uv, colour }` (plain arrays; UVs in metres).
+ * A batch's corners, kept as they will be drawn: 32-bit floats in one store that doubles when full. (As plain arrays of
+ * numbers a town of a million corners held 700 MB while it was built and after, and a phone closed the page: a number in
+ * an array is 8 bytes, and the arrays were kept by the builders.) `position`, `normal`, `uv`, `colour` are views of what
+ * has been laid so far.
  */
-export function tkgBuilder() {
+function tkgBatch(material, level) {
+  // Floats a corner: position 3, normal 3, uv 2, colour 3.
+  const WIDTH = 11;
+  let store = new Float32Array(WIDTH * 96);
+  let corners = 0;
+  const views = { at: -1 };
+  const view = (name, from, size) => {
+    if (views.at !== corners || views.store !== store) Object.assign(views, { at: corners, store, position: null, normal: null, uv: null, colour: null });
+    if (!views[name]) {
+      const out = new Float32Array(corners * size);
+      for (let k = 0; k < corners; k += 1) for (let n = 0; n < size; n += 1) out[k * size + n] = store[k * WIDTH + from + n];
+      views[name] = out;
+    }
+    return views[name];
+  };
+  return {
+    material,
+    level,
+    /** A corner: position, normal, [u, v], colour. */
+    add(p, n, uv, tint) {
+      if ((corners + 1) * WIDTH > store.length) {
+        const grown = new Float32Array(store.length * 2);
+        grown.set(store);
+        store = grown;
+      }
+      const at = corners * WIDTH;
+      store[at] = p[0]; store[at + 1] = p[1]; store[at + 2] = p[2];
+      store[at + 3] = n[0]; store[at + 4] = n[1]; store[at + 5] = n[2];
+      store[at + 6] = uv[0]; store[at + 7] = uv[1];
+      store[at + 8] = tint[0]; store[at + 9] = tint[1]; store[at + 10] = tint[2];
+      corners += 1;
+    },
+    get position() { return view('position', 0, 3); },
+    get normal() { return view('normal', 3, 3); },
+    get uv() { return view('uv', 6, 2); },
+    get colour() { return view('colour', 8, 3); },
+    /** Let the corners go (the meshes are made). */
+    free() {
+      store = new Float32Array(0);
+      corners = 0;
+    },
+  };
+}
+
+/**
+ * The builder. `quad`, `tri` and the shapes below add to the batch named `${material}|${level}`; `batches()` gives each
+ * as `{ material, level, position, normal, uv, colour }` (Float32Arrays of what is laid so far; UVs in metres).
+ * `near: false`: what is laid at the 'near' level (the fine detail a weak device never shows) is not made at all.
+ */
+export function tkgBuilder({ near = true } = {}) {
   const batches = new Map();
   const batch = (material, level = 'all') => {
     const key = `${material}|${level}`;
     let made = batches.get(key);
-    if (!made) batches.set(key, (made = { material, level, position: [], normal: [], uv: [], colour: [] }));
+    if (!made) batches.set(key, (made = tkgBatch(material, level)));
     return made;
   };
   const builder = {
@@ -58,6 +109,7 @@ export function tkgBuilder() {
     lod: 'all',
     /** Lay what `work` adds at `level`. */
     at(level, work) {
+      if (level === 'near' && !near) return;
       const before = builder.lod;
       builder.lod = level;
       work();
@@ -69,12 +121,7 @@ export function tkgBuilder() {
       const flat = normals ? null : tkgUnit(tkgCross(tkgSub(b, a), tkgSub(c, a)));
       const corners = [a, b, c];
       for (let k = 0; k < 3; k += 1) {
-        into.position.push(corners[k][0], corners[k][1], corners[k][2]);
-        const normal = normals ? normals[k] : flat;
-        into.normal.push(normal[0], normal[1], normal[2]);
-        into.uv.push(uvs[k][0], uvs[k][1]);
-        const tint = Array.isArray(colour[0]) ? colour[k] : colour;
-        into.colour.push(tint[0], tint[1], tint[2]);
+        into.add(corners[k], normals ? normals[k] : flat, uvs[k], Array.isArray(colour[0]) ? colour[k] : colour);
       }
     },
     /**
@@ -230,6 +277,11 @@ export function tkgBuilder() {
       builder.quad(material, last[0], last[3], last[2], last[1], { uvs: [[0, 0], [0, high], [wide, high], [wide, 0]], colour });
     },
     batches: () => [...batches.values()],
+    /** Let every batch's corners go (the meshes are made). */
+    free() {
+      for (const made of batches.values()) made.free();
+      batches.clear();
+    },
   };
   return builder;
 }

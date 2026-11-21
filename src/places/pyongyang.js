@@ -1356,9 +1356,9 @@ export function buildPyongyang(_arena = null, { shift = [0, 0], key = 'pyongyang
   const plan = pyongyangPlan();
   const { wall } = plan;
   const tier = tkTier();
-  const blocks = tkBlocks();
+  const blocks = tkBlocks(undefined, { near: tier !== 'low' });
   // (The far woods by tiles of their own: PY_WOODS.tile.)
-  const woods = tkBlocks(PY_WOODS.tile);
+  const woods = tkBlocks(PY_WOODS.tile, { near: tier !== 'low' });
   // The ground: the two fields, tinted (the road to the gate and the trodden strip darker; the bank's earth), and the far country.
   const road = (x, z) => 1 - pySmooth(2.2, 5, Math.abs(z - pyRoad(x)));
   blocks.wide.at('all', () => {
