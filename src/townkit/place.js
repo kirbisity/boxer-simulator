@@ -44,9 +44,12 @@ let tkTierNow = null;
 /** The tier a kit place is built and kept at. */
 export const tkTier = () => tkTierNow ?? (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches ? 'low' : 'high');
 
-/** Tell the kit the tier (main.js, from the frame-rate controller): on 'low' no fine detail is shown from then on. */
+/**
+ * Tell the kit the tier (main.js, from the frame-rate controller or a quality the player holds): on 'low' no fine detail is
+ * shown from then on. null: back to the guess from the pointer.
+ */
 export function tkSetTier(tier) {
-  tkTierNow = tier === 'low' ? 'low' : 'high';
+  tkTierNow = tier == null ? null : tier === 'low' ? 'low' : 'high';
 }
 
 /** Builders by block of ground: `at(x, z)` is the builder for whatever stands at world (x, z). */

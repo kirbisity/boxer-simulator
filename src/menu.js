@@ -192,6 +192,24 @@ export function installMenus(game) {
         return button;
       })));
     panel.append(langRow);
+    // The picture's quality (levelmode/quality.js), on a phone as on a desk: auto lets the frame rate choose, ultra holds everything on, low the cheapest picture.
+    if (game.quality) {
+      const note = el('p', { className: 'quality-note' });
+      const seg = el('div', { className: 'seg quality-seg', role: 'radiogroup' });
+      const draw = () => {
+        const held = game.quality.get();
+        note.textContent = t(`settings.quality.${held}.text`);
+        seg.replaceChildren(...game.quality.modes.map((mode) => {
+          const on = mode === held;
+          const button = el('button', { type: 'button', className: on ? 'on' : '', textContent: t(`settings.quality.${mode}`), role: 'radio', ariaChecked: String(on) });
+          button.dataset.quality = mode;
+          button.onclick = () => { game.quality.set(mode); draw(); };
+          return button;
+        }));
+      };
+      draw();
+      panel.append(el('section', { className: 'audio-mixer quality-row', ariaLabel: t('settings.quality') }, el('h2', { textContent: t('settings.quality') }), seg, note));
+    }
     if (game.audio) panel.append(audioMixer(game.audio));
     if (game.hitFeel) panel.append(hitFeelPanel(game.hitFeel.settings, game.hitFeel.save));
     panel.append(el('button', { className: 'bench-open', type: 'button', icon: 'headset', textContent: t('settings.bench'), onclick: () => game.soundBench?.() }));

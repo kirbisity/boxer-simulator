@@ -2093,6 +2093,10 @@ button.on, .card-choice.on { box-shadow: inset 0 -2px 0 var(--gold); }
 /* The settings' language: two equal halves, each a thumb's height. */
 .lang-seg { display: grid; grid-template-columns: 1fr 1fr; }
 .lang-seg button { min-height: 44px; font-size: 15px; }
+/* The settings' picture quality: three equal parts, and what the one held does. */
+.quality-seg { display: grid; grid-template-columns: repeat(3, 1fr); }
+.quality-seg button { min-height: 44px; font-size: 15px; }
+.quality-note { margin: 0; font-size: 13px; color: var(--muted); }
 
 /* The sound bench and the camera tuner: the same plate as every other panel (corner marks, the book face for heads, the gilt
    rule, mono for measured values). */

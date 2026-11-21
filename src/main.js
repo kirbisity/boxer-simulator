@@ -813,7 +813,11 @@ let last = performance.now();
 const resolution = createAdaptiveResolution();
 // The quality of a stage's picture (levelmode/quality.js): 'auto' (the frame times pick the rung of the ladder: pixels, then tiers), or one held: 'high', 'low'. Remembered.
 let qualityMode = readQuality(typeof localStorage === 'undefined' ? null : localStorage);
-const holdQuality = (view = null) => resolution.pin(qualityMode === 'auto' ? null : pinnedRung(qualityMode, Infinity), view);
+// (A held quality is the town kit's tier too, on a phone as on a desk: the controller only tells it of a change, and a held 'high' never changes.)
+const holdQuality = (view = null) => {
+  tkSetTier(qualityMode === 'auto' ? null : qualityMode);
+  return resolution.pin(qualityMode === 'auto' ? null : pinnedRung(qualityMode, Infinity), view);
+};
 holdQuality();
 // The tier a rung gives goes to the stage's drawing (and, there being none yet, to the one made next: enterStage).
 // (And to the town kit's places, which drop their near detail on the low tier: townkit/place.js.)
@@ -3971,6 +3975,8 @@ const menus = installMenus({
   audio,
   soundBench: () => soundBench.open(),
   hitFeel: { settings: hitFeel.settings, save: () => saveHitFeel(hitFeelStorage, hitFeel.settings) },
+  // The picture's quality (levelmode/quality.js), for the settings: the modes, the one held, and holding another.
+  quality: { modes: QUALITY_MODES, get: () => qualityMode, set: (mode) => boxer.quality(mode) },
 });
 // The sound bench straight from the address (?bench=sound).
 if (/[?&]bench=sound\b/.test(location.search)) soundBench.open();
@@ -4290,6 +4296,7 @@ const boxer = window.boxer = {
       qualityMode = mode;
       writeQuality(typeof localStorage === 'undefined' ? null : localStorage, mode);
       holdQuality(scene);
+      qualitySelect.value = mode;
     }
     return { mode: qualityMode, ...resolution.info(scene) };
   },
