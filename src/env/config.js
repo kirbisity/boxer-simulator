@@ -869,6 +869,8 @@ export const ENV_WEATHER = {
 //   standards, kind }: no tree stands in one but its `standards`, that many tall trees of `kind` (pine if not
 //   given) left standing in it where they fall. Where the sun comes down a ride the floor at its end is lit and the
 //   wood either side is not; the standards' trunks are what bands that light, on the ground and in the air.
+// grass.share (left out: 1): the share of the blades drawn, each widened to cover the same ground: a desert's few
+//   patches of sward are coarse tufts and most of its blades would stand on bare ground at no height.
 // ground.loose, ground.ripple (left out: 0): how loose the bare ground is, 0..1 (dry sand 1: it takes a print), and how
 //   steep the wind's ripples stand on it (a slope; 0 on gravel).
 // woods: 0..1 of the far hills wooded (drawn as colour on the land beyond the last tree), and its colour.
@@ -1159,7 +1161,7 @@ PLACE_ENV.mobei = {
   // Grey-brown gravel and grit with sand blown between the stones: bare over most of it (`wear`), a little loose.
   // (Colours: display values of dry gravel, about a quarter of the light thrown back; approximate.)
   ground: { grass: 0x8a8658, dry: 0xa39a66, soil: 0x9a8a68, rock: 0x6a6258, wear: 1.15, loose: 0.6, ripple: 0.12, paths: [{ points: [[-160, 9], [-50, 2], [0, -3], [60, -5], [170, -16]], width: 2.2, by: 0.9 }], worn: [] },
-  grass: { height: [0.1, 0.2], grazed: 0, kept: 0.3, dry: 0.75, flowers: 0, flowerColours: [] },
+  grass: { height: [0.1, 0.2], grazed: 0, kept: 0.3, dry: 0.75, flowers: 0, flowerColours: [], share: 0.15 },
   rocks: [{ count: 22, from: 28, to: 260, clump: 0.4, size: [0.25, 0.9] }, { count: 520, from: 0, to: 80, clump: 0.3, size: [0.03, 0.11] }],
   trees: [{ kind: 'bunch', count: 900, from: 0, to: 110, clump: 0.55 }, { kind: 'bunch', count: 1400, from: 110, to: 420, clump: 0.6 }, { kind: 'thorn', count: 40, from: 14, to: 160, clump: 0.4 }],
   woods: { cover: 0, colour: 0x6e664e },
@@ -1190,7 +1192,7 @@ PLACE_ENV.carrhae = {
   },
   // (The sand's colour is the arena's own, ground/painted.js sandRaked, a little paler and greyer with flint.)
   ground: { grass: 0x7a8458, dry: 0x969268, soil: 0xc6a672, rock: 0xa89878, wear: 1.3, loose: 1, ripple: 0.22, paths: [], worn: [] },
-  grass: { height: [0.16, 0.26], grazed: 0, kept: 0.3, dry: 0.5, flowers: 0, flowerColours: [] },
+  grass: { height: [0.16, 0.26], grazed: 0, kept: 0.3, dry: 0.5, flowers: 0, flowerColours: [], share: 0.08 },
   rocks: [{ count: 10, from: 30, to: 240, clump: 0.3, size: [0.2, 0.7] }, { count: 360, from: 0, to: 80, clump: 0.3, size: [0.02, 0.08] }],
   trees: [{ kind: 'thorn', count: 260, from: 0, to: 120, clump: 0.35 }, { kind: 'thorn', count: 500, from: 120, to: 460, clump: 0.4 }, { kind: 'bunch', count: 160, from: 0, to: 110, clump: 0.5 }],
   woods: { cover: 0, colour: 0xa8906a },

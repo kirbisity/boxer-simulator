@@ -191,7 +191,8 @@ export function unlinearise(material) {
  *   z  m a point is moved off its surface, along the normal, before it is looked up in the shadow map: a body is
  *      finer than the map's texels, and without it a lit surface shades itself in stripes.
  */
-export const FIGURE_SHADE = { value: new THREE.Vector3(0, 1, 0) };
+// (A plain array: this module is loaded where there is no renderer.)
+export const FIGURE_SHADE = { value: [0, 1, 0] };
 
 const FIGURE_FRAGMENT_PARS = `#include <lights_pars_begin>
 uniform vec3 uFigureShade;

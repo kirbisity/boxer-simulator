@@ -189,6 +189,8 @@ export const tkWeather = {
   // The place's own share of three shared figures (tkSetLook): (TK_WEATHER.shade.street, TK_WEATHER.snow.caught,
   // TK_WEATHER.shade.most).
   uTkLook: { value: null },
+  // The corners' values of the surfaces' noise (tkNoise in the shader).
+  uTkNoiseMap: { value: null },
 };
 
 function tkWeatherInit() {
@@ -200,6 +202,20 @@ function tkWeatherInit() {
   blank.needsUpdate = true;
   tkWeather.uTkLayA.value = blank;
   tkWeather.uTkLayB.value = blank;
+  // (Seeded, so a wall's stains and a roof's snow lie the same at every visit.)
+  const values = new Uint8Array(256 * 256 * 4);
+  let seed = 0x2f6e2b1;
+  for (let at = 0; at < 256 * 256; at += 1) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    values[at * 4] = values[at * 4 + 1] = values[at * 4 + 2] = seed >>> 24;
+    values[at * 4 + 3] = 255;
+  }
+  const noise = new THREE.DataTexture(values, 256, 256, THREE.RGBAFormat);
+  noise.wrapS = noise.wrapT = THREE.RepeatWrapping;
+  noise.minFilter = noise.magFilter = THREE.LinearFilter;
+  noise.generateMipmaps = false;
+  noise.needsUpdate = true;
+  tkWeather.uTkNoiseMap.value = noise;
   tkWeather.uTkLay.value = new THREE.Vector4(0, 0, 1, 1);
   tkWeather.uTkLayH.value = new THREE.Vector3(0, 1, 0);
   tkWeather.uTkAir.value = new THREE.Vector4(0, 0, -1, 1);
@@ -284,6 +300,7 @@ uniform vec4 uTkDirt;
 uniform vec4 uTkLaid;
 uniform sampler2D uTkLayA;
 uniform sampler2D uTkLayB;
+uniform sampler2D uTkNoiseMap;
 uniform vec4 uTkLay;
 uniform vec3 uTkLayH;
 uniform vec4 uTkAir;
@@ -297,11 +314,13 @@ ${KT_SHADOW_PARS}
   const vec4 uKitFlags = vec4(0.0, 2.0, 0.0, 0.0);
   const vec4 uKitLod = vec4(0.0, 0.0, 0.0, 30.0);
 float tkHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// Value noise, one random value a unit cell eased between its corners: read from a sheet of the corners' values
+// (uTkNoiseMap, 256 cells a side, repeating), which the sampler blends as the four hashes were blended by hand. A
+// surface asks for it some forty times a point (snow's lie, its grain, the wet, the stains), and worked out from
+// sines that was most of what a town cost to draw.
 float tkNoise(vec2 p) {
-  vec2 i = floor(p);
   vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  return mix(mix(tkHash(i), tkHash(i + vec2(1.0, 0.0)), f.x), mix(tkHash(i + vec2(0.0, 1.0)), tkHash(i + vec2(1.0, 1.0)), f.x), f.y);
+  return texture2D(uTkNoiseMap, (floor(p) + f * f * (3.0 - 2.0 * f) + 0.5) * ${(1 / 256).toFixed(8)}).r;
 }
 float tkFbm(vec2 p) { return 0.55 * tkNoise(p) + 0.3 * tkNoise(p * 2.3 + 7.1) + 0.15 * tkNoise(p * 5.1 + 3.7); }
 // A foot's print at a ground point (TK_WEATHER.snow.print): 1 on its floor, falling to 0 at its rim; chance: the

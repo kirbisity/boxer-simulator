@@ -236,7 +236,10 @@ function envFill(group, place, view, spec, own) {
 function envApplyTier(state) {
   const quality = ENV.quality[envChosen.tier];
   const parts = state.group.userData.envParts;
-  if (parts.grass) envGrassQuality(parts.grass, quality.grass, quality.far);
+  // (A land that is mostly bare draws a share of the blades, config.js `grass.share`: most of a desert's would stand
+  // at no height on bare ground and still be worked through.)
+  const sward = state.own.grass?.share ?? 1;
+  if (parts.grass) envGrassQuality(parts.grass, quality.grass * sward, quality.far * sward);
   if (parts.trees) envTreesQuality(parts.trees, quality.cards);
   envParticlesSet(parts.particles, state.own.drift, state.weather, quality.particles);
   envAirToUniforms(state.air, state.weather, quality, state.own);
@@ -356,10 +359,11 @@ export function envLeave(view) {
     // (Where the look has been put back already (looks.js resetForLook, before the next place's scenery) it has
     // taken its own map back from every material; otherwise the map the open air found goes back.)
     if (view.steelEnv === view.envSteelOurs) replaceEnvironment(view, view.envSteelWas);
-    FIGURE_SHADE.value.set(0, 1, 0);
     view.envSteelOurs.dispose();
     view.envSteelOurs = null;
   }
+  FIGURE_SHADE.value[0] = 0;
+  FIGURE_SHADE.value[1] = 1;
   envPressForget();
   envUniforms().uEnvOn.value = 0;
   envUniforms().uEnvExposure.value = 1;
@@ -677,7 +681,9 @@ export function envUpdate(view, world, lead = null) {
   state.figureSweep = ((state.figureSweep ?? 0) + 1) % ENV.shadow.figure.every;
   if (state.figureSweep === 1 || view.scene.children.length !== state.figureCount) sweepFigureShade(view.scene);
   state.figureCount = view.scene.children.length;
-  FIGURE_SHADE.value.set(1, ENV.shadow.figure.mirror, (ENV.shadow.figure.off * (shadow.camera.right - shadow.camera.left)) / shadow.mapSize.x);
+  FIGURE_SHADE.value[0] = 1;
+  FIGURE_SHADE.value[1] = ENV.shadow.figure.mirror;
+  FIGURE_SHADE.value[2] = (ENV.shadow.figure.off * (shadow.camera.right - shadow.camera.left)) / shadow.mapSize.x;
   if (parts.beams) envBeamsLook(parts.beams, eye);
   // What stands on the ground, for the shade at its feet and the grass under them: the fighters nearest the camera.
   const bodies = u.uEnvBodies.value;
