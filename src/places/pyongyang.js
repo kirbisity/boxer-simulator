@@ -798,12 +798,14 @@ export const PYONGYANG_WEATHER = {
 // -23.44 x cos(360 / 365 x (39 + 10)) = -15.6 degrees; at an hour angle H, sin(height) = sin 39.0 sin -15.6 +
 // cos 39.0 cos -15.6 cos H, and the bearing west of south A has tan A = sin H / (cos H sin lat - tan dec cos lat)
 // (at three by the sun, H = 45 degrees: 21.1 high, 46.9 west of south; at noon 35.4, due south). The hour is half
-// past three: a low winter sun of 16.6 degrees, 52.9 west of south, under air that lets more of the sky's blue
-// through it pale (the weather below), the light a clear winter day has in its first and last hours. Only an
-// afternoon sun can do it here: the wall's outer face looks west, so a morning sun (in the south-east) leaves the
-// face the ladders climb and the gate's front in their own shade, and throws the wall's shadow out over the field.
+// past eight in the morning: a low winter sun of 16.6 degrees, 52.9 east of south, standing over the town before the
+// men who come at the wall (the wall's outer face looks west, so they look east and a little south into it): the
+// face the ladders climb and the gate's front are in their own shade, the wall's shadow lies out over the field, and
+// the sun comes through the gatehouse, over the parapet and between the roofs behind as light in the snowy air
+// (the user's call, 2026-11-21; the assault itself began in the morning). It was half past three, the mirror of
+// this hour in the south-west, which lit the face square-on and put the sun at the attackers' backs.
 // `azimuth` is the open air's measure (rad: 0 toward +x east, a quarter turn toward +z south).
-const PY_DAY = { latitude: 39.0, declination: -15.6, hour: 15.5 };
+const PY_DAY = { latitude: 39.0, declination: -15.6, hour: 8.5 };
 function pySunAt({ latitude, declination, hour }) {
   const [lat, dec, h] = [latitude, declination, 15 * (hour - 12)].map((degrees) => (degrees * Math.PI) / 180);
   const elevation = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(h));

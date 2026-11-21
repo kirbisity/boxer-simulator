@@ -9,6 +9,8 @@
 // own drag of the view is kept for `holdSeconds`, then eases back. No DOM
 // and no THREE: positions are [x, y, z], angles radians.
 
+import { COLOSSEUM } from './props/arenasize.js';
+
 export const FOLLOW_CAM = {
   // m behind, rad above, m over the hips the view looks, m to the right of him (the view's right).
   distance: 4.2,
@@ -456,8 +458,8 @@ export function createFollowCam(spec = FOLLOW_CAM, { reduced = false } = {}) {
 
 /** Where the camera may stand in a place: inside its walls, if it has any (null: anywhere). */
 export function cameraRoom(place, arena) {
-  // The Colosseum's podium wall is an oval of 10.5 by 7 m; the subway's stair wall stands 0.9 m behind the platform.
-  if (place === 'colosseum') return (x, z) => (x / 10.1) ** 2 + (z / 6.6) ** 2 < 1;
+  // The Colosseum's podium wall is an oval (props/arenasize.js), the camera 0.4 m inside it; the subway's stair wall stands 0.9 m behind the platform.
+  if (place === 'colosseum') return (x, z) => (x / (COLOSSEUM.rx - 0.4)) ** 2 + (z / (COLOSSEUM.rz - 0.4)) ** 2 < 1;
   if (place === 'subway') return (x, z) => z > -(arena.halfZ + 0.9) + 0.3;
   return null;
 }

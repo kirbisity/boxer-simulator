@@ -5,6 +5,7 @@
 // fighters (the `stage` hooks) in the same world and drawing as everywhere
 // else. Skippable at any moment; remembered once seen.
 
+import { COLOSSEUM } from './props/arenasize.js';
 import { FACTIONS } from './outfits.js';
 import { WARRIORS } from './roster.js';
 import { pick, SEP, t, tname } from './i18n.js';
@@ -26,7 +27,7 @@ export const INTRO = {
   // The Colosseum's sand inside the podium wall (m, half-axes, a little in): the camera stays within it,
   // or above the wall's top (`wall`, m) and the seats behind, rising `rise` m for each wall's radius out, by `clear` m.
   // No further out than `seats` of the wall's radius (the outer wall stands there).
-  room: { rx: 10.1, rz: 6.6, wall: 3.6, rise: 8.3, clear: 1.5, seats: 1.5 },
+  room: { rx: COLOSSEUM.rx - 0.4, rz: COLOSSEUM.rz - 0.4, wall: 3.6, rise: 8.3, clear: 1.5, seats: 1.5 },
   // The line-up's camera: the turns off square (rad) and pitches tried, the nearest that sees all
   // from inside the wall taken; it starts `closer`, `crane` lower and `swing` round, and moves to it.
   // Further than `farthest` (m), they are too small to make out: the camera pans along them, `few` in view.

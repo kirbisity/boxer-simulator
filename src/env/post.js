@@ -48,6 +48,9 @@ export function envToneOf(air, weather, place) {
     saturation: grade.saturation,
     warmth: grade.warmth,
     split: grade.split ?? 0,
+    // (A weather's own glare, config.js grade: `bloom` times the lens's, from `bloomFrom` white cards.)
+    bloom: grade.bloom ?? 1,
+    bloomFrom: grade.bloomFrom ?? tune.bloomFrom,
   };
 }
 
@@ -401,7 +404,7 @@ export function envPostDraw(view, tone, level, shafts, air) {
   }
   const levels = post.levels;
   run(post.blur, scene, post.half, 0, tone.exposure, 0, 1);
-  run(post.blur, post.half, levels[0], 0, 0, tune.bloomFrom, 1);
+  run(post.blur, post.half, levels[0], 0, 0, tone.bloomFrom ?? tune.bloomFrom, 1);
   for (let at = 1; at < levels.length; at += 1) run(post.blur, levels[at - 1], levels[at], 0, 0, 0, 1);
   for (let at = levels.length - 1; at > 0; at -= 1) run(post.add, levels[at], levels[at - 1], 1, 0, 0, tune.bloomSpread);
 
@@ -432,7 +435,7 @@ export function envPostDraw(view, tone, level, shafts, air) {
   u.uRange.value.set(camera.near, camera.far, tune.shaftAir);
   u.uSplit.value = tone.split;
   u.uTone.value.set(tone.exposure, tone.contrast, tone.sigma, tone.gain);
-  u.uGrade.value.set(tone.saturation, tone.warmth, tune.bloom, tune.vignette);
+  u.uGrade.value.set(tone.saturation, tone.warmth, tune.bloom * (tone.bloom ?? 1), tune.vignette);
   const tangent = Math.tan((camera.fov * Math.PI) / 360);
   u.uLens.value.set(tangent * camera.aspect, tangent, rays);
   run(post.frame, scene, null);

@@ -1023,7 +1023,9 @@ const PAINTED_GROUND_PLACES = {
     },
   },
   colosseum: {
-    a: 'sandRaked', b: 'sandTrodden', tiles: [1.5, 1.7], bomb: [2, 1], macro: PAINTED_GROUND_SAND_MACRO, match: 0.3,
+    // (Raked all over before the bout: what treads it since is the fighters' own prints, `press` below. A trodden
+    // middle laid by the layout met the raked sand in a smooth dark band where the two were mixed.)
+    a: 'sandRaked', b: 'sandRaked', tiles: [1.5, 1.7], bomb: [2, 1], macro: PAINTED_GROUND_SAND_MACRO, match: 0.3,
     // The rake's furrows and the trodden hollows stand out under a high sun (`relief`: the layers' slopes, as many times
     // over), and the sand takes a print: loose to `press[0]` m (a foot sinks a few centimetres into raked dry sand, far
     // less than into new snow: by eye), its walls' slope drawn `press[1]` times over so so shallow a print still
@@ -1031,8 +1033,8 @@ const PAINTED_GROUND_PLACES = {
     relief: 1.8, press: [0.045, 3.2, 0.2],
     decal: [0.33, 0.13, 0.08, 0.7], decalRough: 0.6,
     layout: (x, z, f, random) => {
-      const ring = Math.hypot(x / 6, z / 4.2) + (f(x * 0.35, z * 0.35, 20) - 0.5) * 0.45;
-      const trodden = 1 - paintedGroundSmooth(0.65, 1.05, ring);
+      // (One layer: nothing is laid as trodden.)
+      const trodden = 0;
       let stain = 0;
       for (const [sx, sz, r] of PAINTED_GROUND_STAINS) {
         const d = Math.hypot(x - sx, z - sz) / r;

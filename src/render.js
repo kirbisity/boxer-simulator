@@ -60,6 +60,7 @@ import { worksOf } from './physics/fieldworks.js';
 import { buildCanalTown, CANAL_TOWN_LIGHT } from './places/canaltown.js';
 import { PLACE_ENV } from './env/config.js';
 import { envDress } from './env/air.js';
+import { COLOSSEUM } from './props/arenasize.js';
 import { buildPyongyang, buildPyongyangTown, PYONGYANG_LIGHT } from './places/pyongyang.js';
 // (The kit's door to the open air: townkit/air.js puts env/'s registration where the kit's places find it.)
 import './townkit/air.js';
@@ -459,7 +460,8 @@ const PLACE_LIGHT = {
 export const PLACE_ARENAS = {
   // `ring`: a sport's ring, with its ropes and rules (fear runs lower there: ai.js fearTarget).
   ring: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true },
-  colosseum: { halfX: 6.5, halfZ: 4.4 },
+  // (The fought ground within the podium wall's oval of 22 by 13 m, props/arenasize.js: twice what it was when the sand was 10.5 by 7.)
+  colosseum: { halfX: 13, halfZ: 8 },
   subway: SUBWAY_ARENA,
   meadow: { halfX: 9, halfZ: 7 },
   stadium: { halfX: WORLD.ringHalf, halfZ: WORLD.ringHalf, ring: true },
@@ -689,8 +691,7 @@ const ARENA_BOUNCE = 0.3;
 
 function buildColosseum() {
   const place = new THREE.Group();
-  const rx = 10.5;
-  const rz = 7;
+  const { rx, rz } = COLOSSEUM;
   const stone = (color, options = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.92, ...options });
   const oval = (geometry) => {
     geometry.scale(rx, 1, rz);
@@ -724,8 +725,7 @@ function buildColosseum() {
   // the arcaded outer wall and attic, the velarium, and the signs of use:
   // grime, stains, repairs, litter in the stands, a rake by a gate (src/props/arena.js).
   const podiumHeight = 3.2;
-  const tiers = 9;
-  const colosseum = arenaColosseum({ rx, rz, podiumHeight, tiers, rise: 0.62, step: 0.075, firstTread: podiumHeight + 0.2 });
+  const colosseum = arenaColosseum({ rx, rz, podiumHeight, tiers: COLOSSEUM.tiers, rise: COLOSSEUM.rise, step: COLOSSEUM.step, firstTread: podiumHeight + 0.2 });
   place.add(colosseum.group);
   // The open air (env/config.js PLACE_ENV.colosseum) is told of the sun's own shadow map: the dust in the air is lit
   // where the rim and the awning let the sun through, and stands in shade where they do not.

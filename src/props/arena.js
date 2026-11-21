@@ -722,12 +722,14 @@ function arenaLinen() {
 // twice the size; this one is about a third of its height), three arcaded
 // storeys of 4.18 m and the attic above. Each arch 1.5 m wide springing at
 // 2.5 m: the real proportion of opening to pier.
-const ARENA_BAYS = 40;
-const ARENA_STOREY = 4.18;
-const ARENA_ARCH = 0.75;
-const ARENA_IMPOST = 2.5;
-const ARENA_ENTABLATURE = 3.66;
-const ARENA_ATTIC = [ARENA_STOREY * 3, 16.0];
+// (Eighty arches round, as the Colosseum has; its storeys are about 10 m each and its wall 48 m: these are about 0.6 of
+// that, on a plan half its size, so the bowl is a little steeper than the real one and the far seats are still seen.)
+const ARENA_BAYS = 80;
+const ARENA_STOREY = 6.2;
+const ARENA_ARCH = 1.1;
+const ARENA_IMPOST = 3.7;
+const ARENA_ENTABLATURE = 5.4;
+const ARENA_ATTIC = [ARENA_STOREY * 3, 23.7];
 
 /**
  * The amphitheatre round an elliptical arena (half-axes rx, rz): the podium
@@ -1090,9 +1092,11 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
   // between them, the sand's middle left open to the sun (as the sources and the paintings have it: an awning over
   // the spectators, not over the fight). The sun comes down through the opening and between the widths, so the arena's
   // dust shows it as one great beam and a fan of lesser ones.
-  const mastTop = 19.3;
+  const mastTop = ARENA_ATTIC[1] + 3.3;
+  // (The ring the widths are drawn out to, over the sand's edge: a little under the wall's top.)
+  const ringHigh = ARENA_ATTIC[1] - 0.4;
   // How many widths, and the share of each bay of them that is sky.
-  const sails = { count: 20, gap: 0.3 };
+  const sails = { count: 40, gap: 0.3 };
   const sailProfile = [];
   for (let k = 0; k <= 6; k += 1) {
     const f = k / 6;
@@ -1103,7 +1107,7 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
       const [bx, bz] = to(t);
       return [ax + (bx - ax) * f, az + (bz - az) * f];
     };
-    sailProfile.push([curve, mastTop - 0.4 - (mastTop - 0.4 - 15.6) * f - 0.7 * Math.sin(Math.PI * f)]);
+    sailProfile.push([curve, mastTop - 0.4 - (mastTop - 0.4 - ringHigh) * f - 0.7 * Math.sin(Math.PI * f)]);
   }
   const ropes = [];
   const turn = (Math.PI * 2) / sails.count;
@@ -1117,7 +1121,7 @@ export function arenaColosseum({ rx, rz, podiumHeight, tiers, rise, step, firstT
     for (const t of [t0, t1]) {
       const [mx, mz] = off(0.12)(t);
       const [ix, iz] = scaled(1.3)(t);
-      ropes.push(mx, mastTop, mz, ix, 15.5, iz);
+      ropes.push(mx, mastTop, mz, ix, ringHigh - 0.1, iz);
     }
   }
 

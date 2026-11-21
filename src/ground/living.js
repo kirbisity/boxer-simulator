@@ -10,6 +10,7 @@
 
 /* global THREE */
 import { BLOOD_DYE_GLSL, bloodDyeShader } from '../blooddye.js';
+import { COLOSSEUM } from '../props/arenasize.js';
 
 /** The one dial: 1 is the full look, 0.5 halves every scatter (grass, flowers, stones, leaves). */
 const LIVING_DENSITY = 1;
@@ -1235,8 +1236,8 @@ function livingDryPlace({ place, view, arena, grounds, rng }) {
 /** The Colosseum: raked sand (rake lines and prints in relief), mounds at the wall foot, a dropped rudis. */
 function livingArenaSand({ arena, grounds, rng }) {
   const group = new THREE.Group();
-  const rx = 10.5;
-  const rz = 7;
+  // (The sand's own oval: props/arenasize.js.)
+  const { rx, rz } = COLOSSEUM;
   const width = 2 * rx;
   const depth = 2 * rz;
   const relief = livingCanvas({ width, depth, pixels: 1280 });
