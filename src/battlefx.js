@@ -247,7 +247,12 @@ void main() {
   vec3 colour = uAlbedo * light * mix(0.78, 1.04, tex.r) + vGlow * uAlbedo;
   // Soot (a fuel fire's smoke, flameview.js): near black.
   colour *= 1.0 - 0.88 * vSoot;
+  // (Under 0 it is dust off the ground, grounddust.js: the pale tan of dry sand and earth, not smoke's white.)
+  if (vSoot < 0.0) colour *= mix(vec3(1.0), vec3(1.0, 0.86, 0.68), min(1.0, -vSoot * 2.0));
   gl_FragColor = vec4(colour, alpha);
+  // (The renderer's curve, as every lit surface has it: under the open air's, which takes a surface's value for light
+  // and exposes it, a puff without it was drawn as it stood, a dark grey cloud over sunlit sand.)
+  #include <tonemapping_fragment>
   #include <fog_fragment>
 }`;
 
@@ -570,7 +575,10 @@ export function battleFxAddFire(view, at, size, colour, tail = null) {
   battleFxOf(view).fires.push({ at, size, colour, tail });
 }
 
-/** A puff of smoke ({ at, velocity, size0, size1, grow, alpha, life, rise?, soot? 0..1 }), with the shots' (the oldest gives way). */
+/**
+ * A puff of smoke ({ at, velocity, size0, size1, grow, alpha, life, rise?, soot? 0..1 }), with the shots' (the oldest gives way).
+ * (`soot` under 0: a paler cloud than smoke, brighter by 0.88 of that share: dust, grounddust.js.)
+ */
 export function battleFxAddPuff(view, puff) {
   const fx = battleFxOf(view);
   puff.shelter ??= battleFxShelter(view, puff.at);

@@ -102,6 +102,7 @@ import { placeFlameTanks, updateFlames } from './flameview.js';
 import { updateClothWind } from './clothwind.js';
 import { envAdapt, envInfo, envSetEnabled, envSetWeather, envUpdate } from './env/index.js';
 import { envDress } from './env/air.js';
+import { updateGroundDust } from './grounddust.js';
 import { mergeFallen } from './fallenview.js';
 import { townfolkFrame, townfolkInfo, townfolkReset } from './townfolkview.js';
 import { disposeObject } from './toon.js';
@@ -1447,6 +1448,8 @@ function drawWorld(dt, drawIt = true) {
   updateWhips(scene, world);
   updateBlood(scene, world, dt * (state.paused ? 0 : state.speed));
   updateFlames(scene, world, world.stage ? resolution.tier ?? 'high' : 'high');
+  // Dust off dry sand and earth where bodies strike and drag across it (grounddust.js).
+  updateGroundDust(scene, world, dt * (state.paused ? 0 : state.speed));
   updateClothWind(scene, world);
   // The canal town's own people (townfolkview.js): about on an ordinary day, indoors or in their doorways once a fight starts.
   townfolkFrame(scene, world, dt * (state.paused ? 0 : state.speed));
