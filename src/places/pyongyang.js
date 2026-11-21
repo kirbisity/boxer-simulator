@@ -804,13 +804,20 @@ export const PYONGYANG_WEATHER = {
 // the sun comes through the gatehouse, over the parapet and between the roofs behind as light in the snowy air
 // (the user's call, 2026-11-21; the assault itself began in the morning). It was half past three, the mirror of
 // this hour in the south-west, which lit the face square-on and put the sun at the attackers' backs.
-// `azimuth` is the open air's measure (rad: 0 toward +x east, a quarter turn toward +z south).
-const PY_DAY = { latitude: 39.0, declination: -15.6, hour: 8.5 };
-function pySunAt({ latitude, declination, hour }) {
+// `turn`: how far the place's +x lies south of east (degrees). The set is not square to the compass: its wall runs
+// 25 degrees off north-south, the outer face looking west-north-west, so the avenue from the gate runs east-south-east
+// and the half-past-eight sun stands 12 degrees to the right of it: almost straight behind the gatehouse for the men
+// before the wall, and behind the roofs at the avenue's end for the men who have come in through the gate (the
+// user's call, 2026-11-21: the sun almost right behind the building from the fighters' side. With the set square to
+// the compass it stood 37 degrees off to the right, over the houses beside the avenue; which way the stretch of wall
+// by this gate faced is not known to me).
+// `azimuth` is the open air's measure (rad: 0 toward +x, a quarter turn toward +z).
+const PY_DAY = { latitude: 39.0, declination: -15.6, hour: 8.5, turn: 25 };
+function pySunAt({ latitude, declination, hour, turn = 0 }) {
   const [lat, dec, h] = [latitude, declination, 15 * (hour - 12)].map((degrees) => (degrees * Math.PI) / 180);
   const elevation = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(h));
   const bearing = Math.atan2(Math.sin(h), Math.cos(h) * Math.sin(lat) - Math.tan(dec) * Math.cos(lat));
-  return { azimuth: Math.PI / 2 + bearing, elevation: (elevation * 180) / Math.PI };
+  return { azimuth: Math.PI / 2 + bearing - (turn * Math.PI) / 180, elevation: (elevation * 180) / Math.PI };
 }
 const PY_SUN = pySunAt(PY_DAY);
 // The same day at other hours, by the same rule (the open air's `days`): eight in the morning, the sun 11.8 degrees
