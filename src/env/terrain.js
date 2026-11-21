@@ -160,7 +160,8 @@ export function envBuildNearMap({ place, height, sun, keepOut, floor, shadows, f
       const lawn = Math.max(grazed > 0 ? 1 - envSmooth(lawnUnder - 0.025, lawnUnder + 0.025, lawnOf(x, z)) : 0, Math.min(1, trodden * 1.5));
       let tall = (1 - (1 - keptShare) * lawn) * (1 - 0.45 * trodden);
       // Bare earth: in the ground's own patches, more of them the more the land is worn and trodden.
-      const bare = Math.min(1, wear + trodden);
+      // (A desert's `wear` runs past 1: over it no patch of the mosaic is left as sward.)
+      const bare = Math.max(Math.min(1, wear + trodden), Math.min(1.5, wear));
       const worn = Math.min(1, envSmooth(0.62 - 0.5 * bare, 0.86 - 0.4 * bare, patch) * (0.4 + 0.6 * envSmooth(0, 0.35, bare)));
       tall *= 1 - 0.85 * worn;
       values[at + 1] = tall;
@@ -399,6 +400,7 @@ uniform vec3 uDry;
 uniform vec3 uSoil;
 uniform vec3 uRock;
 uniform vec3 uWoodsColour;
+uniform vec3 uEnvLoose;
 uniform sampler2D uEnvSkyline;
 varying vec3 vWorld;
 varying vec3 vNormal;
@@ -411,7 +413,8 @@ void main() {
   float distance = length(vWorld - cameraPosition);
   float inMap = envInMap(xz);
   vec4 map = envMap(xz);
-  float worn = map.a * inMap;
+  // (Beyond the near map a land that is mostly bare is drawn bare: a desert has no green horizon.)
+  float worn = mix(uEnvLoose.z, map.a, inMap);
   float shade = mix(vShade, map.b, inMap);
 
   // The grain of the ground at three sizes; the finest fades before it would shimmer.
@@ -439,9 +442,20 @@ void main() {
 
   // Snow lies on what is level, first in the lee of the grain.
   float snow = uEnvWet.y * smoothstep(0.25, 0.6, normal.y - 0.45 + (fine - 0.5) * 0.4 * near + 0.5 * uEnvWet.y) * (1.0 - 0.35 * woods);
+  // Loose dry ground (sand, grit: the place's ground.loose) where it lies bare: it takes a print too, a third as
+  // deep as snow's, and the wind lays it in ripples a hand apart across its way, seen only near (ground/painted.js
+  // draws an arena's sand the same way).
+  float loose = uEnvLoose.x * worn * (1.0 - uEnvWet.x) * step(snow, 0.02);
+  float close = 1.0 - smoothstep(5.0, 16.0, distance);
+  if (loose * close * uEnvLoose.y > 0.0) {
+    vec2 across = normalize(uEnvWind.xy + vec2(1e-4, 0.0));
+    float phase = dot(xz, across) * ${(2 * Math.PI / ENV.terrain.ripple).toFixed(2)} + (medium + fine) * 5.0;
+    normal = normalize(normal - vec3(across.x, 0.0, across.y) * cos(phase) * uEnvLoose.y * loose * close * (0.5 + medium));
+  }
   // Where it has been trodden (press.js): the print's walls turn the light, its packed bed is darker and bluer.
-  vec4 print = snow > 0.02 && near > 0.0 ? envSnowPrint(xz, uEnvWet.y * ${ENV_PRESS.snow.toFixed(3)}) : vec4(0.0);
-  normal = normalize(normal - vec3(print.y, 0.0, print.z) * snow);
+  vec4 print = (snow > 0.02 || loose > 0.0) && near > 0.0 ? envSnowPrint(xz, snow > 0.02 ? uEnvWet.y * ${ENV_PRESS.snow.toFixed(3)} : ${ENV_PRESS.snow.toFixed(3)}) : vec4(0.0);
+  normal = normalize(normal - vec3(print.y, 0.0, print.z) * (snow + loose * ${ENV.terrain.loosePrint[0].toFixed(2)}));
+  colour *= 1.0 - ${ENV.terrain.loosePrint[1].toFixed(2)} * print.w * loose;
   // The sky a print's bed sees: a trench as wide as a sole, as deep as the print (the view factor of its floor).
   float printSky = mix(1.0, ${(ENV_PRESS.sole / 2).toFixed(3)} / sqrt(${((ENV_PRESS.sole / 2) ** 2).toFixed(5)} + print.x * print.x), snow * step(0.0, print.x));
   colour = mix(colour, vec3(${ENV.terrain.snowColour.join(', ')}) * mix(vec3(1.0), vec3(${ENV_PRESS.packedColour.join(', ')}), print.w), snow);
@@ -564,6 +578,7 @@ export function envBuildTerrain({ place, height, sun, map }) {
       uSoil: { value: new THREE.Color(ground.soil) },
       uRock: { value: new THREE.Color(ground.rock) },
       uWoodsColour: { value: new THREE.Color(place.woods.colour) },
+      uEnvLoose: { value: new THREE.Vector3(ground.loose ?? 0, ground.ripple ?? 0, Math.min(1, Math.max(0, ((ground.wear ?? 0) - 0.5) * 2))) },
     },
     lights: true,
     fog: false,

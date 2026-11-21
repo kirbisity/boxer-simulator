@@ -1068,6 +1068,8 @@ const PAINTED_GROUND_PLACES = {
   coastFort: {
     a: 'beachDry', b: 'beachWet', tiles: [1.6, 1.6], bomb: [2, 1], macro: PAINTED_GROUND_SAND_MACRO, match: 0.35,
     wet: [0.55, 0.22, 1, 0.6], env: 1, envSplit: [0.15, 0.55], decal: [0.42, 0.34, 0.24, 0.8], decalRough: 0.8,
+    // (The beach takes a print as the arena's sand does, and its hollows stand out under a low sun.)
+    relief: 1.4, press: [0.045, 3.2, 0.2],
     layout: (x, z, f) => paintedGroundShore(x, z, f, 28),
   },
   coastVillage: {

@@ -1055,7 +1055,8 @@ function buildOpenPlain(key, arena = PLACE_ARENAS[key]) {
   // (Tagged as the field's are, so where the place is drawn as open air its own grass and stones stand in: scenery.js OPEN_AIR.)
   for (const mesh of litter) mesh.userData.scenery = 'litter';
   place.add(...litter);
-  place.add(...spec.props(arena));
+  const props = spec.props(arena);
+  if (props.length) place.add(...props);
   return place;
 }
 
@@ -1156,8 +1157,37 @@ function buildCoast({ fort }) {
     ships.push(ship);
     place.add(ship);
   }
-  place.add(...coastFarPlaneGuard(ships));
+  const guard = coastFarPlaneGuard(ships);
+  place.add(...guard);
+  // Zeelandia joins the open air (env/config.js PLACE_ENV.coastFort): there the camera sees to the horizon, so the
+  // beach runs on inland and along the shore and the sea out to it (drawn only then: under the other looks the
+  // painted band stands for the far sea, and stands down here), and the air is told of the sun's own shadow map.
+  let shown = null;
+  const beyond = [];
+  if (fort) {
+    const farSand = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), lit(0xa8966a));
+    farSand.rotation.x = -Math.PI / 2;
+    farSand.position.set(shoreX - 4500, -0.03, 0);
+    farSand.receiveShadow = true;
+    const farSea = new THREE.Mesh(new THREE.PlaneGeometry(9000, 9000), sea.material);
+    farSea.rotation.x = -Math.PI / 2;
+    farSea.position.set(shoreX + 4500, -0.06, 0);
+    beyond.push(farSand, farSea);
+    for (const mesh of beyond) mesh.visible = false;
+    place.add(...beyond);
+    place.userData.bind = (view) => {
+      shown = view;
+      const shadow = view.lights.sun.shadow;
+      PLACE_ENV.coastFort.sunMap = { matrix: shadow.matrix, texture: () => shadow.map?.texture ?? null };
+    };
+    place.traverse((object) => {
+      for (const material of [].concat(object.material ?? [])) envDress(material);
+    });
+  }
   place.userData.tick = (time) => {
+    const open = Boolean(shown?.env?.on);
+    for (const mesh of beyond) mesh.visible = open;
+    if (fort) guard[1].visible = !open;
     for (const ship of ships) {
       ship.position.y = Math.sin(time * 0.7 + ship.userData.phase) * 0.18;
       ship.rotation.z = Math.sin(time * 0.55 + ship.userData.phase) * 0.03;

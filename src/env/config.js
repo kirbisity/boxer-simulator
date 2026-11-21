@@ -481,6 +481,11 @@ export const ENV = {
     // about a third of the ground; by eye, against a trodden ring after rain: separate pools, not a sheet. With
     // every worn patch one pool and a sheen of 0.5 a rained-on floor was a single dark mirror).
     puddles: 0.4,
+    // Loose dry ground (a place's `ground.loose`): wind ripples `ripple` m from crest to crest (sand ripples run 5
+    // to 15 cm apart: approximate), and a print pressed into it, [how far its walls turn the light against snow's,
+    // how much darker its bed]: a third of snow's depth (ground/painted.js draws an arena's sand at the same figures).
+    ripple: 0.11,
+    loosePrint: [1.0, 0.2],
     // What standing water mirrors: the sky only above what stands round the floor (trees.js envBuildSkyline:
     // `skyline` texels round the compass, tangents up to `skylineMost`, 63 degrees); below that line the wood,
     // at `mirrorWood` of the sky's light on its colour (a crown seen from below and the side is mostly its own
@@ -749,6 +754,11 @@ export const ENV_TREES = {
   // feet do not kill (plantain, dandelion, young dock and thistle: a hand to a forearm across, approximate). Low
   // enough to be trodden through (ENV.trees.underfoot), so it grows on the fought ground as anywhere.
   rosette: { height: [0.14, 0.34], crown: { wide: 0.8, tall: 0.4, at: 0.42 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 1.1, cards: 6, leaf: [0x3a5a22, 0x4a6a2c, 0x2c481e], bark: 0x3a4a26, trunk: 0.02, picture: 'blade' },
+  // What grows on dry open ground, each plant by itself with bare ground between: a bunch of steppe grass gone to
+  // straw, a hand or two high (needlegrass and fescue on the Gobi's edge), and camelthorn, a low grey-green spiny
+  // bush to a man's knee (Alhagi, on the Jazira's plain). Sizes approximate; colours by eye, dry leaf.
+  bunch: { height: [0.16, 0.36], crown: { wide: 0.6, tall: 0.5, at: 0.5 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 1.0, cards: 9, leaf: [0xa89a60, 0x8e8a56, 0xb8a870], bark: 0x7a6e48, trunk: 0.01, picture: 'blade' },
+  thorn: { height: [0.3, 0.6], crown: { wide: 0.7, tall: 0.45, at: 0.5 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 0.7, cards: 10, leaf: [0x7a8458, 0x8a9066, 0x6a744c], bark: 0x6e6648, trunk: 0.012, picture: 'frond' },
   // Bracken and fern: fronds fanning from the foot, to a man's waist or chest.
   bracken: { height: [0.7, 1.5], crown: { wide: 0.55, tall: 0.45, at: 0.5 }, shape: 'tuft', limbs: 1, fork: 1.0, card: 0.9, cards: 8, leaf: [0x3a5622, 0x4c6a2a, 0x2c441e], bark: 0x3a4a26, trunk: 0.01, picture: 'frond' },
   // Autumn broadleaf among the pines (maple, zelkova): the valley's colour in October.
@@ -859,6 +869,8 @@ export const ENV_WEATHER = {
 //   standards, kind }: no tree stands in one but its `standards`, that many tall trees of `kind` (pine if not
 //   given) left standing in it where they fall. Where the sun comes down a ride the floor at its end is lit and the
 //   wood either side is not; the standards' trunks are what bands that light, on the ground and in the air.
+// ground.loose, ground.ripple (left out: 0): how loose the bare ground is, 0..1 (dry sand 1: it takes a print), and how
+//   steep the wind's ripples stand on it (a slope; 0 on gravel).
 // woods: 0..1 of the far hills wooded (drawn as colour on the land beyond the last tree), and its colour.
 // drift: what is in the air on its clear day: [{ kind (ENV.particles), share of its count, colours }].
 //
@@ -921,6 +933,26 @@ export const PLACE_ENV = {
     meter: { sky: 0.6, frame: 0.1 },
     litAt: [0, 45, 0],
     drift: [{ kind: 'motes', share: 1, colours: [0xf2dcae, 0xe6c890] }],
+  },
+  // Fort Zeelandia on its sandbank (it draws itself: render.js buildCoast): the open field's light on a tropical
+  // shore, an hour before sunset over the strait. The fort looked west over the roadstead (Tayouan, by Tainan), so
+  // the sun stands low over the sea to the right of a fight as it is first watched, the brick curtains take it
+  // warm and whole, the men throw long shadows up the beach and the sea glitters toward it. The field's evening is
+  // at 7 degrees in dry air; here a little higher (11) and clearer of cloud, the air a sea haze (14 km: approximate,
+  // a humid coast) that pales the ships and the far shore, and the camera's grade a little richer and warmer than
+  // the field's for brick, sand and blue water against it (by eye).
+  coastFort: {
+    ...ENV_PLACE_PLAIN,
+    own: true,
+    weather: 'clear',
+    weatherHere: { grade: { contrast: 1.4, saturation: 1.08, warmth: 0.05, split: 0.12, bloom: 1.5 } },
+    sun: { azimuth: -0.5, elevation: 11 },
+    air: { visibility: 14000, hazeHeight: 700 },
+    clouds: { cover: 0.3, deck: 1 },
+    ground: { ...ENV_PLACE_PLAIN.ground, albedo: 0.3 },
+    shadowBox: { half: 34, depth: 110, size: 2048 },
+    far: 9000,
+    drift: [{ kind: 'motes', share: 0.3, colours: [0xf2e8d0] }],
   },
   // A village green on the brow of a down late on a summer afternoon under heavy broken cloud, the sun low over the
   // left shoulder: the grass uncut beyond the fence, the land in shade with light crossing it and falling away to
@@ -1098,6 +1130,71 @@ export const PLACE_ENV = {
     woods: { cover: 0.9, colour: 0x2c4430 },
     drift: [{ kind: 'leaves', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }, { kind: 'motes', share: 0.6, colours: [0xfff0c8] }, { kind: 'litter', share: 1, colours: [0xa8642a, 0xb8862e, 0x8a3a22, 0x6a5a2a] }],
   },
+};
+
+// The Gobi's northern edge (Mobei, 119 BC; render.js OPEN_PLAINS.mobei): a gravel plain, level where the armies met and
+// rising in long low swells to dark bare ridges, thin steppe grass in clumps and nothing taller. Its day is the
+// battle's: late in the afternoon a great wind got up and drove sand and gravel into the men's faces until neither
+// army could see the other (Shiji 111; the hour and the wind are the source's, their figures are not: by eye).
+// So the sun stands 22 degrees up ahead and to the left of a fight as it is first watched, through blown dust that
+// hides the ridges and takes the light as the arena's dust does (the colosseum's grade, a little less of each:
+// open ground under a low sun glares less than a bowl of pale sand at midday).
+PLACE_ENV.mobei = {
+  weather: 'dust',
+  weatherHere: { visibility: 1500, hazeHeight: 70, wind: 1.6, gust: 0.3, sun: 0.85, cover: 0.12, shafts: 1.3, fall: { kind: 'dust', share: 0.8 }, grade: { contrast: 1.5, white: 6, saturation: 0.95, warmth: 0.05, split: 0.16, ev: 0.35, bloom: 2.0, bloomFrom: 0.85 } },
+  sun: { azimuth: -2.2, elevation: 22 },
+  air: { visibility: 22000, hazeHeight: 900 },
+  clouds: { cover: 0.15 },
+  // (Under any other weather the sun of a clear mid-afternoon, as the field's.)
+  other: { than: 'dust', sun: { azimuth: -2.2, elevation: 34 }, clouds: { cover: 0.35 } },
+  terrain: {
+    seed: 51,
+    layers: [
+      { from: 1, full: 120, height: 1.6, length: 140, shape: 'roll' },
+      { from: 1, full: 15, height: 0.12, length: 7, shape: 'roll' },
+      { from: 260, full: 1400, height: 34, length: 1100, shape: 'roll' },
+      { from: 2400, full: 6000, height: 420, length: 3400, shape: 'ridge' },
+    ],
+  },
+  // Grey-brown gravel and grit with sand blown between the stones: bare over most of it (`wear`), a little loose.
+  // (Colours: display values of dry gravel, about a quarter of the light thrown back; approximate.)
+  ground: { grass: 0x8a8658, dry: 0xa39a66, soil: 0x9a8a68, rock: 0x6a6258, wear: 1.15, loose: 0.6, ripple: 0.12, paths: [{ points: [[-160, 9], [-50, 2], [0, -3], [60, -5], [170, -16]], width: 2.2, by: 0.9 }], worn: [] },
+  grass: { height: [0.1, 0.2], grazed: 0, kept: 0.3, dry: 0.75, flowers: 0, flowerColours: [] },
+  rocks: [{ count: 22, from: 28, to: 260, clump: 0.4, size: [0.25, 0.9] }, { count: 520, from: 0, to: 80, clump: 0.3, size: [0.03, 0.11] }],
+  trees: [{ kind: 'bunch', count: 900, from: 0, to: 110, clump: 0.55 }, { kind: 'bunch', count: 1400, from: 110, to: 420, clump: 0.6 }, { kind: 'thorn', count: 40, from: 14, to: 160, clump: 0.4 }],
+  woods: { cover: 0, colour: 0x6e664e },
+  drift: [{ kind: 'motes', share: 1, colours: [0xe8d2a4, 0xd8c090] }, { kind: 'litter', share: 0.6, colours: [0xa09058, 0x8a7a4a] }],
+};
+
+// The plain below Harran (Carrhae, June 53 BC; OPEN_PLAINS.carrhae): pale sand and flint gravel, level, treeless and
+// waterless, camelthorn in grey tufts, a few bare hills far off. The legions were brought to battle after noon in
+// the heat, and the Parthian horse raised dust until the Romans could neither see nor speak plainly (Plutarch,
+// Crassus 24 to 25; the hour is his, the figures here by eye): a high sun on pale ground, the arena's light and
+// sand in the open (the colosseum's grade nearly whole), the dust thinner than a bowl holds but a kilometre thick
+// toward the horizon, so the hills are a paler band and the sky near the ground is the ground's colour.
+PLACE_ENV.carrhae = {
+  weather: 'dust',
+  weatherHere: { visibility: 3200, hazeHeight: 60, wind: 0.9, gust: 0.15, sun: 0.95, cover: 0, shafts: 1.2, fall: { kind: 'dust', share: 0.55 }, grade: { contrast: 1.58, white: 6, saturation: 1.0, warmth: 0.04, split: 0.17, ev: 0.35, bloom: 2.4, bloomFrom: 0.82 } },
+  sun: { azimuth: -2.5, elevation: 52 },
+  air: { visibility: 20000, hazeHeight: 900 },
+  clouds: { cover: 0 },
+  other: { than: 'dust', sun: { azimuth: -2.5, elevation: 40 }, clouds: { cover: 0.35 } },
+  terrain: {
+    seed: 67,
+    layers: [
+      { from: 1, full: 140, height: 1.1, length: 170, shape: 'roll' },
+      { from: 1, full: 15, height: 0.1, length: 8, shape: 'roll' },
+      { from: 500, full: 2600, height: 60, length: 1800, shape: 'roll' },
+      { from: 4200, full: 8000, height: 260, length: 4200, shape: 'ridge' },
+    ],
+  },
+  // (The sand's colour is the arena's own, ground/painted.js sandRaked, a little paler and greyer with flint.)
+  ground: { grass: 0x7a8458, dry: 0x969268, soil: 0xc6a672, rock: 0xa89878, wear: 1.3, loose: 1, ripple: 0.22, paths: [], worn: [] },
+  grass: { height: [0.16, 0.26], grazed: 0, kept: 0.3, dry: 0.5, flowers: 0, flowerColours: [] },
+  rocks: [{ count: 10, from: 30, to: 240, clump: 0.3, size: [0.2, 0.7] }, { count: 360, from: 0, to: 80, clump: 0.3, size: [0.02, 0.08] }],
+  trees: [{ kind: 'thorn', count: 260, from: 0, to: 120, clump: 0.35 }, { kind: 'thorn', count: 500, from: 120, to: 460, clump: 0.4 }, { kind: 'bunch', count: 160, from: 0, to: 110, clump: 0.5 }],
+  woods: { cover: 0, colour: 0xa8906a },
+  drift: [{ kind: 'motes', share: 1, colours: [0xf2dcae, 0xe6c890] }],
 };
 
 // The hills by the Hun River (Sarhu, 1619; the story's Liaodong battles of 1593 to 1621): the open field as it is, its
